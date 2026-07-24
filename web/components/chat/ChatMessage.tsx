@@ -9,7 +9,6 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
-import { postFeedback } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
@@ -33,7 +32,9 @@ type ChatMessageProps = {
   conversationId?: string | null;
   isGuest?: boolean;
   canSaveDecision?: boolean;
-  onDecisionUnavailable?: () => void;
+  onDecisionUnavailable?: (artifactId: string) => void;
+  resumeDecisionArtifactId?: string | null;
+  onDecisionResumeHandled?: () => void;
 };
 
 export default function ChatMessage({
@@ -47,6 +48,8 @@ export default function ChatMessage({
   isGuest = false,
   canSaveDecision = true,
   onDecisionUnavailable,
+  resumeDecisionArtifactId,
+  onDecisionResumeHandled,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
@@ -115,13 +118,6 @@ export default function ChatMessage({
       setRating(null);
     } else {
       setRating(newRating);
-      // First, post the basic rating
-      postFeedback({
-        type: "general",
-        message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down",
-        context: feedbackContext({ rating: newRating })
-      });
-      // Then, open the detailed feedback dialog
       onFeedback?.("rating", feedbackContext(), newRating);
     }
   };
@@ -265,6 +261,8 @@ export default function ChatMessage({
                 onAction={onAction}
                 canSaveDecision={canSaveDecision}
                 onDecisionUnavailable={onDecisionUnavailable}
+                resumeDecisionArtifactId={resumeDecisionArtifactId}
+                onDecisionResumeHandled={onDecisionResumeHandled}
               />
               {isGuest ? <GuestArtifactHint kind="result" /> : null}
               {displayContent && (

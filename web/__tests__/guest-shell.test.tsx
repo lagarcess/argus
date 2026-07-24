@@ -51,6 +51,38 @@ describe("guest shell contract", () => {
     expect(sidebar).toMatch(/showProfileMenu[\s\S]{0,500}<ProfileMenu/);
   });
 
+  test("keeps guest Recents owner-scoped with truthful expiry and sign-in copy", () => {
+    const sidebar = source("components/sidebar/ChatSidebar.tsx");
+    const chat = source("components/chat/ChatInterface.tsx");
+
+    expect(chat).toContain("isGuest={isGuest}");
+    expect(sidebar).toContain("item.expires_at");
+    expect(sidebar).toContain('"guest.history.keep_history"');
+    expect(sidebar).toContain('"guest.history.expires_at"');
+  });
+
+  test("scopes guest search to the current workspace with honest discovery truth", () => {
+    const chat = source("components/chat/ChatInterface.tsx");
+    const palette = source("components/sidebar/ChatCommandPalette.tsx");
+    const en = JSON.parse(source("public/locales/en/common.json"));
+    const es = JSON.parse(source("public/locales/es-419/common.json"));
+
+    expect(chat).toContain("isGuest={isGuest}");
+    expect(chat).toContain(
+      "groundedDiscoveryAvailable={canUseGroundedDiscovery}",
+    );
+    expect(chat).toContain("canManageConversation={canManageConversation}");
+    expect(palette).toContain("if (isGuest) return;");
+    expect(palette).toContain("groundedDiscoveryAvailable");
+    expect(palette).toContain('"command_palette.guest.discovery_unavailable"');
+    expect(en.command_palette.guest.discovery_unavailable).toBe(
+      "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet.",
+    );
+    expect(es.command_palette.guest.discovery_unavailable).toBe(
+      "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible.",
+    );
+  });
+
   test("keeps the temporary-chat notice beneath the composer and out of the sidebar", () => {
     const chat = source("components/chat/ChatInterface.tsx");
     const sidebar = source("components/sidebar/ChatSidebar.tsx");

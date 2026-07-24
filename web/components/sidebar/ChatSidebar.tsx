@@ -85,6 +85,7 @@ export type ChatSidebarProps = {
   omnisearchEnabled?: boolean;
   canManageConversation?: boolean;
   showProfileMenu?: boolean;
+  isGuest?: boolean;
 };
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
@@ -175,8 +176,9 @@ export default function ChatSidebar({
   omnisearchEnabled = false,
   canManageConversation = true,
   showProfileMenu = true,
+  isGuest = false,
 }: ChatSidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -591,6 +593,24 @@ export default function ChatSidebar({
                                 }`}>
                                   {item.subtitle}
                                 </span>
+                                {isGuest && item.expires_at ? (
+                                  <time
+                                    dateTime={item.expires_at}
+                                    title={item.expires_at}
+                                    className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
+                                  >
+                                    {t("guest.history.expires_at", {
+                                      defaultValue: "Available until {{date}}",
+                                      date: new Intl.DateTimeFormat(
+                                        i18n.resolvedLanguage ?? i18n.language,
+                                        {
+                                          dateStyle: "medium",
+                                          timeStyle: "short",
+                                        },
+                                      ).format(new Date(item.expires_at)),
+                                    })}
+                                  </time>
+                                ) : null}
                               </>
                             )}
                           </div>
@@ -620,6 +640,14 @@ export default function ChatSidebar({
                       )}
                     </div>
                   )}
+                  {isGuest ? (
+                    <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
+                      {t(
+                        "guest.history.keep_history",
+                        "Sign in to keep your history",
+                      )}
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>

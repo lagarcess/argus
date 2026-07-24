@@ -62,7 +62,9 @@ def guest_capabilities() -> AccountCapabilities:
         can_manage_conversation=False,
         can_save_decision=False,
         can_manage_account=False,
-        can_use_omnisearch=False,
+        can_use_omnisearch=True,
+        can_search_current_workspace=True,
+        can_use_grounded_discovery=False,
         can_submit_feedback=True,
     )
 
@@ -74,6 +76,8 @@ def registered_capabilities() -> AccountCapabilities:
         can_save_decision=True,
         can_manage_account=True,
         can_use_omnisearch=True,
+        can_search_current_workspace=True,
+        can_use_grounded_discovery=False,
         can_submit_feedback=True,
     )
 

@@ -352,6 +352,28 @@ class GuestAccountPersistenceMixin:
             raise RuntimeError("Failed to replace guest conversation.")
         return Conversation.model_validate(row)
 
+    def replace_guest_conversation(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        title_source: str,
+        language: str,
+    ) -> Conversation:
+        result = self.client.rpc(
+            "replace_guest_conversation",
+            {
+                "p_user_id": user_id,
+                "p_title": title,
+                "p_title_source": title_source,
+                "p_language": language,
+            },
+        ).execute()
+        row = _row_one(result)
+        if row is None:
+            raise RuntimeError("Failed to replace guest conversation.")
+        return Conversation.model_validate(row)
+
     def claim_expired_guest_workspaces(
         self,
         *,

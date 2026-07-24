@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
+from argus.api.guest_access import account_context
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     DecisionState,
@@ -41,6 +42,7 @@ def search(
     include_ledger_groups: bool = Query(False),  # noqa: B008
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedSearch:
+    context = account_context(request)
     query = q.strip().lower()
     # An empty query is allowed when filtering by decision_state (browse the
     # ledger, e.g. "show my promising ideas"); otherwise it returns nothing.
@@ -57,6 +59,28 @@ def search(
     else:
         scored_items.extend(scored_memory_search_items(user=user, query=query))
 
+    if context.kind == "guest":
+        workspace_conversation_id: str | None = None
+        if api_state.supabase_gateway is not None:
+            workspace = api_state.supabase_gateway.get_active_guest_workspace(
+                user_id=user.id,
+                at=datetime.now(timezone.utc),
+            )
+            workspace_conversation_id = (
+                workspace.conversation_id if workspace is not None else None
+            )
+        scored_items = [
+            pair
+            for pair in scored_items
+            if workspace_conversation_id is not None
+            and pair[1].type
+            in {"chat", "run", "backtest", "idea", "evidence", "decision"}
+            and (
+                (pair[1].type == "chat" and pair[1].id == workspace_conversation_id)
+                or pair[1].conversation_id == workspace_conversation_id
+            )
+        ]
+
     scored_items.sort(
         key=lambda pair: search_rank_key(
             score=pair[0],
@@ -67,7 +91,11 @@ def search(
         reverse=True,
     )
     ledger_groups = (
-        _ledger_groups_from_items(scored_items) if include_ledger_groups else None
+        []
+        if context.kind == "guest" and include_ledger_groups
+        else _ledger_groups_from_items(scored_items)
+        if include_ledger_groups
+        else None
     )
     if decision_state is not None:
         # Idea Ledger: narrow recall to ideas carrying the requested decision_state.
@@ -148,9 +176,7 @@ def search(
 def _ledger_groups_from_items(
     scored_items: list[tuple[int, SearchItem]],
 ) -> list[SearchLedgerGroup]:
-    counts: dict[DecisionState, int] = {
-        state: 0 for state in LEDGER_DECISION_STATE_ORDER
-    }
+    counts: dict[DecisionState, int] = {state: 0 for state in LEDGER_DECISION_STATE_ORDER}
     for _, item in scored_items:
         if item.type != "idea" or item.decision_state not in counts:
             continue

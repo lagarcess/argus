@@ -29,6 +29,8 @@ export type AccountCapabilities = {
   can_save_decision: boolean;
   can_manage_account: boolean;
   can_use_omnisearch: boolean;
+  can_search_current_workspace: boolean;
+  can_use_grounded_discovery: boolean;
   can_submit_feedback: boolean;
 };
 

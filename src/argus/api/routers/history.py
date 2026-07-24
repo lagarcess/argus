@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
+from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
@@ -30,6 +31,42 @@ def history(
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedHistory:
+    context = account_context(request)
+    if context.kind == "guest":
+        if api_state.supabase_gateway is None:
+            return PaginatedHistory(items=[], next_cursor=None)
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=user.id,
+            at=datetime.now(timezone.utc),
+        )
+        if workspace is None or workspace.conversation_id is None:
+            return PaginatedHistory(items=[], next_cursor=None)
+        conversation = api_state.supabase_gateway.get_conversation(
+            user_id=user.id,
+            conversation_id=workspace.conversation_id,
+        )
+        if (
+            conversation is None
+            or conversation.deleted_at is not None
+            or conversation.archived is not archived
+            or deleted
+        ):
+            return PaginatedHistory(items=[], next_cursor=None)
+        return PaginatedHistory(
+            items=[
+                HistoryItem(
+                    type="chat",
+                    id=conversation.id,
+                    title=conversation.title,
+                    subtitle=conversation.last_message_preview or "No messages yet",
+                    pinned=False,
+                    created_at=conversation.updated_at,
+                    conversation_id=conversation.id,
+                    expires_at=workspace.expires_at,
+                )
+            ],
+            next_cursor=None,
+        )
     if api_state.supabase_gateway is not None:
         raw = api_state.supabase_gateway.list_history_rows(
             user_id=user.id,

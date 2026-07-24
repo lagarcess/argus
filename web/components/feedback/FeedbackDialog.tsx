@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { postFeedback } from "@/lib/argus-api";
+import { feedbackContextForSubmission } from "@/lib/feedback-context";
 
 type FeedbackType = "bug" | "feature" | "general" | "rating";
 
@@ -52,7 +53,8 @@ export default function FeedbackDialog({
   const [steps, setSteps] = useState("");
   const [expected, setExpected] = useState("");
   const [actual, setActual] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [includeConversationContext, setIncludeConversationContext] =
+    useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +72,7 @@ export default function FeedbackDialog({
     setSteps("");
     setExpected("");
     setActual("");
-    setConsent(false);
+    setIncludeConversationContext(false);
     setFiles([]);
     setSelectedTags([]);
     setIsSubmitting(false);
@@ -142,7 +144,6 @@ export default function FeedbackDialog({
 
   const canSubmit = () => {
     if (isRating) return selectedTags.length > 0 || message.trim().length > 0;
-    if (!consent) return false;
     if (isBug) return bugTitle.trim().length > 0 && steps.trim().length > 0;
     return message.trim().length > 0;
   };
@@ -196,15 +197,12 @@ export default function FeedbackDialog({
         message:
           finalMessage ||
           (isRating ? t("feedback.rating_message_fallback", "{{rating}} rating with tags", { rating }) : ""),
-        context: {
-          ...context,
+        context: feedbackContextForSubmission(context, {
+          includeConversationContext,
           rating,
           tags: selectedTags,
-          url: typeof window !== "undefined" ? window.location.href : undefined,
-          timestamp: new Date().toISOString(),
-          hasAttachments: files.length > 0,
           attachmentCount: files.length,
-        },
+        }),
       });
       setIsSuccess(true);
       setTimeout(() => onClose(), 2000);
@@ -489,28 +487,25 @@ export default function FeedbackDialog({
                 </div>
               )}
 
-              {!isRating && (
+              {hasConversationContext && (
                 <div className="mt-1 flex items-start gap-3">
                   <input
-                    id="consent"
+                    id="include-conversation-context"
                     type="checkbox"
-                    checked={consent}
-                    onChange={(event) => setConsent(event.target.checked)}
+                    checked={includeConversationContext}
+                    onChange={(event) =>
+                      setIncludeConversationContext(event.target.checked)
+                    }
                     className="mt-0.5 h-4 w-4 accent-[#4f55f1]"
                   />
                   <label
-                    htmlFor="consent"
+                    htmlFor="include-conversation-context"
                     className="cursor-pointer select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
                   >
-                    {isFeature
-                      ? t(
-                          "feedback.consent_feature",
-                          "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
-                        )
-                      : t(
-                          "feedback.consent",
-                          "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
-                        )}
+                    {t(
+                      "feedback.include_conversation_context",
+                      "Include approved context from this conversation",
+                    )}
                   </label>
                 </div>
               )}
@@ -523,14 +518,14 @@ export default function FeedbackDialog({
               )}
 
               <p className="text-[12px] leading-relaxed text-black/45 dark:text-white/45">
-                {hasConversationContext
+                {hasConversationContext && includeConversationContext
                   ? t(
                       "feedback.footer_note_conversation",
-                      "Your current conversation context may be included to help us understand this feedback.",
+                      "Approved conversation identifiers will be included. The transcript is not attached.",
                     )
                   : t(
                       "feedback.footer_note",
-                      "App context like this page and timestamp may be included to help us understand this feedback.",
+                      "No conversation transcript or contact information is attached.",
                     )}{" "}
                 <button
                   type="button"

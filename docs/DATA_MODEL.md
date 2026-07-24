@@ -188,6 +188,12 @@ Server-owned policy record for one temporary anonymous identity.
   server-admin Auth deletion removes the remaining owner-scoped product rows.
   Privacy-safe append-only cost and route/security evidence may retain nullable
   attribution; transcript-bearing state may not.
+- Guest Start over is one service-owned transaction. It locks the workspace,
+  validates the complete conversation-owned graph, removes that graph and its
+  checkpoint thread, and binds one new empty conversation to the same
+  workspace. It does not replace the Auth identity, move `expires_at`, or reset
+  any lifetime allowance or feedback counter. Append-only cost, route, security,
+  and audit evidence is not rewritten.
 
 ---
 

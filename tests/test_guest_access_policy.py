@@ -128,7 +128,9 @@ def test_verified_anonymous_auth_truth_owns_guest_status_and_capabilities(
         "can_manage_conversation": False,
         "can_save_decision": False,
         "can_manage_account": False,
-        "can_use_omnisearch": False,
+        "can_use_omnisearch": True,
+        "can_search_current_workspace": True,
+        "can_use_grounded_discovery": False,
         "can_submit_feedback": True,
     }
     gateway.private_alpha_email_allowed.assert_not_called()
@@ -159,7 +161,13 @@ def test_registered_auth_truth_ignores_editable_anonymous_metadata() -> None:
     assert response.status_code == 200
     assert response.json()["account_kind"] == "registered"
     assert response.json()["guest"] is None
-    assert all(response.json()["capabilities"].values())
+    capabilities = response.json()["capabilities"]
+    assert capabilities["can_use_grounded_discovery"] is False
+    assert all(
+        enabled
+        for name, enabled in capabilities.items()
+        if name != "can_use_grounded_discovery"
+    )
 
 
 def test_account_context_requires_current_user_to_establish_verified_truth() -> None:

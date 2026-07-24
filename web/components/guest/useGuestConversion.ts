@@ -6,6 +6,8 @@ import {
   claimGuestHandoff,
   createGuestHandoff,
   linkGuestIdentity,
+} from "@/lib/guest-api";
+import {
   loginWithEmail,
 } from "@/lib/argus-api";
 import type { UserResponse } from "@/lib/guest-account";

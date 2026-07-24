@@ -140,6 +140,168 @@ def test_replacing_empty_conversation_preserves_identity_expiry_and_counters() -
             cursor.execute("delete from auth.users where id = %s", (user_id,))
 
 
+def test_start_over_replaces_complete_graph_but_preserves_guest_policy() -> None:
+    with _connect() as connection:
+        user_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
+        run_id = str(uuid.uuid4())
+        idea_id = str(uuid.uuid4())
+        version_id = str(uuid.uuid4())
+        evidence_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).replace(microsecond=0)
+        expires_at = created_at + timedelta(days=7)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id, email, is_anonymous)"
+                " values (%s, null, true)",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.profiles (id, email) values (%s, null)",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.guest_workspaces"
+                " (user_id, created_at, expires_at) values (%s, %s, %s)",
+                (user_id, created_at, expires_at),
+            )
+            cursor.execute(
+                "insert into public.conversations (id,user_id,title)"
+                " values (%s,%s,'temporary result')",
+                (conversation_id, user_id),
+            )
+            cursor.execute(
+                "insert into public.messages (conversation_id,user_id,role,content)"
+                " values (%s,%s,'user','test BTC')",
+                (conversation_id, user_id),
+            )
+            cursor.execute(
+                "insert into public.backtest_runs"
+                " (id,user_id,conversation_id,status,asset_class,symbols,"
+                "  benchmark_symbol,config_snapshot,conversation_result_card)"
+                " values (%s,%s,%s,'completed','crypto',array['BTC'],'BTC',"
+                " '{}'::jsonb,'{}'::jsonb)",
+                (run_id, user_id, conversation_id),
+            )
+            cursor.execute(
+                "insert into public.ideas"
+                " (id,user_id,source_conversation_id,title)"
+                " values (%s,%s,%s,'BTC idea')",
+                (idea_id, user_id, conversation_id),
+            )
+            cursor.execute(
+                "insert into public.idea_versions"
+                " (id,user_id,idea_id,source_conversation_id,source_run_id,"
+                "  title,canonical_spec,strategy_snapshot)"
+                " values (%s,%s,%s,%s,%s,'BTC idea','{}'::jsonb,'{}'::jsonb)",
+                (version_id, user_id, idea_id, conversation_id, run_id),
+            )
+            cursor.execute(
+                "update public.ideas set active_version_id=%s where id=%s",
+                (version_id, idea_id),
+            )
+            cursor.execute(
+                "insert into public.evidence_artifacts"
+                " (id,user_id,idea_id,idea_version_id,source_conversation_id,"
+                "  source_run_id,title)"
+                " values (%s,%s,%s,%s,%s,%s,'BTC result')",
+                (
+                    evidence_id,
+                    user_id,
+                    idea_id,
+                    version_id,
+                    conversation_id,
+                    run_id,
+                ),
+            )
+            cursor.execute(
+                "insert into public.decision_notes"
+                " (user_id,idea_id,idea_version_id,evidence_artifact_id,"
+                "  source_conversation_id,decision_state)"
+                " values (%s,%s,%s,%s,%s,'watching')",
+                (user_id, idea_id, version_id, evidence_id, conversation_id),
+            )
+            cursor.execute(
+                "insert into public.usage_counters"
+                " (user_id,resource,period,period_start,period_end,"
+                "  used_count,limit_count)"
+                " values (%s,'chat_messages','guest_session',%s,%s,4,10)",
+                (user_id, created_at, expires_at),
+            )
+            cursor.execute(
+                "insert into public.checkpoints"
+                " (thread_id,checkpoint_ns,checkpoint_id,checkpoint)"
+                " values (%s,'','checkpoint-start-over','{}'::jsonb)",
+                (conversation_id,),
+            )
+
+            cursor.execute(
+                "select id::text from public.replace_guest_conversation("
+                "%s,'New idea','system_default','en')",
+                (user_id,),
+            )
+            replacement_id = cursor.fetchone()[0]
+            cursor.execute(
+                "select conversation_id::text,created_at,expires_at"
+                " from public.guest_workspaces where user_id=%s",
+                (user_id,),
+            )
+            workspace = cursor.fetchone()
+            cursor.execute(
+                "select used_count from public.usage_counters"
+                " where user_id=%s and resource='chat_messages'"
+                " and period='guest_session'",
+                (user_id,),
+            )
+            used_count = cursor.fetchone()[0]
+            counts = {}
+            for table in (
+                "messages",
+                "backtest_runs",
+                "ideas",
+                "idea_versions",
+                "evidence_artifacts",
+                "decision_notes",
+            ):
+                cursor.execute(
+                    f"select count(*) from public.{table} where user_id=%s",
+                    (user_id,),
+                )
+                counts[table] = cursor.fetchone()[0]
+            cursor.execute(
+                "select count(*) from public.checkpoints where thread_id=%s",
+                (conversation_id,),
+            )
+            checkpoint_count = cursor.fetchone()[0]
+            cursor.execute(
+                "select count(*) from public.conversations where user_id=%s",
+                (user_id,),
+            )
+            conversation_count = cursor.fetchone()[0]
+            cursor.execute(
+                "select is_anonymous from auth.users where id=%s",
+                (user_id,),
+            )
+            is_anonymous = cursor.fetchone()[0]
+
+        assert replacement_id != conversation_id
+        assert workspace == (replacement_id, created_at, expires_at)
+        assert used_count == 4
+        assert counts == {
+            "messages": 0,
+            "backtest_runs": 0,
+            "ideas": 0,
+            "idea_versions": 0,
+            "evidence_artifacts": 0,
+            "decision_notes": 0,
+        }
+        assert checkpoint_count == 0
+        assert conversation_count == 1
+        assert is_anonymous is True
+        with connection.cursor() as cursor:
+            cursor.execute("delete from auth.users where id=%s", (user_id,))
+
+
 def test_cleanup_dry_run_is_bounded_and_changes_nothing() -> None:
     with _connect() as connection:
         guest = _seed_expired_guest(connection)

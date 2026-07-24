@@ -55,7 +55,9 @@ function guestMe() {
       can_manage_conversation: false,
       can_save_decision: false,
       can_manage_account: false,
-      can_use_omnisearch: false,
+      can_use_omnisearch: true,
+      can_search_current_workspace: true,
+      can_use_grounded_discovery: false,
       can_submit_feedback: true,
     },
   };

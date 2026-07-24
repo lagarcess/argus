@@ -19,18 +19,16 @@ import StarterActions from "@/components/chat/StarterActions";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
+import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
+import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
-import GuestConversionModal from "@/components/guest/GuestConversionModal";
-import { useGuestConversion } from "@/components/guest/useGuestConversion";
-import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
+import { useGuestExperience, useGuestSendBridge, type GuestResumeSend } from "@/components/guest/useGuestExperience";
 import { useAccount, useAccountRefresh } from "@/lib/account-context";
-import type { GuestPendingAction } from "@/lib/guest-conversion";
 import {
   createConversation,
   deleteConversation,
   getBacktestJob,
   getBacktestRun,
-  getMe,
   getConversationMessages,
   listConversations,
   listHistory,
@@ -148,6 +146,7 @@ type View = "chat" | "strategies" | "settings";
 type SendOptions = {
   renderUserMessage?: boolean;
   replacementAssistantId?: string;
+  bypassGuestGate?: boolean;
 };
 type OnboardingChoice = {
   goal: PrimaryGoal;
@@ -670,7 +669,6 @@ export default function ChatInterface() {
   }>({ isOpen: false, type: "general" });
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("collapsed");
   const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] = useState(false);
-
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -679,6 +677,7 @@ export default function ChatInterface() {
   const activeConversationIdRef = useRef<string | null>(null);
   const activeStreamConversationIdRef = useRef<string | null>(null);
   const hasAcceptedUserInputRef = useRef(false);
+  const guestSendRef = useRef<GuestResumeSend | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -777,15 +776,18 @@ export default function ChatInterface() {
     }
   }, [clearConversationAttention, conversationId, currentView]);
 
-  const resetToEmptyChatSurface = useCallback(() => {
-    retireActiveStreamForNavigation(null);
-    const clearedRoute = clearActiveConversationPointer();
-    if (clearedRoute) {
-      router.replace(clearedRoute, { scroll: false });
+  const resetToEmptyChatSurface = useCallback((nextConversationId: string | null = null) => {
+    retireActiveStreamForNavigation(nextConversationId);
+    if (nextConversationId) {
+      rememberActiveConversationId(nextConversationId);
+    } else {
+      const clearedRoute = clearActiveConversationPointer();
+      if (clearedRoute) router.replace(clearedRoute, { scroll: false });
     }
-    activeConversationIdRef.current = null;
+    activeConversationIdRef.current = nextConversationId;
+    hasAcceptedUserInputRef.current = false;
     currentViewRef.current = "chat";
-    setConversationId(null);
+    setConversationId(nextConversationId);
     setMessages([]);
     setInputActions([]);
     setStreamStatus(null);
@@ -1180,93 +1182,45 @@ export default function ChatInterface() {
 
   // ── Start new chat ─────────────────────────────────────────────────────────
 
-  const startNewChat = useCallback(async () => {
-    resetToEmptyChatSurface();
-    closeTransientSidebar();
-    try {
-      const me = await getMe();
-      const stage = me.user.onboarding.stage;
-      setShowOnboardingGoalCards(
-        me.account_kind !== "guest" &&
-        privateAlphaOnboardingEnabled &&
-        (stage === "language_selection" || stage === "primary_goal_selection"),
-      );
-    } catch {
-      setShowOnboardingGoalCards(false);
-    }
-    void refreshHistory();
-    return null;
-  }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
+  const {
+    startNewChat, adoptGuestConversation, handleConversationRemoved,
+    handleAllConversationsDeleted,
+  } = useChatSurfaceLifecycle({
+    conversationId,
+    setHistoryItems,
+    setShowOnboardingGoalCards,
+    resetToEmptyChatSurface,
+    closeTransientSidebar,
+    refreshHistory,
+  });
 
-  const resumeGuestAction = useCallback(
-    async (_action: GuestPendingAction) => {
-      void _action;
-      void refreshHistory();
-    },
-    [refreshHistory],
-  );
-  const guestConversion = useGuestConversion({
+  const guestExperience = useGuestExperience({
     account,
     conversationId,
+    messages,
+    sendRef: guestSendRef,
     refreshAccount,
-    onResume: resumeGuestAction,
-  });
-
-  const {
-    isGuest,
-    canManageConversation,
-    canSaveDecision,
-    canUseOmnisearch,
-    requestGuestDecision,
-    requestGuestFeedback,
-    requestGuestSignIn,
-    requestNewChat,
-    requestOmnisearch,
-  } = useGuestShellActions({
-    account,
-    hasConversation: messages.length > 0 || conversationId !== null,
+    refreshHistory,
     closeTransientSidebar,
+    startNewChat,
     onOpenFeedback: () =>
       setFeedbackState({
-        isOpen: true,
-        type: "general",
-        context: {
-          surface: "guest_header",
-          conversation_id: conversationId,
-        },
+        isOpen: true, type: "general",
+        context: { surface: "guest_header", conversation_id: conversationId },
       }),
-    onNewChat: startNewChat,
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
-    onRequestSignIn: () =>
-      guestConversion.requestConversion(
-        "keep_history",
-        conversationId
-          ? {
-              reason: "keep_history",
-              conversationId,
-              actionId: crypto.randomUUID(),
-            }
-          : null,
-      ),
+    onAdoptConversation: adoptGuestConversation,
+    onGateError: () => showToast(t("chat.error_generic")),
+    onStartOverError: () => showToast(t("guest.new_conversation.error",
+      "The temporary chat was left unchanged.")),
     omnisearchShortcutEnabled: omnisearchEnabled,
-    showToast,
   });
-
-  const handleConversationRemoved = useCallback((removedConversationId: string) => {
-    setHistoryItems((prev) =>
-      prev.filter((item) => !historyItemBelongsToConversation(item, removedConversationId)),
-    );
-    refreshHistory();
-    if (removedConversationId !== conversationId) return;
-    resetToEmptyChatSurface();
-  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
-
-  const handleAllConversationsDeleted = useCallback(() => {
-    setHistoryItems([]);
-    refreshHistory();
-    if (conversationId === null) return;
-    resetToEmptyChatSurface();
-  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
+  const {
+    isGuest, canManageConversation, canSaveDecision, canUseOmnisearch,
+    canUseGroundedDiscovery, requestGuestDecision, requestGuestFeedback,
+    requestGuestSignIn, requestNewChat, requestOmnisearch,
+    resumeDecisionArtifactId, clearResumeDecision,
+  } = guestExperience;
 
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
@@ -1301,11 +1255,17 @@ export default function ChatInterface() {
     options?: SendOptions,
   ) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    if (isStreamingResponse) return;
-    hasAcceptedUserInputRef.current = true;
+    if (!trimmed) return false;
+    if (isStreamingResponse) return false;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
+    if (
+      !options?.bypassGuestGate &&
+      !(await guestExperience.admitSend({ text: trimmed, mentions, action }))
+    ) {
+      return false;
+    }
+    hasAcceptedUserInputRef.current = true;
     const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;
     const routeState = readActiveConversationRouteState();
     let targetConversationId = targetConversationIdForSend({
@@ -1331,7 +1291,7 @@ export default function ChatInterface() {
       } catch (err) {
         console.error("Failed to start conversation before sending:", err);
         showToast(t('chat.error_generic'));
-        return;
+        return false;
       }
     }
 
@@ -1346,11 +1306,11 @@ export default function ChatInterface() {
       } catch (err) {
         console.error("Failed to start conversation before sending:", err);
         showToast(t('chat.error_generic'));
-        return;
+        return false;
       }
     }
 
-    if (!targetConversationId) return;
+    if (!targetConversationId) return false;
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1696,9 +1656,10 @@ export default function ChatInterface() {
       );
     };
 
-    try {
-      await streamToConversation(targetConversationId);
-    } catch (err: unknown) {
+    void (async () => {
+      try {
+        await streamToConversation(targetConversationId);
+      } catch (err: unknown) {
       if (err instanceof ChatStreamError && err.status === 404 && !action?.type) {
         try {
           clearActiveConversationPointer();
@@ -1747,9 +1708,12 @@ export default function ChatInterface() {
         );
       }
       markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
-    }
+      }
+    })();
+    return true;
   };
 
+  useGuestSendBridge(guestSendRef, handleSend);
   const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
     let targetConversationId = conversationId;
     if (!targetConversationId) {
@@ -2217,6 +2181,7 @@ export default function ChatInterface() {
         omnisearchEnabled={omnisearchEnabled}
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
+        isGuest={isGuest}
       />
 
       {omnisearchEnabled && (!isGuest || canUseOmnisearch) && searchOverlayOpen && (
@@ -2227,6 +2192,9 @@ export default function ChatInterface() {
             void loadConversation(convId);
           }}
           activeConversationId={conversationId}
+          isGuest={isGuest}
+          groundedDiscoveryAvailable={canUseGroundedDiscovery}
+          canManageConversation={canManageConversation}
           onMutated={refreshHistory}
           onConversationRemoved={handleConversationRemoved}
         />
@@ -2511,6 +2479,8 @@ export default function ChatInterface() {
                           isGuest={isGuest}
                           canSaveDecision={canSaveDecision}
                           onDecisionUnavailable={requestGuestDecision}
+                          resumeDecisionArtifactId={resumeDecisionArtifactId}
+                          onDecisionResumeHandled={clearResumeDecision}
                         />
                       );
                     })}
@@ -2613,17 +2583,7 @@ export default function ChatInterface() {
         rating={feedbackState.rating}
         context={feedbackState.context}
       />
-
-      <GuestConversionModal
-        isOpen={guestConversion.isOpen}
-        reason={guestConversion.reason}
-        publicAccountAccessEnabled={
-          guestConversion.publicAccountAccessEnabled
-        }
-        onClose={guestConversion.close}
-        onAuthenticate={guestConversion.authenticate}
-      />
-
+      <GuestExperienceSurfaces experience={guestExperience} />
       {isSidebarPreferenceModalOpen && (
         <SidebarPreferenceModal
           mode={sidebarMode}

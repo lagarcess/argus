@@ -910,7 +910,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("if (isStreamingResponse) return;");
+    expect(chat).toContain("if (isStreamingResponse) return false;");
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
     expect(chat).toContain("disabled={isStreamingResponse}");
@@ -1376,11 +1376,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain("steps");
     expect(dialog).toContain("expected");
     expect(dialog).toContain("actual");
-    expect(dialog).toContain("consent");
+    expect(dialog).toContain("includeConversationContext");
     expect(dialog).toContain("files");
     expect(dialog).toContain("Paperclip");
     expect(dialog).toContain("ChevronDown");
-    expect(dialog).toContain("hasAttachments");
+    expect(dialog).toContain("attachmentCount: files.length");
     expect(dialog).toContain("Maximum 5 files");
     expect(dialog).toContain("attachments_with_count");
     expect(dialog).toContain("Attachments ({{count}}/5)");
@@ -1388,8 +1388,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain("General Feedback");
     expect(dialog).toContain("Report a Bug");
     expect(dialog).toContain("Request a Feature");
-    expect(dialog).toContain("I consent to the Argus team");
-    expect(dialog).toContain("consent_feature");
+    expect(dialog).toContain("Include approved context from this conversation");
     expect(dialog).toContain("hasConversationContext");
     expect(dialog).toContain('event.key === "Escape"');
     expect(dialog).toContain('document.addEventListener("keydown"');
@@ -1400,10 +1399,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain('"What worked well in this response?"');
     expect(dialog).toContain('"What should be improved in this response?"');
     expect(dialog).toContain(
-      "Your current conversation context may be included to help us understand this feedback.",
+      "Approved conversation identifiers will be included. The transcript is not attached.",
     );
     expect(dialog).toContain(
-      "App context like this page and timestamp may be included to help us understand this feedback.",
+      "No conversation transcript or contact information is attached.",
     );
     expect(dialog).toContain("Learn more");
     expect(dialog).not.toContain("Provide positive feedback");
@@ -1455,7 +1454,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("MessageSquareWarning");
     expect(message).toContain("chat.report_issue");
     expect(message).toContain('onFeedback?.("rating"');
-    expect(message).toContain("postFeedback");
+    expect(message).not.toContain("postFeedback");
     expect(message).toContain("conversationId?: string | null");
     expect(message).toContain(
       "feedbackContextForMessage(message, conversationId, extra)",
@@ -1731,14 +1730,14 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("account recovery and session controls expose localized dedicated surfaces", () => {
-    const landing = readFileSync(
-      join(root, "components/auth/AuthLanding.tsx"),
-      "utf-8",
-    );
     const forgot = join(root, "app/auth/forgot-password/page.tsx");
     const recovery = join(root, "app/auth/recovery/page.tsx");
     const security = join(root, "app/account/security/page.tsx");
     const recoveryRoute = join(root, "app/api/auth/recovery/route.ts");
+    const authForm = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
     const en = JSON.parse(
       readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
     );
@@ -1746,7 +1745,7 @@ describe("Argus Alpha frontend contract", () => {
       readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
     );
 
-    expect(landing).toContain('/auth/forgot-password');
+    expect(authForm).toContain('/auth/forgot-password');
     expect(existsSync(forgot)).toBe(true);
     expect(existsSync(recovery)).toBe(true);
     expect(existsSync(security)).toBe(true);
@@ -1815,14 +1814,18 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/auth/AuthLanding.tsx"),
       "utf-8",
     );
+    const authForm = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
 
-    expect(page).toContain("Eye");
-    expect(page).toContain("EyeClosed");
-    expect(page).not.toContain("EyeOff");
-    expect(page).toContain("showPassword");
-    expect(page).toContain('type={showPassword ? "text" : "password"}');
-    expect(page).toContain("auth.password.show");
-    expect(page).toContain("auth.password.hide");
+    expect(authForm).toContain("Eye");
+    expect(authForm).toContain("EyeClosed");
+    expect(authForm).not.toContain("EyeOff");
+    expect(authForm).toContain("showPassword");
+    expect(authForm).toContain('type={showPassword ? "text" : "password"}');
+    expect(authForm).toContain("auth.password.show");
+    expect(authForm).toContain("auth.password.hide");
     expect(page).toContain("signupWithEmail");
     expect(page).toContain("loginWithEmail");
     expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');

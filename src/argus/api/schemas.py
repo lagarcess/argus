@@ -122,6 +122,8 @@ class AccountCapabilities(BaseModel):
     can_save_decision: bool
     can_manage_account: bool
     can_use_omnisearch: bool
+    can_search_current_workspace: bool
+    can_use_grounded_discovery: bool
     can_submit_feedback: bool
 
 
@@ -461,6 +463,7 @@ class HistoryItem(BaseModel):
     pinned: bool = False
     created_at: datetime
     conversation_id: str | None = None
+    expires_at: datetime | None = None
 
 
 class PaginatedHistory(BaseModel):

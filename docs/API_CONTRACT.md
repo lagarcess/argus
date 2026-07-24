@@ -1508,6 +1508,10 @@ to `false`; the frontend flag controls presentation only.
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
   the verified typed pending action.
+- `POST /api/v1/conversations/guest/replace` is the only guest Start over
+  mutation. It locks the active workspace, removes the current temporary
+  conversation graph, creates one replacement conversation, and preserves the
+  anonymous identity, fixed expiry, and lifetime usage counters.
 - `GET /api/v1/me` returns the verified account kind, guest expiry and limits,
   and server capabilities with the ordinary profile.
 
@@ -1515,6 +1519,10 @@ The response includes `user`, `account_kind`, a nullable `guest` summary with
 expiry plus limits `1/10/1/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
+Guest capability truth distinguishes owner-scoped current-workspace search
+(`can_search_current_workspace`) from broader Grounded Discovery
+(`can_use_grounded_discovery`). `can_use_omnisearch` may remain true for the
+former while the latter is false.
 
 All guest mutation failures use the existing Problem Details, request-ID,
 same-origin, secure-cookie, and idempotency conventions.
@@ -2894,12 +2902,20 @@ Mixed recent activity feed.
       "title": "Tesla dip thread",
       "subtitle": "Last message or metric preview",
       "pinned": false,
-      "created_at": "timestamp"
+      "created_at": "timestamp",
+      "conversation_id": "uuid",
+      "expires_at": "timestamp or null"
     }
   ],
   "next_cursor": null
 }
 ```
+
+A verified guest receives at most its one workspace-bound conversation.
+`expires_at` is the exact fixed workspace expiry. Clients may localize its
+visible presentation but must not infer or extend it. Guest Recents exposes no
+rename, archive, delete, Strategy, or Collection controls and presents the
+sign-in path for keeping history.
 
 ---
 
@@ -2908,6 +2924,14 @@ Mixed recent activity feed.
 ## `GET /search`
 
 Global omni-search across conversations and typed recall objects.
+
+For guests, this endpoint is current-workspace search, not Grounded Discovery:
+results are restricted to the one owned temporary conversation and its
+conversation-linked chat, run/backtest, Idea, EvidenceArtifact, and Decision
+records. Strategy and Collection destinations, ledger groups, other owners,
+and provider/model/runtime metadata are excluded. The client uses
+`can_use_grounded_discovery=false` to render one honest unavailable state for
+the broader pillar while keeping current-workspace search functional.
 
 **Query Params:**
 - `q`
@@ -3133,6 +3157,10 @@ metadata. Raw browser URLs are not persisted; when a URL or legacy
 `metadata.path` is provided, the backend stores only a queryless `page_path`
 with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
 tokens, and arbitrary browser metadata are dropped.
+
+Guest feedback does not require an email and does not consume chat or simulation
+allowance. Conversation and artifact identifiers are attached only after the
+user explicitly opts in; raw transcript content is never attached by default.
 
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account

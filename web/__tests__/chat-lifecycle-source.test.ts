@@ -40,12 +40,19 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("stale or deleted active chats reset to a lazy empty chat instead of creating a new stored conversation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const lifecycle = readFileSync(
+      join(root, "components/chat/useChatSurfaceLifecycle.ts"),
+      "utf-8",
+    );
     const initStart = chat.indexOf("// ── Init conversation");
     const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
     const initBlock = chat.slice(initStart, initEnd);
-    const removedStart = chat.indexOf("const handleConversationRemoved");
-    const removedEnd = chat.indexOf("const handleTriggerPrompt", removedStart);
-    const removedBlock = chat.slice(removedStart, removedEnd);
+    const removedStart = lifecycle.indexOf("const handleConversationRemoved");
+    const removedEnd = lifecycle.indexOf(
+      "const handleAllConversationsDeleted",
+      removedStart,
+    );
+    const removedBlock = lifecycle.slice(removedStart, removedEnd);
 
     expect(chat).toContain("resetToEmptyChatSurface");
     expect(initBlock).not.toContain("await createConversation(resolvedLanguage)");

@@ -168,9 +168,12 @@ def test_guest_account_response_contract_is_typed_and_exact() -> None:
             can_manage_conversation=False,
             can_save_decision=False,
             can_manage_account=False,
-            can_use_omnisearch=False,
+            can_use_omnisearch=True,
+            can_search_current_workspace=True,
+            can_use_grounded_discovery=False,
             can_submit_feedback=True,
         ),
+        public_account_access_enabled=False,
     )
 
     assert response.guest is not None

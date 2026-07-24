@@ -54,6 +54,9 @@ type ChatCommandPaletteProps = {
   onClose: () => void;
   onOpenConversation: (conversationId: string) => void;
   activeConversationId: string | null;
+  isGuest?: boolean;
+  groundedDiscoveryAvailable?: boolean;
+  canManageConversation?: boolean;
   onMutated?: () => void;
   onConversationRemoved?: (conversationId: string) => void;
 };
@@ -180,6 +183,9 @@ export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
   activeConversationId,
+  isGuest = false,
+  groundedDiscoveryAvailable = true,
+  canManageConversation = true,
   onMutated,
   onConversationRemoved,
 }: ChatCommandPaletteProps) {
@@ -225,12 +231,13 @@ export default function ChatCommandPalette({
   }, []);
 
   useEffect(() => {
+    if (isGuest) return;
     searchGlobal({ q: "", limit: 100, includeLedgerGroups: true })
       .then(({ ledger_groups }) => {
         setLedgerGroups(ledger_groups ?? []);
       })
       .catch(() => setLedgerGroups([]));
-  }, []);
+  }, [isGuest]);
 
   const clearSearchAndLedger = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -322,10 +329,20 @@ export default function ChatCommandPalette({
           }),
         )
       : recentItems.map(commandPaletteItemFromHistory);
-    return items.filter((item): item is CommandPaletteDisplayItem =>
-      Boolean(item),
-    );
-  }, [isResultMode, recentItems, searchResults, t]);
+    return items
+      .filter((item): item is CommandPaletteDisplayItem => Boolean(item))
+      .map((item) =>
+        canManageConversation
+          ? item
+          : { ...item, canManageConversation: false },
+      );
+  }, [
+    canManageConversation,
+    isResultMode,
+    recentItems,
+    searchResults,
+    t,
+  ]);
   const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
     [displayItems, t],
@@ -453,11 +470,12 @@ export default function ChatCommandPalette({
   );
 
   const startRename = useCallback((item: CommandPaletteDisplayItem) => {
+    if (!canManageConversation) return;
     if (!item.canManageConversation || !item.conversationId) return;
     setEditingId(item.conversationId);
     setEditingTitle(item.title.slice(0, 80));
     setPreviewItem(item);
-  }, []);
+  }, [canManageConversation]);
 
   const cancelRename = useCallback(() => {
     setEditingId(null);
@@ -466,6 +484,7 @@ export default function ChatCommandPalette({
 
   const handleRenameSave = useCallback(
     async (item: CommandPaletteDisplayItem) => {
+      if (!canManageConversation) return;
       if (isSubmittingEdit) return;
       if (!item.canManageConversation || !item.conversationId) return;
 
@@ -486,30 +505,45 @@ export default function ChatCommandPalette({
         setIsSubmittingEdit(false);
       }
     },
-    [cancelRename, editingTitle, isSubmittingEdit, onMutated, updateLocalTitle],
+    [
+      canManageConversation,
+      cancelRename,
+      editingTitle,
+      isSubmittingEdit,
+      onMutated,
+      updateLocalTitle,
+    ],
   );
 
   const handleArchive = useCallback(
     async (item: CommandPaletteDisplayItem) => {
+      if (!canManageConversation) return;
       if (!item.canManageConversation || !item.conversationId) return;
       removeLocalConversation(item.conversationId);
       onConversationRemoved?.(item.conversationId);
       await patchConversation(item.conversationId, { archived: true });
       onMutated?.();
     },
-    [onConversationRemoved, onMutated, removeLocalConversation],
+    [
+      canManageConversation,
+      onConversationRemoved,
+      onMutated,
+      removeLocalConversation,
+    ],
   );
 
   const handleDelete = useCallback((item: CommandPaletteDisplayItem) => {
+    if (!canManageConversation) return;
     if (!item.canManageConversation) return;
     setPendingDeleteItem(item);
-  }, []);
+  }, [canManageConversation]);
 
   const handleCancelDelete = useCallback(() => {
     if (!isDeleting) setPendingDeleteItem(null);
   }, [isDeleting]);
 
   const handleConfirmDelete = useCallback(async () => {
+    if (!canManageConversation) return;
     if (!pendingDeleteItem || isDeleting) return;
     if (!pendingDeleteItem.conversationId) return;
 
@@ -525,6 +559,7 @@ export default function ChatCommandPalette({
     }
   }, [
     isDeleting,
+    canManageConversation,
     onConversationRemoved,
     onMutated,
     pendingDeleteItem,
@@ -609,6 +644,18 @@ export default function ChatCommandPalette({
             </button>
           )}
         </div>
+
+        {isGuest && !groundedDiscoveryAvailable && (
+          <div
+            className="border-b border-black/5 bg-black/[0.02] px-5 py-2.5 text-[12px] leading-relaxed text-black/50 dark:border-white/5 dark:bg-white/[0.025] dark:text-white/50"
+            role="status"
+          >
+            {t(
+              "command_palette.guest.discovery_unavailable",
+              "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet.",
+            )}
+          </div>
+        )}
 
         {ledgerGroups.length > 0 && (
           <div

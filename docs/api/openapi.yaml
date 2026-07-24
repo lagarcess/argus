@@ -164,6 +164,18 @@ paths:
           description: Cursor-paginated conversations.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/conversations/guest/replace:
+    post:
+      description: Atomically replace the current guest conversation while preserving the anonymous identity, fixed expiry, and lifetime allowances.
+      responses:
+        "200":
+          description: The one guest workspace is bound to the replacement empty conversation.
+        "403":
+          description: The session is not an active verified guest.
+        "409":
+          description: Replacement failed closed and the existing conversation was left unchanged.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
@@ -553,6 +565,8 @@ components:
         - can_save_decision
         - can_manage_account
         - can_use_omnisearch
+        - can_search_current_workspace
+        - can_use_grounded_discovery
         - can_submit_feedback
       properties:
         can_create_additional_conversation:
@@ -565,6 +579,12 @@ components:
           type: boolean
         can_use_omnisearch:
           type: boolean
+        can_search_current_workspace:
+          type: boolean
+          description: Owner-scoped search over the current account workspace.
+        can_use_grounded_discovery:
+          type: boolean
+          description: Server-authoritative availability of broader grounded discovery.
         can_submit_feedback:
           type: boolean
     UserResponse:

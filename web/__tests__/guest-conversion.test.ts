@@ -124,6 +124,10 @@ describe("guest conversion contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const surfaces = readFileSync(
+      join(root, "components/guest/GuestExperienceSurfaces.tsx"),
+      "utf-8",
+    );
     expect(existsSync(hookPath)).toBe(true);
     if (!existsSync(hookPath)) return;
     const hook = readFileSync(hookPath, "utf-8");
@@ -140,7 +144,8 @@ describe("guest conversion contract", () => {
     );
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
-    expect(chat).toContain("<GuestConversionModal");
-    expect(chat).toContain("publicAccountAccessEnabled");
+    expect(chat).toContain("<GuestExperienceSurfaces");
+    expect(surfaces).toContain("<GuestConversionModal");
+    expect(surfaces).toContain("publicAccountAccessEnabled");
   });
 });

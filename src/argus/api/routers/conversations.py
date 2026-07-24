@@ -103,6 +103,42 @@ def create_conversation(
     return ConversationResponse(conversation=conversation)
 
 
+@router.post(
+    "/conversations/guest/replace",
+    response_model=ConversationResponse,
+)
+def replace_guest_conversation(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConversationResponse:
+    context = account_context(request)
+    if context.kind != "guest" or api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=403,
+            code="guest_account_required",
+            title="Guest Account Required",
+            detail="Only an active guest workspace can be replaced.",
+        )
+    try:
+        conversation = api_state.supabase_gateway.replace_guest_conversation(
+            user_id=user.id,
+            title="New idea",
+            title_source="system_default",
+            language=user.language,
+        )
+    except Exception as exc:
+        logger.warning("Guest conversation replacement failed", error=type(exc).__name__)
+        raise problem(
+            request,
+            status_code=409,
+            code="guest_start_over_failed",
+            title="Could Not Start Over",
+            detail="The temporary conversation was left unchanged.",
+        ) from exc
+    return ConversationResponse(conversation=conversation)
+
+
 @router.get("/conversations", response_model=PaginatedConversations)
 def list_conversations(
     request: Request,

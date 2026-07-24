@@ -143,6 +143,7 @@
     "attach_files_feature": "Opcional: agrega una captura, boceto o ejemplo.",
     "consent": "Autorizo al equipo de Argus a procesar estos comentarios y contactarme si necesitan más detalles.",
     "consent_feature": "Autorizo al equipo de Argus a usar esta solicitud de función y contactarme si necesitan más contexto.",
+    "include_conversation_context": "Incluir el contexto aprobado de esta conversación",
     "rating_positive_prompt": "¿Qué salió bien?",
     "rating_negative_prompt": "¿Qué salió mal?",
     "subheading": {
@@ -173,8 +174,8 @@
     "placeholder_details": "Compartir detalles (opcional)",
     "success": "¡Gracias por tus comentarios!",
     "error": "Error al enviar comentarios. Inténtalo de nuevo.",
-    "footer_note": "Se puede incluir contexto de la app, como esta página y la hora, para entender mejor tus comentarios.",
-    "footer_note_conversation": "Se puede incluir el contexto de tu conversación actual para entender mejor estos comentarios.",
+    "footer_note": "No se adjunta la conversación ni información de contacto.",
+    "footer_note_conversation": "Se incluirán identificadores aprobados de la conversación. No se adjunta la transcripción.",
     "tags": {
       "positive": {
         "accurate": "Preciso y completo",
@@ -833,6 +834,9 @@
   "command_palette": {
     "close": "Cerrar búsqueda",
     "search_placeholder": "Buscar en Argus...",
+    "guest": {
+      "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
+    },
     "no_results": "No se encontraron resultados",
     "no_conversations": "No hay conversaciones aún",
     "clear_search": "Borrar búsqueda",
@@ -1043,6 +1047,17 @@
       "save_decision": "Inicia sesión para guardar esta decisión.",
       "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
       "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra."
+    },
+    "new_conversation": {
+      "title": "¿Quieres iniciar otra conversación?",
+      "description": "Empezar de nuevo reemplaza esta conversación temporal. Inicia sesión para conservarla y comenzar otra.",
+      "start_over": "Empezar de nuevo",
+      "sign_in": "Iniciar sesión para conservarla",
+      "error": "El chat temporal no cambió."
+    },
+    "history": {
+      "expires_at": "Disponible hasta {{date}}",
+      "keep_history": "Inicia sesión para conservar tu historial"
     },
     "shell": {
       "value_title": "Prueba una idea de inversión con datos históricos.",
