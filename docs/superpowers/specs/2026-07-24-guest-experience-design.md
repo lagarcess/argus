@@ -1,7 +1,7 @@
 # Argus Guest Experience: Value-Before-Account Design
 
-Status: **DRAFT FOR FOUNDER REVIEW — implementation is not authorized by this
-document alone**
+Status: **FOUNDER-APPROVED DESIGN — implementation remains separately gated by
+the serialized plan and release checks below**
 
 Date: 2026-07-24
 
@@ -1162,7 +1162,7 @@ the verdict; they do not replace visible product judgment.
 
 Guest mode is not ready for public exposure until all are true:
 
-- [ ] Founder approves this written spec.
+- [x] Founder approves this written spec.
 - [ ] An implementation plan is written from the approved spec.
 - [ ] Always Progresses is integrated and guest QA passes on the combined head.
 - [ ] Omnisearch/grounded-discovery guest behavior is implemented and reviewed.
