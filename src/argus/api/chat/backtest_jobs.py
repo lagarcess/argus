@@ -47,6 +47,7 @@ class BacktestJobShadowContext:
     workflow_dispatch_started: bool = False
     workflow_task_run_id: str | None = None
     workflow_dispatch_error: str | None = None
+    admission_decision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -826,9 +827,12 @@ class ShadowBacktestJobTool:
             job = admission.job
             if job is None:
                 return None, _admission_rejection_envelope("missing_job")
+            context.admission_decision = admission.decision
             job_id = str(job.get("id") or "").strip()
             if job_id:
                 context.created_job_id = job_id
+                if admission.decision == "replay":
+                    return dict(job), None
                 self._maybe_dispatch_shadow_job(
                     gateway=gateway,
                     context=context,
@@ -872,6 +876,9 @@ class ShadowBacktestJobTool:
     def _should_return_async_job(job: dict[str, Any] | None) -> bool:
         if job is None:
             return False
+        context = current_backtest_job_shadow_context()
+        if context is not None and context.admission_decision == "replay":
+            return True
         if not (
             backtest_jobs_shadow_enabled()
             and backtest_jobs_dispatch_enabled()
@@ -883,7 +890,6 @@ class ShadowBacktestJobTool:
             return False
         if launch_payload.get("kind") != REAL_BACKTEST_JOB_KIND:
             return False
-        context = current_backtest_job_shadow_context()
         if context is None or context.created_job_id is None:
             return False
         status = str(job.get("status") or "").strip().lower()

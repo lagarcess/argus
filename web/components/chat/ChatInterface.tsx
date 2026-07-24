@@ -109,6 +109,7 @@ import {
   backtestJobMessageFromApi,
 } from "@/lib/chat-backtest-jobs";
 import {
+  applyRecoverableRunReconciliation,
   ambiguousRunConfirmationId,
   applyReconciledBacktestJobResponse,
   getBacktestJobByAction,
@@ -821,6 +822,11 @@ export default function ChatInterface() {
     markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
   }
 
+  function clearActiveStreamState() {
+    setStreamStatus(null);
+    setIsStreamingResponse(false);
+    activeStreamConversationIdRef.current = null;
+  }
   const loadMoreHistory = () => {
     if (!historyNextCursor || isLoadingMoreHistory) return;
     setIsLoadingMoreHistory(true);
@@ -1322,9 +1328,7 @@ export default function ChatInterface() {
               })
             : retryLastTurnAction);
         setInputActions([]);
-        setStreamStatus(null);
-        setIsStreamingResponse(false);
-        activeStreamConversationIdRef.current = null;
+        clearActiveStreamState();
         setMessages((prev) =>
           normalizeDurableRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
@@ -1558,9 +1562,7 @@ export default function ChatInterface() {
           markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
-        setStreamStatus(null);
-        setIsStreamingResponse(false);
-        activeStreamConversationIdRef.current = null;
+        clearActiveStreamState();
         markSettledStreamAttention(activeStreamTargetConversationId);
       }
     };
@@ -1639,9 +1641,7 @@ export default function ChatInterface() {
           replay: () => streamToConversation(activeStreamTargetConversationId),
         });
         if (reconciliation.kind === "replayed") return;
-        if (reconciliation.kind === "rejected") {
-          err = reconciliation.error;
-        } else if (reconciliation.kind === "durable") {
+        if (reconciliation.kind === "durable") {
           if (
             canApplyConversationOwnedUpdate(
               reconciliation.response.job.conversation_id,
@@ -1658,16 +1658,22 @@ export default function ChatInterface() {
                 ),
               ),
             );
-            setStreamStatus(null);
-            setIsStreamingResponse(false);
-            activeStreamConversationIdRef.current = null;
+            clearActiveStreamState();
           }
           markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
           return;
-        } else {
+        }
+        if (reconciliation.kind === "recoverable") {
           if (canApplyConversationOwnedUpdate(activeStreamTargetConversationId)) {
-            setIsStreamingResponse(false);
-            activeStreamConversationIdRef.current = null;
+            setMessages((prev) =>
+              applyRecoverableRunReconciliation(
+                prev,
+                assistantId,
+                activeStreamTargetConversationId,
+                reconciliation.error,
+              ),
+            );
+            clearActiveStreamState();
           }
           markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
           return;
@@ -1678,9 +1684,7 @@ export default function ChatInterface() {
       );
       if (canApplyOwnedUpdate) {
         setInputActions([]);
-        setStreamStatus(null);
-        setIsStreamingResponse(false);
-        activeStreamConversationIdRef.current = null;
+        clearActiveStreamState();
       }
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;

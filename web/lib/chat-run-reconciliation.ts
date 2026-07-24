@@ -17,13 +17,17 @@ import {
   applyBacktestJobUpdate,
   pendingBacktestJobIds,
 } from "@/lib/chat-backtest-jobs";
-import { normalizeDurableRetryActionHistory } from "@/lib/chat-retry-actions";
+import {
+  conversationLoadRetryActionFromConversationId,
+  normalizeDurableRetryActionHistory,
+} from "@/lib/chat-retry-actions";
 
 type ReconciliationResult =
   | { kind: "durable"; response: BacktestJobResponse }
   | { kind: "replayed" }
-  | { kind: "checking"; error: unknown }
-  | { kind: "rejected"; error: unknown };
+  | { kind: "recoverable"; error: unknown };
+
+const LOOKUP_RETRY_DELAYS_MS = [250, 750] as const;
 
 export async function getBacktestJobByAction(
   confirmationId: string,
@@ -36,12 +40,17 @@ export async function getBacktestJobByAction(
 export async function reconcileAmbiguousRunResponse(operations: {
   lookup: () => Promise<BacktestJobResponse>;
   replay: () => Promise<void>;
+  pause?: (delayMs: number) => Promise<void>;
 }): Promise<ReconciliationResult> {
   try {
     return { kind: "durable", response: await operations.lookup() };
   } catch (lookupError) {
-    if (errorStatus(lookupError) !== 404) {
-      return { kind: "checking", error: lookupError };
+    const status = errorStatus(lookupError);
+    if (status === 409 || (status !== null && status < 500 && status !== 404)) {
+      return { kind: "recoverable", error: lookupError };
+    }
+    if (status !== 404) {
+      return continueDurableRunLookup(operations, lookupError);
     }
   }
 
@@ -49,15 +58,74 @@ export async function reconcileAmbiguousRunResponse(operations: {
     await operations.replay();
     return { kind: "replayed" };
   } catch (replayError) {
-    if (!isTransportAmbiguity(replayError)) {
-      return { kind: "rejected", error: replayError };
+    if (
+      isTransportAmbiguity(replayError) ||
+      errorStatus(replayError) === 500 ||
+      errorCode(replayError) === "idempotency_in_progress"
+    ) {
+      return continueDurableRunLookup(operations, replayError);
     }
+    return { kind: "recoverable", error: replayError };
+  }
+}
+
+async function continueDurableRunLookup(
+  operations: {
+    lookup: () => Promise<BacktestJobResponse>;
+    pause?: (delayMs: number) => Promise<void>;
+  },
+  initialError: unknown,
+): Promise<ReconciliationResult> {
+  const pause = operations.pause ?? waitForLookupRetry;
+  let latestError = initialError;
+  for (const delayMs of LOOKUP_RETRY_DELAYS_MS) {
+    await pause(delayMs);
     try {
       return { kind: "durable", response: await operations.lookup() };
     } catch (lookupError) {
-      return { kind: "checking", error: lookupError };
+      latestError = lookupError;
+      if (errorStatus(lookupError) === 409) {
+        break;
+      }
     }
   }
+  return { kind: "recoverable", error: latestError };
+}
+
+function waitForLookupRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+export function applyRecoverableRunReconciliation(
+  messages: Message[],
+  assistantId: string,
+  conversationId: string,
+  error: unknown,
+): Message[] {
+  const retryAction =
+    conversationLoadRetryActionFromConversationId(conversationId);
+  const recoveryDisplay =
+    errorStatus(error) === 409
+      ? {
+          kind: "artifact_action_recovery" as const,
+          status: "invalid_state",
+        }
+      : {
+          kind: "recovery_code" as const,
+          code: "runtime_failure",
+        };
+  return messages.map((message) =>
+    message.id === assistantId
+      ? {
+          ...message,
+          content: "",
+          recoveryDisplay,
+          actions: retryAction ? [retryAction] : undefined,
+        }
+      : message,
+  );
 }
 
 export function ambiguousRunConfirmationId(
@@ -159,6 +227,12 @@ function errorStatus(error: unknown): number | null {
   if (typeof error !== "object" || error === null) return null;
   const status = (error as { status?: unknown }).status;
   return typeof status === "number" ? status : null;
+}
+
+function errorCode(error: unknown): string | null {
+  if (typeof error !== "object" || error === null) return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
 }
 
 function isTransportAmbiguity(error: unknown): boolean {

@@ -4,14 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
-from argus.agent_runtime.confirmation_artifacts import (
-    validate_confirmation_execution_payload,
-)
 from argus.api import state as api_state
-from argus.api.chat.backtest_jobs import (
-    payload_hash,
-    reconcile_terminal_render_task_run,
-)
 from argus.api.dependencies import current_user, problem
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
@@ -613,20 +606,6 @@ def get_backtest_job(
             title="Not Found",
             detail="Backtest job not found.",
         )
-    job = reconcile_terminal_render_task_run(
-        gateway=api_state.supabase_gateway,
-        user_id=user.id,
-        job=job,
-    )
-    if not job:
-        raise problem(
-            request,
-            status_code=404,
-            code="not_found",
-            title="Not Found",
-            detail="Backtest job not found.",
-        )
-
     return _backtest_job_response(
         request=request,
         gateway=api_state.supabase_gateway,
@@ -733,19 +712,22 @@ def _linked_confirmation_launch_hash(
     if not isinstance(card, dict) or card.get("confirmation_id") != confirmation_id:
         raise _by_action_internal_error(request)
 
-    launch_payload_hash = card.get("launch_payload_hash")
-    if isinstance(launch_payload_hash, str) and _is_full_payload_hash(
-        launch_payload_hash
+    launch_payload_hash = card.get("canonical_launch_payload_hash")
+    if not _is_full_payload_hash(launch_payload_hash):
+        raise _by_action_internal_error(request)
+    active_reference = message.metadata.get("active_confirmation_reference")
+    if not isinstance(active_reference, dict):
+        raise _by_action_internal_error(request)
+    reference_metadata = active_reference.get("metadata")
+    if (
+        active_reference.get("artifact_kind") != "confirmation"
+        or active_reference.get("artifact_id") != confirmation_id
+        or not isinstance(reference_metadata, dict)
+        or reference_metadata.get("canonical_launch_payload_hash")
+        != launch_payload_hash
     ):
-        return launch_payload_hash
-
-    confirmation_payload = message.metadata.get("confirmation_payload")
-    if not isinstance(confirmation_payload, dict):
         raise _by_action_internal_error(request)
-    validation = validate_confirmation_execution_payload(confirmation_payload)
-    if not validation.executable or validation.launch_payload is None:
-        raise _by_action_internal_error(request)
-    return payload_hash(validation.launch_payload)
+    return str(launch_payload_hash)
 
 
 def _is_full_payload_hash(value: object) -> bool:

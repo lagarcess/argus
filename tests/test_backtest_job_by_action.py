@@ -4,8 +4,15 @@ from datetime import datetime, timezone
 from typing import Literal
 
 import pytest
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    validate_confirmation_execution_payload,
+)
+from argus.api.chat.backtest_jobs import payload_hash
+from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
 from argus.api.schemas import BacktestRun, Message, OnboardingState, User
+from argus.domain.backtest_admission import chat_run_identity_hash
 from faker import Faker
 from fastapi.testclient import TestClient
 
@@ -30,8 +37,11 @@ class _ByActionGateway:
             "non_assistant",
             "missing_confirmation_id",
             "short_launch_hash",
+            "missing_canonical_hash",
+            "reference_hash_mismatch",
         ] = "none",
         run_exists: bool = True,
+        confirmation_metadata: dict[str, object] | None = None,
     ) -> None:
         fake = Faker()
         self.user = User(
@@ -50,6 +60,7 @@ class _ByActionGateway:
         self.reservation_exists = reservation_exists
         self.artifact_issue = artifact_issue
         self.run_exists = run_exists
+        self.confirmation_metadata = confirmation_metadata
         self.reservation_calls: list[dict[str, str]] = []
         self.message_calls: list[dict[str, str]] = []
         self.run = _run()
@@ -117,14 +128,33 @@ class _ByActionGateway:
         )
         if self.artifact_issue == "missing":
             return None
+        if self.confirmation_metadata is not None:
+            return Message(
+                id="confirmation-message-1",
+                conversation_id=conversation_id,
+                role="assistant",
+                content="Ready to run.",
+                metadata=self.confirmation_metadata,
+                created_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
+            )
         card = {
             "confirmation_id": "confirmation-1",
             "launch_payload_hash": FULL_LAUNCH_PAYLOAD_HASH,
+            "canonical_launch_payload_hash": FULL_LAUNCH_PAYLOAD_HASH,
         }
         if self.artifact_issue == "missing_confirmation_id":
             card.pop("confirmation_id")
         if self.artifact_issue == "short_launch_hash":
             card["launch_payload_hash"] = "aaaaaaaaaaaaaaaa"
+            card["canonical_launch_payload_hash"] = "aaaaaaaaaaaaaaaa"
+        if self.artifact_issue == "missing_canonical_hash":
+            card.pop("canonical_launch_payload_hash")
+            card["launch_payload_hash"] = FULL_LAUNCH_PAYLOAD_HASH
+        reference_hash = (
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            if self.artifact_issue == "reference_hash_mismatch"
+            else FULL_LAUNCH_PAYLOAD_HASH
+        )
         return Message(
             id="confirmation-message-1",
             conversation_id=(
@@ -134,7 +164,17 @@ class _ByActionGateway:
             ),
             role="user" if self.artifact_issue == "non_assistant" else "assistant",
             content="Ready to run.",
-            metadata={"confirmation_card": card},
+            metadata={
+                "confirmation_card": card,
+                "active_confirmation_reference": {
+                    "artifact_kind": "confirmation",
+                    "artifact_id": "confirmation-1",
+                    "artifact_status": "active",
+                    "metadata": {
+                        "canonical_launch_payload_hash": reference_hash,
+                    },
+                },
+            },
             created_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
         )
 
@@ -204,6 +244,7 @@ def test_by_action_lookup_returns_canonical_succeeded_job_without_render_reconci
         lambda **_: (_ for _ in ()).throw(
             AssertionError("fresh by-action lookup must not call Render")
         ),
+        raising=False,
     )
 
     response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
@@ -267,6 +308,8 @@ def test_by_action_lookup_returns_409_without_job_disclosure_on_identity_collisi
         "non_assistant",
         "missing_confirmation_id",
         "short_launch_hash",
+        "missing_canonical_hash",
+        "reference_hash_mismatch",
     ],
 )
 def test_by_action_lookup_returns_safe_500_for_inconsistent_confirmation_artifact(
@@ -277,6 +320,8 @@ def test_by_action_lookup_returns_safe_500_for_inconsistent_confirmation_artifac
         "non_assistant",
         "missing_confirmation_id",
         "short_launch_hash",
+        "missing_canonical_hash",
+        "reference_hash_mismatch",
     ],
 ) -> None:
     from argus.api import state as api_state
@@ -290,6 +335,81 @@ def test_by_action_lookup_returns_safe_500_for_inconsistent_confirmation_artifac
     assert response.json()["code"] == "internal_error"
     assert "job-by-action-1" not in response.text
     assert "run-by-action-1" not in response.text
+
+
+def test_real_confirmation_persists_full_launch_identity_used_by_job_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    confirmation_payload = {
+        "confirmation_id": "confirmation-1",
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "date_range": {"start": "2024-01-01", "end": "2025-01-01"},
+        },
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2025-01-01"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10_000,
+            "benchmark_symbol": "SPY",
+        },
+        "validation": {"executable": True},
+    }
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+        },
+        confirmation_id="confirmation-1",
+        conversation_id="conversation-1",
+    )
+    assert card is not None
+    reference = confirmation_artifact_reference(
+        confirmation_id="confirmation-1",
+        confirmation_payload=confirmation_payload,
+        confirmation_card=card,
+    )
+    validation = validate_confirmation_execution_payload(confirmation_payload)
+    assert validation.launch_payload is not None
+    admitted_payload_hash = payload_hash(validation.launch_payload)
+
+    assert card["canonical_launch_payload_hash"] == admitted_payload_hash
+    assert (
+        reference.metadata["canonical_launch_payload_hash"]
+        == admitted_payload_hash
+    )
+    assert card["launch_payload_hash"] != admitted_payload_hash
+
+    gateway = _ByActionGateway(
+        confirmation_metadata={
+            "confirmation_card": card,
+            "confirmation_payload": confirmation_payload,
+            "active_confirmation_reference": reference.model_dump(mode="python"),
+        }
+    )
+    gateway.job["payload_hash"] = admitted_payload_hash
+    gateway.job["identity_hash"] = chat_run_identity_hash(
+        conversation_id="conversation-1",
+        confirmation_id="confirmation-1",
+        launch_payload_hash=admitted_payload_hash,
+    )
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    response = TestClient(app).get(
+        "/api/v1/backtest-jobs/by-action/confirmation-1"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job"]["id"] == "job-by-action-1"
 
 
 def test_by_action_lookup_returns_safe_500_when_succeeded_job_has_no_run(

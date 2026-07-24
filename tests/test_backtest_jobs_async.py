@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from threading import Event, Lock, Thread
 from typing import Any
 
 import pytest
@@ -92,6 +93,65 @@ class _Dispatcher:
         self.events.append("dispatch")
         self.calls.append(payload)
         return {"id": "task-run-real-1", "status": "pending"}
+
+
+class _AtomicReplayGateway(_Gateway):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self._lock = Lock()
+        self.admission_calls = 0
+        self.allowance_reservations = 0
+        self.job: dict[str, object] | None = None
+
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        with self._lock:
+            self.admission_calls += 1
+            if self.job is not None:
+                return {"decision": "replay", "job": dict(self.job)}
+            self.allowance_reservations += 1
+            payload.pop("initial_status", None)
+            self.job = {
+                "id": "job-race-1",
+                "status": "queued",
+                "result_run_id": None,
+                "failure_code": None,
+                "failure_detail": None,
+                "retryable": False,
+                "queued_at": "2026-06-06T12:00:00+00:00",
+                "created_at": "2026-06-06T12:00:00+00:00",
+                "updated_at": "2026-06-06T12:00:00+00:00",
+                "execution_metadata": {},
+                **payload,
+            }
+            self.jobs.append(self.job)
+            self.events.append("job")
+            return {"decision": "admitted", "job": dict(self.job)}
+
+    def merge_backtest_job_execution_metadata(
+        self, **payload: object
+    ) -> dict[str, object]:
+        result = super().merge_backtest_job_execution_metadata(**payload)
+        with self._lock:
+            assert self.job is not None
+            metadata = dict(self.job.get("execution_metadata") or {})
+            metadata.update(dict(payload.get("execution_metadata") or {}))
+            self.job["execution_metadata"] = metadata
+        return result
+
+
+class _GatedDispatcher(_Dispatcher):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self.first_dispatch_entered = Event()
+        self.release_first_dispatch = Event()
+
+    def dispatch(self, **payload: object) -> dict[str, object]:
+        result = super().dispatch(**payload)
+        if len(self.calls) == 1:
+            self.first_dispatch_entered.set()
+            if not self.release_first_dispatch.wait(timeout=5):
+                raise AssertionError("timed out waiting to release admitted dispatch")
+        return result
 
 
 class _AsyncJobTool:
@@ -436,6 +496,57 @@ def test_real_workflow_mode_returns_async_job_without_delegate(
     )
 
 
+def test_atomic_replay_never_becomes_a_second_dispatch_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _AtomicReplayGateway(events)
+    dispatcher = _GatedDispatcher(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    results: list[dict[str, object]] = []
+    errors: list[BaseException] = []
+
+    def run_same_key() -> None:
+        try:
+            with backtest_job_shadow_context(_context()):
+                results.append(tool.run(_payload()))
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    admitted_thread = Thread(target=run_same_key)
+    admitted_thread.start()
+    assert dispatcher.first_dispatch_entered.wait(timeout=5)
+
+    replay_thread = Thread(target=run_same_key)
+    replay_thread.start()
+    replay_thread.join(timeout=5)
+    dispatcher.release_first_dispatch.set()
+    admitted_thread.join(timeout=5)
+
+    assert not admitted_thread.is_alive()
+    assert not replay_thread.is_alive()
+    assert errors == []
+    assert len(results) == 2
+    assert gateway.admission_calls == 2
+    assert gateway.allowance_reservations == 1
+    assert len(gateway.jobs) == 1
+    assert len(dispatcher.calls) == 1
+    assert delegate.calls == []
+    assert {
+        result["payload"]["backtest_job"]["id"]  # type: ignore[index]
+        for result in results
+    } == {"job-race-1"}
+
+
 def test_execute_stage_returns_job_artifact_without_result_explanation() -> None:
     state = RunState.new(current_user_message="Run it", recent_thread_history=[])
     state.confirmation_payload = {
@@ -636,24 +747,19 @@ def test_terminal_render_task_reconciliation_ignores_malformed_metadata() -> Non
     assert gateway.failed_updates == []
 
 
-def test_backtest_job_status_endpoint_reconciles_terminal_workflow_run(
+def test_backtest_job_status_endpoint_reads_database_truth_without_render(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import state as api_state
-    from argus.api.chat import backtest_jobs as backtest_job_helpers
+    from argus.api.routers import backtest as backtest_router
 
     gateway = _TimedOutJobGateway()
+    render_calls: list[dict[str, object]] = []
     monkeypatch.setattr(
-        backtest_job_helpers,
-        "RenderTaskRunClient",
-        lambda: _FakeTerminalTaskRunClient(
-            {
-                "id": "trn-timeout-1",
-                "status": "failed",
-                "error": "task timed out",
-                "completedAt": "2026-06-06T12:01:10Z",
-            }
-        ),
+        backtest_router,
+        "reconcile_terminal_render_task_run",
+        lambda **payload: render_calls.append(payload),
+        raising=False,
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     client = TestClient(app)
@@ -662,9 +768,9 @@ def test_backtest_job_status_endpoint_reconciles_terminal_workflow_run(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["job"]["status"] == "failed"
-    assert payload["job"]["failure_code"] == "workflow_task_timeout"
-    assert payload["job"]["retryable"] is True
+    assert payload["job"]["status"] == "running"
+    assert payload["job"]["failure_code"] is None
+    assert render_calls == []
 
 
 def test_stale_backtest_job_scan_reconciles_terminal_task_run() -> None:

@@ -7,12 +7,12 @@ import { pendingBacktestJobIds } from "../lib/chat-backtest-jobs";
 type ReconciliationResult =
   | { kind: "durable"; response: BacktestJobResponse }
   | { kind: "replayed" }
-  | { kind: "checking"; error: unknown }
-  | { kind: "rejected"; error: unknown };
+  | { kind: "recoverable"; error: unknown };
 
 type ReconcileAmbiguousRunResponse = (operations: {
   lookup: () => Promise<BacktestJobResponse>;
   replay: () => Promise<void>;
+  pause?: (delayMs: number) => Promise<void>;
 }) => Promise<ReconciliationResult>;
 
 async function loadReconciler(): Promise<ReconcileAmbiguousRunResponse> {
@@ -145,10 +145,11 @@ describe("ambiguous Run response reconciliation", () => {
     expect(replayCalls).toBe(1);
   });
 
-  test("a second 404 stays checking and never triggers a second replay", async () => {
+  test("a second 404 exits through bounded recovery and never triggers a second replay", async () => {
     const reconcile = await loadReconciler();
     let lookupCalls = 0;
     let replayCalls = 0;
+    const pauses: number[] = [];
 
     const result = await reconcile({
       lookup: async () => {
@@ -159,38 +160,68 @@ describe("ambiguous Run response reconciliation", () => {
         replayCalls += 1;
         throw statusError(0, "stream_interrupted");
       },
+      pause: async (delayMs) => {
+        pauses.push(delayMs);
+      },
     });
 
-    expect(result.kind).toBe("checking");
-    expect(lookupCalls).toBe(2);
+    expect(result.kind).toBe("recoverable");
+    expect(lookupCalls).toBe(3);
     expect(replayCalls).toBe(1);
+    expect(pauses).toEqual([250, 750]);
   });
 
-  test("409 or 500 lookup failures never replay the Run action", async () => {
+  test("409 lookup stops immediately with typed recovery and never replays", async () => {
     const reconcile = await loadReconciler();
+    let lookupCalls = 0;
+    let replayCalls = 0;
+    const lookupError = statusError(409, "idempotency_conflict");
 
-    for (const status of [409, 500]) {
-      let replayCalls = 0;
-      const lookupError = statusError(
-        status,
-        status === 409 ? "idempotency_conflict" : "internal_error",
-      );
+    const result = await reconcile({
+      lookup: async () => {
+        lookupCalls += 1;
+        throw lookupError;
+      },
+      replay: async () => {
+        replayCalls += 1;
+      },
+      pause: async () => {
+        throw new Error("409 must not continue automatic lookup");
+      },
+    });
 
-      const result = await reconcile({
-        lookup: async () => {
-          throw lookupError;
-        },
-        replay: async () => {
-          replayCalls += 1;
-        },
-      });
-
-      expect(result).toEqual({ kind: "checking", error: lookupError });
-      expect(replayCalls).toBe(0);
-    }
+    expect(result).toEqual({ kind: "recoverable", error: lookupError });
+    expect(lookupCalls).toBe(1);
+    expect(replayCalls).toBe(0);
   });
 
-  test("a definite replay rejection is preserved without another lookup", async () => {
+  test("500 lookup uses a finite lookup-only continuation and never replays", async () => {
+    const reconcile = await loadReconciler();
+    let lookupCalls = 0;
+    let replayCalls = 0;
+    const pauses: number[] = [];
+    const lookupError = statusError(500, "internal_error");
+
+    const result = await reconcile({
+      lookup: async () => {
+        lookupCalls += 1;
+        throw lookupError;
+      },
+      replay: async () => {
+        replayCalls += 1;
+      },
+      pause: async (delayMs) => {
+        pauses.push(delayMs);
+      },
+    });
+
+    expect(result).toEqual({ kind: "recoverable", error: lookupError });
+    expect(lookupCalls).toBe(3);
+    expect(replayCalls).toBe(0);
+    expect(pauses).toEqual([250, 750]);
+  });
+
+  test("a definite stale replay rejection is preserved without another lookup", async () => {
     const reconcile = await loadReconciler();
     let lookupCalls = 0;
     let replayCalls = 0;
@@ -207,8 +238,82 @@ describe("ambiguous Run response reconciliation", () => {
       },
     });
 
-    expect(result).toEqual({ kind: "rejected", error: rejection });
+    expect(result).toEqual({ kind: "recoverable", error: rejection });
     expect(lookupCalls).toBe(1);
     expect(replayCalls).toBe(1);
+  });
+
+  test("an in-progress replay rejection relooks up the racing durable job", async () => {
+    const reconcile = await loadReconciler();
+    let lookupCalls = 0;
+    let replayCalls = 0;
+    const response = queuedResponse();
+
+    const result = await reconcile({
+      lookup: async () => {
+        lookupCalls += 1;
+        if (lookupCalls === 1) {
+          throw statusError(404, "not_found");
+        }
+        return response;
+      },
+      replay: async () => {
+        replayCalls += 1;
+        throw statusError(409, "idempotency_in_progress");
+      },
+      pause: async () => undefined,
+    });
+
+    expect(result).toEqual({ kind: "durable", response });
+    expect(lookupCalls).toBe(2);
+    expect(replayCalls).toBe(1);
+  });
+
+  test("recoverable ambiguity renders existing typed recovery without could_not_run", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const applyRecovery =
+      reconciliationModule.applyRecoverableRunReconciliation;
+    expect(typeof applyRecovery).toBe("function");
+    const messages: Message[] = [
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "superseded",
+          title: "AAPL buy and hold",
+          status: "running",
+          statusLabel: "Running",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+      },
+      {
+        id: "assistant-placeholder",
+        role: "ai",
+        kind: "text",
+        content: "",
+      },
+    ];
+
+    const updated = applyRecovery(
+      messages,
+      "assistant-placeholder",
+      "conversation-1",
+      statusError(409, "idempotency_conflict"),
+    ) as Message[];
+
+    expect(updated[0]?.confirmation?.status).toBe("running");
+    expect(updated[0]?.confirmation?.status).not.toBe("could_not_run");
+    expect(updated[1]?.recoveryDisplay).toEqual({
+      kind: "artifact_action_recovery",
+      status: "invalid_state",
+    });
+    expect(updated[1]?.actions?.map((action) => action.type)).toEqual([
+      "retry_load_conversation",
+    ]);
   });
 });

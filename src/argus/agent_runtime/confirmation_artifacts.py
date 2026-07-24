@@ -76,6 +76,9 @@ def confirmation_artifact_reference(
         "artifact_type": "confirmation",
         "confirmation_payload": confirmation_payload,
         "launch_payload_hash": stable_payload_hash(validation.launch_payload),
+        "canonical_launch_payload_hash": canonical_payload_hash(
+            validation.launch_payload
+        ),
         "strategy_hash": stable_payload_hash(confirmation_payload.get("strategy")),
         "validation": {
             "executable": validation.executable,
@@ -106,10 +109,17 @@ def confirmation_id_from_payload(
 
 
 def stable_payload_hash(value: Any) -> str | None:
+    canonical = canonical_payload_hash(value)
+    if canonical is None:
+        return None
+    return canonical.removeprefix("sha256:")[:16]
+
+
+def canonical_payload_hash(value: Any) -> str | None:
     if value is None:
         return None
     encoded = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+    return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _strategy_contract_failure(

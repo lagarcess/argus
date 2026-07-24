@@ -631,4 +631,37 @@ describe("chat backtest jobs", () => {
     expect(polling).toContain("response.job.status === \"running\"");
     expect(chat).not.toContain('workflow_proof');
   });
+
+  test("ChatInterface exits ambiguous Run checking through typed recovery", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const ambiguityStart = chat.indexOf(
+      "const confirmationId = ambiguousRunConfirmationId",
+    );
+    const ambiguityEnd = chat.indexOf(
+      "const canApplyOwnedUpdate",
+      ambiguityStart,
+    );
+    const ambiguity = chat.slice(ambiguityStart, ambiguityEnd);
+    const recoveryStart = ambiguity.indexOf(
+      'reconciliation.kind === "recoverable"',
+    );
+    const recovery = ambiguity.slice(recoveryStart);
+    const clearStart = chat.indexOf("function clearActiveStreamState()");
+    const clearEnd = chat.indexOf("const loadMoreHistory", clearStart);
+    const clearState = chat.slice(clearStart, clearEnd);
+
+    expect(ambiguityStart).toBeGreaterThan(-1);
+    expect(ambiguity).toContain("applyRecoverableRunReconciliation");
+    expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
+    expect(ambiguity).toContain("clearActiveStreamState()");
+    expect(clearState).toContain("setStreamStatus(null)");
+    expect(clearState).toContain("setIsStreamingResponse(false)");
+    expect(ambiguity).toContain("durableStateUnknown: true");
+    expect(recovery).not.toContain(
+      "settleConfirmationAfterActionTransportError(",
+    );
+  });
 });
