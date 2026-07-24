@@ -85,6 +85,9 @@ describe("guest session entry contract", () => {
     expect(existsSync(contextPath)).toBe(true);
     expect(gate).toContain("<AccountProvider");
     expect(chat).toContain("useAccount()");
+    expect(gate.indexOf('me.account_kind === "guest"')).toBeLessThan(
+      gate.indexOf("const profileLanguage"),
+    );
     expect(gate).not.toMatch(
       /me\.account_kind === "guest"[\s\S]{0,500}patchMe\(\{[\s\S]{0,300}primary_goal/,
     );

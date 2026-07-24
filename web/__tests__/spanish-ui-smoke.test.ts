@@ -62,6 +62,22 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.result_followup.headings.general",
     "chat.result_followup.headings.next_experiment",
     "chat.history.pinned",
+    "guest.shell.value_title",
+    "guest.shell.value_body",
+    "guest.shell.sign_in",
+    "guest.shell.settings",
+    "guest.shell.feedback",
+    "guest.shell.temporary_until",
+    "guest.shell.before_message.prefix",
+    "guest.shell.before_message.terms",
+    "guest.shell.before_message.middle",
+    "guest.shell.before_message.privacy",
+    "guest.shell.after_message.safety",
+    "guest.shell.after_message.terms",
+    "guest.shell.after_message.privacy",
+    "guest.hints.confirmation",
+    "guest.hints.result",
+    "guest.hints.dismiss",
   ];
 
   const requiredSpanishStaticValues = {

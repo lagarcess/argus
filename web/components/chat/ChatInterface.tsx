@@ -16,6 +16,8 @@ import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar"
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import GuestHeader from "@/components/guest/GuestHeader";
+import GuestLegalFooter from "@/components/guest/GuestLegalFooter";
 import { useAccount } from "@/lib/account-context";
 
 import {
@@ -586,6 +588,15 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const account = useAccount();
+  const isGuest = account?.account_kind === "guest";
+  const canCreateAdditionalConversation =
+    account?.capabilities.can_create_additional_conversation ?? true;
+  const canManageConversation =
+    account?.capabilities.can_manage_conversation ?? true;
+  const canSaveDecision =
+    account?.capabilities.can_save_decision ?? true;
+  const canUseOmnisearch =
+    account?.capabilities.can_use_omnisearch ?? true;
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -718,6 +729,37 @@ export default function ChatInterface() {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const requestOmnisearch = useCallback(() => {
+    if (isGuest && !canUseOmnisearch) {
+      showToast(
+        t(
+          "guest.shell.search_unavailable",
+          "Search isn't available for temporary chats yet.",
+        ),
+      );
+      return;
+    }
+    setSearchOverlayOpen(true);
+  }, [canUseOmnisearch, isGuest, showToast, t]);
+
+  const requestGuestSignIn = useCallback(() => {
+    showToast(
+      t(
+        "guest.shell.sign_in_unavailable",
+        "Sign in is not available in this preview. Your temporary chat stays here.",
+      ),
+    );
+  }, [showToast, t]);
+
+  const requestGuestDecision = useCallback(() => {
+    showToast(
+      t(
+        "guest.shell.decision_unavailable",
+        "Sign in to save this decision.",
+      ),
+    );
+  }, [showToast, t]);
 
   const clearConversationAttention = useCallback((nextConversationId?: string | null) => {
     setAttentionConversationIds((prev) =>
@@ -906,12 +948,12 @@ export default function ChatInterface() {
         return;
       }
       event.preventDefault();
-      setSearchOverlayOpen(true);
+      requestOmnisearch();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [requestOmnisearch]);
 
   useEffect(() => {
     if (!strategiesEnabled && currentView === "strategies") {
@@ -1203,6 +1245,33 @@ export default function ChatInterface() {
     void refreshHistory();
     return null;
   }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
+
+  const requestNewChat = useCallback(() => {
+    if (
+      isGuest &&
+      !canCreateAdditionalConversation &&
+      (messages.length > 0 || conversationId !== null)
+    ) {
+      showToast(
+        t(
+          "guest.shell.new_chat_unavailable",
+          "Sign in to keep this conversation and start another.",
+        ),
+      );
+      closeTransientSidebar();
+      return;
+    }
+    void startNewChat();
+  }, [
+    canCreateAdditionalConversation,
+    closeTransientSidebar,
+    conversationId,
+    isGuest,
+    messages.length,
+    showToast,
+    startNewChat,
+    t,
+  ]);
 
   const handleConversationRemoved = useCallback((removedConversationId: string) => {
     setHistoryItems((prev) =>
@@ -1960,7 +2029,7 @@ export default function ChatInterface() {
       return;
     }
     if (value === "/action:new-chat") {
-      void startNewChat();
+      requestNewChat();
       return;
     }
     if (action.type === "retry_last_turn") {
@@ -2135,7 +2204,7 @@ export default function ChatInterface() {
         historyNextCursor={historyNextCursor}
         isLoadingMoreHistory={isLoadingMoreHistory}
         onNewChat={() => {
-          void startNewChat();
+          requestNewChat();
           closeTransientSidebar();
         }}
         onNavigate={(view) => {
@@ -2146,7 +2215,7 @@ export default function ChatInterface() {
         onLoadMoreHistory={loadMoreHistory}
         onOpenSearch={() => {
           if (omnisearchEnabled) {
-            setSearchOverlayOpen(true);
+            requestOmnisearch();
           }
         }}
         onHistoryMutated={refreshHistory}
@@ -2167,9 +2236,12 @@ export default function ChatInterface() {
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={omnisearchEnabled}
+        canManageConversation={canManageConversation}
+        showProfileMenu={!isGuest}
+        temporaryExpiresAt={account?.guest?.expires_at ?? null}
       />
 
-      {omnisearchEnabled && searchOverlayOpen && (
+      {omnisearchEnabled && (!isGuest || canUseOmnisearch) && searchOverlayOpen && (
         <ChatCommandPalette
           onClose={() => setSearchOverlayOpen(false)}
           onOpenConversation={(convId) => {
@@ -2216,8 +2288,28 @@ export default function ChatInterface() {
           </h1>
 
           {/* Action Button (Always Right-Anchored) */}
-          <div className="flex w-11 justify-end pointer-events-auto md:w-32">
+          <div
+            className={`flex justify-end pointer-events-auto ${
+              isGuest ? "w-auto md:w-64" : "w-11 md:w-32"
+            }`}
+          >
             {currentView === "chat" && (
+              isGuest ? (
+                <GuestHeader
+                  expiresAt={account?.guest?.expires_at ?? null}
+                  onFeedback={() => {
+                    setFeedbackState({
+                      isOpen: true,
+                      type: "general",
+                      context: {
+                        surface: "guest_header",
+                        conversation_id: conversationId,
+                      },
+                    });
+                  }}
+                  onSignIn={requestGuestSignIn}
+                />
+              ) : (
               <div className="relative" ref={chatOptionsRef}>
                 <button
                   type="button"
@@ -2303,6 +2395,7 @@ export default function ChatInterface() {
                   </div>
                 )}
               </div>
+              )
             )}
             {strategiesEnabled && currentView === "strategies" && (
               <button
@@ -2321,10 +2414,29 @@ export default function ChatInterface() {
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
 
             {messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
-                <h1 className="font-display mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
+              <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
+                <h1 className={`font-display text-[40px] font-medium tracking-tight text-black dark:text-white ${
+                  isGuest ? "mb-3" : "mb-8"
+                }`}>
                   argus
                 </h1>
+
+                {isGuest ? (
+                  <div className="mb-6 max-w-xl text-center">
+                    <p className="font-display text-[22px] font-medium tracking-tight text-black/85 dark:text-white/85">
+                      {t(
+                        "guest.shell.value_title",
+                        "Test an investing idea against history.",
+                      )}
+                    </p>
+                    <p className="mx-auto mt-2 max-w-lg text-[15px] leading-[1.55] text-black/50 dark:text-white/50">
+                      {t(
+                        "guest.shell.value_body",
+                        "Describe your idea naturally. Argus will clarify the setup, show what it can test, and run a historical simulation.",
+                      )}
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="w-full max-w-2xl">
                   <ChatInput
@@ -2333,6 +2445,12 @@ export default function ChatInterface() {
                     placeholder={chatInputPlaceholder}
                     onToast={showToast}
                   />
+                  {isGuest ? (
+                    <GuestLegalFooter
+                      expiresAt={account?.guest?.expires_at}
+                      variant="before_message"
+                    />
+                  ) : null}
                 </div>
 
                 {showOnboardingGoalCards && (
@@ -2443,6 +2561,9 @@ export default function ChatInterface() {
                           isLatest={isLatestAi}
                           isStreaming={isWorkingMessage}
                           conversationId={conversationId}
+                          isGuest={isGuest}
+                          canSaveDecision={canSaveDecision}
+                          onDecisionUnavailable={requestGuestDecision}
                         />
                       );
                     })}
@@ -2493,14 +2614,19 @@ export default function ChatInterface() {
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
                     />
-                    {showConversationDisclaimer && (
+                    {isGuest ? (
+                      <GuestLegalFooter
+                        expiresAt={account?.guest?.expires_at}
+                        variant="after_message"
+                      />
+                    ) : showConversationDisclaimer ? (
                       <p
                         data-testid="chat-disclaimer"
                         className="mt-3 text-center text-[13px] font-normal leading-[1.45] text-black/40 dark:text-white/40"
                       >
                         {t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </>

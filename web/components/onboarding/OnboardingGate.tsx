@@ -76,14 +76,14 @@ export function OnboardingGate({
       try {
         const me = await getMe();
         let resolvedUser = me.user;
-        const profileLanguage = normalizeEnabledLanguage(resolvedUser.language);
-        if (profileLanguage !== normalizeEnabledLanguage(i18n.language)) {
-          await i18n.changeLanguage(profileLanguage);
-        }
         if (me.account_kind === "guest") {
           setAccount(me);
           setStep("done");
           return;
+        }
+        const profileLanguage = normalizeEnabledLanguage(resolvedUser.language);
+        if (profileLanguage !== normalizeEnabledLanguage(i18n.language)) {
+          await i18n.changeLanguage(profileLanguage);
         }
         resolvedUser = await resolveRegisteredOnboarding(me);
         setAccount({ ...me, user: resolvedUser });

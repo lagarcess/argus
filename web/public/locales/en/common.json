@@ -1027,5 +1027,39 @@
     "legal_prefix": "By signing up, you agree to our",
     "terms": "Terms",
     "privacy": "Privacy Policy"
+  },
+  "guest": {
+    "entry": {
+      "loading": "Opening Argus",
+      "error": "Argus couldn't open a temporary chat. Try again."
+    },
+    "shell": {
+      "value_title": "Test an investing idea against history.",
+      "value_body": "Describe your idea naturally. Argus will clarify the setup, show what it can test, and run a historical simulation.",
+      "sign_in": "Sign in",
+      "settings": "Guest settings",
+      "feedback": "Feedback",
+      "temporary_until": "Temporary chat · available in this browser until {{date}}",
+      "before_message": {
+        "prefix": "By messaging Argus, you agree to ",
+        "terms": "Terms",
+        "middle": " and acknowledge ",
+        "privacy": "Privacy"
+      },
+      "after_message": {
+        "safety": "Argus can make mistakes. For education only. Not financial advice.",
+        "terms": "Terms",
+        "privacy": "Privacy"
+      },
+      "new_chat_unavailable": "Sign in to keep this conversation and start another.",
+      "search_unavailable": "Search isn't available for temporary chats yet.",
+      "decision_unavailable": "Sign in to save this decision.",
+      "sign_in_unavailable": "Sign in is not available in this preview. Your temporary chat stays here."
+    },
+    "hints": {
+      "confirmation": "Review the assumptions, then run the test.",
+      "result": "Change the chart range or ask a follow-up.",
+      "dismiss": "Dismiss hint"
+    }
   }
 }

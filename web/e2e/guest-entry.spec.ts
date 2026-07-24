@@ -252,3 +252,208 @@ test("@guest-shell frontend-on server-off mismatch stays on a retry surface", as
   await expect(page.getByTestId("chat-input")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign up" })).toHaveCount(0);
 });
+
+test("@guest-shell capability chrome stays visible and fail closed before conversion", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page);
+  let searchCalls = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith("/api/v1/search")) {
+      searchCalls += 1;
+    }
+  });
+
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  await expect(
+    page.getByText("Test an investing idea against history."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Chat options" })).toHaveCount(0);
+  await expect(page.getByTestId("guest-legal-before_message")).toContainText(
+    "By messaging Argus",
+  );
+  await expect(
+    page.getByTestId("guest-legal-before_message").getByRole("link", { name: "Terms" }),
+  ).toHaveAttribute("href", "/terms");
+  await expect(
+    page.getByTestId("guest-legal-before_message").getByRole("link", { name: "Privacy" }),
+  ).toHaveAttribute("href", "/privacy");
+  await expect(page.getByTestId("guest-legal-before_message")).toContainText("2026");
+
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(
+    page.getByText("Sign in is not available in this preview."),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/chat$/);
+
+  await page.getByRole("button", { name: "Guest settings" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "Guest settings" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Guest settings" }).click();
+  await page.getByRole("button", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("menuitemradio", { name: "Español" }).click();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await expect(page.getByRole("button", { name: "Buscar" })).toBeVisible();
+  await page.getByRole("button", { name: "Buscar" }).click();
+  await expect(
+    page.getByText("La búsqueda aún no está disponible para chats temporales."),
+  ).toBeVisible();
+  expect(searchCalls).toBe(0);
+
+  await page.getByTestId("chat-input").fill("Compara Apple con SPY");
+  await page.getByTestId("chat-input").press("Enter");
+  await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+  await expect(page.getByTestId("guest-legal-after_message")).toContainText(
+    "Solo con fines educativos",
+  );
+  await expect(page.getByRole("button", { name: "Opciones de chat" })).toHaveCount(0);
+  expect(evidence.profilePatches).toEqual([]);
+
+  await page.getByRole("button", { name: "Nuevo chat" }).click();
+  await expect(
+    page.getByText("Inicia sesión para conservar esta conversación y comenzar otra."),
+  ).toBeVisible();
+  await expect(page.getByText("Compara Apple con SPY")).toBeVisible();
+});
+
+test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockGuestJourney(page);
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const composer = page.getByTestId("chat-input");
+  await expect(composer).toBeVisible();
+  await expect(page.getByTestId("guest-legal-before_message")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+
+  expect(
+    await composer.evaluate((element) =>
+      Number.parseFloat(window.getComputedStyle(element).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(16);
+  for (const locator of [
+    page.getByRole("button", { name: "Guest settings" }),
+    page.getByRole("button", { name: "Sign in" }),
+  ]) {
+    const box = await locator.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+});
+
+test("@guest-shell hints require typed artifacts and dismiss locally without writes", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page);
+  let durableHintWrites = 0;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      request.method() !== "GET" &&
+      (url.pathname.includes("/evidence-artifacts/") ||
+        url.pathname.endsWith("/api/v1/me"))
+    ) {
+      durableHintWrites += 1;
+    }
+  });
+
+  evidence.persistedMessages = [
+    {
+      id: "msg-confirmation",
+      conversation_id: CONVERSATION_ID,
+      role: "assistant",
+      content: "",
+      created_at: "2026-07-24T18:01:01Z",
+      metadata: {
+        confirmation_card: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          status: "ready_to_run",
+          statusLabel: "Ready to run",
+          summary: "Buy and hold AAPL with SPY as the benchmark.",
+          rows: [
+            { key: "strategy", label: "Strategy", value: "Buy and hold" },
+            { key: "assets", label: "Assets", value: "AAPL" },
+            { key: "period", label: "Period", value: "Last 12 months" },
+          ],
+          assumptions: ["Long only"],
+          actions: [],
+        },
+      },
+    },
+  ];
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.getByTestId("guest-confirmation-hint")).toContainText(
+    "Review the assumptions",
+  );
+  await page
+    .getByTestId("guest-confirmation-hint")
+    .getByRole("button", { name: "Dismiss hint" })
+    .click();
+  await expect(page.getByTestId("guest-confirmation-hint")).toHaveCount(0);
+
+  evidence.persistedMessages = [
+    {
+      id: "msg-result",
+      conversation_id: CONVERSATION_ID,
+      role: "assistant",
+      content: "AAPL finished ahead of its starting value.",
+      created_at: "2026-07-24T18:02:00Z",
+      metadata: {
+        result_run_id: "run-1",
+        latest_run_id: "run-1",
+        result_conversation_id: CONVERSATION_ID,
+        result_card: {
+          title: "AAPL buy and hold",
+          symbols: ["AAPL"],
+          strategy_label: "Buy and hold",
+          asset_class: "equity",
+          date_range: {
+            start: "2025-07-24",
+            end: "2026-07-24",
+            display: "Jul 24, 2025 to Jul 24, 2026",
+          },
+          status_label: "Simulation Complete",
+          rows: [
+            { key: "ending_value", label: "Ending value", value: "$11,200" },
+            { key: "total_return_pct", label: "Total return", value: "12.0%" },
+          ],
+          benchmark_note: "AAPL finished 1.2 points ahead of SPY.",
+          assumptions: ["Long only"],
+          actions: [],
+          evidence_artifact_id: "evidence-1",
+        },
+      },
+    },
+  ];
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByTestId("guest-confirmation-hint")).toHaveCount(0);
+  await expect(page.getByTestId("guest-result-hint")).toContainText(
+    "Change the chart range",
+  );
+  await page.getByRole("button", { name: "Add decision" }).click();
+  await expect(page.getByText("Sign in to save this decision.")).toBeVisible();
+  expect(durableHintWrites).toBe(0);
+
+  await page
+    .getByTestId("guest-result-hint")
+    .getByRole("button", { name: "Dismiss hint" })
+    .click();
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByTestId("guest-result-hint")).toHaveCount(0);
+  expect(durableHintWrites).toBe(0);
+});

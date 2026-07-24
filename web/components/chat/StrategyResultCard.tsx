@@ -35,6 +35,8 @@ type StrategyResultCardProps = {
   result: StrategyResultPayload;
   onAction?: (action: ChatActionOption) => void;
   appearance?: "light" | "dark";
+  canSaveDecision?: boolean;
+  onDecisionUnavailable?: () => void;
 };
 
 const actionClassName =
@@ -49,6 +51,8 @@ const decisionOptions: DecisionState[] = [
 
 export default function StrategyResultCard({
   appearance,
+  canSaveDecision = true,
+  onDecisionUnavailable,
   onAction,
   result,
 }: StrategyResultCardProps) {
@@ -226,6 +230,10 @@ export default function StrategyResultCard({
             <button
               type="button"
               onClick={() => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.();
+                  return;
+                }
                 setDecisionSaveFailed(false);
                 setIsDecisionOpen((current) => !current);
               }}
@@ -291,6 +299,10 @@ export default function StrategyResultCard({
               type="button"
               disabled={isSavingDecision}
               onClick={async () => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.();
+                  return;
+                }
                 if (!result.evidenceArtifactId || isSavingDecision) return;
                 setIsSavingDecision(true);
                 setDecisionSaveFailed(false);

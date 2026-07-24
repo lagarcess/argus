@@ -290,14 +290,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain('message.kind === "strategy_result"');
     expect(message).toContain("const displayContent = getDisplayContent()");
     expect(message).toContain("displayContent &&");
-    expect(message).toContain(
-      "<StrategyResultCard result={message.result} onAction={onAction} />",
+    expect(message).toContain("<StrategyResultCard");
+    expect(message).toContain("result={message.result}");
+    expect(message.indexOf("<StrategyResultCard")).toBeLessThan(
+      message.indexOf("displayContent &&"),
     );
-    expect(
-      message.indexOf(
-        "<StrategyResultCard result={message.result} onAction={onAction} />",
-      ),
-    ).toBeLessThan(message.indexOf("displayContent &&"));
   });
 
   test("failed-action retry stays a structured footer action and message menus close on focus loss", () => {
@@ -1919,7 +1916,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(flags).toContain(
       'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
     );
-    expect(chat).toContain("{omnisearchEnabled && searchOverlayOpen && (");
+    expect(chat).toContain(
+      "{omnisearchEnabled && (!isGuest || canUseOmnisearch) && searchOverlayOpen && (",
+    );
     expect(sidebar).toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");
     expect(sidebar).toContain("{omnisearchEnabled && (");

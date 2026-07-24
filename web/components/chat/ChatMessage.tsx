@@ -19,6 +19,7 @@ import {
 } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
+import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 
@@ -30,6 +31,9 @@ type ChatMessageProps = {
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
+  isGuest?: boolean;
+  canSaveDecision?: boolean;
+  onDecisionUnavailable?: () => void;
 };
 
 export default function ChatMessage({
@@ -40,6 +44,9 @@ export default function ChatMessage({
   isLatest,
   isStreaming,
   conversationId,
+  isGuest = false,
+  canSaveDecision = true,
+  onDecisionUnavailable,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
@@ -253,7 +260,13 @@ export default function ChatMessage({
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
-              <StrategyResultCard result={message.result} onAction={onAction} />
+              <StrategyResultCard
+                result={message.result}
+                onAction={onAction}
+                canSaveDecision={canSaveDecision}
+                onDecisionUnavailable={onDecisionUnavailable}
+              />
+              {isGuest ? <GuestArtifactHint kind="result" /> : null}
               {displayContent && (
                 <ResultReadout
                   content={displayContent}
@@ -276,6 +289,7 @@ export default function ChatMessage({
                 </p>
               ) : null}
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
+              {isGuest ? <GuestArtifactHint kind="confirmation" /> : null}
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (
             <ResultBreakdown
