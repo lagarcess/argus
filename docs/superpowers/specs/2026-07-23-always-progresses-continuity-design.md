@@ -1,6 +1,6 @@
 # Argus Always Progresses: End-to-End Conversation Continuity Design
 
-Status: **FOUNDER-APPROVED DESIGN — implementation not yet authorized**
+Status: **FOUNDER-APPROVED DESIGN — implementation handoff authorized**
 
 Date: 2026-07-23
 

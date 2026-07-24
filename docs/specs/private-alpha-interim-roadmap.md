@@ -238,21 +238,23 @@ Completion evidence:
 
 ### Next selected pillar: Argus always progresses
 
-Status: **READY TO SPEC — implementation not authorized**
+Status: **SPEC LOCKED — implementation handoff authorized**
 
 This pillar is next because it protects every later conversational surface.
-The first spec must choose one representative user journey on the latest
-integration checkpoint and prove that every accepted turn either advances
-typed state or reaches a clear, actionable stopping point. It must cover
-reload when the journey is durable and compare the candidate against the
-current Golden Path.
+The founder-approved end-to-end contract is
+[`2026-07-23-always-progresses-continuity-design.md`](../superpowers/specs/2026-07-23-always-progresses-continuity-design.md).
+The serialized execution plan is
+[`2026-07-23-always-progresses-continuity.md`](../superpowers/plans/2026-07-23-always-progresses-continuity.md).
+Together they require every accepted operation to advance typed state or reach
+a clear, actionable stopping point across clarification, confirmation, Run,
+result, retry, and reload.
 
 This is not permission for a generic loop engine, broad runtime refactor, new
 intent taxonomy, phrase-based routing, or a sweep of historical issue debt.
-Related issues and the audit donor are evidence only. Implementation begins
-only after a founder-approved vertical-slice contract names the exact journey,
-allowed surfaces, no-touch areas, live-browser acceptance, rollback, and stop
-conditions.
+Related issues and the audit donor remain evidence only. The implementation
+worker must execute the locked plan from a fresh worktree based on the current
+integration branch, prove gaps at exact head before editing, and stop at the
+plan's founder review boundaries.
 
 ## Retained Product Decisions
 
