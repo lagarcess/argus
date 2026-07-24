@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api import state as api_state
+from argus.api.guest_access import guest_account_context
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
 from argus.api.schemas import (
@@ -19,6 +20,7 @@ from argus.api.schemas import (
     IdeaVersion,
     Strategy,
 )
+from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
@@ -1151,6 +1153,49 @@ def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
     assert final_payload["message_id"]
 
 
+def test_guest_chat_bypasses_registered_onboarding_without_profile_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    client = _client()
+    before = client.get("/api/v1/me").json()["user"]
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    created_at = utcnow()
+    workspace = GuestWorkspace(
+        user_id=before["id"],
+        conversation_id=conversation["id"],
+        status="active",
+        created_at=created_at,
+        expires_at=created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=created_at,
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "account_context",
+        lambda request: guest_account_context(workspace),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "primary goal" not in response.text
+    assert "I tested that idea with TSLA." in response.text
+    after = client.get("/api/v1/me").json()["user"]
+    assert after["onboarding"] == before["onboarding"]
+    assert after["onboarding"]["completed"] is False
+    assert after["onboarding"]["primary_goal"] is None
+
+
 def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
@@ -1337,9 +1382,9 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     response = client.get("/api/v1/search", params={"q": "tesla chat"})
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [
-        item["id"] for item in items if item["type"] == "chat"
-    ] == [conversation["id"]]
+    assert [item["id"] for item in items if item["type"] == "chat"] == [
+        conversation["id"]
+    ]
 
 
 def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
@@ -1946,9 +1991,7 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
         and card.get("decision_state") == "promising"
         for card in assistant_result_cards
     )
-    reloaded = client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    )
+    reloaded = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert reloaded.status_code == 200
     reloaded_cards = [
         item.get("metadata", {}).get("result_card")

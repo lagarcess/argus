@@ -5,10 +5,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api import state as api_state
+from argus.api.chat.onboarding import (
+    account_uses_registered_onboarding,
+    persist_registered_onboarding_update,
+)
 from argus.api.guest_access import (
     account_context,
     guest_access_enabled,
+    guest_account_context,
     public_account_access_enabled,
+    registered_account_context,
 )
 from argus.api.main import app
 from argus.api.schemas import OnboardingState, User
@@ -161,3 +167,37 @@ def test_account_context_requires_current_user_to_establish_verified_truth() -> 
 
     with pytest.raises(RuntimeError, match="not established"):
         account_context(request)
+
+
+def test_only_registered_accounts_use_registered_onboarding_policy() -> None:
+    guest = guest_account_context(_workspace())
+    registered = registered_account_context(USER_ID)
+
+    assert account_uses_registered_onboarding(guest, configured_enabled=True) is False
+    assert account_uses_registered_onboarding(registered, configured_enabled=True) is True
+    assert (
+        account_uses_registered_onboarding(registered, configured_enabled=False) is False
+    )
+
+
+def test_guest_onboarding_profile_truth_is_never_mutated() -> None:
+    profile = _profile(email=None)
+    guest = guest_account_context(_workspace())
+    gateway = MagicMock(spec=SupabaseGateway)
+
+    with patch.object(api_state, "supabase_gateway", gateway):
+        result = persist_registered_onboarding_update(
+            guest,
+            profile,
+            {
+                "stage": "completed",
+                "completed": True,
+                "primary_goal": "surprise_me",
+            },
+        )
+
+    assert result.onboarding == profile.onboarding
+    assert result.onboarding.completed is False
+    assert result.onboarding.primary_goal is None
+    gateway.get_user.assert_not_called()
+    gateway.update_user.assert_not_called()

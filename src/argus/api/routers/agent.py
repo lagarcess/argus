@@ -49,8 +49,10 @@ from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
 from argus.api.chat.onboarding import (
-    parse_onboarding_control_message,
-    persist_onboarding_update,
+    onboarding_goal_for_account,
+    persist_registered_onboarding_update,
+    primary_goal_for_account,
+    registered_onboarding_required,
 )
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
@@ -347,9 +349,11 @@ def _missing_result_action_run_message(
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
 def list_starter_prompts(
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> StarterPromptsResponse:
-    prompts = get_starter_prompts(user.onboarding.primary_goal, user.language)
+    context = account_context(request)
+    prompts = get_starter_prompts(primary_goal_for_account(context, user), user.language)
     return StarterPromptsResponse(prompts=prompts)
 
 
@@ -392,7 +396,7 @@ async def chat_stream(
     language = payload.language or current_user_profile.language or "en"
     request_message = chat_request_message(payload, language=language)
     display_message = chat_display_message(payload, language=language)
-    onboarding_goal = parse_onboarding_control_message(request_message)
+    onboarding_goal = onboarding_goal_for_account(turn_account, request_message)
 
     conversation = None
     if api_state.supabase_gateway is not None:
@@ -688,13 +692,9 @@ async def chat_stream(
     # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
     # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
     # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
-    onboarding_enabled = (
-        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
-        != "false"
-    )
-    onboarding_required = onboarding_enabled and (
-        current_user_profile.onboarding.stage
-        in {"language_selection", "primary_goal_selection"}
+    onboarding_required = registered_onboarding_required(
+        turn_account,
+        current_user_profile.onboarding.stage,
     )
 
     async def events() -> AsyncIterator[str]:
@@ -773,7 +773,8 @@ async def chat_stream(
             return
 
         if onboarding_goal is not None:
-            persist_onboarding_update(
+            persist_registered_onboarding_update(
+                turn_account,
                 current_user_profile,
                 {
                     "stage": "ready",
@@ -1069,7 +1070,8 @@ async def chat_stream(
                         quick_take=assistant_text,
                         execution_identity=active_finalization_execution_identity,
                     )
-                    persist_onboarding_update(
+                    persist_registered_onboarding_update(
+                        turn_account,
                         current_user_profile,
                         {
                             "stage": "completed",
