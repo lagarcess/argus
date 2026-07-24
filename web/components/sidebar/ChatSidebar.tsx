@@ -394,7 +394,7 @@ export default function ChatSidebar({
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
+      className={`flex shrink-0 flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
         isOpen ? "w-72" : "w-14"
       }`}
     >

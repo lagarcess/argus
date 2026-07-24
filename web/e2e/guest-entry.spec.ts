@@ -350,6 +350,14 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await expect
+    .poll(async () => (await page.locator("aside").boundingBox())?.width ?? 0)
+    .toBeGreaterThanOrEqual(280);
+  await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recents" })).toBeVisible();
 });
 
 test("@guest-shell hints require typed artifacts and dismiss locally without writes", async ({
