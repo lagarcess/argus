@@ -22,7 +22,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   createConversation,
   deleteConversation,
-  getBacktestJob,
   getBacktestRun,
   getMe,
   listConversations,
@@ -40,7 +39,6 @@ import {
   type ChatActionRequest,
   type HistoryItem,
   type BacktestRun,
-  type BacktestJobResponse,
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
@@ -109,8 +107,14 @@ import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
   backtestJobMessageFromApi,
-  pendingBacktestJobIds,
 } from "@/lib/chat-backtest-jobs";
+import {
+  ambiguousRunConfirmationId,
+  applyReconciledBacktestJobResponse,
+  getBacktestJobByAction,
+  reconcileAmbiguousRunResponse,
+  useBacktestJobPolling,
+} from "@/lib/chat-run-reconciliation";
 import {
   actionHasCardScopedOwnership,
   isConfirmationAction,
@@ -664,25 +668,10 @@ export default function ChatInterface() {
       }),
     [],
   );
-  const pendingBacktestJobKey = useMemo(
-    () => pendingBacktestJobIds(messages).join("|"),
-    [messages],
-  );
-
-  const applyDurableBacktestJobResponse = useCallback(
-    (response: BacktestJobResponse) => {
-      if (!canApplyConversationOwnedUpdate(response.job.conversation_id)) {
-        return;
-      }
-      setMessages((prev) =>
-        normalizeDurableRetryActionHistory(
-          normalizeConfirmationHistory(
-            applyBacktestJobUpdate(prev, response),
-          ),
-        ),
-      );
-    },
-    [canApplyConversationOwnedUpdate],
+  useBacktestJobPolling(
+    messages,
+    canApplyConversationOwnedUpdate,
+    setMessages,
   );
 
   // ── Toast helper ───────────────────────────────────────────────────────────
@@ -1026,49 +1015,6 @@ export default function ChatInterface() {
       updateScrollPositionState();
     }
   }, [messages.length, streamStatus]);
-
-  useEffect(() => {
-    if (!pendingBacktestJobKey) {
-      return;
-    }
-    let cancelled = false;
-    const timers: number[] = [];
-    const jobIds = pendingBacktestJobKey.split("|").filter(Boolean);
-
-    const pollJob = async (jobId: string, attempt = 0) => {
-      try {
-        const response = await getBacktestJob(jobId);
-        if (cancelled) {
-          return;
-        }
-        applyDurableBacktestJobResponse(response);
-        const shouldContinue =
-          response.job.status === "queued" ||
-          response.job.status === "running" ||
-          (response.job.status === "succeeded" && !response.run);
-        if (shouldContinue && attempt < 45) {
-          timers.push(window.setTimeout(() => {
-            void pollJob(jobId, attempt + 1);
-          }, 2000));
-        }
-      } catch {
-        if (!cancelled && attempt < 5) {
-          timers.push(window.setTimeout(() => {
-            void pollJob(jobId, attempt + 1);
-          }, 3000));
-        }
-      }
-    };
-
-    jobIds.forEach((jobId) => {
-      void pollJob(jobId);
-    });
-
-    return () => {
-      cancelled = true;
-      timers.forEach(window.clearTimeout);
-    };
-  }, [applyDurableBacktestJobResponse, pendingBacktestJobKey]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
@@ -1676,6 +1622,56 @@ export default function ChatInterface() {
         }
         markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
         return;
+      }
+      const confirmationId = ambiguousRunConfirmationId(action, err);
+      if (confirmationId) {
+        if (canApplyConversationOwnedUpdate(activeStreamTargetConversationId)) {
+          setInputActions([]);
+          setStreamStatus(t('chat.status.checking'));
+          setMessages((prev) =>
+            settleConfirmationAfterActionTransportError(prev, action, {
+              durableStateUnknown: true,
+            }),
+          );
+        }
+        const reconciliation = await reconcileAmbiguousRunResponse({
+          lookup: () => getBacktestJobByAction(confirmationId),
+          replay: () => streamToConversation(activeStreamTargetConversationId),
+        });
+        if (reconciliation.kind === "replayed") return;
+        if (reconciliation.kind === "rejected") {
+          err = reconciliation.error;
+        } else if (reconciliation.kind === "durable") {
+          if (
+            canApplyConversationOwnedUpdate(
+              reconciliation.response.job.conversation_id,
+            )
+          ) {
+            setMessages((prev) =>
+              normalizeDurableRetryActionHistory(
+                normalizeConfirmationHistory(
+                  applyReconciledBacktestJobResponse(
+                    prev,
+                    reconciliation.response,
+                    assistantId,
+                  ),
+                ),
+              ),
+            );
+            setStreamStatus(null);
+            setIsStreamingResponse(false);
+            activeStreamConversationIdRef.current = null;
+          }
+          markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+          return;
+        } else {
+          if (canApplyConversationOwnedUpdate(activeStreamTargetConversationId)) {
+            setIsStreamingResponse(false);
+            activeStreamConversationIdRef.current = null;
+          }
+          markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+          return;
+        }
       }
       const canApplyOwnedUpdate = canApplyConversationOwnedUpdate(
         activeStreamTargetConversationId,

@@ -483,9 +483,13 @@ export function settleOpenConfirmationsAfterStreamError(
 export function settleConfirmationAfterActionTransportError(
   messages: Message[],
   action: ChatActionOption | undefined,
+  options: { durableStateUnknown?: boolean } = {},
 ): Message[] {
   const effect = confirmationActionEffectFromAction(action);
   if (!effect) {
+    return messages;
+  }
+  if (effect.type === "run_backtest" && options.durableStateUnknown) {
     return messages;
   }
   const failedEffect: ConfirmationActionEffect = {

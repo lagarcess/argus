@@ -299,6 +299,28 @@ def test_backtests_run_openapi_requires_idempotency_key() -> None:
     assert "required: true" in backtest_run_contract
 
 
+def test_by_action_backtest_job_lookup_is_declared_in_openapi() -> None:
+    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+    contract = yaml.safe_load(openapi.read_text(encoding="utf-8"))
+
+    operation = contract["paths"][
+        "/api/v1/backtest-jobs/by-action/{confirmation_id}"
+    ]["get"]
+
+    assert operation["parameters"] == [
+        {
+            "name": "confirmation_id",
+            "in": "path",
+            "required": True,
+            "schema": {"type": "string"},
+        }
+    ]
+    assert operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/BacktestJobResponse"}
+    assert {"404", "409", "500"}.issubset(operation["responses"])
+
+
 def test_logout_openapi_declares_browser_origin_rejection() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 

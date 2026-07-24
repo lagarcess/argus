@@ -79,7 +79,12 @@ def get_backtest_job_reservation(
 ) -> dict[str, Any] | None:
     result = (
         client.table("backtest_jobs")
-        .select("id,status,identity_hash")
+        .select(
+            "id,conversation_id,request_message_id,confirmation_message_id,"
+            "operation_scope,idempotency_key,identity_hash,payload_hash,status,"
+            "result_run_id,failure_code,failure_detail,retryable,queued_at,"
+            "started_at,finished_at,created_at,updated_at,execution_metadata"
+        )
         .eq("user_id", user_id)
         .eq("operation_scope", operation_scope)
         .eq("idempotency_key", idempotency_key)

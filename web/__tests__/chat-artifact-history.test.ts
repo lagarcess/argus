@@ -247,6 +247,31 @@ describe("chat artifact history", () => {
     expect(messages[1].actions).toEqual([]);
   });
 
+  test("ambiguous run transport keeps its confirmation nonterminal during lookup", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [checking] = settleConfirmationAfterActionTransportError(
+      [running],
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+      { durableStateUnknown: true },
+    );
+
+    expect(checking.confirmation?.confirmation_state).toBe("superseded");
+    expect(checking.confirmation?.status).toBe("running");
+    expect(checking.confirmation?.status).not.toBe("could_not_run");
+  });
+
   test("cancel action tombstones hide action transcript noise on reload", () => {
     const items: ApiMessage[] = [
       {

@@ -562,7 +562,7 @@ export function formatRelativeDate(
 
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
 

@@ -615,15 +615,20 @@ describe("chat backtest jobs", () => {
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const polling = readFileSync(
+      join(root, "lib/chat-run-reconciliation.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("getBacktestJob");
+    expect(chat).toContain("useBacktestJobPolling");
+    expect(polling).toContain("getBacktestJob");
     expect(chat).toContain("backtestJobMessageFromApi(m)");
     expect(chat).toContain("const finalBacktestJob = backtestJobFromFinalPayload(finalPayload)");
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
-    expect(chat).toContain("pendingBacktestJobKey");
-    expect(chat).toContain("response.job.status === \"succeeded\" && !response.run");
-    expect(chat).toContain("response.job.status === \"running\"");
+    expect(polling).toContain("pendingBacktestJobKey");
+    expect(polling).toContain("response.job.status === \"succeeded\" && !response.run");
+    expect(polling).toContain("response.job.status === \"running\"");
     expect(chat).not.toContain('workflow_proof');
   });
 });
