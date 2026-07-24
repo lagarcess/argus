@@ -807,6 +807,7 @@ def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
         assert set(schema["properties"]) == {
             "hour",
             "day",
+            "guest_session",
             "available_now",
             "limiting_window",
         }

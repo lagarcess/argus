@@ -157,6 +157,81 @@ def test_cleanup_dry_run_is_bounded_and_changes_nothing() -> None:
             cursor.execute("delete from auth.users where id = %s", (guest["user_id"],))
 
 
+def test_cleanup_dry_run_and_real_run_share_transition_grace_predicate() -> None:
+    with psycopg.connect(DSN, autocommit=False) as connection:
+        active = _seed_expired_guest(connection)
+        stale_expired = _seed_expired_guest(connection)
+        recent_expired = _seed_expired_guest(connection)
+        permanent = _seed_expired_guest(connection)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set status = 'expired', updated_at = now() - interval '10 minutes'"
+                " where user_id = %s",
+                (stale_expired["user_id"],),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set status = 'expired', updated_at = now() - interval '1 minute'"
+                " where user_id = %s",
+                (recent_expired["user_id"],),
+            )
+            cursor.execute(
+                "update auth.users" " set is_anonymous = false, email = %s where id = %s",
+                (
+                    f"permanent-{permanent['user_id'][:8]}@example.com",
+                    permanent["user_id"],
+                ),
+            )
+            cursor.execute(
+                "update public.profiles set email = %s where id = %s",
+                (
+                    f"permanent-{permanent['user_id'][:8]}@example.com",
+                    permanent["user_id"],
+                ),
+            )
+            fixture_ids = [
+                active["user_id"],
+                stale_expired["user_id"],
+                recent_expired["user_id"],
+                permanent["user_id"],
+            ]
+            cursor.execute(
+                "select user_id::text, status, conversation_id::text"
+                " from public.guest_workspaces"
+                " where user_id = any(%s::uuid[]) order by user_id",
+                (fixture_ids,),
+            )
+            before = cursor.fetchall()
+            cursor.execute(
+                "select user_id::text, conversation_id::text"
+                " from public.claim_expired_guest_workspaces(100, true)",
+            )
+            dry_ids = {row[0] for row in cursor.fetchall() if row[0] in set(fixture_ids)}
+            cursor.execute(
+                "select user_id::text, status, conversation_id::text"
+                " from public.guest_workspaces"
+                " where user_id = any(%s::uuid[]) order by user_id",
+                (fixture_ids,),
+            )
+            assert cursor.fetchall() == before
+            cursor.execute(
+                "select user_id::text, conversation_id::text"
+                " from public.claim_expired_guest_workspaces(100, false)",
+            )
+            real_ids = {row[0] for row in cursor.fetchall() if row[0] in set(fixture_ids)}
+
+        assert (
+            dry_ids
+            == real_ids
+            == {
+                active["user_id"],
+                stale_expired["user_id"],
+            }
+        )
+        connection.rollback()
+
+
 def test_cleanup_marks_expired_before_removing_conversation_graph() -> None:
     with _connect() as connection:
         guest = _seed_expired_guest(connection)

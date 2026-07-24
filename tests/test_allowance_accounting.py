@@ -10,14 +10,16 @@ for both messages and simulations.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.schemas import Conversation, Message, OnboardingState, User
+from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
+from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi.testclient import TestClient
@@ -141,6 +143,36 @@ def _assistant_settlements(gateway: MagicMock) -> list[dict[str, Any]]:
         if settle is not None:
             settlements.append(dict(settle))
     return settlements
+
+
+def _configure_guest_account(mock_gateway: MagicMock) -> GuestWorkspace:
+    profile = _profile().model_copy(
+        update={
+            "email": None,
+            "username": None,
+            "display_name": None,
+            "is_admin": False,
+        }
+    )
+    workspace = GuestWorkspace(
+        user_id=profile.id,
+        conversation_id="00000000-0000-0000-0000-000000000101",
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": profile.id,
+        "email": None,
+        "is_anonymous": True,
+    }
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = profile
+    mock_gateway.get_active_guest_workspace.return_value = workspace
+    mock_gateway.get_user.return_value = profile
+    return workspace
 
 
 def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
@@ -458,6 +490,70 @@ def test_me_usage_used_beyond_limit_clamps_remaining_to_zero(mock_gateway):
     assert backtests["day"]["used"] == 53
     assert backtests["day"]["remaining"] == 0
     assert backtests["available_now"] is False
+
+
+def test_guest_me_usage_returns_only_fixed_session_truth(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    workspace = _configure_guest_account(mock_gateway)
+
+    def _list(**kwargs: Any) -> list[dict[str, Any]]:
+        assert kwargs["period"] == "guest_session"
+        assert kwargs["period_start"] == workspace.created_at
+        return [
+            _usage_row(
+                "chat_messages",
+                "guest_session",
+                8,
+                10,
+                workspace.expires_at.isoformat(),
+            ),
+            _usage_row(
+                "backtest_runs",
+                "guest_session",
+                1,
+                1,
+                workspace.expires_at.isoformat(),
+            ),
+        ]
+
+    mock_gateway.list_current_usage_counters.side_effect = _list
+
+    response = client.get(
+        "/api/v1/me/usage", headers={"Authorization": "Bearer guest-token"}
+    )
+
+    assert response.status_code == 200
+    allowances = response.json()["allowances"]
+    assert allowances["messages"] == {
+        "hour": None,
+        "day": None,
+        "guest_session": {
+            "limit": 10,
+            "used": 8,
+            "remaining": 2,
+            "period_end": workspace.expires_at.isoformat().replace("+00:00", "Z"),
+        },
+        "available_now": True,
+        "limiting_window": "guest_session",
+    }
+    assert allowances["backtests"] == {
+        "hour": None,
+        "day": None,
+        "guest_session": {
+            "limit": 1,
+            "used": 1,
+            "remaining": 0,
+            "period_end": workspace.expires_at.isoformat().replace("+00:00", "Z"),
+        },
+        "available_now": False,
+        "limiting_window": "guest_session",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -814,6 +910,129 @@ def test_exhausted_precheck_still_reports_same_key_collisions(
 
     assert response.status_code == 409
     assert response.json()["code"] == "idempotency_conflict"
+
+
+def test_guest_direct_exhaustion_requires_conversion_before_provider_access(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from argus.domain.supabase_gateway import QuotaExceededError
+
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    _configure_guest_account(mock_gateway)
+    mock_gateway.check_allowance_windows.side_effect = QuotaExceededError(
+        "Quota exceeded for backtest_runs (guest_session)"
+    )
+
+    with patch("argus.api.backtest_service.prepare_run_from_payload") as prepare_run:
+        response = client.post(
+            "/api/v1/backtests/run",
+            json={
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "start_date": "2024-01-02",
+                "end_date": "2024-01-05",
+            },
+            headers={
+                "Authorization": "Bearer guest-token",
+                "Idempotency-Key": "guest-second-run",
+            },
+        )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "account_conversion_required"
+    prepare_run.assert_not_called()
+    mock_gateway.admit_backtest_job.assert_not_called()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+
+
+def test_exhausted_guest_direct_exact_replay_returns_prior_result(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    _configure_guest_account(mock_gateway)
+    now = utcnow()
+    prior_run = BacktestRun(
+        id="guest-prior-run",
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={},
+        conversation_result_card={},
+        created_at=now,
+    )
+    mock_gateway.get_backtest_job_reservation.return_value = {"id": "guest-job"}
+    mock_gateway.admit_backtest_job.return_value = {
+        "decision": "replay",
+        "job": {
+            "id": "guest-job",
+            "status": "succeeded",
+            "result_run_id": prior_run.id,
+        },
+    }
+    mock_gateway.get_backtest_run.return_value = prior_run
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer guest-token",
+            "Idempotency-Key": "guest-replay",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["run"]["id"] == prior_run.id
+    mock_gateway.check_allowance_windows.assert_not_called()
+
+
+def test_exhausted_guest_direct_identity_collision_remains_conflict(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    _configure_guest_account(mock_gateway)
+    mock_gateway.get_backtest_job_reservation.return_value = {"id": "guest-job"}
+    mock_gateway.admit_backtest_job.return_value = {"decision": "conflict"}
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer guest-token",
+            "Idempotency-Key": "guest-collision",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "idempotency_conflict"
+    mock_gateway.check_allowance_windows.assert_not_called()
 
 
 def test_unexpected_direct_failure_still_settles_the_job_terminally(

@@ -10,6 +10,7 @@ type UsageWindow = {
 type UsageAllowance = {
   hour: UsageWindow;
   day: UsageWindow;
+  guest_session: null;
   available_now: boolean;
   limiting_window: "hour" | "day";
 };
@@ -37,6 +38,7 @@ function zeroAllowance(
       period_end: hourEnd,
     },
     day: { limit: dayLimit, used: 0, remaining: dayLimit, period_end: dayEnd },
+    guest_session: null,
     available_now: true,
     limiting_window: "hour",
   };
@@ -226,6 +228,7 @@ test("Usage reveals the hourly window when the backend marks it limiting", async
       messages: {
         hour: { limit: 60, used: 60, remaining: 0, period_end: hourEnd },
         day: { limit: 200, used: 90, remaining: 110, period_end: dayEnd },
+        guest_session: null,
         available_now: false,
         limiting_window: "hour",
       },
@@ -259,6 +262,7 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
       messages: {
         hour: { limit: 60, used: 0, remaining: 60, period_end: hourEnd },
         day: { limit: 200, used: 200, remaining: 0, period_end: dayEnd },
+        guest_session: null,
         available_now: false,
         limiting_window: "day",
       },

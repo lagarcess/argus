@@ -54,28 +54,28 @@ def feedback(
                     title="Account Required",
                     detail="Sign in to submit more feedback.",
                 )
-            return SuccessResponse(success=True)
-        try:
-            api_state.supabase_gateway.check_and_increment_usage_limits(
+        else:
+            try:
+                api_state.supabase_gateway.check_and_increment_usage_limits(
+                    user_id=user.id,
+                    resource="feedback",
+                    limits=[("day", 50), ("hour", 20)],
+                )
+            except QuotaExceededError as exc:
+                raise problem(
+                    request,
+                    status_code=429,
+                    code="too_many_requests",
+                    title="Quota Exceeded",
+                    detail=str(exc),
+                    headers={"Retry-After": "60"},
+                ) from exc
+            api_state.supabase_gateway.create_feedback(
                 user_id=user.id,
-                resource="feedback",
-                limits=[("day", 50), ("hour", 20)],
+                feedback_type=payload.type,
+                message=payload.message,
+                context=context,
             )
-        except QuotaExceededError as exc:
-            raise problem(
-                request,
-                status_code=429,
-                code="too_many_requests",
-                title="Quota Exceeded",
-                detail=str(exc),
-                headers={"Retry-After": "60"},
-            ) from exc
-        api_state.supabase_gateway.create_feedback(
-            user_id=user.id,
-            feedback_type=payload.type,
-            message=payload.message,
-            context=context,
-        )
     else:
         api_state.store.feedback.append(
             {

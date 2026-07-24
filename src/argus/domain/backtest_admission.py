@@ -22,6 +22,8 @@ from typing import Any, Literal
 from argus.domain.backtesting.config import normalize_timeframe
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
+    AllowanceWindowInput,
+    normalize_allowance_windows,
     read_memory_usage,
     settle_memory_usage,
 )
@@ -337,7 +339,7 @@ def admit_backtest_job_memory(
     request_message_id: str | None = None,
     confirmation_message_id: str | None = None,
     execution_metadata: dict[str, Any] | None = None,
-    allowance_limits: list[tuple[str, int]] | None = None,
+    allowance_limits: list[AllowanceWindowInput] | None = None,
     limits: AdmissionLimits | None = None,
     now: datetime | None = None,
 ) -> AdmissionOutcome:
@@ -363,16 +365,27 @@ def admit_backtest_job_memory(
                     return AdmissionOutcome(kind="replay", job=dict(job))
                 return AdmissionOutcome(kind="conflict")
 
-        for period, limit_count in allowance_limits or []:
+        allowance_windows = normalize_allowance_windows(
+            allowance_limits or [],
+            at=moment,
+        )
+        for window in allowance_windows:
             row = read_memory_usage(
                 store.usage_counters,
                 user_id=user_id,
                 resource=SIMULATION_USAGE_RESOURCE,
-                period=period,
+                period=window.period,
                 at=moment,
+                period_start=window.period_start,
             )
-            if row is not None and int(row.get("used_count", 0)) >= limit_count:
-                return AdmissionOutcome(kind="allowance_exhausted")
+            if row is not None and int(row.get("used_count", 0)) >= window.limit:
+                return AdmissionOutcome(
+                    kind=(
+                        "conversion_required"
+                        if window.period == "guest_session"
+                        else "allowance_exhausted"
+                    )
+                )
 
         if operation_scope == DIRECT_RUN_SCOPE:
             reconcile_stale_direct_jobs_memory(store, now=moment)
@@ -426,12 +439,12 @@ def admit_backtest_job_memory(
         }
         store.backtest_jobs[job_id] = job
         store.backtest_job_reservations[reservation] = job_id
-        if allowance_limits:
+        if allowance_windows:
             settle_memory_usage(
                 store.usage_counters,
                 user_id=user_id,
                 resource=SIMULATION_USAGE_RESOURCE,
-                limits=list(allowance_limits),
+                limits=allowance_windows,
                 at=moment,
             )
         return AdmissionOutcome(kind="admitted", job=dict(job))

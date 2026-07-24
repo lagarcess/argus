@@ -204,7 +204,11 @@ def guest_bootstrap(
     try:
         existing = current_user(request)
     except HTTPException as exc:
-        if exc.status_code != 401:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        expired_guest = (
+            exc.status_code == 403 and detail.get("code") == "guest_session_expired"
+        )
+        if exc.status_code != 401 and not expired_guest:
             raise
     else:
         context = account_context(request)

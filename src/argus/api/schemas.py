@@ -108,10 +108,10 @@ class GuestAccountSummary(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     expires_at: datetime
-    conversation_limit: Literal[1]
-    message_limit: Literal[10]
-    simulation_limit: Literal[1]
-    feedback_limit: Literal[5]
+    conversation_limit: int = Field(ge=1, le=2_147_483_647)
+    message_limit: int = Field(ge=1, le=2_147_483_647)
+    simulation_limit: int = Field(ge=1, le=2_147_483_647)
+    feedback_limit: int = Field(ge=1, le=2_147_483_647)
 
 
 class AccountCapabilities(BaseModel):
@@ -142,15 +142,15 @@ class UsageWindow(BaseModel):
 
 
 class UsageAllowance(BaseModel):
-    """Backend-derived allowance truth for one resource: both active UTC
-    windows plus availability and the most restrictive window."""
+    """Backend-derived allowance truth for the account's active windows."""
 
     model_config = ConfigDict(frozen=True)
 
-    hour: UsageWindow
-    day: UsageWindow
+    hour: UsageWindow | None
+    day: UsageWindow | None
+    guest_session: UsageWindow | None
     available_now: bool
-    limiting_window: Literal["hour", "day"]
+    limiting_window: Literal["hour", "day", "guest_session"]
 
 
 class UsageAllowances(BaseModel):

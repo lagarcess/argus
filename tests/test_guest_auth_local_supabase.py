@@ -89,6 +89,66 @@ def test_real_anonymous_identity_survives_reload(
             gateway.delete_auth_user(user_id)
 
 
+def test_expired_real_anonymous_session_renews_with_fresh_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    expired_user_id: str | None = None
+    renewed_user_id: str | None = None
+    try:
+        expired_auth = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        expired_user = expired_auth["user"]
+        expired_user_id = str(expired_user["id"])
+        expired_profile = gateway.get_or_create_profile_for_auth_user(expired_user)
+        created_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=8)
+        gateway.client.table("guest_workspaces").insert(
+            {
+                "user_id": expired_profile.id,
+                "created_at": created_at.isoformat(),
+            }
+        ).execute()
+        access_token = str(expired_auth["session"]["access_token"])
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app) as client,
+        ):
+            client.cookies.set("sb-auth-token", access_token)
+            renewed = client.post(
+                "/api/v1/auth/guest",
+                json={"captcha_token": "local-captcha-proof", "language": "en"},
+                headers={"origin": "http://localhost:3000"},
+            )
+
+        assert renewed.status_code == 200
+        assert renewed.json()["reused"] is False
+        renewed_user = renewed.json()["user"]
+        renewed_user_id = str(renewed_user["id"])
+        assert renewed_user_id != expired_user_id
+        assert renewed_user["is_anonymous"] is True
+        assert renewed_user.get("email") in {None, ""}
+        workspace = gateway.get_active_guest_workspace(
+            user_id=renewed_user_id,
+            at=datetime.now(timezone.utc),
+        )
+        assert workspace is not None
+    finally:
+        for user_id in (expired_user_id, renewed_user_id):
+            if user_id:
+                with suppress(Exception):
+                    gateway.delete_auth_user(user_id)
+
+
 def test_cleanup_deletes_real_anonymous_auth_user_through_admin() -> None:
     gateway = _gateway()
     auth_user_id: str | None = None

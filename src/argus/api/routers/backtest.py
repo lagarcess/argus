@@ -131,8 +131,8 @@ def run_backtest(
             return _replay_direct_job(request, user=user, job=job or {})
 
     if api_state.supabase_gateway is not None:
+        account = account_context(request)
         try:
-            account = account_context(request)
             if account.kind == "guest":
                 api_state.supabase_gateway.check_allowance_windows(
                     user_id=user.id,
@@ -162,6 +162,14 @@ def run_backtest(
                 )
                 if decision == "replay":
                     return _replay_direct_job(request, user=user, job=job or {})
+            if account.kind == "guest":
+                raise problem(
+                    request,
+                    status_code=403,
+                    code="account_conversion_required",
+                    title="Account Required",
+                    detail="Sign in before running another simulation.",
+                ) from exc
             raise problem(
                 request,
                 status_code=429,
@@ -387,7 +395,10 @@ def _admit_direct_run(
             initial_status="running",
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
-            allowance_limits=SIMULATION_ALLOWANCE_LIMITS,
+            allowance_limits=allowance_windows(
+                account_context(request),
+                SIMULATION_USAGE_RESOURCE,
+            ),
         )
         decision = memory_outcome.kind
         job = memory_outcome.job

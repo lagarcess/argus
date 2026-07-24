@@ -1529,6 +1529,10 @@ null through their existing foreign-key behavior.
 While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
 remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
 authenticate without role elevation; explicitly disabled rows remain blocked.
+Before that flag may be enabled, founder-approved production-parity evidence
+must prove that every enabled permanent Auth provider supplies a verified email
+compatible with profile and allowlist-role rules. Phone, OAuth, or other
+emailless permanent identities require a separate schema and Auth slice.
 
 ## `POST /auth/signup`
 
@@ -1698,6 +1702,7 @@ create or increment a counter.
         "remaining": 188,
         "period_end": "2026-07-22T00:00:00Z"
       },
+      "guest_session": null,
       "available_now": true,
       "limiting_window": "hour"
     },
@@ -1714,6 +1719,7 @@ create or increment a counter.
         "remaining": 46,
         "period_end": "2026-07-22T00:00:00Z"
       },
+      "guest_session": null,
       "available_now": true,
       "limiting_window": "hour"
     }
@@ -1721,21 +1727,30 @@ create or increment a counter.
 }
 ```
 
+Guests receive the same typed resource keys with `hour` and `day` set to
+`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
+expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
+simulation counter reports `available_now: false`. Guest responses never
+fabricate registered hour/day windows.
+
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
-- Both active UTC calendar windows are returned per resource with exact
-  backend-owned `period_end` reset timestamps. Clients may localize their
-  display, but must not infer or replace them with a countdown, local timer,
-  or `Retry-After` value.
+- Registered accounts receive both active UTC calendar windows. Guests receive
+  only the fixed `guest_session` window. Every populated window carries the
+  exact backend-owned `period_end`; clients may localize its display, but must
+  not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
-- `available_now` is backend-derived: true exactly when both windows have
-  remaining capacity.
-- `limiting_window` is backend-derived: the window with the smaller remaining
-  capacity (`day` on ties). The frontend must not compute, estimate, or
-  hardcode quota truth; it renders these derived fields.
+- `available_now` is backend-derived: for registered accounts it is true when
+  both calendar windows have capacity; for guests it follows the one fixed
+  session window.
+- `limiting_window` is backend-derived: registered accounts use the calendar
+  window with the smaller remaining capacity (`day` on ties), while guests use
+  `guest_session`. The frontend must not compute, estimate, or hardcode quota
+  truth; it renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 

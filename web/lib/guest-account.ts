@@ -17,10 +17,10 @@ export type ApiUser = {
 
 export type GuestAccountSummary = {
   expires_at: string;
-  conversation_limit: 1;
-  message_limit: 10;
-  simulation_limit: 1;
-  feedback_limit: 5;
+  conversation_limit: number;
+  message_limit: number;
+  simulation_limit: number;
+  feedback_limit: number;
 };
 
 export type AccountCapabilities = {

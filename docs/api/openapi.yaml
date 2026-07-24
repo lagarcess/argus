@@ -495,16 +495,20 @@ components:
           format: date-time
         conversation_limit:
           type: integer
-          const: 1
+          minimum: 1
+          maximum: 2147483647
         message_limit:
           type: integer
-          const: 10
+          minimum: 1
+          maximum: 2147483647
         simulation_limit:
           type: integer
-          const: 1
+          minimum: 1
+          maximum: 2147483647
         feedback_limit:
           type: integer
-          const: 5
+          minimum: 1
+          maximum: 2147483647
     AccountCapabilities:
       type: object
       required:
@@ -955,17 +959,26 @@ components:
           format: date-time
     UsageAllowance:
       type: object
-      description: Backend-derived allowance truth for one resource, covering both active UTC windows plus availability and the most restrictive window.
+      description: Backend-derived allowance truth for the account's active windows.
       required:
         - hour
         - day
+        - guest_session
         - available_now
         - limiting_window
       properties:
         hour:
-          $ref: "#/components/schemas/UsageWindow"
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
         day:
-          $ref: "#/components/schemas/UsageWindow"
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
+        guest_session:
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
         available_now:
           type: boolean
         limiting_window:
@@ -973,6 +986,7 @@ components:
           enum:
             - hour
             - day
+            - guest_session
     UsageAllowances:
       type: object
       required:

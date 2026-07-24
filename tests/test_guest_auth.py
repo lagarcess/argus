@@ -5,12 +5,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api import state as api_state
+from argus.api.guest_access import registered_account_context
 from argus.api.main import app
 from argus.api.routers import auth as auth_router
 from argus.api.schemas import OnboardingState, User
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 USER_ID = "00000000-0000-0000-0000-000000000041"
@@ -177,6 +179,133 @@ def test_valid_guest_cookie_reuses_identity_across_reload(
     assert response.json()["user"]["id"] == USER_ID
     gateway.sign_in_anonymously.assert_not_called()
     gateway.create_guest_workspace.assert_not_called()
+
+
+def test_expired_verified_guest_session_mints_a_fresh_anonymous_identity(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    expired = HTTPException(
+        status_code=403,
+        detail={
+            "code": "guest_session_expired",
+            "detail": "This temporary guest session is no longer available.",
+        },
+    )
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch.object(auth_router, "current_user", side_effect=expired),
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/v1/auth/guest",
+            json={"captcha_token": "captcha-proof", "language": "en"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["reused"] is False
+    assert response.json()["user"]["email"] is None
+    gateway.sign_in_anonymously.assert_called_once()
+    gateway.create_guest_workspace.assert_called_once()
+
+
+def test_guest_bootstrap_preserves_unrelated_forbidden_session_failure(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    denied = HTTPException(
+        status_code=403,
+        detail={
+            "code": "private_alpha_access_required",
+            "detail": "Private alpha access is required.",
+        },
+    )
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch.object(auth_router, "current_user", side_effect=denied),
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/v1/auth/guest",
+            json={"captcha_token": "captcha-proof", "language": "en"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
+    gateway.sign_in_anonymously.assert_not_called()
+
+
+def test_guest_bootstrap_never_replaces_a_registered_session(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    registered = _profile().model_copy(
+        update={"email": "registered@example.com", "is_admin": False}
+    )
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch.object(auth_router, "current_user", return_value=registered),
+        patch.object(
+            auth_router,
+            "account_context",
+            return_value=registered_account_context(registered.id),
+        ),
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/v1/auth/guest",
+            json={"captcha_token": "captcha-proof", "language": "en"},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "account_already_registered"
+    gateway.sign_in_anonymously.assert_not_called()
+
+
+def test_guest_feedback_success_uses_shared_sanitized_telemetry(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    secret_feedback = "feedback-secret-that-must-not-be-logged"
+    gateway.get_auth_user_from_token.return_value = (
+        gateway.sign_in_anonymously.return_value["user"]
+    )
+    gateway.create_feedback_settling_usage.return_value = {
+        "decision": "accepted",
+        "replayed": False,
+    }
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        patch("argus.api.routers.feedback.logger.info") as log_info,
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/v1/feedback",
+            json={
+                "type": "general",
+                "message": secret_feedback,
+                "context": {
+                    "source": "settings",
+                    "raw_prompt": "transcript-secret",
+                },
+            },
+            headers={"Authorization": "Bearer existing-guest-token"},
+        )
+
+    assert response.status_code == 200
+    log_info.assert_called_once_with(
+        "Feedback submitted",
+        feedback_type="general",
+        feedback_source="settings",
+        message_len=len(secret_feedback),
+    )
+    assert secret_feedback not in repr(log_info.call_args)
+    assert "transcript-secret" not in repr(log_info.call_args)
 
 
 def test_guest_ip_limit_runs_before_anonymous_auth_creation(
