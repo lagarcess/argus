@@ -735,6 +735,7 @@
     "app": {
       "title": "App",
       "language": "App language",
+      "close_language_modal": "Close language modal",
       "sidebar": "Sidebar",
       "security": "Security",
       "appearance": "Appearance",
@@ -1035,11 +1036,12 @@
     },
     "shell": {
       "value_title": "Test an investing idea against history.",
-      "value_body": "Describe your idea naturally. Argus will clarify the setup, show what it can test, and run a historical simulation.",
+      "input_placeholder": "What do you want to test?",
       "sign_in": "Sign in",
       "settings": "Guest settings",
+      "language": "Language",
       "feedback": "Feedback",
-      "temporary_until": "Temporary chat · available in this browser until {{date}}",
+      "temporary_until": "Temporary chat · available until {{date}}",
       "before_message": {
         "prefix": "By messaging Argus, you agree to ",
         "terms": "Terms",

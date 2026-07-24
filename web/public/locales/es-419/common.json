@@ -735,6 +735,7 @@
     "app": {
       "title": "App",
       "language": "Idioma de la app",
+      "close_language_modal": "Cerrar selector de idioma",
       "sidebar": "Barra lateral",
       "security": "Seguridad",
       "appearance": "Apariencia",
@@ -1035,11 +1036,12 @@
     },
     "shell": {
       "value_title": "Prueba una idea de inversión con datos históricos.",
-      "value_body": "Describe tu idea de forma natural. Argus aclarará la configuración, mostrará qué puede probar y ejecutará una simulación histórica.",
+      "input_placeholder": "¿Qué quieres probar?",
       "sign_in": "Iniciar sesión",
       "settings": "Ajustes de invitado",
+      "language": "Idioma",
       "feedback": "Comentarios",
-      "temporary_until": "Chat temporal · disponible en este navegador hasta {{date}}",
+      "temporary_until": "Chat temporal · disponible hasta {{date}}",
       "before_message": {
         "prefix": "Al enviar mensajes a Argus, aceptas los ",
         "terms": "Términos",

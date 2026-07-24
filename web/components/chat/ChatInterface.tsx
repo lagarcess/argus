@@ -2133,7 +2133,7 @@ export default function ChatInterface() {
   );
   const chatInputPlaceholder =
     messages.length === 0
-      ? t("chat.input_placeholder")
+      ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
       : t("chat.followup_placeholder", "Ask a follow-up...");
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -2188,7 +2188,6 @@ export default function ChatInterface() {
         omnisearchEnabled={omnisearchEnabled}
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
-        temporaryExpiresAt={account?.guest?.expires_at ?? null}
       />
 
       {omnisearchEnabled && (!isGuest || canUseOmnisearch) && searchOverlayOpen && (

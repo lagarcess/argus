@@ -143,4 +143,18 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(en.chat.disclaimer).toBe("Argus can make mistakes. For education only. Not financial advice.");
     expect(es.chat.disclaimer).toBe("Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.");
   });
+
+  test("guest expiry stays composer-owned across empty and active chat layouts", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const legal = readFileSync(join(root, "components/chat/ChatLegalNotice.tsx"), "utf-8");
+    const footer = readFileSync(join(root, "components/guest/GuestLegalFooter.tsx"), "utf-8");
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+
+    expect(chat.match(/<ChatLegalNotice/g)?.length).toBe(2);
+    expect(chat).not.toContain("temporaryExpiresAt=");
+    expect(legal).toContain("<GuestLegalFooter");
+    expect(footer.match(/data-testid="guest-temporary-notice"/g)?.length).toBe(1);
+    expect(sidebar).not.toContain("guest-sidebar-expiry");
+    expect(sidebar).not.toContain("temporaryExpiresAt");
+  });
 });

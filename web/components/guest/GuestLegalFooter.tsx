@@ -5,7 +5,18 @@ import { localeForLanguage } from "@/lib/language-features";
 
 export type GuestLegalFooterVariant = "before_message" | "after_message";
 
-export function formatGuestExpiry(
+export function formatGuestExpiryDate(
+  expiresAt: string,
+  language: string,
+): string {
+  const expires = new Date(expiresAt);
+  if (Number.isNaN(expires.getTime())) return "";
+  return new Intl.DateTimeFormat(localeForLanguage(language), {
+    dateStyle: "medium",
+  }).format(expires);
+}
+
+export function formatGuestExpiryTimestamp(
   expiresAt: string,
   language: string,
 ): string {
@@ -25,8 +36,12 @@ export default function GuestLegalFooter({
   variant: GuestLegalFooterVariant;
 }) {
   const { t, i18n } = useTranslation();
-  const formattedExpiry = expiresAt
-    ? formatGuestExpiry(expiresAt, i18n.resolvedLanguage ?? i18n.language)
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  const expiryDate = expiresAt
+    ? formatGuestExpiryDate(expiresAt, language)
+    : "";
+  const accessibleExpiry = expiresAt
+    ? formatGuestExpiryTimestamp(expiresAt, language)
     : "";
   const linkClass =
     "font-medium underline decoration-black/20 underline-offset-2 transition-colors hover:text-black hover:decoration-black/50 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:decoration-white/25 dark:hover:text-white dark:hover:decoration-white/55 dark:focus-visible:ring-white/30";
@@ -66,14 +81,20 @@ export default function GuestLegalFooter({
           </>
         )}
       </p>
-      {formattedExpiry ? (
-        <p className="mt-1 text-[12px] text-black/35 dark:text-white/35">
+      {expiresAt && expiryDate ? (
+        <time
+          data-testid="guest-temporary-notice"
+          dateTime={expiresAt}
+          title={expiresAt}
+          aria-label={accessibleExpiry}
+          className="mt-1 block text-[12px] text-black/35 dark:text-white/35"
+        >
           {t(
             "guest.shell.temporary_until",
-            "Temporary chat · available in this browser until {{date}}",
-            { date: formattedExpiry },
+            "Temporary chat · available until {{date}}",
+            { date: expiryDate },
           )}
-        </p>
+        </time>
       ) : null}
     </div>
   );

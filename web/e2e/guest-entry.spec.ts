@@ -5,6 +5,12 @@ test.describe.configure({ timeout: 60_000 });
 const GUEST_ID = "00000000-0000-4000-8000-000000000101";
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000202";
 const EXPIRES_AT = "2026-07-31T18:00:00Z";
+const EN_EXPIRY_DATE = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+}).format(new Date(EXPIRES_AT));
+const ES_EXPIRY_DATE = new Intl.DateTimeFormat("es-419", {
+  dateStyle: "medium",
+}).format(new Date(EXPIRES_AT));
 
 type GuestBootEvidence = {
   bootstrapCalls: number;
@@ -181,7 +187,7 @@ test("@guest-shell guest entry bootstraps once and bypasses onboarding without p
 }) => {
   const evidence = await mockGuestJourney(page);
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
@@ -195,32 +201,49 @@ test("@guest-shell guest entry bootstraps once and bypasses onboarding without p
   expect(evidence.sentMessages).toEqual(["Compare Apple with SPY"]);
 });
 
-test("@guest-shell verified starter action uses the ordinary localized send path", async ({
+test("@guest-shell verified starter actions use the same ordinary localized send payloads", async ({
   page,
 }) => {
   const evidence = await mockGuestJourney(page);
-  await page.goto("/", { waitUntil: "networkidle" });
+  const starterCases = [
+    {
+      label: "Test Apple vs SPY",
+      value:
+        "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
+    },
+    {
+      label: "Test Bitcoin (BTC) hold",
+      value: "What if I bought Bitcoin this year so far?",
+    },
+    {
+      label: "Test weekly Nvidia buys",
+      value:
+        "What if I bought $250 of Nvidia every week over the last 12 months?",
+    },
+  ];
 
-  await page.getByRole("button", { name: "Test Apple vs SPY" }).click();
-  await expect(page.getByText("Let’s test that idea.")).toBeVisible();
-  expect(evidence.sentMessages).toEqual([
-    "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
-  ]);
-  await expect(
-    page.getByRole("button", { name: "Test Apple vs SPY" }),
-  ).toHaveCount(0);
+  for (const starter of starterCases) {
+    evidence.persistedMessages = [];
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: starter.label }).click();
+    await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+    expect(evidence.sentMessages.at(-1)).toBe(starter.value);
+    await expect(
+      page.getByRole("button", { name: starter.label }),
+    ).toHaveCount(0);
+  }
 });
 
 test("@guest-shell root re-entry restores the one server-owned guest conversation", async ({
   page,
 }) => {
   const evidence = await mockGuestJourney(page);
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.getByTestId("chat-input").fill("Compare Apple with SPY");
   await page.getByTestId("chat-input").press("Enter");
   await expect(page.getByText("Let’s test that idea.")).toBeVisible();
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Compare Apple with SPY")).toBeVisible();
   await expect(page.getByText("Let’s test that idea.")).toBeVisible();
@@ -246,7 +269,7 @@ test("@guest-shell frontend-on server-off mismatch stays on a retry surface", as
     );
   });
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await expect(page.getByTestId("chat-input")).toHaveCount(0);
@@ -264,14 +287,31 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
     }
   });
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(
     page.getByText("Test an investing idea against history."),
   ).toBeVisible();
+  await expect(page.getByTestId("chat-input")).toHaveAttribute(
+    "aria-label",
+    "What do you want to test?",
+  );
   await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Chat options" })).toHaveCount(0);
+  const temporaryNotice = page.getByTestId("guest-temporary-notice");
+  await expect(temporaryNotice).toHaveCount(1);
+  await expect(temporaryNotice).toHaveText(
+    `Temporary chat · available until ${EN_EXPIRY_DATE}`,
+  );
+  await expect(temporaryNotice).toHaveAttribute("datetime", EXPIRES_AT);
+  await expect(temporaryNotice).toHaveAttribute("title", EXPIRES_AT);
+  await expect(page.getByTestId("guest-sidebar-expiry")).toHaveCount(0);
+  const composerBox = await page.getByTestId("chat-input").boundingBox();
+  const noticeBox = await temporaryNotice.boundingBox();
+  expect(noticeBox?.y ?? 0).toBeGreaterThan(
+    (composerBox?.y ?? 0) + (composerBox?.height ?? 0),
+  );
   await expect(page.getByTestId("guest-legal-before_message")).toContainText(
     "By messaging Argus",
   );
@@ -289,22 +329,50 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
   ).toBeVisible();
   await expect(page).toHaveURL(/\/chat$/);
 
-  await page.getByRole("button", { name: "Guest settings" }).click();
+  const settingsTrigger = page.getByRole("button", { name: "Guest settings" });
+  await settingsTrigger.click();
+  await expect(page.getByRole("menu", { name: "Guest settings" })).toBeVisible();
+  await expect(page.getByText("Theme", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem")).toHaveCount(2);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu", { name: "Guest settings" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Guest settings" }).click();
+  await expect(settingsTrigger).toBeFocused();
+  await settingsTrigger.click();
   await page.getByRole("button", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.getByRole("menuitemradio", { name: "Español" }).click();
+  await page.getByRole("menuitem", { name: "Language" }).click();
+  await expect(page.getByRole("dialog", { name: "Language" })).toBeVisible();
+  await page.getByRole("button", { name: /Español/ }).click();
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveText(
+    `Chat temporal · disponible hasta ${ES_EXPIRY_DATE}`,
+  );
+  const localizedSettingsTrigger = page.getByRole("button", {
+    name: "Ajustes de invitado",
+  });
+  await expect(localizedSettingsTrigger).toBeFocused();
+  await localizedSettingsTrigger.click();
+  const localizedLanguageEntry = page.getByRole("menuitem", { name: "Idioma" });
+  await expect(localizedLanguageEntry).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Language" })).toHaveCount(0);
+  await localizedLanguageEntry.click();
+  await expect(page.getByRole("dialog", { name: "Idioma" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cerrar selector de idioma" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Expand sidebar" }).click();
   await expect(page.getByRole("button", { name: "Buscar" })).toBeVisible();
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+  await expect(page.locator("aside").getByText(/Chat temporal/)).toHaveCount(0);
   await page.getByRole("button", { name: "Buscar" }).click();
   await expect(
     page.getByText("La búsqueda aún no está disponible para chats temporales."),
   ).toBeVisible();
   expect(searchCalls).toBe(0);
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
 
   await page.getByTestId("chat-input").fill("Compara Apple con SPY");
   await page.getByTestId("chat-input").press("Enter");
@@ -312,6 +380,8 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
   await expect(page.getByTestId("guest-legal-after_message")).toContainText(
     "Solo con fines educativos",
   );
+  await expect(page.getByTestId("guest-legal-before_message")).toHaveCount(0);
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Opciones de chat" })).toHaveCount(0);
   expect(evidence.profilePatches).toEqual([]);
 
@@ -327,13 +397,48 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockGuestJourney(page);
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const composer = page.getByTestId("chat-input");
   await expect(composer).toBeVisible();
+  await expect(composer).toHaveAttribute(
+    "aria-label",
+    "What do you want to test?",
+  );
   await expect(page.getByTestId("guest-legal-before_message")).toBeVisible();
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+  await expect(page.getByTestId("guest-sidebar-expiry")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+
+  const mobileSettingsTrigger = page.getByRole("button", {
+    name: "Guest settings",
+  });
+  await mobileSettingsTrigger.click();
+  const mobileSettingsMenu = page.getByRole("menu", {
+    name: "Guest settings",
+  });
+  await expect(mobileSettingsMenu).toBeVisible();
+  const mobileMenuBox = await mobileSettingsMenu.boundingBox();
+  const mobileViewportWidth = await page.evaluate(() => window.innerWidth);
+  expect(mobileMenuBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((mobileMenuBox?.x ?? 0) + (mobileMenuBox?.width ?? 0)).toBeLessThanOrEqual(
+    mobileViewportWidth,
+  );
+  await mobileSettingsTrigger.click();
+
+  // The in-app browser reserves a narrow browser rail inside a 390px device
+  // frame, so the app surface must also remain clean at its 354px content width.
+  await page.setViewportSize({ width: 354, height: 844 });
+  await mobileSettingsTrigger.click();
+  const narrowMobileMenuBox = await mobileSettingsMenu.boundingBox();
+  const narrowMobileViewportWidth = await page.evaluate(() => window.innerWidth);
+  expect(narrowMobileMenuBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect(
+    (narrowMobileMenuBox?.x ?? 0) + (narrowMobileMenuBox?.width ?? 0),
+  ).toBeLessThanOrEqual(narrowMobileViewportWidth);
+  await mobileSettingsTrigger.click();
+  await page.setViewportSize({ width: 390, height: 844 });
 
   expect(
     await composer.evaluate((element) =>
@@ -358,6 +463,13 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Recents" })).toBeVisible();
+  await expect(page.locator("aside").getByText(/Temporary chat/)).toHaveCount(0);
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
 });
 
 test("@guest-shell hints require typed artifacts and dismiss locally without writes", async ({
@@ -403,7 +515,7 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
     },
   ];
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("guest-confirmation-hint")).toContainText(
     "Review the assumptions",
   );
@@ -448,7 +560,7 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
     },
   ];
 
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("guest-confirmation-hint")).toHaveCount(0);
   await expect(page.getByTestId("guest-result-hint")).toContainText(
     "Change the chart range",
@@ -461,7 +573,7 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
     .getByTestId("guest-result-hint")
     .getByRole("button", { name: "Dismiss hint" })
     .click();
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("guest-result-hint")).toHaveCount(0);
   expect(durableHintWrites).toBe(0);
 });

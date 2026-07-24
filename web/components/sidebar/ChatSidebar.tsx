@@ -15,7 +15,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { formatGuestExpiry } from "@/components/guest/GuestLegalFooter";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
 import ProfileMenu from "./ProfileMenu";
@@ -86,7 +85,6 @@ export type ChatSidebarProps = {
   omnisearchEnabled?: boolean;
   canManageConversation?: boolean;
   showProfileMenu?: boolean;
-  temporaryExpiresAt?: string | null;
 };
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
@@ -177,9 +175,8 @@ export default function ChatSidebar({
   omnisearchEnabled = false,
   canManageConversation = true,
   showProfileMenu = true,
-  temporaryExpiresAt = null,
 }: ChatSidebarProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -695,22 +692,6 @@ export default function ChatSidebar({
             />
           </div>
         </div>
-      ) : temporaryExpiresAt && isOpen ? (
-        <p
-          className="border-t border-black/5 px-4 py-3 text-[12px] leading-[1.45] text-black/38 dark:border-white/5 dark:text-white/38"
-          data-testid="guest-sidebar-expiry"
-        >
-          {t(
-            "guest.shell.temporary_until",
-            "Temporary chat · available in this browser until {{date}}",
-            {
-              date: formatGuestExpiry(
-                temporaryExpiresAt,
-                i18n.resolvedLanguage ?? i18n.language,
-              ),
-            },
-          )}
-        </p>
       ) : null}
     </aside>
   );

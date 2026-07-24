@@ -35,7 +35,7 @@ describe("guest shell contract", () => {
     expect(chat).toContain("requestGuestDecision");
     expect(chat).toContain("canManageConversation={canManageConversation}");
     expect(chat).toContain("showProfileMenu={!isGuest}");
-    expect(chat).toContain("temporaryExpiresAt={account?.guest?.expires_at");
+    expect(chat).not.toContain("temporaryExpiresAt={account?.guest?.expires_at");
     expect(result).toContain("canSaveDecision");
     expect(result).toContain("onDecisionUnavailable");
   });
@@ -51,7 +51,21 @@ describe("guest shell contract", () => {
     expect(sidebar).toMatch(/showProfileMenu[\s\S]{0,500}<ProfileMenu/);
   });
 
-  test("shows exact server expiry and permanent legal links in both states", () => {
+  test("keeps the temporary-chat notice beneath the composer and out of the sidebar", () => {
+    const chat = source("components/chat/ChatInterface.tsx");
+    const sidebar = source("components/sidebar/ChatSidebar.tsx");
+    const header = source("components/guest/GuestHeader.tsx");
+    const intro = source("components/guest/GuestEmptyStateIntro.tsx");
+
+    expect(sidebar).not.toContain("temporaryExpiresAt");
+    expect(sidebar).not.toContain("guest-sidebar-expiry");
+    expect(chat).not.toContain("temporaryExpiresAt={account?.guest?.expires_at");
+    expect(header).not.toContain("temporary_until");
+    expect(intro).not.toContain("value_body");
+    expect(chat).toContain('"guest.shell.input_placeholder"');
+  });
+
+  test("shows exact server expiry metadata and permanent legal links in both states", () => {
     const footerPath = join(root, "components/guest/GuestLegalFooter.tsx");
     expect(existsSync(footerPath)).toBe(true);
     if (!existsSync(footerPath)) return;
@@ -63,7 +77,23 @@ describe("guest shell contract", () => {
     expect(footer).toContain('"after_message"');
     expect(footer).toContain("Intl.DateTimeFormat");
     expect(footer).toContain("expiresAt");
+    expect(footer).toContain('data-testid="guest-temporary-notice"');
+    expect(footer).toContain("dateTime={expiresAt}");
     expect(footer).not.toContain("Date.now");
+  });
+
+  test("uses the compact settings menu and shared centered language modal", () => {
+    const settings = source("components/guest/GuestSettingsMenu.tsx");
+    const languageModal = source("components/settings/LanguageModal.tsx");
+
+    expect(settings).not.toContain('"settings.appearance.title"');
+    expect(settings).toContain("<LanguageModal");
+    expect(settings).toContain("persistProfile={false}");
+    expect(settings).toContain('role="group"');
+    expect(settings.match(/role="menuitem"/g)?.length).toBe(2);
+    expect(settings).not.toContain('role="menuitemradio"');
+    expect(languageModal).toContain("persistProfile = true");
+    expect(languageModal).toContain("if (persistProfile)");
   });
 
   test("keeps English and Spanish guest shell keys in parity", () => {
@@ -71,9 +101,10 @@ describe("guest shell contract", () => {
     const es = JSON.parse(source("public/locales/es-419/common.json"));
     const requiredKeys = [
       "value_title",
-      "value_body",
+      "input_placeholder",
       "sign_in",
       "settings",
+      "language",
       "feedback",
       "temporary_until",
       "before_message.prefix",
@@ -99,5 +130,14 @@ describe("guest shell contract", () => {
       expect(valueAt(en.guest?.shell, key), `missing en guest.shell.${key}`).toBeString();
       expect(valueAt(es.guest?.shell, key), `missing es guest.shell.${key}`).toBeString();
     }
+
+    expect(en.guest.shell.input_placeholder).toBe("What do you want to test?");
+    expect(es.guest.shell.input_placeholder).toBe("¿Qué quieres probar?");
+    expect(en.guest.shell.temporary_until).toBe(
+      "Temporary chat · available until {{date}}",
+    );
+    expect(es.guest.shell.temporary_until).toBe(
+      "Chat temporal · disponible hasta {{date}}",
+    );
   });
 });

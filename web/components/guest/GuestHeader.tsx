@@ -2,7 +2,6 @@
 
 import { useTranslation } from "react-i18next";
 import GuestSettingsMenu from "./GuestSettingsMenu";
-import { formatGuestExpiry } from "./GuestLegalFooter";
 
 export default function GuestHeader({
   expiresAt,
@@ -13,25 +12,13 @@ export default function GuestHeader({
   onFeedback: () => void;
   onSignIn: () => void;
 }) {
-  const { t, i18n } = useTranslation();
-  const formattedExpiry = expiresAt
-    ? formatGuestExpiry(expiresAt, i18n.resolvedLanguage ?? i18n.language)
-    : "";
+  const { t } = useTranslation();
 
   return (
     <div
       className="flex items-center gap-1.5"
       data-guest-expires-at={expiresAt ?? undefined}
     >
-      {formattedExpiry ? (
-        <span className="sr-only">
-          {t(
-            "guest.shell.temporary_until",
-            "Temporary chat · available in this browser until {{date}}",
-            { date: formattedExpiry },
-          )}
-        </span>
-      ) : null}
       <GuestSettingsMenu onFeedback={onFeedback} />
       <button
         type="button"
