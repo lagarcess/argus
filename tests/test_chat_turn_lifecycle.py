@@ -118,8 +118,8 @@ def _terminal_message(
     status: str,
     message_id: str | None = None,
     created_at: datetime | None = None,
-    failure_code: str | None = None,
-    retryable: bool = False,
+    failure_code: object = None,
+    retryable: object = False,
     include_failure_code: bool = True,
     include_retryable: bool = True,
 ) -> Message:
@@ -750,6 +750,132 @@ def test_equal_timestamp_failure_evidence_wins_before_success(
     assert row["assistant_message_id"] == failure.id
     assert row["failure_code"] == "runtime_failure"
     assert row["retryable"] is True
+
+
+def test_reconciliation_skips_malformed_failure_for_later_valid_evidence(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn_id = _id()
+    request_id = f"request-{turn_id}"
+    _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+    )
+    store.chat_turn_lifecycles[turn_id]["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    malformed = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        status="recoverable_failed",
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=2),
+        failure_code="malformed_failure",
+        retryable=True,
+        include_failure_code=False,
+    )
+    valid = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        status="recoverable_failed",
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        failure_code="durable_failure",
+        retryable=True,
+    )
+
+    [row] = gateway.reconcile_stale_chat_turns(
+        conversation_id=conversation_id,
+        user_id=user_id,
+    )
+
+    assert malformed.created_at < valid.created_at
+    assert row["status"] == "reconciled"
+    assert row["assistant_message_id"] == valid.id
+    assert row["reconciled_outcome"] == "recoverable_failed"
+    assert row["failure_code"] == "durable_failure"
+    assert row["retryable"] is True
+
+
+@pytest.mark.parametrize(
+    (
+        "failure_code",
+        "retryable",
+        "include_failure_code",
+        "include_retryable",
+    ),
+    [
+        ("runtime_failure", True, False, True),
+        ("runtime_failure", True, True, False),
+        (7, True, True, True),
+        ("runtime_failure", "yes", True, True),
+    ],
+)
+def test_reconciliation_abandons_when_only_failure_evidence_is_malformed(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+    failure_code: object,
+    retryable: object,
+    include_failure_code: bool,
+    include_retryable: bool,
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn_id = _id()
+    request_id = f"request-{turn_id}"
+    _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+    )
+    store.chat_turn_lifecycles[turn_id]["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        status="recoverable_failed",
+        failure_code=failure_code,
+        retryable=retryable,
+        include_failure_code=include_failure_code,
+        include_retryable=include_retryable,
+    )
+
+    [row] = gateway.reconcile_stale_chat_turns(
+        conversation_id=conversation_id,
+        user_id=user_id,
+    )
+    replay = gateway.reconcile_stale_chat_turns(
+        conversation_id=conversation_id,
+        user_id=user_id,
+    )
+
+    assert row["status"] == "abandoned"
+    assert row["assistant_message_id"] is None
+    assert row["failure_code"] == "turn_abandoned"
+    assert row["retryable"] is True
+    assert replay == []
 
 
 def test_no_terminal_evidence_reconciles_directly_to_abandoned(

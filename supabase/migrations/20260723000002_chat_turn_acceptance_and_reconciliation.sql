@@ -167,6 +167,21 @@ begin
        and m.metadata #> '{agent_runtime_turn,terminal}' = 'true'::jsonb
        and m.metadata #>> '{agent_runtime_turn,status}'
          in ('completed', 'recoverable_failed')
+       and (
+         m.metadata #>> '{agent_runtime_turn,status}' = 'completed'
+         or (
+           m.metadata #>> '{agent_runtime_turn,status}'
+             = 'recoverable_failed'
+           and m.metadata -> 'agent_runtime_turn' ? 'failure_code'
+           and jsonb_typeof(
+             m.metadata #> '{agent_runtime_turn,failure_code}'
+           ) in ('string', 'null')
+           and m.metadata -> 'agent_runtime_turn' ? 'retryable'
+           and jsonb_typeof(
+             m.metadata #> '{agent_runtime_turn,retryable}'
+           ) = 'boolean'
+         )
+       )
      order by m.created_at asc,
        case m.metadata #>> '{agent_runtime_turn,status}'
          when 'recoverable_failed' then 0

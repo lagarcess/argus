@@ -124,6 +124,22 @@ def _terminal_metadata(message: Message) -> dict[str, Any] | None:
     return runtime_turn if isinstance(runtime_turn, dict) else None
 
 
+def _qualifies_as_terminal_evidence(metadata: dict[str, Any]) -> bool:
+    status = metadata.get("status")
+    if status == "completed":
+        return True
+    return (
+        status == "recoverable_failed"
+        and "failure_code" in metadata
+        and (
+            metadata["failure_code"] is None
+            or isinstance(metadata["failure_code"], str)
+        )
+        and "retryable" in metadata
+        and isinstance(metadata["retryable"], bool)
+    )
+
+
 class MemoryChatTurnLifecycleGateway:
     """Mirror the SQL lifecycle for hermetic development and contract tests."""
 
@@ -466,7 +482,7 @@ class MemoryChatTurnLifecycleGateway:
                 or metadata.get("turn_id") != row["turn_id"]
                 or metadata.get("request_id") != row["request_id"]
                 or metadata.get("terminal") is not True
-                or metadata.get("status") not in _EVIDENCE_STATUSES
+                or not _qualifies_as_terminal_evidence(metadata)
             ):
                 continue
             precedence = (

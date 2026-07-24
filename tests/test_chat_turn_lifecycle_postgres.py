@@ -99,8 +99,8 @@ def _append_terminal(
     request_id: str,
     status: str,
     message_id: str | None = None,
-    failure_code: str | None = None,
-    retryable: bool = False,
+    failure_code: object = None,
+    retryable: object = False,
     include_failure_code: bool = True,
     include_retryable: bool = True,
 ) -> str:
@@ -505,6 +505,99 @@ def test_reconciliation_prefers_failure_on_equal_timestamp(owner) -> None:
         assert row["assistant_message_id"] == failure_id
         assert row["failure_code"] == "runtime_failure"
         assert row["retryable"] is True
+
+
+def test_reconciliation_skips_malformed_failure_for_later_valid_evidence(
+    owner,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        _age_turn(connection, turn_id)
+        malformed_id = _append_terminal(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            status="recoverable_failed",
+            failure_code="malformed_failure",
+            retryable=True,
+            include_failure_code=False,
+        )
+        valid_id = _append_terminal(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            status="recoverable_failed",
+            failure_code="durable_failure",
+            retryable=True,
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update public.messages set created_at = case id"
+                " when %s then now() - interval '2 minutes'"
+                " when %s then now() - interval '1 minute' end"
+                " where id in (%s, %s)",
+                (malformed_id, valid_id, malformed_id, valid_id),
+            )
+
+        [row] = _reconcile(connection, owner)
+
+        assert row["status"] == "reconciled"
+        assert row["assistant_message_id"] == valid_id
+        assert row["reconciled_outcome"] == "recoverable_failed"
+        assert row["failure_code"] == "durable_failure"
+        assert row["retryable"] is True
+
+
+@pytest.mark.parametrize(
+    (
+        "failure_code",
+        "retryable",
+        "include_failure_code",
+        "include_retryable",
+    ),
+    [
+        ("runtime_failure", True, False, True),
+        ("runtime_failure", True, True, False),
+        (7, True, True, True),
+        ("runtime_failure", "yes", True, True),
+    ],
+)
+def test_reconciliation_abandons_when_only_failure_evidence_is_malformed(
+    owner,
+    failure_code: object,
+    retryable: object,
+    include_failure_code: bool,
+    include_retryable: bool,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        _age_turn(connection, turn_id)
+        _append_terminal(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            status="recoverable_failed",
+            failure_code=failure_code,
+            retryable=retryable,
+            include_failure_code=include_failure_code,
+            include_retryable=include_retryable,
+        )
+
+        [row] = _reconcile(connection, owner)
+        replay = _reconcile(connection, owner)
+
+        assert row["status"] == "abandoned"
+        assert row["assistant_message_id"] is None
+        assert row["failure_code"] == "turn_abandoned"
+        assert row["retryable"] is True
+        assert replay == []
 
 
 def test_foreign_or_mismatched_evidence_cannot_reconcile(owner) -> None:

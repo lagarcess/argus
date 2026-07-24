@@ -184,6 +184,25 @@ def test_reconciliation_is_bounded_locked_database_time_recovery() -> None:
         "m.metadata #>> '{agent_runtime_turn,status}' in "
         "('completed', 'recoverable_failed')"
     ) in sql
+    assert (
+        "m.metadata #>> '{agent_runtime_turn,status}' = 'completed'"
+        in sql
+    )
+    assert (
+        "m.metadata #>> '{agent_runtime_turn,status}' = "
+        "'recoverable_failed'"
+    ) in sql
+    assert "m.metadata -> 'agent_runtime_turn' ? 'failure_code'" in sql
+    assert (
+        "jsonb_typeof( m.metadata #> "
+        "'{agent_runtime_turn,failure_code}' ) in ('string', 'null')"
+        in sql
+    )
+    assert "m.metadata -> 'agent_runtime_turn' ? 'retryable'" in sql
+    assert (
+        "jsonb_typeof( m.metadata #> '{agent_runtime_turn,retryable}' ) "
+        "= 'boolean'"
+    ) in sql
     assert "order by m.created_at asc" in sql
     assert "when 'recoverable_failed' then 0" in sql
     assert "m.id asc" in sql
