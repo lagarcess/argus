@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import os
-import time
 from collections.abc import AsyncIterator
-from contextlib import suppress
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -13,8 +10,18 @@ from loguru import logger
 
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.resolution import mention_to_provenance
-from argus.agent_runtime.runtime import stream_agent_turn_events
+from argus.agent_runtime.runtime import build_workflow_input, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.turn_execution import (
+    RuntimeEventTimeoutError as TurnRuntimeEventTimeoutError,
+)
+from argus.agent_runtime.turn_execution import (
+    claim_turn_terminal,
+    record_exit_progress,
+    runtime_events_with_keepalive,
+    turn_execution_scope,
+    turn_execution_summary,
+)
 from argus.api import state as api_state
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
@@ -104,12 +111,7 @@ from argus.llm.openrouter import (
 router = APIRouter(tags=["agent"])
 RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
 RUNTIME_EVENT_KEEPALIVE_SECONDS = 15.0
-
-
-class RuntimeEventTimeoutError(asyncio.TimeoutError):
-    def __init__(self, diagnostics: dict[str, Any]) -> None:
-        super().__init__("agent_runtime_event_timeout")
-        self.diagnostics = diagnostics
+RuntimeEventTimeoutError = TurnRuntimeEventTimeoutError
 
 
 def _runtime_event_timeout_seconds() -> float:
@@ -143,78 +145,15 @@ def _positive_float_env(name: str, default: float, *, min_value: float) -> float
     return max(value, min_value)
 
 
-async def _cancel_runtime_event_task(
-    runtime_event_task: asyncio.Task[dict[str, Any]],
-) -> None:
-    runtime_event_task.cancel()
-    with suppress(asyncio.CancelledError, StopAsyncIteration):
-        await runtime_event_task
-
-
 async def _runtime_events_with_keepalive(
     runtime_events: AsyncIterator[dict[str, Any]],
 ) -> AsyncIterator[dict[str, Any] | None]:
-    next_runtime_event: asyncio.Task[dict[str, Any]] | None = None
-    next_runtime_event_started = time.monotonic()
-    runtime_timeout_seconds = _runtime_event_timeout_seconds()
-    runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
-    last_event: dict[str, str] | None = None
-    event_count = 0
-
-    try:
-        while True:
-            if next_runtime_event is None:
-                next_runtime_event = asyncio.create_task(anext(runtime_events))
-                next_runtime_event_started = time.monotonic()
-            try:
-                elapsed_seconds = time.monotonic() - next_runtime_event_started
-                remaining_seconds = runtime_timeout_seconds - elapsed_seconds
-                if remaining_seconds <= 0:
-                    raise asyncio.TimeoutError
-                runtime_event = await asyncio.wait_for(
-                    asyncio.shield(next_runtime_event),
-                    timeout=min(runtime_keepalive_seconds, remaining_seconds),
-                )
-                next_runtime_event = None
-            except asyncio.TimeoutError:
-                if (
-                    time.monotonic() - next_runtime_event_started
-                    >= runtime_timeout_seconds
-                ):
-                    elapsed_seconds = time.monotonic() - next_runtime_event_started
-                    await _cancel_runtime_event_task(next_runtime_event)
-                    next_runtime_event = None
-                    raise RuntimeEventTimeoutError(
-                        {
-                            "code": "agent_runtime_event_timeout",
-                            "timeout_seconds": runtime_timeout_seconds,
-                            "elapsed_seconds": round(elapsed_seconds, 3),
-                            "keepalive_seconds": runtime_keepalive_seconds,
-                            "event_count": event_count,
-                            "last_event": last_event,
-                        }
-                    ) from None
-                yield None
-                continue
-            except StopAsyncIteration:
-                break
-            event_count += 1
-            last_event = _runtime_event_boundary(runtime_event)
-            yield runtime_event
-    finally:
-        if next_runtime_event is not None and not next_runtime_event.done():
-            await _cancel_runtime_event_task(next_runtime_event)
-
-
-def _runtime_event_boundary(runtime_event: dict[str, Any]) -> dict[str, str]:
-    boundary = {"type": str(runtime_event.get("type") or "unknown")}
-    stage = runtime_event.get("stage")
-    if stage not in (None, "", [], {}):
-        boundary["stage"] = str(stage)
-    outcome = runtime_event.get("outcome")
-    if outcome not in (None, "", [], {}):
-        boundary["outcome"] = str(outcome)
-    return boundary
+    async for event in runtime_events_with_keepalive(
+        runtime_events,
+        runtime_timeout_seconds=_runtime_event_timeout_seconds(),
+        runtime_keepalive_seconds=_runtime_event_keepalive_seconds(),
+    ):
+        yield event
 
 
 def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
@@ -531,21 +470,27 @@ async def chat_stream(
         )
 
         async def initialization_failure_events() -> AsyncIterator[str]:
-            yield sse_data(
-                {
-                    "type": "error",
-                    "code": "agent_runtime_failure",
-                    "message": assistant_text,
-                    "message_id": assistant_message.id,
-                    "recovery": recovery,
-                    **(
-                        {"retry_last_turn": retry_last_turn}
-                        if isinstance(retry_last_turn, dict)
-                        else {}
-                    ),
-                }
-            )
-            yield sse_done()
+            with turn_execution_scope(entry_state={}):
+                claim_turn_terminal(
+                    "recoverable_failed",
+                    "runtime_initialization_failed",
+                )
+                record_exit_progress({}, terminal="recoverable_failed")
+                yield sse_data(
+                    {
+                        "type": "error",
+                        "code": "agent_runtime_failure",
+                        "message": assistant_text,
+                        "message_id": assistant_message.id,
+                        "recovery": recovery,
+                        **(
+                            {"retry_last_turn": retry_last_turn}
+                            if isinstance(retry_last_turn, dict)
+                            else {}
+                        ),
+                    }
+                )
+                yield sse_done()
 
         return StreamingResponse(
             initialization_failure_events(),
@@ -691,7 +636,11 @@ async def chat_stream(
         in {"language_selection", "primary_goal_selection"}
     )
 
-    async def events() -> AsyncIterator[str]:
+    action_context = request_admission.runtime_action_context()
+
+    async def accepted_turn_events(
+        workflow_input: dict[str, Any],
+    ) -> AsyncIterator[str]:
         active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
@@ -763,6 +712,7 @@ async def chat_stream(
                     },
                 }
             )
+            record_exit_progress(workflow_input, terminal="clarification")
             yield sse_done()
             return
 
@@ -840,6 +790,7 @@ async def chat_stream(
                     },
                 }
             )
+            record_exit_progress(workflow_input, terminal="advanced")
             yield sse_done()
             return
 
@@ -879,6 +830,7 @@ async def chat_stream(
                     },
                 }
             )
+            record_exit_progress(workflow_input, terminal="clarification")
             yield sse_done()
             return
 
@@ -924,10 +876,10 @@ async def chat_stream(
                     },
                 }
             )
+            record_exit_progress(workflow_input, terminal="finished")
             yield sse_done()
             return
 
-        action_context = request_admission.runtime_action_context()
         streamed_text_parts: list[str] = []
         receipt_run_id: str | None = None
         receipt_message_id: str | None = None
@@ -957,6 +909,7 @@ async def chat_stream(
                     user=runtime_user,
                     thread_id=conversation.id,
                     message=request_message,
+                    workflow_input=workflow_input,
                     recent_thread_history=recent_thread_history,
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
@@ -1319,6 +1272,15 @@ async def chat_stream(
                 )
                 if assistant_text and not runtime_result.get("assistant_response"):
                     runtime_result["assistant_response"] = assistant_text
+                record_exit_progress(
+                    runtime_result,
+                    terminal=(
+                        "clarification"
+                        if stage_status
+                        in {"await_user_reply", "needs_clarification"}
+                        else None
+                    ),
+                )
                 if (
                     not streamed_text_parts
                     and confirmation_card is None
@@ -1421,6 +1383,19 @@ async def chat_stream(
             }
             if runtime_diagnostics is not None:
                 receipt_metadata["runtime_diagnostics"] = runtime_diagnostics
+            claim_turn_terminal(
+                "recoverable_failed",
+                (
+                    str(runtime_diagnostics.get("code"))
+                    if runtime_diagnostics is not None
+                    and runtime_diagnostics.get("code")
+                    else failure_code
+                ),
+            )
+            record_exit_progress(
+                workflow_input,
+                terminal="recoverable_failed",
+            )
             yield sse_data(
                 {
                     "type": "error",
@@ -1439,14 +1414,41 @@ async def chat_stream(
             return
         finally:
             reset_backtest_job_shadow_context(shadow_context_token)
+            claim_turn_terminal("recoverable_failed", "stream_severed")
+            receipts = end_openrouter_route_receipt_capture(receipt_token)
+            receipt_metadata["turn_execution"] = turn_execution_summary(receipts)
             persist_route_receipts(
-                receipts=end_openrouter_route_receipt_capture(receipt_token),
+                receipts=receipts,
                 user_id=user.id,
                 conversation_id=conversation.id,
                 run_id=receipt_run_id,
                 message_id=receipt_message_id,
                 metadata=receipt_metadata,
             )
+
+    async def events() -> AsyncIterator[str]:
+        workflow_input = build_workflow_input(
+            user=runtime_user,
+            message=request_message,
+            recent_thread_history=recent_thread_history,
+            context_hints=[
+                item.model_dump(mode="python") for item in mention_provenance
+            ],
+            action_context=action_context,
+            fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+            fallback_selected_thread_metadata=(
+                runtime_fallback.selected_thread_metadata
+            ),
+            fallback_artifact_references=runtime_fallback.artifact_references,
+            fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+        )
+        with turn_execution_scope(entry_state=workflow_input):
+            accepted_events = accepted_turn_events(workflow_input)
+            try:
+                async for event in accepted_events:
+                    yield event
+            finally:
+                await accepted_events.aclose()
 
     return StreamingResponse(
         events(),

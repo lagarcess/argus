@@ -1075,6 +1075,91 @@ def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
 
 
 @pytest.mark.asyncio
+async def test_events_cannot_reset_the_absolute_turn_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import turn_execution
+    from argus.api.routers import agent as agent_router
+
+    class _Clock:
+        def __init__(self) -> None:
+            self.value = 0.0
+
+        def __call__(self) -> float:
+            return self.value
+
+        def advance(self, seconds: float) -> None:
+            self.value += seconds
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", "0.25")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS", "1")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS", "0.1")
+
+    async def _many_timely_events():
+        for index in range(40):
+            clock.advance(0.03)
+            yield {"type": "token", "content": str(index)}
+
+    seen: list[dict[str, Any]] = []
+    with turn_execution.turn_execution_scope(entry_state={}):
+        with pytest.raises(agent_router.RuntimeEventTimeoutError) as exc_info:
+            async for event in agent_router._runtime_events_with_keepalive(
+                _many_timely_events()
+            ):
+                if event is not None:
+                    seen.append(event)
+
+    diagnostics = exc_info.value.diagnostics
+    assert len(seen) < 40
+    assert diagnostics["code"] == "turn_deadline_exhausted"
+    assert diagnostics["timeout_seconds"] == 0.25
+    assert diagnostics["elapsed_seconds"] >= 0.25
+
+
+@pytest.mark.asyncio
+async def test_turn_deadline_diagnostic_uses_total_turn_elapsed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import turn_execution
+    from argus.api.routers import agent as agent_router
+
+    class _Clock:
+        def __init__(self) -> None:
+            self.value = 10.0
+
+        def __call__(self) -> float:
+            return self.value
+
+        def advance(self, seconds: float) -> None:
+            self.value += seconds
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", "0.25")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS", "5")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS", "0.1")
+
+    async def _events():
+        clock.advance(0.2)
+        yield {"type": "stage_start", "stage": "interpret"}
+        clock.advance(0.06)
+        yield {"type": "stage_outcome", "outcome": "ready_for_confirmation"}
+
+    with turn_execution.turn_execution_scope(entry_state={}):
+        with pytest.raises(agent_router.RuntimeEventTimeoutError) as exc_info:
+            async for _event in agent_router._runtime_events_with_keepalive(_events()):
+                pass
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics["code"] == "turn_deadline_exhausted"
+    assert diagnostics["timeout_seconds"] == 0.25
+    assert diagnostics["elapsed_seconds"] == pytest.approx(0.26)
+    assert diagnostics["event_count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_runtime_keepalive_wrapper_cleans_pending_task_on_close(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

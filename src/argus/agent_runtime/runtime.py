@@ -79,6 +79,7 @@ async def stream_agent_turn_events(
     user: UserState,
     thread_id: str,
     message: str,
+    workflow_input: WorkflowState | None = None,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
     action_context: dict[str, Any] | None = None,
@@ -88,16 +89,20 @@ async def stream_agent_turn_events(
     | None = None,
     fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    initial_state = build_workflow_input(
-        user=user,
-        message=message,
-        recent_thread_history=recent_thread_history,
-        context_hints=context_hints,
-        action_context=action_context,
-        fallback_latest_task_snapshot=fallback_latest_task_snapshot,
-        fallback_selected_thread_metadata=fallback_selected_thread_metadata,
-        fallback_artifact_references=fallback_artifact_references,
-        fallback_confirmation_payload=fallback_confirmation_payload,
+    initial_state = (
+        workflow_input
+        if workflow_input is not None
+        else build_workflow_input(
+            user=user,
+            message=message,
+            recent_thread_history=recent_thread_history,
+            context_hints=context_hints,
+            action_context=action_context,
+            fallback_latest_task_snapshot=fallback_latest_task_snapshot,
+            fallback_selected_thread_metadata=fallback_selected_thread_metadata,
+            fallback_artifact_references=fallback_artifact_references,
+            fallback_confirmation_payload=fallback_confirmation_payload,
+        )
     )
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()

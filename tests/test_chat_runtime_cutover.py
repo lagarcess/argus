@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pytest
 from argus.api.main import app
 from fastapi.testclient import TestClient
 
@@ -129,6 +131,83 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
         "user",
         "assistant",
     ]
+
+
+@pytest.mark.parametrize("threaded", [False, True])
+def test_inline_and_threaded_streams_use_one_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    threaded: bool,
+) -> None:
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    observed_contexts: list[object | None] = []
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        observed_contexts.append(active_turn_execution())
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "What date range should I use for AAPL?",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                    },
+                    "requested_field": "date_range",
+                    "missing_required_fields": ["date_range"],
+                },
+                "response_intent": {
+                    "kind": "clarification",
+                    "requested_fields": ["date_range"],
+                    "semantic_needs": ["period"],
+                },
+            },
+        }
+
+    @asynccontextmanager
+    async def _isolated_workflow():
+        yield "isolated-workflow"
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: threaded)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "isolated_agent_runtime_workflow",
+        _isolated_workflow,
+    )
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Test buy and hold AAPL.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(observed_contexts) == 1
+    assert observed_contexts[0] is not None
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == "clarification"
+    assert summary["progress_outcome"] == "clarification"
 
 
 def test_chat_stream_production_path_uses_astream_events_not_invoke() -> None:

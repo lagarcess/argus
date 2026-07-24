@@ -16,6 +16,7 @@ from langchain_openrouter import ChatOpenRouter
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.agent_runtime import turn_execution
 from argus.env import load_project_dotenv
 from argus.llm.openrouter_usage import (
     merge_openrouter_token_usage,
@@ -405,6 +406,13 @@ def record_openrouter_route_receipt(
     return receipt
 
 
+def _reserve_openrouter_attempt(task: OpenRouterTask, timeout_seconds: float, model_name: str, mode: Literal["json_schema", "chat_model"], schema_name: str | None, context_packet_ids: list[str] | None) -> turn_execution.ProviderCallPermit | None:
+    if (permit := turn_execution.reserve_provider_call(task, timeout_seconds)) is not None:
+        return permit
+    record_openrouter_route_receipt(task=task, model_name=model_name, mode=mode, schema_name=schema_name, latency_ms=0, outcome="skipped", failure_mode=turn_execution.turn_budget_block_reason(), context_packet_ids=context_packet_ids)
+    return None
+
+
 def get_openrouter_route_receipts() -> list[OpenRouterRouteReceipt]:
     with _ROUTE_RECEIPTS_LOCK:
         return list(_ROUTE_RECEIPTS)
@@ -510,6 +518,8 @@ async def invoke_openrouter_json_schema(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids)) is None:
+            return None
         payload = _json_schema_payload(
             model=candidate_model,
             messages=messages,
@@ -518,14 +528,14 @@ async def invoke_openrouter_json_schema(
             profile=profile,
         )
         try:
-            async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=permit.timeout_seconds) as client:
                 response = await asyncio.wait_for(
                     _post_openrouter_json_schema(
                         client=client,
                         api_key=api_key,
                         payload=payload,
                     ),
-                    timeout=profile.timeout_seconds,
+                    timeout=permit.timeout_seconds,
                 )
             data = response.json()
             _raise_openrouter_payload_error(data)
@@ -617,6 +627,8 @@ async def invoke_openrouter_chat_completion(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "chat_model", None, context_packet_ids)) is None:
+            return None
         payload: dict[str, object] = {
             "model": candidate_model,
             "messages": messages,
@@ -624,14 +636,14 @@ async def invoke_openrouter_chat_completion(
             "max_tokens": profile.max_tokens,
         }
         try:
-            async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=permit.timeout_seconds) as client:
                 response = await asyncio.wait_for(
                     _post_openrouter_json_schema(
                         client=client,
                         api_key=api_key,
                         payload=payload,
                     ),
-                    timeout=profile.timeout_seconds,
+                    timeout=permit.timeout_seconds,
                 )
                 data = response.json()
                 _raise_openrouter_payload_error(data)
@@ -737,6 +749,8 @@ def invoke_openrouter_json_schema_sync(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids)) is None:
+            return None
         payload = _json_schema_payload(
             model=candidate_model,
             messages=messages,
@@ -745,7 +759,7 @@ def invoke_openrouter_json_schema_sync(
             profile=profile,
         )
         try:
-            with httpx.Client(timeout=profile.timeout_seconds) as client:
+            with httpx.Client(timeout=permit.timeout_seconds) as client:
                 response = _post_openrouter_json_schema_sync(
                     client=client,
                     api_key=api_key,
