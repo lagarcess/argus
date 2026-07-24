@@ -16,6 +16,54 @@ paths:
       responses:
         "200":
           description: Session created.
+  /api/v1/auth/guest:
+    post:
+      description: Create or reuse one verified anonymous guest session when server policy permits it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestBootstrapRequest"
+      responses:
+        "200":
+          description: Guest session and temporary workspace are ready.
+        "403":
+          description: Guest access is disabled or the browser origin is rejected.
+        "429":
+          description: Anonymous-session creation is temporarily rate limited.
+        "503":
+          description: Anonymous Auth or temporary-workspace bootstrap is unavailable.
+  /api/v1/auth/guest/link:
+    post:
+      description: Reserved typed boundary for linking the current anonymous identity to a new permanent account.
+      responses:
+        "501":
+          description: Conversion is not active in Guest Experience Block 1.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/auth/guest/handoffs:
+    post:
+      description: Reserved typed boundary for creating an existing-account guest handoff.
+      responses:
+        "501":
+          description: Conversion is not active in Guest Experience Block 1.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/auth/guest/handoffs/{handoff_id}/claim:
+    post:
+      description: Reserved typed boundary for atomically claiming a guest workspace into an existing account.
+      parameters:
+        - name: handoff_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "501":
+          description: Conversion is not active in Guest Experience Block 1.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/logout:
     post:
       responses:
@@ -379,6 +427,127 @@ components:
             code: auth_session_verification_unavailable
             request_id: req_123
   schemas:
+    GuestBootstrapRequest:
+      type: object
+      required:
+        - captcha_token
+      properties:
+        captcha_token:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        language:
+          type: string
+          enum: [en, es-419]
+          default: en
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        email:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        display_name:
+          type:
+            - string
+            - "null"
+        language:
+          type: string
+          enum: [en, es-419]
+        locale:
+          type: string
+          enum: [en-US, es-419]
+        theme:
+          type: string
+          enum: [dark, light, system]
+        is_admin:
+          type: boolean
+        onboarding:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GuestAccountSummary:
+      type: object
+      required:
+        - expires_at
+        - conversation_limit
+        - message_limit
+        - simulation_limit
+        - feedback_limit
+      properties:
+        expires_at:
+          type: string
+          format: date-time
+        conversation_limit:
+          type: integer
+          const: 1
+        message_limit:
+          type: integer
+          const: 10
+        simulation_limit:
+          type: integer
+          const: 1
+        feedback_limit:
+          type: integer
+          const: 5
+    AccountCapabilities:
+      type: object
+      required:
+        - can_create_additional_conversation
+        - can_manage_conversation
+        - can_save_decision
+        - can_manage_account
+        - can_use_omnisearch
+        - can_submit_feedback
+      properties:
+        can_create_additional_conversation:
+          type: boolean
+        can_manage_conversation:
+          type: boolean
+        can_save_decision:
+          type: boolean
+        can_manage_account:
+          type: boolean
+        can_use_omnisearch:
+          type: boolean
+        can_submit_feedback:
+          type: boolean
+    UserResponse:
+      type: object
+      required:
+        - user
+        - account_kind
+        - guest
+        - capabilities
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        account_kind:
+          type: string
+          enum:
+            - guest
+            - registered
+        guest:
+          anyOf:
+            - $ref: "#/components/schemas/GuestAccountSummary"
+            - type: "null"
+        capabilities:
+          $ref: "#/components/schemas/AccountCapabilities"
     ChatClarification:
       type: object
       description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.

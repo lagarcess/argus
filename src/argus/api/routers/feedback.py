@@ -6,9 +6,11 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
 from argus.api.feedback_context import sanitize_feedback_context
+from argus.api.guest_access import account_context
 from argus.api.schemas import FeedbackRequest, SuccessResponse, User
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError
+from argus.domain.usage_limits import FEEDBACK_USAGE_RESOURCE, allowance_windows
 
 router = APIRouter(prefix="/api/v1", tags=["feedback"])
 
@@ -32,6 +34,27 @@ def feedback(
         )
 
     if api_state.supabase_gateway is not None:
+        account = account_context(request)
+        if account.kind == "guest":
+            outcome = api_state.supabase_gateway.create_feedback_settling_usage(
+                user_id=user.id,
+                feedback_type=payload.type,
+                message=payload.message,
+                context=context,
+                allowance_limits=allowance_windows(
+                    account,
+                    FEEDBACK_USAGE_RESOURCE,
+                ),
+            )
+            if outcome.get("decision") != "accepted":
+                raise problem(
+                    request,
+                    status_code=403,
+                    code="account_conversion_required",
+                    title="Account Required",
+                    detail="Sign in to submit more feedback.",
+                )
+            return SuccessResponse(success=True)
         try:
             api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=user.id,

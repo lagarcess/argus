@@ -6,6 +6,7 @@ from time import monotonic
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
@@ -14,12 +15,20 @@ from argus.api.dependencies import (
     current_user,
     problem,
 )
-from argus.api.schemas import LoginRequest, SignupRequest, User
+from argus.api.guest_access import (
+    account_context,
+    guest_access_enabled,
+    guest_account_context,
+    permanent_account_access_allowed,
+    store_account_context,
+)
+from argus.api.schemas import GuestBootstrapRequest, LoginRequest, SignupRequest, User
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 AUTH_LOGIN_ATTEMPT_LIMIT = 8
 AUTH_SIGNUP_ATTEMPT_LIMIT = 5
+AUTH_GUEST_ATTEMPT_LIMIT = 5
 _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
 _AUTH_ATTEMPT_RETRY_FLOOR_SECONDS = 1
 _AUTH_ATTEMPT_COMPACT_THRESHOLD = 2048
@@ -146,9 +155,123 @@ def _client_identity(request: Request) -> str:
     return "unknown"
 
 
+def _enforce_guest_attempt_limit(request: Request) -> None:
+    retry_after = _AUTH_ATTEMPT_LIMITER.record_or_retry_after(
+        keys=(f"guest:ip:{_client_identity(request)}",),
+        limit=AUTH_GUEST_ATTEMPT_LIMIT,
+        window_seconds=_AUTH_ATTEMPT_WINDOW_SECONDS,
+    )
+    if retry_after is None:
+        return
+    raise problem(
+        request,
+        status_code=429,
+        code="too_many_requests",
+        title="Too Many Requests",
+        detail="Too many guest session attempts. Please wait before trying again.",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
 @router.get("/auth/session")
 def auth_session(user: User = Depends(current_user)) -> dict[str, object]:  # noqa: B008
     return {"authenticated": True, "user": user.model_dump(mode="json")}
+
+
+@router.post("/auth/guest")
+def guest_bootstrap(
+    request: Request,
+    body: GuestBootstrapRequest,
+) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
+    if not guest_access_enabled():
+        raise problem(
+            request,
+            status_code=403,
+            code="guest_access_unavailable",
+            title="Guest Access Unavailable",
+            detail="Guest access is not available.",
+        )
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for guest authentication.",
+        )
+
+    try:
+        existing = current_user(request)
+    except HTTPException as exc:
+        if exc.status_code != 401:
+            raise
+    else:
+        context = account_context(request)
+        if context.kind != "guest":
+            raise problem(
+                request,
+                status_code=409,
+                code="account_already_registered",
+                title="Account Already Registered",
+                detail="This browser already has a permanent account session.",
+            )
+        return JSONResponse(
+            jsonable_encoder(
+                {
+                    "authenticated": True,
+                    "reused": True,
+                    "user": existing.model_dump(mode="json"),
+                    "account_kind": "guest",
+                }
+            )
+        )
+
+    _enforce_guest_attempt_limit(request)
+    auth_user_id: str | None = None
+    try:
+        result = api_state.supabase_gateway.sign_in_anonymously(
+            captcha_token=body.captcha_token,
+            language=body.language,
+        )
+        auth_user = result.get("user")
+        if not isinstance(auth_user, dict) or auth_user.get("is_anonymous") is not True:
+            raise RuntimeError("Provider did not return a verified anonymous user.")
+        auth_user_id = str(auth_user.get("id") or "")
+        if not auth_user_id:
+            raise RuntimeError("Provider anonymous user is missing an id.")
+        profile = api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+            auth_user
+        )
+        workspace = api_state.supabase_gateway.create_guest_workspace(
+            user_id=profile.id,
+            created_at=profile.created_at,
+        )
+        store_account_context(request, guest_account_context(workspace))
+        payload = dict(result)
+        payload.update(
+            {
+                "authenticated": True,
+                "reused": False,
+                "account_kind": "guest",
+            }
+        )
+        return auth_response(request, payload)
+    except HTTPException:
+        raise
+    except Exception:
+        if auth_user_id:
+            try:
+                api_state.supabase_gateway.delete_auth_user(auth_user_id)
+            except Exception:
+                pass
+        raise problem(
+            request,
+            status_code=503,
+            code="guest_bootstrap_failed",
+            title="Guest Session Unavailable",
+            detail="Argus could not start a guest session. Please try again.",
+        ) from None
 
 
 @router.post("/auth/signup")
@@ -162,7 +285,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             detail="Supabase persistence is required for authentication.",
         )
     _enforce_auth_attempt_limit(request, action="signup", email=body.email)
-    if not api_state.supabase_gateway.private_alpha_email_allowed(body.email):
+    if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _signup_auth_problem(request)
     try:
         result = api_state.supabase_gateway.signup(
@@ -188,7 +311,7 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             detail="Supabase persistence is required for authentication.",
         )
     _enforce_auth_attempt_limit(request, action="login", email=body.email)
-    if not api_state.supabase_gateway.private_alpha_email_allowed(body.email):
+    if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _login_auth_problem(request)
     try:
         result = api_state.supabase_gateway.login(

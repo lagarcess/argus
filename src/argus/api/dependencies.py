@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -11,6 +12,13 @@ from argus.api import state as api_state
 from argus.api.auth_sessions import (
     AuthSessionVerificationUnavailable,
     auth_session_is_active,
+)
+from argus.api.guest_access import (
+    guest_access_enabled,
+    guest_account_context,
+    permanent_account_access_allowed,
+    registered_account_context,
+    store_account_context,
 )
 from argus.api.schemas import User
 
@@ -113,11 +121,15 @@ def current_user(request: Request) -> User:
     ):
         if api_state.supabase_gateway is not None:
             try:
-                return api_state.supabase_gateway.get_or_create_mock_user()
+                user = api_state.supabase_gateway.get_or_create_mock_user()
+                store_account_context(request, registered_account_context(user.id))
+                return user
             except Exception:
                 if not dev_memory_fallback_enabled():
                     raise
-        return api_state.store.get_or_create_dev_user()
+        user = api_state.store.get_or_create_dev_user()
+        store_account_context(request, registered_account_context(user.id))
+        return user
 
     if api_state.supabase_gateway is None:
         raise problem(
@@ -201,8 +213,35 @@ def current_user(request: Request) -> User:
             detail="Invalid or expired access token.",
         )
 
+    if auth_user.get("is_anonymous") is True:
+        if not guest_access_enabled():
+            raise problem(
+                request,
+                status_code=403,
+                code="guest_access_unavailable",
+                title="Guest Access Unavailable",
+                detail="Guest access is not available.",
+            )
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=auth_user_id,
+            at=datetime.now(timezone.utc),
+        )
+        if workspace is None:
+            raise problem(
+                request,
+                status_code=403,
+                code="guest_session_expired",
+                title="Guest Session Expired",
+                detail="This temporary guest session is no longer available.",
+            )
+        user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+        store_account_context(request, guest_account_context(workspace))
+        return user
+
     auth_email = str(auth_user.get("email") or "")
-    if not api_state.supabase_gateway.private_alpha_email_allowed(auth_email):
+    if not permanent_account_access_allowed(api_state.supabase_gateway, auth_email):
         raise private_alpha_access_problem(request)
 
-    return api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    store_account_context(request, registered_account_context(user.id))
+    return user

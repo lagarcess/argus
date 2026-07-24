@@ -283,7 +283,61 @@ def test_active_openapi_uses_alpha_contract_names() -> None:
     assert "backtest_runs" in text
     assert "portfolios" not in text.lower()
     assert "simulations" not in text.lower()
-    assert "summary:" not in text.lower()
+    contract = yaml.safe_load(text)
+    assert all(
+        "summary" not in (schema.get("properties") or {})
+        for schema in contract["components"]["schemas"].values()
+        if isinstance(schema, dict)
+    )
+
+
+def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> None:
+    product = (ROOT / "docs" / "PRODUCT.md").read_text(encoding="utf-8")
+    architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    api_contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")
+    design = (ROOT / ".agent" / "designs" / "argus" / "DESIGN.md").read_text(
+        encoding="utf-8"
+    )
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    assert "Guest mode supersedes the auth-first landing page when enabled." in product
+    assert "ARGUS_GUEST_ACCESS_ENABLED" in architecture
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in architecture
+    assert "`POST /api/v1/auth/guest`" in api_contract
+    assert "`POST /api/v1/auth/guest/link`" in api_contract
+    assert "`POST /api/v1/auth/guest/handoffs`" in api_contract
+    assert "`POST /api/v1/auth/guest/handoffs/{handoff_id}/claim`" in api_contract
+    assert "`guest_session`" in api_contract
+    assert "cost_ledger_entries" in api_contract
+    assert "profiles.email" in data_model
+    assert "verified anonymous Auth user" in data_model
+    assert "fixed seven-day" in data_model
+    assert "centered auth modal" in design
+    assert "/api/v1/auth/guest" in openapi["paths"]
+    guest_bootstrap = openapi["paths"]["/api/v1/auth/guest"]["post"]
+    assert guest_bootstrap["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/GuestBootstrapRequest"
+    }
+    captcha = openapi["components"]["schemas"]["GuestBootstrapRequest"]["properties"][
+        "captcha_token"
+    ]
+    assert captcha == {"type": "string", "minLength": 1, "maxLength": 4096}
+    assert "GuestAccountSummary" in openapi["components"]["schemas"]
+    assert "AccountCapabilities" in openapi["components"]["schemas"]
+    user_response = openapi["components"]["schemas"]["UserResponse"]
+    assert set(user_response["required"]) == {
+        "user",
+        "account_kind",
+        "guest",
+        "capabilities",
+    }
+    assert user_response["properties"]["user"] == {"$ref": "#/components/schemas/User"}
+    assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {
+        "type": ["string", "null"]
+    }
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:
@@ -321,6 +375,7 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
     unauthenticated_paths = {
         "/api/v1/auth/signup",
         "/api/v1/auth/login",
+        "/api/v1/auth/guest",
         "/api/v1/auth/logout",
     }
     for path, path_contract in contract["paths"].items():

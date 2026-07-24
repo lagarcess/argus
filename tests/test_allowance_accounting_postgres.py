@@ -64,6 +64,64 @@ def _seed_owner(connection) -> dict[str, str]:
     return {"user_id": user_id, "conversation_id": conversation_id}
 
 
+def _seed_guest_owner(connection) -> dict[str, str]:
+    user_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).replace(microsecond=0)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into auth.users (id, email, is_anonymous)" " values (%s, null, true)",
+            (user_id,),
+        )
+        cursor.execute(
+            "insert into public.profiles (id, email) values (%s, null)",
+            (user_id,),
+        )
+        cursor.execute(
+            "insert into public.guest_workspaces"
+            " (user_id, created_at, expires_at)"
+            " values (%s, %s, %s)",
+            (user_id, created_at, created_at + timedelta(days=7)),
+        )
+        cursor.execute(
+            "insert into public.conversations (user_id, title)"
+            " values (%s, 'guest proof') returning id",
+            (user_id,),
+        )
+        conversation_id = str(cursor.fetchone()[0])
+    return {
+        "user_id": user_id,
+        "conversation_id": conversation_id,
+        "period_start": created_at.isoformat(),
+        "period_end": (created_at + timedelta(days=7)).isoformat(),
+    }
+
+
+@pytest.fixture
+def guest_owner():
+    with _connect() as connection:
+        guest = _seed_guest_owner(connection)
+    try:
+        yield guest
+    finally:
+        with _connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from auth.users where id = %s",
+                    (guest["user_id"],),
+                )
+
+
+def _guest_limits(owner, limit: int) -> list[dict[str, object]]:
+    return [
+        {
+            "period": "guest_session",
+            "limit": limit,
+            "period_start": owner["period_start"],
+            "period_end": owner["period_end"],
+        }
+    ]
+
+
 def _usage_rows(connection, user_id: str, resource: str) -> dict[str, dict]:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -140,6 +198,21 @@ def _admit(connection, owner, **overrides):
         return cursor.fetchone()[0]
 
 
+def _submit_feedback(connection, owner, feedback_id: str) -> dict:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select public.create_feedback_settling_usage("
+            " %s, %s, 'general', 'guest feedback', '{}'::jsonb,"
+            " 'feedback', %s::jsonb)",
+            (
+                feedback_id,
+                owner["user_id"],
+                json.dumps(_guest_limits(owner, 5)),
+            ),
+        )
+        return cursor.fetchone()[0]
+
+
 def test_settlement_charges_both_windows_once_and_replays_zero(owner):
     with _connect() as connection:
         message_id = str(uuid.uuid4())
@@ -164,6 +237,143 @@ def test_settlement_charges_both_windows_once_and_replays_zero(owner):
         windows = _usage_rows(connection, owner["user_id"], "chat_messages")
         assert windows["hour"]["used_count"] == 1
         assert windows["day"]["used_count"] == 1
+
+
+def test_guest_ten_useful_terminals_settle_ten_lifetime_units(guest_owner):
+    with _connect() as connection:
+        for _ in range(10):
+            _settle_message(
+                connection,
+                guest_owner,
+                str(uuid.uuid4()),
+                limits=_guest_limits(guest_owner, 10),
+            )
+        windows = _usage_rows(
+            connection,
+            guest_owner["user_id"],
+            "chat_messages",
+        )
+        assert set(windows) == {"guest_session"}
+        assert windows["guest_session"]["used_count"] == 10
+        assert windows["guest_session"]["limit_count"] == 10
+
+        with pytest.raises(psycopg.errors.CheckViolation):
+            _settle_message(
+                connection,
+                guest_owner,
+                str(uuid.uuid4()),
+                limits=_guest_limits(guest_owner, 10),
+            )
+
+
+def test_guest_failure_interruption_and_exact_replay_add_no_unit(guest_owner):
+    with _connect() as connection:
+        message_id = str(uuid.uuid4())
+        _settle_message(
+            connection,
+            guest_owner,
+            message_id,
+            limits=_guest_limits(guest_owner, 10),
+        )
+        _settle_message(
+            connection,
+            guest_owner,
+            message_id,
+            limits=_guest_limits(guest_owner, 10),
+        )
+
+        # Failure, recoverable failure, and interruption never call the
+        # terminal settlement owner. The durable count therefore stays exact.
+        windows = _usage_rows(
+            connection,
+            guest_owner["user_id"],
+            "chat_messages",
+        )
+        assert windows["guest_session"]["used_count"] == 1
+
+
+def test_guest_cannot_bypass_lifetime_policy_with_registered_windows(guest_owner):
+    with _connect() as connection:
+        message_id = str(uuid.uuid4())
+        with pytest.raises(psycopg.errors.CheckViolation):
+            _settle_message(
+                connection,
+                guest_owner,
+                message_id,
+                limits=MESSAGE_LIMITS,
+            )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.messages where id = %s",
+                (message_id,),
+            )
+            assert cursor.fetchone()[0] == 0
+        assert (
+            _usage_rows(
+                connection,
+                guest_owner["user_id"],
+                "chat_messages",
+            )
+            == {}
+        )
+
+
+def test_guest_unique_simulation_charges_once_replay_zero_and_second_stops(
+    guest_owner,
+):
+    with _connect() as connection:
+        key = str(uuid.uuid4())
+        first = _admit(
+            connection,
+            guest_owner,
+            idempotency_key=key,
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+        )
+        replay = _admit(
+            connection,
+            guest_owner,
+            idempotency_key=key,
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+        )
+        second = _admit(
+            connection,
+            guest_owner,
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+        )
+
+        assert first["decision"] == "admitted"
+        assert replay["decision"] == "replay"
+        assert second == {"decision": "conversion_required"}
+        windows = _usage_rows(
+            connection,
+            guest_owner["user_id"],
+            "backtest_runs",
+        )
+        assert windows["guest_session"]["used_count"] == 1
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.backtest_jobs where user_id = %s",
+                (guest_owner["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+
+
+def test_guest_five_feedback_submissions_allowed_and_sixth_rejected(guest_owner):
+    with _connect() as connection:
+        for _ in range(5):
+            outcome = _submit_feedback(connection, guest_owner, str(uuid.uuid4()))
+            assert outcome["decision"] == "accepted"
+
+        sixth = _submit_feedback(connection, guest_owner, str(uuid.uuid4()))
+        assert sixth == {"decision": "conversion_required"}
+        windows = _usage_rows(connection, guest_owner["user_id"], "feedback")
+        assert windows["guest_session"]["used_count"] == 5
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.feedback where user_id = %s",
+                (guest_owner["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 5
 
 
 def test_settlement_rolls_back_with_its_message(owner):

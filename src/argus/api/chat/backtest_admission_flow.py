@@ -65,6 +65,7 @@ def admit_durable_chat_job(
             request_message_id=context.request_message_id,
             confirmation_message_id=context.confirmation_message_id,
             execution_metadata=execution_metadata,
+            allowance_limits=context.allowance_limits,
         )
         decision = str(outcome.get("decision") or "")
         if decision in ("admitted", "replay"):
@@ -89,7 +90,7 @@ def admit_durable_chat_job(
                 conversation_id=context.conversation_id,
             )
             return ChatAdmissionResult(decision=decision)
-        if decision in ("conflict", "allowance_exhausted"):
+        if decision in ("conflict", "allowance_exhausted", "conversion_required"):
             logger.warning(
                 "Chat backtest admission rejected",
                 reason=decision,

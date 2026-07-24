@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
@@ -21,7 +22,11 @@ from argus.domain.backtest_finalization import (
     stable_backtest_run_id,
 )
 from argus.domain.supabase_gateway import QuotaExceededError
-from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
+from argus.domain.usage_limits import (
+    SIMULATION_ALLOWANCE_LIMITS,
+    SIMULATION_USAGE_RESOURCE,
+    allowance_windows,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
 
@@ -127,11 +132,19 @@ def run_backtest(
 
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.check_usage_limits(
-                user_id=user.id,
-                resource="backtest_runs",
-                limits=SIMULATION_ALLOWANCE_LIMITS,
-            )
+            account = account_context(request)
+            if account.kind == "guest":
+                api_state.supabase_gateway.check_allowance_windows(
+                    user_id=user.id,
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    windows=allowance_windows(account, SIMULATION_USAGE_RESOURCE),
+                )
+            else:
+                api_state.supabase_gateway.check_usage_limits(
+                    user_id=user.id,
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    limits=SIMULATION_ALLOWANCE_LIMITS,
+                )
         except QuotaExceededError as exc:
             # A duplicate racing the admission that filled the window must
             # still resolve replay/collision first.
@@ -355,6 +368,10 @@ def _admit_direct_run(
             initial_status="running",
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
+            allowance_limits=allowance_windows(
+                account_context(request),
+                SIMULATION_USAGE_RESOURCE,
+            ),
         )
         decision = str(outcome.get("decision") or "")
         job = outcome.get("job") if isinstance(outcome.get("job"), dict) else None
@@ -396,6 +413,14 @@ def _admit_direct_run(
             title="Quota Exceeded",
             detail="Simulation allowance exhausted for the current window.",
             headers={"Retry-After": "60"},
+        )
+    if decision == "conversion_required":
+        raise problem(
+            request,
+            status_code=403,
+            code="account_conversion_required",
+            title="Account Required",
+            detail="Sign in before running another simulation.",
         )
     if decision == "per_user_capacity":
         raise problem(

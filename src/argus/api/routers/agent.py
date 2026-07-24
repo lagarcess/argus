@@ -81,6 +81,7 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.guest_access import account_context
 from argus.api.message_store import (
     create_message,
     latest_unresolved_terminal_runtime_failure_metadata,
@@ -95,7 +96,11 @@ from argus.api.schemas import (
 )
 from argus.domain import backtest_admission
 from argus.domain.backtest_finalization import BacktestFinalizationError
-from argus.domain.usage_limits import message_usage_settlement
+from argus.domain.usage_limits import (
+    SIMULATION_USAGE_RESOURCE,
+    allowance_windows,
+    message_usage_settlement,
+)
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -355,6 +360,7 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
+    turn_account = account_context(request)
     clean_idempotency_key = _validated_optional_idempotency_key(request, idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
@@ -750,7 +756,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=msg,
-                settle_usage=message_usage_settlement(),
+                settle_usage=message_usage_settlement(turn_account),
             )
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
@@ -826,7 +832,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=follow_up,
-                settle_usage=message_usage_settlement(),
+                settle_usage=message_usage_settlement(turn_account),
             )
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})
@@ -911,7 +917,7 @@ async def chat_stream(
                 role="assistant",
                 content="",
                 metadata=metadata,
-                settle_usage=message_usage_settlement(),
+                settle_usage=message_usage_settlement(turn_account),
             )
             yield sse_data(
                 {
@@ -945,6 +951,10 @@ async def chat_stream(
                 idempotency_key=clean_idempotency_key,
                 request_id=request.state.request_id,
                 chat_action=action_context,
+                allowance_limits=allowance_windows(
+                    turn_account,
+                    SIMULATION_USAGE_RESOURCE,
+                ),
             )
         )
         try:
@@ -1301,7 +1311,8 @@ async def chat_stream(
                         content=persisted_text,
                         metadata=metadata,
                         settle_usage=ordinary_turn_settlement(
-                            is_run_backtest_turn=is_run_backtest_turn
+                            is_run_backtest_turn=is_run_backtest_turn,
+                            account=turn_account,
                         ),
                     )
                     receipt_message_id = assistant_message.id

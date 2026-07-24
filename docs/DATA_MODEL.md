@@ -123,7 +123,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 
 ### Fields
 - `id`: `uuid` (Primary Key, references `auth.users.id`)
-- `email`: `text`
+- `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
 - `language`: `text` (Default: `'en'`)
@@ -152,8 +152,43 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
   authentication this row is authoritative and no frontend repair update is
   required.
 - `display_name` is used for personalization.
-- `email` is for authentication, not primary UX identity.
+- `profiles.email` is null only for a verified anonymous Auth user. Permanent
+  profiles require the verified provider email. Fake or placeholder guest
+  addresses are forbidden.
 - `username` is optional for Alpha.
+---
+
+## 5.1 guest_workspaces
+
+Server-owned policy record for one temporary anonymous identity.
+
+### Fields
+- `user_id`: `uuid` (Primary Key, references `profiles.id`)
+- `conversation_id`: `uuid` (Unique, nullable, references `conversations.id`)
+- `status`: `active`, `claiming`, `claimed`, or `expired`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz`
+- `claimed_by`: `uuid` (Nullable, references `profiles.id`)
+- `claimed_at`: `timestamptz` (Nullable)
+- `updated_at`: `timestamptz`
+
+### Invariants
+- The owner must be a verified anonymous Supabase Auth user when the workspace
+  is created.
+- Exactly one workspace exists per anonymous owner and at most one
+  conversation may bind to it.
+- Expiry uses a fixed seven-day window after creation. Message, simulation, feedback, and
+  conversation activity cannot extend it.
+- Browser roles may read only their own active workspace and cannot mutate
+  expiry, claim, or cleanup state.
+- Cleanup re-verifies `auth.users.is_anonymous` and an unclaimed state while
+  locked. A converted or permanent account is never eligible for deletion.
+- Cleanup deletes conversation messages/jobs, guest feedback text, and the
+  checkpoint rows whose `thread_id` matches the guest conversation before the
+  server-admin Auth deletion removes the remaining owner-scoped product rows.
+  Privacy-safe append-only cost and route/security evidence may retain nullable
+  attribution; transcript-bearing state may not.
+
 ---
 
 # 6. private_alpha_allowlist
@@ -939,7 +974,7 @@ Tracks resource consumption for quotas and limits.
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
 - `resource`: `text` (e.g., `backtest_runs`, `backtest_jobs`, `chat_messages`)
-- `period`: `text` (e.g., `hour`, `day`)
+- `period`: `text` (e.g., `hour`, `day`, `guest_session`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
 - `used_count`: `integer` (Default: `0`)
@@ -954,10 +989,15 @@ Tracks resource consumption for quotas and limits.
 
 ### Alpha Enums
 - **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`
-- **Period**: `hour`, `day`
+- **Period**: `hour`, `day`, `guest_session`
 
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
+- For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
+  `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
+  assistant terminals, one unique simulation admission, and five feedback
+  submissions over the identity lifetime.
+- Registered users continue to use the existing UTC hour/day accounting.
 
 ---
 
@@ -1044,7 +1084,14 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
-  `usage_counters`.
+  `usage_counters`, `guest_workspaces`.
+
+### Guest ownership
+- Supabase anonymous identities use the `authenticated` role, so every guest
+  policy keeps `(select auth.uid()) = user_id`; role membership alone is never
+  authorization.
+- Expired guest identities cannot read or write product rows.
+- Another guest and a permanent user see zero guest workspace rows.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.

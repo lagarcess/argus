@@ -88,7 +88,7 @@ class OnboardingState(BaseModel):
 
 class User(BaseModel):
     id: str
-    email: str
+    email: str | None
     username: str | None = None
     display_name: str | None = None
     language: Language = "en"
@@ -104,8 +104,32 @@ class User(BaseModel):
         return self.onboarding.completed
 
 
+class GuestAccountSummary(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    expires_at: datetime
+    conversation_limit: Literal[1]
+    message_limit: Literal[10]
+    simulation_limit: Literal[1]
+    feedback_limit: Literal[5]
+
+
+class AccountCapabilities(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    can_create_additional_conversation: bool
+    can_manage_conversation: bool
+    can_save_decision: bool
+    can_manage_account: bool
+    can_use_omnisearch: bool
+    can_submit_feedback: bool
+
+
 class UserResponse(BaseModel):
     user: User
+    account_kind: Literal["guest", "registered"]
+    guest: GuestAccountSummary | None
+    capabilities: AccountCapabilities
 
 
 class UsageWindow(BaseModel):
@@ -584,6 +608,11 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class GuestBootstrapRequest(BaseModel):
+    captcha_token: str = Field(min_length=1, max_length=4096)
+    language: Language = "en"
 
 
 class SuccessResponse(BaseModel):

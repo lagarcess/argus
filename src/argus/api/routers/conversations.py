@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.guest_access import account_context
 from argus.api.message_store import (
     memory_conversation,
     reconcile_reload_message_metadata,
@@ -44,12 +45,34 @@ def _memory_conversation_owned_by(
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(
     payload: ConversationCreate,
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
     title = payload.title or "New idea"
     title_source = "user_renamed" if payload.title else "system_default"
     language = payload.language or user.language
     if api_state.supabase_gateway is not None:
+        context = account_context(request)
+        if context.kind == "guest":
+            workspace = api_state.supabase_gateway.get_active_guest_workspace(
+                user_id=user.id,
+                at=datetime.now(timezone.utc),
+            )
+            if workspace is None:
+                raise problem(
+                    request,
+                    status_code=403,
+                    code="guest_session_expired",
+                    title="Guest Session Expired",
+                    detail="This temporary guest session is no longer available.",
+                )
+            if workspace.conversation_id is not None:
+                existing = api_state.supabase_gateway.get_conversation(
+                    user_id=user.id,
+                    conversation_id=workspace.conversation_id,
+                )
+                if existing is not None:
+                    return ConversationResponse(conversation=existing)
         try:
             conversation = api_state.supabase_gateway.create_conversation(
                 user_id=user.id,

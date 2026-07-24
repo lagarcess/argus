@@ -43,6 +43,7 @@ class BacktestJobShadowContext:
     idempotency_key: str | None = None
     request_id: str | None = None
     chat_action: dict[str, Any] | None = None
+    allowance_limits: list[dict[str, object]] | None = None
     created_job_id: str | None = None
     workflow_dispatch_started: bool = False
     workflow_task_run_id: str | None = None
@@ -429,7 +430,11 @@ def scan_stale_backtest_jobs(
     }
     scan_plan = (
         ("queued", queued_age_seconds, ("queued_at", "created_at", "updated_at")),
-        ("running", running_age_seconds, ("started_at", "updated_at", "queued_at", "created_at")),
+        (
+            "running",
+            running_age_seconds,
+            ("started_at", "updated_at", "queued_at", "created_at"),
+        ),
     )
     max_jobs = max(1, limit)
 
@@ -452,7 +457,9 @@ def scan_stale_backtest_jobs(
             if not isinstance(job, dict):
                 continue
             report["scanned_count"] += 1
-            age_seconds = _job_age_seconds(job, now=now_utc, timestamp_keys=timestamp_keys)
+            age_seconds = _job_age_seconds(
+                job, now=now_utc, timestamp_keys=timestamp_keys
+            )
             if age_seconds is not None and age_seconds < stale_after_seconds:
                 continue
 
@@ -524,7 +531,9 @@ def _fail_stale_proof_job_without_task_run(
     job: dict[str, Any],
 ) -> dict[str, Any]:
     failure_code = "workflow_dispatch_missing"
-    failure_detail = "Render workflow proof did not record a task run before the stale threshold."
+    failure_detail = (
+        "Render workflow proof did not record a task run before the stale threshold."
+    )
     reconciled_at = _utcnow_iso()
     metadata = _dict_or_empty(job.get("execution_metadata"))
 
@@ -1001,7 +1010,10 @@ def _admission_rejection_envelope(decision: str) -> dict[str, Any]:
     """Typed rejection: an unadmitted run must fail honestly, never execute
     for free or charge the allowance."""
 
-    if decision == "allowance_exhausted":
+    if decision == "conversion_required":
+        error_type = "account_required"
+        failure_code = "account_conversion_required"
+    elif decision == "allowance_exhausted":
         error_type = "rate_limited"
         failure_code = "simulation_allowance_exhausted"
     elif decision in ("per_user_capacity", "global_capacity"):

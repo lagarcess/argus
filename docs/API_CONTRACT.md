@@ -1486,7 +1486,49 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 **Potential later modes:**
 - username + password mapped to email-backed identity
 - OAuth
-- anonymous/guest sessions
+
+## Guest identity and policy endpoints
+
+Guest access is additive and server-flagged. Both
+`ARGUS_GUEST_ACCESS_ENABLED` and `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` default
+to `false`; the frontend flag controls presentation only.
+
+- `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
+  session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
+  checked before Auth creation. It uses the existing secure cookie rules.
+- `POST /api/v1/auth/guest/link` is the typed future boundary for linking the
+  current anonymous identity into a new permanent account.
+- `POST /api/v1/auth/guest/handoffs` is the typed future boundary for creating
+  a short-lived existing-account handoff.
+- `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` is the typed future
+  boundary for one atomic, single-use workspace claim.
+- `GET /api/v1/me` returns the verified account kind, guest expiry and limits,
+  and server capabilities with the ordinary profile.
+
+The Block 1 response includes `user`, `account_kind`, a nullable `guest`
+summary with expiry plus limits `1/10/1/5`, and typed `capabilities`. Guest
+capabilities deny additional conversations, conversation/account management,
+decision saving, and Omnisearch during Block 1 while allowing quota-bound
+feedback.
+
+All guest mutation failures use the existing Problem Details, request-ID,
+same-origin, secure-cookie, and idempotency conventions.
+
+`usage_counters.period = guest_session` adds the `guest_session` period. Its `period_start` is the
+guest workspace creation time and its `period_end` is the fixed seven-day
+expiry. The existing message settlement and backtest admission transactions
+own completed-turn and unique-simulation charges; feedback insert and charge
+are one transaction. Replays, failures, and interruptions add no unit.
+
+New-account linking preserves the owner UUID. An existing-account claim must
+move the complete conversation-owned product graph atomically.
+`cost_ledger_entries`, security evidence, and route evidence are deliberately
+excluded from owner rewriting: they retain anonymous attribution or become
+null through their existing foreign-key behavior.
+
+While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
+remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
+authenticate without role elevation; explicitly disabled rows remain blocked.
 
 ## `POST /auth/signup`
 
@@ -1780,7 +1822,9 @@ Argus supports English and Spanish (Latin America) in Alpha.
 
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
-- **Logged-out Users**: Frontend may store preferences in `localStorage`. API does not persist these unless guest sessions are implemented.
+- **Logged-out Users**: Frontend may store pre-session hints in `localStorage`.
+  When guest access is enabled, the resolved language is persisted on the real
+  anonymous profile and becomes authoritative after bootstrap.
 - Successful signup writes both profile values from the validated signup
   language before the authenticated application renders. Login, session
   hydration, and reload replace browser/local hints with the stored profile;

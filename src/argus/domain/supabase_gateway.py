@@ -40,6 +40,7 @@ from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
+from argus.domain.supabase_guest_accounts import GuestAccountPersistenceMixin
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
@@ -140,7 +141,11 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
+class SupabaseGateway(
+    GuestAccountPersistenceMixin,
+    ConversationMessagePersistenceMixin,
+    UsageCounterReader,
+):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
@@ -2023,20 +2028,24 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
             f"Failed to initialize usage counter for {resource} ({period})."
         )
 
-    def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
-        response = self.client.auth.get_user(token)
-        if not response or not response.user:
-            raise RuntimeError("Invalid or missing user in token response.")
-        return response.user.model_dump(mode="json")
-
     def get_or_create_profile_for_auth_user(self, auth_user: dict[str, Any]) -> User:
         user_id = auth_user["id"]
-        email = str(auth_user.get("email") or "").strip()
-        allowlist_role = self.private_alpha_role_for_email(email)
+        is_anonymous = auth_user.get("is_anonymous") is True
+        email = None if is_anonymous else str(auth_user.get("email") or "").strip()
+        if not is_anonymous and not email:
+            raise RuntimeError("Permanent Auth user is missing a verified email.")
+        allowlist_role = (
+            None if is_anonymous else self.private_alpha_role_for_email(email or "")
+        )
         is_admin = allowlist_role in {"admin", "developer"}
         # Try to get existing profile
         existing = self.get_user(user_id=user_id)
         if existing is not None:
+            if not is_anonymous and existing.email is None:
+                return self.update_user(
+                    user_id=user_id,
+                    updates={"id": user_id, "email": email, "is_admin": is_admin},
+                )
             if is_admin and not existing.is_admin:
                 return self.update_user(
                     user_id=user_id,

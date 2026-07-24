@@ -744,6 +744,38 @@ The release manifest records the profile hash, environment fingerprints,
 deployed service SHAs, and full real-user Spanish signup-to-evidence-to-decision-
 to-recall canary evidence for that same candidate.
 
+## Guest Identity and Policy Boundary
+
+Supabase Auth owns both permanent and anonymous identities. Anonymous users
+receive the ordinary `authenticated` Postgres role; verified Auth truth
+(`is_anonymous`) plus an active `guest_workspaces` row determines guest status.
+Editable profile metadata, browser state, and the frontend flag never determine
+authorization.
+
+One request-scoped typed account context is the server policy owner for guest
+capabilities, fixed expiry, and lifetime allowances. The existing conversation,
+LangGraph, message settlement, and backtest-admission paths remain the only
+runtime and accounting owners.
+
+Two server flags control rollout and default off:
+
+- `ARGUS_GUEST_ACCESS_ENABLED`
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`
+
+`NEXT_PUBLIC_GUEST_ACCESS_ENABLED` selects presentation only. An explicit
+client/server disagreement fails closed. Guest access may be enabled while
+public permanent accounts remain disabled; in that state the current
+private-alpha allowlist continues to own signup/login and role elevation.
+
+Cleanup is a bounded server-admin operation. It first marks an expired
+anonymous workspace inaccessible, removes its conversation-owned product
+graph, guest feedback text, and the matching LangGraph checkpoint thread, then
+deletes the anonymous Auth user. It re-verifies anonymous Auth truth and claim
+state under lock, so it cannot delete a converted or permanent account.
+Append-only cost and route/security evidence may remain only with privacy-safe
+nullable attribution. No hosted Supabase setting is changed by the feature
+branch.
+
 # 19. Failure Handling Standards
 
 ## AI Failure

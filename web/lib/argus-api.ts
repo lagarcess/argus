@@ -175,21 +175,6 @@ export type Conversation = {
   language?: "en" | "es-419" | null;
 };
 
-export type ApiUser = {
-  id: string;
-  email: string;
-  username: string | null;
-  display_name: string | null;
-  language: "en" | "es-419";
-  locale: "en-US" | "es-419";
-  onboarding: {
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  };
-};
-
 type AuthSessionPayload = {
   access_token?: string;
   refresh_token?: string;
@@ -669,7 +654,7 @@ export type ProfilePatch = {
 };
 
 export async function getMe() {
-  return apiFetch<{ user: ApiUser }>("/me");
+  return apiFetch<UserResponse>("/me");
 }
 
 export async function getUsageAllowances() {
@@ -677,7 +662,7 @@ export async function getUsageAllowances() {
 }
 
 export async function patchMe(patch: ProfilePatch) {
-  return apiFetch<{ user: ApiUser }>("/me", {
+  return apiFetch<UserResponse>("/me", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
@@ -1252,3 +1237,11 @@ export async function postFeedback(payload: {
     body: JSON.stringify(payload),
   });
 }
+import type { UserResponse } from "./guest-account";
+
+export type {
+  AccountCapabilities,
+  ApiUser,
+  GuestAccountSummary,
+  UserResponse,
+} from "./guest-account";

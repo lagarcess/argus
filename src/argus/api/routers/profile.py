@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.guest_access import AccountContext, account_context
 from argus.api.schemas import (
     ProfilePatch,
     UsageAllowance,
@@ -35,13 +36,36 @@ _ALLOWANCE_POLICIES: dict[str, tuple[str, dict[str, int]]] = {
 }
 
 
+def _user_response(user: User, context: AccountContext) -> UserResponse:
+    return UserResponse(
+        user=user,
+        account_kind=context.kind,
+        guest=(
+            {
+                "expires_at": context.expires_at,
+                "conversation_limit": 1,
+                "message_limit": 10,
+                "simulation_limit": 1,
+                "feedback_limit": 5,
+            }
+            if context.kind == "guest"
+            else None
+        ),
+        capabilities=context.capabilities,
+    )
+
+
 @router.get("/me", response_model=UserResponse)
-def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
+def get_me(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> UserResponse:
+    context = account_context(request)
     if api_state.supabase_gateway is not None:
         try:
             profile = api_state.supabase_gateway.get_user(user_id=user.id)
             if profile:
-                return UserResponse(user=profile)
+                return _user_response(profile, context)
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -50,7 +74,7 @@ def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
                 error=str(exc),
                 user_id=user.id,
             )
-    return UserResponse(user=user)
+    return _user_response(user, context)
 
 
 @router.get("/me/usage", response_model=UsageAllowanceResponse)
@@ -145,6 +169,15 @@ def patch_me(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
+    context = account_context(request)
+    if not context.capabilities.can_manage_account:
+        raise problem(
+            request,
+            status_code=403,
+            code="account_conversion_required",
+            title="Account Required",
+            detail="Sign in to manage a permanent profile.",
+        )
     current = (
         api_state.supabase_gateway.get_user(user_id=user.id)
         if api_state.supabase_gateway is not None
@@ -195,4 +228,4 @@ def patch_me(
         fields=updated_fields,
         onboarding_fields=sorted(onboarding_patch or {}),
     )
-    return UserResponse(user=updated)
+    return _user_response(updated, context)

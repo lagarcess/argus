@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from argus.api.guest_access import AccountContext
 
 
 class QuotaExceededError(Exception):
@@ -16,13 +19,65 @@ SIMULATION_ALLOWANCE_LIMITS: list[tuple[str, int]] = [("hour", 10), ("day", 50)]
 
 MESSAGE_USAGE_RESOURCE = "chat_messages"
 SIMULATION_USAGE_RESOURCE = "backtest_runs"
+FEEDBACK_USAGE_RESOURCE = "feedback"
+
+GUEST_MESSAGE_ALLOWANCE = 10
+GUEST_SIMULATION_ALLOWANCE = 1
+GUEST_FEEDBACK_ALLOWANCE = 5
+
+_REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
+    MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,
+    SIMULATION_USAGE_RESOURCE: SIMULATION_ALLOWANCE_LIMITS,
+    FEEDBACK_USAGE_RESOURCE: [("day", 50), ("hour", 20)],
+}
+_GUEST_ALLOWANCES = {
+    MESSAGE_USAGE_RESOURCE: GUEST_MESSAGE_ALLOWANCE,
+    SIMULATION_USAGE_RESOURCE: GUEST_SIMULATION_ALLOWANCE,
+    FEEDBACK_USAGE_RESOURCE: GUEST_FEEDBACK_ALLOWANCE,
+}
 
 
-def message_usage_settlement() -> dict[str, Any]:
+def allowance_windows(
+    account: AccountContext,
+    resource: str,
+) -> list[dict[str, object]]:
+    if account.kind == "guest":
+        if account.expires_at is None:
+            raise RuntimeError("Guest account context is missing its fixed expiry.")
+        try:
+            limit = _GUEST_ALLOWANCES[resource]
+        except KeyError as exc:
+            raise ValueError(
+                f"Unsupported guest allowance resource {resource!r}."
+            ) from exc
+        return [
+            {
+                "period": "guest_session",
+                "limit": limit,
+                "period_start": account.expires_at - timedelta(days=7),
+                "period_end": account.expires_at,
+            }
+        ]
+    try:
+        registered = _REGISTERED_ALLOWANCES[resource]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported allowance resource {resource!r}.") from exc
+    return [
+        {"period": period, "limit": limit_count} for period, limit_count in registered
+    ]
+
+
+def message_usage_settlement(
+    account: AccountContext | None = None,
+) -> dict[str, Any]:
     """One message unit settled with a durable terminal product outcome."""
+    if account is not None and account.kind == "guest":
+        limits: Any = allowance_windows(account, MESSAGE_USAGE_RESOURCE)
+    else:
+        limits = list(MESSAGE_ALLOWANCE_LIMITS)
     return {
         "resource": MESSAGE_USAGE_RESOURCE,
-        "limits": list(MESSAGE_ALLOWANCE_LIMITS),
+        "limits": limits,
     }
 
 
@@ -113,6 +168,4 @@ def check_usage_limits(
             row = rows[0] if isinstance(rows, list) and rows else None
             current_used = int(row.get("used_count", 0)) if row else 0
             if current_used >= limit_count:
-                raise QuotaExceededError(
-                    f"Quota exceeded for {resource} ({period})"
-                )
+                raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")

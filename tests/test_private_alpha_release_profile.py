@@ -48,6 +48,19 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert "eyjhb" not in serialized
     assert "bearer " not in serialized
     assert "sk-" not in serialized
+    assert "ARGUS_GUEST_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
+    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED" not in profile["services"]["web"]["env"]
+
+
+def test_guest_flags_are_documented_off_without_enabling_hosted_release() -> None:
+    backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
+
+    assert "ARGUS_GUEST_ACCESS_ENABLED=false" in backend_example
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false" in backend_example
+    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false" in backend_example
+    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false" in web_example
 
 
 def test_profile_utility_validates_hashes_and_emits_expected_pairs() -> None:
@@ -102,10 +115,7 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
     profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
     render_blueprint = yaml.safe_load((ROOT / "render.yaml").read_text(encoding="utf-8"))
     render_services = {
-        service["name"]: {
-            entry["key"]: entry
-            for entry in service.get("envVars", [])
-        }
+        service["name"]: {entry["key"]: entry for entry in service.get("envVars", [])}
         for service in render_blueprint["services"]
     }
 
@@ -120,6 +130,8 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
         for key, value in service_profile["env"].items():
             assert str(rendered_env[key].get("value")) == value
         for key in service_profile["required_present"]:
-            assert rendered_env[key].get("sync") is False or rendered_env[key].get("value")
+            assert rendered_env[key].get("sync") is False or rendered_env[key].get(
+                "value"
+            )
         for key in service_profile["optional"]:
             assert rendered_env[key].get("sync") is False

@@ -231,6 +231,7 @@ DecisionKind = Literal[
     "replay",
     "conflict",
     "allowance_exhausted",
+    "conversion_required",
     "per_user_capacity",
     "global_capacity",
 ]

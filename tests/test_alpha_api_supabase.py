@@ -10,14 +10,17 @@ import yaml
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import (
+    AccountCapabilities,
     BacktestRun,
     Conversation,
     EvidenceArtifact,
+    GuestAccountSummary,
     Idea,
     IdeaVersion,
     Message,
     OnboardingState,
     User,
+    UserResponse,
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.market_data.assets import ResolvedAsset
@@ -146,6 +149,36 @@ def _fake_fetch_price_series(
         end_date=end_date,
         timeframe=timeframe,
     )["close"]
+
+
+def test_guest_account_response_contract_is_typed_and_exact() -> None:
+    now = utcnow()
+    response = UserResponse(
+        user=_mock_profile(),
+        account_kind="guest",
+        guest=GuestAccountSummary(
+            expires_at=now + timedelta(days=7),
+            conversation_limit=1,
+            message_limit=10,
+            simulation_limit=1,
+            feedback_limit=5,
+        ),
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=False,
+            can_manage_conversation=False,
+            can_save_decision=False,
+            can_manage_account=False,
+            can_use_omnisearch=False,
+            can_submit_feedback=True,
+        ),
+    )
+
+    assert response.guest is not None
+    assert response.guest.conversation_limit == 1
+    assert response.guest.message_limit == 10
+    assert response.guest.simulation_limit == 1
+    assert response.guest.feedback_limit == 5
+    assert response.model_dump()["account_kind"] == "guest"
 
 
 def test_gateway_auth_flows_use_separate_auth_client():
