@@ -79,6 +79,30 @@ The tests then exposed two stale test-fixture/source assertions while turning
 green; those assertions were updated to use the actual typed
 `select_response_option` contract and the new narrow composer filter.
 
+## Release-Captain Full-Gate Red
+
+After commit `0ba2675a08da4cc296a42bbc441e180282c19f00`, the release
+captain's full hermetic gate found a candidate-caused modularity failure:
+
+```bash
+poetry run pytest tests/test_modularity_budget.py -q --no-cov
+```
+
+Result at that commit: `2 failed, 4 passed`.
+
+- `src/argus/domain/supabase_gateway.py`: 2119 lines, 8 over its existing
+  2111-line limit.
+- `web/components/chat/ChatInterface.tsx`: 2615 lines, 17 over its existing
+  2598-line limit.
+
+No baseline or growth budget was raised. The follow-up used a green-to-refactor
+step with the existing behavior tests held constant:
+
+- compacted the duplicate-safe gateway branch to 2109 lines;
+- moved the unsupported-strategy predicate and composer helper beside the typed
+  projector in `web/lib/chat-recovery-display.ts`, reducing
+  `ChatInterface.tsx` to 2598 lines.
+
 ## Implementation
 
 ### Backend
@@ -111,7 +135,10 @@ green; those assertions were updated to use the actual typed
 - `tests/test_alpha_api_supabase.py`
   - Concurrent-create regression and updated bootstrap mock contract.
 - `web/components/chat/ChatInterface.tsx`
-  - Narrow unsupported-strategy composer ownership filter.
+  - Consumes the typed composer filter without owning recovery projection logic.
+- `web/lib/chat-recovery-display.ts`
+  - Owns the narrow unsupported-strategy composer predicate and filter beside
+    the typed strategy action projector.
 - `web/__tests__/chat-message-hydration.test.ts`
   - Reload regression for three unique assistant-owned strategy alternatives.
 - `web/__tests__/chat-turn-artifact-ux.test.ts`
@@ -129,7 +156,7 @@ ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture \
 poetry run pytest tests/test_alpha_api_supabase.py -q --no-cov
 ```
 
-Result: `76 passed, 1 warning in 6.88s`.
+Result after the modularity refactor: `76 passed, 1 warning in 7.11s`.
 
 The warning is an existing Starlette per-request-cookie deprecation warning.
 
@@ -176,6 +203,25 @@ Result: passed with no findings.
 
 Targeted ESLint for all touched frontend files also passed with no findings.
 
+### Modularity regression
+
+```bash
+poetry run pytest tests/test_modularity_budget.py -q --no-cov
+```
+
+Result after the refactor: `6 passed`.
+
+### Canonical modularity script
+
+```bash
+poetry run python scripts/check_modularity_budget.py
+```
+
+Result: no budget violations.
+
+- `src/argus/domain/supabase_gateway.py`: 2109 lines, limit 2111.
+- `web/components/chat/ChatInterface.tsx`: 2598 lines, limit 2598.
+
 ### Frontend production build
 
 ```bash
@@ -209,12 +255,14 @@ The final change remains proportional:
 
 - one duplicate-safe persistence operation plus one conditional canonical
   re-read;
-- one narrow action-ownership predicate reused across live, reload, and render
-  paths;
+- one narrow action-ownership predicate in the typed recovery-display owner,
+  reused across live, reload, and render paths;
 - no new state machine, API shape, database object, or compatibility layer.
 
-Rollback is file-local: revert this commit to restore the previous plain insert
-and composer action behavior. No data migration or cleanup is required.
+Rollback is commit-local. Reverting the behavior commit restores the previous
+plain insert and composer action behavior; reverting only the follow-up
+refactor restores the same behavior with the watched-file budget violations.
+No data migration or cleanup is required.
 
 ## Known Caveats
 
@@ -225,6 +273,7 @@ and composer action behavior. No data migration or cleanup is required.
 
 ## Commit Readiness
 
-This slice is independently committable. It contains only the two requested
-behavior fixes, their focused regressions, source-contract maintenance, and this
-verification report.
+This slice and its modularity follow-up are independently committable. They
+contain only the two requested behavior fixes, their focused regressions,
+source-contract maintenance, the refactor needed to respect existing budgets,
+and this verification report.

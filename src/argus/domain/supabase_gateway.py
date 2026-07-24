@@ -2042,14 +2042,10 @@ class SupabaseGateway(
         email = str(auth_user.get("email") or "").strip()
         allowlist_role = self.private_alpha_role_for_email(email)
         is_admin = allowlist_role in {"admin", "developer"}
-        # Try to get existing profile
         existing = self.get_user(user_id=user_id)
         if existing is not None:
             if is_admin and not existing.is_admin:
-                return self.update_user(
-                    user_id=user_id,
-                    updates={"id": user_id, "is_admin": True},
-                )
+                return self.update_user(user_id, {"id": user_id, "is_admin": True})
             return existing
 
         now = _now_iso()
@@ -2057,7 +2053,6 @@ class SupabaseGateway(
         user_metadata = raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
         metadata_language = user_metadata.get("language")
         language: Language = "es-419" if metadata_language == "es-419" else "en"
-        # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": email,
@@ -2077,23 +2072,18 @@ class SupabaseGateway(
             "updated_at": now,
         }
 
-        created = (
-            self.client.table("profiles")
-            .upsert(payload, on_conflict="id", ignore_duplicates=True)
-            .execute()
-        )
+        created = self.client.table("profiles").upsert(
+            payload, on_conflict="id", ignore_duplicates=True
+        ).execute()
         row = _row_one(created)
-        if row is None:
-            existing = self.get_user(user_id=user_id)
-            if existing is not None:
-                if is_admin and not existing.is_admin:
-                    return self.update_user(
-                        user_id=user_id,
-                        updates={"id": user_id, "is_admin": True},
-                    )
-                return existing
+        if row is not None:
+            return User.model_validate(row)
+        existing = self.get_user(user_id=user_id)
+        if existing is None:
             raise RuntimeError("Failed to create user profile.")
-        return User.model_validate(row)
+        if is_admin and not existing.is_admin:
+            return self.update_user(user_id, {"id": user_id, "is_admin": True})
+        return existing
 
     @staticmethod
     def parse_iso(value: str) -> datetime:

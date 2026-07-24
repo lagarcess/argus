@@ -10,7 +10,7 @@ import {
   confirmationRowKey,
   confirmationStatusAllowsActions,
 } from "../components/chat/confirmation-display";
-import { visibleComposerResponseActions } from "../components/chat/ChatInterface";
+import { visibleComposerResponseActions } from "../lib/chat-recovery-display";
 import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");

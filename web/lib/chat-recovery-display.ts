@@ -1,5 +1,8 @@
 import type { TFunction } from "i18next";
 import type { ChatActionOption } from "@/components/chat/types";
+import { visibleComposerActions } from "@/lib/chat-action-ownership";
+
+const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 
 export type RecoveryDisplay =
   | {
@@ -432,6 +435,21 @@ export function unsupportedStrategyActionsFromMetadata(
       },
     ];
   });
+}
+
+function isUnsupportedStrategyResponseAction(action: ChatActionOption): boolean {
+  return (
+    action.type === "select_response_option" &&
+    Boolean(action.id?.startsWith(UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX))
+  );
+}
+
+export function visibleComposerResponseActions(
+  actions: ChatActionOption[],
+): ChatActionOption[] {
+  return visibleComposerActions(actions).filter(
+    (action) => !isUnsupportedStrategyResponseAction(action),
+  );
 }
 
 function unsupportedRecoveryDisplayFromClarification(
