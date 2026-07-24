@@ -153,6 +153,18 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(message).toContain("data-testid=\"user-turn-retry\"");
   });
 
+  test("the adjacent user-turn Retry control keeps a 44px minimum tap target", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const retryStart = message.indexOf('data-testid="user-turn-retry"');
+    const retryEnd = message.indexOf("</button>", retryStart);
+    const retryButton = message.slice(retryStart, retryEnd);
+
+    expect(retryStart).toBeGreaterThan(-1);
+    expect(retryEnd).toBeGreaterThan(retryStart);
+    expect(retryButton).toContain("min-h-11");
+    expect(retryButton).not.toContain("min-h-9");
+  });
+
   test("ordinary transport ambiguity follows durable pages and never builds composer retry", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");

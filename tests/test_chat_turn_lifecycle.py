@@ -321,6 +321,178 @@ def test_exact_null_safe_transition_replay_is_a_noop(
     assert replay.row == applied.row
 
 
+def test_completed_finalization_exact_replay_is_a_noop_without_duplicate_usage(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn = _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-completed",
+    )
+    message = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Completed once.",
+        metadata={
+            "agent_runtime_turn": {
+                "turn_id": turn.id,
+                "request_id": "request-completed",
+                "status": "completed",
+                "terminal": True,
+            }
+        },
+    )
+    settlement = {
+        "resource": "chat_messages",
+        "limits": [("hour", 60), ("day", 200)],
+    }
+
+    first = gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn.id,
+        request_id="request-completed",
+        message=message,
+        to_status="completed",
+        failure_code=None,
+        retryable=False,
+        settle_usage=settlement,
+    )
+    replay = gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn.id,
+        request_id="request-completed",
+        message=message,
+        to_status="completed",
+        failure_code=None,
+        retryable=False,
+        settle_usage={
+            "resource": "chat_messages",
+            "limits": [("hour", 61), ("day", 201)],
+        },
+    )
+
+    assert replay == first
+    assert [item.id for item in store.messages[conversation_id]].count(message.id) == 1
+    assert {
+        period: row["used_count"]
+        for (_owner, resource, period), row in store.usage_counters.items()
+        if resource == "chat_messages"
+    } == {"hour": 1, "day": 1}
+
+    with pytest.raises(ValueError, match="Chat-turn finalization conflict"):
+        gateway.finalize_chat_turn(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            turn_id=turn.id,
+            request_id="request-completed",
+            message=message.model_copy(update={"content": "Changed payload."}),
+            to_status="completed",
+            failure_code=None,
+            retryable=False,
+            settle_usage=settlement,
+        )
+
+
+def test_recoverable_finalization_exact_replay_is_a_noop_and_tuple_is_strict(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn = _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-failure",
+    )
+    message = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Recover safely.",
+        metadata={
+            "agent_runtime_turn": {
+                "turn_id": turn.id,
+                "request_id": "request-failure",
+                "status": "recoverable_failed",
+                "terminal": True,
+                "failure_code": "agent_runtime_failure",
+                "retryable": True,
+            }
+        },
+    )
+
+    first = gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn.id,
+        request_id="request-failure",
+        message=message,
+        to_status="recoverable_failed",
+        failure_code="agent_runtime_failure",
+        retryable=True,
+        settle_usage=None,
+    )
+    replay = gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn.id,
+        request_id="request-failure",
+        message=message,
+        to_status="recoverable_failed",
+        failure_code="agent_runtime_failure",
+        retryable=True,
+        settle_usage=None,
+    )
+
+    assert replay == first
+    assert [item.id for item in store.messages[conversation_id]].count(message.id) == 1
+    assert store.usage_counters == {}
+
+    with pytest.raises(ValueError, match="Chat-turn terminal payload is invalid"):
+        gateway.finalize_chat_turn(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            turn_id=turn.id,
+            request_id="request-failure",
+            message=message,
+            to_status="recoverable_failed",
+            failure_code="agent_runtime_failure",
+            retryable=True,
+            settle_usage={
+                "resource": "chat_messages",
+                "limits": [("hour", 60), ("day", 200)],
+            },
+        )
+    assert store.usage_counters == {}
+
+    with pytest.raises(ValueError, match="Chat-turn finalization conflict"):
+        gateway.finalize_chat_turn(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            turn_id=turn.id,
+            request_id="request-failure",
+            message=message,
+            to_status="recoverable_failed",
+            failure_code="different_failure",
+            retryable=True,
+            settle_usage=None,
+        )
+
+
 def test_conflicting_terminal_replay_does_not_overwrite_the_row(
     lifecycle: tuple[
         MemoryChatTurnLifecycleGateway,

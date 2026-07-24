@@ -22,6 +22,13 @@ LIFECYCLE_RPC_MIGRATION = (
         "20260723000003_chat_turn_option_acceptance_and_finalization.sql"
     )
 )
+IDEMPOTENT_FINALIZATION_MIGRATION = (
+    ROOT
+    / (
+        "supabase/migrations/"
+        "20260724214312_idempotent_chat_turn_finalization.sql"
+    )
+)
 BASE_ACCEPTANCE_MIGRATION_SHA256 = (
     "b0e7ade1d01b8c3290397b82dc76048f8c64477d4ef0f6eeea8a1b8c0b5dca3f"
 )
@@ -223,6 +230,44 @@ def test_response_option_retry_matches_finalizer_lock_order() -> None:
     original_message_load = retry_branch.index("from public.messages as m")
 
     assert lifecycle_lock < conversation_lock < original_message_load
+
+
+def test_forward_finalizer_migration_replays_exact_terminal_tuple_without_charge() -> None:
+    assert IDEMPOTENT_FINALIZATION_MIGRATION.exists()
+    sql = _normalized(IDEMPOTENT_FINALIZATION_MIGRATION)
+
+    assert "create or replace function public.finalize_chat_turn(" in sql
+    finalizer = sql.split(
+        "create or replace function public.finalize_chat_turn(",
+        1,
+    )[1]
+    lifecycle_lock = finalizer.index("from public.chat_turn_lifecycles as l")
+    existing_message = finalizer.index("from public.messages as m")
+    first_append = finalizer.index("from public.append_conversation_message")
+    assert lifecycle_lock < existing_message < first_append
+    assert "for update" in finalizer
+    assert "v_turn.status in ('completed', 'recoverable_failed')" in finalizer
+    assert "v_turn.assistant_message_id is distinct from p_message_id" in finalizer
+    assert "v_turn.failure_code is distinct from p_failure_code" in finalizer
+    assert "v_turn.retryable is distinct from v_retryable" in finalizer
+    assert "v_existing.content is distinct from p_content" in finalizer
+    assert (
+        "v_existing.metadata is distinct from coalesce(p_metadata, '{}'::jsonb)"
+        in finalizer
+    )
+    assert "return query select to_jsonb(v_existing)" in finalizer
+    replay_branch = finalizer.split(
+        "if v_turn.status in ('completed', 'recoverable_failed') then",
+        1,
+    )[1].split("end if;", 1)[0]
+    assert "p_usage_resource" not in replay_branch
+    assert "p_usage_limits" not in replay_branch
+
+    for role in ("public", "anon", "authenticated"):
+        assert "revoke all on function public.finalize_chat_turn(" in finalizer
+        assert f"from {role}" in finalizer
+    assert "grant execute on function public.finalize_chat_turn(" in finalizer
+    assert "to service_role" in finalizer
 
 
 def test_forward_migration_leaves_only_service_role_rpc_execution() -> None:

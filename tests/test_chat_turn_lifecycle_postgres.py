@@ -293,6 +293,9 @@ def _finalize(
     status: str = "completed",
     failure_code: str | None = None,
     retryable: bool = False,
+    content: str = "terminal response",
+    usage_resource: str | None = None,
+    usage_limits: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     message_id = message_id or _id()
     runtime_turn: dict[str, object] = {
@@ -309,18 +312,22 @@ def _finalize(
     with connection.cursor() as cursor:
         cursor.execute(
             "select * from public.finalize_chat_turn("
-            " %s, %s, %s, %s, %s, 'assistant', 'terminal response',"
-            " %s::jsonb, now(), 'terminal response', %s, %s, %s, null, null)",
+            " %s, %s, %s, %s, %s, 'assistant', %s,"
+            " %s::jsonb, now(), %s, %s, %s, %s, %s, %s::jsonb)",
             (
                 owner["user_id"],
                 owner["conversation_id"],
                 turn_id,
                 request_id,
                 message_id,
+                content,
                 json.dumps({"agent_runtime_turn": runtime_turn}),
+                content,
                 status,
                 failure_code,
                 retryable,
+                usage_resource,
+                json.dumps(usage_limits) if usage_limits is not None else None,
             ),
         )
         row = cursor.fetchone()
@@ -803,6 +810,153 @@ def test_terminal_finalization_rolls_back_message_when_transition_fails(
                 (assistant_id, turn_id),
             )
             assert cursor.fetchone() == (0, "accepted")
+
+
+def test_completed_finalization_exact_replay_is_noop_without_duplicate_usage(
+    owner,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        assistant_id = _id()
+        first = _finalize(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            message_id=assistant_id,
+            usage_resource="chat_messages",
+            usage_limits=[
+                {"period": "hour", "limit": 60},
+                {"period": "day", "limit": 200},
+            ],
+        )
+        replay = _finalize(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            message_id=assistant_id,
+            usage_resource="chat_messages",
+            usage_limits=[
+                {"period": "hour", "limit": 61},
+                {"period": "day", "limit": 201},
+            ],
+        )
+
+        assert replay == first
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select (select count(*) from public.messages where id = %s),"
+                " array_agg((period, used_count)::text order by period)"
+                " from public.usage_counters"
+                " where user_id = %s and resource = 'chat_messages'",
+                (assistant_id, owner["user_id"]),
+            )
+            message_count, usage = cursor.fetchone()
+        assert message_count == 1
+        assert usage == ['(day,1)', '(hour,1)']
+
+        with pytest.raises(
+            psycopg.errors.DatabaseError,
+            match="Chat-turn finalization conflict",
+        ):
+            _finalize(
+                connection,
+                owner,
+                turn_id=turn_id,
+                request_id=request_id,
+                message_id=assistant_id,
+                content="changed terminal response",
+                usage_resource="chat_messages",
+                usage_limits=[
+                    {"period": "hour", "limit": 60},
+                    {"period": "day", "limit": 200},
+                ],
+            )
+
+
+def test_recoverable_finalization_exact_replay_is_noop_and_tuple_is_strict(
+    owner,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        assistant_id = _id()
+        first = _finalize(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            message_id=assistant_id,
+            status="recoverable_failed",
+            failure_code="runtime_failure",
+            retryable=True,
+        )
+        replay = _finalize(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            message_id=assistant_id,
+            status="recoverable_failed",
+            failure_code="runtime_failure",
+            retryable=True,
+        )
+
+        assert replay == first
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select (select count(*) from public.messages where id = %s),"
+                " (select count(*) from public.usage_counters"
+                " where user_id = %s)",
+                (assistant_id, owner["user_id"]),
+            )
+            assert cursor.fetchone() == (1, 0)
+
+        with pytest.raises(
+            psycopg.errors.DatabaseError,
+            match="Chat-turn terminal payload is invalid",
+        ):
+            _finalize(
+                connection,
+                owner,
+                turn_id=turn_id,
+                request_id=request_id,
+                message_id=assistant_id,
+                status="recoverable_failed",
+                failure_code="runtime_failure",
+                retryable=True,
+                usage_resource="chat_messages",
+                usage_limits=[
+                    {"period": "hour", "limit": 60},
+                    {"period": "day", "limit": 200},
+                ],
+            )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.usage_counters"
+                " where user_id = %s",
+                (owner["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+
+        with pytest.raises(
+            psycopg.errors.DatabaseError,
+            match="Chat-turn finalization conflict",
+        ):
+            _finalize(
+                connection,
+                owner,
+                turn_id=turn_id,
+                request_id=request_id,
+                message_id=assistant_id,
+                status="recoverable_failed",
+                failure_code="different_failure",
+                retryable=True,
+            )
 
 
 def test_finalizer_lock_wins_over_stale_reconciliation(owner) -> None:

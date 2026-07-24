@@ -388,7 +388,6 @@ class MemoryChatTurnLifecycleGateway:
                 or row["user_id"] != user_id
                 or row["conversation_id"] != conversation_id
                 or row["request_id"] != request_id
-                or row["status"] not in {"accepted", "running"}
             ):
                 raise ValueError("Chat-turn finalization conflict.")
             if (
@@ -399,6 +398,24 @@ class MemoryChatTurnLifecycleGateway:
                 or (to_status == "recoverable_failed" and settle_usage is not None)
             ):
                 raise ValueError("Chat-turn terminal payload is invalid.")
+            if row["status"] in {"completed", "recoverable_failed"}:
+                existing = self._message_by_id(message.id)
+                if (
+                    row["status"] != to_status
+                    or not self._matches_payload(
+                        row,
+                        assistant_message_id=message.id,
+                        reconciled_outcome=None,
+                        failure_code=failure_code,
+                        retryable=retryable,
+                    )
+                    or existing is None
+                    or not self._same_immutable_message(existing, message)
+                ):
+                    raise ValueError("Chat-turn finalization conflict.")
+                return existing
+            if row["status"] not in {"accepted", "running"}:
+                raise ValueError("Chat-turn finalization conflict.")
             runtime_turn = _terminal_metadata(message)
             if (
                 runtime_turn is None

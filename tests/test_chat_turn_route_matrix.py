@@ -73,6 +73,27 @@ class _EvidenceCountingMemoryGateway:
     def finalize_chat_turn(self, **kwargs: Any):
         return self.lifecycle.finalize_chat_turn(**kwargs)
 
+    def accept_response_option_chat_turn(self, **kwargs: Any):
+        return self.lifecycle.accept_response_option_chat_turn(**kwargs)
+
+    def get_message(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+    ):
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            return None
+        return next(
+            (
+                message
+                for message in api_state.store.messages.get(conversation_id, [])
+                if message.id == message_id
+            ),
+            None,
+        )
+
     def reconcile_stale_chat_turns(self, **kwargs: Any):
         return self.lifecycle.reconcile_stale_chat_turns(**kwargs)
 
@@ -92,6 +113,25 @@ class _EvidenceCountingMemoryGateway:
         row = {"id": f"cost-{len(self.cost_ledger_rows) + 1}", **entry}
         self.cost_ledger_rows.append(row)
         return row
+
+
+class _OrderingMemoryGateway(_EvidenceCountingMemoryGateway):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__()
+        self.events = events
+
+    def accept_chat_turn(self, **kwargs: Any):
+        self.events.append("admit")
+        return super().accept_chat_turn(**kwargs)
+
+    def accept_response_option_chat_turn(self, **kwargs: Any):
+        self.events.append("admit")
+        return super().accept_response_option_chat_turn(**kwargs)
+
+    def transition_chat_turn(self, **kwargs: Any):
+        if kwargs.get("to_status") == "running":
+            self.events.append("running")
+        return super().transition_chat_turn(**kwargs)
 
 
 def _client() -> TestClient:
@@ -923,6 +963,140 @@ def test_normal_onboarding_language_reaches_workflow_initialization(
     assert lifecycle["retryable"] is True
     assert evidence_gateway.route_receipt_rows == []
     assert evidence_gateway.cost_ledger_rows == []
+
+
+@pytest.mark.parametrize(
+    "turn_kind",
+    ["ordinary_text", "response_option", "durable_retry"],
+)
+def test_ordinary_turn_is_running_before_first_workflow_operation(
+    monkeypatch: pytest.MonkeyPatch,
+    turn_kind: str,
+) -> None:
+    client = _client()
+    conversation = _conversation(client)
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+    source = prepare_message(
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Which timeframe?",
+        metadata={
+            "clarification": {
+                "options": [
+                    {
+                        "id": "daily",
+                        "label": "Use daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            },
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                },
+                "requested_field": "timeframe",
+            },
+        },
+    )
+    request_payload: dict[str, Any] = {
+        "conversation_id": conversation["id"],
+        "language": "en",
+        "message": "Test AAPL.",
+    }
+    if turn_kind != "ordinary_text":
+        api_state.store.messages[conversation["id"]].append(source)
+        request_payload.pop("message")
+        request_payload["action"] = {
+            "type": "select_response_option",
+            "label": "Use daily bars",
+            "payload": {
+                "source_assistant_id": source.id,
+                "option_id": "daily",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        }
+    if turn_kind == "durable_retry":
+        lifecycle = MemoryChatTurnLifecycleGateway(api_state.store)
+        original = lifecycle.accept_response_option_chat_turn(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            request_id="request-original",
+            message=prepare_message(
+                conversation_id=conversation["id"],
+                role="user",
+                content="Use daily bars",
+                metadata={
+                    "chat_action": {
+                        "type": "select_response_option",
+                        "label": "Use daily bars",
+                        "payload": {
+                            "option_id": "daily",
+                            "replacement_values": {"timeframe": "1D"},
+                        },
+                        "presentation": None,
+                    }
+                },
+            ),
+            source_assistant_id=source.id,
+            expected_source_metadata=source.metadata,
+            option_id="daily",
+            replacement_values={"timeframe": "1D"},
+        )
+        assert original is not None
+        _accepted_source, original_request = original
+        hooks = ChatTurnLifecycleHooks(
+            owner="ordinary_turn",
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            request_id="request-original",
+            request_message=original_request,
+        )
+        hooks.recoverable_failure(
+            content="Please retry.",
+            metadata={"conversation_mode": "recovery"},
+            failure_code="agent_runtime_failure",
+            retryable=True,
+        )
+        request_payload["action"]["payload"].update(
+            request_message_id=original_request.id,
+            source_assistant_id="tampered-source",
+            option_id="tampered-option",
+            replacement_values={"timeframe": "5m"},
+        )
+
+    ordering: list[str] = []
+    gateway = _OrderingMemoryGateway(ordering)
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    def _workflow_operation(_request: Any) -> Any:
+        ordering.append("workflow_acquire")
+        raise RuntimeError("stop after first workflow operation")
+
+    monkeypatch.setattr(
+        api_state,
+        "get_agent_runtime_workflow",
+        _workflow_operation,
+    )
+
+    response = client.post("/api/v1/chat/stream", json=request_payload)
+
+    assert response.status_code == 200
+    assert ordering == ["admit", "running", "workflow_acquire"]
+    assert len(api_state.store.chat_turn_lifecycles) == (
+        2 if turn_kind == "durable_retry" else 1
+    )
+    latest = max(
+        api_state.store.chat_turn_lifecycles.values(),
+        key=lambda row: row["accepted_at"],
+    )
+    assert latest["status"] == "recoverable_failed"
+    assert latest["failure_code"] == "runtime_initialization_failed"
+    assert api_state.store.usage_counters == {}
+    assert gateway.route_receipt_rows == []
+    assert gateway.cost_ledger_rows == []
+    assert get_openrouter_route_receipts() == []
 
 
 def test_unauthorized_conversation_does_not_reconcile_or_disclose_turn() -> None:

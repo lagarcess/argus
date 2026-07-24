@@ -441,7 +441,7 @@ function UserTurnRecovery({
           type="button"
           data-testid="user-turn-retry"
           onClick={() => onAction?.(retryAction)}
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/12 px-3 py-1.5 text-[13px] font-medium text-black/80 transition-colors hover:bg-black/5 dark:border-white/12 dark:text-white/80 dark:hover:bg-white/6"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/12 px-3 py-1.5 text-[13px] font-medium text-black/80 transition-colors hover:bg-black/5 dark:border-white/12 dark:text-white/80 dark:hover:bg-white/6"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           {retryLabel}

@@ -450,19 +450,17 @@ async def chat_stream(
         ):
             mention_provenance = []
     lifecycle_hooks = (
-        request_admission.lifecycle_hooks()
-        if validated_option_source is not None
-        else None
+        None if is_run_backtest_turn else request_admission.lifecycle_hooks()
     )
     deterministic_control_turn = (
         onboarding_goal is not None or cancel_confirmation_action
     )
-    if deterministic_control_turn and lifecycle_hooks is None:
-        lifecycle_hooks = request_admission.lifecycle_hooks()
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
     try:
+        if lifecycle_hooks is not None and not deterministic_control_turn:
+            lifecycle_hooks.mark_running()
         if deterministic_control_turn:
             checkpoint_values = {}
         else:
@@ -667,7 +665,8 @@ async def chat_stream(
         workflow_input: dict[str, Any],
         workflow_input_error: Exception | None = None,
     ) -> AsyncIterator[str]:
-        lifecycle_hooks.mark_running()
+        if deterministic_control_turn:
+            lifecycle_hooks.mark_running()
         active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
