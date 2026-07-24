@@ -377,6 +377,63 @@ export function unsupportedTimeframeActionsFromMetadata(
   });
 }
 
+export function unsupportedStrategyActionsFromMetadata(
+  metadata: Record<string, unknown>,
+  sourceAssistantId: string,
+): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
+  const clarification = recordOrNull(metadata.clarification);
+  if (
+    stringOrNull(clarification?.kind) !== "unsupported_recovery" ||
+    stringOrNull(clarification?.reason_code) !== "unsupported_strategy_logic"
+  ) {
+    return [];
+  }
+  const options = Array.isArray(clarification?.options)
+    ? clarification.options
+    : [];
+  const allowedLabels = new Map([
+    [
+      "rsi_threshold",
+      "Use a supported RSI threshold rule",
+    ],
+    ["buy_and_hold", "Compare with buy and hold"],
+    [
+      "moving_average_crossover",
+      "Use a supported moving-average crossover",
+    ],
+  ]);
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const optionId = stringOrNull(option?.id);
+    const replacementValues = recordOrNull(option?.replacement_values);
+    const label = optionId ? allowedLabels.get(optionId) : undefined;
+    if (
+      !optionId ||
+      !replacementValues ||
+      !label ||
+      simplificationOptionKey(replacementValues) !== optionId
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: `unsupported-strategy-${optionId.replaceAll("_", "-")}`,
+        label,
+        labelKey: `chat.simplification_options.${optionId}`,
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: sourceAssistantId,
+          option_id: optionId,
+          replacement_values: replacementValues,
+        },
+      },
+    ];
+  });
+}
+
 function unsupportedRecoveryDisplayFromClarification(
   clarification: Record<string, unknown>,
 ): RecoveryDisplay | null {

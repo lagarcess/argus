@@ -6,6 +6,7 @@ import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
+  unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "../lib/chat-recovery-display";
 
@@ -505,6 +506,101 @@ describe("chat recovery display", () => {
         },
       }),
     ).toBeNull();
+  });
+
+  test("projects supported strategy options with exact server replacement values", () => {
+    const movingAverageReplacementValues = {
+      strategy_type: "signal_strategy",
+      rule_family: "moving_average_crossover",
+    };
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        prompt_source: "llm_generated",
+        options: [
+          {
+            id: "rsi_threshold",
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: { strategy_type: "buy_and_hold" },
+          },
+          {
+            id: "moving_average_crossover",
+            replacement_values: movingAverageReplacementValues,
+          },
+        ],
+      },
+    };
+
+    expect(
+      unsupportedStrategyActionsFromMetadata(metadata, "assistant-strategy"),
+    ).toEqual([
+      {
+        id: "unsupported-strategy-rsi-threshold",
+        label: "Use a supported RSI threshold rule",
+        labelKey: "chat.simplification_options.rsi_threshold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "rsi_threshold",
+          replacement_values: { simplify_logic: "rsi_only" },
+        },
+      },
+      {
+        id: "unsupported-strategy-buy-and-hold",
+        label: "Compare with buy and hold",
+        labelKey: "chat.simplification_options.buy_and_hold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "buy_and_hold",
+          replacement_values: { strategy_type: "buy_and_hold" },
+        },
+      },
+      {
+        id: "unsupported-strategy-moving-average-crossover",
+        label: "Use a supported moving-average crossover",
+        labelKey: "chat.simplification_options.moving_average_crossover",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "moving_average_crossover",
+          replacement_values: movingAverageReplacementValues,
+        },
+      },
+    ]);
+  });
+
+  test("does not project unknown or untyped unsupported strategy options", () => {
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        options: [
+          {
+            id: "unknown_strategy",
+            replacement_values: { strategy_type: "buy_and_hold" },
+          },
+          {
+            id: "rsi_threshold",
+          },
+          {
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+        ],
+      },
+    };
+
+    expect(
+      unsupportedStrategyActionsFromMetadata(metadata, "assistant-strategy"),
+    ).toEqual([]);
   });
 
   test("recovery locale keys stay in parity", () => {

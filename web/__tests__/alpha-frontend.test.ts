@@ -397,6 +397,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("failedActionRetryActionFromMetadata(finalPayload)");
     expect(chat).toContain("const finalUnsupportedTimeframeActions =");
     expect(chat).toContain("...finalUnsupportedTimeframeActions");
+    expect(chat).toContain("const finalUnsupportedStrategyActions =");
+    expect(chat).toContain(
+      "unsupportedStrategyActionsFromMetadata(finalPayload, finalMessageId)",
+    );
+    expect(chat).toContain("...finalUnsupportedStrategyActions");
     expect(chat).toContain("...finalRetryActions");
     expect(chat).toContain("mergeFinalTextMessage(m, {");
     expect(chat).toContain("finalActions: finalTextActions");

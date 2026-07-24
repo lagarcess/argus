@@ -82,6 +82,7 @@ import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
@@ -1431,6 +1432,9 @@ export default function ChatInterface() {
         const finalUnsupportedTimeframeActions = finalMessageId
           ? unsupportedTimeframeActionsFromMetadata(finalPayload, finalMessageId)
           : [];
+        const finalUnsupportedStrategyActions = finalMessageId
+          ? unsupportedStrategyActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
@@ -1440,6 +1444,7 @@ export default function ChatInterface() {
         const finalTextActions = [
           ...finalCoverageActions,
           ...finalUnsupportedTimeframeActions,
+          ...finalUnsupportedStrategyActions,
           ...finalRetryActions,
         ];
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
@@ -1538,6 +1543,7 @@ export default function ChatInterface() {
           setInputActions([
             ...finalCoverageActions,
             ...finalUnsupportedTimeframeActions,
+            ...finalUnsupportedStrategyActions,
           ]);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;

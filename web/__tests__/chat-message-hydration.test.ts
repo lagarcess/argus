@@ -968,4 +968,50 @@ describe("chat message hydration", () => {
       },
     ]);
   });
+
+  test("preserves LLM strategy recovery voice and hydrates typed options", () => {
+    const exactLlmPrompt =
+      "I can't run momentum breakout yet. Choose a supported alternative.";
+    const movingAverageReplacementValues = {
+      strategy_type: "signal_strategy",
+      rule_family: "moving_average_crossover",
+    };
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "assistant-strategy-llm",
+        content: exactLlmPrompt,
+        metadata: {
+          clarification: {
+            kind: "unsupported_recovery",
+            reason_code: "unsupported_strategy_logic",
+            prompt_source: "llm_generated",
+            requested_field: "unsupported_constraints",
+            semantic_needs: ["simplification_choice"],
+            options: [
+              {
+                id: "moving_average_crossover",
+                replacement_values: movingAverageReplacementValues,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(message.content).toBe(exactLlmPrompt);
+    expect(message.recoveryDisplay).toBeNull();
+    expect(message.actions).toEqual([
+      {
+        id: "unsupported-strategy-moving-average-crossover",
+        label: "Use a supported moving-average crossover",
+        labelKey: "chat.simplification_options.moving_average_crossover",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy-llm",
+          option_id: "moving_average_crossover",
+          replacement_values: movingAverageReplacementValues,
+        },
+      },
+    ]);
+  });
 });

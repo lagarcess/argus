@@ -10,6 +10,7 @@ import {
 import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
@@ -301,9 +302,13 @@ export function hydrateTextMessageFromApi(
   const unsupportedTimeframeActions = isAssistant
     ? unsupportedTimeframeActionsFromMetadata(metadata, message.id)
     : [];
+  const unsupportedStrategyActions = isAssistant
+    ? unsupportedStrategyActionsFromMetadata(metadata, message.id)
+    : [];
   const actions = [
     ...coverageActions,
     ...unsupportedTimeframeActions,
+    ...unsupportedStrategyActions,
     ...retryActions,
   ];
 
