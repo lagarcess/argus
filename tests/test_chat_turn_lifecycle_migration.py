@@ -101,6 +101,11 @@ def test_transition_function_is_service_role_only_null_safe_cas() -> None:
         in sql
     )
     assert (
+        "jsonb_typeof( v_message.metadata #> "
+        "'{agent_runtime_turn,failure_code}' ) "
+        "in ('string', 'null')"
+    ) in sql
+    assert (
         "v_message.metadata #>> '{agent_runtime_turn,failure_code}' "
         "is distinct from p_failure_code"
     ) in sql

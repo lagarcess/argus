@@ -279,6 +279,11 @@ begin
            or jsonb_typeof(
              v_message.metadata #> '{agent_runtime_turn,retryable}'
            ) is distinct from 'boolean'
+           or not (
+             jsonb_typeof(
+               v_message.metadata #> '{agent_runtime_turn,failure_code}'
+             ) in ('string', 'null')
+           )
            or v_message.metadata
              #>> '{agent_runtime_turn,failure_code}'
              is distinct from p_failure_code

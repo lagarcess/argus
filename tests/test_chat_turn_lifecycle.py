@@ -458,6 +458,15 @@ def test_late_success_cannot_supersede_recoverable_failure(
         (True, False, "runtime_failure", True, "runtime_failure", True),
         (True, True, "durable_failure", True, "caller_failure", True),
         (True, True, "runtime_failure", True, "runtime_failure", False),
+        pytest.param(
+            True,
+            True,
+            7,
+            True,
+            "7",
+            True,
+            id="numeric-json-failure-code-text-match",
+        ),
     ],
 )
 def test_recoverable_failure_evidence_fields_are_required_and_exact(
@@ -471,7 +480,7 @@ def test_recoverable_failure_evidence_fields_are_required_and_exact(
     reconciled_outcome: str | None,
     include_failure_code: bool,
     include_retryable: bool,
-    evidence_failure_code: str,
+    evidence_failure_code: object,
     evidence_retryable: bool,
     caller_failure_code: str,
     caller_retryable: bool,
