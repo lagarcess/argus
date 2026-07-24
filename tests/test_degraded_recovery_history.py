@@ -17,6 +17,7 @@ from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.chat import title_finalization
+from argus.api.guest_access import registered_account_context
 from argus.api.message_store import (
     create_message,
     load_runtime_thread_history,
@@ -118,8 +119,10 @@ def test_degraded_compatibility_text_stays_durable_but_not_in_history_or_preview
         )
     }
 
+    request = MagicMock()
+    request.state.account_context = registered_account_context(user.id)
     history_items = list_history(
-        request=MagicMock(),
+        request=request,
         limit=20,
         cursor=None,
         archived=False,
