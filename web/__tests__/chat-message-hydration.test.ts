@@ -8,6 +8,7 @@ import {
   retryRequestMessageForAssistant,
 } from "../lib/chat-message-hydration";
 import type { ApiMessage } from "../lib/argus-api";
+import { latestInputActions } from "../components/chat/ChatInterface";
 import type { Message } from "../components/chat/types";
 
 function apiMessage(overrides: Partial<ApiMessage>): ApiMessage {
@@ -969,7 +970,7 @@ describe("chat message hydration", () => {
     ]);
   });
 
-  test("preserves LLM strategy recovery voice and hydrates typed options", () => {
+  test("reload keeps each strategy alternative once on its owning assistant", () => {
     const exactLlmPrompt =
       "I can't run momentum breakout yet. Choose a supported alternative.";
     const movingAverageReplacementValues = {
@@ -989,6 +990,14 @@ describe("chat message hydration", () => {
             semantic_needs: ["simplification_choice"],
             options: [
               {
+                id: "rsi_threshold",
+                replacement_values: { simplify_logic: "rsi_only" },
+              },
+              {
+                id: "buy_and_hold",
+                replacement_values: { strategy_type: "buy_and_hold" },
+              },
+              {
                 id: "moving_average_crossover",
                 replacement_values: movingAverageReplacementValues,
               },
@@ -1000,18 +1009,28 @@ describe("chat message hydration", () => {
 
     expect(message.content).toBe(exactLlmPrompt);
     expect(message.recoveryDisplay).toBeNull();
-    expect(message.actions).toEqual([
+    expect(message.actions?.map((action) => action.id)).toEqual([
+      "unsupported-strategy-rsi-threshold",
+      "unsupported-strategy-buy-and-hold",
+      "unsupported-strategy-moving-average-crossover",
+    ]);
+    expect(message.actions?.map((action) => action.payload)).toEqual([
       {
-        id: "unsupported-strategy-moving-average-crossover",
-        label: "Use a supported moving-average crossover",
-        labelKey: "chat.simplification_options.moving_average_crossover",
-        type: "select_response_option",
-        payload: {
-          source_assistant_id: "assistant-strategy-llm",
-          option_id: "moving_average_crossover",
-          replacement_values: movingAverageReplacementValues,
-        },
+        source_assistant_id: "assistant-strategy-llm",
+        option_id: "rsi_threshold",
+        replacement_values: { simplify_logic: "rsi_only" },
+      },
+      {
+        source_assistant_id: "assistant-strategy-llm",
+        option_id: "buy_and_hold",
+        replacement_values: { strategy_type: "buy_and_hold" },
+      },
+      {
+        source_assistant_id: "assistant-strategy-llm",
+        option_id: "moving_average_crossover",
+        replacement_values: movingAverageReplacementValues,
       },
     ]);
+    expect(latestInputActions([message])).toEqual([]);
   });
 });

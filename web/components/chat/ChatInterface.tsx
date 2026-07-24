@@ -162,6 +162,7 @@ type OnboardingChoice = {
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
+const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 
 type HydratedMessages = {
   messages: Message[];
@@ -248,7 +249,22 @@ function clearActiveConversationPointer() {
   return clearActiveConversationRoute();
 }
 
-function latestInputActions(messages: Message[]) {
+function isUnsupportedStrategyResponseAction(action: ChatActionOption): boolean {
+  return (
+    action.type === "select_response_option" &&
+    Boolean(action.id?.startsWith(UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX))
+  );
+}
+
+export function visibleComposerResponseActions(
+  actions: ChatActionOption[],
+): ChatActionOption[] {
+  return visibleComposerActions(actions).filter(
+    (action) => !isUnsupportedStrategyResponseAction(action),
+  );
+}
+
+export function latestInputActions(messages: Message[]): ChatActionOption[] {
   if (hasActiveArtifactActionSet(messages)) {
     return [];
   }
@@ -259,7 +275,7 @@ function latestInputActions(messages: Message[]) {
   ) {
     return [];
   }
-  return visibleComposerActions(latestAi?.actions ?? []).filter(
+  return visibleComposerResponseActions(latestAi?.actions ?? []).filter(
     (action) => action.artifactType !== "failed_action",
   );
 }
@@ -1540,11 +1556,13 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
-          setInputActions([
-            ...finalCoverageActions,
-            ...finalUnsupportedTimeframeActions,
-            ...finalUnsupportedStrategyActions,
-          ]);
+          setInputActions(
+            visibleComposerResponseActions([
+              ...finalCoverageActions,
+              ...finalUnsupportedTimeframeActions,
+              ...finalUnsupportedStrategyActions,
+            ]),
+          );
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -2105,7 +2123,7 @@ export default function ChatInterface() {
 
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
-    : visibleComposerActions(inputActions);
+    : visibleComposerResponseActions(inputActions);
   const actionLabel = (action: ChatActionOption) =>
     action.labelKey ? t(action.labelKey, action.label) : action.label;
   const latestAssistantContent =

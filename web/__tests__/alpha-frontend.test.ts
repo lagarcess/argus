@@ -571,7 +571,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(ownership).toContain("isCardScopedAction");
     expect(chat).toContain('from "@/lib/chat-action-ownership"');
     expect(chat).toContain("hasActiveArtifactActionSet(messages)");
-    expect(chat).toContain("visibleComposerActions(inputActions)");
+    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
     expect(chat).not.toContain("setInputActions(confirmation.actions ?? [])");
     expect(chat).not.toContain("visibleInputActions(inputActions).map");
     expect(chat).not.toContain('event.event === "confirmation"');
@@ -627,7 +627,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain(
       "const composerActions = hasActiveArtifactActionSet(messages)",
     );
-    expect(chat).toContain("visibleComposerActions(inputActions)");
+    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
   });
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {

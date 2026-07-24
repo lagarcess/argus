@@ -2077,9 +2077,21 @@ class SupabaseGateway(
             "updated_at": now,
         }
 
-        created = self.client.table("profiles").insert(payload).execute()
+        created = (
+            self.client.table("profiles")
+            .upsert(payload, on_conflict="id", ignore_duplicates=True)
+            .execute()
+        )
         row = _row_one(created)
         if row is None:
+            existing = self.get_user(user_id=user_id)
+            if existing is not None:
+                if is_admin and not existing.is_admin:
+                    return self.update_user(
+                        user_id=user_id,
+                        updates={"id": user_id, "is_admin": True},
+                    )
+                return existing
             raise RuntimeError("Failed to create user profile.")
         return User.model_validate(row)
 

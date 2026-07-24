@@ -214,7 +214,7 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
     gateway.private_alpha_role_for_email = MagicMock(return_value="user")
     gateway.get_user = MagicMock(return_value=None)
     now = utcnow().isoformat()
-    service_client.table.return_value.insert.return_value.execute.return_value.data = [
+    service_client.table.return_value.upsert.return_value.execute.return_value.data = [
         {
             "id": "00000000-0000-0000-0000-000000000009",
             "email": "alpha@example.com",
@@ -243,9 +243,48 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
 
     assert profile.language == "es-419"
     assert profile.locale == "es-419"
-    persisted = service_client.table.return_value.insert.call_args.args[0]
+    persisted = service_client.table.return_value.upsert.call_args.args[0]
     assert persisted["language"] == "es-419"
     assert persisted["locale"] == "es-419"
+
+
+def test_gateway_profile_bootstrap_rereads_winner_after_concurrent_create():
+    service_client = MagicMock()
+    gateway = SupabaseGateway(client=service_client)
+    gateway.private_alpha_role_for_email = MagicMock(return_value="user")
+    canonical_profile = _mock_profile().model_copy(
+        update={
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "is_admin": False,
+        }
+    )
+    gateway.get_user = MagicMock(side_effect=[None, canonical_profile])
+    service_client.table.return_value.insert.return_value.execute.side_effect = (
+        RuntimeError("duplicate key value violates unique constraint profiles_pkey")
+    )
+    service_client.table.return_value.upsert.return_value.execute.return_value.data = []
+
+    profile = gateway.get_or_create_profile_for_auth_user(
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "user_metadata": {
+                "display_name": "Racing Alpha",
+                "language": "es-419",
+            },
+        }
+    )
+
+    assert profile is canonical_profile
+    assert gateway.get_user.call_count == 2
+    service_client.table.return_value.upsert.assert_called_once()
+    _, upsert_kwargs = service_client.table.return_value.upsert.call_args
+    assert upsert_kwargs == {
+        "on_conflict": "id",
+        "ignore_duplicates": True,
+    }
+    service_client.table.return_value.insert.assert_not_called()
 
 
 def test_gateway_private_alpha_role_reads_active_allowlist_row():

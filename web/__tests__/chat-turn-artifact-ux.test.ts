@@ -10,6 +10,7 @@ import {
   confirmationRowKey,
   confirmationStatusAllowsActions,
 } from "../components/chat/confirmation-display";
+import { visibleComposerResponseActions } from "../components/chat/ChatInterface";
 import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
@@ -46,6 +47,101 @@ describe("chat turn artifact UX", () => {
     expect(visibleComposerActions(actions).map((action) => action.label)).toEqual([
       "Try again",
       "Ask follow-up",
+    ]);
+  });
+
+  test("live unsupported-strategy alternatives stay once on their owning assistant", () => {
+    const alternatives = [
+      {
+        id: "unsupported-strategy-rsi-threshold",
+        label: "Use a supported RSI threshold rule",
+        labelKey: "chat.simplification_options.rsi_threshold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "rsi_threshold",
+          replacement_values: { simplify_logic: "rsi_only" },
+        },
+      },
+      {
+        id: "unsupported-strategy-buy-and-hold",
+        label: "Compare with buy and hold",
+        labelKey: "chat.simplification_options.buy_and_hold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "buy_and_hold",
+          replacement_values: { strategy_type: "buy_and_hold" },
+        },
+      },
+      {
+        id: "unsupported-strategy-moving-average-crossover",
+        label: "Use a supported moving-average crossover",
+        labelKey: "chat.simplification_options.moving_average_crossover",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "moving_average_crossover",
+          replacement_values: {
+            strategy_type: "signal_strategy",
+            rule_family: "moving_average_crossover",
+          },
+        },
+      },
+    ] satisfies ChatActionOption[];
+    const coverageAction = {
+      id: "coverage-change-dates",
+      label: "Change dates",
+      type: "select_response_option",
+      payload: {
+        source_assistant_id: "assistant-coverage",
+        option_id: "change_dates",
+        replacement_values: { requested_field: "date_range" },
+      },
+    } satisfies ChatActionOption;
+    const timeframeAction = {
+      id: "unsupported-timeframe-option-1",
+      label: "Retry with daily bars",
+      type: "select_response_option",
+      payload: {
+        source_assistant_id: "assistant-timeframe",
+        option_id: "option_1",
+        replacement_values: { timeframe: "1D" },
+      },
+    } satisfies ChatActionOption;
+
+    expect(new Set(alternatives.map((action) => action.id)).size).toBe(3);
+    for (const alternative of alternatives) {
+      expect(
+        alternatives.filter((action) => action.id === alternative.id),
+      ).toHaveLength(1);
+    }
+    expect(
+      visibleComposerResponseActions([
+        coverageAction,
+        timeframeAction,
+        ...alternatives,
+      ]),
+    ).toEqual([coverageAction, timeframeAction]);
+    expect(alternatives.map((action) => action.payload)).toEqual([
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "rsi_threshold",
+        replacement_values: { simplify_logic: "rsi_only" },
+      },
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "buy_and_hold",
+        replacement_values: { strategy_type: "buy_and_hold" },
+      },
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "moving_average_crossover",
+        replacement_values: {
+          strategy_type: "signal_strategy",
+          rule_family: "moving_average_crossover",
+        },
+      },
     ]);
   });
 
@@ -143,7 +239,9 @@ describe("chat turn artifact UX", () => {
 
     expect(ownership).toContain("export function actionHasCardScopedOwnership");
     expect(ownership).toContain("export function visibleComposerActions");
-    expect(chat).toContain("visibleComposerActions(latestAi?.actions ?? [])");
+    expect(chat).toContain(
+      "visibleComposerResponseActions(latestAi?.actions ?? [])",
+    );
     expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
