@@ -132,9 +132,7 @@ def test_degraded_compatibility_text_stays_durable_but_not_in_history_or_preview
     assert history_items.items[0].subtitle == "Prueba AAPL con velas de cinco minutos."
     assert scored_memory_search_items(user=user, query="compatibility") == []
     search_items = scored_memory_search_items(user=user, query="prueba")
-    assert search_items[0][1].matched_text == (
-        "Prueba AAPL con velas de cinco minutos."
-    )
+    assert search_items[0][1].matched_text == ("Prueba AAPL con velas de cinco minutos.")
 
 
 def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messages() -> (
