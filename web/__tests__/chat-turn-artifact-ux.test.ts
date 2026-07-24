@@ -156,24 +156,25 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
 
-  test("card-scoped confirmation actions close the source card before sending", () => {
+  test("card-scoped confirmation actions close only after guest admission", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
-    const handleActionStart = chat.indexOf("const handleAction =");
-    const handleActionEnd = chat.indexOf("// ── Chat options helpers", handleActionStart);
-    const handleActionBlock = chat.slice(handleActionStart, handleActionEnd);
+    const handleSendStart = chat.indexOf("const handleSend =");
+    const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
+    const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
+    const admissionIndex = handleSendBlock.indexOf(
+      "await guestExperience.admitSend",
+    );
+    const consumeIndex = handleSendBlock.indexOf(
+      "consumeConfirmationActionOnMessages",
+    );
 
-    expect(handleActionStart).toBeGreaterThan(-1);
-    expect(handleActionBlock).toContain(
-      "const confirmationEffect = confirmationActionEffectFromAction(action)",
-    );
-    expect(handleActionBlock).toContain("setMessages((prev) =>");
-    expect(handleActionBlock).toContain("normalizeConfirmationHistory(");
-    expect(handleActionBlock).toContain(
-      "applyConfirmationActionEffects(prev, [confirmationEffect])",
-    );
+    expect(handleSendStart).toBeGreaterThan(-1);
+    expect(admissionIndex).toBeGreaterThan(-1);
+    expect(consumeIndex).toBeGreaterThan(admissionIndex);
+    expect(handleSendBlock).toContain("setMessages((prev) =>");
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {
