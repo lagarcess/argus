@@ -1049,6 +1049,17 @@ proof.
 - Produces atomic acceptance, `running`, durable terminal transitions, stale
   reconciliation on next POST/read, and one persisted-content Retry action.
 
+**Founder-approved daily-only acceptance boundary (2026-07-24):**
+
+Validate this Always Progresses slice against Argus's established daily-bar
+(`1D`) product loop. Non-daily timeframe interpretation,
+unsupported-granularity recovery, and intraday product readiness are deferred
+to a dedicated future roadmap. The observed silent `5m` to `1D` substitution
+is known behavior, not a fixed or accepted capability claim for this slice.
+Task 5's response-option Retry browser proof must therefore use the daily-bar
+unsupported momentum-breakout journey recorded in the Task 5 browser runbook;
+it must not depend on unsupported timeframe recovery.
+
 **Non-negotiable Tasks 4-5 integration acceptance:**
 
 Using the real lifecycle owner and the real route-receipt and cost-ledger sinks,
