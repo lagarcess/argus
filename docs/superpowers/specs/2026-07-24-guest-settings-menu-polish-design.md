@@ -38,7 +38,8 @@ start account conversion or any other Block 3 work.
   by the existing settings surfaces.
 - The modal retains search, enabled-language filtering, the current-language
   checkmark, outside-click dismissal, keyboard focus, and Escape dismissal.
-- Closing the modal returns focus to the Language row.
+- Closing the modal returns focus to the gear trigger because the Language row
+  is no longer mounted after the popover closes.
 - Selecting a language applies it immediately and closes the modal.
 
 ### Feedback
@@ -80,15 +81,43 @@ The shared language modal therefore accepts an explicit persistence policy:
   entry point, Feedback entry, and focus restoration.
 - `LanguageModal` remains the shared centered language surface and accepts the
   persistence policy needed by the caller.
+- `GuestLegalFooter` remains the sole visible owner of temporary-chat expiry.
+- `ChatSidebar` has no guest-expiry presentation or expiry prop.
+- `GuestEmptyStateIntro` owns only the existing headline.
 - `GuestHeader`, the chat runtime, account context, and feedback owners do not
   change.
 
 No new settings framework, icon package, route, API endpoint, or profile policy
 is introduced.
 
+## Empty-State Hierarchy Correction
+
+This same pass makes one narrow guest empty-state correction:
+
+- Remove temporary-chat expiry from the sidebar entirely.
+- Keep one temporary-chat notice beneath the composer in both the empty and
+  populated conversation layouts.
+- Visible copy uses a localized date only:
+  - English: `Temporary chat · available until {localized date}`
+  - Spanish: `Chat temporal · disponible hasta {localized date}`
+- Preserve the exact server timestamp in the notice's semantic `time` element
+  and accessible metadata. Do not change its source, timezone, or expiry
+  behavior.
+- Remove the explanatory paragraph beneath the guest headline.
+- Keep the centered Argus wordmark and existing guest headline.
+- Give the guest empty composer its own shorter localized placeholder:
+  - English: `What do you want to test?`
+  - Spanish: `¿Qué quieres probar?`
+- Do not change the registered empty-composer placeholder.
+- Keep starter-chip labels, typed values, and `handleSend` ownership unchanged.
+- Keep pre-message Terms/Privacy copy and post-message safety/legal copy
+  unchanged.
+
 ## Responsive and Accessibility Requirements
 
 - The popover stays fully visible on desktop and 390-pixel mobile viewports.
+- The sole temporary notice stays beneath the composer with the sidebar
+  expanded or collapsed.
 - Theme buttons and menu rows retain at least 44-pixel targets.
 - Icon-only theme buttons have localized accessible names and pressed state.
 - The gear exposes menu expanded state.
@@ -116,6 +145,12 @@ Red-first tests will prove:
 - guest selection changes i18n without `PATCH /me`;
 - registered/default modal use retains `PATCH /me`;
 - Escape and outside click close the modal and restore focus;
+- the sidebar contains no temporary notice or expiry prop;
+- the composer area contains exactly one localized temporary notice before and
+  after the first message;
+- guest empty state retains its wordmark, headline, and starter actions while
+  removing the explanatory paragraph;
+- the guest empty placeholder uses the approved short English and Spanish copy;
 - theme, feedback, Sign in, English/Spanish, and 44-pixel target behavior remain
   intact.
 
