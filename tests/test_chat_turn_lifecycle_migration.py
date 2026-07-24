@@ -90,6 +90,24 @@ def test_transition_function_is_service_role_only_null_safe_cas() -> None:
     assert "'reconciled'" in sql
     assert "v_turn.status not in ('accepted', 'running')" in sql
     assert "v_turn.status = 'accepted' and p_to_status = 'running'" in sql
+    assert (
+        "v_message.metadata -> 'agent_runtime_turn' ? 'failure_code'"
+        in sql
+    )
+    assert "v_message.metadata -> 'agent_runtime_turn' ? 'retryable'" in sql
+    assert (
+        "jsonb_typeof( v_message.metadata #> "
+        "'{agent_runtime_turn,retryable}' ) is distinct from 'boolean'"
+        in sql
+    )
+    assert (
+        "v_message.metadata #>> '{agent_runtime_turn,failure_code}' "
+        "is distinct from p_failure_code"
+    ) in sql
+    assert (
+        "v_message.metadata #> '{agent_runtime_turn,retryable}' "
+        "is distinct from to_jsonb(v_retryable)"
+    ) in sql
     for outcome in ("applied", "noop", "conflict", "missing", "invalid"):
         assert f"'outcome', '{outcome}'" in sql
     for role in ("public", "anon", "authenticated"):

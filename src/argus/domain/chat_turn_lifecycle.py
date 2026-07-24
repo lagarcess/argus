@@ -240,6 +240,8 @@ class MemoryChatTurnLifecycleGateway:
                 message_id=canonical_assistant_id,
                 to_status=to_status,
                 reconciled_outcome=canonical_reconciled_outcome,
+                failure_code=canonical_failure_code,
+                retryable=canonical_retryable,
             ):
                 return TransitionResult(outcome="invalid", row=dict(row))
             now = utcnow().isoformat()
@@ -418,6 +420,8 @@ class MemoryChatTurnLifecycleGateway:
         message_id: str,
         to_status: str,
         reconciled_outcome: str | None,
+        failure_code: str | None,
+        retryable: bool,
     ) -> bool:
         message = self._message_by_id(message_id)
         if message is None or message.conversation_id != row["conversation_id"]:
@@ -426,13 +430,22 @@ class MemoryChatTurnLifecycleGateway:
         expected_status = (
             reconciled_outcome if to_status == "reconciled" else to_status
         )
-        return (
+        identity_matches = (
             message.role == "assistant"
             and metadata is not None
             and metadata.get("turn_id") == row["turn_id"]
             and metadata.get("request_id") == row["request_id"]
             and metadata.get("terminal") is True
             and metadata.get("status") == expected_status
+        )
+        if not identity_matches or expected_status != "recoverable_failed":
+            return identity_matches
+        return (
+            "failure_code" in metadata
+            and "retryable" in metadata
+            and isinstance(metadata["retryable"], bool)
+            and metadata["failure_code"] == failure_code
+            and metadata["retryable"] is retryable
         )
 
     @staticmethod

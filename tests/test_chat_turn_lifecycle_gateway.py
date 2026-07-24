@@ -211,19 +211,15 @@ class _ProjectionQuery:
         self.operations.append(("eq", args))
         return self
 
-    def in_(self, *args: object) -> _ProjectionQuery:
-        self.operations.append(("in_", args))
-        return self
-
-    def is_(self, *args: object) -> _ProjectionQuery:
-        self.operations.append(("is_", args))
+    def or_(self, *args: object) -> _ProjectionQuery:
+        self.operations.append(("or_", args))
         return self
 
     def execute(self) -> SimpleNamespace:
         return SimpleNamespace(data=self.rows)
 
 
-def test_list_projectable_chat_turns_queries_both_projection_owners() -> None:
+def test_list_projectable_chat_turns_uses_one_snapshot_for_both_owners() -> None:
     user_id = _id()
     conversation_id = _id()
     assistant_message_id = _id()
@@ -242,10 +238,9 @@ def test_list_projectable_chat_turns_queries_both_projection_owners() -> None:
         "assistant_message_id": None,
         "status": "abandoned",
     }
-    assistant_query = _ProjectionQuery([assistant_row])
-    user_query = _ProjectionQuery([abandoned_row])
+    query = _ProjectionQuery([assistant_row, abandoned_row])
     client = MagicMock()
-    client.table.side_effect = [assistant_query, user_query]
+    client.table.return_value = query
     gateway = SupabaseGateway(client=client)
     message_ids = [assistant_message_id, abandoned_turn_id]
 
@@ -259,18 +254,22 @@ def test_list_projectable_chat_turns_queries_both_projection_owners() -> None:
         [assistant_row, abandoned_row],
         key=lambda row: str(row["turn_id"]),
     )
-    assert assistant_query.operations == [
+    client.table.assert_called_once_with("chat_turn_lifecycles")
+    message_ids_filter = ",".join(message_ids)
+    assert query.operations == [
         ("select", ("*",)),
         ("eq", ("user_id", user_id)),
         ("eq", ("conversation_id", conversation_id)),
-        ("in_", ("assistant_message_id", message_ids)),
-    ]
-    assert user_query.operations == [
-        ("select", ("*",)),
-        ("eq", ("user_id", user_id)),
-        ("eq", ("conversation_id", conversation_id)),
-        ("is_", ("assistant_message_id", "null")),
-        ("in_", ("turn_id", message_ids)),
+        (
+            "or_",
+            (
+                (
+                    f"assistant_message_id.in.({message_ids_filter}),"
+                    "and(assistant_message_id.is.null,"
+                    f"turn_id.in.({message_ids_filter}))"
+                ),
+            ),
+        ),
     ]
 
 

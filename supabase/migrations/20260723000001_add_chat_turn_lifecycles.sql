@@ -267,6 +267,26 @@ begin
          is distinct from 'true'::jsonb
        or v_message.metadata #>> '{agent_runtime_turn,status}'
          is distinct from v_expected_message_status
+       or (
+         v_expected_message_status = 'recoverable_failed'
+         and (
+           not (
+             v_message.metadata -> 'agent_runtime_turn' ? 'failure_code'
+           )
+           or not (
+             v_message.metadata -> 'agent_runtime_turn' ? 'retryable'
+           )
+           or jsonb_typeof(
+             v_message.metadata #> '{agent_runtime_turn,retryable}'
+           ) is distinct from 'boolean'
+           or v_message.metadata
+             #>> '{agent_runtime_turn,failure_code}'
+             is distinct from p_failure_code
+           or v_message.metadata
+             #> '{agent_runtime_turn,retryable}'
+             is distinct from to_jsonb(v_retryable)
+         )
+       )
        or exists (
          select 1
            from public.chat_turn_lifecycles as linked

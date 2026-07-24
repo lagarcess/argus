@@ -120,17 +120,20 @@ def _terminal_message(
     created_at: datetime | None = None,
     failure_code: str | None = None,
     retryable: bool = False,
+    include_failure_code: bool = True,
+    include_retryable: bool = True,
 ) -> Message:
-    metadata: dict[str, object] = {
-        "agent_runtime_turn": {
-            "turn_id": turn_id,
-            "request_id": request_id,
-            "terminal": True,
-            "status": status,
-            "failure_code": failure_code,
-            "retryable": retryable,
-        }
+    runtime_turn: dict[str, object] = {
+        "turn_id": turn_id,
+        "request_id": request_id,
+        "terminal": True,
+        "status": status,
     }
+    if include_failure_code:
+        runtime_turn["failure_code"] = failure_code
+    if include_retryable:
+        runtime_turn["retryable"] = retryable
+    metadata: dict[str, object] = {"agent_runtime_turn": runtime_turn}
     message = _message(
         message_id=message_id or _id(),
         conversation_id=conversation_id,
@@ -432,6 +435,136 @@ def test_late_success_cannot_supersede_recoverable_failure(
     assert late.row is not None
     assert late.row["status"] == "recoverable_failed"
     assert late.row["assistant_message_id"] == failure.id
+
+
+@pytest.mark.parametrize(
+    ("to_status", "reconciled_outcome"),
+    [
+        ("recoverable_failed", None),
+        ("reconciled", "recoverable_failed"),
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "include_failure_code",
+        "include_retryable",
+        "evidence_failure_code",
+        "evidence_retryable",
+        "caller_failure_code",
+        "caller_retryable",
+    ),
+    [
+        (False, True, "runtime_failure", True, "runtime_failure", True),
+        (True, False, "runtime_failure", True, "runtime_failure", True),
+        (True, True, "durable_failure", True, "caller_failure", True),
+        (True, True, "runtime_failure", True, "runtime_failure", False),
+    ],
+)
+def test_recoverable_failure_evidence_fields_are_required_and_exact(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+    to_status: str,
+    reconciled_outcome: str | None,
+    include_failure_code: bool,
+    include_retryable: bool,
+    evidence_failure_code: str,
+    evidence_retryable: bool,
+    caller_failure_code: str,
+    caller_retryable: bool,
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn_id = _id()
+    request_id = f"request-{turn_id}"
+    _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+    )
+    failure = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        status="recoverable_failed",
+        failure_code=evidence_failure_code,
+        retryable=evidence_retryable,
+        include_failure_code=include_failure_code,
+        include_retryable=include_retryable,
+    )
+    before = dict(store.chat_turn_lifecycles[turn_id])
+
+    result = gateway.transition_chat_turn(
+        turn_id=turn_id,
+        to_status=to_status,
+        assistant_message_id=failure.id,
+        reconciled_outcome=reconciled_outcome,
+        failure_code=caller_failure_code,
+        retryable=caller_retryable,
+    )
+
+    assert result.outcome == "invalid"
+    assert result.row == before
+    assert store.chat_turn_lifecycles[turn_id] == before
+
+
+@pytest.mark.parametrize(
+    ("to_status", "reconciled_outcome"),
+    [
+        ("recoverable_failed", None),
+        ("reconciled", "recoverable_failed"),
+    ],
+)
+def test_recoverable_failure_evidence_matches_null_safely(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+    to_status: str,
+    reconciled_outcome: str | None,
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    turn_id = _id()
+    request_id = f"request-{turn_id}"
+    _accept(
+        gateway,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+    )
+    failure = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        status="recoverable_failed",
+        failure_code=None,
+        retryable=False,
+    )
+
+    result = gateway.transition_chat_turn(
+        turn_id=turn_id,
+        to_status=to_status,
+        assistant_message_id=failure.id,
+        reconciled_outcome=reconciled_outcome,
+        failure_code=None,
+        retryable=None,
+    )
+
+    assert result.outcome == "applied"
+    assert result.row is not None
+    assert result.row["failure_code"] is None
+    assert result.row["retryable"] is False
 
 
 def test_missing_and_invalid_transitions_are_distinct(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from uuid import UUID
 
 from argus.api.chat.previews import plain_text_preview
 from argus.api.schemas import Message
@@ -120,31 +121,36 @@ class ChatTurnLifecycleGatewayMixin:
     ) -> list[dict[str, Any]]:
         if not message_ids:
             return []
-        assistant_rows = (
+        canonical_message_ids = list(
+            dict.fromkeys(str(UUID(message_id)) for message_id in message_ids)
+        )
+        message_ids_filter = ",".join(canonical_message_ids)
+        rows = (
             self.client.table("chat_turn_lifecycles")
             .select("*")
             .eq("user_id", user_id)
             .eq("conversation_id", conversation_id)
-            .in_("assistant_message_id", message_ids)
+            .or_(
+                f"assistant_message_id.in.({message_ids_filter}),"
+                "and(assistant_message_id.is.null,"
+                f"turn_id.in.({message_ids_filter}))"
+            )
             .execute()
             .data
             or []
         )
-        user_rows = (
-            self.client.table("chat_turn_lifecycles")
-            .select("*")
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-            .is_("assistant_message_id", "null")
-            .in_("turn_id", message_ids)
-            .execute()
-            .data
-            or []
-        )
+        message_id_set = set(canonical_message_ids)
         by_turn_id = {
             str(row["turn_id"]): dict(row)
-            for row in [*assistant_rows, *user_rows]
+            for row in rows
             if row.get("turn_id") is not None
+            and (
+                str(row.get("assistant_message_id")) in message_id_set
+                or (
+                    row.get("assistant_message_id") is None
+                    and str(row["turn_id"]) in message_id_set
+                )
+            )
         }
         return sorted(
             by_turn_id.values(),

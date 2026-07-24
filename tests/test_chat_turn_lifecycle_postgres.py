@@ -101,18 +101,21 @@ def _append_terminal(
     message_id: str | None = None,
     failure_code: str | None = None,
     retryable: bool = False,
+    include_failure_code: bool = True,
+    include_retryable: bool = True,
 ) -> str:
     message_id = message_id or _id()
-    metadata = {
-        "agent_runtime_turn": {
-            "turn_id": turn_id,
-            "request_id": request_id,
-            "terminal": True,
-            "status": status,
-            "failure_code": failure_code,
-            "retryable": retryable,
-        }
+    runtime_turn = {
+        "turn_id": turn_id,
+        "request_id": request_id,
+        "terminal": True,
+        "status": status,
     }
+    if include_failure_code:
+        runtime_turn["failure_code"] = failure_code
+    if include_retryable:
+        runtime_turn["retryable"] = retryable
+    metadata = {"agent_runtime_turn": runtime_turn}
     with connection.cursor() as cursor:
         cursor.execute(
             "select * from public.append_conversation_message("
@@ -309,6 +312,118 @@ def test_transition_is_null_safe_idempotent_and_terminal(owner) -> None:
         assert replay["outcome"] == "noop"
         assert conflict["outcome"] == "conflict"
         assert conflict["row"] == applied["row"]
+
+
+@pytest.mark.parametrize(
+    ("status", "reconciled_outcome"),
+    [
+        ("recoverable_failed", None),
+        ("reconciled", "recoverable_failed"),
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "include_failure_code",
+        "include_retryable",
+        "evidence_failure_code",
+        "evidence_retryable",
+        "caller_failure_code",
+        "caller_retryable",
+    ),
+    [
+        (False, True, "runtime_failure", True, "runtime_failure", True),
+        (True, False, "runtime_failure", True, "runtime_failure", True),
+        (True, True, "durable_failure", True, "caller_failure", True),
+        (True, True, "runtime_failure", True, "runtime_failure", False),
+    ],
+)
+def test_recoverable_failure_evidence_fields_are_required_and_exact(
+    owner,
+    status: str,
+    reconciled_outcome: str | None,
+    include_failure_code: bool,
+    include_retryable: bool,
+    evidence_failure_code: str,
+    evidence_retryable: bool,
+    caller_failure_code: str,
+    caller_retryable: bool,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        assistant_id = _append_terminal(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            status="recoverable_failed",
+            failure_code=evidence_failure_code,
+            retryable=evidence_retryable,
+            include_failure_code=include_failure_code,
+            include_retryable=include_retryable,
+        )
+
+        result = _transition(
+            connection,
+            turn_id=turn_id,
+            status=status,
+            assistant_message_id=assistant_id,
+            reconciled_outcome=reconciled_outcome,
+            failure_code=caller_failure_code,
+            retryable=caller_retryable,
+        )
+
+        assert result["outcome"] == "invalid"
+        assert result["row"]["status"] == "accepted"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select status, assistant_message_id, failure_code, retryable"
+                " from public.chat_turn_lifecycles where turn_id = %s",
+                (turn_id,),
+            )
+            assert cursor.fetchone() == ("accepted", None, None, False)
+
+
+@pytest.mark.parametrize(
+    ("status", "reconciled_outcome"),
+    [
+        ("recoverable_failed", None),
+        ("reconciled", "recoverable_failed"),
+    ],
+)
+def test_recoverable_failure_evidence_matches_null_safely(
+    owner,
+    status: str,
+    reconciled_outcome: str | None,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        assistant_id = _append_terminal(
+            connection,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+            status="recoverable_failed",
+            failure_code=None,
+            retryable=False,
+        )
+
+        result = _transition(
+            connection,
+            turn_id=turn_id,
+            status=status,
+            assistant_message_id=assistant_id,
+            reconciled_outcome=reconciled_outcome,
+            failure_code=None,
+            retryable=None,
+        )
+
+        assert result["outcome"] == "applied"
+        assert result["row"]["failure_code"] is None
+        assert result["row"]["retryable"] is False
 
 
 def test_late_success_cannot_overwrite_terminal_failure(owner) -> None:
