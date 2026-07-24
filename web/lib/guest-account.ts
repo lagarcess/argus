@@ -37,4 +37,5 @@ export type UserResponse = {
   account_kind: "guest" | "registered";
   guest: GuestAccountSummary | null;
   capabilities: AccountCapabilities;
+  public_account_access_enabled: boolean;
 };

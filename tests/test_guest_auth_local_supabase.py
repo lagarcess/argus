@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -259,3 +260,267 @@ def test_cleanup_deletes_real_anonymous_auth_user_through_admin() -> None:
                         "delete from public.cost_ledger_entries where id = %s",
                         (aggregate_id,),
                     )
+
+
+def test_real_anonymous_identity_links_in_place_without_moving_product_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    email = f"block3-link-{secrets.token_hex(6)}@example.test"
+    password = f"Block3-{secrets.token_urlsafe(18)}"
+    user_id: str | None = None
+    conversation_id: str | None = None
+    try:
+        guest = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        auth_user = guest["user"]
+        user_id = str(auth_user["id"])
+        profile = gateway.get_or_create_profile_for_auth_user(auth_user)
+        gateway.create_guest_workspace(
+            user_id=profile.id,
+            created_at=profile.created_at,
+        )
+        conversation = gateway.create_conversation(
+            user_id=user_id,
+            title="Identity link proof",
+            title_source="system_default",
+            language="en",
+        )
+        conversation_id = conversation.id
+        gateway.client.table("messages").insert(
+            {
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "role": "user",
+                "content": "Preserve this exact message",
+            }
+        ).execute()
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            client.cookies.set(
+                "sb-auth-token",
+                str(guest["session"]["access_token"]),
+            )
+            client.cookies.set(
+                "sb-refresh-token",
+                str(guest["session"]["refresh_token"]),
+            )
+            linked = client.post(
+                "/api/v1/auth/guest/link",
+                json={"email": email, "password": password},
+                headers={"origin": "http://localhost:3000"},
+            )
+
+            assert linked.status_code == 200
+            assert linked.json()["account_kind"] == "registered"
+            assert linked.json()["user"]["id"] == user_id
+            assert linked.json()["user"]["email"] == email
+            access_token = str(linked.json()["session"]["access_token"])
+            reloaded = client.get(
+                "/api/v1/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+
+        assert reloaded.status_code == 200
+        assert reloaded.json()["account_kind"] == "registered"
+        assert reloaded.json()["user"]["id"] == user_id
+        verified = gateway.get_auth_user_from_token(access_token)
+        assert str(verified["id"]) == user_id
+        assert verified["is_anonymous"] is False
+        assert str(verified["email"]).lower() == email
+        preserved = (
+            gateway.client.table("conversations")
+            .select("id,user_id")
+            .eq("id", conversation_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert preserved == {"id": conversation_id, "user_id": user_id}
+        messages = (
+            gateway.client.table("messages")
+            .select("id,user_id,content")
+            .eq("conversation_id", conversation_id)
+            .execute()
+            .data
+        )
+        assert len(messages) == 1
+        assert messages[0]["user_id"] == user_id
+        assert messages[0]["content"] == "Preserve this exact message"
+        workspace = (
+            gateway.client.table("guest_workspaces")
+            .select("status,claimed_by,conversation_id")
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert workspace == {
+            "status": "claimed",
+            "claimed_by": user_id,
+            "conversation_id": conversation_id,
+        }
+    finally:
+        if user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
+
+
+def test_existing_account_claim_preserves_same_conversation_and_deletes_source_only_after_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    email = f"block3-claim-{secrets.token_hex(6)}@example.test"
+    password = f"Block3-{secrets.token_urlsafe(18)}"
+    source_user_id: str | None = None
+    destination_user_id: str | None = None
+    conversation_id: str | None = None
+    try:
+        created_destination = gateway.client.auth.admin.create_user(
+            {
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+            }
+        )
+        assert created_destination.user is not None
+        destination_user_id = str(created_destination.user.id)
+        gateway.get_or_create_profile_for_auth_user(
+            created_destination.user.model_dump(mode="json")
+        )
+        gateway.client.table("private_alpha_allowlist").insert({"email": email}).execute()
+
+        guest = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        guest_user = guest["user"]
+        source_user_id = str(guest_user["id"])
+        guest_profile = gateway.get_or_create_profile_for_auth_user(guest_user)
+        gateway.create_guest_workspace(
+            user_id=source_user_id,
+            created_at=guest_profile.created_at,
+        )
+        conversation = gateway.create_conversation(
+            user_id=source_user_id,
+            title="Claim proof",
+            title_source="system_default",
+            language="en",
+        )
+        conversation_id = conversation.id
+        gateway.client.table("messages").insert(
+            [
+                {
+                    "conversation_id": conversation_id,
+                    "user_id": source_user_id,
+                    "role": "user",
+                    "content": "One guest message",
+                },
+                {
+                    "conversation_id": conversation_id,
+                    "user_id": source_user_id,
+                    "role": "assistant",
+                    "content": "One durable response",
+                },
+            ]
+        ).execute()
+        assert gateway.private_alpha_email_allowed(email) is True
+        assert gateway.resolve_permanent_auth_user_id(email) == destination_user_id
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            client.cookies.set(
+                "sb-auth-token",
+                str(guest["session"]["access_token"]),
+            )
+            client.cookies.set(
+                "sb-refresh-token",
+                str(guest["session"]["refresh_token"]),
+            )
+            handoff = client.post(
+                "/api/v1/auth/guest/handoffs",
+                json={
+                    "destination_email": email,
+                    "source_conversation_id": conversation_id,
+                    "pending_action": {
+                        "reason": "keep_history",
+                        "conversation_id": conversation_id,
+                        "action_id": "keep-history-1",
+                    },
+                },
+                headers={"origin": "http://localhost:3000"},
+            )
+            assert handoff.status_code == 201, handoff.json()
+
+            signed_in = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": password},
+            )
+            assert signed_in.status_code == 200
+            claimed = client.post(
+                f"/api/v1/auth/guest/handoffs/{handoff.json()['handoff_id']}/claim",
+                headers={"origin": "http://localhost:3000"},
+            )
+            assert claimed.status_code == 200
+            assert claimed.json()["conversation_id"] == conversation_id
+            assert claimed.json()["pending_action"]["action_id"] == "keep-history-1"
+
+            reloaded = client.get("/api/v1/me")
+
+        assert reloaded.status_code == 200
+        assert reloaded.json()["account_kind"] == "registered"
+        assert reloaded.json()["user"]["id"] == destination_user_id
+        transferred = (
+            gateway.client.table("conversations")
+            .select("id,user_id")
+            .eq("id", conversation_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert transferred == {
+            "id": conversation_id,
+            "user_id": destination_user_id,
+        }
+        messages = (
+            gateway.client.table("messages")
+            .select("id,user_id,content")
+            .eq("conversation_id", conversation_id)
+            .order("created_at")
+            .execute()
+            .data
+        )
+        assert [row["content"] for row in messages] == [
+            "One guest message",
+            "One durable response",
+        ]
+        assert all(row["user_id"] == destination_user_id for row in messages)
+        with pytest.raises(AuthApiError):
+            gateway.client.auth.admin.get_user_by_id(source_user_id)
+    finally:
+        if destination_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(destination_user_id)
+        if source_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(source_user_id)

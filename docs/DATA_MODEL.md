@@ -191,6 +191,40 @@ Server-owned policy record for one temporary anonymous identity.
 
 ---
 
+## 5.2 guest_workspace_handoffs
+
+Server-owned, short-lived claim record for moving one anonymous workspace into
+one existing permanent account.
+
+### Fields
+- `id`: `uuid` (Primary Key)
+- `secret_hash`: `text` (SHA-256 hex digest; the opaque secret is never stored)
+- `source_user_id`: `uuid` (References the anonymous `profiles.id`)
+- `destination_user_id`: `uuid` (References the permanent `profiles.id`)
+- `source_conversation_id`: `uuid` (References the one guest conversation)
+- `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
+  decision artifact id when applicable)
+- `status`: `pending`, `consumed`, or `revoked`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz` (Exactly ten minutes after creation)
+- `consumed_at`: `timestamptz` (Nullable)
+
+### Invariants
+- Browser roles cannot read or execute against this table. Only the service
+  role may create or claim a handoff.
+- A pending source workspace has at most one handoff.
+- Claim locks the handoff and complete source product graph, verifies every
+  foreign owner, and transfers all mutable product rows in one transaction.
+- Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
+  decision, and context ids do not change. Checkpoint rows keep
+  `thread_id == conversation_id`.
+- Guest counters and feedback are not merged into registered allowances.
+  Immutable cost, provider, security, and audit evidence is not rewritten.
+- Source anonymous Auth deletion occurs only after the product transaction
+  commits. Any claim failure changes zero owners.
+
+---
+
 # 6. private_alpha_allowlist
 
 Server-side access list for private alpha. This table is checked before signup

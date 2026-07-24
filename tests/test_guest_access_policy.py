@@ -122,6 +122,7 @@ def test_verified_anonymous_auth_truth_owns_guest_status_and_capabilities(
         "simulation_limit": 1,
         "feedback_limit": 5,
     }
+    assert payload["public_account_access_enabled"] is False
     assert payload["capabilities"] == {
         "can_create_additional_conversation": False,
         "can_manage_conversation": False,

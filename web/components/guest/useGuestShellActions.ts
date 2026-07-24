@@ -11,6 +11,7 @@ type GuestShellActionsInput = {
   onOpenFeedback: () => void;
   onNewChat: () => void | Promise<unknown>;
   onOpenOmnisearch: () => void;
+  onRequestSignIn: () => void;
   omnisearchShortcutEnabled: boolean;
   showToast: (message: string) => void;
 };
@@ -22,6 +23,7 @@ export function useGuestShellActions({
   onOpenFeedback,
   onNewChat,
   onOpenOmnisearch,
+  onRequestSignIn,
   omnisearchShortcutEnabled,
   showToast,
 }: GuestShellActionsInput) {
@@ -42,8 +44,8 @@ export function useGuestShellActions({
   }, [canUseOmnisearch, isGuest, onOpenOmnisearch, showToast, t]);
 
   const requestGuestSignIn = useCallback(() => {
-    showToast(t("guest.shell.sign_in_unavailable"));
-  }, [showToast, t]);
+    onRequestSignIn();
+  }, [onRequestSignIn]);
 
   const requestGuestDecision = useCallback(() => {
     showToast(t("guest.shell.decision_unavailable"));

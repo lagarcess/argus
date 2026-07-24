@@ -130,6 +130,7 @@ class UserResponse(BaseModel):
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
+    public_account_access_enabled: bool
 
 
 class UsageWindow(BaseModel):
@@ -613,6 +614,92 @@ class LoginRequest(BaseModel):
 class GuestBootstrapRequest(BaseModel):
     captcha_token: str = Field(min_length=1, max_length=4096)
     language: Language = "en"
+
+
+GuestConversionReason = Literal[
+    "second_simulation",
+    "message_limit",
+    "save_decision",
+    "new_conversation",
+    "keep_history",
+]
+
+
+class GuestPendingAction(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: GuestConversionReason
+    conversation_id: str = Field(min_length=1, max_length=128)
+    action_id: str = Field(min_length=1, max_length=128)
+    artifact_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def require_reason_specific_identity(self) -> "GuestPendingAction":
+        if self.reason == "save_decision" and self.artifact_id is None:
+            raise ValueError("save_decision_requires_artifact_id")
+        if self.reason != "save_decision" and self.artifact_id is not None:
+            raise ValueError("artifact_id_is_only_valid_for_save_decision")
+        return self
+
+
+class GuestHandoffCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    destination_email: str = Field(min_length=3, max_length=320)
+    source_conversation_id: str = Field(min_length=1, max_length=128)
+    pending_action: GuestPendingAction | None = None
+
+    @field_validator("destination_email")
+    @classmethod
+    def normalize_destination_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+    @model_validator(mode="after")
+    def bind_action_to_source_conversation(self) -> "GuestHandoffCreateRequest":
+        if (
+            self.pending_action is not None
+            and self.pending_action.conversation_id != self.source_conversation_id
+        ):
+            raise ValueError("pending_action_conversation_mismatch")
+        return self
+
+
+class GuestHandoffCreateResponse(BaseModel):
+    handoff_id: str
+    expires_at: datetime
+
+
+class GuestHandoffClaimResponse(BaseModel):
+    conversation_id: str
+    pending_action: GuestPendingAction | None = None
+
+
+class GuestIdentityLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
 
 
 class SuccessResponse(BaseModel):

@@ -333,6 +333,13 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
         "account_kind",
         "guest",
         "capabilities",
+        "public_account_access_enabled",
+    }
+    assert user_response["properties"]["public_account_access_enabled"] == {
+        "type": "boolean",
+        "description": (
+            "Server-authoritative permission to expose ordinary account creation."
+        ),
     }
     assert user_response["properties"]["user"] == {"$ref": "#/components/schemas/User"}
     assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {

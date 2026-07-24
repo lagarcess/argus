@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from datetime import datetime, timezone
 from threading import Lock
 from time import monotonic
 from typing import Literal
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
 from argus.api.dependencies import (
+    _session_cookie_secure,
     auth_response,
     current_user,
     problem,
@@ -20,9 +22,20 @@ from argus.api.guest_access import (
     guest_access_enabled,
     guest_account_context,
     permanent_account_access_allowed,
+    public_account_access_enabled,
     store_account_context,
 )
-from argus.api.schemas import GuestBootstrapRequest, LoginRequest, SignupRequest, User
+from argus.api.schemas import (
+    GuestBootstrapRequest,
+    GuestHandoffClaimResponse,
+    GuestHandoffCreateRequest,
+    GuestHandoffCreateResponse,
+    GuestIdentityLinkRequest,
+    GuestPendingAction,
+    LoginRequest,
+    SignupRequest,
+    User,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -33,6 +46,8 @@ _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
 _AUTH_ATTEMPT_RETRY_FLOOR_SECONDS = 1
 _AUTH_ATTEMPT_COMPACT_THRESHOLD = 2048
 _AuthAction = Literal["login", "signup"]
+_GUEST_HANDOFF_COOKIE = "argus-guest-handoff"
+_GUEST_HANDOFF_MAX_AGE_SECONDS = 10 * 60
 
 
 class _AuthAttemptLimiter:
@@ -276,6 +291,286 @@ def guest_bootstrap(
             title="Guest Session Unavailable",
             detail="Argus could not start a guest session. Please try again.",
         ) from None
+
+
+@router.post(
+    "/auth/guest/handoffs",
+    response_model=GuestHandoffCreateResponse,
+    status_code=201,
+)
+def create_guest_handoff(
+    request: Request,
+    body: GuestHandoffCreateRequest,
+    user: User = Depends(current_user),  # noqa: B008
+) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for guest conversion.",
+        )
+    context = account_context(request)
+    if context.kind != "guest":
+        raise problem(
+            request,
+            status_code=409,
+            code="account_already_registered",
+            title="Account Already Registered",
+            detail="This session already belongs to a permanent account.",
+        )
+    if not permanent_account_access_allowed(
+        api_state.supabase_gateway,
+        body.destination_email,
+    ):
+        raise _login_auth_problem(request)
+    try:
+        destination_user_id = api_state.supabase_gateway.resolve_permanent_auth_user_id(
+            body.destination_email
+        )
+        if not destination_user_id:
+            raise RuntimeError("Destination account was not found.")
+        created = api_state.supabase_gateway.create_guest_workspace_handoff(
+            source_user_id=user.id,
+            destination_user_id=destination_user_id,
+            source_conversation_id=body.source_conversation_id,
+            pending_action=(
+                body.pending_action.model_dump(mode="json", exclude_none=True)
+                if body.pending_action is not None
+                else None
+            ),
+            created_at=datetime.now(timezone.utc),
+        )
+        opaque_secret = str(created.pop("opaque_secret"))
+        payload = GuestHandoffCreateResponse(
+            handoff_id=str(created["id"]),
+            expires_at=created["expires_at"],
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise _login_auth_problem(request) from None
+
+    response = JSONResponse(
+        status_code=201,
+        content=jsonable_encoder(payload.model_dump(mode="json")),
+    )
+    response.set_cookie(
+        _GUEST_HANDOFF_COOKIE,
+        opaque_secret,
+        httponly=True,
+        secure=_session_cookie_secure(request),
+        samesite="lax",
+        max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
+        path="/api/v1/auth/guest/handoffs",
+    )
+    return response
+
+
+@router.post(
+    "/auth/guest/handoffs/{handoff_id}/claim",
+    response_model=GuestHandoffClaimResponse,
+)
+def claim_guest_handoff(
+    handoff_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for guest conversion.",
+        )
+    context = account_context(request)
+    if context.kind != "registered":
+        raise problem(
+            request,
+            status_code=403,
+            code="registered_account_required",
+            title="Account Required",
+            detail="Sign in to claim this temporary conversation.",
+        )
+    opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
+    if not opaque_secret:
+        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+    try:
+        claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
+            handoff_id=handoff_id,
+            opaque_secret=opaque_secret,
+            destination_user_id=user.id,
+        )
+    except Exception as exc:
+        raise _guest_handoff_problem(request, str(exc)) from None
+
+    source_user_id = str(claimed.get("source_user_id") or "")
+    if not source_user_id:
+        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+    try:
+        api_state.supabase_gateway.delete_anonymous_auth_user(source_user_id)
+    except Exception:
+        # The product graph is already safe and owned by the destination.
+        # Cleanup is idempotent and may be retried independently.
+        pass
+
+    pending_raw = claimed.get("pending_action")
+    pending_action = (
+        GuestPendingAction.model_validate(pending_raw)
+        if isinstance(pending_raw, dict)
+        else None
+    )
+    payload = GuestHandoffClaimResponse(
+        conversation_id=str(claimed["conversation_id"]),
+        pending_action=pending_action,
+    )
+    response = JSONResponse(
+        content=jsonable_encoder(payload.model_dump(mode="json")),
+    )
+    response.delete_cookie(
+        _GUEST_HANDOFF_COOKIE,
+        path="/api/v1/auth/guest/handoffs",
+        secure=_session_cookie_secure(request),
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+
+def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
+    known = {
+        "guest_handoff_consumed": (
+            409,
+            "Handoff Already Used",
+            "This guest handoff has already been used.",
+        ),
+        "guest_handoff_expired": (
+            410,
+            "Handoff Expired",
+            "This guest handoff has expired.",
+        ),
+        "guest_handoff_wrong_destination": (
+            403,
+            "Handoff Denied",
+            "This guest handoff does not belong to the signed-in account.",
+        ),
+        "guest_handoff_unsafe_product_graph": (
+            409,
+            "Handoff Unsafe",
+            "This temporary workspace could not be transferred safely.",
+        ),
+        "guest_handoff_workspace_unavailable": (
+            409,
+            "Workspace Unavailable",
+            "This temporary workspace is no longer available.",
+        ),
+    }
+    code = next((value for value in known if value in raw_code), "guest_handoff_invalid")
+    status, title, detail = known.get(
+        code,
+        (400, "Invalid Handoff", "This guest handoff is invalid."),
+    )
+    return problem(
+        request,
+        status_code=status,
+        code=code,
+        title=title,
+        detail=detail,
+    )
+
+
+@router.post("/auth/guest/link")
+def link_guest_identity(
+    request: Request,
+    body: GuestIdentityLinkRequest,
+    user: User = Depends(current_user),  # noqa: B008
+) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
+    if not public_account_access_enabled():
+        raise problem(
+            request,
+            status_code=403,
+            code="public_account_access_unavailable",
+            title="Account Creation Unavailable",
+            detail="Public account creation is not available.",
+        )
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for guest conversion.",
+        )
+    if account_context(request).kind != "guest":
+        raise problem(
+            request,
+            status_code=409,
+            code="account_already_registered",
+            title="Account Already Registered",
+            detail="This session already belongs to a permanent account.",
+        )
+    access_token = _request_access_token(request)
+    refresh_token = request.cookies.get("sb-refresh-token", "").strip()
+    if not access_token or not refresh_token:
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Unauthorized",
+            detail="The guest session could not be verified for account creation.",
+        )
+    try:
+        result = api_state.supabase_gateway.link_anonymous_identity(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            email=body.email,
+            password=body.password,
+        )
+        auth_user = result.get("user")
+        if (
+            not isinstance(auth_user, dict)
+            or str(auth_user.get("id") or "") != user.id
+            or auth_user.get("is_anonymous") is not False
+        ):
+            raise RuntimeError("Provider linked a different identity.")
+        api_state.supabase_gateway.mark_guest_identity_linked(
+            user.id,
+            at=datetime.now(timezone.utc),
+        )
+        profile = api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+            auth_user
+        )
+        payload = dict(result)
+        payload.update(
+            {
+                "authenticated": True,
+                "account_kind": "registered",
+                "user": profile.model_dump(mode="json"),
+            }
+        )
+        return auth_response(request, payload)
+    except HTTPException:
+        raise
+    except Exception:
+        raise problem(
+            request,
+            status_code=400,
+            code="guest_identity_link_failed",
+            title="Account Creation Failed",
+            detail="Argus could not create this account. Your temporary chat is unchanged.",
+        ) from None
+
+
+def _request_access_token(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    if authorization.startswith("Bearer "):
+        return authorization.removeprefix("Bearer ").strip()
+    return request.cookies.get("sb-auth-token", "").strip()
 
 
 @router.post("/auth/signup")

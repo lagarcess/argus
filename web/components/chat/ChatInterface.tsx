@@ -20,8 +20,11 @@ import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import GuestHeader from "@/components/guest/GuestHeader";
+import GuestConversionModal from "@/components/guest/GuestConversionModal";
+import { useGuestConversion } from "@/components/guest/useGuestConversion";
 import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
-import { useAccount } from "@/lib/account-context";
+import { useAccount, useAccountRefresh } from "@/lib/account-context";
+import type { GuestPendingAction } from "@/lib/guest-conversion";
 import {
   createConversation,
   deleteConversation,
@@ -590,6 +593,7 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const account = useAccount();
+  const refreshAccount = useAccountRefresh();
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -1194,6 +1198,20 @@ export default function ChatInterface() {
     return null;
   }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
 
+  const resumeGuestAction = useCallback(
+    async (_action: GuestPendingAction) => {
+      void _action;
+      void refreshHistory();
+    },
+    [refreshHistory],
+  );
+  const guestConversion = useGuestConversion({
+    account,
+    conversationId,
+    refreshAccount,
+    onResume: resumeGuestAction,
+  });
+
   const {
     isGuest,
     canManageConversation,
@@ -1219,6 +1237,17 @@ export default function ChatInterface() {
       }),
     onNewChat: startNewChat,
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    onRequestSignIn: () =>
+      guestConversion.requestConversion(
+        "keep_history",
+        conversationId
+          ? {
+              reason: "keep_history",
+              conversationId,
+              actionId: crypto.randomUUID(),
+            }
+          : null,
+      ),
     omnisearchShortcutEnabled: omnisearchEnabled,
     showToast,
   });
@@ -2583,6 +2612,16 @@ export default function ChatInterface() {
         type={feedbackState.type}
         rating={feedbackState.rating}
         context={feedbackState.context}
+      />
+
+      <GuestConversionModal
+        isOpen={guestConversion.isOpen}
+        reason={guestConversion.reason}
+        publicAccountAccessEnabled={
+          guestConversion.publicAccountAccessEnabled
+        }
+        onClose={guestConversion.close}
+        onAuthenticate={guestConversion.authenticate}
       />
 
       {isSidebarPreferenceModalOpen && (

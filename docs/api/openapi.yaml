@@ -36,23 +36,47 @@ paths:
           description: Anonymous Auth or temporary-workspace bootstrap is unavailable.
   /api/v1/auth/guest/link:
     post:
-      description: Reserved typed boundary for linking the current anonymous identity to a new permanent account.
+      description: Link the verified anonymous identity to a new permanent account without changing its Auth UUID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestIdentityLinkRequest"
       responses:
-        "501":
-          description: Conversion is not active in Guest Experience Block 1.
+        "200":
+          description: The same Auth identity and product graph are now registered.
+        "403":
+          description: Public account access is disabled or the session is not an active guest.
+        "409":
+          description: The current session is already registered.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/guest/handoffs:
     post:
-      description: Reserved typed boundary for creating an existing-account guest handoff.
+      description: Create a ten-minute, destination-bound guest handoff and store its opaque secret only in an HttpOnly cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestHandoffCreateRequest"
       responses:
-        "501":
-          description: Conversion is not active in Guest Experience Block 1.
+        "201":
+          description: A single-use guest handoff is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestHandoffCreateResponse"
+        "401":
+          description: The destination account is unavailable or not permitted.
+        "409":
+          description: The current session is already registered.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/guest/handoffs/{handoff_id}/claim:
     post:
-      description: Reserved typed boundary for atomically claiming a guest workspace into an existing account.
+      description: Atomically claim the complete guest product graph into the signed-in destination account.
       parameters:
         - name: handoff_id
           in: path
@@ -60,8 +84,20 @@ paths:
           schema:
             type: string
       responses:
-        "501":
-          description: Conversion is not active in Guest Experience Block 1.
+        "200":
+          description: The original conversation and optional typed action were claimed once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestHandoffClaimResponse"
+        "400":
+          description: The handoff cookie or secret is invalid.
+        "403":
+          description: The signed-in account is not the bound destination.
+        "409":
+          description: The handoff was consumed or the product graph is unsafe.
+        "410":
+          description: The handoff expired.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/logout:
@@ -538,6 +574,7 @@ components:
         - account_kind
         - guest
         - capabilities
+        - public_account_access_enabled
       properties:
         user:
           $ref: "#/components/schemas/User"
@@ -552,6 +589,100 @@ components:
             - type: "null"
         capabilities:
           $ref: "#/components/schemas/AccountCapabilities"
+        public_account_access_enabled:
+          type: boolean
+          description: Server-authoritative permission to expose ordinary account creation.
+    GuestConversionReason:
+      type: string
+      enum:
+        - second_simulation
+        - message_limit
+        - save_decision
+        - new_conversation
+        - keep_history
+    GuestPendingAction:
+      type: object
+      additionalProperties: false
+      required:
+        - reason
+        - conversation_id
+        - action_id
+      properties:
+        reason:
+          $ref: "#/components/schemas/GuestConversionReason"
+        conversation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        action_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        artifact_id:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 128
+          description: Required only for save_decision.
+    GuestHandoffCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - destination_email
+        - source_conversation_id
+      properties:
+        destination_email:
+          type: string
+          format: email
+          maxLength: 320
+        source_conversation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        pending_action:
+          anyOf:
+            - $ref: "#/components/schemas/GuestPendingAction"
+            - type: "null"
+    GuestHandoffCreateResponse:
+      type: object
+      required:
+        - handoff_id
+        - expires_at
+      properties:
+        handoff_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    GuestHandoffClaimResponse:
+      type: object
+      required:
+        - conversation_id
+        - pending_action
+      properties:
+        conversation_id:
+          type: string
+        pending_action:
+          anyOf:
+            - $ref: "#/components/schemas/GuestPendingAction"
+            - type: "null"
+    GuestIdentityLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
     ChatClarification:
       type: object
       description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.

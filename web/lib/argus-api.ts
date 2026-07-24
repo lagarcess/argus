@@ -181,7 +181,7 @@ type AuthSessionPayload = {
   expires_in?: number;
 };
 
-type AuthResponsePayload = {
+export type AuthResponsePayload = {
   session?: AuthSessionPayload | null;
   user?: Record<string, unknown> | null;
 };
@@ -709,6 +709,63 @@ export async function loginWithEmail(payload: {
       body: JSON.stringify(payload),
     },
   );
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function createGuestHandoff(payload: {
+  destination_email: string;
+  source_conversation_id: string;
+  pending_action?: {
+    reason:
+      | "second_simulation"
+      | "message_limit"
+      | "save_decision"
+      | "new_conversation"
+      | "keep_history";
+    conversation_id: string;
+    action_id: string;
+    artifact_id?: string;
+  } | null;
+}) {
+  return apiFetch<{ handoff_id: string; expires_at: string }>(
+    "/auth/guest/handoffs",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function claimGuestHandoff(handoffId: string) {
+  return apiFetch<{
+    conversation_id: string;
+    pending_action: {
+      reason:
+        | "second_simulation"
+        | "message_limit"
+        | "save_decision"
+        | "new_conversation"
+        | "keep_history";
+      conversation_id: string;
+      action_id: string;
+      artifact_id?: string;
+    } | null;
+  }>(`/auth/guest/handoffs/${handoffId}/claim`, {
+    method: "POST",
+  });
+}
+
+export async function linkGuestIdentity(payload: {
+  email: string;
+  password: string;
+}) {
+  const response = await apiFetch<AuthResponsePayload & {
+    account_kind: "registered";
+  }>("/auth/guest/link", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   await persistBrowserSession(response);
   return response;
 }

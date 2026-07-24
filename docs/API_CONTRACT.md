@@ -1496,20 +1496,25 @@ to `false`; the frontend flag controls presentation only.
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
   checked before Auth creation. It uses the existing secure cookie rules.
-- `POST /api/v1/auth/guest/link` is the typed future boundary for linking the
-  current anonymous identity into a new permanent account.
-- `POST /api/v1/auth/guest/handoffs` is the typed future boundary for creating
-  a short-lived existing-account handoff.
-- `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` is the typed future
-  boundary for one atomic, single-use workspace claim.
+- `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
+  update to add verified email/password credentials to the current anonymous
+  identity. It is available only when the server enables public account access
+  and preserves the Auth UUID.
+- `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
+  destination account, source conversation, and optional typed pending action
+  to a ten-minute handoff. The response exposes only the handoff id and expiry;
+  the opaque secret exists only in a Secure/SameSite/HttpOnly cookie.
+- `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
+  the signed-in destination, then atomically transfers the complete mutable
+  product graph. It is single-use and returns the original conversation id plus
+  the verified typed pending action.
 - `GET /api/v1/me` returns the verified account kind, guest expiry and limits,
   and server capabilities with the ordinary profile.
 
-The Block 1 response includes `user`, `account_kind`, a nullable `guest`
-summary with expiry plus limits `1/10/1/5`, and typed `capabilities`. Guest
-capabilities deny additional conversations, conversation/account management,
-decision saving, and Omnisearch during Block 1 while allowing quota-bound
-feedback.
+The response includes `user`, `account_kind`, a nullable `guest` summary with
+expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+server-authoritative `public_account_access_enabled` presentation permission.
+Public account creation is absent unless that last value is true.
 
 All guest mutation failures use the existing Problem Details, request-ID,
 same-origin, secure-cookie, and idempotency conventions.

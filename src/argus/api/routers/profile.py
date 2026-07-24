@@ -8,7 +8,11 @@ from pydantic import ValidationError
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
-from argus.api.guest_access import AccountContext, account_context
+from argus.api.guest_access import (
+    AccountContext,
+    account_context,
+    public_account_access_enabled,
+)
 from argus.api.schemas import (
     ProfilePatch,
     UsageAllowance,
@@ -56,6 +60,7 @@ def _user_response(user: User, context: AccountContext) -> UserResponse:
             else None
         ),
         capabilities=context.capabilities,
+        public_account_access_enabled=public_account_access_enabled(),
     )
 
 

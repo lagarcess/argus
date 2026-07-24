@@ -1034,6 +1034,16 @@
       "loading": "Opening Argus",
       "error": "Argus couldn't open a temporary chat. Try again."
     },
+    "conversion": {
+      "eyebrow": "Keep going with Argus",
+      "sign_in_title": "Sign in",
+      "create_title": "Create your account",
+      "second_simulation": "Sign in to run another simulation.",
+      "message_limit": "Sign in to keep this conversation and continue.",
+      "save_decision": "Sign in to save this decision.",
+      "new_conversation": "Sign in to keep this conversation and start another.",
+      "keep_history": "Sign in to keep this conversation and start another."
+    },
     "shell": {
       "value_title": "Test an investing idea against history.",
       "input_placeholder": "What do you want to test?",

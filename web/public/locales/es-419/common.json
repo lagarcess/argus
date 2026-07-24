@@ -1034,6 +1034,16 @@
       "loading": "Abriendo Argus",
       "error": "Argus no pudo abrir un chat temporal. Inténtalo de nuevo."
     },
+    "conversion": {
+      "eyebrow": "Sigue con Argus",
+      "sign_in_title": "Iniciar sesión",
+      "create_title": "Crea tu cuenta",
+      "second_simulation": "Inicia sesión para ejecutar otra simulación.",
+      "message_limit": "Inicia sesión para conservar esta conversación y continuar.",
+      "save_decision": "Inicia sesión para guardar esta decisión.",
+      "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
+      "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra."
+    },
     "shell": {
       "value_title": "Prueba una idea de inversión con datos históricos.",
       "input_placeholder": "¿Qué quieres probar?",

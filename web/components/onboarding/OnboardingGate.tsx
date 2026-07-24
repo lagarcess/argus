@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -116,6 +116,18 @@ export function OnboardingGate({
     checkUser();
   }, [i18n]);
 
+  const refreshAccount = useCallback(async () => {
+    const me = await getMe();
+    setAccount(me);
+    if (me.account_kind === "registered") {
+      const profileLanguage = normalizeEnabledLanguage(me.user.language);
+      if (profileLanguage !== normalizeEnabledLanguage(i18n.language)) {
+        await i18n.changeLanguage(profileLanguage);
+      }
+    }
+    return me;
+  }, [i18n]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authMode = params.get("auth");
@@ -190,7 +202,9 @@ export function OnboardingGate({
     return (
       <>
         <DevModeBadge />
-        <AccountProvider account={account}>{children}</AccountProvider>
+        <AccountProvider account={account} refreshAccount={refreshAccount}>
+          {children}
+        </AccountProvider>
       </>
     );
   }
