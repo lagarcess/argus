@@ -172,6 +172,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const starterActions = readFileSync(
+      join(root, "components/chat/StarterActions.tsx"),
+      "utf-8",
+    );
     const input = readFileSync(
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
@@ -199,9 +203,10 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(chat).toContain("chatExploratorySuggestionsEnabled");
     expect(chat).toContain("showExploratorySuggestions");
-    expect(chat).toContain("chat.starter_actions.tsla.value");
-    expect(chat).toContain("chat.starter_actions.btc.value");
-    expect(chat).toContain("chat.starter_actions.dca.value");
+    expect(starterActions).toContain("chat.starter_actions.tsla.value");
+    expect(starterActions).toContain("chat.starter_actions.btc.value");
+    expect(starterActions).toContain("chat.starter_actions.dca.value");
+    expect(chat).toContain("<StarterActions");
     expect(chat).toContain("showExploratorySuggestions &&");
     expect(input).toContain("chatExploratorySuggestionsEnabled");
     expect(input).toContain(
@@ -1725,7 +1730,10 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("account recovery and session controls expose localized dedicated surfaces", () => {
-    const landing = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const landing = readFileSync(
+      join(root, "components/auth/AuthLanding.tsx"),
+      "utf-8",
+    );
     const forgot = join(root, "app/auth/forgot-password/page.tsx");
     const recovery = join(root, "app/auth/recovery/page.tsx");
     const security = join(root, "app/account/security/page.tsx");
@@ -1791,7 +1799,10 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("landing onboarding continues into chat after completion", () => {
-    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const page = readFileSync(
+      join(root, "components/auth/AuthLanding.tsx"),
+      "utf-8",
+    );
 
     expect(page).toContain('postCompleteHref="/chat"');
     expect(page).toContain("font-display text-6xl");
@@ -1799,7 +1810,10 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("landing front door adapts signup and login inline", () => {
-    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const page = readFileSync(
+      join(root, "components/auth/AuthLanding.tsx"),
+      "utf-8",
+    );
 
     expect(page).toContain("Eye");
     expect(page).toContain("EyeClosed");

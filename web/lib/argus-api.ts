@@ -186,6 +186,12 @@ type AuthResponsePayload = {
   user?: Record<string, unknown> | null;
 };
 
+export type GuestBootstrapResponse = AuthResponsePayload & {
+  authenticated: true;
+  reused: boolean;
+  account_kind: "guest";
+};
+
 /** Backend message shape (distinct from the frontend chat Message type) */
 export type ApiMessage = {
   id: string;
@@ -701,6 +707,21 @@ export async function loginWithEmail(payload: {
 }) {
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function bootstrapGuest(payload: {
+  captcha_token: string;
+  language: ApiLanguage;
+}) {
+  const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
+    "/auth/guest",
     {
       method: "POST",
       body: JSON.stringify(payload),

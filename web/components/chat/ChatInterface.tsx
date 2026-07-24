@@ -8,9 +8,6 @@ import {
   Pin,
   Plus,
   Trash2,
-  TrendingUp,
-  Bitcoin,
-  LineChart,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -18,6 +15,7 @@ import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import StarterActions from "@/components/chat/StarterActions";
 
 import {
   createConversation,
@@ -954,7 +952,16 @@ export default function ChatInterface() {
           await i18n.changeLanguage(resolvedLanguage);
         }
         const stage = meResponse?.user?.onboarding?.stage;
-        const activeConversationId = readActiveConversationIdFromUrl();
+        const showRegisteredOnboarding =
+          meResponse?.account_kind !== "guest" &&
+          privateAlphaOnboardingEnabled &&
+          (stage === "language_selection" ||
+            stage === "primary_goal_selection");
+        let activeConversationId = readActiveConversationIdFromUrl();
+        if (!activeConversationId && meResponse?.account_kind === "guest") {
+          const { items } = await listConversations({ limit: 2 });
+          activeConversationId = items[0]?.id ?? null;
+        }
         if (activeConversationId) {
           try {
             const { items } = await getConversationMessages(activeConversationId, 50);
@@ -964,8 +971,7 @@ export default function ChatInterface() {
               // clear empty persisted conversations from the active route.
               resetToEmptyChatSurface();
               setShowOnboardingGoalCards(
-                privateAlphaOnboardingEnabled &&
-                (stage === "language_selection" || stage === "primary_goal_selection"),
+                showRegisteredOnboarding,
               );
               return;
             }
@@ -974,9 +980,7 @@ export default function ChatInterface() {
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
             setShowOnboardingGoalCards(
-              privateAlphaOnboardingEnabled &&
-              hydrated.messages.length === 0
-              && (stage === "language_selection" || stage === "primary_goal_selection"),
+              showRegisteredOnboarding && hydrated.messages.length === 0,
             );
 
             return;
@@ -988,8 +992,7 @@ export default function ChatInterface() {
               );
               resetToEmptyChatSurface();
               setShowOnboardingGoalCards(
-                privateAlphaOnboardingEnabled &&
-                (stage === "language_selection" || stage === "primary_goal_selection"),
+                showRegisteredOnboarding,
               );
               return;
             }
@@ -1007,8 +1010,7 @@ export default function ChatInterface() {
         if (cancelled) return;
         resetToEmptyChatSurface();
         setShowOnboardingGoalCards(
-          privateAlphaOnboardingEnabled &&
-          (stage === "language_selection" || stage === "primary_goal_selection"),
+          showRegisteredOnboarding,
         );
 
       } catch {
@@ -1181,6 +1183,7 @@ export default function ChatInterface() {
       const me = await getMe();
       const stage = me.user.onboarding.stage;
       setShowOnboardingGoalCards(
+        me.account_kind !== "guest" &&
         privateAlphaOnboardingEnabled &&
         (stage === "language_selection" || stage === "primary_goal_selection"),
       );
@@ -2363,30 +2366,10 @@ export default function ChatInterface() {
                   </div>
                 )}
 
-                {/* Starter Actions / Chips */}
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Buy and hold AAPL over the last 12 months with SPY as the benchmark.'))}
-                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                  >
-                    <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.tsla.label', 'Test Apple vs SPY')}
-                  </button>
-                  <button
-                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin this year so far?'))}
-                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                  >
-                    <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.btc.label', 'Test Bitcoin (BTC) hold')}
-                  </button>
-                  <button
-                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought $250 of Nvidia every week over the last 12 months?'))}
-                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                  >
-                    <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.dca.label', 'Test weekly Nvidia buys')}
-                  </button>
-                </div>
+                <StarterActions
+                  disabled={isStreamingResponse}
+                  onSelect={handleSend}
+                />
 
                 {chatExploratorySuggestionsEnabled && (
                   <div className="mt-4">

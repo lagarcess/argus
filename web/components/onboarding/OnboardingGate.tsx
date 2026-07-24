@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import { getMe, patchMe, ApiUser } from "@/lib/argus-api";
+import {
+  getMe,
+  patchMe,
+  type ApiUser,
+  type UserResponse,
+} from "@/lib/argus-api";
 import { DevModeBadge } from "@/components/ui/DevModeBadge";
 import {
   ENABLED_LANGUAGES,
@@ -19,6 +24,27 @@ const GOAL_IDS = [
   "test_stock_idea",
   "explore_crypto"
 ] as const;
+
+async function resolveRegisteredOnboarding(
+  me: UserResponse,
+): Promise<ApiUser> {
+  if (
+    privateAlphaOnboardingEnabled ||
+    me.user.onboarding.completed ||
+    me.user.onboarding.stage === "ready"
+  ) {
+    return me.user;
+  }
+  const patched = await patchMe({
+    onboarding: {
+      stage: "ready",
+      language_confirmed: true,
+      primary_goal: "surprise_me",
+      completed: true,
+    },
+  });
+  return patched.user;
+}
 
 export function OnboardingGate({
   children,
@@ -52,21 +78,12 @@ export function OnboardingGate({
         if (profileLanguage !== normalizeEnabledLanguage(i18n.language)) {
           await i18n.changeLanguage(profileLanguage);
         }
-        if (
-          !privateAlphaOnboardingEnabled &&
-          !me.user.onboarding.completed &&
-          me.user.onboarding.stage !== "ready"
-        ) {
-          const patched = await patchMe({
-            onboarding: {
-              stage: "ready",
-              language_confirmed: true,
-              primary_goal: "surprise_me",
-              completed: true,
-            },
-          });
-          resolvedUser = patched.user;
+        if (me.account_kind === "guest") {
+          setUser(resolvedUser);
+          setStep("done");
+          return;
         }
+        resolvedUser = await resolveRegisteredOnboarding(me);
         setUser(resolvedUser);
         if (
           !privateAlphaOnboardingEnabled ||
