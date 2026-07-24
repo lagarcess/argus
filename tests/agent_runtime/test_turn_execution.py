@@ -213,6 +213,87 @@ def test_same_typed_state_becomes_no_progress() -> None:
         assert "exit_state" not in summary
 
 
+def test_exact_final_preserves_claimed_no_progress_across_private_evidence() -> None:
+    from argus.agent_runtime.turn_execution import (
+        claim_turn_terminal,
+        record_exit_progress,
+        turn_execution_scope,
+        turn_execution_summary,
+    )
+
+    entry_state = _typed_state()
+    final_state = _typed_state()
+    final_state["pending_strategy"]["strategy"]["asset_universe"] = ["MSFT"]
+    final_state["response_intent"]["facts"] = {
+        "progress_outcome": "no_progress"
+    }
+
+    with turn_execution_scope(entry_state=entry_state) as execution:
+        assert claim_turn_terminal("no_progress", "unchanged_typed_state") is True
+        assessment = record_exit_progress(final_state, terminal=None)
+        summary = turn_execution_summary(())
+
+        assert final_state["response_intent"]["facts"]["progress_outcome"] == (
+            "no_progress"
+        )
+        assert assessment.outcome == "no_progress"
+        assert assessment.changed_fields == ("strategy",)
+        assert execution.progress_outcome == "no_progress"
+        assert execution.terminal == "no_progress"
+        assert summary["progress_outcome"] == "no_progress"
+        assert summary["terminal"] == "no_progress"
+        assert summary["input_fingerprint"] != summary["output_fingerprint"]
+
+
+def test_exact_final_preserves_other_claimed_explicit_terminal() -> None:
+    from argus.agent_runtime.turn_execution import (
+        claim_turn_terminal,
+        record_exit_progress,
+        turn_execution_scope,
+        turn_execution_summary,
+    )
+
+    entry_state = _typed_state()
+    final_state = _typed_state()
+    final_state["pending_strategy"]["strategy"]["asset_universe"] = ["MSFT"]
+
+    with turn_execution_scope(entry_state=entry_state) as execution:
+        assert claim_turn_terminal("redirected", "explicit_redirect") is True
+        assessment = record_exit_progress(final_state, terminal=None)
+        summary = turn_execution_summary(())
+
+        assert assessment.outcome == "redirected"
+        assert assessment.changed_fields == ("strategy",)
+        assert execution.progress_outcome == "redirected"
+        assert execution.terminal == "redirected"
+        assert summary["progress_outcome"] == "redirected"
+        assert summary["terminal"] == "redirected"
+
+
+def test_exact_final_without_claim_keeps_changed_state_assessment() -> None:
+    from argus.agent_runtime.turn_execution import (
+        record_exit_progress,
+        turn_execution_scope,
+        turn_execution_summary,
+    )
+
+    entry_state = _typed_state()
+    final_state = _typed_state()
+    final_state["pending_strategy"]["strategy"]["asset_universe"] = ["MSFT"]
+
+    with turn_execution_scope(entry_state=entry_state) as execution:
+        assessment = record_exit_progress(final_state, terminal=None)
+        summary = turn_execution_summary(())
+
+        assert assessment.outcome == "advanced"
+        assert assessment.changed_fields == ("strategy",)
+        assert execution.progress_outcome == "advanced"
+        assert execution.terminal == "advanced"
+        assert summary["progress_outcome"] == "advanced"
+        assert summary["terminal"] == "advanced"
+        assert summary["input_fingerprint"] != summary["output_fingerprint"]
+
+
 @pytest.mark.asyncio
 async def test_background_title_work_has_no_parent_turn_context(
     monkeypatch: pytest.MonkeyPatch,

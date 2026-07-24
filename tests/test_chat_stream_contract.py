@@ -1291,6 +1291,94 @@ async def test_runtime_records_exact_graph_final_before_public_filtering() -> No
     assert "semantic_turn_act" not in json.dumps(final_event["payload"])
 
 
+@pytest.mark.asyncio
+async def test_runtime_exact_final_preserves_claimed_no_progress_evidence() -> None:
+    from types import SimpleNamespace
+
+    from argus.agent_runtime.runtime import stream_agent_turn_events
+    from argus.agent_runtime.state.models import UserState
+    from argus.agent_runtime.turn_execution import (
+        claim_turn_terminal,
+        turn_execution_scope,
+        turn_execution_summary,
+    )
+    from argus.agent_runtime.turn_progress import semantic_progress_fingerprint
+
+    entry_state = {
+        "response_intent": {
+            "kind": "clarification",
+            "requested_fields": ["date_range"],
+        },
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+            },
+            "requested_field": "date_range",
+        },
+    }
+    exact_final_state = {
+        "response_intent": {
+            "kind": "clarification",
+            "requested_fields": ["date_range"],
+            "facts": {"progress_outcome": "no_progress"},
+        },
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["MSFT"],
+                "asset_class": "equity",
+            },
+            "requested_field": "date_range",
+        },
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "I could not safely apply that change.",
+    }
+
+    class _Workflow:
+        async def astream_events(self, *_: Any, **__: Any):
+            if False:
+                yield {}
+
+        async def aget_state(self, _config: dict[str, Any]) -> Any:
+            return SimpleNamespace(values=exact_final_state)
+
+    with turn_execution_scope(entry_state=entry_state) as execution:
+        assert claim_turn_terminal("no_progress", "unchanged_typed_state") is True
+        events = [
+            event
+            async for event in stream_agent_turn_events(
+                workflow=_Workflow(),
+                user=UserState(user_id="user-1"),
+                thread_id="conversation-1",
+                message="Use Microsoft instead.",
+                workflow_input=entry_state,
+            )
+        ]
+        summary = turn_execution_summary(())
+
+    assert len(events) == 1
+    final_event = events[0]
+    assert final_event["type"] == "final"
+    assert final_event["payload"]["response_intent"]["facts"][
+        "progress_outcome"
+    ] == "no_progress"
+    evidence = final_event["_turn_progress"]
+    assert evidence["progress_outcome"] == "no_progress"
+    assert evidence["terminal"] == "no_progress"
+    assert execution.progress_outcome == "no_progress"
+    assert execution.terminal == "no_progress"
+    assert summary["progress_outcome"] == "no_progress"
+    assert summary["terminal"] == "no_progress"
+    assert evidence["output_fingerprint"] == semantic_progress_fingerprint(
+        exact_final_state
+    )
+    assert summary["input_fingerprint"] != evidence["output_fingerprint"]
+    assert "changed_fields" not in final_event["payload"]
+    assert "changed_fields" not in evidence
+
+
 def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

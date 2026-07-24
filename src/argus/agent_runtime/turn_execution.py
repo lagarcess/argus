@@ -27,6 +27,16 @@ DEFAULT_TURN_DEADLINE_SECONDS = 120.0
 # fallback, interpretation primary and fallback, focused repair, then
 # clarification primary and fallback.
 DEFAULT_TURN_CALL_ALLOWANCE = 7
+_EXPLICIT_PROGRESS_TERMINALS: frozenset[ProgressOutcome] = frozenset(
+    {
+        "clarification",
+        "redirected",
+        "finished",
+        "no_progress",
+        "recoverable_failed",
+        "terminal_failed",
+    }
+)
 
 _monotonic = time.monotonic
 
@@ -185,7 +195,16 @@ def record_exit_progress(
     if execution is None:
         return assess_progress(None, exit_snapshot, terminal)
 
-    assessment = assess_progress(execution._entry_snapshot, exit_snapshot, terminal)
+    authoritative_terminal = (
+        execution.terminal
+        if execution.terminal in _EXPLICIT_PROGRESS_TERMINALS
+        else terminal
+    )
+    assessment = assess_progress(
+        execution._entry_snapshot,
+        exit_snapshot,
+        authoritative_terminal,
+    )
     execution.exit_fingerprint = semantic_progress_fingerprint(state)
     execution.progress_outcome = assessment.outcome
     claim_turn_terminal(
