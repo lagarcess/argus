@@ -692,6 +692,9 @@ describe("Checks 6–20 harness guards", () => {
     expect(check15).toContain("same_uuid_conversion");
     expect(check15).toContain("decisionTargetsEvidence");
     expect(check15).toContain("POST /api/v1/auth/guest/link");
+    expect(check15).toContain(
+      "allowlistDisposableRegisteredIdentity(primaryOwner)",
+    );
     expect(check16).toContain("context_packets");
     expect(check16).toContain("run_context_packets");
     expect(check16).toContain("sameGraphIds");
@@ -744,6 +747,9 @@ describe("Checks 6–20 harness guards", () => {
     expect(check19).toContain("retained_route_rows");
     expect(check19).toContain("retained_cost_rows");
     expect(supportSource).toContain("includeCleanupEvidence?: boolean");
+    expect(supportSource).toContain(
+      "export async function allowlistDisposableRegisteredIdentity",
+    );
   });
 
   test("keeps product safety failures separate from sanitized teardown evidence", () => {

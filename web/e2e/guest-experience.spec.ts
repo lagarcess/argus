@@ -10,6 +10,7 @@ import {
   BrowserSafetyMonitor,
   CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES,
   GUEST_ACCEPTANCE_CHECKS,
+  allowlistDisposableRegisteredIdentity,
   apiJson,
   assertExactLocalCandidate,
   assertFreshContext,
@@ -1318,6 +1319,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         reloadedCard.getByPlaceholder("Optional note for future you"),
       ).toHaveCount(0);
       expect(ownerSnapshot(primaryOwner).decisions).toBe(beforeDecisions + 1);
+      await allowlistDisposableRegisteredIdentity(primaryOwner);
     });
 
     await runStep(16, evidence, (value) => (currentCheck = value), async () => {

@@ -2343,6 +2343,25 @@ export function newSignupCredentials(): Pick<
   };
 }
 
+export async function allowlistDisposableRegisteredIdentity(
+  userId: string,
+): Promise<void> {
+  requireUuid(userId, "disposable registered identity");
+  const client = serviceClient();
+  const { data: identity, error: identityError } =
+    await client.auth.admin.getUserById(userId);
+  const email = identity.user?.email;
+  if (identityError || !email) {
+    throw new Error("Could not inspect the local registered QA identity");
+  }
+  const { error } = await client
+    .from("private_alpha_allowlist")
+    .upsert({ email });
+  if (error) {
+    throw new Error("Could not allowlist the local registered QA identity");
+  }
+}
+
 export async function deleteDisposableIdentity(userId: string): Promise<void> {
   requireUuid(userId, "disposable identity");
   const client = serviceClient();
