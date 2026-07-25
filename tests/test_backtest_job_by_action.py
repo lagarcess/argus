@@ -8,6 +8,8 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.stages.execute import _launch_payload
+from argus.agent_runtime.state.models import RunState
 from argus.api.chat.backtest_jobs import payload_hash
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
@@ -680,6 +682,27 @@ def test_real_confirmation_persists_full_launch_identity_used_by_job_lookup(
 ) -> None:
     from argus.api import state as api_state
 
+    embedded_launch_request = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": {"start": "2024-01-01", "end": "2025-01-01"},
+        "requested_date_range": None,
+        "coverage_preflight": None,
+        "entry_rule": None,
+        "exit_rule": None,
+        "rule_spec": None,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10_000.0,
+        "position_size": None,
+        "cadence": None,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
     confirmation_payload = {
         "confirmation_id": "confirmation-1",
         "strategy": {
@@ -689,17 +712,7 @@ def test_real_confirmation_persists_full_launch_identity_used_by_job_lookup(
             "date_range": {"start": "2024-01-01", "end": "2025-01-01"},
         },
         "optional_parameters": {},
-        "launch_payload": {
-            "strategy_type": "buy_and_hold",
-            "symbol": "AAPL",
-            "symbols": ["AAPL"],
-            "asset_class": "equity",
-            "timeframe": "1D",
-            "date_range": {"start": "2024-01-01", "end": "2025-01-01"},
-            "sizing_mode": "capital_amount",
-            "capital_amount": 10_000,
-            "benchmark_symbol": "SPY",
-        },
+        "launch_payload": embedded_launch_request,
         "validation": {"executable": True},
     }
     card = runtime_confirmation_card(
@@ -718,8 +731,34 @@ def test_real_confirmation_persists_full_launch_identity_used_by_job_lookup(
     )
     validation = validate_confirmation_execution_payload(confirmation_payload)
     assert validation.launch_payload is not None
-    admitted_payload_hash = payload_hash(validation.launch_payload)
+    run_state = RunState(
+        current_user_message="Run backtest",
+        confirmation_payload=confirmation_payload,
+    )
+    actual_admitted_request = _launch_payload(run_state)
+    admitted_payload_hash = payload_hash(actual_admitted_request)
 
+    assert validation.launch_payload == actual_admitted_request
+    assert "_execution_realism" not in actual_admitted_request
+    assert actual_admitted_request["position_size"] is None
+    assert actual_admitted_request["cadence"] is None
+    explicit_realism = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+    realism_validation = validate_confirmation_execution_payload(
+        {
+            **confirmation_payload,
+            "launch_payload": {
+                **embedded_launch_request,
+                "_execution_realism": explicit_realism,
+            },
+        }
+    )
+    assert realism_validation.launch_payload is not None
+    assert realism_validation.launch_payload["_execution_realism"] == explicit_realism
+    assert "execution_realism" not in realism_validation.launch_payload
     assert card["canonical_launch_payload_hash"] == admitted_payload_hash
     assert (
         reference.metadata["canonical_launch_payload_hash"]

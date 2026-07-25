@@ -60,7 +60,13 @@ def validate_confirmation_execution_payload(
         )
     return ConfirmationExecutionValidation(
         executable=True,
-        launch_payload=dict(request.model_dump(mode="python")),
+        launch_payload=dict(
+            request.model_dump(
+                mode="python",
+                by_alias=True,
+                exclude_unset=True,
+            )
+        ),
     )
 
 
