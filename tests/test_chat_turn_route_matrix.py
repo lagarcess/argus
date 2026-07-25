@@ -1182,6 +1182,7 @@ def test_run_backtest_route_uses_message_only_owner(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirmation-1"},
         json={
             "conversation_id": conversation["id"],
             "action": {
