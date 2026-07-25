@@ -113,6 +113,71 @@ def hydrate_completed_backtest_job_messages(
     return projected
 
 
+def hydrate_backtest_job_action_messages(
+    messages: list[Message],
+    *,
+    load_job_by_action: Callable[[str], dict[str, Any] | None],
+) -> list[Message]:
+    """Project a durable job when process loss skipped its assistant message."""
+
+    represented_request_ids = {
+        str(job.get("request_message_id") or "").strip()
+        for message in messages
+        if message.role == "assistant"
+        for job in [_backtest_job(message.metadata or {})]
+        if job is not None
+    }
+    jobs: dict[str, dict[str, Any] | None] = {}
+    projected: list[Message] = []
+    for message in messages:
+        confirmation_id = _run_action_confirmation_id(message)
+        if confirmation_id is None or message.id in represented_request_ids:
+            projected.append(message)
+            continue
+        if confirmation_id not in jobs:
+            jobs[confirmation_id] = load_job_by_action(confirmation_id)
+        job = jobs[confirmation_id]
+        if not _job_matches_action_message(job, message):
+            projected.append(message)
+            continue
+        assert job is not None
+        metadata = dict(message.metadata or {})
+        metadata.update(
+            {
+                "backtest_job": _public_backtest_job(job),
+                "backtest_job_id": str(job.get("id") or ""),
+            }
+        )
+        projected.append(message.model_copy(update={"metadata": metadata}))
+    return projected
+
+
+def _run_action_confirmation_id(message: Message) -> str | None:
+    if message.role != "user" or not isinstance(message.metadata, dict):
+        return None
+    action = message.metadata.get("chat_action")
+    if not isinstance(action, dict) or action.get("type") != "run_backtest":
+        return None
+    payload = action.get("payload")
+    candidate = payload.get("confirmation_id") if isinstance(payload, dict) else None
+    if not isinstance(candidate, str):
+        return None
+    normalized = candidate.strip()
+    return normalized or None
+
+
+def _job_matches_action_message(
+    job: dict[str, Any] | None,
+    message: Message,
+) -> bool:
+    return bool(
+        isinstance(job, dict)
+        and str(job.get("id") or "").strip()
+        and job.get("conversation_id") == message.conversation_id
+        and job.get("request_message_id") == message.id
+    )
+
+
 def _backtest_job_id(metadata: dict[str, Any]) -> str | None:
     candidate = metadata.get("backtest_job_id")
     if not isinstance(candidate, str) or not candidate.strip():
@@ -122,6 +187,11 @@ def _backtest_job_id(metadata: dict[str, Any]) -> str | None:
         return None
     normalized = candidate.strip()
     return normalized or None
+
+
+def _backtest_job(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    job = metadata.get("backtest_job")
+    return job if isinstance(job, dict) else None
 
 
 def _is_completed_job_for_message(

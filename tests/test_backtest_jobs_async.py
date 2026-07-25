@@ -779,6 +779,44 @@ def test_terminal_render_task_timeout_reconciles_running_job() -> None:
     assert metadata["workflow_backtest"]["workflow_run_error"] == "task timed out"
 
 
+def test_terminal_render_task_failure_cas_preserves_concurrent_success() -> None:
+    from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
+
+    class _ConcurrentSuccessGateway(_TimedOutJobGateway):
+        def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+            self.failed_updates.append(payload)
+            self.job.update(
+                {
+                    "status": "succeeded",
+                    "result_run_id": "run-concurrent-success",
+                    "finished_at": "2026-06-06T12:01:09+00:00",
+                }
+            )
+            if payload.get("expected_status") != self.job["status"]:
+                return {}
+            raise AssertionError("failure update overwrote concurrent success")
+
+    gateway = _ConcurrentSuccessGateway()
+    reconciled = reconcile_terminal_render_task_run(
+        gateway=gateway,
+        user_id="user-1",
+        job=gateway.get_backtest_job(user_id="user-1", job_id="job-timeout-1"),
+        task_run_client=_FakeTerminalTaskRunClient(
+            {
+                "id": "trn-timeout-1",
+                "status": "failed",
+                "error": "task timed out",
+                "completedAt": "2026-06-06T12:01:10Z",
+            }
+        ),
+    )
+
+    assert gateway.failed_updates[0]["expected_status"] == "running"
+    assert reconciled is not None
+    assert reconciled["status"] == "succeeded"
+    assert reconciled["result_run_id"] == "run-concurrent-success"
+
+
 def test_terminal_render_task_cancellation_reconciles_as_non_retryable() -> None:
     from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 

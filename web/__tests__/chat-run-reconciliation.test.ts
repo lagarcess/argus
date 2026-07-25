@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { Message } from "../components/chat/types";
 import type { BacktestJobResponse } from "../lib/argus-api";
@@ -149,7 +151,7 @@ describe("ambiguous Run response reconciliation", () => {
     const modulePath = "../lib/chat-run-reconciliation";
     const reconciliationModule = await import(modulePath);
     const rejectReplayError =
-      reconciliationModule.throwIfAmbiguousRunReplaySseError;
+      reconciliationModule.throwIfAmbiguousRunSseError;
     expect(typeof rejectReplayError).toBe("function");
     const reconcile = await loadReconciler();
     let lookupCalls = 0;
@@ -189,7 +191,7 @@ describe("ambiguous Run response reconciliation", () => {
     const modulePath = "../lib/chat-run-reconciliation";
     const reconciliationModule = await import(modulePath);
     const rejectReplayError =
-      reconciliationModule.throwIfAmbiguousRunReplaySseError;
+      reconciliationModule.throwIfAmbiguousRunSseError;
     expect(typeof rejectReplayError).toBe("function");
     const errorEvent = {
       event: "error" as const,
@@ -203,6 +205,118 @@ describe("ambiguous Run response reconciliation", () => {
         true,
       ),
     ).not.toThrow();
+  });
+
+  test("initial Run HTTP-200 SSE errors enter durable lookup recovery", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const rejectRunError =
+      reconciliationModule.throwIfAmbiguousRunSseError;
+
+    expect(() =>
+      rejectRunError(
+        {
+          event: "error",
+          data: {
+            code: "idempotency_in_progress",
+            detail: "The durable job is still becoming visible.",
+          },
+        },
+        true,
+      ),
+    ).toThrow(expect.objectContaining({ status: 0 }));
+  });
+
+  test("initial SSE ambiguity restores queued running and succeeded durable truth", async () => {
+    const reconcile = await loadReconciler();
+    for (const status of ["queued", "running", "succeeded"] as const) {
+      const response = queuedResponse();
+      response.job.status = status;
+      let replayCalls = 0;
+      const result = await reconcile({
+        lookup: async () => response,
+        replay: async () => {
+          replayCalls += 1;
+        },
+      });
+
+      expect(result).toEqual({ kind: "durable", response });
+      expect(replayCalls).toBe(0);
+    }
+  });
+
+  test("empty HTTP-200 Run streams become transport ambiguity", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const rejectEmptyRun =
+      reconciliationModule.throwIfAmbiguousRunStreamTermination;
+    expect(typeof rejectEmptyRun).toBe("function");
+
+    expect(() => rejectEmptyRun(true, false)).toThrow(
+      expect.objectContaining({ status: 0 }),
+    );
+    expect(() => rejectEmptyRun(true, true)).not.toThrow();
+    expect(() => rejectEmptyRun(false, false)).not.toThrow();
+  });
+
+  test("empty HTTP-200 Run stream triggers lookup before any replay", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    let terminationError: unknown;
+    try {
+      reconciliationModule.throwIfAmbiguousRunStreamTermination(true, false);
+    } catch (error) {
+      terminationError = error;
+    }
+    expect(
+      reconciliationModule.ambiguousRunConfirmationId(
+        {
+          type: "run_backtest",
+          payload: { confirmation_id: "confirmation-1" },
+        },
+        terminationError,
+      ),
+    ).toBe("confirmation-1");
+    let replayCalls = 0;
+
+    const result = await reconciliationModule.reconcileAmbiguousRunResponse({
+      lookup: async () => queuedResponse(),
+      replay: async () => {
+        replayCalls += 1;
+      },
+    });
+
+    expect(result.kind).toBe("durable");
+    expect(replayCalls).toBe(0);
+  });
+
+  test("definite Run 4xx responses do not become replay ambiguity", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const confirmationId =
+      reconciliationModule.ambiguousRunConfirmationId;
+    const runAction = {
+      type: "run_backtest",
+      payload: { confirmation_id: "confirmation-1" },
+    };
+
+    expect(confirmationId(runAction, statusError(400, "required"))).toBeNull();
+    expect(confirmationId(runAction, statusError(409, "stale"))).toBeNull();
+    expect(confirmationId(runAction, statusError(422, "invalid"))).toBeNull();
+  });
+
+  test("ChatInterface checks initial Run SSE errors and empty termination", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+
+    expect(chat).toContain(
+      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
+    );
+    expect(chat).toContain(
+      'throwIfAmbiguousRunStreamTermination(action?.type === "run_backtest", runStreamFinalSeen)',
+    );
   });
 
   test("a second 404 exits through bounded recovery and never triggers a second replay", async () => {

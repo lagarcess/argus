@@ -31,15 +31,27 @@ type ReconciliationResult =
 
 const LOOKUP_RETRY_DELAYS_MS = [250, 750] as const;
 
-export function throwIfAmbiguousRunReplaySseError(
+export function throwIfAmbiguousRunSseError(
   event: ChatStreamEvent,
-  ambiguityReplay: boolean,
+  runAction: boolean,
 ): void {
-  if (!ambiguityReplay || event.event !== "error") return;
+  if (!runAction || event.event !== "error") return;
   throw new ChatStreamError(
     event.data.detail,
     0,
     event.data.code ?? "run_replay_sse_error",
+  );
+}
+
+export function throwIfAmbiguousRunStreamTermination(
+  runAction: boolean,
+  finalSeen: boolean,
+): void {
+  if (!runAction || finalSeen) return;
+  throw new ChatStreamError(
+    "The Run response ended before durable status was confirmed.",
+    0,
+    "run_stream_ended_ambiguously",
   );
 }
 

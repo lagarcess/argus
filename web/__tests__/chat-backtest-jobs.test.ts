@@ -100,6 +100,25 @@ function apiMessageWithJob(currentJob: BacktestJob): ApiMessage {
   };
 }
 
+function projectedUserActionWithJob(currentJob: BacktestJob): ApiMessage {
+  return {
+    ...apiMessageWithJob(currentJob),
+    id: "request-message-1",
+    role: "user",
+    content: "Run backtest",
+    metadata: {
+      chat_action: {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirmation-1" },
+      },
+      backtest_job: currentJob,
+      backtest_job_id: currentJob.id,
+    },
+  };
+}
+
 function queuedJobMessage(): Message {
   const message = backtestJobMessageFromApi(apiMessageWithJob(job()));
   if (!message) {
@@ -150,6 +169,23 @@ describe("chat backtest jobs", () => {
     expect(message?.backtestJob?.id).toBe("job-1");
     expect(message?.backtestJob?.status).toBe("queued");
     expect(pendingBacktestJobIds([message!])).toEqual(["job-1"]);
+  });
+
+  test("hydrates owner-scoped missing-message Run projection into a job card", () => {
+    const message = backtestJobMessageFromApi(
+      projectedUserActionWithJob(
+        job({
+          status: "failed",
+          failure_code: "workflow_dispatch_missing",
+          retryable: true,
+        }),
+      ),
+    );
+
+    expect(message?.role).toBe("ai");
+    expect(message?.kind).toBe("backtest_job");
+    expect(message?.backtestJob?.status).toBe("failed");
+    expect(message?.backtestJob?.retryable).toBe(true);
   });
 
   test("hydrates stream final job payloads into durable job state", () => {
@@ -623,6 +659,9 @@ describe("chat backtest jobs", () => {
     expect(chat).toContain("useBacktestJobPolling");
     expect(polling).toContain("getBacktestJob");
     expect(chat).toContain("backtestJobMessageFromApi(m)");
+    expect(chat.indexOf("backtestJobMessageFromApi(m)")).toBeLessThan(
+      chat.indexOf('m.role === "user" && chatAction'),
+    );
     expect(chat).toContain("const finalBacktestJob = backtestJobFromFinalPayload(finalPayload)");
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
@@ -658,10 +697,10 @@ describe("chat backtest jobs", () => {
     expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
     expect(ambiguity).toContain("clearActiveStreamState()");
     expect(ambiguity).toContain(
-      "streamToConversation(activeStreamTargetConversationId, true)",
+      "streamToConversation(activeStreamTargetConversationId)",
     );
     expect(chat).toContain(
-      "throwIfAmbiguousRunReplaySseError(event, ambiguityReplay)",
+      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
     );
     expect(clearState).toContain("setStreamStatus(null)");
     expect(clearState).toContain("setIsStreamingResponse(false)");

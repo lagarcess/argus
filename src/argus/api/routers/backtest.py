@@ -5,6 +5,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from argus.api import state as api_state
+from argus.api.chat.backtest_jobs import (
+    fail_job_without_task_run,
+    should_fail_stale_job_without_task_run,
+)
 from argus.api.dependencies import current_user, problem
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
@@ -24,6 +28,17 @@ from argus.domain.supabase_gateway import QuotaExceededError
 from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
+
+
+def _reconcile_stale_owner_job(
+    *,
+    gateway: Any,
+    user_id: str,
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    if not should_fail_stale_job_without_task_run(job):
+        return job
+    return fail_job_without_task_run(gateway=gateway, user_id=user_id, job=job)
 
 
 @router.post("/backtests/run", response_model=BacktestRunResponse)
@@ -573,6 +588,11 @@ def get_backtest_job_by_action(
             detail="This action identity is already linked to different inputs.",
         )
 
+    job = _reconcile_stale_owner_job(
+        gateway=gateway,
+        user_id=user.id,
+        job=job,
+    )
     return _backtest_job_response(
         request=request,
         gateway=gateway,
@@ -606,6 +626,11 @@ def get_backtest_job(
             title="Not Found",
             detail="Backtest job not found.",
         )
+    job = _reconcile_stale_owner_job(
+        gateway=api_state.supabase_gateway,
+        user_id=user.id,
+        job=job,
+    )
     return _backtest_job_response(
         request=request,
         gateway=api_state.supabase_gateway,

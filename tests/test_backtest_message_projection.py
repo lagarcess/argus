@@ -5,6 +5,7 @@ from typing import Any
 
 from argus.api.schemas import BacktestRun, Message
 from argus.domain.backtest_message_projection import (
+    hydrate_backtest_job_action_messages,
     hydrate_completed_backtest_job_messages,
 )
 from argus.domain.store import utcnow
@@ -167,3 +168,46 @@ def test_completed_workflow_job_without_readout_clears_stale_queued_copy() -> No
 
     assert projected.content == ""
     assert projected.metadata["result_run_id"] == "run-1"
+
+
+def test_missing_assistant_job_message_projects_owner_scoped_action_job() -> None:
+    request = Message(
+        id="request-message-1",
+        conversation_id="conversation-1",
+        role="user",
+        content="Run backtest",
+        metadata={
+            "chat_action": {
+                "type": "run_backtest",
+                "payload": {"confirmation_id": "confirmation-1"},
+            }
+        },
+        created_at=utcnow(),
+    )
+    job = {
+        "id": "job-hard-loss",
+        "conversation_id": "conversation-1",
+        "request_message_id": "request-message-1",
+        "confirmation_message_id": "confirmation-message-1",
+        "status": "failed",
+        "failure_code": "workflow_dispatch_missing",
+        "failure_detail": "Backtest workflow did not record a task run.",
+        "retryable": True,
+        "launch_payload": {"must_not": "leak"},
+        "execution_metadata": {"must_not": "leak"},
+    }
+    load_job, calls = _loader(job)
+
+    [projected] = hydrate_backtest_job_action_messages(
+        [request],
+        load_job_by_action=load_job,
+    )
+
+    assert calls == ["confirmation-1"]
+    assert projected.id == request.id
+    assert projected.role == "user"
+    assert projected.metadata["backtest_job_id"] == "job-hard-loss"
+    assert projected.metadata["backtest_job"]["status"] == "failed"
+    assert projected.metadata["backtest_job"]["retryable"] is True
+    assert "launch_payload" not in projected.metadata["backtest_job"]
+    assert "execution_metadata" not in projected.metadata["backtest_job"]

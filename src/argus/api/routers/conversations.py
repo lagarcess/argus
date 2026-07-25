@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -28,6 +29,10 @@ from argus.api.schemas import (
     PaginatedMessages,
     SuccessResponse,
     User,
+)
+from argus.domain.backtest_admission import CHAT_RUN_SCOPE
+from argus.domain.backtest_message_projection import (
+    hydrate_backtest_job_action_messages,
 )
 from argus.domain.store import utcnow
 
@@ -57,6 +62,33 @@ def _public_message_projection(messages: list[Message]) -> list[Message]:
             and parse_onboarding_control_message(message.content) is not None
         )
     ]
+
+
+def _project_backtest_job_actions(
+    *,
+    user_id: str,
+    conversation_id: str,
+    messages: list[Message],
+) -> list[Message]:
+    gateway = api_state.supabase_gateway
+    load_reservation = getattr(gateway, "get_backtest_job_reservation", None)
+    if gateway is None or load_reservation is None:
+        return messages
+
+    def load_job(confirmation_id: str) -> dict[str, Any] | None:
+        job = load_reservation(
+            user_id=user_id,
+            operation_scope=CHAT_RUN_SCOPE,
+            idempotency_key=confirmation_id,
+        )
+        if not isinstance(job, dict) or job.get("conversation_id") != conversation_id:
+            return None
+        return job
+
+    return hydrate_backtest_job_action_messages(
+        messages,
+        load_job_by_action=load_job,
+    )
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -361,6 +393,11 @@ def list_messages(
     items.sort(key=lambda item: (item.created_at, item.id))
     items = reconcile_reload_message_metadata(items)
     items = reconcile_and_project_chat_turns(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        messages=items,
+    )
+    items = _project_backtest_job_actions(
         user_id=user.id,
         conversation_id=conversation_id,
         messages=items,

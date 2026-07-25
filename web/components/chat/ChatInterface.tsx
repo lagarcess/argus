@@ -99,10 +99,7 @@ import {
   hydrateResultActions,
   hydrateResultActionsForRun,
 } from "@/lib/chat-result-actions";
-import {
-  appendOrReplacePendingAssistantMessage,
-  replaceOrAppendFinalAssistantMessage,
-} from "@/lib/chat-send-state";
+import { appendOrReplacePendingAssistantMessage, replaceOrAppendFinalAssistantMessage } from "@/lib/chat-send-state";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -114,17 +111,12 @@ import {
   applyReconciledBacktestJobResponse,
   getBacktestJobByAction,
   reconcileAmbiguousRunResponse,
-  throwIfAmbiguousRunReplaySseError,
+  throwIfAmbiguousRunSseError,
+  throwIfAmbiguousRunStreamTermination,
   useBacktestJobPolling,
 } from "@/lib/chat-run-reconciliation";
-import {
-  actionHasCardScopedOwnership,
-  isConfirmationAction,
-} from "@/lib/chat-action-ownership";
-import {
-  attentionAfterConversationOpen,
-  attentionAfterTurnSettled,
-} from "@/lib/chat-attention-state";
+import { actionHasCardScopedOwnership, isConfirmationAction } from "@/lib/chat-action-ownership";
+import { attentionAfterConversationOpen, attentionAfterTurnSettled } from "@/lib/chat-attention-state";
 import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
@@ -469,6 +461,8 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
     const resultCard = metadata.result_card;
+    const projectedJob = m.role === "user" ? backtestJobMessageFromApi(m) : null;
+    if (projectedJob) return projectedJob;
     if (m.role === "user" && chatAction && typeof chatAction === "object") {
       const hydrated = hydrateTextMessageFromApi(m);
       return {
@@ -1286,8 +1280,8 @@ export default function ChatInterface() {
     const canApplyOwnedStreamUpdate = () =>
       activeStreamConversationIdRef.current === activeStreamTargetConversationId &&
       canApplyConversationOwnedUpdate(activeStreamTargetConversationId);
-    const handleStreamEvent = (event: ChatStreamEvent, ambiguityReplay = false) => {
-      throwIfAmbiguousRunReplaySseError(event, ambiguityReplay);
+    const handleStreamEvent = (event: ChatStreamEvent) => {
+      throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
       const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
       const canApplyOwnedUpdate = canApplyOwnedStreamUpdate();
       if (event.event === "stage_start") {
@@ -1567,16 +1561,21 @@ export default function ChatInterface() {
         markSettledStreamAttention(activeStreamTargetConversationId);
       }
     };
-    const streamToConversation = (nextTargetConversationId: string, ambiguityReplay = false) => {
+    const streamToConversation = async (nextTargetConversationId: string) => {
       activeStreamTargetConversationId = nextTargetConversationId;
       activeStreamConversationIdRef.current = nextTargetConversationId;
-      return streamChatMessage(
+      let runStreamFinalSeen = false;
+      await streamChatMessage(
         nextTargetConversationId,
         streamInput,
         i18n.language,
-        (event) => handleStreamEvent(event, ambiguityReplay),
+        (event) => {
+          runStreamFinalSeen ||= event.event === "final";
+          handleStreamEvent(event);
+        },
         action?.type ? [] : mentions,
       );
+      throwIfAmbiguousRunStreamTermination(action?.type === "run_backtest", runStreamFinalSeen);
     };
 
     try {
@@ -1638,7 +1637,7 @@ export default function ChatInterface() {
         }
         const reconciliation = await reconcileAmbiguousRunResponse({
           lookup: () => getBacktestJobByAction(confirmationId),
-          replay: () => streamToConversation(activeStreamTargetConversationId, true),
+          replay: () => streamToConversation(activeStreamTargetConversationId),
         });
         if (reconciliation.kind === "replayed") return;
         if (reconciliation.kind === "durable") {

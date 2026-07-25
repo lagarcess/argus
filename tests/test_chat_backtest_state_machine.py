@@ -164,6 +164,96 @@ def _conversation(client: TestClient) -> dict[str, Any]:
     return client.post("/api/v1/conversations", json={}).json()["conversation"]
 
 
+@pytest.mark.parametrize(
+    ("headers", "action_payload", "expected_status", "expected_code"),
+    [
+        ({}, {"confirmation_id": "confirmation-1"}, 400, "idempotency_key_required"),
+        (
+            {"X-Idempotency-Key": "confirmation-1"},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"X-Request-Id": "confirmation-1"},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"Idempotency-Key": "   "},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"Idempotency-Key": "confirmation-1"},
+            {},
+            422,
+            "validation_error",
+        ),
+        (
+            {"Idempotency-Key": "confirmation-other"},
+            {"confirmation_id": "confirmation-1"},
+            409,
+            "idempotency_conflict",
+        ),
+    ],
+)
+def test_run_action_identity_is_rejected_before_route_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+    headers: dict[str, str],
+    action_payload: dict[str, str],
+    expected_status: int,
+    expected_code: str,
+) -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user = api_state.store.get_or_create_dev_user()
+
+    class _RouteBoundaryGateway:
+        def __init__(self) -> None:
+            self.profile_reads = 0
+
+        def get_or_create_mock_user(self) -> object:
+            return user
+
+        def get_user(self, *, user_id: str) -> object:
+            self.profile_reads += 1
+            raise AssertionError(f"profile read reached for {user_id}")
+
+    gateway = _RouteBoundaryGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    before_messages = sum(len(items) for items in api_state.store.messages.values())
+    before_jobs = len(api_state.store.backtest_jobs)
+    before_allowance = len(api_state.store.backtest_job_reservations)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers=headers,
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": action_payload,
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == expected_status
+    assert response.json()["code"] == expected_code
+    assert gateway.profile_reads == 0
+    assert sum(len(items) for items in api_state.store.messages.values()) == before_messages
+    assert len(api_state.store.backtest_jobs) == before_jobs
+    assert len(api_state.store.backtest_job_reservations) == before_allowance
+
+
 def _confirmation_runtime_result() -> dict[str, Any]:
     return {
         "stage_outcome": "await_approval",
@@ -849,6 +939,7 @@ def test_confirmation_action_requires_pending_confirmation(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirmation-1"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -861,8 +952,8 @@ def test_confirmation_action_requires_pending_confirmation(
         },
     )
 
-    assert response.status_code == 409
-    assert response.json()["code"] == "confirmation_required"
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
 
 
@@ -908,6 +999,7 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
         json={
             "conversation_id": conversation["id"],
             "action": run_action,
@@ -1212,6 +1304,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     first = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
         json={
             "conversation_id": conversation["id"],
             "action": run_action,

@@ -78,6 +78,7 @@ from argus.api.chat.request_admission import (
     reject_invalid_non_run_confirmation_action,
 )
 from argus.api.chat.route_receipts import persist_route_receipts
+from argus.api.chat.run_action_identity import require_run_action_identity
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
@@ -308,6 +309,12 @@ async def chat_stream(
     is_run_backtest_turn = (
         payload.action is not None and payload.action.type == "run_backtest"
     )
+    if is_run_backtest_turn:
+        require_run_action_identity(
+            payload=payload,
+            request=request,
+            idempotency_key=clean_idempotency_key,
+        )
     if not is_run_backtest_turn:
         check_message_allowance(request, user)
 

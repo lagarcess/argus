@@ -266,8 +266,8 @@ def _reconcile_backpressure_blockers(
             continue
         owner_user_id = str(job.get("user_id") or user_id or fallback_user_id)
         before = str(job.get("status") or "").strip().lower()
-        if _should_fail_stale_job_without_task_run(job):
-            reconciled = _fail_job_without_task_run(
+        if should_fail_stale_job_without_task_run(job):
+            reconciled = fail_job_without_task_run(
                 gateway=gateway,
                 user_id=owner_user_id,
                 job=job,
@@ -392,7 +392,9 @@ def reconcile_terminal_render_task_run(
             failure_code=failure_code,
             reconciled_at=_utcnow_iso(),
         ),
+        expected_status=status,
     )
+    reconciled = reconciled or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or "")) or job
     return dict(reconciled)
 
 
@@ -470,7 +472,7 @@ def scan_stale_backtest_jobs(
 
             try:
                 if _is_undispatched_workflow_job(job):
-                    reconciled = _fail_job_without_task_run(
+                    reconciled = fail_job_without_task_run(
                         gateway=gateway,
                         user_id=user_id,
                         job=job,
@@ -527,7 +529,7 @@ def _is_undispatched_workflow_job(job: dict[str, Any]) -> bool:
     )
 
 
-def _fail_job_without_task_run(
+def fail_job_without_task_run(
     *,
     gateway: Any,
     user_id: str,
@@ -583,7 +585,7 @@ def _stale_seconds_for_status(status: str) -> int:
     return DEFAULT_STALE_RUNNING_SECONDS
 
 
-def _should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:
+def should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:
     status = str(job.get("status") or "").strip().lower()
     if not _is_undispatched_workflow_job(job):
         return False
@@ -961,7 +963,7 @@ class ShadowBacktestJobTool:
                 conversation_id=context.conversation_id,
                 job_id=job_id,
             )
-            return _fail_job_without_task_run(
+            return fail_job_without_task_run(
                 gateway=gateway,
                 user_id=context.user_id,
                 job=job,

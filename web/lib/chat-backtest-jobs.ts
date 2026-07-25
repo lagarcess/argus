@@ -33,9 +33,6 @@ const JOB_SETTLEABLE_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>
 ]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
-  if (message.role === "user") {
-    return null;
-  }
   const job = backtestJobFromMetadata(message.metadata ?? {});
   if (!job) {
     return null;

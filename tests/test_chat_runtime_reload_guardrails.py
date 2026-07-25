@@ -283,6 +283,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -349,6 +350,7 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -446,6 +448,7 @@ def test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1017,13 +1020,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -1070,13 +1074,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_spanish_reco
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Ejecutar backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "es-419",
         },
@@ -1138,6 +1143,7 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -2054,6 +2060,7 @@ def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> N
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -2103,6 +2110,7 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -2115,18 +2123,9 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    text = final["assistant_response"]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    lowered = text.lower()
-    assert "confirmation action" in lowered
-    assert "latest card action" in lowered
 
 
 def test_run_confirmation_action_without_confirmation_id_returns_spanish_recovery(
@@ -2155,6 +2154,7 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -2167,15 +2167,9 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    assert "confirmation action" in final["assistant_response"].lower()
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
@@ -2218,13 +2212,14 @@ def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -2357,6 +2352,7 @@ def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -
 
     stale_run_response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -4710,13 +4706,14 @@ def test_terminal_runtime_failure_reconciles_hidden_pending_checkpoint_before_ac
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
