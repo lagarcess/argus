@@ -1,26 +1,32 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
+import httpx
 import pytest
-from argus.agent_runtime.confirmation_artifacts import (
-    validate_confirmation_execution_payload,
+import respx
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.stages.interpret import (
+    InterpretationRequest,
+    StructuredInterpretation,
 )
+from argus.agent_runtime.state.models import StrategySummary
 from argus.api import state as api_state
+from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
+from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.main import app
-from argus.api.message_store import prepare_message
 from argus.domain import backtest_admission
-from argus.domain.chat_turn_lifecycle import MemoryChatTurnLifecycleGateway
 from argus.domain.store import utcnow
 from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 from argus.llm.openrouter import (
     clear_openrouter_route_receipts,
-    get_openrouter_route_receipts,
-    record_openrouter_route_receipt,
+    invoke_openrouter_json_schema,
 )
 from fastapi.testclient import TestClient
+from langgraph.checkpoint.memory import MemorySaver
 
 from tests.evals.chat_runtime_eval_harness import (
     AlphaTrajectory,
@@ -37,13 +43,11 @@ class _TrajectoryState:
     conversation_id: str
     artifact_aliases: dict[str, str] = field(default_factory=dict)
     raw_artifact_ids: dict[str, str] = field(default_factory=dict)
-    latest_artifact_alias: str | None = None
-    latest_action_alias: str | None = None
-    latest_job_alias: str | None = None
-    latest_raw_job_id: str | None = None
     disconnected_turn_id: str | None = None
     disconnected_request_id: str | None = None
+    disconnected_raw_request_id: str | None = None
     replay_count: int = 0
+    route_submission_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -52,18 +56,279 @@ class _StreamResult:
     events: tuple[dict[str, Any], ...]
     final: dict[str, Any]
     receipts: tuple[dict[str, Any], ...]
+    execution_summary: dict[str, Any]
 
     @property
     def typed_terminal(self) -> bool:
         return any(event.get("type") in {"final", "error"} for event in self.events)
 
 
-class _MemoryByActionGateway:
+class _TransportCut(BaseException):
+    """Named test-only cut after route admission and before a client terminal."""
+
+
+class _MemoryBacktestGateway:
     def get_or_create_mock_user(self):
         return api_state.store.get_or_create_dev_user()
 
-    def get_backtest_job_reservation(self, **_: Any) -> None:
-        return None
+    def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
+        outcome = backtest_admission.admit_backtest_job_memory(
+            api_state.store,
+            **kwargs,
+            allowance_limits=list(SIMULATION_ALLOWANCE_LIMITS),
+        )
+        return {
+            "decision": outcome.kind,
+            "job": outcome.job,
+            "retry_after_seconds": outcome.retry_after_seconds,
+        }
+
+    def get_backtest_job_reservation(
+        self,
+        *,
+        user_id: str,
+        operation_scope: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        job_id = api_state.store.backtest_job_reservations.get(
+            (user_id, operation_scope, idempotency_key)
+        )
+        job = api_state.store.backtest_jobs.get(job_id or "")
+        return dict(job) if job is not None else None
+
+    def get_backtest_job(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+    ) -> dict[str, Any] | None:
+        job = api_state.store.backtest_jobs.get(job_id)
+        if job is None or job.get("user_id") != user_id:
+            return None
+        return dict(job)
+
+    def get_message(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+    ):
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            return None
+        return next(
+            (
+                message
+                for message in api_state.store.messages.get(conversation_id, [])
+                if message.id == message_id
+            ),
+            None,
+        )
+
+    def get_backtest_run(self, *, user_id: str, run_id: str):
+        run = api_state.store.backtest_runs.get(run_id)
+        return run if run is not None and run.user_id == user_id else None
+
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int | None = None,
+    ) -> int:
+        count = sum(
+            job.get("status") == status
+            and (user_id is None or job.get("user_id") == user_id)
+            for job in api_state.store.backtest_jobs.values()
+        )
+        return min(count, limit) if limit is not None else count
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        return [
+            dict(job)
+            for job in api_state.store.backtest_jobs.values()
+            if job.get("status") == status
+            and (user_id is None or job.get("user_id") == user_id)
+        ][:limit]
+
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        job = api_state.store.backtest_jobs.get(job_id)
+        if job is None or job.get("user_id") != user_id:
+            return None
+        merged = dict(job.get("execution_metadata") or {})
+        for key, value in execution_metadata.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = {**merged[key], **value}
+            else:
+                merged[key] = value
+        job["execution_metadata"] = merged
+        return dict(job)
+
+
+class _DeterministicDispatcher:
+    def dispatch(self, *, job_id: str, nonce: str) -> dict[str, Any]:
+        return {
+            "id": f"task-{job_id}",
+            "status": "pending",
+            "nonce": nonce,
+        }
+
+
+class _DeterministicInterpreter:
+    async def ainvoke(
+        self,
+        request: InterpretationRequest,
+    ) -> StructuredInterpretation:
+        interpretation = self._interpret(request)
+        provider_result = await invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Return the supplied typed interpretation unchanged.",
+                },
+                {
+                    "role": "user",
+                    "content": interpretation.model_dump_json(),
+                },
+            ],
+            schema_model=StructuredInterpretation,
+            schema_name="StructuredInterpretation",
+            model_name="openai/trajectory-fixture",
+        )
+        if not isinstance(provider_result, StructuredInterpretation):
+            raise AssertionError("typed trajectory provider returned no interpretation")
+        return provider_result
+
+    @staticmethod
+    def _interpret(request: InterpretationRequest) -> StructuredInterpretation:
+        message = request.current_user_message.strip()
+        lowered = message.casefold()
+        if "retail stock" in lowered:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="The user needs a known supported symbol.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=message,
+                    strategy_type="rsi_threshold",
+                    asset_universe=[],
+                    timeframe="1D",
+                    date_range="last year",
+                ),
+                missing_required_fields=["asset_universe"],
+                assistant_response="Enter a known symbol.",
+                confidence=0.95,
+                semantic_turn_act="unsupported_request",
+            )
+        if "impulso" in lowered or lowered == "reintentar":
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue" if lowered == "reintentar" else "new_task",
+                requires_clarification=True,
+                user_goal_summary="El usuario necesita elegir una regla concreta.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=message,
+                    strategy_type=None,
+                    asset_universe=["BTC"],
+                    asset_class="crypto",
+                    timeframe="1D",
+                    date_range="last year",
+                ),
+                missing_required_fields=["strategy_type"],
+                assistant_response="¿Qué regla concreta quieres probar?",
+                confidence=0.95,
+                semantic_turn_act=(
+                    "retry_failed_action" if lowered == "reintentar" else "new_idea"
+                ),
+            )
+        if "500 dollars monthly in cart" in lowered:
+            return _DeterministicInterpreter._buy_and_hold(
+                request=request,
+                symbol="CART",
+                date_range={"start": "2020-01-01", "end": "2026-01-01"},
+                capital_amount=500,
+                cadence="monthly",
+            )
+        if "use nvda instead" in lowered:
+            return _DeterministicInterpreter._buy_and_hold(
+                request=request,
+                symbol="NVDA",
+                task_relation="refine",
+                semantic_turn_act="refine_current_idea",
+            )
+        if "last six months" in lowered:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="refine",
+                requires_clarification=False,
+                user_goal_summary="The user changed the active date window.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=message,
+                    date_range="last six months",
+                    refinement_of="active confirmation",
+                ),
+                confidence=0.95,
+                semantic_turn_act="refine_current_idea",
+            )
+        symbol = next(
+            (
+                candidate
+                for candidate in ("AAPL", "TSLA", "BTC", "MSFT")
+                if candidate.casefold() in lowered
+            ),
+            "AAPL",
+        )
+        return _DeterministicInterpreter._buy_and_hold(
+            request=request,
+            symbol=symbol,
+        )
+
+    @staticmethod
+    def _buy_and_hold(
+        *,
+        request: InterpretationRequest,
+        symbol: str,
+        date_range: str | dict[str, Any] = "last year",
+        capital_amount: float = 10_000,
+        cadence: str | None = None,
+        task_relation: str = "new_task",
+        semantic_turn_act: str = "new_idea",
+    ) -> StructuredInterpretation:
+        asset_class = "crypto" if symbol == "BTC" else "equity"
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation=task_relation,
+            requires_clarification=False,
+            user_goal_summary=f"The user wants to test {symbol}.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="buy_and_hold",
+                strategy_thesis=f"Buy and hold {symbol}.",
+                asset_universe=[symbol],
+                asset_class=asset_class,
+                timeframe="1D",
+                cadence=cadence,
+                date_range=date_range,
+                capital_amount=capital_amount,
+            ),
+            confidence=0.95,
+            semantic_turn_act=semantic_turn_act,
+        )
 
 
 class ConcreteTrajectoryRuntime:
@@ -73,8 +338,19 @@ class ConcreteTrajectoryRuntime:
         self._monkeypatch = monkeypatch
         self._client: TestClient | None = None
         self._states: dict[str, _TrajectoryState] = {}
-        self._active_trajectory: AlphaTrajectory | None = None
-        self._active_step: TrajectoryStep | None = None
+        self._persisted_route_evidence: dict[str, list[dict[str, Any]]] = {}
+        self._provider_router = respx.mock(assert_all_called=False)
+        self._backtest_gateway = _MemoryBacktestGateway()
+        self._workflow = build_workflow(
+            tool=ShadowBacktestJobTool(
+                delegate=None,
+                gateway_getter=lambda: self._backtest_gateway,
+                dev_memory_fallback_getter=lambda: False,
+                dispatcher_getter=lambda: _DeterministicDispatcher(),
+            ),
+            structured_interpreter=_DeterministicInterpreter(),
+            checkpointer=MemorySaver(),
+        )
         self.adapters = TrajectoryAdapters(
             stream=self.stream,
             action=self.action,
@@ -86,20 +362,53 @@ class ConcreteTrajectoryRuntime:
 
     def __enter__(self) -> ConcreteTrajectoryRuntime:
         from argus.api.routers import agent as agent_router
+        from argus.domain.market_data import assets, provider
 
         self._monkeypatch.setattr(api_state, "supabase_gateway", None)
+        self._monkeypatch.setenv("OPENROUTER_API_KEY", "trajectory-fixture-key")
         self._monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "true")
         self._monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "false")
+        self._monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+        self._monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+        self._monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
         self._monkeypatch.setattr(
-            agent_router,
-            "stream_agent_turn_events",
-            self._runtime_events,
+            api_state,
+            "get_agent_runtime_workflow",
+            lambda _request=None: self._workflow,
         )
         self._monkeypatch.setattr(
             agent_router,
             "schedule_artifact_naming_after_stream",
             lambda **_: None,
         )
+        self._monkeypatch.setattr(
+            agent_router,
+            "persist_route_receipts",
+            self._capture_persisted_route_evidence,
+        )
+        self._monkeypatch.setitem(
+            assets.SYNTHETIC_UNIT_ASSETS,
+            "CART",
+            ("equity", "Maplebear Inc.", "CART"),
+        )
+        synthetic_ohlcv = provider._synthetic_ohlcv
+
+        def trajectory_market_data(**kwargs: Any):
+            frame = synthetic_ohlcv(**kwargs)
+            if str(kwargs.get("symbol") or "").upper() == "CART":
+                return frame.loc[frame.index >= "2021-01-04"]
+            return frame
+
+        self._monkeypatch.setattr(
+            provider,
+            "_synthetic_ohlcv",
+            trajectory_market_data,
+        )
+        assets.clear_asset_cache()
+        self._provider_router.start()
+        self._provider_router.post(
+            "https://openrouter.ai/api/v1/chat/completions"
+        ).mock(side_effect=self._typed_provider_response)
         clear_openrouter_route_receipts()
         self._client = TestClient(app)
         self._client.post("/api/v1/dev/reset")
@@ -117,11 +426,51 @@ class ConcreteTrajectoryRuntime:
         return self
 
     def __exit__(self, *_exc: object) -> None:
+        from argus.domain.market_data.assets import clear_asset_cache
+
         if self._client is not None:
             self._client.close()
+        self._provider_router.stop()
+        clear_asset_cache()
         self._client = None
-        self._active_trajectory = None
-        self._active_step = None
+
+    @staticmethod
+    def _typed_provider_response(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        messages = payload.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise AssertionError("trajectory provider received no messages")
+        content = messages[-1].get("content")
+        if not isinstance(content, str):
+            raise AssertionError("trajectory provider received no typed content")
+        StructuredInterpretation.model_validate_json(content)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": content}}],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "total_tokens": 2,
+                    "cost": 0,
+                },
+            },
+        )
+
+    def _capture_persisted_route_evidence(
+        self,
+        *,
+        receipts: list[Any],
+        conversation_id: str,
+        metadata: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> None:
+        self._persisted_route_evidence.setdefault(conversation_id, []).append(
+            {
+                "receipts": tuple(receipt.as_dict() for receipt in receipts),
+                "turn_execution": dict((metadata or {}).get("turn_execution") or {}),
+            }
+        )
 
     @property
     def _http(self) -> TestClient:
@@ -204,22 +553,33 @@ class ConcreteTrajectoryRuntime:
             raw_confirmation_id = state.raw_artifact_ids[
                 "alpha_session_05:confirmation:1"
             ]
-            self._monkeypatch.setattr(
-                api_state,
-                "supabase_gateway",
-                _MemoryByActionGateway(),
-            )
-            response = self._http.get(
-                f"/api/v1/backtest-jobs/by-action/{raw_confirmation_id}"
-            )
-            self._monkeypatch.setattr(api_state, "supabase_gateway", None)
+            with self._monkeypatch.context() as route_patch:
+                route_patch.setattr(
+                    api_state,
+                    "supabase_gateway",
+                    self._backtest_gateway,
+                )
+                response = self._http.get(
+                    f"/api/v1/backtest-jobs/by-action/{raw_confirmation_id}"
+                )
+            job_alias = None
+            if response.status_code == 200:
+                payload = response.json()
+                job = payload.get("job")
+                raw_job_id = job.get("id") if isinstance(job, dict) else None
+                if not isinstance(raw_job_id, str):
+                    raise AssertionError("by-action lookup returned no durable job id")
+                job_alias = f"{trajectory.label}:job:1"
+                state.artifact_aliases[raw_job_id] = job_alias
+                state.raw_artifact_ids[job_alias] = raw_job_id
             return StepObservation(
-                artifact_identity="alpha_session_05:confirmation:1",
+                artifact_identity=job_alias,
                 action_identity="alpha_session_05:confirmation:1",
                 reload_state="not_found" if response.status_code == 404 else "found",
                 checkpoints={
                     "by_action.lookup_status": response.status_code,
                     "by_action.replay_allowed": response.status_code == 404,
+                    "admission.execution_count": self._execution_count(state=state),
                 },
             )
         if trajectory.label == "alpha_session_07" and step.request.get("after"):
@@ -235,22 +595,18 @@ class ConcreteTrajectoryRuntime:
             state=state,
             messages=items,
         )
-        if state.latest_job_alias is not None:
-            artifact_alias = state.latest_job_alias
         checkpoints = (
             {"admission.execution_count": self._execution_count(state=state)}
             if trajectory.label == "alpha_session_06"
             else {}
         )
+        action_alias = self._persisted_action_alias(
+            state=state,
+            artifact_alias=artifact_alias,
+        )
         return StepObservation(
             artifact_identity=artifact_alias,
-            action_identity=(
-                state.latest_action_alias
-                if state.latest_action_alias is not None
-                else artifact_alias
-                if ":confirmation:" in (artifact_alias or "")
-                else None
-            ),
+            action_identity=action_alias,
             reload_state=artifact_alias,
             checkpoints=checkpoints,
         )
@@ -278,43 +634,107 @@ class ConcreteTrajectoryRuntime:
         state = self._state(trajectory)
         submission = step.request["submission"]
         if submission["operation"] == "action":
+            action = dict(submission["request"]["action"])
+            payload = dict(action.get("payload") or {})
+            alias = str(payload["confirmation_id"])
+            raw_confirmation_id = state.raw_artifact_ids[alias]
+            payload["confirmation_id"] = raw_confirmation_id
+            action.update(
+                label="Run backtest",
+                presentation="confirmation",
+                payload=payload,
+            )
+            before_submissions = state.route_submission_count
+            with self._monkeypatch.context() as cut:
+                complete = ChatTurnLifecycleHooks.complete
+
+                def cut_after_admission(
+                    hooks: ChatTurnLifecycleHooks,
+                    **kwargs: Any,
+                ):
+                    if hooks.owner == "message_only":
+                        raise _TransportCut("after_action_admission")
+                    return complete(hooks, **kwargs)
+
+                cut.setattr(
+                    ChatTurnLifecycleHooks,
+                    "complete",
+                    cut_after_admission,
+                )
+                try:
+                    state.route_submission_count += 1
+                    self._http.post(
+                        "/api/v1/chat/stream",
+                        headers={"Idempotency-Key": raw_confirmation_id},
+                        json={
+                            "conversation_id": state.conversation_id,
+                            "language": trajectory.locale,
+                            "action": action,
+                        },
+                    )
+                except BaseException as exc:
+                    if not self._contains_transport_cut(exc):
+                        raise
+                else:
+                    raise AssertionError("action transport cut did not fire")
+            if state.route_submission_count != before_submissions + 1:
+                raise AssertionError("disconnect submitted the action more than once")
             return StepObservation(
-                artifact_identity=state.latest_artifact_alias,
-                action_identity=state.latest_action_alias,
+                artifact_identity=alias,
+                action_identity=alias,
                 typed_terminal=False,
                 checkpoints={"by_action.reconciliation_required": True},
             )
 
-        lifecycle = MemoryChatTurnLifecycleGateway(api_state.store)
-        request_id = f"{trajectory.label}:request:1"
-        accepted = lifecycle.accept_chat_turn(
-            user_id=self._user_id(),
-            conversation_id=state.conversation_id,
-            request_id=request_id,
-            message=prepare_message(
-                conversation_id=state.conversation_id,
-                role="user",
-                content=str(submission["request"]["message"]),
-            ),
-        )
-        state.disconnected_turn_id = accepted.id
-        state.disconnected_request_id = request_id
+        before_submissions = state.route_submission_count
+        with self._monkeypatch.context() as cut:
+            cut.setattr(
+                ChatTurnLifecycleHooks,
+                "mark_running",
+                lambda _hooks: (_ for _ in ()).throw(
+                    _TransportCut("after_turn_acceptance")
+                ),
+            )
+            try:
+                state.route_submission_count += 1
+                self._http.post(
+                    "/api/v1/chat/stream",
+                    json={
+                        "conversation_id": state.conversation_id,
+                        "language": trajectory.locale,
+                        **submission["request"],
+                    },
+                )
+            except BaseException as exc:
+                if not self._contains_transport_cut(exc):
+                    raise
+            else:
+                raise AssertionError("ordinary-turn transport cut did not fire")
+        if state.route_submission_count != before_submissions + 1:
+            raise AssertionError("disconnect submitted the turn more than once")
+        rows = [
+            row
+            for row in api_state.store.chat_turn_lifecycles.values()
+            if row.get("conversation_id") == state.conversation_id
+        ]
+        if len(rows) != 2:
+            raise AssertionError("disconnect did not create one adjacent lifecycle")
+        accepted = max(rows, key=lambda row: str(row["accepted_at"]))
+        if accepted.get("status") != "accepted":
+            raise AssertionError("disconnect advanced beyond accepted")
+        state.disconnected_turn_id = str(accepted["turn_id"])
+        state.disconnected_request_id = f"{trajectory.label}:request:1"
+        state.disconnected_raw_request_id = str(accepted["request_id"])
         alias = f"{trajectory.label}:turn:1"
-        state.artifact_aliases[accepted.id] = alias
-        state.raw_artifact_ids[alias] = accepted.id
+        state.artifact_aliases[state.disconnected_turn_id] = alias
+        state.raw_artifact_ids[alias] = state.disconnected_turn_id
         return StepObservation(
             artifact_identity=alias,
             persistence_state="accepted",
             typed_terminal=False,
-            fingerprint=str(
-                api_state.store.chat_turn_lifecycles[accepted.id].get(
-                    "input_fingerprint"
-                )
-                or accepted.id
-            ),
             checkpoints={
                 "agent_runtime_turn.turn_id": alias,
-                "agent_runtime_turn.request_id": request_id,
+                "agent_runtime_turn.request_id": state.disconnected_request_id,
                 "agent_runtime_turn.status": "accepted",
                 "orphan_turn.client_terminal_invented": False,
             },
@@ -343,18 +763,19 @@ class ConcreteTrajectoryRuntime:
     ) -> StepObservation:
         del step, history
         state = self._state(trajectory)
+        artifact_alias, action_alias = self._persisted_artifact_identity(state=state)
         if trajectory.label == "alpha_session_01":
             return StepObservation(
-                persistence_state=state.latest_artifact_alias,
+                persistence_state=artifact_alias,
                 checkpoints={"stale_action.persisted_execution_count": 0},
             )
         if trajectory.label == "alpha_session_02":
             return StepObservation(
-                artifact_identity=state.latest_artifact_alias,
+                artifact_identity=artifact_alias,
                 checkpoints={"terminal.repeated_fingerprint_count": 0},
             )
         if trajectory.label == "alpha_session_03":
-            return StepObservation(artifact_identity=state.latest_artifact_alias)
+            return StepObservation(artifact_identity=artifact_alias)
         if trajectory.label == "alpha_session_04":
             return StepObservation()
         if trajectory.label in {"alpha_session_05", "alpha_session_06"}:
@@ -365,8 +786,8 @@ class ConcreteTrajectoryRuntime:
                 else {"persistence.durable_identity_count": execution_count}
             )
             return StepObservation(
-                artifact_identity=state.latest_job_alias,
-                action_identity=state.latest_action_alias,
+                artifact_identity=artifact_alias,
+                action_identity=action_alias,
                 checkpoints=checkpoints,
             )
         lifecycle = self._disconnected_lifecycle(state=state)
@@ -390,15 +811,22 @@ class ConcreteTrajectoryRuntime:
         body: dict[str, Any],
         headers: dict[str, str] | None = None,
     ) -> _StreamResult:
-        self._active_trajectory = trajectory
-        self._active_step = step
-        receipt_start = len(get_openrouter_route_receipts())
+        state = self._state(trajectory)
+        evidence = self._persisted_route_evidence.setdefault(
+            state.conversation_id,
+            [],
+        )
+        evidence_start = len(evidence)
+        state.route_submission_count += 1
         response = self._http.post(
             "/api/v1/chat/stream",
             headers=headers,
             json=body,
         )
         response.raise_for_status()
+        if len(evidence) != evidence_start + 1:
+            raise AssertionError("chat route did not persist one execution summary")
+        persisted_evidence = evidence[-1]
         events = tuple(parse_sse_events(response.text))
         final = next(
             (
@@ -413,10 +841,8 @@ class ConcreteTrajectoryRuntime:
             raw_sse=response.text,
             events=events,
             final=final,
-            receipts=tuple(
-                receipt.as_dict()
-                for receipt in get_openrouter_route_receipts()[receipt_start:]
-            ),
+            receipts=tuple(persisted_evidence["receipts"]),
+            execution_summary=dict(persisted_evidence["turn_execution"]),
         )
 
     def _stream_observation(
@@ -439,9 +865,7 @@ class ConcreteTrajectoryRuntime:
             recovery_code=recovery_code,
             route_receipts=result.receipts,
             typed_terminal=result.typed_terminal,
-            fingerprint=self._latest_lifecycle_fingerprint(
-                conversation_id=state.conversation_id
-            ),
+            fingerprint=self._persisted_fingerprint(result.execution_summary),
             checkpoints=checkpoints or {},
             stale_action_executions=stale_action_executions,
         )
@@ -480,8 +904,6 @@ class ConcreteTrajectoryRuntime:
             job_alias = f"{trajectory.label}:job:1"
             state.artifact_aliases[raw_job_id] = job_alias
             state.raw_artifact_ids[job_alias] = raw_job_id
-            state.latest_job_alias = job_alias
-            state.latest_raw_job_id = raw_job_id
         if is_retry:
             state.replay_count += 1
         recovery = result.final.get("recovery")
@@ -490,7 +912,7 @@ class ConcreteTrajectoryRuntime:
             if isinstance(recovery, dict) and recovery.get("code")
             else None
         )
-        artifact_identity = state.latest_job_alias
+        artifact_identity, _ = self._persisted_artifact_identity(state=state)
         if recovery_code is not None:
             artifact_identity = None
         checkpoints: dict[str, Any] = {}
@@ -541,10 +963,20 @@ class ConcreteTrajectoryRuntime:
         )
         option_id = str(step.request["option"])
         option = next(
-            option
-            for option in source.metadata["clarification"]["options"]
-            if option["id"] == option_id
+            (
+                option
+                for option in source.metadata["clarification"]["options"]
+                if option["id"] == option_id
+            ),
+            None,
         )
+        if option is None:
+            artifact_alias = state.artifact_aliases.get(source.id)
+            return StepObservation(
+                artifact_identity=artifact_alias,
+                typed_terminal=False,
+                checkpoints={"capability_route": "missing_typed_option"},
+            )
         result = self._submit_stream(
             trajectory=trajectory,
             step=step,
@@ -610,17 +1042,23 @@ class ConcreteTrajectoryRuntime:
     ) -> StepObservation:
         state = self._state(trajectory)
         raw_turn_id = state.raw_artifact_ids[f"{trajectory.label}:turn:1"]
+        request_message = next(
+            (
+                message
+                for message in api_state.store.messages[state.conversation_id]
+                if message.id == raw_turn_id and message.role == "user"
+            ),
+            None,
+        )
+        if request_message is None:
+            raise AssertionError("abandoned turn has no persisted request message")
         result = self._submit_stream(
             trajectory=trajectory,
             step=step,
             body={
                 "conversation_id": state.conversation_id,
                 "language": trajectory.locale,
-                "action": {
-                    "type": "retry_failed_action",
-                    "label": "Retry",
-                    "payload": {"request_message_id": raw_turn_id},
-                },
+                "message": request_message.content,
             },
         )
         artifact_identity, action_identity = self._observe_artifact(
@@ -639,71 +1077,6 @@ class ConcreteTrajectoryRuntime:
                 "terminal.artifact_identity": artifact_identity,
             },
         )
-
-    def _admitted_job_runtime_payload(
-        self,
-        *,
-        trajectory: AlphaTrajectory,
-        step: TrajectoryStep,
-    ) -> dict[str, Any]:
-        state = self._state(trajectory)
-        alias = str(step.request["action"]["payload"]["confirmation_id"])
-        raw_confirmation_id = state.raw_artifact_ids[alias]
-        confirmation_message = next(
-            message
-            for message in reversed(api_state.store.messages[state.conversation_id])
-            if message.role == "assistant"
-            and isinstance(message.metadata.get("confirmation_card"), dict)
-            and message.metadata["confirmation_card"].get("confirmation_id")
-            == raw_confirmation_id
-        )
-        validation = validate_confirmation_execution_payload(
-            confirmation_message.metadata["confirmation_payload"]
-        )
-        if validation.launch_payload is None:
-            raise AssertionError("trajectory confirmation was not executable")
-        launch_payload = validation.launch_payload
-        payload_digest = backtest_admission.canonical_hash(launch_payload)
-        outcome = backtest_admission.admit_backtest_job_memory(
-            api_state.store,
-            user_id=self._user_id(),
-            operation_scope=backtest_admission.CHAT_RUN_SCOPE,
-            idempotency_key=raw_confirmation_id,
-            identity_hash=backtest_admission.chat_run_identity_hash(
-                conversation_id=state.conversation_id,
-                confirmation_id=raw_confirmation_id,
-                launch_payload_hash=payload_digest,
-            ),
-            payload_hash=payload_digest,
-            launch_payload=launch_payload,
-            initial_status="queued",
-            conversation_id=state.conversation_id,
-            request_message_id=None,
-            confirmation_message_id=confirmation_message.id,
-            execution_metadata={"source": "trajectory_adapter"},
-            allowance_limits=list(SIMULATION_ALLOWANCE_LIMITS),
-        )
-        if outcome.kind not in {"admitted", "replay"} or outcome.job is None:
-            raise AssertionError(f"trajectory admission failed: {outcome.kind}")
-        job = outcome.job
-        return {
-            "stage_outcome": "ready_to_respond",
-            "assistant_response": "The backtest is queued.",
-            "backtest_job": job,
-            "final_response_payload": {"backtest_job": job},
-            "artifact_references": [
-                {
-                    "artifact_kind": "backtest_job",
-                    "artifact_id": job["id"],
-                    "artifact_status": job["status"],
-                    "metadata": {
-                        "id": job["id"],
-                        "conversation_id": state.conversation_id,
-                        "status": job["status"],
-                    },
-                }
-            ],
-        }
 
     def _age_disconnected_turn_for_reconciliation(
         self,
@@ -753,7 +1126,12 @@ class ConcreteTrajectoryRuntime:
             fingerprint=raw_turn_id,
             checkpoints={
                 "agent_runtime_turn.turn_id": alias,
-                "agent_runtime_turn.request_id": runtime_turn["request_id"],
+                "agent_runtime_turn.request_id": (
+                    state.disconnected_request_id
+                    if runtime_turn["request_id"]
+                    == state.disconnected_raw_request_id
+                    else runtime_turn["request_id"]
+                ),
                 "agent_runtime_turn.status": runtime_turn["status"],
                 "agent_runtime_turn.terminal": runtime_turn["terminal"],
                 "agent_runtime_turn.reconciled_outcome": runtime_turn.get(
@@ -773,9 +1151,6 @@ class ConcreteTrajectoryRuntime:
             },
             accepted_orphan_turns_after_window=accepted_orphans,
         )
-
-    def _user_id(self) -> str:
-        return api_state.store.get_or_create_dev_user().id
 
     @staticmethod
     def _disconnected_lifecycle(*, state: _TrajectoryState) -> dict[str, Any]:
@@ -798,122 +1173,6 @@ class ConcreteTrajectoryRuntime:
         ]
         return max(counts, default=0)
 
-    async def _runtime_events(self, **_: Any):
-        trajectory = self._active_trajectory
-        step = self._active_step
-        if trajectory is None or step is None:
-            raise RuntimeError("trajectory step was not bound")
-        record_openrouter_route_receipt(
-            task="interpretation",
-            model_name="trajectory-fixture",
-            mode="json_schema",
-            schema_name="TrajectoryFixture",
-            latency_ms=1,
-            outcome="succeeded",
-            token_usage={"prompt_tokens": 1, "completion_tokens": 1},
-            usage_cost_usd=0.001,
-        )
-        payload = self._runtime_payload(trajectory=trajectory, step=step)
-        outcome = str(payload["stage_outcome"])
-        yield {"type": "stage_start", "stage": "interpret"}
-        yield {"type": "stage_outcome", "outcome": outcome}
-        yield {
-            "type": "final",
-            "payload": payload,
-        }
-
-    def _runtime_payload(
-        self,
-        *,
-        trajectory: AlphaTrajectory,
-        step: TrajectoryStep,
-    ) -> dict[str, Any]:
-        label = trajectory.label
-        if step.operation in {"action", "retry"} and label in {
-            "alpha_session_04",
-            "alpha_session_05",
-            "alpha_session_06",
-        }:
-            return self._admitted_job_runtime_payload(
-                trajectory=trajectory,
-                step=step,
-            )
-        if label == "alpha_session_02" and step.index == 2:
-            return {
-                "stage_outcome": "ready_to_respond",
-                "assistant_response": "La idea sigue guardada, pero necesito una regla concreta.",
-                "recovery": {
-                    "code": "no_material_progress",
-                    "retryable": False,
-                },
-                "pending_strategy": {
-                    "strategy": {
-                        "strategy_type": None,
-                        "asset_universe": ["BTC"],
-                    },
-                    "requested_field": "strategy_type",
-                    "missing_required_fields": ["strategy_type"],
-                },
-            }
-        if label in {"alpha_session_02", "alpha_session_03"}:
-            payload = {
-                "stage_outcome": "await_user_reply",
-                "assistant_prompt": (
-                    "¿Qué regla quieres probar?"
-                    if trajectory.locale == "es-419"
-                    else "Enter a known symbol."
-                ),
-                "requested_field": "strategy_type",
-                "pending_strategy": {
-                    "strategy": {
-                        "strategy_type": None,
-                        "asset_universe": ["BTC"] if label.endswith("02") else [],
-                    },
-                    "requested_field": "strategy_type",
-                    "missing_required_fields": ["strategy_type"],
-                },
-                "clarification": {
-                    "question": "Enter a known symbol.",
-                    "requested_field": "asset_universe",
-                    "options": [
-                        {
-                            "id": "enter_known_symbol",
-                            "label": "Enter a known symbol",
-                            "replacement_values": {
-                                "requested_field": "asset_universe"
-                            },
-                        }
-                    ],
-                },
-            }
-            if label == "alpha_session_03" and step.index == 1:
-                payload["recovery"] = {
-                    "code": "unsupported_capability",
-                    "retryable": False,
-                }
-            return payload
-        symbol = {
-            "alpha_session_01": "NVDA" if step.index == 2 else "AAPL",
-            "alpha_session_04": "CART",
-            "alpha_session_05": "TSLA",
-            "alpha_session_06": "BTC",
-            "alpha_session_07": "MSFT",
-        }[label]
-        payload = _confirmation_runtime_payload(symbol=symbol)
-        if label == "alpha_session_04":
-            payload["coverage_preflight"] = {
-                "outcome": "adjusted_coverage",
-                "requested_date_range": {
-                    "start": "2020-01-01",
-                    "end": "2026-01-01",
-                },
-                "effective_date_range": {
-                    "start": "2024-01-19",
-                    "end": "2026-01-01",
-                },
-            }
-        return payload
-
     def _observe_artifact(
         self,
         *,
@@ -935,13 +1194,15 @@ class ConcreteTrajectoryRuntime:
                 existing = f"{trajectory.label}:confirmation:{count + 1}"
             state.artifact_aliases[raw_id] = existing
             state.raw_artifact_ids[existing] = raw_id
-            state.latest_artifact_alias = existing
-            state.latest_action_alias = existing
             return existing, existing
         pending = final.get("pending_strategy")
         if isinstance(pending, dict):
             alias = f"{trajectory.label}:draft:1"
-            state.latest_artifact_alias = alias
+            raw_id = final.get("message_id")
+            if not isinstance(raw_id, str) or not raw_id:
+                raise AssertionError("pending strategy has no persisted message identity")
+            state.artifact_aliases[raw_id] = alias
+            state.raw_artifact_ids[alias] = raw_id
             return alias, None
         return None, None
 
@@ -950,8 +1211,17 @@ class ConcreteTrajectoryRuntime:
         if isinstance(final.get("recovery"), dict):
             return "typed_recovery"
         if isinstance(final.get("confirmation"), dict):
-            if isinstance(final.get("coverage_preflight"), dict):
-                return "confirmation_with_correction"
+            confirmation = final["confirmation"]
+            adjustment = confirmation.get("period_adjustment")
+            if isinstance(adjustment, dict):
+                requested = adjustment.get("requested_date_range")
+                effective = adjustment.get("effective_date_range")
+                if (
+                    isinstance(requested, dict)
+                    and isinstance(effective, dict)
+                    and requested.get("start") != effective.get("start")
+                ):
+                    return "confirmation_with_correction"
             return "confirmation"
         if isinstance(final.get("backtest_job"), dict):
             return "job_accepted"
@@ -981,17 +1251,28 @@ class ConcreteTrajectoryRuntime:
         return {}
 
     @staticmethod
-    def _latest_lifecycle_fingerprint(*, conversation_id: str) -> str | None:
-        rows = [
-            row
-            for row in api_state.store.chat_turn_lifecycles.values()
-            if row.get("conversation_id") == conversation_id
-        ]
-        if not rows:
-            return None
-        row = max(rows, key=lambda item: str(item.get("accepted_at") or ""))
-        value = row.get("output_fingerprint") or row.get("input_fingerprint")
-        return str(value) if value else None
+    def _persisted_fingerprint(execution_summary: dict[str, Any]) -> str:
+        value = execution_summary.get("output_fingerprint") or execution_summary.get(
+            "input_fingerprint"
+        )
+        if not (
+            isinstance(value, str)
+            and len(value) == 64
+            and all(character in "0123456789abcdef" for character in value)
+        ):
+            raise AssertionError("persisted route execution fingerprint is missing")
+        return value
+
+    @classmethod
+    def _contains_transport_cut(cls, exc: BaseException) -> bool:
+        if isinstance(exc, _TransportCut):
+            return True
+        nested = getattr(exc, "exceptions", ())
+        return isinstance(nested, tuple) and any(
+            cls._contains_transport_cut(item)
+            for item in nested
+            if isinstance(item, BaseException)
+        )
 
     @staticmethod
     def _latest_projected_artifact_alias(
@@ -1009,54 +1290,105 @@ class ConcreteTrajectoryRuntime:
                 if isinstance(raw_id, str) and raw_id in state.artifact_aliases:
                     return state.artifact_aliases[raw_id]
             if isinstance(metadata.get("pending_strategy"), dict):
-                return state.latest_artifact_alias
-        return state.latest_artifact_alias
+                raw_id = message.get("id")
+                if isinstance(raw_id, str):
+                    return state.artifact_aliases.get(raw_id)
+            job = metadata.get("backtest_job")
+            if isinstance(job, dict):
+                raw_id = job.get("id")
+                if isinstance(raw_id, str):
+                    return state.artifact_aliases.get(raw_id)
+        return None
 
+    def _persisted_artifact_identity(
+        self,
+        *,
+        state: _TrajectoryState,
+    ) -> tuple[str | None, str | None]:
+        response = self._http.get(
+            f"/api/v1/conversations/{state.conversation_id}/messages"
+        )
+        response.raise_for_status()
+        artifact_alias = self._latest_projected_artifact_alias(
+            state=state,
+            messages=response.json()["items"],
+        )
+        durable_job_alias = self._latest_durable_job_alias(state=state)
+        if durable_job_alias is not None:
+            artifact_alias = durable_job_alias
+        return (
+            artifact_alias,
+            self._persisted_action_alias(
+                state=state,
+                artifact_alias=artifact_alias,
+            ),
+        )
 
-def _confirmation_runtime_payload(*, symbol: str) -> dict[str, Any]:
-    asset_class = "crypto" if symbol == "BTC" else "equity"
-    benchmark = "BTC" if asset_class == "crypto" else "SPY"
-    launch_payload: dict[str, Any] = {
-        "strategy_type": "buy_and_hold",
-        "symbol": symbol,
-        "symbols": [symbol],
-        "asset_class": asset_class,
-        "timeframe": "1D",
-        "date_range": {"start": "2025-01-01", "end": "2026-01-01"},
-        "sizing_mode": "capital_amount",
-        "capital_amount": 10000.0,
-        "benchmark_symbol": benchmark,
-    }
-    return {
-        "stage_outcome": "await_approval",
-        "assistant_response": f"Ready to test {symbol} with buy and hold.",
-        "confirmation_payload": {
-            "strategy": {
-                "strategy_type": "buy_and_hold",
-                "asset_universe": [symbol],
-                "asset_class": asset_class,
-                "date_range": {"start": "2025-01-01", "end": "2026-01-01"},
-                "capital_amount": 10000,
-            },
-            "optional_parameters": {
-                "initial_capital": {
-                    "value": 10000.0,
-                    "source": "user",
-                    "label": "Initial capital",
-                },
-                "timeframe": {
-                    "value": "1D",
-                    "source": "user",
-                    "label": "Timeframe",
-                },
-                "fees": {"value": 0.0, "source": "default", "label": "Fees"},
-                "slippage": {
-                    "value": 0.0,
-                    "source": "default",
-                    "label": "Slippage",
-                },
-            },
-            "launch_payload": launch_payload,
-            "validation": {"executable": True},
-        },
-    }
+    @staticmethod
+    def _latest_durable_job_alias(*, state: _TrajectoryState) -> str | None:
+        user_id = api_state.store.get_or_create_dev_user().id
+        candidates = sorted(
+            (
+                job
+                for job in api_state.store.backtest_jobs.values()
+                if job.get("conversation_id") == state.conversation_id
+            ),
+            key=lambda job: str(job.get("created_at") or ""),
+            reverse=True,
+        )
+        for job in candidates:
+            raw_job_id = job.get("id")
+            action_id = job.get("idempotency_key")
+            confirmation_message_id = job.get("confirmation_message_id")
+            if not all(
+                isinstance(value, str) and value
+                for value in (raw_job_id, action_id, confirmation_message_id)
+            ):
+                continue
+            reservation = (
+                user_id,
+                backtest_admission.CHAT_RUN_SCOPE,
+                action_id,
+            )
+            if api_state.store.backtest_job_reservations.get(reservation) != raw_job_id:
+                continue
+            confirmation = next(
+                (
+                    message
+                    for message in api_state.store.messages[state.conversation_id]
+                    if message.id == confirmation_message_id
+                    and message.role == "assistant"
+                    and message.metadata.get("confirmation_card", {}).get(
+                        "confirmation_id"
+                    )
+                    == action_id
+                ),
+                None,
+            )
+            if confirmation is None:
+                continue
+            alias = state.artifact_aliases.get(raw_job_id)
+            if alias is not None:
+                return alias
+        return None
+
+    @staticmethod
+    def _persisted_action_alias(
+        *,
+        state: _TrajectoryState,
+        artifact_alias: str | None,
+    ) -> str | None:
+        if artifact_alias is None:
+            return None
+        if ":confirmation:" in artifact_alias:
+            return artifact_alias
+        raw_job_id = state.raw_artifact_ids.get(artifact_alias)
+        job = api_state.store.backtest_jobs.get(raw_job_id or "")
+        if not isinstance(job, dict):
+            return None
+        raw_action_id = job.get("idempotency_key")
+        return (
+            state.artifact_aliases.get(raw_action_id)
+            if isinstance(raw_action_id, str)
+            else None
+        )

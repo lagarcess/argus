@@ -18,6 +18,10 @@ from argus.api.message_store import (
 )
 from argus.api.schemas import BacktestRun
 from argus.domain.store import utcnow
+from argus.llm.openrouter import (
+    clear_openrouter_route_receipts,
+    get_openrouter_route_receipts,
+)
 from fastapi.testclient import TestClient
 
 
@@ -1167,6 +1171,110 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     }
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
+
+
+def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
+    monkeypatch,
+) -> None:
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    clear_openrouter_route_receipts()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = deepcopy(_confirmation_metadata())
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["title"] = "NVDA buy and hold"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as NVDA using a buy and hold approach.",
+        metadata=new_metadata,
+    )
+    usage_before = deepcopy(api_state.store.usage_counters)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    raw_frames = [
+        part.removeprefix("data: ").strip()
+        for part in response.text.split("\n\n")
+        if part.startswith("data: ")
+    ]
+    assert [
+        "[DONE]" if raw == "[DONE]" else json.loads(raw)["type"]
+        for raw in raw_frames
+    ] == ["stage_start", "stage_outcome", "final", "[DONE]"]
+    [final] = _stream_payloads(response.text, "final")
+    assert final["stage_outcome"] == "ready_to_respond"
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_assistant = persisted[-1]
+    assert persisted_assistant["role"] == "assistant"
+    assert persisted_assistant["metadata"]["agent_runtime_stage_outcome"] == (
+        "ready_to_respond"
+    )
+    assert persisted_assistant["metadata"]["recovery"] == final["recovery"]
+    assert persisted_assistant["metadata"]["chat_action"]["payload"] == {
+        "confirmation_id": "confirm-old"
+    }
+    assert api_state.store.chat_turn_lifecycles == {}
+    assert api_state.store.usage_counters == usage_before
+    assert get_openrouter_route_receipts() == []
+    assert api_state.store.backtest_jobs == {}
+    assert (
+        latest_active_confirmation_id(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        == "confirm-new"
+    )
 
 
 def test_response_option_action_rejects_an_older_recovery_message_identity(

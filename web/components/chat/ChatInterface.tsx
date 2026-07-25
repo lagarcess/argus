@@ -1533,6 +1533,7 @@ export default function ChatInterface() {
                   finalActions: finalTextActions,
                   hasFailedAction: finalHasFailedAction,
                   stageOutcome: finalStageOutcome,
+                  recoveryCode: stringOrNull(recordOrNull(finalPayload.recovery)?.code),
                 }),
               );
             }

@@ -459,13 +459,18 @@ export function settleOpenConfirmationsAfterTextFinal(
     action,
     finalActions = [],
     hasFailedAction = false,
+    recoveryCode,
   }: {
     action?: ChatActionOption;
     finalActions?: ChatActionOption[];
     hasFailedAction?: boolean;
     stageOutcome?: unknown;
+    recoveryCode?: string | null;
   },
 ): Message[] {
+  if (recoveryCode === "confirmation_action_stale_card") {
+    return messages;
+  }
   const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
   const hasFailedActionFinal =
     hasFailedAction || finalActions.some(isFailedActionRetry);

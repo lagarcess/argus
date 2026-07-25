@@ -817,15 +817,19 @@ async def chat_stream(
 
         if runtime_fallback.recovery_message:
             assistant_text = runtime_fallback.recovery_message
+            recovery = runtime_fallback.recovery
+            recovery_code = recovery.get("code") if isinstance(recovery, dict) else None
+            stale_card_redirect = recovery_code == "confirmation_action_stale_card"
+            stage_status = "ready_to_respond" if stale_card_redirect else "await_user_reply"
             metadata: dict[str, Any] = {
                 "conversation_mode": "confirm",
-                "agent_runtime_stage_outcome": "await_user_reply",
+                "agent_runtime_stage_outcome": stage_status,
                 "recovery_reason": "missing_confirmation_checkpoint",
             }
             if payload.action is not None:
                 metadata["chat_action"] = persisted_chat_action(payload)
-            if runtime_fallback.recovery is not None:
-                metadata["recovery"] = dict(runtime_fallback.recovery)
+            if recovery is not None:
+                metadata["recovery"] = dict(recovery)
             assistant_message = lifecycle_hooks.complete(
                 content=assistant_text,
                 metadata=metadata,
@@ -833,22 +837,27 @@ async def chat_stream(
                     is_run_backtest_turn=is_run_backtest_turn
                 ),
             )
-            record_control_exit("retry_failed_action", "clarification")
+            progress = "redirected" if stale_card_redirect else "clarification"
+            record_control_exit("retry_failed_action", progress)
             persist_turn_evidence()
             yield sse_data({"type": "stage_start", "stage": "clarify"})
-            if runtime_fallback.recovery is None:
+            if recovery is None:
                 yield sse_data({"type": "token", "content": assistant_text})
+            yield sse_data(
+                {
+                    "type": "stage_outcome",
+                    "outcome": stage_status,
+                }
+            )
             yield sse_data(
                 {
                     "type": "final",
                     "payload": {
-                        "stage_outcome": "await_user_reply",
+                        "stage_outcome": stage_status,
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
                         **(
-                            {"recovery": runtime_fallback.recovery}
-                            if runtime_fallback.recovery is not None
-                            else {}
+                            {"recovery": recovery} if recovery is not None else {}
                         ),
                     },
                 }

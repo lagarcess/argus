@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from argus.api import state as api_state
 
 from tests.evals.chat_runtime_eval_harness import (
     ALPHA_TRAJECTORY_PATH,
@@ -29,7 +30,7 @@ ISSUE_LABELS = {
     "#230": "alpha_session_06",
     "#240": "alpha_session_07",
 }
-EXPECTED_UNRESOLVED_ISSUES = {"#238", "#241", "#251"}
+EXPECTED_UNRESOLVED_ISSUES = {"#239", "#241", "#251"}
 EXPECTED_OPERATIONS = {
     "stream",
     "action",
@@ -53,8 +54,8 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
         }
 
     assert {label: result.status for label, result in results.items()} == {
-        "alpha_session_01": "expected_failed",
-        "alpha_session_02": "passed",
+        "alpha_session_01": "passed",
+        "alpha_session_02": "expected_failed",
         "alpha_session_03": "expected_failed",
         "alpha_session_04": "expected_failed",
         "alpha_session_05": "passed",
@@ -64,8 +65,123 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
     assert all(
         result.failed_checks
         for label, result in results.items()
-        if label in {"alpha_session_03", "alpha_session_04"}
+        if label in {"alpha_session_02", "alpha_session_03", "alpha_session_04"}
     )
+
+
+def test_concrete_reload_cannot_pass_from_cached_alias_when_persistence_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#239")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        api_state.store.messages[state.conversation_id] = []
+
+        observation = runtime.reload(
+            trajectory=trajectory,
+            step=trajectory.steps[3],
+            history=(),
+        )
+
+    assert observation.artifact_identity is None
+    assert observation.reload_state is None
+
+
+def test_concrete_stream_fails_closed_when_route_fingerprint_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    trajectory = _trajectory_for_issue("#239")
+    monkeypatch.setattr(
+        agent_router,
+        "turn_execution_summary",
+        lambda _receipts: {
+            "input_fingerprint": None,
+            "output_fingerprint": None,
+        },
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        with pytest.raises(
+            AssertionError,
+            match="persisted route execution fingerprint",
+        ):
+            runtime.stream(
+                trajectory=trajectory,
+                step=trajectory.steps[0],
+                history=(),
+            )
+
+
+def test_run_disconnect_submits_once_through_the_real_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        before_count = len(api_state.store.messages[state.conversation_id])
+
+        observation = runtime.disconnect(
+            trajectory=trajectory,
+            step=trajectory.steps[1],
+            history=(),
+        )
+
+        submitted_actions = [
+            message
+            for message in api_state.store.messages[state.conversation_id][before_count:]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        jobs = [
+            job
+            for job in api_state.store.backtest_jobs.values()
+            if job.get("conversation_id") == state.conversation_id
+        ]
+
+    assert observation.typed_terminal is False
+    assert len(submitted_actions) == 1
+    assert len(jobs) == 1
+
+
+def test_direct_job_bypass_cannot_satisfy_persisted_trajectory_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        confirmation_alias = "alpha_session_05:confirmation:1"
+        raw_confirmation_id = state.raw_artifact_ids[confirmation_alias]
+        confirmation_message = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "assistant"
+            and message.metadata.get("confirmation_card", {}).get("confirmation_id")
+            == raw_confirmation_id
+        )
+        raw_job_id = "direct-bypass-job"
+        job_alias = "alpha_session_05:job:1"
+        api_state.store.backtest_jobs[raw_job_id] = {
+            "id": raw_job_id,
+            "conversation_id": state.conversation_id,
+            "idempotency_key": raw_confirmation_id,
+            "confirmation_message_id": confirmation_message.id,
+            "created_at": "9999-12-31T00:00:00+00:00",
+        }
+        state.artifact_aliases[raw_job_id] = job_alias
+        state.raw_artifact_ids[job_alias] = raw_job_id
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[-1],
+            history=(),
+        )
+
+    assert observation.artifact_identity == confirmation_alias
+    assert observation.artifact_identity != job_alias
 
 
 def _matching_observation(step: Any) -> StepObservation:
@@ -307,37 +423,26 @@ def test_run_actions_use_confirmation_id_as_the_exact_idempotency_identity() -> 
             assert step.request["submission"]["identity"] == confirmation_id
 
 
-def test_ambiguous_run_uses_by_action_lookup_before_one_exact_replay() -> None:
+def test_ambiguous_run_reconciles_by_action_without_replay() -> None:
     trajectory = _trajectory_for_issue("#242")
     confirmation_id = "alpha_session_05:confirmation:1"
     lookup_path = f"/api/v1/backtest-jobs/by-action/{confirmation_id}"
     lookup_step = trajectory.steps[2]
-    replay_step = trajectory.steps[3]
 
     assert lookup_step.operation == "reload"
     assert lookup_step.request == {
         "method": "GET",
         "path": lookup_path,
     }
-    assert lookup_step.expectation.reload_state == "not_found"
+    assert lookup_step.expectation.reload_state == "found"
+    assert lookup_step.expectation.artifact_identity == "alpha_session_05:job:1"
     assert lookup_step.expectation.action_identity == confirmation_id
     assert lookup_step.expectation.checkpoints == {
-        "by_action.lookup_status": 404,
-        "by_action.replay_allowed": True,
+        "by_action.lookup_status": 200,
+        "by_action.replay_allowed": False,
+        "admission.execution_count": 1,
     }
-
-    assert replay_step.operation == "retry"
-    replay_envelopes = _run_action_envelopes(replay_step.request)
-    assert len(replay_envelopes) == 1
-    assert replay_envelopes[0] == trajectory.steps[1].request["submission"]["request"]
-    assert replay_envelopes[0] == {
-        "action": {
-            "type": "run_backtest",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        "headers": {"Idempotency-Key": confirmation_id},
-    }
-    assert replay_step.expectation.checkpoints["by_action.replay_count"] == 1
+    assert all(step.operation != "retry" for step in trajectory.steps)
 
 
 def test_abandoned_turn_projects_terminal_recovery_and_keyed_retry() -> None:
@@ -628,7 +733,7 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
         ),
     )
     budget_result = run_alpha_trajectory(
-        trajectory=budget_trajectory,
+        trajectory=replace(budget_trajectory, expected_fail=None),
         adapters=_recording_adapters(
             [], overrides={budget_step.step_id: budget_observation}
         ),

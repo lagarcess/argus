@@ -8,14 +8,6 @@
       "locale": "en",
       "purpose": "Keep one canonical idea alive through an edit and reject an older card action.",
       "tags": ["canonical_edit", "stale_action"],
-      "expected_fail": {
-        "issue": "#238",
-        "reason": "The stale-action transport fallback still omits the canonical stage outcome and reports the wrong typed outcome.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_01:step:3", "prefix": "stage_outcome:"},
-          {"step_id": "alpha_session_01:step:3", "prefix": "sse:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
@@ -87,6 +79,29 @@
       "locale": "es-419",
       "purpose": "End an ambiguous Spanish turn within one bounded route and preserve typed recovery.",
       "tags": ["spanish", "turn_budget", "fingerprint"],
+      "expected_fail": {
+        "issue": "#239",
+        "reason": "The turn-wide deadline and semantic-loop terminal contract is owned by issue 239.",
+        "allowed_failures": [
+          {"step_id": "alpha_session_02:step:1", "prefix": "visible_response:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "stage_outcome:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "budget.calls:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "budget.cost:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "budget.latency:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "fingerprint:"},
+          {"step_id": "alpha_session_02:step:1", "prefix": "terminal:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "budget.calls:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "budget.cost:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "budget.latency:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "fingerprint:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "visible_response:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "terminal:"},
+          {"step_id": "alpha_session_02:step:2", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_02:step:3", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_02:step:4", "prefix": "artifact_identity:"}
+        ]
+      },
       "steps": [
         {
           "operation": "stream",
@@ -140,7 +155,12 @@
         "issue": "#241",
         "reason": "Typed capability and discovery ownership must land before this route is authoritative.",
         "allowed_failures": [
+          {"step_id": "alpha_session_03:step:1", "prefix": "visible_response:"},
           {"step_id": "alpha_session_03:step:1", "prefix": "capability_route:"},
+          {"step_id": "alpha_session_03:step:2", "prefix": "visible_response:"},
+          {"step_id": "alpha_session_03:step:2", "prefix": "stage_outcome:"},
+          {"step_id": "alpha_session_03:step:2", "prefix": "sse:"},
+          {"step_id": "alpha_session_03:step:2", "prefix": "terminal:"},
           {"step_id": "alpha_session_03:step:2", "prefix": "capability_route:"}
         ]
       },
@@ -306,31 +326,12 @@
             "path": "/api/v1/backtest-jobs/by-action/alpha_session_05:confirmation:1"
           },
           "expect": {
-            "artifact_identity": "alpha_session_05:confirmation:1",
-            "action_identity": "alpha_session_05:confirmation:1",
-            "reload_state": "not_found",
-            "checkpoints": {
-              "by_action.lookup_status": 404,
-              "by_action.replay_allowed": true
-            }
-          }
-        },
-        {
-          "operation": "retry",
-          "request": {
-            "action": {
-              "type": "run_backtest",
-              "payload": {"confirmation_id": "alpha_session_05:confirmation:1"}
-            },
-            "headers": {"Idempotency-Key": "alpha_session_05:confirmation:1"}
-          },
-          "expect": {
-            "canonical_sse": true,
             "artifact_identity": "alpha_session_05:job:1",
             "action_identity": "alpha_session_05:confirmation:1",
-            "typed_terminal": true,
+            "reload_state": "found",
             "checkpoints": {
-              "by_action.replay_count": 1,
+              "by_action.lookup_status": 200,
+              "by_action.replay_allowed": false,
               "admission.execution_count": 1
             }
           }

@@ -358,6 +358,63 @@ describe("chat artifact history", () => {
     expect([...effects.hiddenMessageIds]).toEqual([]);
   });
 
+  test("stale old-card recovery preserves the newest active confirmation", () => {
+    const oldCard: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+        actions: [],
+      },
+      actions: [],
+    };
+    const newestCard: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-new",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-nvda",
+        title: "NVDA buy and hold",
+        actions: [
+          {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirm-nvda" },
+          },
+        ],
+      },
+      actions: [
+        {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-nvda" },
+        },
+      ],
+    };
+
+    const settled = settleOpenConfirmationsAfterTextFinal(
+      [oldCard, newestCard],
+      {
+        action: {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-aapl" },
+        },
+        stageOutcome: "ready_to_respond",
+        recoveryCode: "confirmation_action_stale_card",
+      },
+    );
+
+    expect(settled[0]?.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(settled[1]?.actions).toHaveLength(1);
+  });
+
   test("transient edit actions do not reopen superseded cards during hydration", () => {
     const previousCard: Message = {
       ...confirmationMessage(),
