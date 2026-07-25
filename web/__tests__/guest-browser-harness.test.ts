@@ -597,6 +597,13 @@ describe("Checks 6–20 harness guards", () => {
       "item.conversation_id === claimConversation",
     );
     expect(check10).toContain("foreignSearchResponse");
+    expect(check10).toContain(
+      "const evidenceRow = foreignSearchSurface",
+    );
+    expect(check10).toContain("await expect(evidenceRow).toHaveCount(1)");
+    expect(check10).toContain(
+      'evidenceRow.getByText("Preserved local QA result"',
+    );
     expect(check10).toContain("deniedBodyContainsNoPrivatePayload");
     expect(check10).not.toContain(
       '.getByRole("button", { name: "Close search" })',

@@ -908,11 +908,18 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(foreignSearchHttpResponse.status()).toBe(200);
       const foreignSearch =
         (await foreignSearchHttpResponse.json()) as SearchList;
+      const evidenceRow = foreignSearchSurface
+        .locator('[role="button"]')
+        .filter({ hasText: evidenceQuery });
+      await expect(evidenceRow).toHaveCount(1);
       await expect(
-        foreignSearchSurface.getByText("Preserved local QA result", {
+        evidenceRow.getByText("Preserved local QA result", {
           exact: true,
         }),
       ).toHaveCount(1);
+      await expect(
+        evidenceRow.getByText("Evidence", { exact: true }),
+      ).toBeVisible();
       const foreignRead = await apiJson<Record<string, unknown>>(
         claimGuestContext.request,
         `/conversations/${primaryConversation}/messages?limit=100`,
