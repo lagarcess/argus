@@ -103,6 +103,14 @@ def _prior_strategy_symbols(request: InterpretationRequest) -> set[str]:
     if snapshot is None:
         return set()
     prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if prior is None and snapshot.latest_backtest_result_reference is not None:
+        from argus.agent_runtime.stages.artifact_context import (
+            strategy_from_result_reference,
+        )
+
+        prior = strategy_from_result_reference(
+            snapshot.latest_backtest_result_reference
+        )
     if prior is None:
         return set()
     return {

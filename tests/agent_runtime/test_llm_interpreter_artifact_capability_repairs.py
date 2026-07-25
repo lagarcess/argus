@@ -1471,6 +1471,74 @@ async def test_asset_grounding_audit_clears_lowercase_pronoun_even_with_run_cont
 
 
 @pytest.mark.asyncio
+async def test_asset_grounding_inherits_completed_result_asset_for_refinement(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_must_not_run(**_kwargs):
+        raise AssertionError("canonical completed-result asset reached grounding audit")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_must_not_run,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="Move the completed result start date forward one year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            date_range={"start": "2024-01-03", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "Change the start date to January 3, 2024 and keep every other "
+            "assumption the same."
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            latest_backtest_result_reference=ArtifactReference(
+                artifact_kind="backtest_result",
+                artifact_id="run-141",
+                artifact_status="completed",
+                metadata={
+                    "asset_class": "equity",
+                    "symbols": ["AAPL"],
+                    "config_snapshot": {
+                        "template": "buy_and_hold",
+                        "symbols": ["AAPL"],
+                        "date_range": {
+                            "start": "2023-01-03",
+                            "end": "2024-12-31",
+                        },
+                    },
+                },
+            )
+        ),
+        selected_thread_metadata={"requested_field": "refinement"},
+        user=UserState(user_id="u1"),
+    )
+
+    audited = await interpreter_module._asset_grounding_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert audited.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert not any(
+        code.startswith("asset_grounding_audit_")
+        for code in audited.reason_codes
+    )
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_preserves_recent_dca_strategy_family_when_user_supplies_run_facts(
     monkeypatch,
 ) -> None:
