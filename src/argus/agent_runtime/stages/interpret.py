@@ -1667,17 +1667,6 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
-    if (
-        "pending_date_answer_unowned_candidate_stripped"
-        in interpretation.reason_codes
-        and resolve_date_range_text(
-            current_user_message,
-            today=date.today(),
-            languages=dateparser_languages_for_user_language(language),
-        )
-        is None
-    ):
-        return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
@@ -1702,6 +1691,10 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
         today=date.today(),
+        require_explicit_range=(
+            "pending_date_answer_unowned_candidate_stripped"
+            in interpretation.reason_codes
+        ),
         reason_code=(
             "pending_date_answer_current_message_repaired"
             if interpretation.semantic_turn_act == "answer_pending_need"

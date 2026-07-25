@@ -37,6 +37,7 @@ def pending_date_answer_interpretation(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
     today: date | None = None,
+    require_explicit_range: bool = False,
     reason_code: str = "pending_date_answer_route_repaired",
     user_goal_summary: str = (
         "User supplied the requested date range after structured interpretation "
@@ -76,6 +77,8 @@ def pending_date_answer_interpretation(
     date_range_intent: dict[str, Any] | None = None
     if resolved_range is not None:
         date_range = resolved_range.payload
+    elif require_explicit_range:
+        return None
     else:
         year_intent = resolve_calendar_year_intent_text(
             text,
