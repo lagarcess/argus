@@ -14,9 +14,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from argus.agent_runtime.confirmation_artifacts import (
-    validate_confirmation_execution_payload,
-)
+from argus.agent_runtime.confirmation_artifacts import canonical_launch_identity_payload
 from argus.domain.backtest_admission import (
     DEFAULT_GLOBAL_QUEUED_LIMIT,
     DEFAULT_GLOBAL_RUNNING_LIMIT,
@@ -128,22 +126,8 @@ def reset_backtest_job_shadow_context(
 
 
 def payload_hash(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _admission_identity_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    validation = validate_confirmation_execution_payload(
-        {"launch_payload": payload}
-    )
-    if validation.executable and validation.launch_payload is not None:
-        return validation.launch_payload
-    return payload
 
 
 def shadow_launch_payload(
@@ -826,7 +810,7 @@ class ShadowBacktestJobTool:
                 raise RuntimeError(
                     "Supabase persistence is required for shadow backtest jobs."
                 )
-            payload_digest = payload_hash(_admission_identity_payload(payload))
+            payload_digest = payload_hash(canonical_launch_identity_payload(payload))
             confirmation_id = None
             if isinstance(context.chat_action, dict):
                 raw_confirmation = context.chat_action.get("confirmation_id")

@@ -70,6 +70,13 @@ def validate_confirmation_execution_payload(
     )
 
 
+def canonical_launch_identity_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    validation = validate_confirmation_execution_payload({"launch_payload": payload})
+    if validation.executable and validation.launch_payload is not None:
+        return validation.launch_payload
+    return payload
+
+
 def confirmation_artifact_reference(
     *,
     confirmation_id: str,
