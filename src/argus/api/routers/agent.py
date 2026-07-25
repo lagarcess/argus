@@ -84,6 +84,10 @@ from argus.api.chat.streaming import (
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.guest_access import account_context
+from argus.api.guest_observability import (
+    emit_first_guest_message_event,
+    emit_guest_funnel_event,
+)
 from argus.api.message_store import (
     create_message,
     latest_unresolved_terminal_runtime_failure_metadata,
@@ -1341,6 +1345,52 @@ async def chat_stream(
                     yield sse_data({"type": "token", "content": assistant_text})
                 yield sse_data({"type": "final", "payload": runtime_result})
                 yield sse_done()
+                if assistant_message is not None and not is_run_backtest_turn:
+                    emit_first_guest_message_event(
+                        account=turn_account,
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        message_id=assistant_message.id,
+                        language=runtime_user.language_preference,
+                    )
+                if confirmation_card is not None:
+                    emit_guest_funnel_event(
+                        account=turn_account,
+                        kind="confirmation_reached",
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        message_id=(
+                            assistant_message.id
+                            if assistant_message is not None
+                            else None
+                        ),
+                        language=runtime_user.language_preference,
+                        surface="confirmation",
+                        capability_category="simulation",
+                        terminal_outcome="completed",
+                    )
+                if run is not None:
+                    emit_guest_funnel_event(
+                        account=turn_account,
+                        kind="first_result_completed",
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        message_id=(
+                            assistant_message.id
+                            if assistant_message is not None
+                            else None
+                        ),
+                        job_id=(
+                            str(backtest_job.get("id") or "")
+                            if backtest_job is not None
+                            else None
+                        ),
+                        backtest_run_id=run.id,
+                        language=runtime_user.language_preference,
+                        surface="backtest",
+                        capability_category="simulation",
+                        terminal_outcome="completed",
+                    )
                 schedule_runtime_measurement_events_after_stream(
                     user_id=user.id,
                     conversation_id=conversation.id,

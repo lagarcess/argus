@@ -705,6 +705,38 @@ class GuestIdentityLinkRequest(BaseModel):
         return normalized
 
 
+class GuestFunnelClientEventRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event: Literal["starter_action_selected", "conversion_prompt_shown"]
+    language: Language
+    surface: Literal["starter_actions", "conversion_modal"]
+    strategy_category: (
+        Literal["buy_and_hold", "dca_accumulation"] | None
+    ) = None
+    conversion_reason: GuestConversionReason | None = None
+    terminal_outcome: Literal["selected", "shown"]
+
+    @model_validator(mode="after")
+    def require_event_specific_properties(self) -> "GuestFunnelClientEventRequest":
+        if self.event == "starter_action_selected":
+            if (
+                self.surface != "starter_actions"
+                or self.strategy_category is None
+                or self.conversion_reason is not None
+                or self.terminal_outcome != "selected"
+            ):
+                raise ValueError("invalid_starter_action_event")
+        elif (
+            self.surface != "conversion_modal"
+            or self.conversion_reason is None
+            or self.strategy_category is not None
+            or self.terminal_outcome != "shown"
+        ):
+            raise ValueError("invalid_conversion_prompt_event")
+        return self
+
+
 class SuccessResponse(BaseModel):
     success: bool
 

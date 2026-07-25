@@ -11,6 +11,7 @@ import {
   loginWithEmail,
 } from "@/lib/argus-api";
 import type { UserResponse } from "@/lib/guest-account";
+import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import {
   pendingGuestActionSummary,
   SingleUseGuestAction,
@@ -42,6 +43,15 @@ export function useGuestConversion({
       nextReason: GuestConversionReason,
       pendingAction?: GuestPendingAction | null,
     ) => {
+      if (account?.account_kind === "guest") {
+        captureGuestFunnelEvent({
+          event: "conversion_prompt_shown",
+          language: account.user.language,
+          surface: "conversion_modal",
+          conversion_reason: nextReason,
+          terminal_outcome: "shown",
+        });
+      }
       setReason(nextReason);
       latchRef.current = pendingAction
         ? new SingleUseGuestAction(pendingAction)
@@ -49,7 +59,7 @@ export function useGuestConversion({
       handoffIdRef.current = null;
       setIsOpen(true);
     },
-    [],
+    [account],
   );
 
   const close = useCallback(() => {

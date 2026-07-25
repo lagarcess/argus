@@ -2404,6 +2404,7 @@ export default function ChatInterface() {
 
                 <StarterActions
                   disabled={isStreamingResponse || isHydratingConversation}
+                  guestAnalyticsEnabled={guestExperience.isGuest}
                   onSelect={handleSend}
                 />
 

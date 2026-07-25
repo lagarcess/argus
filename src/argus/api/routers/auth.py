@@ -25,6 +25,10 @@ from argus.api.guest_access import (
     public_account_access_enabled,
     store_account_context,
 )
+from argus.api.guest_observability import (
+    emit_guest_funnel_event,
+    emit_verified_guest_funnel_event,
+)
 from argus.api.schemas import (
     GuestBootstrapRequest,
     GuestHandoffClaimResponse,
@@ -266,7 +270,17 @@ def guest_bootstrap(
             user_id=profile.id,
             created_at=profile.created_at,
         )
-        store_account_context(request, guest_account_context(workspace))
+        guest_context = guest_account_context(workspace)
+        store_account_context(request, guest_context)
+        emit_guest_funnel_event(
+            account=guest_context,
+            kind="guest_session_started",
+            user_id=profile.id,
+            language=profile.language,
+            surface="guest_entry",
+            capability_category="account",
+            terminal_outcome="started",
+        )
         payload = dict(result)
         payload.update(
             {
@@ -428,6 +442,24 @@ def claim_guest_handoff(
         conversation_id=str(claimed["conversation_id"]),
         pending_action=pending_action,
     )
+    emit_verified_guest_funnel_event(
+        "existing_account_sign_in_completed",
+        user_id=source_user_id,
+        conversation_id=payload.conversation_id,
+        language=user.language,
+        surface="account_conversion",
+        capability_category="account",
+        terminal_outcome="completed",
+    )
+    emit_verified_guest_funnel_event(
+        "temporary_workspace_claimed",
+        user_id=source_user_id,
+        conversation_id=payload.conversation_id,
+        language=user.language,
+        surface="account_conversion",
+        capability_category="history",
+        terminal_outcome="claimed",
+    )
     response = JSONResponse(
         content=jsonable_encoder(payload.model_dump(mode="json")),
     )
@@ -506,7 +538,8 @@ def link_guest_identity(
             title="Internal Error",
             detail="Supabase persistence is required for guest conversion.",
         )
-    if account_context(request).kind != "guest":
+    guest_context = account_context(request)
+    if guest_context.kind != "guest":
         raise problem(
             request,
             status_code=409,
@@ -552,6 +585,15 @@ def link_guest_identity(
                 "account_kind": "registered",
                 "user": profile.model_dump(mode="json"),
             }
+        )
+        emit_guest_funnel_event(
+            account=guest_context,
+            kind="account_creation_completed",
+            user_id=user.id,
+            language=profile.language,
+            surface="account_conversion",
+            capability_category="account",
+            terminal_outcome="completed",
         )
         return auth_response(request, payload)
     except HTTPException:

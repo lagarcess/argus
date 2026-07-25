@@ -8,6 +8,7 @@ from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
+from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
@@ -163,6 +164,16 @@ def run_backtest(
                 if decision == "replay":
                     return _replay_direct_job(request, user=user, job=job or {})
             if account.kind == "guest":
+                emit_guest_funnel_event(
+                    account=account,
+                    kind="guest_limit_reached",
+                    user_id=user.id,
+                    conversation_id=payload.conversation_id,
+                    surface="backtest",
+                    capability_category="simulation",
+                    conversion_reason="second_simulation",
+                    terminal_outcome="limit_reached",
+                )
                 raise problem(
                     request,
                     status_code=403,
@@ -270,6 +281,17 @@ def run_backtest(
             ),
             context={"backtest_job_id": job_id, "retryable": True},
         )
+    emit_guest_funnel_event(
+        account=account_context(request),
+        kind="first_result_completed",
+        user_id=user.id,
+        conversation_id=finalized.run.conversation_id,
+        job_id=job_id,
+        backtest_run_id=finalized.run.id,
+        surface="backtest",
+        capability_category="simulation",
+        terminal_outcome="completed",
+    )
     return BacktestRunResponse(run=finalized.run)
 
 
@@ -365,6 +387,7 @@ def _admit_direct_run(
     conversation_id: str | None,
 ) -> tuple[str, dict[str, Any] | None]:
     gateway = api_state.supabase_gateway
+    account = account_context(request)
     if gateway is not None:
         outcome = gateway.admit_backtest_job(
             user_id=user.id,
@@ -377,7 +400,7 @@ def _admit_direct_run(
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
             allowance_limits=allowance_windows(
-                account_context(request),
+                account,
                 SIMULATION_USAGE_RESOURCE,
             ),
         )
@@ -396,7 +419,7 @@ def _admit_direct_run(
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
             allowance_limits=allowance_windows(
-                account_context(request),
+                account,
                 SIMULATION_USAGE_RESOURCE,
             ),
         )
@@ -404,6 +427,17 @@ def _admit_direct_run(
         job = memory_outcome.job
 
     if decision in ("admitted", "replay"):
+        if decision == "admitted":
+            emit_guest_funnel_event(
+                account=account,
+                kind="first_simulation_admitted",
+                user_id=user.id,
+                conversation_id=conversation_id,
+                job_id=str((job or {}).get("id") or "") or None,
+                surface="backtest",
+                capability_category="simulation",
+                terminal_outcome="admitted",
+            )
         return decision, job
     if decision == "conflict":
         raise problem(
@@ -426,6 +460,16 @@ def _admit_direct_run(
             headers={"Retry-After": "60"},
         )
     if decision == "conversion_required":
+        emit_guest_funnel_event(
+            account=account,
+            kind="guest_limit_reached",
+            user_id=user.id,
+            conversation_id=conversation_id,
+            surface="backtest",
+            capability_category="simulation",
+            conversion_reason="second_simulation",
+            terminal_outcome="limit_reached",
+        )
         raise problem(
             request,
             status_code=403,

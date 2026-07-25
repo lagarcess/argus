@@ -3087,12 +3087,20 @@ Privacy posture:
 - Default mode is `metadata_only`.
 - The sanitizer removes raw prompts, transcripts, context packets, route
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
-  account balances, exact holdings, payment identifiers, and similar sensitive
-  payloads before capture.
+  account balances, exact holdings, exact dates/capital, email, display name,
+  private titles/previews, URLs, cookies, headers, IP addresses, payment
+  identifiers, and similar sensitive payloads before capture.
 - PostHog receives only the sanitized projection. Raw identifiers are hashed
   before emission.
-- Capture is server-side only. Frontend PostHog, autocapture, session replay,
-  and product behavior reads from analytics remain out of scope.
+- PostHog capture remains server-side only. Two browser-owned facts
+  (`starter_action_selected` and `conversion_prompt_shown`) cross the
+  authenticated `POST /analytics/guest-events` contract; the browser never
+  receives a PostHog key or sends prompts, prose, Auth material, provider/model
+  data, or other arbitrary properties. The remaining guest funnel facts emit
+  from their authoritative server settlement, admission, Auth, feedback, and
+  cleanup owners.
+- Frontend PostHog, autocapture, session replay, and product behavior reads
+  from analytics remain out of scope.
 - Person profiles are disabled per event with `$process_person_profile = false`.
 - Current PostHog region is US Cloud, selected deliberately for the private
   alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
@@ -3108,6 +3116,26 @@ Approved product events:
 Each approved product event sets `attributes.product_event` to the registered
 name above while preserving the envelope `event_type` taxonomy and
 `event_action` state model from memo 15.5.
+
+Approved guest funnel events use `feature_area = "guest_acquisition"`:
+- `guest_session_started`
+- `starter_action_selected`
+- `first_useful_assistant_response_completed`
+- `confirmation_reached`
+- `first_simulation_admitted`
+- `first_result_completed`
+- `conversion_prompt_shown`
+- `account_creation_completed`
+- `existing_account_sign_in_completed`
+- `temporary_workspace_claimed`
+- `guest_limit_reached`
+- `guest_feedback_submitted`
+- `guest_session_expired`
+
+Their optional properties are limited to hashed/correlated identity, language,
+surface, approved typed strategy/capability category, conversion reason, and
+terminal outcome. Provider cost and latency stay in the existing server-owned
+evidence ledger and correlate through privacy-safe identifiers.
 
 Implemented operational surface:
 - The append-only first-party `cost_ledger_entries` table is the server-owned

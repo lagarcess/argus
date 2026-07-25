@@ -114,6 +114,24 @@ paths:
           description: Current authentication state and user.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/analytics/guest-events:
+    post:
+      description: Capture one approved browser-owned guest funnel fact through the authenticated, same-origin server envelope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestFunnelClientEventRequest"
+      responses:
+        "200":
+          description: The sanitized guest event was accepted for background capture.
+        "403":
+          description: The origin or verified guest account context was rejected.
+        "422":
+          description: The event or property combination is outside the approved contract.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me:
     get:
       responses:
@@ -703,6 +721,43 @@ components:
           format: password
           minLength: 8
           maxLength: 128
+    GuestFunnelClientEventRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - event
+        - language
+        - surface
+        - terminal_outcome
+      properties:
+        event:
+          type: string
+          enum: [starter_action_selected, conversion_prompt_shown]
+        language:
+          type: string
+          enum: [en, es-419]
+        surface:
+          type: string
+          enum: [starter_actions, conversion_modal]
+        strategy_category:
+          type:
+            - string
+            - "null"
+          enum: [buy_and_hold, dca_accumulation, null]
+        conversion_reason:
+          type:
+            - string
+            - "null"
+          enum:
+            - second_simulation
+            - message_limit
+            - save_decision
+            - new_conversation
+            - keep_history
+            - null
+        terminal_outcome:
+          type: string
+          enum: [selected, shown]
     ChatClarification:
       type: object
       description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.

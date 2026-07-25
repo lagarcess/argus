@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Protocol
 
+from loguru import logger
+
+from argus.observability.guest_funnel import capture_guest_funnel_event
+
 
 class GuestCleanupGateway(Protocol):
     def claim_expired_guest_workspaces(
@@ -56,6 +60,19 @@ def cleanup_expired_guest_workspaces(
         if not user_id:
             failed += 1
             continue
+        try:
+            capture_guest_funnel_event(
+                "guest_session_expired",
+                user_id=user_id,
+                surface="cleanup",
+                capability_category="account",
+                terminal_outcome="expired",
+            )
+        except Exception:
+            logger.opt(exception=True).warning(
+                "Guest expiry event emission failed",
+                product_event="guest_session_expired",
+            )
         try:
             was_deleted = gateway.delete_anonymous_auth_user(user_id)
         except Exception:
