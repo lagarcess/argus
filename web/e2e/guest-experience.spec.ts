@@ -1161,7 +1161,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await expect(dialog).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(dialog).toHaveCount(0);
-      await expect(page.getByTestId("chat-input")).toHaveValue(draft);
+      await expect(page.getByTestId("chat-input")).toHaveText(draft);
       await expect(card.getByTestId("result-equity-chart")).toBeVisible();
       expect(requireConversationId(page) === primaryConversation).toBe(true);
       expect(handoffCount(primaryOwner)).toBe(handoffsBefore);

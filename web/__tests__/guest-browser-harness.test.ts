@@ -660,6 +660,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(check14).toContain("resultCard(page)");
     expect(check14).toContain("handoffCount");
     expect(check14).toContain("snapshotStayedStable");
+    expect(check14).toContain("toHaveText(draft)");
+    expect(check14).not.toContain("toHaveValue(draft)");
   });
 
   test("preserves the approved public-mode New chat acceptance", () => {
