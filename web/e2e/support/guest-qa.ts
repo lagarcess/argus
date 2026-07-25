@@ -81,6 +81,17 @@ export type ConfirmationContinuityChecks = {
   effectiveDateRangeUnchanged: boolean;
 };
 
+export type ResultFacts = {
+  messageId: string;
+  runId: string;
+  evidenceId: string;
+};
+
+export type ResultTruthFingerprint = {
+  rows: number;
+  fingerprint: string;
+};
+
 export const CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES = {
   updateMessagePersisted:
     "The exact Check 4 update message was not durably persisted as a user message",
@@ -195,6 +206,8 @@ export type ConversationGraph = {
   idea_versions: string[];
   evidence: string[];
   decisions: string[];
+  context_packets: string[];
+  run_context_packets: string[];
   checkpoints: string[];
 };
 
@@ -237,7 +250,13 @@ export type SafeEvidence = {
   page_error_count: number;
   failed_request_count: number;
   browser_safety_details: BrowserSafetyDetail[];
+  teardown_console_error_count: number;
+  teardown_page_error_count: number;
+  teardown_failed_request_count: number;
+  teardown_hosted_write_count: number;
+  teardown_credential_exposure_count: number;
   hosted_write_count: number;
+  server_product_analytics_disabled: boolean;
   credential_exposure_count: number;
   provider_cost_usd: number;
   provider_latency_ms: number;
@@ -356,6 +375,53 @@ export function confirmationContinuityChecks(
   };
 }
 
+export function latestResultFacts(
+  items: PersistedMessageItem[],
+): ResultFacts {
+  for (const item of [...items].reverse()) {
+    const metadata = recordOrEmpty(item.metadata);
+    if (!Object.hasOwn(metadata, "result_card")) continue;
+    const resultCard = recordOrEmpty(metadata.result_card);
+    const runId = metadata.result_run_id;
+    const evidenceId =
+      resultCard.evidenceArtifactId ?? resultCard.evidence_artifact_id;
+    if (
+      typeof runId !== "string" ||
+      runId === "" ||
+      typeof evidenceId !== "string" ||
+      evidenceId === ""
+    ) {
+      throw new Error("Canonical result is missing typed result identities");
+    }
+    return {
+      messageId: item.id,
+      runId,
+      evidenceId,
+    };
+  }
+  throw new Error("A canonical typed result artifact was not persisted");
+}
+
+export function binaryEvidenceDiffers(
+  before: Uint8Array,
+  after: Uint8Array,
+): boolean {
+  if (before.length !== after.length) return true;
+  return before.some((value, index) => value !== after[index]);
+}
+
+export function resultTruthStayedStable(
+  before: ResultTruthFingerprint,
+  after: ResultTruthFingerprint,
+): boolean {
+  return (
+    before.rows > 0 &&
+    before.rows === after.rows &&
+    before.fingerprint !== "" &&
+    before.fingerprint === after.fingerprint
+  );
+}
+
 type DisposableIdentity = {
   userId: string;
   email: string;
@@ -455,6 +521,15 @@ export function assertExactLocalCandidate(): void {
   }
   if (process.env.NEXT_PUBLIC_GUEST_ACCESS_ENABLED !== "true") {
     throw new Error("Guest QA requires the process-only frontend guest flag");
+  }
+  for (const key of [
+    "POSTHOG_PROJECT_TOKEN",
+    "POSTHOG_REGION",
+    "POSTHOG_HOST",
+  ]) {
+    if (process.env[key]?.trim()) {
+      throw new Error("Guest QA requires server product analytics disabled");
+    }
   }
 }
 
@@ -586,6 +661,45 @@ export function resultSummaryCost(userId: string): {
   `);
 }
 
+export function resultTruthFingerprint(
+  userId: string,
+  conversationId: string,
+): ResultTruthFingerprint {
+  const owner = requireUuid(userId, "owner");
+  const conversation = requireUuid(conversationId, "conversation");
+  return psqlJson<ResultTruthFingerprint>(`
+    select json_build_object(
+      'rows', count(*),
+      'fingerprint', md5(
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', id,
+              'strategy_id', strategy_id,
+              'status', status,
+              'asset_class', asset_class,
+              'symbols', symbols,
+              'allocation_method', allocation_method,
+              'benchmark_symbol', benchmark_symbol,
+              'config_snapshot', config_snapshot,
+              'metrics', metrics,
+              'conversation_result_card', conversation_result_card,
+              'chart', chart,
+              'trades', trades,
+              'error', error
+            )
+            order by id
+          )::text,
+          '[]'
+        )
+      )
+    )::text
+    from public.backtest_runs
+    where user_id = '${owner}'
+      and conversation_id = '${conversation}'
+  `);
+}
+
 export function conversationGraph(
   userId: string,
   conversationId: string,
@@ -603,6 +717,14 @@ export function conversationGraph(
       'idea_versions', coalesce((select json_agg(id::text order by id) from public.idea_versions where source_conversation_id = '${conversation}' and user_id = '${owner}'), '[]'::json),
       'evidence', coalesce((select json_agg(id::text order by id) from public.evidence_artifacts where source_conversation_id = '${conversation}' and user_id = '${owner}'), '[]'::json),
       'decisions', coalesce((select json_agg(id::text order by id) from public.decision_notes where source_conversation_id = '${conversation}' and user_id = '${owner}'), '[]'::json),
+      'context_packets', coalesce((select json_agg(id::text order by id) from public.context_packets where user_id = '${owner}'), '[]'::json),
+      'run_context_packets', coalesce((
+        select json_agg(link.id::text order by link.id)
+        from public.run_context_packets as link
+        join public.backtest_runs as run on run.id = link.run_id
+        where link.user_id = '${owner}'
+          and run.conversation_id = '${conversation}'
+      ), '[]'::json),
       'checkpoints', coalesce((select json_agg(checkpoint_id order by checkpoint_id) from public.checkpoints where thread_id = '${conversation}'), '[]'::json)
     )::text
   `);
@@ -643,6 +765,100 @@ export function markWorkspaceExpired(userId: string): void {
   if (!changed.ok) {
     throw new Error("Local guest QA expiry fixture was incomplete");
   }
+}
+
+export function markClaimedWorkspaceCleanupReady(userId: string): void {
+  const owner = requireUuid(userId, "claimed guest owner");
+  const changed = psqlJson<{ ok: boolean }>(`
+    with changed as (
+      update public.guest_workspaces
+         set claimed_at = now() - interval '20 minutes',
+             updated_at = now() - interval '20 minutes'
+       where user_id = '${owner}'
+         and status = 'claimed'
+         and claimed_by is not null
+       returning 1
+    )
+    select json_build_object('ok', exists(select 1 from changed))::text
+  `);
+  if (!changed.ok) {
+    throw new Error("Claimed guest cleanup fixture was incomplete");
+  }
+}
+
+export function cleanupExpectedGuestCandidates(
+  userIds: string[],
+): {
+  dry_run_count: number;
+  deleted_count: number;
+  claimed_identity_count: number;
+  expired_workspace_count: number;
+} {
+  if (userIds.length < 1 || userIds.length > 100) {
+    throw new Error("Cleanup fixture must contain between one and 100 owners");
+  }
+  const expected = userIds.map((value) => requireUuid(value, "cleanup owner"));
+  const expectedSet = new Set(expected);
+  if (expectedSet.size !== expected.length) {
+    throw new Error("Cleanup fixture owners must be unique");
+  }
+  const dryRun = psqlJson<
+    Array<{ user_id: string; cleanup_reason: string }>
+  >(`
+    select coalesce(
+      json_agg(
+        json_build_object(
+          'user_id', user_id,
+          'cleanup_reason', cleanup_reason
+        )
+      ),
+      '[]'::json
+    )::text
+    from public.claim_expired_guest_workspaces(${expected.length}, true)
+  `);
+  if (
+    dryRun.length !== expected.length ||
+    dryRun.some((row) => !expectedSet.has(row.user_id))
+  ) {
+    throw new Error("Cleanup dry run did not select the exact fixture set");
+  }
+  const claimed = psqlJson<
+    Array<{
+      user_id: string;
+      auth_deleted: boolean;
+      cleanup_reason: string;
+    }>
+  >(`
+    select coalesce(
+      json_agg(
+        json_build_object(
+          'user_id', user_id,
+          'auth_deleted', auth_deleted,
+          'cleanup_reason', cleanup_reason
+        )
+      ),
+      '[]'::json
+    )::text
+    from public.claim_expired_guest_workspaces(${expected.length}, false)
+  `);
+  if (
+    claimed.length !== expected.length ||
+    claimed.some(
+      (row) => !expectedSet.has(row.user_id) || row.auth_deleted !== true,
+    )
+  ) {
+    throw new Error("Cleanup claim did not match the bounded dry run");
+  }
+  return {
+    dry_run_count: dryRun.length,
+    deleted_count: claimed.length,
+    claimed_identity_count: claimed.filter(
+      (row) => row.cleanup_reason === "claimed_identity",
+    ).length,
+    expired_workspace_count: claimed.filter(
+      (row) => row.cleanup_reason === "expired_workspace",
+    ).length,
+  };
 }
 
 export function cleanupOneExpiredGuest(): {
@@ -769,18 +985,33 @@ export function workspaceFacts(userId: string): {
   `);
 }
 
-export function feedbackPrivacy(userId: string): {
+export function feedbackPrivacy(params: {
+  userId: string;
+  conversationId: string;
+}): {
   rows: number;
   email_present: boolean;
   transcript_present: boolean;
   forbidden_context_fields: number;
+  unchecked_rows: number;
+  approved_context_rows: number;
+  unapproved_key_rows: number;
+  sensitive_value_rows: number;
 } {
-  const owner = requireUuid(userId, "owner");
+  const owner = requireUuid(params.userId, "owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "feedback conversation",
+  );
   return psqlJson<{
     rows: number;
     email_present: boolean;
     transcript_present: boolean;
     forbidden_context_fields: number;
+    unchecked_rows: number;
+    approved_context_rows: number;
+    unapproved_key_rows: number;
+    sensitive_value_rows: number;
   }>(`
     select json_build_object(
       'rows', count(*),
@@ -788,11 +1019,184 @@ export function feedbackPrivacy(userId: string): {
       'transcript_present', coalesce(bool_or(context ? 'transcript' or context ? 'messages' or context ? 'raw_transcript'), false),
       'forbidden_context_fields', coalesce(sum(
         case when context ?| array['token','cookie','authorization','headers','email','url_query','transcript','messages'] then 1 else 0 end
-      ), 0)
+      ), 0),
+      'unchecked_rows', count(*) filter (where not (context ? 'conversation_id')),
+      'approved_context_rows', count(*) filter (
+        where context ->> 'conversation_id' = '${conversation}'
+          and context ->> 'surface' = 'guest_header'
+      ),
+      'unapproved_key_rows', count(*) filter (
+        where exists (
+          select 1
+          from jsonb_object_keys(context) as context_key(key)
+          where context_key.key <> all(array[
+            'source','surface','conversation_id','message_id','message_kind',
+            'artifact_id','artifact_type','artifact_status','result_run_id',
+            'strategy_id','saved_strategy_id','confirmation_id',
+            'confirmation_state','confirmation_status','backtest_job_id',
+            'backtest_job_status','failure_code','retryable','rating','tags',
+            'timestamp','page_path','has_attachments','attachment_count'
+          ])
+        )
+      ),
+      'sensitive_value_rows', count(*) filter (
+        where context::text ~* (
+          'Preserved local QA idea'
+          || '|The preserved local QA simulation completed'
+          || '|[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}'
+          || '|bearer|refresh[_ -]?token|cookie|authorization'
+        )
+      )
     )::text
     from public.feedback
     where user_id = '${owner}'
   `);
+}
+
+export function seedDurableRetryableFailure(params: {
+  userId: string;
+  conversationId: string;
+}): {
+  inserted: boolean;
+  failedAssistantId: string;
+} {
+  const owner = requireUuid(params.userId, "failure owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "failure conversation",
+  );
+  const userMessage = randomUUID();
+  const assistantMessage = randomUUID();
+  const prompt = "Retry this local QA recovery turn";
+  const seeded = psqlJson<{ inserted: boolean }>(`
+    with owned_conversation as (
+      select 1
+      from public.conversations
+      where id = '${conversation}'
+        and user_id = '${owner}'
+    ),
+    inserted_user as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        '${userMessage}', '${conversation}', '${owner}', 'user',
+        '${prompt}', '{}'::jsonb, now()
+      from owned_conversation
+      returning 1
+    ),
+    inserted_assistant as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        '${assistantMessage}', '${conversation}', '${owner}', 'assistant',
+        'Something went wrong. Your conversation is saved. Please try again.',
+        jsonb_build_object(
+          'conversation_mode', 'recovery',
+          'agent_runtime_stage_outcome', 'agent_runtime_failure',
+          'recovery', jsonb_build_object(
+            'code', 'runtime_failure',
+            'retryable', true,
+            'language', 'en'
+          ),
+          'retry_last_turn', jsonb_build_object('message', '${prompt}')
+        ),
+        now() + interval '1 millisecond'
+      from owned_conversation
+      cross join inserted_user
+      returning 1
+    )
+    select json_build_object(
+      'inserted',
+      exists(select 1 from inserted_user)
+      and exists(select 1 from inserted_assistant)
+    )::text
+  `);
+  if (!seeded.inserted) {
+    throw new Error("Durable recovery fixture was not inserted");
+  }
+  return {
+    inserted: true,
+    failedAssistantId: assistantMessage,
+  };
+}
+
+export function seedClaimSourceResultFixture(params: {
+  userId: string;
+  conversationId: string;
+}): void {
+  const owner = requireUuid(params.userId, "claim source owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "claim source conversation",
+  );
+  const strategy = randomUUID();
+  const run = randomUUID();
+  const assistantMessage = randomUUID();
+  const seeded = psqlJson<{ ok: boolean }>(`
+    with owned_conversation as (
+      select 1
+      from public.conversations
+      where id = '${conversation}'
+        and user_id = '${owner}'
+    ),
+    inserted_strategy as (
+      insert into public.strategies (
+        id, user_id, conversation_id, name, template, asset_class,
+        symbols, benchmark_symbol
+      )
+      select
+        '${strategy}', '${owner}', '${conversation}',
+        'Guest QA claim source', 'buy_and_hold', 'equity',
+        array['MSFT']::text[], 'SPY'
+      from owned_conversation
+      returning 1
+    ),
+    inserted_run as (
+      insert into public.backtest_runs (
+        id, user_id, conversation_id, strategy_id, status, asset_class,
+        symbols, benchmark_symbol, config_snapshot, conversation_result_card
+      )
+      select
+        '${run}', '${owner}', '${conversation}', '${strategy}', 'completed',
+        'equity', array['MSFT']::text[], 'SPY', '{}'::jsonb,
+        jsonb_build_object(
+          'status', 'completed',
+          'symbols', jsonb_build_array('MSFT'),
+          'benchmark_symbol', 'SPY'
+        )
+      from inserted_strategy
+      returning 1
+    ),
+    inserted_message as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata
+      )
+      select
+        '${assistantMessage}', '${conversation}', '${owner}', 'assistant',
+        'Completed local claim source.',
+        jsonb_build_object(
+          'result_run_id', '${run}',
+          'result_card', jsonb_build_object(
+            'status', 'completed',
+            'symbols', jsonb_build_array('MSFT'),
+            'benchmark_symbol', 'SPY'
+          )
+        )
+      from inserted_run
+      returning 1
+    )
+    select json_build_object(
+      'ok',
+      exists(select 1 from inserted_strategy)
+      and exists(select 1 from inserted_run)
+      and exists(select 1 from inserted_message)
+    )::text
+  `);
+  if (!seeded.ok) {
+    throw new Error("Local claim source fixture was incomplete");
+  }
 }
 
 export function seedClaimGraphFromConversation(params: {
@@ -816,6 +1220,10 @@ export function seedClaimGraphFromConversation(params: {
     idea: randomUUID(),
     version: randomUUID(),
     evidence: randomUUID(),
+    decisionEvidence: randomUUID(),
+    decision: randomUUID(),
+    contextPacket: randomUUID(),
+    runContextPacket: randomUUID(),
   };
   const resultCardExpression = `
     jsonb_set(
@@ -936,6 +1344,46 @@ export function seedClaimGraphFromConversation(params: {
       )
       returning 1
     ),
+    inserted_decision_evidence as (
+      insert into public.evidence_artifacts (
+        id, user_id, idea_id, idea_version_id, source_conversation_id,
+        source_run_id, lifecycle, title, digest, payload
+      ) values (
+        '${ids.decisionEvidence}', '${targetOwner}', '${ids.idea}',
+        '${ids.version}', '${ids.conversation}', null, 'decided',
+        'Preserved local QA prior decision', 'local-qa-decision-digest',
+        '{}'::jsonb
+      )
+      returning 1
+    ),
+    inserted_decision as (
+      insert into public.decision_notes (
+        id, user_id, idea_id, idea_version_id, evidence_artifact_id,
+        source_conversation_id, decision_state, note
+      ) values (
+        '${ids.decision}', '${targetOwner}', '${ids.idea}', '${ids.version}',
+        '${ids.decisionEvidence}', '${ids.conversation}', 'watching',
+        'Preserved prior decision'
+      )
+      returning 1
+    ),
+    inserted_context_packet as (
+      insert into public.context_packets (
+        id, user_id, provider, packet_type, retrieved_at
+      ) values (
+        '${ids.contextPacket}', '${targetOwner}', 'alpaca', 'news', now()
+      )
+      returning 1
+    ),
+    inserted_run_context_packet as (
+      insert into public.run_context_packets (
+        id, user_id, run_id, context_packet_id
+      ) values (
+        '${ids.runContextPacket}', '${targetOwner}', '${ids.run}',
+        '${ids.contextPacket}'
+      )
+      returning 1
+    ),
     inserted_assistant_message as (
       insert into public.messages (
         id, conversation_id, user_id, role, content, metadata
@@ -996,6 +1444,10 @@ export function seedClaimGraphFromConversation(params: {
       and exists(select 1 from inserted_idea)
       and exists(select 1 from inserted_version)
       and exists(select 1 from inserted_evidence)
+      and exists(select 1 from inserted_decision_evidence)
+      and exists(select 1 from inserted_decision)
+      and exists(select 1 from inserted_context_packet)
+      and exists(select 1 from inserted_run_context_packet)
       and exists(select 1 from inserted_assistant_message)
       and exists(select 1 from inserted_checkpoint)
       and (select count(*) from inserted_usage) = 2
@@ -1246,13 +1698,26 @@ function sanitizedEndpoint(rawUrl: string, method: string): string {
 function browserErrorCategory(
   event: BrowserSafetyDetail["event"],
   rawError: string,
+  status?: number | null,
 ): string {
+  if (typeof status === "number" && status >= 500) {
+    return "http_server_error";
+  }
+  if (typeof status === "number" && status >= 400) {
+    return "http_client_error";
+  }
   const value = rawError.toLowerCase();
   if (
     value.includes("err_connection_refused") ||
     value.includes("connection refused")
   ) {
     return "connection_refused";
+  }
+  if (
+    value.includes("err_connection_reset") ||
+    value.includes("connection reset")
+  ) {
+    return "connection_reset";
   }
   if (value.includes("err_aborted") || value.includes("abort")) {
     return "aborted";
@@ -1292,10 +1757,26 @@ export function browserSafetyDetail(input: {
       typeof input.status === "number" && Number.isInteger(input.status)
         ? input.status
         : null,
-    category: browserErrorCategory(input.event, input.rawError ?? ""),
+    category: browserErrorCategory(
+      input.event,
+      input.rawError ?? "",
+      input.status,
+    ),
     check: input.context.check,
     phase: input.context.phase,
   };
+}
+
+export function productFailedRequestsForCheck(
+  details: BrowserSafetyDetail[],
+  check: GuestCheckNumber,
+): BrowserSafetyDetail[] {
+  return details.filter(
+    (detail) =>
+      detail.event === "failed_request" &&
+      detail.check === check &&
+      detail.phase === "product",
+  );
 }
 
 export class BrowserSafetyMonitor {
@@ -1351,14 +1832,42 @@ export class BrowserSafetyMonitor {
         }),
       );
     });
+    page.on("response", (response) => {
+      if (response.status() < 400) return;
+      this.failedRequests += 1;
+      this.details.push(
+        browserSafetyDetail({
+          event: "failed_request",
+          rawUrl: response.url(),
+          method: response.request().method(),
+          status: response.status(),
+          context: this.context(),
+        }),
+      );
+    });
     page.on("request", (request) => {
       const url = new URL(request.url());
       const isWrite = !["GET", "HEAD", "OPTIONS"].includes(request.method());
       if (isWrite) {
-        const key = `${request.method()} ${normalizeRoute(request.url())}`;
+        const key = sanitizedEndpoint(request.url(), request.method());
         this.mutations.set(key, (this.mutations.get(key) ?? 0) + 1);
         if (!["localhost", "127.0.0.1"].includes(url.hostname)) {
           this.hostedWrites += 1;
+        }
+      }
+      if (!["localhost", "127.0.0.1"].includes(url.hostname)) {
+        const headers = request.headers();
+        const sensitiveShape = [
+          url.search,
+          Object.keys(headers).join(" "),
+          request.postData() ?? "",
+        ].join(" ");
+        if (
+          /token|cookie|authorization|bearer|password|email|session|secret/i.test(
+            sensitiveShape,
+          )
+        ) {
+          this.credentialExposure += 1;
         }
       }
     });
@@ -1405,27 +1914,66 @@ export async function safeScreenshot(
 ): Promise<void> {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Unsafe screenshot name");
   const destination = path.join(evidenceDirectory(), `${name}.png`);
+  const mask = [
+    page.locator('input[type="email"]'),
+    page.locator('input[type="password"]'),
+    page.locator("textarea"),
+    page.locator('[data-conversation-id]'),
+  ];
   if (target) {
-    await target.screenshot({ path: destination });
+    await target.screenshot({ path: destination, mask });
   } else {
     await page.screenshot({
       path: destination,
       fullPage: false,
-      mask: [
-        page.locator('input[type="email"]'),
-        page.locator('input[type="password"]'),
-        page.locator("textarea"),
-        page.locator('[data-conversation-id]'),
-      ],
+      mask,
     });
   }
   chmodSync(destination, 0o600);
 }
 
-function assertSafeEvidence(evidence: SafeEvidence): void {
+export function assertSafeEvidence(evidence: SafeEvidence): void {
   const candidate = requireCandidateSha();
   if (evidence.candidate_sha !== candidate) {
     throw new Error("Evidence SHA does not match candidate");
+  }
+  const labels = [
+    ...evidence.owner_labels,
+    ...evidence.conversation_labels,
+    ...evidence.artifact_labels,
+  ];
+  if (labels.some((label) => !/^[0-9a-f]{20}$/.test(label))) {
+    throw new Error("Evidence contains a non-hashed product identifier");
+  }
+  const safeEndpoint = /^[A-Z]+ \/[A-Za-z0-9_./:@-]+$/;
+  const safeCategories = new Set([
+    "connection_refused",
+    "connection_reset",
+    "aborted",
+    "timeout",
+    "hydration_error",
+    "network_error",
+    "console_error",
+    "page_error",
+    "failed_request",
+    "http_client_error",
+    "http_server_error",
+  ]);
+  for (const detail of evidence.browser_safety_details) {
+    if (
+      (detail.endpoint !== null && !safeEndpoint.test(detail.endpoint)) ||
+      !safeCategories.has(detail.category) ||
+      (detail.check !== null && (detail.check < 1 || detail.check > 20))
+    ) {
+      throw new Error("Evidence contains an unsafe browser safety detail");
+    }
+  }
+  if (
+    Object.keys(evidence.normalized_mutation_counts).some(
+      (endpoint) => !safeEndpoint.test(endpoint),
+    )
+  ) {
+    throw new Error("Evidence contains an unsafe mutation endpoint");
   }
   const serialized = JSON.stringify(evidence);
   if (
@@ -1599,7 +2147,13 @@ export function emptyEvidence(): SafeEvidence {
     page_error_count: 0,
     failed_request_count: 0,
     browser_safety_details: [],
+    teardown_console_error_count: 0,
+    teardown_page_error_count: 0,
+    teardown_failed_request_count: 0,
+    teardown_hosted_write_count: 0,
+    teardown_credential_exposure_count: 0,
     hosted_write_count: 0,
+    server_product_analytics_disabled: false,
     credential_exposure_count: 0,
     provider_cost_usd: 0,
     provider_latency_ms: 0,

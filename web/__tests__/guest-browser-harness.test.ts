@@ -1,11 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   BrowserSafetyMonitor,
   CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES,
+  assertSafeEvidence,
+  binaryEvidenceDiffers,
   browserSafetyDetail,
   confirmationContinuityChecks,
   distinctConfirmationFacts,
+  emptyEvidence,
   latestConfirmationFacts,
+  latestResultFacts,
+  productFailedRequestsForCheck,
+  resultTruthStayedStable,
   type ConfirmationFacts,
   type PersistedMessageItem,
 } from "../e2e/support/guest-qa";
@@ -262,6 +270,12 @@ describe("browser safety evidence", () => {
       type: () => "error",
       text: () => "Hydration failed with founder@example.com",
     });
+    pageStub.emit("response", {
+      status: () => 429,
+      url: () =>
+        "http://127.0.0.1:8000/api/v1/backtests/4f8c3dea-c926-4e33-9d50-959bd43d4868?token=secret",
+      request: () => ({ method: () => "POST" }),
+    });
     phase = "teardown";
     pageStub.emit("requestfailed", {
       url: () =>
@@ -283,6 +297,15 @@ describe("browser safety evidence", () => {
       {
         event: "failed_request",
         component: "network",
+        endpoint: "POST /api/v1/backtests/:id",
+        status: 429,
+        category: "http_client_error",
+        check: 4,
+        phase: "product",
+      },
+      {
+        event: "failed_request",
+        component: "network",
         endpoint: "POST /api/v1/conversations/:id/messages",
         status: null,
         category: "aborted",
@@ -292,6 +315,322 @@ describe("browser safety evidence", () => {
     ]);
     expect(JSON.stringify(monitor.detailSnapshot())).not.toMatch(
       /founder|secret|bearer|token|4f8c3dea/i,
+    );
+  });
+
+  test("selects a product-phase failed request without accepting teardown noise", () => {
+    const expected = browserSafetyDetail({
+      event: "failed_request",
+      rawUrl: "http://127.0.0.1:8000/api/v1/chat/stream",
+      method: "POST",
+      rawError: "net::ERR_CONNECTION_RESET",
+      context: { check: 18, phase: "product" },
+    });
+    const unrelated = browserSafetyDetail({
+      event: "failed_request",
+      rawUrl: "http://127.0.0.1:8000/api/v1/me",
+      method: "GET",
+      rawError: "net::ERR_ABORTED",
+      context: { check: 18, phase: "teardown" },
+    });
+
+    expect(productFailedRequestsForCheck([expected, unrelated], 18)).toEqual([
+      {
+        event: "failed_request",
+        component: "network",
+        endpoint: "POST /api/v1/chat/stream",
+        status: null,
+        category: "connection_reset",
+        check: 18,
+        phase: "product",
+      },
+    ]);
+  });
+
+  test("detects credential-shaped data on a non-loopback request without retaining it", () => {
+    type StubHandler = (payload: unknown) => void;
+    const handlers = new Map<string, StubHandler[]>();
+    const pageStub = {
+      on(event: string, handler: StubHandler) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+        return pageStub;
+      },
+      emit(event: string, payload: unknown) {
+        for (const handler of handlers.get(event) ?? []) handler(payload);
+      },
+    };
+    const monitor = new BrowserSafetyMonitor();
+    monitor.attach(
+      pageStub as unknown as Parameters<BrowserSafetyMonitor["attach"]>[0],
+    );
+
+    pageStub.emit("request", {
+      url: () => "https://example.invalid/collect?token=opaque-secret",
+      method: () => "POST",
+      headers: () => ({ authorization: "Bearer opaque-secret" }),
+      postData: () => '{"cookie":"opaque-secret"}',
+    });
+
+    expect(monitor.hostedWrites).toBe(1);
+    expect(monitor.credentialExposure).toBe(1);
+    expect(JSON.stringify(monitor.detailSnapshot())).not.toContain(
+      "opaque-secret",
+    );
+  });
+
+  test("accepts only hashed identifiers and classified endpoint evidence", () => {
+    const previousCandidate = process.env.ARGUS_CANDIDATE_SHA;
+    process.env.ARGUS_CANDIDATE_SHA = "a".repeat(40);
+    try {
+      const safe = emptyEvidence();
+      safe.owner_labels = ["b".repeat(20)];
+      safe.normalized_mutation_counts = {
+        "POST /api/v1/auth/guest/link": 1,
+      };
+      assertSafeEvidence(safe);
+
+      const unsafeCategory = {
+        ...safe,
+        browser_safety_details: [
+          {
+            event: "console_error" as const,
+            component: "browser_console" as const,
+            endpoint: null,
+            status: null,
+            category: "raw transcript prose",
+            check: 2 as const,
+            phase: "product" as const,
+          },
+        ],
+      };
+      expect(() => assertSafeEvidence(unsafeCategory)).toThrow(
+        "unsafe browser safety detail",
+      );
+
+      const unsafeEndpoint = {
+        ...safe,
+        normalized_mutation_counts: {
+          "POST /api/v1/feedback?token=opaque": 1,
+        },
+      };
+      expect(() => assertSafeEvidence(unsafeEndpoint)).toThrow(
+        "unsafe mutation endpoint",
+      );
+    } finally {
+      if (previousCandidate === undefined) {
+        delete process.env.ARGUS_CANDIDATE_SHA;
+      } else {
+        process.env.ARGUS_CANDIDATE_SHA = previousCandidate;
+      }
+    }
+  });
+});
+
+describe("guest result and chart evidence", () => {
+  test("requires typed result identities and selects the latest durable result", () => {
+    const first: PersistedMessageItem = {
+      id: "message-result-1",
+      conversation_id: "conversation-fixture",
+      role: "assistant",
+      content: "redacted fixture prose",
+      metadata: {
+        result_run_id: "run-1",
+        result_card: { evidenceArtifactId: "evidence-1" },
+      },
+    };
+    const second: PersistedMessageItem = {
+      ...first,
+      id: "message-result-2",
+      metadata: {
+        result_run_id: "run-2",
+        result_card: { evidenceArtifactId: "evidence-2" },
+      },
+    };
+
+    expect(latestResultFacts([first, second])).toEqual({
+      messageId: "message-result-2",
+      runId: "run-2",
+      evidenceId: "evidence-2",
+    });
+    expect(() =>
+      latestResultFacts([
+        {
+          ...second,
+          metadata: {
+            result_card: {
+              description: "run-2 evidence-2",
+            },
+          },
+        },
+      ]),
+    ).toThrow("typed result");
+  });
+
+  test("distinguishes a changed chart viewport and exact immutable result truth", () => {
+    expect(
+      binaryEvidenceDiffers(
+        new Uint8Array([1, 2, 3]),
+        new Uint8Array([1, 2, 3]),
+      ),
+    ).toBe(false);
+    expect(
+      binaryEvidenceDiffers(
+        new Uint8Array([1, 2, 3]),
+        new Uint8Array([1, 4, 3]),
+      ),
+    ).toBe(true);
+    expect(
+      resultTruthStayedStable(
+        { rows: 1, fingerprint: "truth-a" },
+        { rows: 1, fingerprint: "truth-a" },
+      ),
+    ).toBe(true);
+    expect(
+      resultTruthStayedStable(
+        { rows: 1, fingerprint: "truth-a" },
+        { rows: 1, fingerprint: "truth-b" },
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Checks 6–20 harness guards", () => {
+  const source = readFileSync(
+    join(import.meta.dir, "../e2e/guest-experience.spec.ts"),
+    "utf-8",
+  );
+  const checkSource = (number: number) => {
+    const start =
+      new RegExp(`await runStep\\(\\s*${number}\\b`).exec(source)?.index ?? -1;
+    const end =
+      number === 20
+        ? source.indexOf("  } finally {", start)
+        : (new RegExp(`await runStep\\(\\s*${number + 1}\\b`).exec(source)
+            ?.index ?? -1);
+    if (start < 0 || end < 0) {
+      throw new Error(`Check ${number} source boundary is missing`);
+    }
+    return source.slice(start, end);
+  };
+
+  test("does not use hidden range details or the permanent spacer as evidence", () => {
+    expect(source).not.toContain(
+      'getByTestId("result-chart-visible-period")',
+    );
+    expect(source).not.toContain(
+      '".argus-scrollbar > .space-y-8 > *"',
+    );
+    expect(source).toContain('toHaveAttribute("aria-pressed", "true")');
+    expect(source).toContain("binaryEvidenceDiffers");
+  });
+
+  test("uses typed API and database truth for result, usage, reload, and Recents", () => {
+    const check7 = checkSource(7);
+    const check8 = checkSource(8);
+    const check9 = checkSource(9);
+
+    expect(check7).toContain("latestResultFacts");
+    expect(check7).toContain("guest_session");
+    expect(check7).toContain("graph.runs");
+    expect(check8).toContain("messagesResponse");
+    expect(check8).toContain("latestResultFacts");
+    expect(check8).toContain("conversationGraph");
+    expect(check9).toContain('goto("/chat"');
+    expect(check9).toContain("data-conversation-id");
+    expect(check9).toContain("primaryExpiry");
+  });
+
+  test("scopes Omnisearch to its overlay and typed owned result classes", () => {
+    const check10 = checkSource(10);
+
+    expect(check10).toContain("searchSurface(page)");
+    expect(check10).toContain("allowedGuestItemTypes");
+    expect(check10).toContain("deniedBodyContainsNoPrivatePayload");
+    expect(check10).not.toContain("JSON.stringify(search.body).includes");
+  });
+
+  test("binds Check 11 to a distinct persisted confirmation before clicking Run", () => {
+    const check11 = checkSource(11);
+
+    expect(check11).toContain("distinctConfirmationFacts");
+    expect(check11).toContain("confirmationCards(page)");
+    expect(check11).not.toContain("runButtons.last()");
+  });
+
+  test("keeps decision and cancel assertions scoped to the typed result artifact", () => {
+    const check12 = checkSource(12);
+    const check14 = checkSource(14);
+
+    expect(check12).toContain("resultCard(page)");
+    expect(check12).toContain("primaryEvidenceId");
+    expect(check14).toContain("resultCard(page)");
+    expect(check14).toContain("handoffCount");
+    expect(check14).toContain("snapshotStayedStable");
+  });
+
+  test("preserves the approved public-mode New chat acceptance", () => {
+    const check13 = checkSource(13);
+
+    expect(check13).toContain(
+      'getByRole("button", { name: "Create account" })',
+    );
+    expect(check13).toContain(
+      'getByRole("button", { name: "Sign in to keep it" })',
+    );
+  });
+
+  test("proves typed exactly-once conversion and complete atomic claim graphs", () => {
+    const check15 = checkSource(15);
+    const check16 = checkSource(16);
+
+    expect(check15).toContain("same_uuid_conversion");
+    expect(check15).toContain("decisionTargetsEvidence");
+    expect(check15).toContain("POST /api/v1/auth/guest/link");
+    expect(check16).toContain("context_packets");
+    expect(check16).toContain("run_context_packets");
+    expect(check16).toContain("sameGraphIds");
+    expect(check16).toContain("guestClaim.pending_action");
+    expect(check16).toContain("decisionTargetsEvidence");
+  });
+
+  test("proves feedback consent in both directions without storing private evidence", () => {
+    const check17 = checkSource(17);
+
+    expect(check17).toContain("uncheckedContext");
+    expect(check17).toContain("approvedContext");
+    expect(check17).toContain("feedbackPrivacy({");
+    expect(check17).toContain("sensitive_value_rows");
+  });
+
+  test("hydrates a durable retry and never fabricates recovery with request aborts", () => {
+    const check18 = checkSource(18);
+
+    expect(check18).toContain("seedDurableRetryableFailure");
+    expect(check18).toContain("messagesResponse");
+    expect(check18).not.toContain('route.abort("connectionreset")');
+    expect(check18).not.toContain("unroute");
+  });
+
+  test("uses the bounded cleanup predicate and preserves claimed graph ownership", () => {
+    const check19 = checkSource(19);
+
+    expect(check19).toContain("cleanupExpectedGuestCandidates");
+    expect(check19).toContain("markClaimedWorkspaceCleanupReady");
+    expect(check19).toContain("claimedDestinationBefore");
+    expect(check19).toContain("sameGraphIds");
+  });
+
+  test("keeps product safety failures separate from sanitized teardown evidence", () => {
+    const check20 = checkSource(20);
+    const teardown = source.slice(source.indexOf("  } finally {"));
+
+    expect(check20).toContain('detail.phase === "product"');
+    expect(check20).toContain("server_product_analytics_disabled");
+    expect(check20).toContain("deniedBodyContainsNoPrivatePayload");
+    expect(teardown).toContain('detail.phase === "teardown"');
+    expect(teardown).toContain("teardown_failed_request_count");
+    expect(teardown).not.toContain(
+      "evidence.failed_request_count = monitors.reduce",
     );
   });
 });

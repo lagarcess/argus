@@ -35,7 +35,7 @@ if [ -n "$status" ]; then
   invalid_path="$(
     git status --porcelain |
       sed -E 's/^.. //' |
-      grep -Ev '^(web/e2e/|scripts/qa/README\.md$|scripts/qa/run-guest-experience-qa\.sh$)' |
+      grep -Ev '^(web/e2e/|web/__tests__/guest-browser-harness\.test\.ts$|scripts/qa/README\.md$|scripts/qa/run-guest-experience-qa\.sh$)' |
       head -1 || true
   )"
   [ -z "$invalid_path" ] || {
@@ -119,6 +119,8 @@ export NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 export NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 export NEXT_PUBLIC_POSTHOG_KEY=
 unset NEXT_PUBLIC_POSTHOG_HOST || true
+unset POSTHOG_PROJECT_TOKEN POSTHOG_REGION POSTHOG_HOST \
+  ARGUS_POSTHOG_TIMEOUT_SECONDS || true
 
 if [ "$mode" = "authoritative" ]; then
   argus_require_qa_env

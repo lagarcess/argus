@@ -1,13 +1,20 @@
 import { expect, test } from "@playwright/test";
 import {
   BackendController,
+  BrowserSafetyMonitor,
   GUEST_ACCEPTANCE_CHECKS,
+  apiJson,
   assertExactLocalCandidate,
   assertFreshContext,
   assertZeroState,
+  conversationGraph,
   deleteDisposableIdentity,
+  feedbackPrivacy,
   freshGuest,
   purgeDisposableQaEvidence,
+  seedClaimGraphFromConversation,
+  seedClaimSourceResultFixture,
+  seedDurableRetryableFailure,
   zeroStateSnapshot,
 } from "./support/guest-qa";
 
@@ -32,6 +39,8 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
   ).toBe(true);
 
   const backend = new BackendController();
+  const monitor = new BrowserSafetyMonitor();
+  monitor.attach(page);
   let guestOwner = "";
   try {
     await backend.start(false);
@@ -69,6 +78,9 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
       "http://localhost:8000/api/v1/auth/session",
     );
     expect([200, 401]).toContain(response.status);
+    expect(monitor.detailSnapshot()).toEqual([]);
+    expect(monitor.hostedWrites).toBe(0);
+    expect(monitor.credentialExposure).toBe(0);
   } finally {
     await backend.stop();
     if (guestOwner) await deleteDisposableIdentity(guestOwner);
@@ -116,6 +128,219 @@ test("guest entry errors fail promptly without minting an identity", async ({
     expect(zeroStateSnapshot().auth_users).toBe(0);
   } finally {
     await backend.stop();
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("durable retry fixture hydrates without sending an interpreter turn", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    const created = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(created.status).toBe(200);
+    expect(
+      seedDurableRetryableFailure({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      }).inserted,
+    ).toBe(true);
+    await page.goto(
+      `/chat?conversation=${created.body.conversation.id}`,
+      { waitUntil: "domcontentloaded" },
+    );
+    await expect(
+      page.getByText(
+        "Something went wrong. Your conversation is saved. Please try again.",
+      ),
+    ).toBeVisible();
+    const failureMessage = page
+      .locator("div.group.relative")
+      .filter({
+        has: page.getByText(
+          "Something went wrong. Your conversation is saved. Please try again.",
+          { exact: true },
+        ),
+      })
+      .first();
+    await expect(
+      failureMessage.getByRole("button", { name: /Retry|Try again/i }),
+    ).toHaveCount(1);
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("complete claim graph fixture seeds and tears down without an interpreter turn", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  const disposableOwners = new Set<string>();
+  const browser = page.context().browser();
+  if (!browser) throw new Error("Claim fixture preflight needs a browser");
+  const targetContext = await browser.newContext();
+  try {
+    await backend.start(false);
+    const sourceGuest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        disposableOwners.add(owner);
+      },
+    });
+    disposableOwners.add(sourceGuest.user.id);
+    const sourceConversation = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(sourceConversation.status).toBe(200);
+    seedClaimSourceResultFixture({
+      userId: sourceGuest.user.id,
+      conversationId: sourceConversation.body.conversation.id,
+    });
+
+    await assertFreshContext(targetContext);
+    const targetPage = await targetContext.newPage();
+    const targetGuest = await freshGuest(targetPage, {
+      onBootstrapOwner(owner) {
+        disposableOwners.add(owner);
+      },
+    });
+    disposableOwners.add(targetGuest.user.id);
+    const seeded = seedClaimGraphFromConversation({
+      sourceOwnerId: sourceGuest.user.id,
+      sourceConversationId: sourceConversation.body.conversation.id,
+      targetOwnerId: targetGuest.user.id,
+    });
+    const graph = conversationGraph(
+      targetGuest.user.id,
+      seeded.conversationId,
+    );
+    expect(
+      graph.conversation.length === 1 &&
+        graph.messages.length === 2 &&
+        graph.strategies.length === 1 &&
+        graph.jobs.length === 1 &&
+        graph.runs.length === 1 &&
+        graph.ideas.length === 1 &&
+        graph.idea_versions.length === 1 &&
+        graph.evidence.length === 2 &&
+        graph.decisions.length === 1 &&
+        graph.context_packets.length === 1 &&
+        graph.run_context_packets.length === 1 &&
+        graph.checkpoints.length === 1,
+    ).toBe(true);
+  } finally {
+    await targetContext.close();
+    await backend.stop();
+    for (const owner of disposableOwners) {
+      await deleteDisposableIdentity(owner);
+    }
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("feedback evidence helper distinguishes consent without private content", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    const created = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(created.status).toBe(200);
+    const baseContext = {
+      surface: "guest_header",
+      tags: [],
+      hasAttachments: false,
+      attachmentCount: 0,
+    };
+    const unchecked = await apiJson<{ success: boolean }>(
+      page.context().request,
+      "/feedback",
+      {
+        method: "POST",
+        data: {
+          type: "general",
+          message: "Local consent boundary feedback.",
+          context: baseContext,
+        },
+      },
+    );
+    const checked = await apiJson<{ success: boolean }>(
+      page.context().request,
+      "/feedback",
+      {
+        method: "POST",
+        data: {
+          type: "general",
+          message: "Local approved identifier feedback.",
+          context: {
+            ...baseContext,
+            conversation_id: created.body.conversation.id,
+          },
+        },
+      },
+    );
+    expect(
+      unchecked.status === 200 &&
+        unchecked.body.success &&
+        checked.status === 200 &&
+        checked.body.success,
+    ).toBe(true);
+    expect(
+      feedbackPrivacy({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      }),
+    ).toEqual({
+      rows: 2,
+      email_present: false,
+      transcript_present: false,
+      forbidden_context_fields: 0,
+      unchecked_rows: 1,
+      approved_context_rows: 1,
+      unapproved_key_rows: 0,
+      sensitive_value_rows: 0,
+    });
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
     purgeDisposableQaEvidence();
     assertZeroState();
   }
