@@ -19,12 +19,171 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
 )
 from argus.agent_runtime.strategy_contract import has_partial_explicit_date_range
+from argus.nlp.natural_time import resolve_date_range_text
 
 _DATE_RANGE_EVIDENCE_KEYS = (
     "date_range",
     "date_range_raw_text",
     "date_range_intent",
 )
+
+
+def _strip_unowned_pending_date_candidate(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if interpretation.semantic_turn_act != "answer_pending_need":
+        return interpretation
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return interpretation
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return interpretation
+    if "pending_response_option_selected" in interpretation.reason_codes:
+        return interpretation
+
+    candidate = interpretation.candidate_strategy_draft
+    if _pending_date_claim_is_explicitly_owned(
+        strategy=candidate,
+        current_user_message=current_user_message,
+    ):
+        return interpretation
+    extra_parameters = dict(candidate.extra_parameters or {})
+    field_provenance = extra_parameters.get("field_provenance")
+    has_date_claim = candidate.date_range not in (
+        None,
+        "",
+        [],
+        {},
+    ) or any(key in extra_parameters for key in _DATE_RANGE_EVIDENCE_KEYS)
+    if isinstance(field_provenance, dict) and "date_range" in field_provenance:
+        has_date_claim = True
+    if not has_date_claim:
+        return interpretation
+
+    if isinstance(field_provenance, dict):
+        field_provenance = dict(field_provenance)
+        field_provenance.pop("date_range", None)
+        if field_provenance:
+            extra_parameters["field_provenance"] = field_provenance
+        else:
+            extra_parameters.pop("field_provenance", None)
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        evidence_spans = {
+            key: value
+            for key, value in evidence_spans.items()
+            if key not in _DATE_RANGE_EVIDENCE_KEYS
+        }
+        if evidence_spans:
+            extra_parameters["evidence_spans"] = evidence_spans
+        else:
+            extra_parameters.pop("evidence_spans", None)
+    extra_parameters.pop("date_range_raw_text", None)
+    extra_parameters.pop("date_range_intent", None)
+
+    return interpretation.model_copy(
+        update={
+            "candidate_strategy_draft": candidate.model_copy(
+                update={
+                    "date_range": None,
+                    "extra_parameters": extra_parameters,
+                },
+                deep=True,
+            ),
+            "requires_clarification": True,
+            "assistant_response": None,
+            "missing_required_fields": list(
+                dict.fromkeys([*interpretation.missing_required_fields, "date_range"])
+            ),
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *interpretation.reason_codes,
+                        "pending_date_answer_unowned_candidate_stripped",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def _pending_date_claim_is_explicitly_owned(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> bool:
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    provenance = (
+        field_provenance.get("date_range")
+        if isinstance(field_provenance, dict)
+        else None
+    )
+    if provenance not in (None, "explicit_user"):
+        return False
+    current_message = current_user_message.strip().casefold()
+    if not current_message:
+        return False
+    candidate_endpoints = _date_range_endpoints(strategy.date_range)
+    if candidate_endpoints is not None and bool(candidate_endpoints[0]) != bool(
+        candidate_endpoints[1]
+    ):
+        return True
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict) and intent.get("kind") == "endpoint_patch":
+        return True
+    if isinstance(strategy.date_range, str):
+        normalized_date_range = strategy.date_range.strip().casefold()
+        if normalized_date_range and any(
+            evidence.strip().casefold() == normalized_date_range
+            and normalized_date_range in current_message
+            for evidence in _strategy_date_evidence_candidates(strategy)
+        ):
+            return True
+    if candidate_endpoints is None and isinstance(strategy.date_range, str):
+        resolved_candidate = resolve_date_range_text(
+            strategy.date_range,
+            languages=("en", "es"),
+        )
+        if resolved_candidate is not None:
+            candidate_endpoints = _date_range_endpoints(resolved_candidate.payload)
+    if candidate_endpoints is None:
+        return False
+    if isinstance(intent, dict):
+        evidence = str(intent.get("evidence") or "").strip()
+        if evidence and evidence.casefold() in current_message:
+            if intent.get("kind") == "calendar_year":
+                year = intent.get("year")
+                if isinstance(year, int) and candidate_endpoints == (
+                    f"{year:04d}-01-01",
+                    f"{year:04d}-12-31",
+                ):
+                    return True
+            if intent.get("kind") == "explicit_range" and candidate_endpoints == (
+                str(intent.get("start") or ""),
+                str(intent.get("end") or ""),
+            ):
+                return True
+    for evidence in _strategy_date_evidence_candidates(strategy):
+        normalized_evidence = evidence.strip().casefold()
+        if not normalized_evidence or normalized_evidence not in current_message:
+            continue
+        resolved_evidence = resolve_date_range_text(
+            evidence,
+            languages=("en", "es"),
+        )
+        if (
+            resolved_evidence is not None
+            and _date_range_endpoints(resolved_evidence.payload)
+            == candidate_endpoints
+        ):
+            return True
+    return False
 
 
 def _changed_date_endpoint(

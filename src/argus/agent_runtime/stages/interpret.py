@@ -235,6 +235,7 @@ from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noq
     _strategy_date_evidence_candidates,
     _strategy_date_range_needs_current_message_repair,
     _strategy_has_non_executable_timeframe_label,
+    _strip_unowned_pending_date_candidate,
 )
 from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # noqa: F401
     _LATEST_RESULT_SAVE_REQUESTED_REASON,
@@ -463,6 +464,11 @@ async def _stage_result_from_interpretation(
     interpretation = _repair_fresh_restatement_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _strip_unowned_pending_date_candidate(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
         selected_thread_metadata=selected_thread_metadata,
     )
     interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
@@ -1694,6 +1700,9 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     )
     if repaired is None:
         return interpretation
+    repaired.reason_codes = list(
+        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
+    )
     return repaired
 
 
