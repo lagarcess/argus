@@ -5668,6 +5668,70 @@ def test_pending_date_typed_option_preserves_selected_window(
     assert "pending_response_option_selected" in result.decision.reason_codes
 
 
+def test_interpreter_unavailable_pending_date_stops_with_no_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": {
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    }
+                },
+            }
+        ],
+    }
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Use a reasonable period.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "requested_field": "date_range",
+                "last_stage_outcome": "await_user_reply",
+                "response_intent": response_intent,
+            },
+            structured_interpreter=RecordingInterpreter(None),
+        )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft == pending
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert result.patch["response_intent"]["requested_fields"] == ["date_range"]
+    assert result.patch["requested_field"] == "date_range"
+    assert "recovery" not in result.patch
+
+
 def test_answered_fields_survive_no_progress_stop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
