@@ -268,7 +268,11 @@ def _period_adjustment_from_launch_payload(
     launch_payload: dict[str, Any],
 ) -> dict[str, Any] | None:
     coverage = launch_payload.get("coverage_preflight")
-    if not isinstance(coverage, dict) or coverage.get("outcome") != "adjusted_coverage":
+    if (
+        not isinstance(coverage, dict)
+        or coverage.get("outcome") != "adjusted_coverage"
+        or coverage.get("adjustment_reason") != "provider_coverage_adjustment"
+    ):
         return None
     requested = _date_range_payload(coverage.get("requested_date_range"))
     effective = _date_range_payload(coverage.get("effective_date_range"))
