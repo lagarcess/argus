@@ -793,10 +793,16 @@ class ShadowBacktestJobTool:
     def _maybe_create_shadow_job(
         self, payload: dict[str, Any]
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        if not backtest_jobs_shadow_enabled():
-            return None, None
+        from argus.api.guest_observability import guest_session_allowance_present
 
         context = current_backtest_job_shadow_context()
+        guest_admission_required = (
+            context is not None
+            and guest_session_allowance_present(context.allowance_limits)
+        )
+        if not backtest_jobs_shadow_enabled() and not guest_admission_required:
+            return None, None
+
         if context is None:
             logger.warning(
                 "Backtest job shadow flag enabled without request context; skipping",
@@ -838,16 +844,17 @@ class ShadowBacktestJobTool:
             job_id = str(job.get("id") or "").strip()
             if job_id:
                 context.created_job_id = job_id
-                self._maybe_dispatch_shadow_job(
-                    gateway=gateway,
-                    context=context,
-                    job_id=job_id,
-                    job=job,
-                    payload_digest=payload_digest,
-                )
+                if backtest_jobs_shadow_enabled():
+                    self._maybe_dispatch_shadow_job(
+                        gateway=gateway,
+                        context=context,
+                        job_id=job_id,
+                        job=job,
+                        payload_digest=payload_digest,
+                    )
                 return dict(job), None
         except Exception as exc:
-            if not self._dev_memory_fallback_getter():
+            if guest_admission_required or not self._dev_memory_fallback_getter():
                 raise
             logger.warning(
                 "Shadow backtest job creation failed; continuing in-process execution",

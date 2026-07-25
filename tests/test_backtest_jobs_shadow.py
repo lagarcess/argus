@@ -269,6 +269,19 @@ def _context() -> BacktestJobShadowContext:
     )
 
 
+def _guest_context() -> BacktestJobShadowContext:
+    context = _context()
+    context.allowance_limits = [
+        {
+            "period": "guest_session",
+            "limit": 1,
+            "period_start": "2026-07-24T12:00:00+00:00",
+            "period_end": "2026-07-31T12:00:00+00:00",
+        }
+    ]
+    return context
+
+
 def test_render_workflow_dispatcher_uses_local_task_server_without_render_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -298,9 +311,9 @@ def test_render_workflow_dispatcher_uses_local_task_server_without_render_api_ke
 
     monkeypatch.setattr(backtest_jobs.httpx, "post", fake_post)
 
-    result = RenderWorkflowDispatcher(
-        task_id="argus-backtests/workflow_proof"
-    ).dispatch(job_id="job-1", nonce="nonce-1")
+    result = RenderWorkflowDispatcher(task_id="argus-backtests/workflow_proof").dispatch(
+        job_id="job-1", nonce="nonce-1"
+    )
 
     assert result == {"id": "trn-local", "status": "pending"}
     assert calls == [
@@ -349,7 +362,9 @@ def test_render_task_run_client_uses_local_task_server_without_render_api_key(
     ]
 
 
-def test_shadow_backtest_job_tool_is_noop_when_flag_disabled(monkeypatch) -> None:
+def test_registered_shadow_backtest_job_tool_is_noop_when_flag_disabled(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", raising=False)
     events: list[str] = []
     gateway = _Gateway(events)
@@ -368,6 +383,78 @@ def test_shadow_backtest_job_tool_is_noop_when_flag_disabled(monkeypatch) -> Non
     assert events == ["delegate"]
     assert gateway.jobs == []
     assert delegate.calls == [payload]
+
+
+def test_guest_flag_off_admits_job_before_in_process_execution(monkeypatch) -> None:
+    monkeypatch.delenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", raising=False)
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events)
+    dispatcher = _Dispatcher(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    payload = _payload()
+    context = _guest_context()
+
+    with backtest_job_shadow_context(context):
+        result = tool.run(payload)
+
+    assert result == {"success": True, "payload": {"result": "ok"}}
+    assert events == ["job", "delegate"]
+    assert len(gateway.jobs) == 1
+    assert gateway.jobs[0]["allowance_limits"] == context.allowance_limits
+    assert context.created_job_id == "job-1"
+    assert dispatcher.calls == []
+    assert delegate.calls == [payload]
+
+
+def test_guest_flag_off_admission_failure_fails_closed_with_memory_fallback(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", raising=False)
+    events: list[str] = []
+    gateway = _Gateway(events, should_raise=True)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+    )
+
+    with backtest_job_shadow_context(_guest_context()):
+        with pytest.raises(RuntimeError, match="write failed"):
+            tool.run(_payload())
+
+    assert events == ["job"]
+    assert delegate.calls == []
+
+
+def test_guest_flag_off_conversion_required_skips_delegate(monkeypatch) -> None:
+    monkeypatch.delenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", raising=False)
+    events: list[str] = []
+    gateway = _CapacityRejectingGateway(events, decision="conversion_required")
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+    )
+
+    with backtest_job_shadow_context(_guest_context()):
+        result = tool.run(_payload())
+
+    assert result["success"] is False
+    assert result["retryable"] is False
+    assert result["capability_context"]["execution_status"] == "rejected"
+    assert result["capability_context"]["failure_code"] == "account_conversion_required"
+    assert events == []
+    assert gateway.jobs == []
+    assert delegate.calls == []
 
 
 def test_shadow_backtest_job_tool_creates_job_before_in_process_execution(
