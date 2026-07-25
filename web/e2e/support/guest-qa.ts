@@ -1323,6 +1323,7 @@ export function seedClaimGraphFromConversation(params: {
   sourceOwnerId: string;
   sourceConversationId: string;
   targetOwnerId: string;
+  includeCleanupEvidence?: boolean;
 }): {
   conversationId: string;
   evidenceId: string;
@@ -1336,6 +1337,8 @@ export function seedClaimGraphFromConversation(params: {
     "source conversation",
   );
   const targetOwner = requireUuid(params.targetOwnerId, "target owner");
+  const includeCleanupEvidence =
+    params.includeCleanupEvidence === true ? "true" : "false";
   const ids = {
     conversation: randomUUID(),
     userMessage: randomUUID(),
@@ -1574,6 +1577,7 @@ export function seedClaimGraphFromConversation(params: {
         '${ids.feedback}', '${targetOwner}', 'general',
         'Guest QA cleanup privacy sentinel', '{}'::jsonb
       from inserted_assistant_message
+      where ${includeCleanupEvidence}
       returning 1
     ),
     inserted_route_receipt as (
@@ -1588,6 +1592,7 @@ export function seedClaimGraphFromConversation(params: {
         array['${ids.contextPacket}']::text[]
       from inserted_assistant_message
       cross join inserted_run_context_packet
+      where ${includeCleanupEvidence}
       returning 1
     ),
     inserted_cost_ledger as (
@@ -1621,6 +1626,7 @@ export function seedClaimGraphFromConversation(params: {
           ('backtest_runs'::text, 1, 1)
       ) as policy(resource, used_count, limit_count)
       where workspace.user_id = '${targetOwner}'
+        and ${includeCleanupEvidence}
       returning 1
     )
     select json_build_object(
@@ -1642,10 +1648,15 @@ export function seedClaimGraphFromConversation(params: {
       and exists(select 1 from inserted_checkpoint)
       and exists(select 1 from inserted_checkpoint_blob)
       and exists(select 1 from inserted_checkpoint_write)
-      and exists(select 1 from inserted_feedback)
-      and exists(select 1 from inserted_route_receipt)
-      and exists(select 1 from inserted_cost_ledger)
-      and (select count(*) from inserted_usage) = 2
+      and (
+        not ${includeCleanupEvidence}
+        or (
+          exists(select 1 from inserted_feedback)
+          and exists(select 1 from inserted_route_receipt)
+          and exists(select 1 from inserted_cost_ledger)
+          and (select count(*) from inserted_usage) = 2
+        )
+      )
     )::text
   `);
   if (!seeded.ok) {

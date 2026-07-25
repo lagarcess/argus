@@ -1694,6 +1694,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         sourceOwnerId: primaryOwner,
         sourceConversationId: primaryConversation,
         targetOwnerId: expiredOwner,
+        includeCleanupEvidence: true,
       });
       const expiredGraph = conversationGraph(
         expiredOwner,

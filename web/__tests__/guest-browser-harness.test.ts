@@ -561,6 +561,10 @@ describe("Checks 6–20 harness guards", () => {
     join(import.meta.dir, "../e2e/guest-experience.spec.ts"),
     "utf-8",
   );
+  const supportSource = readFileSync(
+    join(import.meta.dir, "../e2e/support/guest-qa.ts"),
+    "utf-8",
+  );
   const checkSource = (number: number) => {
     const start =
       new RegExp(`await runStep\\(\\s*${number}\\b`).exec(source)?.index ?? -1;
@@ -707,6 +711,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check17).toContain("approvedContext");
     expect(check17).toContain("feedbackPrivacy({");
     expect(check17).toContain("sensitive_value_rows");
+    expect(check17).not.toContain("includeCleanupEvidence: true");
   });
 
   test("hydrates a durable retry and never fabricates recovery with request aborts", () => {
@@ -735,8 +740,10 @@ describe("Checks 6–20 harness guards", () => {
     expect(check19).toContain("checkpoint_blobs");
     expect(check19).toContain("checkpoint_writes");
     expect(check19).toContain("cleanupGraphRows(expiredGraphAfter)");
+    expect(check19).toContain("includeCleanupEvidence: true");
     expect(check19).toContain("retained_route_rows");
     expect(check19).toContain("retained_cost_rows");
+    expect(supportSource).toContain("includeCleanupEvidence?: boolean");
   });
 
   test("keeps product safety failures separate from sanitized teardown evidence", () => {

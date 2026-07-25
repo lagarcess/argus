@@ -268,6 +268,7 @@ test("complete claim graph fixture seeds and tears down without an interpreter t
       sourceOwnerId: sourceGuest.user.id,
       sourceConversationId: sourceConversation.body.conversation.id,
       targetOwnerId: targetGuest.user.id,
+      includeCleanupEvidence: true,
     });
     const graph = conversationGraph(
       targetGuest.user.id,
