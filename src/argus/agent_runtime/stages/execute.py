@@ -815,11 +815,8 @@ def _is_launch_request_payload(payload: dict[str, Any]) -> bool:
 
 
 def _normalize_launch_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = LaunchBacktestRequest.model_validate(payload).model_dump(
-        mode="python",
-        by_alias=True,
-        exclude_unset=True,
-    )
+    LaunchBacktestRequest.model_validate(payload)
+    normalized = deepcopy(payload)
     parameters = normalized.get("parameters")
     if isinstance(parameters, dict):
         normalized["parameters"] = _strategy_parameters_from_launch_payload(parameters)

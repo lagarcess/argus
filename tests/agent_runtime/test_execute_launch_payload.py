@@ -78,7 +78,7 @@ def test_launch_payload_preserves_state_draft_without_confirmation_payload() -> 
     assert payload["benchmark_symbol"] == "SPY"
 
 
-def test_launch_payload_excludes_confirmation_measurement_from_execution() -> None:
+def test_launch_payload_preserves_confirmation_measurement_for_execution() -> None:
     raw_launch_payload = {
         "strategy_type": "buy_and_hold",
         "symbol": "AAPL",
@@ -122,6 +122,7 @@ def test_launch_payload_excludes_confirmation_measurement_from_execution() -> No
         "outcome": "adjusted_coverage",
         "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
         "effective_date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+        "adjustment_reason": "calendar_alignment",
         "preflight_id": "coverage-fixture",
         "observations_by_symbol": {"AAPL": 3, "SPY": 3},
     }

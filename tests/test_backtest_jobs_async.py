@@ -11,6 +11,7 @@ from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
     ShadowBacktestJobTool,
     backtest_job_shadow_context,
+    payload_hash,
 )
 from argus.api.main import app
 from argus.api.schemas import BacktestRun, OnboardingState, User
@@ -117,6 +118,16 @@ class _Gateway:
         )
         self.failed_updates.append(dict(job))
         return dict(job)
+
+
+class _IdentityCaptureGateway(_Gateway):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self.admission_requests: list[dict[str, object]] = []
+
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        self.admission_requests.append(dict(payload))
+        return super().admit_backtest_job(**payload)
 
 
 class _Dispatcher:
@@ -488,6 +499,46 @@ def _payload() -> dict[str, object]:
     }
 
 
+def _coverage_payload(
+    *,
+    adjustment_reason: str | None,
+) -> dict[str, object]:
+    requested_date_range = {"start": "2024-01-01", "end": "2024-01-05"}
+    effective_date_range = {"start": "2024-01-03", "end": "2024-01-05"}
+    coverage_preflight: dict[str, object] = {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "requested_date_range": requested_date_range,
+        "effective_date_range": effective_date_range,
+        "preflight_id": "coverage-fixture",
+        "observations_by_symbol": {"AAPL": 3, "SPY": 3},
+    }
+    if adjustment_reason is not None:
+        coverage_preflight["adjustment_reason"] = adjustment_reason
+    return {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": effective_date_range,
+        "requested_date_range": requested_date_range,
+        "coverage_preflight": coverage_preflight,
+        "entry_rule": None,
+        "exit_rule": None,
+        "rule_spec": None,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10_000.0,
+        "position_size": None,
+        "cadence": None,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+        "_execution_realism": None,
+        "language": "en",
+    }
+
+
 def _context() -> BacktestJobShadowContext:
     return BacktestJobShadowContext(
         user_id="user-1",
@@ -500,6 +551,48 @@ def _context() -> BacktestJobShadowContext:
             "type": "run_backtest",
             "payload": {"confirmation_id": "confirmation-1"},
         },
+    )
+
+
+def test_chat_job_identity_excludes_reason_while_execution_retains_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "false")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "false")
+    admission_requests: list[dict[str, object]] = []
+    delegate_requests: list[dict[str, object]] = []
+
+    for adjustment_reason in (None, "calendar_alignment"):
+        events: list[str] = []
+        gateway = _IdentityCaptureGateway(events)
+        delegate = _DelegateTool(events)
+        tool = ShadowBacktestJobTool(
+            delegate=delegate,
+            gateway_getter=lambda current_gateway=gateway: current_gateway,
+            dev_memory_fallback_getter=lambda: False,
+        )
+
+        with backtest_job_shadow_context(_context()):
+            result = tool.run(
+                _coverage_payload(adjustment_reason=adjustment_reason)
+            )
+
+        assert result["success"] is True
+        admission_requests.append(gateway.admission_requests[0])
+        delegate_requests.append(delegate.calls[0])
+
+    without_reason, with_reason = admission_requests
+    expected_hash = payload_hash(_coverage_payload(adjustment_reason=None))
+    assert without_reason["payload_hash"] == expected_hash
+    assert without_reason["payload_hash"] == with_reason["payload_hash"]
+    assert without_reason["identity_hash"] == with_reason["identity_hash"]
+    stored_request = with_reason["launch_payload"]["request"]  # type: ignore[index]
+    assert stored_request["coverage_preflight"]["adjustment_reason"] == (  # type: ignore[index]
+        "calendar_alignment"
+    )
+    assert delegate_requests[1]["coverage_preflight"]["adjustment_reason"] == (  # type: ignore[index]
+        "calendar_alignment"
     )
 
 
