@@ -21,7 +21,11 @@ from argus.agent_runtime.recovery_messages import (
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import _field_base
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _field_base,
+    _selected_requested_field,
+    _selected_response_intent,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
     StageResult,
@@ -104,10 +108,8 @@ def _offline_pending_no_progress_result(
         return None
     if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
         return None
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    prior_response_intent = selected_thread_metadata.get("response_intent")
+    requested_field = _selected_requested_field(selected_thread_metadata)
+    prior_response_intent = _selected_response_intent(selected_thread_metadata)
     if not requested_field or not isinstance(prior_response_intent, dict):
         return None
 

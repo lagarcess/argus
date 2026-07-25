@@ -34,6 +34,43 @@ def _field_base(field_name: str) -> str:
     return field_name.split("[", 1)[0]
 
 
+def _selected_response_intent(
+    selected_thread_metadata: dict[str, Any],
+) -> dict[str, Any] | None:
+    candidates: list[dict[str, Any]] = []
+    root_intent = selected_thread_metadata.get("response_intent")
+    if isinstance(root_intent, dict):
+        candidates.append(root_intent)
+    pending_strategy = selected_thread_metadata.get("pending_strategy")
+    if isinstance(pending_strategy, dict):
+        nested_intent = pending_strategy.get("response_intent")
+        if isinstance(nested_intent, dict):
+            candidates.append(nested_intent)
+    if not candidates or any(candidate != candidates[0] for candidate in candidates[1:]):
+        return None
+    return dict(candidates[0])
+
+
+def _selected_requested_field(
+    selected_thread_metadata: dict[str, Any],
+) -> str:
+    candidates: list[Any] = [selected_thread_metadata.get("requested_field")]
+    pending_strategy = selected_thread_metadata.get("pending_strategy")
+    if isinstance(pending_strategy, dict):
+        candidates.append(pending_strategy.get("requested_field"))
+    response_intent = _selected_response_intent(selected_thread_metadata)
+    if response_intent is not None:
+        requested_fields = response_intent.get("requested_fields")
+        if isinstance(requested_fields, list) and len(requested_fields) == 1:
+            candidates.append(requested_fields[0])
+    normalized = {
+        _field_base(str(candidate or "")).strip()
+        for candidate in candidates
+        if str(candidate or "").strip()
+    }
+    return next(iter(normalized)) if len(normalized) == 1 else ""
+
+
 # Provenance sources meaning the user set the money field in THIS turn;
 # "prior" (carried context) is deliberately excluded.
 _EXPLICIT_TURN_MONEY_SOURCES = frozenset(

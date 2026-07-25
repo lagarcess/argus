@@ -9,7 +9,10 @@ from typing import Any
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _active_strategy_from_snapshot,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import _field_base
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _field_base,
+    _selected_requested_field,
+)
 from argus.agent_runtime.stages.interpret_types import (
     SemanticTurnAct,
     StructuredInterpretation,
@@ -36,9 +39,7 @@ def _strip_unowned_pending_date_candidate(
 ) -> StructuredInterpretation:
     if interpretation.semantic_turn_act != "answer_pending_need":
         return interpretation
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")

@@ -5491,10 +5491,15 @@ def test_equivalent_pending_need_stops_with_no_progress_options(
         assert execution.terminal == "no_progress"
 
 
-@pytest.mark.parametrize("provenance", [None, "default_assumption", "assistant_suggestion"])
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
+@pytest.mark.parametrize(
+    "provenance",
+    [None, "default_assumption", "assistant_suggestion", "explicit_user"],
+)
 def test_pending_date_answer_rejects_unowned_window(
     monkeypatch: pytest.MonkeyPatch,
     provenance: str | None,
+    metadata_shape: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -5550,17 +5555,24 @@ def test_pending_date_answer_rejects_unowned_window(
             semantic_turn_act="answer_pending_need",
         )
     )
-    selected_thread_metadata = {
-        "requested_field": "date_range",
-        "last_stage_outcome": "await_user_reply",
-        "response_intent": {
-            "kind": "clarification",
-            "semantic_needs": ["period"],
-            "requested_fields": ["date_range"],
-            "facts": {"strategy": pending.model_dump(mode="python")},
-            "options": [],
-        },
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [],
     }
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+        "response_intent": response_intent,
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata["requested_field"] = "date_range"
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
 
     with turn_execution_scope(entry_state={}):
         result = interpret_stage(
@@ -5668,8 +5680,10 @@ def test_pending_date_typed_option_preserves_selected_window(
     assert "pending_response_option_selected" in result.decision.reason_codes
 
 
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
 def test_interpreter_unavailable_pending_date_stops_with_no_progress(
     monkeypatch: pytest.MonkeyPatch,
+    metadata_shape: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -5706,6 +5720,22 @@ def test_interpreter_unavailable_pending_date_stops_with_no_progress(
         ],
     }
 
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata.update(
+            {
+                "requested_field": "date_range",
+                "response_intent": response_intent,
+            }
+        )
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
+
     with turn_execution_scope(entry_state={}):
         result = interpret_stage(
             state=RunState.new(
@@ -5714,11 +5744,7 @@ def test_interpreter_unavailable_pending_date_stops_with_no_progress(
             ),
             user=UserState(user_id="u1"),
             latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
-            selected_thread_metadata={
-                "requested_field": "date_range",
-                "last_stage_outcome": "await_user_reply",
-                "response_intent": response_intent,
-            },
+            selected_thread_metadata=selected_thread_metadata,
             structured_interpreter=RecordingInterpreter(None),
         )
 
