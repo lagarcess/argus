@@ -33,6 +33,33 @@ product failure and preserve the sanitized evidence without silently retrying.
 Passing local evidence does not authorize integration, deployment, public
 flags, or tester exposure.
 
+### Block 4 guest browser harness
+
+The Block 4 matrix has a dedicated local-only runner. It selects only the
+guest harness, rejects hosted targets, disables Playwright retries/traces/
+video, launches one headful Chromium worker, and keeps public-account access
+off except for the in-process isolated conversion step.
+
+Before committing a harness correction, validate setup and teardown without a
+runtime turn:
+
+```bash
+bash scripts/qa/run-guest-experience-qa.sh list --list
+bash scripts/qa/run-guest-experience-qa.sh preflight
+```
+
+After committing, reset the local Supabase stack and prove zero state before
+the one authorized live run:
+
+```bash
+supabase db reset --local
+bash scripts/qa/run-guest-experience-qa.sh authoritative
+```
+
+Do not run the authoritative command against an existing server or a hosted
+Supabase project. The runner requires the exact clean `codex/guest-experience`
+HEAD and starts fresh local services itself.
+
 ## One-shot run
 
 ```bash

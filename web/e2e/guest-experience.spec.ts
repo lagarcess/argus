@@ -1,152 +1,1198 @@
-import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  BackendController,
+  BrowserSafetyMonitor,
+  GUEST_ACCEPTANCE_CHECKS,
+  apiJson,
+  assertExactLocalCandidate,
+  assertFreshContext,
+  assertZeroState,
+  authUserExists,
+  cleanupOneExpiredGuest,
+  conversationGraph,
+  createDisposableRegisteredIdentity,
+  decisionTargetsEvidence,
+  deleteDisposableIdentity,
+  emptyEvidence,
+  evidenceLabel,
+  feedbackPrivacy,
+  freshGuest,
+  graphDuplicateCount,
+  handoffCount,
+  handoffState,
+  markWorkspaceExpired,
+  newSignupCredentials,
+  ownerSnapshot,
+  profileAccountKind,
+  purgeDisposableQaEvidence,
+  resultSummaryCost,
+  safeScreenshot,
+  sameGraphIds,
+  seedClaimGraphFromConversation,
+  waitForMe,
+  workspaceFacts,
+  writeEvidence,
+  type ConversationGraph,
+  type GuestCheckNumber,
+  type GuestMe,
+  type GuestUsage,
+  type OwnerSnapshot,
+  type SafeEvidence,
+} from "./support/guest-qa";
 
-const liveGuestQaEnabled = process.env.ARGUS_LIVE_GUEST_QA === "true";
-const candidateSha = process.env.ARGUS_CANDIDATE_SHA?.trim() ?? "";
+test.describe.configure({ mode: "serial" });
 
-test.skip(!liveGuestQaEnabled, "Runs only against the approved local QA stack.");
-test.describe.configure({ mode: "serial", timeout: 240_000 });
-
-type GuestMeShape = {
-  account_kind: "guest" | "registered";
-  user: {
+type MessageList = {
+  items: Array<{
     id: string;
-    email: string | null;
-    language: "en" | "es-419";
-  };
-  guest: { expires_at: string } | null;
+    conversation_id: string;
+    role: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  next_cursor: string | null;
 };
 
-function evidenceDirectory() {
-  if (!/^[0-9a-f]{40}$/.test(candidateSha)) {
-    throw new Error("ARGUS_CANDIDATE_SHA must be the exact 40-character SHA.");
+type HistoryList = {
+  items: Array<{
+    id: string;
+    conversation_id?: string | null;
+    expires_at?: string | null;
+  }>;
+  next_cursor: string | null;
+};
+
+type SearchList = {
+  items: Array<{
+    id: string;
+    conversation_id?: string | null;
+  }>;
+  ledger_groups?: unknown[] | null;
+  next_cursor: string | null;
+};
+
+type ConfirmationFacts = {
+  assetUniverse: string[];
+  benchmark: string;
+  dateRange: string;
+};
+
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function latestConfirmationFacts(items: MessageList["items"]): ConfirmationFacts {
+  for (const item of [...items].reverse()) {
+    const metadata = recordOrEmpty(item.metadata);
+    const payload = recordOrEmpty(metadata.confirmation_payload);
+    const strategy = recordOrEmpty(payload.strategy);
+    const launch = recordOrEmpty(payload.launch_payload);
+    if (Object.keys(strategy).length === 0) continue;
+    const card = recordOrEmpty(metadata.confirmation_card);
+    const assetUniverse = Array.isArray(strategy.asset_universe)
+      ? strategy.asset_universe.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+    const benchmark =
+      [strategy.benchmark_symbol, launch.benchmark_symbol].find(
+        (value): value is string => typeof value === "string" && value !== "",
+      ) ?? (JSON.stringify(card).includes("SPY") ? "SPY" : "");
+    return {
+      assetUniverse,
+      benchmark,
+      dateRange: JSON.stringify(
+        strategy.date_range ?? launch.date_range ?? null,
+      ),
+    };
   }
-  const directory = join(
-    process.cwd(),
-    "temp",
-    "qa-evidence-guest",
-    candidateSha,
+  throw new Error("A canonical confirmation artifact was not persisted");
+}
+
+function requireConversationId(page: Page): string {
+  const value = new URL(page.url()).searchParams.get("conversation") ?? "";
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new Error("The browser does not own a valid conversation route");
+  }
+  return value;
+}
+
+function snapshotStayedStable(
+  before: OwnerSnapshot,
+  after: OwnerSnapshot,
+  fields: Array<keyof OwnerSnapshot>,
+): boolean {
+  return fields.every((field) => before[field] === after[field]);
+}
+
+function mutableGraphRows(graph: ConversationGraph): number {
+  return (
+    graph.conversation.length +
+    graph.messages.length +
+    graph.strategies.length +
+    graph.jobs.length +
+    graph.runs.length +
+    graph.ideas.length +
+    graph.idea_versions.length +
+    graph.evidence.length +
+    graph.decisions.length
   );
-  mkdirSync(directory, { recursive: true });
-  return directory;
 }
 
-function evidenceLabel(namespace: string, value: string) {
-  return createHash("sha256")
-    .update(`argus-guest-qa:${candidateSha}:${namespace}:${value}`)
-    .digest("hex")
-    .slice(0, 20);
-}
-
-async function waitForMe(page: Page) {
-  const response = await page.waitForResponse(
-    (candidate) =>
-      candidate.request().method() === "GET" &&
-      new URL(candidate.url()).pathname.endsWith("/api/v1/me") &&
-      candidate.status() === 200,
-  );
-  return (await response.json()) as GuestMeShape;
-}
-
-test("@guest-experience exact-head public staged journey", async ({ page }) => {
-  const evidenceDir = evidenceDirectory();
-  const consoleErrors: string[] = [];
-  const mutationPaths: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  page.on("pageerror", (error) => consoleErrors.push(error.message));
-  page.on("request", (request) => {
-    if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) {
-      mutationPaths.push(new URL(request.url()).pathname);
+function mergeMutationCounts(
+  monitors: BrowserSafetyMonitor[],
+): Record<string, number> {
+  const merged = new Map<string, number>();
+  for (const monitor of monitors) {
+    for (const [route, count] of Object.entries(monitor.mutationSnapshot())) {
+      merged.set(route, (merged.get(route) ?? 0) + count);
     }
-  });
-
-  const initialMePromise = waitForMe(page);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  const initialMe = await initialMePromise;
-
-  expect(initialMe.account_kind).toBe("guest");
-  expect(initialMe.user.email).toBeNull();
-  expect(initialMe.guest?.expires_at).toBeTruthy();
-  await expect(page).toHaveURL(/\/chat(?:\?|$)/);
-  await expect(
-    page.getByText("Test an investing idea against history."),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Create account/i })).toHaveCount(0);
-  await expect(page.getByTestId("guest-legal-before_message")).toBeVisible();
-  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
-
-  const streamResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
-  );
-  await page.getByRole("button", { name: "Test Apple vs SPY" }).click();
-  expect((await streamResponse).status()).toBe(200);
-
-  const runButton = page.getByRole("button", { name: /Run backtest/i });
-  await expect(runButton).toBeVisible({ timeout: 120_000 });
-  await runButton.click();
-  await expect(page.getByTestId("result-equity-chart")).toBeVisible({
-    timeout: 120_000,
-  });
-
-  const conversationId = new URL(page.url()).searchParams.get("conversation");
-  expect(conversationId).toBeTruthy();
-  const writesBeforeChart = mutationPaths.length;
-  const chartRange = page.getByTestId("result-chart-range-1M");
-  if (await chartRange.isVisible()) {
-    await chartRange.click();
-    await expect(page.getByTestId("result-chart-visible-period")).toBeVisible();
-    expect(mutationPaths.length).toBe(writesBeforeChart);
   }
+  return Object.fromEntries([...merged.entries()].sort());
+}
 
-  const reloadMePromise = waitForMe(page);
-  await page.reload({ waitUntil: "domcontentloaded" });
-  const reloadMe = await reloadMePromise;
-  expect(reloadMe.user.id).toBe(initialMe.user.id);
-  expect(new URL(page.url()).searchParams.get("conversation")).toBe(
-    conversationId,
+async function runStep(
+  number: GuestCheckNumber,
+  evidence: SafeEvidence,
+  setCurrent: (number: GuestCheckNumber | null) => void,
+  body: () => Promise<void>,
+  recordCompletion = true,
+): Promise<void> {
+  const contract = GUEST_ACCEPTANCE_CHECKS[number - 1];
+  setCurrent(number);
+  await test.step(
+    `Check ${String(number).padStart(2, "0")} — ${contract.title}`,
+    body,
   );
-  await expect(page.getByTestId("result-equity-chart")).toBeVisible({
-    timeout: 30_000,
-  });
+  if (recordCompletion) evidence.completed_checks.push(number);
+  setCurrent(null);
+}
 
-  await page.screenshot({
-    path: join(evidenceDir, "public-staged-result.png"),
-    fullPage: true,
-  });
-  writeFileSync(
-    join(evidenceDir, "public-staged-summary.json"),
-    `${JSON.stringify(
-      {
-        candidate_sha: candidateSha,
-        account_kind: reloadMe.account_kind,
-        owner_label: evidenceLabel("owner", reloadMe.user.id),
-        conversation_label: evidenceLabel(
-          "conversation",
-          conversationId ?? "",
+test("@guest-experience exact-head 20-check matrix", async ({
+  browser,
+  page,
+}) => {
+  test.slow();
+  assertExactLocalCandidate();
+
+  const backend = new BackendController();
+  const evidence = emptyEvidence();
+  const contexts: BrowserContext[] = [page.context()];
+  const monitors: BrowserSafetyMonitor[] = [];
+  const disposableUserIds = new Set<string>();
+  let currentCheck: GuestCheckNumber | null = null;
+
+  let primaryMe: GuestMe | null = null;
+  let primaryOwner = "";
+  let primaryConversation = "";
+  let primaryExpiry = "";
+  let primaryGraph: ConversationGraph | null = null;
+  let primaryEvidenceId = "";
+  let postResultSnapshot: OwnerSnapshot | null = null;
+  let initialConfirmationFacts: ConfirmationFacts | null = null;
+
+  let claimGuestContext: BrowserContext | null = null;
+  let claimGuestPage: Page | null = null;
+  let claimGuestOwner = "";
+  let claimConversation = "";
+  let claimEvidenceId = "";
+
+  let existingAccount:
+    | Awaited<ReturnType<typeof createDisposableRegisteredIdentity>>
+    | null = null;
+  let feedbackGuestOwner = "";
+  let expectedInterruptedFailures = 0;
+
+  const attachMonitor = (target: Page) => {
+    const monitor = new BrowserSafetyMonitor();
+    monitor.attach(target);
+    monitors.push(monitor);
+    return monitor;
+  };
+  attachMonitor(page);
+
+  try {
+    await backend.start(false);
+
+    await runStep(1, evidence, (value) => (currentCheck = value), async () => {
+      await assertFreshContext(page.context());
+      evidence.fresh_context_verified = true;
+      primaryMe = await freshGuest(page);
+      primaryOwner = primaryMe.user.id;
+      primaryExpiry = primaryMe.guest?.expires_at ?? "";
+      disposableUserIds.add(primaryOwner);
+      evidence.owner_labels.push(evidenceLabel("owner", primaryOwner));
+
+      expect(primaryMe.account_kind).toBe("guest");
+      expect(primaryMe.user.email).toBeNull();
+      expect(primaryMe.guest).not.toBeNull();
+      expect(primaryMe.public_account_access_enabled).toBe(false);
+      await expect(page.getByTestId("chat-input")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /Create account/i }),
+      ).toHaveCount(0);
+      expect(profileAccountKind(primaryOwner)).toEqual({
+        is_anonymous: true,
+        email_present: false,
+      });
+      expect(workspaceFacts(primaryOwner)).toMatchObject({
+        exists: true,
+        active: true,
+        fixed_seven_days: true,
+      });
+    });
+
+    await runStep(2, evidence, (value) => (currentCheck = value), async () => {
+      const writesBefore = mergeMutationCounts(monitors);
+      const expiryBefore = ownerSnapshot(primaryOwner).expires_at;
+      await expect(
+        page.getByText("Test an investing idea against history."),
+      ).toBeVisible();
+      await expect(page.getByTestId("guest-legal-before_message")).toBeVisible();
+      await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+      await expect(
+        page.getByRole("button", { name: "Test Apple vs SPY" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Test Bitcoin (BTC) hold" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Test weekly Nvidia buys" }),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Guest settings" }).click();
+      await expect(page.getByRole("menu", { name: "Guest settings" })).toBeVisible();
+      await page.getByRole("menuitem", { name: "Language" }).click();
+      await expect(page.getByRole("dialog", { name: "Language" })).toBeVisible();
+      await page.getByRole("button", { name: /Español/ }).click();
+      await expect(
+        page.getByText("Prueba una idea de inversión con datos históricos."),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Ajustes de invitado" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Iniciar sesión" }),
+      ).toBeVisible();
+      await expect(page.getByTestId("chat-input")).toHaveAttribute(
+        "placeholder",
+        "¿Qué quieres probar?",
+      );
+      await page.setViewportSize({ width: 390, height: 844 });
+      await safeScreenshot(page, "02-spanish-mobile");
+
+      await page
+        .getByRole("button", { name: "Ajustes de invitado" })
+        .click();
+      await page.getByRole("menuitem", { name: "Idioma" }).click();
+      await page.getByRole("button", { name: /English/ }).click();
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await expect(
+        page.getByText("Test an investing idea against history."),
+      ).toBeVisible();
+
+      expect(ownerSnapshot(primaryOwner).expires_at).toBe(expiryBefore);
+      const writesAfter = mergeMutationCounts(monitors);
+      expect(
+        (writesAfter["PATCH /api/v1/me"] ?? 0) -
+          (writesBefore["PATCH /api/v1/me"] ?? 0),
+      ).toBe(0);
+    });
+
+    await runStep(3, evidence, (value) => (currentCheck = value), async () => {
+      const expectedMessage =
+        "Buy and hold AAPL over the last 12 months with SPY as the benchmark.";
+      let ordinaryPayload = false;
+      const streamRequest = page.waitForRequest((request) => {
+        if (
+          request.method() !== "POST" ||
+          !new URL(request.url()).pathname.endsWith("/api/v1/chat/stream")
+        ) {
+          return false;
+        }
+        const payload = request.postDataJSON() as {
+          message?: unknown;
+          action?: unknown;
+        };
+        ordinaryPayload =
+          payload.message === expectedMessage &&
+          (payload.action === undefined || payload.action === null);
+        return true;
+      });
+      await page.getByRole("button", { name: "Test Apple vs SPY" }).click();
+      await streamRequest;
+      expect(ordinaryPayload).toBe(true);
+      await expect(page.getByText(expectedMessage, { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /Run backtest/i }),
+      ).toBeVisible({ timeout: 180_000 });
+      await expect
+        .poll(() => new URL(page.url()).searchParams.has("conversation"), {
+          timeout: 30_000,
+        })
+        .toBe(true);
+      primaryConversation = requireConversationId(page);
+      evidence.conversation_labels.push(
+        evidenceLabel("conversation", primaryConversation),
+      );
+      const snapshot = ownerSnapshot(primaryOwner);
+      expect(snapshot.conversations).toBe(1);
+      expect(snapshot.user_messages).toBe(1);
+      expect(snapshot.assistant_messages).toBeGreaterThanOrEqual(1);
+      const messages = await apiJson<MessageList>(
+        page.context().request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      expect(messages.status).toBe(200);
+      initialConfirmationFacts = latestConfirmationFacts(messages.body.items);
+      expect(
+        initialConfirmationFacts.assetUniverse.length === 1 &&
+          initialConfirmationFacts.assetUniverse[0] === "AAPL" &&
+          initialConfirmationFacts.benchmark === "SPY" &&
+          initialConfirmationFacts.dateRange !== "null",
+      ).toBe(true);
+    });
+
+    await runStep(4, evidence, (value) => (currentCheck = value), async () => {
+      const updateMessage =
+        "Use MSFT instead of AAPL, keeping the 12-month period and SPY benchmark.";
+      await page.getByTestId("chat-input").fill(updateMessage);
+      await page.getByTestId("chat-send").click();
+      await expect(page.getByText(updateMessage, { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /Run backtest/i }),
+      ).toBeVisible({ timeout: 180_000 });
+      await expect(page.getByText(/MSFT/i).first()).toBeVisible();
+      await expect(page.getByText(/SPY/i).first()).toBeVisible();
+
+      const messages = await apiJson<MessageList>(
+        page.context().request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      expect(messages.status).toBe(200);
+      if (!initialConfirmationFacts) {
+        throw new Error("Initial canonical confirmation facts are missing");
+      }
+      const latestFacts = latestConfirmationFacts(messages.body.items);
+      expect(
+        messages.body.items.some((item) => item.content === updateMessage) &&
+          latestFacts.assetUniverse.length === 1 &&
+          latestFacts.assetUniverse[0] === "MSFT" &&
+          latestFacts.benchmark === initialConfirmationFacts.benchmark &&
+          latestFacts.dateRange === initialConfirmationFacts.dateRange,
+      ).toBe(true);
+    });
+
+    await runStep(5, evidence, (value) => (currentCheck = value), async () => {
+      const runResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
+      );
+      await page.getByRole("button", { name: /Run backtest/i }).click();
+      expect((await runResponse).status()).toBe(200);
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible({
+        timeout: 240_000,
+      });
+      await expect(page.getByText("Quick take")).toBeVisible();
+      await expect(page.getByText(/Simulation Complete/i).first()).toBeVisible();
+      await expect
+        .poll(() => ownerSnapshot(primaryOwner).completed_runs, {
+          timeout: 60_000,
+        })
+        .toBe(1);
+
+      postResultSnapshot = ownerSnapshot(primaryOwner);
+      expect(postResultSnapshot.succeeded_jobs).toBe(1);
+      expect(postResultSnapshot.completed_runs).toBe(1);
+      expect(postResultSnapshot.simulation_units).toBe(1);
+      expect(postResultSnapshot.evidence).toBeGreaterThanOrEqual(1);
+      primaryGraph = conversationGraph(primaryOwner, primaryConversation);
+      expect(primaryGraph.jobs).toHaveLength(1);
+      expect(primaryGraph.runs).toHaveLength(1);
+      expect(primaryGraph.evidence.length).toBeGreaterThanOrEqual(1);
+      primaryEvidenceId = primaryGraph.evidence[0];
+      evidence.artifact_labels.push(
+        evidenceLabel("artifact", primaryEvidenceId),
+      );
+      await safeScreenshot(
+        page,
+        "05-completed-result-chart",
+        page.getByTestId("result-equity-chart"),
+      );
+
+      await expect
+        .poll(() => resultSummaryCost(primaryOwner).rows, {
+          timeout: 30_000,
+        })
+        .toBeGreaterThanOrEqual(1);
+      const resultCost = resultSummaryCost(primaryOwner);
+      evidence.provider_cost_usd = resultCost.cost_usd;
+      evidence.provider_latency_ms = resultCost.latency_ms;
+      expect(resultCost.cost_usd).toBeGreaterThan(0);
+      expect(resultCost.latency_ms).toBeGreaterThan(0);
+    });
+
+    await runStep(6, evidence, (value) => (currentCheck = value), async () => {
+      const before = ownerSnapshot(primaryOwner);
+      const mutationsBefore = mergeMutationCounts(monitors);
+      const range = page.getByTestId("result-chart-range-1M");
+      await expect(range).toBeVisible();
+      await range.click();
+      await expect(page.getByTestId("result-chart-visible-period")).toBeVisible();
+      const after = ownerSnapshot(primaryOwner);
+      const mutationsAfter = mergeMutationCounts(monitors);
+      expect(
+        snapshotStayedStable(before, after, [
+          "messages",
+          "jobs",
+          "runs",
+          "ideas",
+          "idea_versions",
+          "evidence",
+          "decisions",
+          "chat_units",
+          "simulation_units",
+          "cost_rows",
+          "provider_cost_usd",
+        ]),
+      ).toBe(true);
+      expect(
+        Object.values(mutationsAfter).reduce((sum, count) => sum + count, 0),
+      ).toBe(
+        Object.values(mutationsBefore).reduce((sum, count) => sum + count, 0),
+      );
+    });
+
+    await runStep(7, evidence, (value) => (currentCheck = value), async () => {
+      const usage = await apiJson<GuestUsage>(
+        page.context().request,
+        "/me/usage",
+      );
+      expect(usage.status).toBe(200);
+      const messageWindow = usage.body.allowances.messages.guest_session;
+      const simulationWindow = usage.body.allowances.backtests.guest_session;
+      const database = ownerSnapshot(primaryOwner);
+      const graph = conversationGraph(primaryOwner, primaryConversation);
+      const messages = await apiJson<MessageList>(
+        page.context().request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      const apiMessageIds = messages.body.items
+        .map((item) => item.id)
+        .sort();
+      const databaseMessageIds = [...graph.messages].sort();
+      const apiResultCount = messages.body.items.filter(
+        (item) => recordOrEmpty(item.metadata).result_card !== undefined,
+      ).length;
+      const renderedMessages = page.locator(
+        ".argus-scrollbar > .space-y-8 > *",
+      );
+      expect(messageWindow.used).toBe(database.chat_units);
+      expect(simulationWindow.used).toBe(1);
+      expect(simulationWindow.limit).toBe(1);
+      expect(simulationWindow.remaining).toBe(0);
+      expect(usage.body.allowances.backtests.available_now).toBe(false);
+      expect(database.simulation_units).toBe(1);
+      expect(messages.status).toBe(200);
+      expect(
+        apiMessageIds.length === databaseMessageIds.length &&
+          apiMessageIds.every(
+            (id, index) => id === databaseMessageIds[index],
+          ),
+      ).toBe(true);
+      await expect(renderedMessages).toHaveCount(apiMessageIds.length);
+      await expect(page.getByTestId("result-equity-chart")).toHaveCount(1);
+      expect(
+        apiResultCount === 1 &&
+          graph.runs.length === 1 &&
+          graph.evidence.length === 1,
+      ).toBe(true);
+      expect(database.expires_at).toBe(primaryExpiry);
+      await expect(page.getByTestId("guest-legal-after_message")).toBeVisible();
+      await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
+      evidence.simulation_usage_matches = true;
+    });
+
+    await runStep(8, evidence, (value) => (currentCheck = value), async () => {
+      const before = ownerSnapshot(primaryOwner);
+      const graphBefore = conversationGraph(primaryOwner, primaryConversation);
+      const mePromise = waitForMe(page);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const reloadedMe = await mePromise;
+      expect(reloadedMe.user.id === primaryOwner).toBe(true);
+      expect(requireConversationId(page) === primaryConversation).toBe(true);
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible({
+        timeout: 60_000,
+      });
+      const graphAfter = conversationGraph(primaryOwner, primaryConversation);
+      expect(sameGraphIds(graphBefore, graphAfter)).toBe(true);
+      expect(
+        snapshotStayedStable(before, ownerSnapshot(primaryOwner), [
+          "messages",
+          "jobs",
+          "runs",
+          "evidence",
+          "chat_units",
+          "simulation_units",
+        ]),
+      ).toBe(true);
+    });
+
+    await runStep(9, evidence, (value) => (currentCheck = value), async () => {
+      const expand = page.getByRole("button", { name: "Expand sidebar" });
+      if (await expand.isVisible()) await expand.click();
+      const recents = page.getByRole("button", { name: "Recents" });
+      await expect(recents).toBeVisible();
+      const row = page.locator("[data-conversation-id]");
+      await expect(row).toHaveCount(1);
+      expect(
+        (await row.getAttribute("data-conversation-id")) ===
+          primaryConversation,
+      ).toBe(true);
+      const expiry = row.locator("time[datetime]");
+      await expect(expiry).toHaveCount(1);
+      expect((await expiry.getAttribute("datetime")) === primaryExpiry).toBe(
+        true,
+      );
+      const history = await apiJson<HistoryList>(
+        page.context().request,
+        "/history?limit=20",
+      );
+      expect(history.status).toBe(200);
+      expect(
+        history.body.items.length === 1 &&
+          history.body.items[0].conversation_id === primaryConversation &&
+          history.body.items[0].expires_at === primaryExpiry,
+      ).toBe(true);
+      await row.click();
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+    });
+
+    await runStep(10, evidence, (value) => (currentCheck = value), async () => {
+      claimGuestContext = await browser.newContext();
+      contexts.push(claimGuestContext);
+      await assertFreshContext(claimGuestContext);
+      claimGuestPage = await claimGuestContext.newPage();
+      attachMonitor(claimGuestPage);
+      const foreignMe = await freshGuest(claimGuestPage);
+      claimGuestOwner = foreignMe.user.id;
+      disposableUserIds.add(claimGuestOwner);
+      evidence.owner_labels.push(evidenceLabel("owner", claimGuestOwner));
+      const seeded = seedClaimGraphFromConversation({
+        sourceOwnerId: primaryOwner,
+        sourceConversationId: primaryConversation,
+        targetOwnerId: claimGuestOwner,
+      });
+      claimConversation = seeded.conversationId;
+      claimEvidenceId = seeded.evidenceId;
+      evidence.conversation_labels.push(
+        evidenceLabel("conversation", claimConversation),
+      );
+      evidence.artifact_labels.push(
+        evidenceLabel("artifact", claimEvidenceId),
+      );
+      await claimGuestPage.goto(
+        `/chat?conversation=${claimConversation}`,
+        { waitUntil: "domcontentloaded" },
+      );
+      await expect(claimGuestPage.getByTestId("result-equity-chart")).toBeVisible(
+        { timeout: 60_000 },
+      );
+
+      const expand = page.getByRole("button", { name: "Expand sidebar" });
+      if (await expand.isVisible()) await expand.click();
+      await page.getByRole("button", { name: "Search" }).click();
+      await expect(
+        page.getByText(
+          "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet.",
         ),
-        guest_email_is_null: reloadMe.user.email === null,
-        expiry_present: Boolean(reloadMe.guest?.expires_at),
-        mutation_path_counts: Object.fromEntries(
-          [...new Set(mutationPaths)].map((path) => [
-            path,
-            mutationPaths.filter((candidate) => candidate === path).length,
-          ]),
-        ),
-        console_error_count: consoleErrors.length,
+      ).toBeVisible();
+      await page.getByPlaceholder("Search Argus...").fill(
+        "Preserved local QA strategy",
+      );
+
+      const ownerSearch = await apiJson<SearchList>(
+        page.context().request,
+        "/search?q=Preserved%20local%20QA%20strategy&limit=20&include_ledger_groups=true",
+      );
+      await expect(page.getByText("No results found")).toBeVisible();
+      await page.getByRole("button", { name: "Close search" }).click();
+
+      const foreignExpand = claimGuestPage.getByRole("button", {
+        name: "Expand sidebar",
+      });
+      if (await foreignExpand.isVisible()) await foreignExpand.click();
+      await claimGuestPage.getByRole("button", { name: "Search" }).click();
+      await claimGuestPage
+        .getByPlaceholder("Search Argus...")
+        .fill("Preserved local QA strategy");
+      await expect(
+        claimGuestPage.getByText("Preserved local QA strategy", {
+          exact: true,
+        }),
+      ).toHaveCount(1);
+      const foreignSearch = await apiJson<SearchList>(
+        claimGuestContext.request,
+        "/search?q=Preserved%20local%20QA%20strategy&limit=20&include_ledger_groups=true",
+      );
+      const foreignRead = await apiJson<Record<string, unknown>>(
+        claimGuestContext.request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      expect(ownerSearch.status).toBe(200);
+      expect(ownerSearch.body.items).toHaveLength(0);
+      expect(ownerSearch.body.ledger_groups ?? []).toHaveLength(0);
+      expect(foreignSearch.status).toBe(200);
+      expect(
+        foreignSearch.body.items.length > 0 &&
+          foreignSearch.body.items.every(
+            (item) =>
+              item.id === claimConversation ||
+              item.conversation_id === claimConversation,
+          ),
+      ).toBe(true);
+      expect(foreignRead.status).toBe(404);
+      evidence.cross_owner_result_count += ownerSearch.body.items.length;
+      await claimGuestPage
+        .getByRole("button", { name: "Close search" })
+        .click();
+    });
+
+    await runStep(11, evidence, (value) => (currentCheck = value), async () => {
+      const secondIdea =
+        "Use AAPL instead of MSFT, keeping every other assumption the same.";
+      await page.getByTestId("chat-input").fill(secondIdea);
+      await page.getByTestId("chat-send").click();
+      await expect(page.getByText(secondIdea, { exact: true })).toBeVisible();
+      const runButtons = page.getByRole("button", { name: /Run backtest/i });
+      await expect(runButtons.last()).toBeVisible({ timeout: 180_000 });
+      const before = ownerSnapshot(primaryOwner);
+      const mutationsBefore = mergeMutationCounts(monitors);
+      await runButtons.last().click();
+      const dialog = page.getByRole("dialog", { name: "Sign in" });
+      await expect(dialog).toBeVisible();
+      await expect(
+        dialog.getByText("Sign in to run another simulation."),
+      ).toBeVisible();
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+      const after = ownerSnapshot(primaryOwner);
+      const mutationsAfter = mergeMutationCounts(monitors);
+      expect(
+        snapshotStayedStable(before, after, [
+          "jobs",
+          "runs",
+          "simulation_units",
+          "cost_rows",
+          "provider_cost_usd",
+        ]),
+      ).toBe(true);
+      expect(
+        (mutationsAfter["POST /api/v1/chat/stream"] ?? 0) -
+          (mutationsBefore["POST /api/v1/chat/stream"] ?? 0),
+      ).toBe(0);
+      await page.getByRole("button", { name: "Cancel" }).last().click();
+    });
+
+    await runStep(
+      12,
+      evidence,
+      (value) => (currentCheck = value),
+      async () => {
+        const decisionsBefore = ownerSnapshot(primaryOwner).decisions;
+        await page.getByRole("button", { name: "Add decision" }).click();
+        const dialog = page.getByRole("dialog", { name: "Sign in" });
+        await expect(dialog).toBeVisible();
+        await expect(
+          dialog.getByText("Sign in to save this decision."),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "Cancel" }).last().click();
+        await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+        expect(ownerSnapshot(primaryOwner).decisions).toBe(decisionsBefore);
       },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
+      false,
+    );
 
-  expect(consoleErrors).toEqual([]);
+    await runStep(13, evidence, (value) => (currentCheck = value), async () => {
+      await page.getByRole("button", { name: "New chat" }).click();
+      const stagedDialog = page.getByRole("dialog", {
+        name: "Start a new conversation?",
+      });
+      await expect(stagedDialog).toBeVisible();
+      await expect(
+        stagedDialog.getByRole("button", { name: "Start over" }),
+      ).toBeVisible();
+      await expect(
+        stagedDialog.getByRole("button", { name: "Sign in to keep it" }),
+      ).toBeVisible();
+      await stagedDialog.getByRole("button", { name: "Cancel" }).click();
+
+      await backend.start(true);
+      const mePromise = waitForMe(page);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const publicModeMe = await mePromise;
+      expect(publicModeMe.user.id === primaryOwner).toBe(true);
+      expect(publicModeMe.public_account_access_enabled).toBe(true);
+      await page.getByRole("button", { name: "New chat" }).click();
+      const publicDialog = page.getByRole("dialog", {
+        name: "Start a new conversation?",
+      });
+      await expect(
+        publicDialog.getByRole("button", { name: "Create account" }),
+      ).toBeVisible();
+      await expect(
+        publicDialog.getByRole("button", { name: "Sign in to keep it" }),
+      ).toHaveCount(0);
+      await publicDialog
+        .getByRole("button", { name: "Create account" })
+        .click();
+      const authDialog = page.getByRole("dialog", {
+        name: "Create your account",
+      });
+      await expect(authDialog).toBeVisible();
+      await authDialog.getByRole("button", { name: "Cancel" }).click();
+    });
+
+    await runStep(14, evidence, (value) => (currentCheck = value), async () => {
+      const draft = "Preserve this unsent local QA draft";
+      await page.getByTestId("chat-input").fill(draft);
+      const before = ownerSnapshot(primaryOwner);
+      const handoffsBefore = handoffCount(primaryOwner);
+      await page.getByRole("button", { name: "Add decision" }).click();
+      await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: "Sign in" })).toHaveCount(0);
+      await expect(page.getByTestId("chat-input")).toHaveValue(draft);
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+      expect(handoffCount(primaryOwner)).toBe(handoffsBefore);
+      expect(
+        snapshotStayedStable(before, ownerSnapshot(primaryOwner), [
+          "messages",
+          "jobs",
+          "runs",
+          "decisions",
+          "chat_units",
+          "simulation_units",
+        ]),
+      ).toBe(true);
+    });
+
+    await runStep(15, evidence, (value) => (currentCheck = value), async () => {
+      if (!primaryGraph) throw new Error("Primary result graph is missing");
+      const before = conversationGraph(primaryOwner, primaryConversation);
+      const beforeDecisions = ownerSnapshot(primaryOwner).decisions;
+      const signup = newSignupCredentials();
+      await page.getByRole("button", { name: "Add decision" }).click();
+      const loginDialog = page.getByRole("dialog", { name: "Sign in" });
+      await loginDialog.getByRole("button", { name: "Sign up" }).click();
+      const signupDialog = page.getByRole("dialog", {
+        name: "Create your account",
+      });
+      await expect(signupDialog).toBeVisible();
+      await safeScreenshot(page, "15-create-account-modal", signupDialog);
+      await signupDialog.getByPlaceholder("Name").fill("Local QA");
+      await signupDialog.getByPlaceholder("Email address").fill(signup.email);
+      await signupDialog.getByPlaceholder("Password").fill(signup.password);
+      const linkResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/auth/guest/link"),
+      );
+      await signupDialog.getByRole("button", { name: "Sign up" }).last().click();
+      expect((await linkResponse).status()).toBe(200);
+      disposableUserIds.add(primaryOwner);
+
+      await expect(
+        page.getByPlaceholder("Optional note for future you"),
+      ).toHaveCount(1);
+      evidence.new_account_resume_count = await page
+        .getByPlaceholder("Optional note for future you")
+        .count();
+      const account = await apiJson<GuestMe>(page.context().request, "/me");
+      expect(account.status).toBe(200);
+      expect(
+        account.body.account_kind === "registered" &&
+          account.body.user.id === primaryOwner,
+      ).toBe(true);
+      const profile = profileAccountKind(primaryOwner);
+      expect(profile).toEqual({
+        is_anonymous: false,
+        email_present: true,
+      });
+      expect(workspaceFacts(primaryOwner).claimed_by === primaryOwner).toBe(true);
+      expect(
+        sameGraphIds(
+          before,
+          conversationGraph(primaryOwner, primaryConversation),
+        ),
+      ).toBe(true);
+      evidence.same_uuid_conversion = true;
+
+      await page.getByRole("button", { name: "Watching" }).click();
+      await page
+        .getByPlaceholder("Optional note for future you")
+        .fill("Local QA decision");
+      await page.getByRole("button", { name: "Save decision" }).click();
+      await expect
+        .poll(() => ownerSnapshot(primaryOwner).decisions)
+        .toBe(beforeDecisions + 1);
+      expect(
+        decisionTargetsEvidence({
+          userId: primaryOwner,
+          conversationId: primaryConversation,
+          evidenceId: primaryEvidenceId,
+        }),
+      ).toBe(true);
+      evidence.completed_checks.push(12);
+      await expect(page.getByText(/Decision: Watching/i)).toBeVisible();
+      const reloadedMePromise = waitForMe(page);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      expect((await reloadedMePromise).account_kind).toBe("registered");
+      await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+    });
+
+    await runStep(16, evidence, (value) => (currentCheck = value), async () => {
+      if (!claimGuestContext || !claimGuestPage) {
+        throw new Error("Existing-account claim guest is missing");
+      }
+      await backend.start(false);
+      existingAccount = await createDisposableRegisteredIdentity();
+      disposableUserIds.add(existingAccount.userId);
+      const before = conversationGraph(claimGuestOwner, claimConversation);
+      const sourceUsageBefore = ownerSnapshot(claimGuestOwner);
+      await claimGuestPage.goto(
+        `/chat?conversation=${claimConversation}`,
+        { waitUntil: "domcontentloaded" },
+      );
+      await expect(claimGuestPage.getByTestId("result-equity-chart")).toBeVisible();
+      await claimGuestPage.getByRole("button", { name: "Add decision" }).click();
+      const modal = claimGuestPage.getByRole("dialog", { name: "Sign in" });
+      await expect(modal).toBeVisible();
+      await safeScreenshot(
+        claimGuestPage,
+        "16-existing-account-modal",
+        modal,
+      );
+      await modal
+        .getByPlaceholder("Email address")
+        .fill(existingAccount.email);
+      await modal.getByPlaceholder("Password").fill(existingAccount.password);
+      const loginResponse = claimGuestPage.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/auth/login"),
+      );
+      await modal.getByRole("button", { name: "Sign In" }).click();
+      expect((await loginResponse).status()).toBe(200);
+      await expect(
+        claimGuestPage.getByPlaceholder("Optional note for future you"),
+      ).toHaveCount(1);
+      evidence.existing_claim_resume_count = await claimGuestPage
+        .getByPlaceholder("Optional note for future you")
+        .count();
+
+      const account = await apiJson<GuestMe>(claimGuestContext.request, "/me");
+      expect(
+        account.status === 200 &&
+          account.body.account_kind === "registered" &&
+          account.body.user.id === existingAccount.userId,
+      ).toBe(true);
+      const after = conversationGraph(
+        existingAccount.userId,
+        claimConversation,
+      );
+      expect(sameGraphIds(before, after)).toBe(true);
+      const sourceAfter = conversationGraph(
+        claimGuestOwner,
+        claimConversation,
+      );
+      expect(mutableGraphRows(sourceAfter)).toBe(0);
+      expect(sourceAfter.checkpoints).toEqual(before.checkpoints);
+      expect(graphDuplicateCount(after)).toBe(0);
+      expect(ownerSnapshot(claimGuestOwner).chat_units).toBe(
+        sourceUsageBefore.chat_units,
+      );
+      expect(ownerSnapshot(claimGuestOwner).simulation_units).toBe(
+        sourceUsageBefore.simulation_units,
+      );
+      expect(ownerSnapshot(existingAccount.userId).chat_units).toBe(0);
+      expect(ownerSnapshot(existingAccount.userId).simulation_units).toBe(0);
+      expect(handoffState(claimGuestOwner)).toEqual({
+        total: 1,
+        consumed: 1,
+      });
+      expect(
+        workspaceFacts(claimGuestOwner).claimed_by === existingAccount.userId,
+      ).toBe(true);
+      await expect(claimGuestPage.getByTestId("result-equity-chart")).toBeVisible();
+      evidence.existing_claim_owner_changed = true;
+      evidence.existing_claim_duplicate_count = graphDuplicateCount(after);
+    });
+
+    await runStep(17, evidence, (value) => (currentCheck = value), async () => {
+      const feedbackContext = await browser.newContext();
+      contexts.push(feedbackContext);
+      await assertFreshContext(feedbackContext);
+      const feedbackPage = await feedbackContext.newPage();
+      attachMonitor(feedbackPage);
+      const feedbackMe = await freshGuest(feedbackPage);
+      feedbackGuestOwner = feedbackMe.user.id;
+      disposableUserIds.add(feedbackGuestOwner);
+      const seeded = seedClaimGraphFromConversation({
+        sourceOwnerId: primaryOwner,
+        sourceConversationId: primaryConversation,
+        targetOwnerId: feedbackGuestOwner,
+      });
+      await feedbackPage.goto(`/chat?conversation=${seeded.conversationId}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await expect(feedbackPage.getByTestId("result-equity-chart")).toBeVisible();
+      const before = ownerSnapshot(feedbackGuestOwner);
+      await feedbackPage
+        .getByRole("button", { name: "Guest settings" })
+        .click();
+      await feedbackPage.getByRole("menuitem", { name: "Feedback" }).click();
+      await expect(feedbackPage.getByText("Provide feedback")).toBeVisible();
+      await expect(feedbackPage.locator('input[type="email"]')).toHaveCount(0);
+      const consent = feedbackPage.getByLabel(
+        "Include approved context from this conversation",
+      );
+      await expect(consent).not.toBeChecked();
+      await consent.check();
+      await feedbackPage
+        .getByPlaceholder("What's on your mind?")
+        .fill("The local guest flow stayed clear.");
+      await feedbackPage
+        .getByRole("button", { name: "Submit feedback" })
+        .click();
+      await expect(feedbackPage.getByText("Feedback submitted.")).toBeVisible();
+      await expect
+        .poll(() => ownerSnapshot(feedbackGuestOwner).feedback)
+        .toBe(before.feedback + 1);
+      const after = ownerSnapshot(feedbackGuestOwner);
+      expect(after.chat_units).toBe(before.chat_units);
+      expect(after.simulation_units).toBe(before.simulation_units);
+      expect(after.feedback_units).toBe(before.feedback_units + 1);
+      const privacy = feedbackPrivacy(feedbackGuestOwner);
+      expect(privacy).toEqual({
+        rows: 1,
+        email_present: false,
+        transcript_present: false,
+        forbidden_context_fields: 0,
+      });
+      evidence.feedback_rows_added = after.feedback - before.feedback;
+      evidence.feedback_email_present = privacy.email_present;
+      evidence.feedback_transcript_present = privacy.transcript_present;
+    });
+
+    await runStep(18, evidence, (value) => (currentCheck = value), async () => {
+      const feedbackContext = contexts.at(-1);
+      if (!feedbackContext) throw new Error("Interrupted-turn context is missing");
+      const feedbackPage = feedbackContext.pages()[0];
+      const before = ownerSnapshot(feedbackGuestOwner);
+      await feedbackPage.route("**/api/v1/chat/stream", async (route) => {
+        await route.abort("connectionreset");
+      });
+      await feedbackPage
+        .getByTestId("chat-input")
+        .fill("Interrupt this local-only QA turn");
+      await feedbackPage.getByTestId("chat-send").click();
+      expectedInterruptedFailures += 1;
+      await expect(
+        feedbackPage.getByText(
+          "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
+        ),
+      ).toBeVisible();
+      await expect(
+        feedbackPage.getByRole("button", { name: /Retry|Try again/i }),
+      ).toBeVisible();
+      const after = ownerSnapshot(feedbackGuestOwner);
+      expect(after.messages).toBe(before.messages);
+      expect(after.chat_units).toBe(before.chat_units);
+      expect(after.simulation_units).toBe(before.simulation_units);
+      evidence.interrupted_usage_delta = after.chat_units - before.chat_units;
+      await feedbackPage.unroute("**/api/v1/chat/stream");
+      const retryResponse = feedbackPage.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
+      );
+      await feedbackPage
+        .getByRole("button", { name: /Retry|Try again/i })
+        .click();
+      expect((await retryResponse).status()).toBe(200);
+      await expect
+        .poll(() => ownerSnapshot(feedbackGuestOwner).chat_units, {
+          timeout: 180_000,
+        })
+        .toBe(before.chat_units + 1);
+      const recovered = ownerSnapshot(feedbackGuestOwner);
+      expect(recovered.user_messages).toBe(before.user_messages + 1);
+      expect(recovered.assistant_messages).toBeGreaterThanOrEqual(
+        before.assistant_messages + 1,
+      );
+    });
+
+    await runStep(19, evidence, (value) => (currentCheck = value), async () => {
+      if (!existingAccount) throw new Error("Permanent cleanup control is missing");
+      const expiryContext = await browser.newContext();
+      contexts.push(expiryContext);
+      await assertFreshContext(expiryContext);
+      const expiryPage = await expiryContext.newPage();
+      attachMonitor(expiryPage);
+      const expiredMe = await freshGuest(expiryPage);
+      const expiredOwner = expiredMe.user.id;
+      disposableUserIds.add(expiredOwner);
+      const fixedExpiry = ownerSnapshot(expiredOwner).expires_at;
+      await apiJson<HistoryList>(expiryContext.request, "/history?limit=20");
+      expect(ownerSnapshot(expiredOwner).expires_at).toBe(fixedExpiry);
+      markWorkspaceExpired(expiredOwner);
+      const denied = await apiJson<{ code?: string }>(
+        expiryContext.request,
+        "/me",
+      );
+      expect(
+        denied.status === 403 && denied.body.code === "guest_session_expired",
+      ).toBe(true);
+      const cleanup = cleanupOneExpiredGuest();
+      expect(cleanup).toEqual({ dry_run_count: 1, deleted_count: 1 });
+      expect(authUserExists(expiredOwner)).toBe(false);
+      disposableUserIds.delete(expiredOwner);
+      expect(authUserExists(existingAccount.userId)).toBe(true);
+      expect(authUserExists(primaryOwner)).toBe(true);
+      evidence.cleanup_deleted_count = cleanup.deleted_count;
+      evidence.cleanup_permanent_control_preserved = true;
+    });
+
+    await runStep(20, evidence, (value) => (currentCheck = value), async () => {
+      if (!claimGuestContext || !existingAccount) {
+        throw new Error("Cross-owner controls are missing");
+      }
+      const registeredRead = await apiJson<Record<string, unknown>>(
+        page.context().request,
+        `/conversations/${claimConversation}/messages?limit=100`,
+      );
+      const claimedRead = await apiJson<Record<string, unknown>>(
+        claimGuestContext.request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      expect(registeredRead.status).toBe(404);
+      expect(claimedRead.status).toBe(404);
+      evidence.cross_owner_result_count +=
+        Number(registeredRead.status !== 404) +
+        Number(claimedRead.status !== 404);
+
+      const consoleErrors = monitors.reduce(
+        (total, monitor) => total + monitor.consoleErrors,
+        0,
+      );
+      const pageErrors = monitors.reduce(
+        (total, monitor) => total + monitor.pageErrors,
+        0,
+      );
+      const failedRequests = monitors.reduce(
+        (total, monitor) => total + monitor.failedRequests,
+        0,
+      );
+      const hostedWrites = monitors.reduce(
+        (total, monitor) => total + monitor.hostedWrites,
+        0,
+      );
+      const credentialExposure = monitors.reduce(
+        (total, monitor) => total + monitor.credentialExposure,
+        0,
+      );
+      expect(consoleErrors).toBe(0);
+      expect(pageErrors).toBe(0);
+      expect(failedRequests).toBe(expectedInterruptedFailures);
+      expect(hostedWrites).toBe(0);
+      expect(credentialExposure).toBe(0);
+      expect(evidence.cross_owner_result_count).toBe(0);
+      expect(backend.flagsRestoredFalse).toBe(true);
+
+      evidence.console_error_count = consoleErrors;
+      evidence.page_error_count = pageErrors;
+      evidence.failed_request_count = failedRequests;
+      evidence.hosted_write_count = hostedWrites;
+      evidence.credential_exposure_count = credentialExposure;
+      evidence.normalized_mutation_counts = mergeMutationCounts(monitors);
+      evidence.flags_restored_false = true;
+      evidence.status = "passed";
+    });
+  } finally {
+    if (currentCheck !== null) evidence.failure_check = currentCheck;
+    const matrixPassed = evidence.status === "passed";
+    let teardownFailed = false;
+    try {
+      if (!backend.flagsRestoredFalse) await backend.start(false);
+      evidence.flags_restored_false = backend.flagsRestoredFalse;
+    } catch {
+      evidence.flags_restored_false = false;
+      teardownFailed = true;
+    }
+    try {
+      await backend.stop();
+    } catch {
+      teardownFailed = true;
+    }
+
+    for (const context of [...contexts].reverse()) {
+      try {
+        await context.close();
+      } catch {
+        teardownFailed = true;
+      }
+    }
+    for (const userId of disposableUserIds) {
+      try {
+        await deleteDisposableIdentity(userId);
+      } catch {
+        teardownFailed = true;
+      }
+    }
+    try {
+      purgeDisposableQaEvidence();
+      assertZeroState();
+    } catch {
+      teardownFailed = true;
+    }
+
+    evidence.teardown_clean = !teardownFailed;
+    if (teardownFailed) {
+      evidence.status = "failed";
+      evidence.failure_check ??= 20;
+    }
+    evidence.normalized_mutation_counts = mergeMutationCounts(monitors);
+    evidence.console_error_count = monitors.reduce(
+      (total, monitor) => total + monitor.consoleErrors,
+      0,
+    );
+    evidence.page_error_count = monitors.reduce(
+      (total, monitor) => total + monitor.pageErrors,
+      0,
+    );
+    evidence.failed_request_count = monitors.reduce(
+      (total, monitor) => total + monitor.failedRequests,
+      0,
+    );
+    evidence.hosted_write_count = monitors.reduce(
+      (total, monitor) => total + monitor.hostedWrites,
+      0,
+    );
+    evidence.credential_exposure_count = monitors.reduce(
+      (total, monitor) => total + monitor.credentialExposure,
+      0,
+    );
+    writeEvidence(evidence);
+    if (matrixPassed && teardownFailed) {
+      throw new Error("Guest QA teardown did not restore local zero state");
+    }
+  }
 });
