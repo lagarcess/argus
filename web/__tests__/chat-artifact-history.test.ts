@@ -662,6 +662,57 @@ describe("chat artifact history", () => {
     expect(settled.actions).toEqual([]);
   });
 
+  test("persisted failed run action remains could not run after hydration normalization", () => {
+    const runAction = {
+      type: "run_backtest",
+      label: "Run backtest",
+      presentation: "confirmation",
+      payload: { confirmation_id: "confirm-aapl" },
+    } satisfies ChatActionOption;
+    const items: ApiMessage[] = [
+      {
+        id: "user-run-action",
+        conversation_id: "conversation-1",
+        role: "user",
+        content: "Run backtest",
+        created_at: "2026-07-24T00:00:00Z",
+        metadata: {
+          chat_action: runAction,
+        },
+      },
+      {
+        id: "assistant-run-failed",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "This backtest could not be started right now.",
+        created_at: "2026-07-24T00:00:01Z",
+        metadata: {
+          chat_action: runAction,
+          failed_action: {
+            artifact_id: "failed-run-aapl",
+            action_type: "run_backtest",
+            failure_classification: "capacity",
+            error: "backtest_capacity_exceeded",
+            retryable: false,
+          },
+        },
+      },
+    ];
+
+    const { effects } = confirmationActionEffectsFromApi(items);
+    const hydrated = applyConfirmationActionEffects(
+      normalizeConfirmationHistory([confirmationMessage()]),
+      effects,
+    );
+    const [normalized] = normalizeConfirmationHistory(hydrated);
+
+    expect(normalized.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalized.confirmation?.status).toBe("could_not_run");
+    expect(normalized.confirmation?.statusLabel).toBe("Could not run");
+    expect(normalized.confirmation?.actions).toEqual([]);
+    expect(normalized.actions).toEqual([]);
+  });
+
   test("clarification text finals keep active confirmation cards open", () => {
     const [settled] = settleOpenConfirmationsAfterTextFinal(
       [confirmationMessage()],

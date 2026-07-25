@@ -109,7 +109,17 @@ export function confirmationActionEffectsFromApi(items: ApiMessage[]) {
     if (!effect) {
       continue;
     }
-    effects.push(effect);
+    const failedAction = recordOrNull(metadata.failed_action);
+    const authoritativeEffect =
+      item.role === "assistant" &&
+      failedAction?.action_type === action?.type
+        ? {
+            ...effect,
+            status: "could_not_run" as const,
+            statusLabel: confirmationStatusLabel("could_not_run"),
+          }
+        : effect;
+    effects.push(authoritativeEffect);
     if (effect.type === "cancel_confirmation") {
       hiddenMessageIds.add(item.id);
     }
