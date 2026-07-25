@@ -700,6 +700,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(check16).toContain("sameGraphIds");
     expect(check16).toContain("guestClaim.pending_action");
     expect(check16).toContain("decisionTargetsEvidence");
+    expect(check16).toContain("resumedDecisionResponse");
+    expect(check16).toContain("response.status() === 200");
     expect(ownerGraphCounter).not.toContain("checkpoint_blobs");
     expect(ownerGraphCounter).not.toContain("checkpoint_writes");
     expect(check16).toContain(
@@ -715,6 +717,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(check17).toContain("feedbackPrivacy({");
     expect(check17).toContain("sensitive_value_rows");
     expect(check17).not.toContain("includeCleanupEvidence: true");
+    expect(check17).toContain('waitForLoadState("networkidle")');
+    expect(check17).toContain("seededMessagesResponse");
   });
 
   test("hydrates a durable retry and never fabricates recovery with request aborts", () => {

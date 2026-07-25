@@ -1446,16 +1446,18 @@ test("@guest-experience exact-head 20-check matrix", async ({
       const destinationDecisionsBefore =
         ownerSnapshot(existingAccount.userId).decisions;
       await card.getByRole("button", { name: "Watching" }).click();
-      const resumedDecisionRequest = claimGuestPage.waitForRequest(
-        (request) =>
-          request.method() === "POST" &&
-          new URL(request.url()).pathname.endsWith(
+      const resumedDecisionResponse = claimGuestPage.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          response.status() === 200 &&
+          new URL(response.url()).pathname.endsWith(
             `/api/v1/evidence-artifacts/${claimEvidenceId}/decision`,
           ),
       );
       await card.getByRole("button", { name: "Save decision" }).click();
-      const resumedDecision = await resumedDecisionRequest;
+      const resumedDecision = await resumedDecisionResponse;
       expect(
+        resumedDecision.status() === 200 &&
         new URL(resumedDecision.url()).pathname.endsWith(
           `/api/v1/evidence-artifacts/${claimEvidenceId}/decision`,
         ),
@@ -1500,14 +1502,24 @@ test("@guest-experience exact-head 20-check matrix", async ({
       });
       feedbackGuestOwner = feedbackMe.user.id;
       disposableUserIds.add(feedbackGuestOwner);
+      await feedbackPage.waitForLoadState("networkidle");
       const seeded = seedClaimGraphFromConversation({
         sourceOwnerId: primaryOwner,
         sourceConversationId: primaryConversation,
         targetOwnerId: feedbackGuestOwner,
       });
+      const seededMessagesResponse = feedbackPage.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.status() === 200 &&
+          new URL(response.url()).pathname.endsWith(
+            `/api/v1/conversations/${seeded.conversationId}/messages`,
+          ),
+      );
       await feedbackPage.goto(`/chat?conversation=${seeded.conversationId}`, {
         waitUntil: "domcontentloaded",
       });
+      expect((await seededMessagesResponse).status()).toBe(200);
       await expect(feedbackPage.getByTestId("result-equity-chart")).toBeVisible();
       const before = ownerSnapshot(feedbackGuestOwner);
       const openFeedback = async () => {
