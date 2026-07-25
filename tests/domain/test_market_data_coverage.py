@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -38,8 +38,8 @@ def _config(*symbols: str) -> dict[str, object]:
         "asset_class": "equity",
         "symbols": list(symbols),
         "timeframe": "1D",
-        "start_date": "2024-01-01",
-        "end_date": "2024-01-05",
+        "start_date": "2024-01-02",
+        "end_date": "2024-01-08",
         "side": "long",
         "starting_capital": 10_000.0,
         "allocation_method": "equal_weight",
@@ -80,13 +80,295 @@ def _market_session(
     )
 
 
+def _session_calendar(
+    *sessions: EquityMarketSession,
+    calls: list[tuple[date, date]] | None = None,
+):
+    def fetch(*, start_date: date, end_date: date) -> tuple[EquityMarketSession, ...]:
+        if calls is not None:
+            calls.append((start_date, end_date))
+        return tuple(
+            session
+            for session in sessions
+            if start_date <= session.session_date <= end_date
+        )
+
+    return fetch
+
+
+def test_exact_equity_session_boundaries_have_no_adjustment_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    days = ("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05")
+    sessions = tuple(_market_session(day) for day in days)
+    calendar_calls: list[tuple[date, date]] = []
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL"),
+            "start_date": days[0],
+            "end_date": days[-1],
+        },
+        fetch_ohlcv_func=_fetcher({"AAPL": _bars(*days), "SPY": _bars(*days)}),
+        fetch_market_calendar_func=_session_calendar(
+            *sessions,
+            calls=calendar_calls,
+        ),
+    )
+
+    assert prepared.outcome == "full_coverage"
+    assert prepared.adjustment_reason == "none"
+    assert prepared.coverage_payload()["adjustment_reason"] == "none"
+    assert calendar_calls == [(date(2024, 1, 2), date(2024, 1, 5))]
+
+
+@pytest.mark.parametrize(
+    ("requested_start", "requested_end", "session_days"),
+    [
+        (
+            "2024-01-01",
+            "2024-01-05",
+            ("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"),
+        ),
+        (
+            "2024-01-06",
+            "2024-01-10",
+            ("2024-01-08", "2024-01-09", "2024-01-10"),
+        ),
+        (
+            "2024-12-20",
+            "2024-12-25",
+            ("2024-12-20", "2024-12-23", "2024-12-24"),
+        ),
+    ],
+    ids=("holiday-start", "weekend-start", "weekend-holiday-end"),
+)
+def test_equity_calendar_only_boundaries_are_calendar_alignment(
+    monkeypatch: pytest.MonkeyPatch,
+    requested_start: str,
+    requested_end: str,
+    session_days: tuple[str, ...],
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    sessions = tuple(_market_session(day) for day in session_days)
+    bars = _bars(*session_days)
+    calendar_calls: list[tuple[date, date]] = []
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL"),
+            "start_date": requested_start,
+            "end_date": requested_end,
+        },
+        fetch_ohlcv_func=_fetcher({"AAPL": bars, "SPY": bars}),
+        fetch_market_calendar_func=_session_calendar(
+            *sessions,
+            calls=calendar_calls,
+        ),
+    )
+
+    assert prepared.outcome == "adjusted_coverage"
+    assert prepared.adjustment_reason == "calendar_alignment"
+    assert prepared.effective_date_range.model_dump() == {
+        "start": session_days[0],
+        "end": session_days[-1],
+    }
+    assert calendar_calls == [
+        (date.fromisoformat(requested_start), date.fromisoformat(requested_end))
+    ]
+
+
+@pytest.mark.parametrize(
+    ("observed_days", "expected_start", "expected_end"),
+    [
+        (
+            ("2024-01-03", "2024-01-04", "2024-01-05"),
+            "2024-01-03",
+            "2024-01-05",
+        ),
+        (
+            ("2024-01-02", "2024-01-03", "2024-01-04"),
+            "2024-01-02",
+            "2024-01-04",
+        ),
+    ],
+    ids=("provider-head", "provider-tail"),
+)
+def test_equity_provider_edge_loss_is_material(
+    monkeypatch: pytest.MonkeyPatch,
+    observed_days: tuple[str, ...],
+    expected_start: str,
+    expected_end: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    candidate_days = ("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05")
+    sessions = tuple(_market_session(day) for day in candidate_days)
+    calendar_calls: list[tuple[date, date]] = []
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL"),
+            "start_date": candidate_days[0],
+            "end_date": candidate_days[-1],
+        },
+        fetch_ohlcv_func=_fetcher(
+            {"AAPL": _bars(*observed_days), "SPY": _bars(*candidate_days)}
+        ),
+        fetch_market_calendar_func=_session_calendar(
+            *sessions,
+            calls=calendar_calls,
+        ),
+    )
+
+    assert prepared.outcome == "adjusted_coverage"
+    assert prepared.adjustment_reason == "provider_coverage_adjustment"
+    assert prepared.effective_date_range.model_dump() == {
+        "start": expected_start,
+        "end": expected_end,
+    }
+    assert calendar_calls == [(date(2024, 1, 2), date(2024, 1, 5))]
+
+
+def test_multi_symbol_and_benchmark_common_window_loss_is_material(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    candidate_days = ("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05")
+    sessions = tuple(_market_session(day) for day in candidate_days)
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL", "MSFT"),
+            "start_date": candidate_days[0],
+            "end_date": candidate_days[-1],
+        },
+        fetch_ohlcv_func=_fetcher(
+            {
+                "AAPL": _bars(*candidate_days),
+                "MSFT": _bars("2024-01-03", "2024-01-04", "2024-01-05"),
+                "SPY": _bars("2024-01-02", "2024-01-03", "2024-01-04"),
+            }
+        ),
+        fetch_market_calendar_func=_session_calendar(*sessions),
+    )
+
+    assert prepared.effective_date_range.model_dump() == {
+        "start": "2024-01-03",
+        "end": "2024-01-04",
+    }
+    assert prepared.adjustment_reason == "provider_coverage_adjustment"
+
+
+def test_continuous_market_classifications_never_use_the_equity_calendar() -> None:
+    today = date.today()
+    requested_start = today - timedelta(days=4)
+    latest_complete = today - timedelta(days=1)
+    complete_days = tuple(
+        (requested_start + timedelta(days=offset)).isoformat() for offset in range(4)
+    )
+
+    def no_equity_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
+        raise AssertionError("continuous markets must not request an equity calendar")
+
+    exact = prepare_market_data(
+        {
+            **_config("ETH"),
+            "asset_class": "crypto",
+            "benchmark_symbol": "BTC",
+            "start_date": requested_start.isoformat(),
+            "end_date": latest_complete.isoformat(),
+        },
+        fetch_ohlcv_func=_fetcher(
+            {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
+        ),
+        fetch_market_calendar_func=no_equity_calendar,
+    )
+    latest_complete_alignment = prepare_market_data(
+        {
+            **_config("ETH"),
+            "asset_class": "crypto",
+            "benchmark_symbol": "BTC",
+            "start_date": requested_start.isoformat(),
+            "end_date": latest_complete.isoformat(),
+            "requested_date_range": {
+                "start": requested_start.isoformat(),
+                "end": today.isoformat(),
+            },
+        },
+        fetch_ohlcv_func=_fetcher(
+            {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
+        ),
+        fetch_market_calendar_func=no_equity_calendar,
+    )
+    provider_truncated = prepare_market_data(
+        {
+            **_config("ETH"),
+            "asset_class": "crypto",
+            "benchmark_symbol": "BTC",
+            "start_date": requested_start.isoformat(),
+            "end_date": latest_complete.isoformat(),
+        },
+        fetch_ohlcv_func=_fetcher(
+            {
+                "ETH": _bars(*complete_days[1:]),
+                "BTC": _bars(*complete_days),
+            }
+        ),
+        fetch_market_calendar_func=no_equity_calendar,
+    )
+
+    assert exact.adjustment_reason == "none"
+    assert latest_complete_alignment.adjustment_reason == "calendar_alignment"
+    assert provider_truncated.adjustment_reason == "provider_coverage_adjustment"
+
+
+def test_relative_equity_period_ending_today_aligns_to_latest_completed_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    today = date.today()
+    latest_complete = today - timedelta(days=1)
+    while latest_complete.weekday() >= 5:
+        latest_complete -= timedelta(days=1)
+    candidate_start = latest_complete - timedelta(days=6)
+    session_days = tuple(
+        (candidate_start + timedelta(days=offset)).isoformat()
+        for offset in range((latest_complete - candidate_start).days + 1)
+        if (candidate_start + timedelta(days=offset)).weekday() < 5
+    )
+    sessions = tuple(_market_session(day) for day in session_days)
+    bars = _bars(*session_days)
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL"),
+            "start_date": candidate_start.isoformat(),
+            "end_date": latest_complete.isoformat(),
+            "requested_date_range": {
+                "start": candidate_start.isoformat(),
+                "end": today.isoformat(),
+            },
+        },
+        fetch_ohlcv_func=_fetcher({"AAPL": bars, "SPY": bars}),
+        fetch_market_calendar_func=_session_calendar(*sessions),
+    )
+
+    assert prepared.outcome == "adjusted_coverage"
+    assert prepared.effective_date_range.model_dump() == {
+        "start": session_days[0],
+        "end": latest_complete.isoformat(),
+    }
+    assert prepared.adjustment_reason == "calendar_alignment"
+
+
 def test_full_coverage_preserves_requested_window_and_fetches_each_series_once() -> None:
     full = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
     calls: Counter[str] = Counter()
 
@@ -97,8 +379,8 @@ def test_full_coverage_preserves_requested_window_and_fetches_each_series_once()
 
     assert prepared.outcome == "full_coverage"
     assert prepared.requested_date_range.model_dump() == {
-        "start": "2024-01-01",
-        "end": "2024-01-05",
+        "start": "2024-01-02",
+        "end": "2024-01-08",
     }
     assert prepared.effective_date_range == prepared.requested_date_range
     assert calls == Counter({"AAPL": 1, "MSFT": 1, "SPY": 1})
@@ -108,14 +390,14 @@ def test_full_coverage_preserves_requested_window_and_fetches_each_series_once()
     ("symbol_days", "expected_start", "expected_end"),
     [
         (
-            ["2024-01-03", "2024-01-04", "2024-01-05"],
-            "2024-01-03",
-            "2024-01-05",
+            ["2024-01-04", "2024-01-05", "2024-01-08"],
+            "2024-01-04",
+            "2024-01-08",
         ),
         (
-            ["2024-01-01", "2024-01-02", "2024-01-03"],
-            "2024-01-01",
-            "2024-01-03",
+            ["2024-01-02", "2024-01-03", "2024-01-04"],
+            "2024-01-02",
+            "2024-01-04",
         ),
     ],
 )
@@ -125,11 +407,11 @@ def test_leading_and_trailing_gaps_produce_one_effective_window(
     expected_end: str,
 ) -> None:
     full = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
 
     prepared = prepare_market_data(
@@ -146,8 +428,8 @@ def test_leading_and_trailing_gaps_produce_one_effective_window(
     assert effective_config["start_date"] == expected_start
     assert effective_config["end_date"] == expected_end
     assert effective_config["requested_date_range"] == {
-        "start": "2024-01-01",
-        "end": "2024-01-05",
+        "start": "2024-01-02",
+        "end": "2024-01-08",
     }
     assert effective_config["effective_date_range"] == {
         "start": expected_start,
@@ -160,31 +442,57 @@ def test_multi_symbol_window_is_intersection_including_benchmark() -> None:
         _config("AAPL", "MSFT"),
         fetch_ohlcv_func=_fetcher(
             {
-                "AAPL": _bars("2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"),
-                "MSFT": _bars("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"),
-                "SPY": _bars("2024-01-01", "2024-01-02", "2024-01-03"),
+                "AAPL": _bars("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"),
+                "MSFT": _bars("2024-01-03", "2024-01-04", "2024-01-05", "2024-01-08"),
+                "SPY": _bars("2024-01-02", "2024-01-03", "2024-01-04"),
             }
         ),
     )
 
     assert prepared.effective_date_range.model_dump() == {
-        "start": "2024-01-02",
-        "end": "2024-01-03",
+        "start": "2024-01-03",
+        "end": "2024-01-04",
     }
     assert all(
-        list(frame.index.strftime("%Y-%m-%d")) == ["2024-01-02", "2024-01-03"]
+        list(frame.index.strftime("%Y-%m-%d")) == ["2024-01-03", "2024-01-04"]
         for frame in prepared.bars_by_symbol.values()
     )
 
 
 def test_effective_window_uses_observed_boundaries_for_every_series() -> None:
-    all_days = [f"2024-01-{day:02d}" for day in range(1, 21)]
+    all_days = [
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11",
+        "2024-01-12",
+        "2024-01-16",
+        "2024-01-17",
+        "2024-01-18",
+        "2024-01-19",
+    ]
     strategy_days = [
         day
         for day in all_days
         if day not in {"2024-01-03", "2024-01-18"}
     ]
-    benchmark_days = [f"2024-01-{day:02d}" for day in range(3, 19)]
+    benchmark_days = [
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11",
+        "2024-01-12",
+        "2024-01-16",
+        "2024-01-17",
+        "2024-01-18",
+    ]
 
     prepared = prepare_market_data(
         {
@@ -213,11 +521,11 @@ def test_effective_window_uses_observed_boundaries_for_every_series() -> None:
 
 def test_sparse_history_is_rejected_with_typed_recovery_code() -> None:
     full = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
 
     with pytest.raises(MarketDataCoverageError) as exc_info:
@@ -226,7 +534,7 @@ def test_sparse_history_is_rejected_with_typed_recovery_code() -> None:
             fetch_ohlcv_func=_fetcher(
                 {
                     "AAPL": full,
-                    "MSFT": _bars("2024-01-01", "2024-01-05"),
+                    "MSFT": _bars("2024-01-02", "2024-01-08"),
                     "SPY": full,
                 }
             ),
@@ -432,14 +740,14 @@ def test_no_common_window_is_rejected_before_a_runnable_artifact_exists() -> Non
             _config("AAPL", "MSFT"),
             fetch_ohlcv_func=_fetcher(
                 {
-                    "AAPL": _bars("2024-01-01", "2024-01-02"),
-                    "MSFT": _bars("2024-01-04", "2024-01-05"),
+                    "AAPL": _bars("2024-01-02", "2024-01-03"),
+                    "MSFT": _bars("2024-01-05", "2024-01-08"),
                     "SPY": _bars(
-                        "2024-01-01",
                         "2024-01-02",
                         "2024-01-03",
                         "2024-01-04",
                         "2024-01-05",
+                        "2024-01-08",
                     ),
                 }
             ),
@@ -450,15 +758,15 @@ def test_no_common_window_is_rejected_before_a_runnable_artifact_exists() -> Non
 
 def test_approved_effective_window_cannot_silently_change_during_execution() -> None:
     full = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
     approved = {
-        "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
-        "effective_date_range": {"start": "2024-01-02", "end": "2024-01-05"},
+        "requested_date_range": {"start": "2024-01-02", "end": "2024-01-08"},
+        "effective_date_range": {"start": "2024-01-03", "end": "2024-01-08"},
     }
 
     with pytest.raises(MarketDataCoverageError) as exc_info:
@@ -473,11 +781,11 @@ def test_approved_effective_window_cannot_silently_change_during_execution() -> 
 
 def test_approved_dataset_identity_cannot_silently_change_during_execution() -> None:
     confirmed = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
     config = _config("AAPL")
     preflight = prepare_market_data(
@@ -500,11 +808,11 @@ def test_approved_dataset_identity_cannot_silently_change_during_execution() -> 
 
 def test_approved_dataset_identity_accepts_the_identical_execution_dataset() -> None:
     confirmed = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
     config = _config("AAPL")
     preflight = prepare_market_data(
@@ -524,11 +832,11 @@ def test_approved_dataset_identity_accepts_the_identical_execution_dataset() -> 
 
 def test_metrics_and_chart_share_prepared_bars_without_refetch_or_edge_backfill() -> None:
     full = _bars(
-        "2024-01-01",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
         "2024-01-05",
+        "2024-01-08",
     )
     calls: Counter[str] = Counter()
     config = _config("AAPL", "MSFT")
@@ -537,7 +845,7 @@ def test_metrics_and_chart_share_prepared_bars_without_refetch_or_edge_backfill(
         fetch_ohlcv_func=_fetcher(
             {
                 "AAPL": full,
-                "MSFT": _bars("2024-01-03", "2024-01-04", "2024-01-05", base=200),
+                "MSFT": _bars("2024-01-04", "2024-01-05", "2024-01-08", base=200),
                 "SPY": full,
             },
             calls,
@@ -556,8 +864,8 @@ def test_metrics_and_chart_share_prepared_bars_without_refetch_or_edge_backfill(
     )
 
     assert calls == calls_after_preflight
-    assert chart["series"][0]["time"] == "2024-01-03"
-    assert chart["series"][-1]["time"] == "2024-01-05"
+    assert chart["series"][0]["time"] == "2024-01-04"
+    assert chart["series"][-1]["time"] == "2024-01-08"
     assert chart["series"][0]["value"] == 10_000.0
     assert (
         metrics["aggregate"]["performance"]["portfolio_value_range"]["lowest_value"]

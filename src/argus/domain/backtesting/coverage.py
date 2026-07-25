@@ -11,6 +11,7 @@ from typing import Any, Callable, Sequence
 import pandas as pd
 from pydantic import BaseModel
 
+from argus.domain.backtesting.types import CoverageAdjustmentReason
 from argus.domain.market_data import fetch_ohlcv as _DEFAULT_FETCH_OHLC
 from argus.domain.market_data.capabilities import (
     PROVIDER_TIMEFRAME_MINUTES,
@@ -38,6 +39,7 @@ class PreparedMarketData:
     requested_date_range: CoverageDateRange
     effective_date_range: CoverageDateRange
     outcome: str
+    adjustment_reason: CoverageAdjustmentReason
     dataset_id: str
     bars_by_symbol: dict[str, pd.DataFrame]
     observations_by_symbol: dict[str, int]
@@ -56,6 +58,7 @@ class PreparedMarketData:
         return {
             "schema_version": "market_data_coverage_v1",
             "outcome": self.outcome,
+            "adjustment_reason": self.adjustment_reason,
             "requested_date_range": self.requested_date_range.model_dump(),
             "effective_date_range": self.effective_date_range.model_dump(),
             "dataset_id": self.dataset_id,
@@ -75,6 +78,7 @@ def prepare_market_data(
     fetch_ohlcv_func: FetchOhlcv | None = None,
     fetch_market_calendar_func: FetchMarketCalendar | None = None,
     approved_coverage: dict[str, Any] | None = None,
+    approved_adjustment_reason: CoverageAdjustmentReason | None = None,
 ) -> PreparedMarketData:
     uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
     if fetch_ohlcv_func is None:
@@ -128,8 +132,8 @@ def prepare_market_data(
         raise MarketDataCoverageError("no_common_data_window")
     equity_market_sessions = _equity_market_sessions_for_window(
         asset_class=str(config["asset_class"]),
-        start_date=pd.Timestamp(common_start).date(),
-        end_date=pd.Timestamp(common_end).date(),
+        start_date=fetch_start,
+        end_date=fetch_end,
         fetch_market_calendar_func=fetch_market_calendar_func,
         uses_default_market_data_provider=uses_default_market_data_provider,
     )
@@ -154,15 +158,53 @@ def prepare_market_data(
         dataset_id=dataset_id,
     )
     outcome = "full_coverage" if effective == requested else "adjusted_coverage"
+    if approved_coverage is not None and approved_adjustment_reason is not None:
+        adjustment_reason = approved_adjustment_reason
+    else:
+        adjustment_reason = _coverage_adjustment_reason(
+            asset_class=str(config["asset_class"]),
+            requested=requested,
+            effective=effective,
+            candidate_start=fetch_start,
+            candidate_end=fetch_end,
+            equity_market_sessions=equity_market_sessions,
+        )
     observations = {symbol: len(frame) for symbol, frame in trimmed.items()}
     return PreparedMarketData(
         requested_date_range=requested,
         effective_date_range=effective,
         outcome=outcome,
+        adjustment_reason=adjustment_reason,
         dataset_id=dataset_id,
         bars_by_symbol=trimmed,
         observations_by_symbol=observations,
     )
+
+
+def _coverage_adjustment_reason(
+    *,
+    asset_class: str,
+    requested: CoverageDateRange,
+    effective: CoverageDateRange,
+    candidate_start: date,
+    candidate_end: date,
+    equity_market_sessions: Sequence[EquityMarketSession] | None,
+) -> CoverageAdjustmentReason:
+    if effective == requested:
+        return "none"
+
+    expected_start = candidate_start
+    expected_end = candidate_end
+    if asset_class == "equity" and equity_market_sessions:
+        expected_start = min(session.session_date for session in equity_market_sessions)
+        expected_end = max(session.session_date for session in equity_market_sessions)
+
+    if (
+        effective.start == expected_start.isoformat()
+        and effective.end == expected_end.isoformat()
+    ):
+        return "calendar_alignment"
+    return "provider_coverage_adjustment"
 
 
 def apply_coverage_to_config(

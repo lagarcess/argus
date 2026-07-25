@@ -116,8 +116,13 @@ def test_launch_validation_rejects_unsupported_timeframe_for_every_strategy(
         validate_launch_supported(request)
 
 
-def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
+@pytest.mark.parametrize(
+    "adjustment_reason",
+    ["provider_coverage_adjustment", "calendar_alignment"],
+)
+def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart(
     monkeypatch: pytest.MonkeyPatch,
+    adjustment_reason: str,
 ) -> None:
     calls: Counter[str] = Counter()
     index = pd.to_datetime(["2024-01-03", "2024-01-04", "2024-01-05"], utc=True)
@@ -159,6 +164,7 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
         requested_date_range={"start": "2024-01-01", "end": "2024-01-05"},
         coverage_preflight={
             "outcome": "adjusted_coverage",
+            "adjustment_reason": adjustment_reason,
             "requested_date_range": {
                 "start": "2024-01-01",
                 "end": "2024-01-05",
@@ -194,6 +200,10 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
         "end": "2024-01-05",
     }
     assert resolved["engine_config"]["data_coverage"]["dataset_id"].startswith("sha256:")
+    assert (
+        resolved["engine_config"]["data_coverage"]["adjustment_reason"]
+        == adjustment_reason
+    )
     assert result.result_card is not None
     assert result.result_card["chart"]["series"][0]["time"] == "2024-01-03"
     assert result.result_card["chart"]["series"][-1]["time"] == "2024-01-05"
@@ -219,6 +229,10 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
         "start": "2024-01-03",
         "end": "2024-01-05",
     }
+    assert (
+        run.config_snapshot["data_coverage"]["adjustment_reason"]
+        == adjustment_reason
+    )
 
 
 def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(

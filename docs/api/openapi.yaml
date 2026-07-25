@@ -451,6 +451,10 @@ components:
           const: market_data_coverage_v1
         outcome:
           enum: [full_coverage, adjusted_coverage]
+        adjustment_reason:
+          type: string
+          enum: [none, calendar_alignment, provider_coverage_adjustment]
+          description: Code-owned explanation for requested/effective window differences. Optional for backward compatibility.
         requested_date_range:
           $ref: "#/components/schemas/DateRange"
         effective_date_range:

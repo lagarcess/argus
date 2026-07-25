@@ -156,6 +156,114 @@ def test_date_range_expectations_compare_iso_interval_and_dict_equivalently() ->
         assert failures == []
 
 
+def test_measurement_outcome_keeps_requested_effective_and_reason_independent() -> None:
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    effective = {"start": "2024-01-03", "end": "2024-01-05"}
+    case = harness.EvalCase(
+        id="calendar-materiality",
+        category="backtest_metric_correctness",
+        prompt="Test AAPL from January 1 through January 5",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            date_range=requested,
+            requested_date_range=requested,
+            effective_date_range=effective,
+            adjustment_reason="provider_coverage_adjustment",
+        ),
+    )
+    interpret_result = SimpleNamespace(
+        outcome="ready_for_confirmation",
+        patch={
+            "intent": "backtest_execution",
+            "candidate_strategy_draft": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": requested,
+            },
+        },
+    )
+    confirm_result = SimpleNamespace(
+        outcome="await_approval",
+        patch={
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": effective,
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": effective,
+                    "requested_date_range": requested,
+                    "coverage_preflight": {
+                        "outcome": "adjusted_coverage",
+                        "requested_date_range": requested,
+                        "effective_date_range": effective,
+                        "adjustment_reason": "provider_coverage_adjustment",
+                    },
+                    "benchmark_symbol": "SPY",
+                },
+                "validation": {"executable": True},
+            }
+        },
+    )
+
+    outcome = harness._typed_outcome(
+        case=case,
+        interpret_result=interpret_result,
+        confirm_result=confirm_result,
+        clarify_result=None,
+    )
+
+    assert outcome["date_range"] == requested
+    assert outcome["requested_date_range"] == requested
+    assert outcome["effective_date_range"] == effective
+    assert outcome["adjustment_reason"] == "provider_coverage_adjustment"
+    assert harness.typed_expectation_failures(case=case, outcome=outcome) == []
+
+
+def test_measurement_comparisons_report_swapped_windows_and_reason_separately() -> None:
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    effective = {"start": "2024-01-03", "end": "2024-01-05"}
+    case = harness.EvalCase(
+        id="calendar-materiality-swapped",
+        category="backtest_metric_correctness",
+        prompt="Test AAPL from January 1 through January 5",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            requested_date_range=requested,
+            effective_date_range=effective,
+            adjustment_reason="provider_coverage_adjustment",
+        ),
+    )
+
+    failures = harness.typed_expectation_failures(
+        case=case,
+        outcome={
+            "intent": "backtest_execution",
+            "capability_verdict": "executable",
+            "requested_date_range": effective,
+            "effective_date_range": requested,
+            "adjustment_reason": "calendar_alignment",
+        },
+    )
+
+    assert len(failures) == 3
+    assert failures[0].startswith("requested_date_range:")
+    assert failures[1].startswith("effective_date_range:")
+    assert failures[2].startswith("adjustment_reason:")
+
+
 def test_tolerant_intent_labels_never_loosen_final_capability_assertions() -> None:
     """A tolerant intent list absorbs model-shape routing variance only; the
     final capability truth checks stay exact for every listed label."""
