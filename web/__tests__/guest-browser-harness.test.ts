@@ -680,6 +680,10 @@ describe("Checks 6–20 harness guards", () => {
   test("proves typed exactly-once conversion and complete atomic claim graphs", () => {
     const check15 = checkSource(15);
     const check16 = checkSource(16);
+    const ownerGraphCounter = source.slice(
+      source.indexOf("function mutableGraphRows"),
+      source.indexOf("function cleanupGraphRows"),
+    );
 
     expect(check15).toContain("same_uuid_conversion");
     expect(check15).toContain("decisionTargetsEvidence");
@@ -689,6 +693,11 @@ describe("Checks 6–20 harness guards", () => {
     expect(check16).toContain("sameGraphIds");
     expect(check16).toContain("guestClaim.pending_action");
     expect(check16).toContain("decisionTargetsEvidence");
+    expect(ownerGraphCounter).not.toContain("checkpoint_blobs");
+    expect(ownerGraphCounter).not.toContain("checkpoint_writes");
+    expect(check16).toContain(
+      "sourceAfter.checkpoints.length === before.checkpoints.length",
+    );
   });
 
   test("proves feedback consent in both directions without storing private evidence", () => {
@@ -725,6 +734,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check19).toContain("retentionAfter");
     expect(check19).toContain("checkpoint_blobs");
     expect(check19).toContain("checkpoint_writes");
+    expect(check19).toContain("cleanupGraphRows(expiredGraphAfter)");
     expect(check19).toContain("retained_route_rows");
     expect(check19).toContain("retained_cost_rows");
   });

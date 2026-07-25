@@ -140,7 +140,13 @@ function mutableGraphRows(graph: ConversationGraph): number {
     graph.evidence.length +
     graph.decisions.length +
     graph.context_packets.length +
-    graph.run_context_packets.length +
+    graph.run_context_packets.length
+  );
+}
+
+function cleanupGraphRows(graph: ConversationGraph): number {
+  return (
+    mutableGraphRows(graph) +
     graph.checkpoints.length +
     graph.checkpoint_blobs.length +
     graph.checkpoint_writes.length
@@ -1756,7 +1762,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         routeReceiptId: seeded.routeReceiptId,
         costLedgerId: seeded.costLedgerId,
       });
-      expect(mutableGraphRows(expiredGraphAfter)).toBe(0);
+      expect(cleanupGraphRows(expiredGraphAfter)).toBe(0);
       expect(retentionAfter).toEqual({
         feedback_rows: 0,
         usage_rows: 0,
@@ -1766,7 +1772,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         attributed_cost_rows: 0,
         retained_cost_route_links: 1,
       });
-      expect(mutableGraphRows(expiredGraph)).toBeGreaterThan(0);
+      expect(cleanupGraphRows(expiredGraph)).toBeGreaterThan(0);
       expect(
         sameGraphIds(
           claimedDestinationBefore,
@@ -1784,9 +1790,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       evidence.cleanup_deleted_count = cleanup.deleted_count;
       evidence.cleanup_permanent_control_preserved = true;
       evidence.cleanup_complete_graph_rows_before =
-        mutableGraphRows(expiredGraph);
+        cleanupGraphRows(expiredGraph);
       evidence.cleanup_complete_graph_rows_after =
-        mutableGraphRows(expiredGraphAfter);
+        cleanupGraphRows(expiredGraphAfter);
       evidence.cleanup_feedback_deleted =
         retentionBefore.feedback_rows === 1 &&
         retentionAfter.feedback_rows === 0;
