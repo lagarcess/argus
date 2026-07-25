@@ -9,12 +9,14 @@ import AuthForm, {
 } from "@/components/auth/AuthForm";
 import {
   guestConversionBenefitKey,
+  type GuestConversionMode,
   type GuestConversionReason,
 } from "@/lib/guest-conversion";
 
 type GuestConversionModalProps = {
   isOpen: boolean;
   reason: GuestConversionReason;
+  initialMode: GuestConversionMode;
   publicAccountAccessEnabled: boolean;
   onClose: () => void;
   onAuthenticate: (submission: AuthFormSubmission) => Promise<void>;
@@ -23,12 +25,13 @@ type GuestConversionModalProps = {
 export default function GuestConversionModal({
   isOpen,
   reason,
+  initialMode,
   publicAccountAccessEnabled,
   onClose,
   onAuthenticate,
 }: GuestConversionModalProps) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<AuthFormMode>("login");
+  const [mode, setMode] = useState<AuthFormMode>(initialMode);
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -38,7 +41,7 @@ export default function GuestConversionModal({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    setMode("login");
+    setMode(initialMode);
     const dialog = dialogRef.current;
     const focusable = dialog?.querySelector<HTMLElement>(
       'input, button, a[href], [tabindex]:not([tabindex="-1"])',
@@ -73,7 +76,7 @@ export default function GuestConversionModal({
       document.removeEventListener("keydown", handleKeyDown);
       restoreFocusRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [initialMode, isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -116,7 +119,7 @@ export default function GuestConversionModal({
             )}
           </h2>
           <p className="mt-2 text-[14px] leading-relaxed text-black/55 dark:text-white/55">
-            {t(guestConversionBenefitKey(reason))}
+            {t(guestConversionBenefitKey(reason, mode))}
           </p>
         </div>
         {mode === "login" ? (

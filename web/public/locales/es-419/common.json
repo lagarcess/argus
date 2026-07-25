@@ -1049,13 +1049,16 @@
       "message_limit": "Inicia sesión para conservar esta conversación y continuar.",
       "save_decision": "Inicia sesión para guardar esta decisión.",
       "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
+      "new_conversation_create": "Crea una cuenta para conservar esta conversación y comenzar otra.",
       "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra."
     },
     "new_conversation": {
       "title": "¿Quieres iniciar otra conversación?",
       "description": "Empezar de nuevo reemplaza esta conversación temporal. Inicia sesión para conservarla y comenzar otra.",
+      "public_description": "Empezar de nuevo reemplaza esta conversación temporal. Crea una cuenta para conservarla y comenzar otra.",
       "start_over": "Empezar de nuevo",
       "sign_in": "Iniciar sesión para conservarla",
+      "create_account": "Crear cuenta",
       "error": "El chat temporal no cambió."
     },
     "history": {

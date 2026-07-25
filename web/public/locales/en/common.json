@@ -1049,13 +1049,16 @@
       "message_limit": "Sign in to keep this conversation and continue.",
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",
+      "new_conversation_create": "Create an account to keep this conversation and start another.",
       "keep_history": "Sign in to keep this conversation and start another."
     },
     "new_conversation": {
       "title": "Start a new conversation?",
       "description": "Start over replaces this temporary conversation. Sign in to keep it and start another.",
+      "public_description": "Start over replaces this temporary conversation. Create an account to keep it and start another.",
       "start_over": "Start over",
       "sign_in": "Sign in to keep it",
+      "create_account": "Create account",
       "error": "The temporary chat was left unchanged."
     },
     "history": {

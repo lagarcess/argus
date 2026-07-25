@@ -21,7 +21,10 @@ import {
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
 import type { UserResponse } from "@/lib/guest-account";
-import type { GuestPendingAction } from "@/lib/guest-conversion";
+import {
+  newConversationConversionMode,
+  type GuestPendingAction,
+} from "@/lib/guest-conversion";
 
 export type GuestResumeSend = (
   text: string,
@@ -224,14 +227,20 @@ export function useGuestExperience({
     if (!isReplacingConversation) setIsNewConversationOpen(false);
   }, [isReplacingConversation]);
 
-  const signInForNewConversation = useCallback(() => {
+  const convertForNewConversation = useCallback(() => {
     if (!conversationId) return;
     setIsNewConversationOpen(false);
-    conversion.requestConversion("new_conversation", {
-      reason: "new_conversation",
-      conversationId,
-      actionId: crypto.randomUUID(),
-    });
+    conversion.requestConversion(
+      "new_conversation",
+      {
+        reason: "new_conversation",
+        conversationId,
+        actionId: crypto.randomUUID(),
+      },
+      newConversationConversionMode(
+        conversion.publicAccountAccessEnabled,
+      ),
+    );
   }, [conversationId, conversion]);
 
   const clearResumeDecision = useCallback(
@@ -250,7 +259,7 @@ export function useGuestExperience({
       isReplacing: isReplacingConversation,
       close: closeNewConversation,
       startOver,
-      signIn: signInForNewConversation,
+      convert: convertForNewConversation,
     },
   };
 }

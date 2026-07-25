@@ -12,19 +12,23 @@ export default function GuestExperienceSurfaces({
   const { conversion, newConversation } = experience;
   return (
     <>
-      <GuestConversionModal
-        isOpen={conversion.isOpen}
-        reason={conversion.reason}
-        publicAccountAccessEnabled={conversion.publicAccountAccessEnabled}
-        onClose={conversion.close}
-        onAuthenticate={conversion.authenticate}
-      />
+      {conversion.isOpen && (
+        <GuestConversionModal
+          isOpen
+          reason={conversion.reason}
+          initialMode={conversion.initialMode}
+          publicAccountAccessEnabled={conversion.publicAccountAccessEnabled}
+          onClose={conversion.close}
+          onAuthenticate={conversion.authenticate}
+        />
+      )}
       <GuestNewConversationDialog
         isOpen={newConversation.isOpen}
         isReplacing={newConversation.isReplacing}
+        publicAccountAccessEnabled={conversion.publicAccountAccessEnabled}
         onCancel={newConversation.close}
         onStartOver={() => void newConversation.startOver()}
-        onSignIn={newConversation.signIn}
+        onConvert={newConversation.convert}
       />
     </>
   );

@@ -14,6 +14,7 @@ import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import {
   pendingGuestActionSummary,
   SingleUseGuestAction,
+  type GuestConversionMode,
   type GuestConversionReason,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
@@ -34,6 +35,8 @@ export function useGuestConversion({
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] =
     useState<GuestConversionReason>("keep_history");
+  const [initialMode, setInitialMode] =
+    useState<GuestConversionMode>("login");
   const latchRef = useRef<SingleUseGuestAction | null>(null);
   const handoffPreparedRef = useRef(false);
 
@@ -41,6 +44,7 @@ export function useGuestConversion({
     (
       nextReason: GuestConversionReason,
       pendingAction?: GuestPendingAction | null,
+      nextInitialMode: GuestConversionMode = "login",
     ) => {
       if (account?.account_kind === "guest") {
         captureGuestFunnelEvent({
@@ -52,6 +56,7 @@ export function useGuestConversion({
         });
       }
       setReason(nextReason);
+      setInitialMode(nextInitialMode);
       latchRef.current = pendingAction
         ? new SingleUseGuestAction(pendingAction)
         : null;
@@ -134,6 +139,7 @@ export function useGuestConversion({
   return {
     isOpen,
     reason,
+    initialMode,
     publicAccountAccessEnabled:
       account?.public_account_access_enabled ?? false,
     requestConversion,

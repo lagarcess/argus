@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { newConversationConversionMode } from "@/lib/guest-conversion";
 
 type GuestNewConversationDialogProps = {
   isOpen: boolean;
   isReplacing: boolean;
+  publicAccountAccessEnabled: boolean;
   onCancel: () => void;
-  onSignIn: () => void;
+  onConvert: () => void;
   onStartOver: () => void;
 };
 
@@ -17,13 +19,18 @@ const focusableSelector =
 export default function GuestNewConversationDialog({
   isOpen,
   isReplacing,
+  publicAccountAccessEnabled,
   onCancel,
-  onSignIn,
+  onConvert,
   onStartOver,
 }: GuestNewConversationDialogProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const conversionMode = newConversationConversionMode(
+    publicAccountAccessEnabled,
+  );
+  const isPublicAccountChoice = conversionMode === "signup";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,8 +87,12 @@ export default function GuestNewConversationDialog({
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
           {t(
-            "guest.new_conversation.description",
-            "Start over replaces this temporary conversation. Sign in to keep it and start another.",
+            isPublicAccountChoice
+              ? "guest.new_conversation.public_description"
+              : "guest.new_conversation.description",
+            isPublicAccountChoice
+              ? "Start over replaces this temporary conversation. Create an account to keep it and start another."
+              : "Start over replaces this temporary conversation. Sign in to keep it and start another.",
           )}
         </p>
         <div className="mt-6 flex flex-col gap-2">
@@ -96,10 +107,12 @@ export default function GuestNewConversationDialog({
           <button
             type="button"
             disabled={isReplacing}
-            onClick={onSignIn}
+            onClick={onConvert}
             className="min-h-11 rounded-full border border-black/12 px-4 text-[14px] font-medium dark:border-white/14"
           >
-            {t("guest.new_conversation.sign_in", "Sign in to keep it")}
+            {isPublicAccountChoice
+              ? t("guest.new_conversation.create_account", "Create account")
+              : t("guest.new_conversation.sign_in", "Sign in to keep it")}
           </button>
           <button
             type="button"

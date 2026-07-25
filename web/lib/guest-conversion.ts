@@ -10,6 +10,8 @@ export type GuestConversionReason =
   | "new_conversation"
   | "keep_history";
 
+export type GuestConversionMode = "login" | "signup";
+
 type GuestPendingActionBase = {
   reason: GuestConversionReason;
   conversationId: string;
@@ -41,8 +43,20 @@ export type GuestPendingActionSummary = {
   artifact_id?: string;
 };
 
-export function guestConversionBenefitKey(reason: GuestConversionReason) {
+export function guestConversionBenefitKey(
+  reason: GuestConversionReason,
+  mode: GuestConversionMode = "login",
+) {
+  if (reason === "new_conversation" && mode === "signup") {
+    return "guest.conversion.new_conversation_create" as const;
+  }
   return `guest.conversion.${reason}` as const;
+}
+
+export function newConversationConversionMode(
+  publicAccountAccessEnabled: boolean,
+): GuestConversionMode {
+  return publicAccountAccessEnabled ? "signup" : "login";
 }
 
 export function pendingGuestActionSummary(

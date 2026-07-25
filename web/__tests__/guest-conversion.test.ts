@@ -2,14 +2,43 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import GuestExperienceSurfaces from "../components/guest/GuestExperienceSurfaces";
+import type { GuestExperience } from "../components/guest/useGuestExperience";
 import {
   guestConversionBenefitKey,
+  newConversationConversionMode,
   pendingGuestActionSummary,
   SingleUseGuestAction,
   type GuestPendingAction,
 } from "../lib/guest-conversion";
 
 const root = join(import.meta.dir, "..");
+
+function guestExperienceSurfaceFixture({
+  conversionOpen,
+  initialMode,
+}: {
+  conversionOpen: boolean;
+  initialMode: "login" | "signup";
+}): GuestExperience {
+  return {
+    conversion: {
+      isOpen: conversionOpen,
+      reason: "new_conversation",
+      initialMode,
+      publicAccountAccessEnabled: initialMode === "signup",
+      close: () => undefined,
+      authenticate: async () => undefined,
+    },
+    newConversation: {
+      isOpen: false,
+      isReplacing: false,
+      close: () => undefined,
+      startOver: async () => undefined,
+      convert: () => undefined,
+    },
+  } as unknown as GuestExperience;
+}
 
 describe("guest conversion contract", () => {
   test("keeps the five contextual reasons typed and localized", () => {
@@ -138,6 +167,63 @@ describe("guest conversion contract", () => {
     expect(modal).toContain("publicAccountAccessEnabled");
     expect(modal).toContain("mode=\"login\"");
     expect(modal).toContain("mode=\"signup\"");
+  });
+
+  test("derives the New-chat auth mode from server-owned public access truth", () => {
+    expect(newConversationConversionMode(false)).toBe("login");
+    expect(newConversationConversionMode(true)).toBe("signup");
+    expect(guestConversionBenefitKey("new_conversation", "login")).toBe(
+      "guest.conversion.new_conversation",
+    );
+    expect(guestConversionBenefitKey("new_conversation", "signup")).toBe(
+      "guest.conversion.new_conversation_create",
+    );
+  });
+
+  test("mounts the conversion modal fresh so the requested mode owns its first render", () => {
+    const closed = GuestExperienceSurfaces({
+      experience: guestExperienceSurfaceFixture({
+        conversionOpen: false,
+        initialMode: "login",
+      }),
+    });
+    const publicOpen = GuestExperienceSurfaces({
+      experience: guestExperienceSurfaceFixture({
+        conversionOpen: true,
+        initialMode: "signup",
+      }),
+    });
+
+    expect(closed.props.children[0]).toBe(false);
+    expect(publicOpen.props.children[0].props.initialMode).toBe("signup");
+  });
+
+  test("localizes staged and public New-chat choices in English and Spanish", () => {
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(en.guest.new_conversation.sign_in).toBe("Sign in to keep it");
+    expect(en.guest.new_conversation.create_account).toBe("Create account");
+    expect(en.guest.new_conversation.public_description).toBe(
+      "Start over replaces this temporary conversation. Create an account to keep it and start another.",
+    );
+    expect(en.guest.conversion.new_conversation_create).toBe(
+      "Create an account to keep this conversation and start another.",
+    );
+    expect(es.guest.new_conversation.sign_in).toBe(
+      "Iniciar sesión para conservarla",
+    );
+    expect(es.guest.new_conversation.create_account).toBe("Crear cuenta");
+    expect(es.guest.new_conversation.public_description).toBe(
+      "Empezar de nuevo reemplaza esta conversación temporal. Crea una cuenta para conservarla y comenzar otra.",
+    );
+    expect(es.guest.conversion.new_conversation_create).toBe(
+      "Crea una cuenta para conservar esta conversación y comenzar otra.",
+    );
   });
 
   test("claims in place before refreshing and resumes through a single-use latch", () => {
