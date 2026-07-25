@@ -286,10 +286,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await expect(
         page.getByRole("button", { name: "Iniciar sesión" }),
       ).toBeVisible();
-      await expect(page.getByTestId("chat-input")).toHaveAttribute(
-        "placeholder",
+      await expect(page.getByTestId("chat-input")).toHaveAccessibleName(
         "¿Qué quieres probar?",
       );
+      await expect(
+        page.getByText("¿Qué quieres probar?", { exact: true }),
+      ).toBeVisible();
       await page.setViewportSize({ width: 390, height: 844 });
       await safeScreenshot(page, "02-spanish-mobile");
 

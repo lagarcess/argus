@@ -56,6 +56,15 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
     expect(guest.account_kind).toBe("guest");
     expect(guest.user.email).toBeNull();
     expect(guest.guest).not.toBeNull();
+    await page.getByRole("button", { name: "Guest settings" }).click();
+    await page.getByRole("menuitem", { name: "Language" }).click();
+    await page.getByRole("button", { name: /Español/ }).click();
+    await expect(page.getByTestId("chat-input")).toHaveAccessibleName(
+      "¿Qué quieres probar?",
+    );
+    await expect(
+      page.getByText("¿Qué quieres probar?", { exact: true }),
+    ).toBeVisible();
     const response = await fetch(
       "http://localhost:8000/api/v1/auth/session",
     );
