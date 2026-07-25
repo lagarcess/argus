@@ -1106,11 +1106,25 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await stagedDialog.getByRole("button", { name: "Cancel" }).click();
 
       await backend.start(true);
+      const publicHydrationPromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname.endsWith(
+            `/api/v1/conversations/${primaryConversation}/messages`,
+          ),
+      );
       const mePromise = waitForMe(page);
       await page.reload({ waitUntil: "domcontentloaded" });
       const publicModeMe = await mePromise;
+      const publicHydrationResponse = await publicHydrationPromise;
+      expect(publicHydrationResponse.status()).toBe(200);
       expect(publicModeMe.user.id === primaryOwner).toBe(true);
       expect(publicModeMe.public_account_access_enabled).toBe(true);
+      expect(requireConversationId(page)).toBe(primaryConversation);
+      await expect(resultCard(page)).toHaveCount(1);
+      await expect(
+        resultCard(page).getByTestId("result-equity-chart"),
+      ).toBeVisible();
       await page.getByRole("button", { name: "New chat" }).click();
       const publicDialog = page.getByRole("dialog", {
         name: "Start a new conversation?",

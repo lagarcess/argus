@@ -671,6 +671,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(check13).toContain(
       'getByRole("button", { name: "Sign in to keep it" })',
     );
+    expect(check13).toContain("publicHydrationResponse");
+    expect(check13).toContain("resultCard(page)");
   });
 
   test("proves typed exactly-once conversion and complete atomic claim graphs", () => {
