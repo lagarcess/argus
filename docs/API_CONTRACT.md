@@ -783,8 +783,11 @@ machine-readable fields alongside display labels:
 - `period_adjustment`: optional typed sidecar with
   `code = effective_window_adjusted`, `requested_date_range`, and
   `effective_date_range`. The frontend renders one localized, provider-neutral
-  assistant lead-in directly above the corrected card. Full-coverage cards omit
-  this field.
+  assistant lead-in directly above the corrected card. The backend emits this
+  sidecar only when `data_coverage.adjustment_reason =
+  provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
+  and legacy coverage without a reason omit it. Clients must not infer the
+  reason from dates.
 - `display_facts`: optional canonical facts for localized card metadata, such as
   `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
   Clients should render these facts through locale-aware presentation code and
@@ -950,6 +953,7 @@ Ownership hardening:
     "data_coverage": {
       "schema_version": "market_data_coverage_v1",
       "outcome": "adjusted_coverage",
+      "adjustment_reason": "provider_coverage_adjustment",
       "dataset_id": "sha256:...",
       "observations_by_symbol": {
         "NVDA": 700,
@@ -1102,6 +1106,12 @@ Ownership hardening:
   "created_at": "timestamp"
 }
 ```
+
+New coverage records include the code-owned `adjustment_reason`:
+`none`, `calendar_alignment`, or `provider_coverage_adjustment`. The field is
+optional when reading older records. Requested and effective ranges remain
+independent provenance; consumers must not classify their difference with
+fixed day thresholds.
 
 `save_strategy` is a legacy/compatibility result action for Strategy persistence
 when that feature surface is enabled. It is separate from the P1 evidence

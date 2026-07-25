@@ -82,6 +82,9 @@ class TypedExpectations:
     asset_class: str | None = None
     strategy_type: str | None = None
     date_range: dict[str, str] | str | None = None
+    requested_date_range: dict[str, str] | str | None = None
+    effective_date_range: dict[str, str] | str | None = None
+    adjustment_reason: str | None = None
     benchmark_symbol: str | None = None
     capital_amount: float | None = None
     stage_outcomes: tuple[str, ...] = ()
@@ -284,7 +287,32 @@ def typed_expectation_failures(
         failures,
     )
     if expected.date_range is not None:
-        _compare_date_range(expected.date_range, outcome.get("date_range"), failures)
+        _compare_date_range(
+            "date_range",
+            expected.date_range,
+            outcome.get("date_range"),
+            failures,
+        )
+    if expected.requested_date_range is not None:
+        _compare_date_range(
+            "requested_date_range",
+            expected.requested_date_range,
+            outcome.get("requested_date_range"),
+            failures,
+        )
+    if expected.effective_date_range is not None:
+        _compare_date_range(
+            "effective_date_range",
+            expected.effective_date_range,
+            outcome.get("effective_date_range"),
+            failures,
+        )
+    _compare(
+        "adjustment_reason",
+        expected.adjustment_reason,
+        outcome.get("adjustment_reason"),
+        failures,
+    )
     _compare(
         "benchmark_symbol",
         expected.benchmark_symbol,
@@ -591,6 +619,9 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             asset_class=expected.get("asset_class"),
             strategy_type=expected.get("strategy_type"),
             date_range=expected.get("date_range"),
+            requested_date_range=expected.get("requested_date_range"),
+            effective_date_range=expected.get("effective_date_range"),
+            adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
@@ -768,6 +799,19 @@ def _typed_outcome(
         strategy = {}
     if not isinstance(launch_payload, dict):
         launch_payload = {}
+    coverage_preflight = launch_payload.get("coverage_preflight")
+    if not isinstance(coverage_preflight, dict):
+        coverage_preflight = {}
+    requested_date_range = (
+        launch_payload.get("requested_date_range")
+        or coverage_preflight.get("requested_date_range")
+        or strategy.get("date_range")
+    )
+    effective_date_range = (
+        coverage_preflight.get("effective_date_range")
+        or launch_payload.get("date_range")
+        or strategy.get("date_range")
+    )
 
     return {
         "intent": _intent(case=case, patch=interpret_patch),
@@ -783,7 +827,10 @@ def _typed_outcome(
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
         "strategy_type": launch_payload.get("strategy_type")
         or strategy.get("strategy_type"),
-        "date_range": launch_payload.get("date_range") or strategy.get("date_range"),
+        "date_range": requested_date_range,
+        "requested_date_range": requested_date_range,
+        "effective_date_range": effective_date_range,
+        "adjustment_reason": coverage_preflight.get("adjustment_reason"),
         "benchmark_symbol": (
             launch_payload.get("benchmark_symbol")
             or strategy.get("benchmark_symbol")
@@ -902,14 +949,19 @@ def _compare_subset(
     _compare(name, expected, actual, failures)
 
 
-def _compare_date_range(expected: Any, actual: Any, failures: list[str]) -> None:
+def _compare_date_range(
+    name: str,
+    expected: Any,
+    actual: Any,
+    failures: list[str],
+) -> None:
     expected_window = _date_range_window(expected)
     actual_window = _date_range_window(actual)
     if expected_window is not None and actual_window is not None:
         if actual_window != expected_window:
-            failures.append(f"date_range: expected {expected!r}, got {actual!r}")
+            failures.append(f"{name}: expected {expected!r}, got {actual!r}")
         return
-    _compare("date_range", expected, actual, failures)
+    _compare(name, expected, actual, failures)
 
 
 def _date_range_window(value: Any) -> tuple[date, date] | None:

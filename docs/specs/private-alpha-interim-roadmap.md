@@ -287,6 +287,11 @@ the completed user-visible Usage slice.
 
 ### Incomplete data windows (#251)
 
+- Implementation checkpoint (2026-07-25): coverage preflight now persists a
+  code-owned `adjustment_reason`, distinguishes exchange-calendar alignment
+  from provider-driven truncation, and emits the existing period-adjustment
+  sidecar only for provider-driven changes. The reason is measurement-visible
+  without changing normalized confirmation action identity.
 - Fit to provider-supported data only when a viable common window remains; a
   material fit must not be silent.
 - Ordinary weekend or holiday session normalization inside available coverage
@@ -300,6 +305,9 @@ the completed user-visible Usage slice.
 - If no viable common window exists, return typed recovery and no runnable card.
 - The approved effective window remains identical across result facts, chart,
   prose, evidence, reload, replay, and Omnisearch.
+- Remaining follow-ups: preserve normal LLM-authored adjustment voice through
+  stream and reload, and decide whether historical cards without the typed
+  reason need notice backfill. Neither follow-up is implemented by this slice.
 
 ## Historical Planning Archive
 

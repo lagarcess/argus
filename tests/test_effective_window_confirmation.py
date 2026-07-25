@@ -1,9 +1,25 @@
 from __future__ import annotations
 
+import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
 
 
-def test_confirmation_card_carries_provider_neutral_effective_window_adjustment() -> None:
+def _confirmation_card(adjustment_reason: str | None) -> dict[str, object]:
+    coverage_preflight = {
+        "outcome": "adjusted_coverage",
+        "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-05",
+        },
+        "effective_date_range": {
+            "start": "2024-01-03",
+            "end": "2024-01-05",
+        },
+        "preflight_id": "coverage-fixture",
+    }
+    if adjustment_reason is not None:
+        coverage_preflight["adjustment_reason"] = adjustment_reason
+
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
@@ -25,18 +41,7 @@ def test_confirmation_card_carries_provider_neutral_effective_window_adjustment(
                         "start": "2024-01-01",
                         "end": "2024-01-05",
                     },
-                    "coverage_preflight": {
-                        "outcome": "adjusted_coverage",
-                        "requested_date_range": {
-                            "start": "2024-01-01",
-                            "end": "2024-01-05",
-                        },
-                        "effective_date_range": {
-                            "start": "2024-01-03",
-                            "end": "2024-01-05",
-                        },
-                        "preflight_id": "coverage-fixture",
-                    },
+                    "coverage_preflight": coverage_preflight,
                     "sizing_mode": "capital_amount",
                     "capital_amount": 10_000,
                     "benchmark_symbol": "SPY",
@@ -47,6 +52,12 @@ def test_confirmation_card_carries_provider_neutral_effective_window_adjustment(
     )
 
     assert card is not None
+    return card
+
+
+def test_confirmation_card_carries_only_provider_adjustment_sidecar() -> None:
+    card = _confirmation_card("provider_coverage_adjustment")
+
     assert card["date_range"] == {
         "start": "2024-01-03",
         "end": "2024-01-05",
@@ -57,6 +68,16 @@ def test_confirmation_card_carries_provider_neutral_effective_window_adjustment(
         "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
         "effective_date_range": {"start": "2024-01-03", "end": "2024-01-05"},
     }
+
+
+@pytest.mark.parametrize(
+    "adjustment_reason",
+    ["none", "calendar_alignment", None, "unknown_reason"],
+)
+def test_confirmation_card_omits_non_provider_adjustment_sidecar(
+    adjustment_reason: str | None,
+) -> None:
+    assert "period_adjustment" not in _confirmation_card(adjustment_reason)
 
 
 def test_full_coverage_confirmation_does_not_emit_adjustment() -> None:

@@ -30,6 +30,10 @@ cases:
       date_range:
         start: "2022-01-02"
         end: "2025-01-02"
+      effective_date_range:
+        start: "2022-01-03"
+        end: "2025-01-02"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 10000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]

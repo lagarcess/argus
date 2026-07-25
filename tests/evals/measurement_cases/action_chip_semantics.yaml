@@ -154,6 +154,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -227,6 +231,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -300,6 +308,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -373,6 +385,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 5000
       stage_outcomes:
@@ -409,6 +425,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -445,6 +465,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
@@ -480,6 +504,10 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-12-31"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -516,6 +544,10 @@ cases:
       date_range:
         start: "2023-01-01"
         end: "2023-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2023-12-29"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 1000
       stage_outcomes:
@@ -552,6 +584,10 @@ cases:
       date_range:
         start: "2023-01-01"
         end: "2023-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2023-12-29"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       capital_amount: 2000
       stage_outcomes:

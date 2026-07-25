@@ -494,6 +494,108 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert "run" not in payload
 
 
+@pytest.mark.parametrize(
+    ("adjustment_reason", "expected_sidecar_count"),
+    [
+        ("provider_coverage_adjustment", 1),
+        ("calendar_alignment", 0),
+    ],
+)
+def test_chat_stream_persists_and_reloads_coverage_adjustment_materiality(
+    monkeypatch: pytest.MonkeyPatch,
+    adjustment_reason: str,
+    expected_sidecar_count: int,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    effective = {"start": "2024-01-02", "end": "2024-01-05"}
+    confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "date_range": effective,
+            "capital_amount": 10_000,
+        },
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": effective,
+            "requested_date_range": requested,
+            "coverage_preflight": {
+                "outcome": "adjusted_coverage",
+                "requested_date_range": requested,
+                "effective_date_range": effective,
+                "adjustment_reason": adjustment_reason,
+                "preflight_id": "sha256:coverage-materiality",
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10_000,
+            "benchmark_symbol": "SPY",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {"type": "stage_outcome", "outcome": "ready_for_confirmation"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "Ready to test AAPL.",
+                "confirmation_payload": confirmation_payload,
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold AAPL in early January 2024",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    live_payload = _final_payload(response.text)
+    live_card = live_payload["confirmation"]
+    assert int("period_adjustment" in live_card) == expected_sidecar_count
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    persisted = next(
+        message
+        for message in reversed(messages)
+        if message["role"] == "assistant"
+        and message["metadata"].get("confirmation_payload")
+    )
+    metadata = persisted["metadata"]
+    persisted_coverage = metadata["confirmation_payload"]["launch_payload"][
+        "coverage_preflight"
+    ]
+    assert persisted_coverage["requested_date_range"] == requested
+    assert persisted_coverage["effective_date_range"] == effective
+    assert persisted_coverage["adjustment_reason"] == adjustment_reason
+    reloaded_card = metadata["confirmation_card"]
+    assert int("period_adjustment" in reloaded_card) == expected_sidecar_count
+    assert reloaded_card == live_card
+
+
 def test_chat_stream_persists_provider_canonicalized_company_name_asset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
