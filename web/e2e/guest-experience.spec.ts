@@ -758,6 +758,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       const recents = sidebar.getByRole("button", { name: "Recents" });
       await expect(recents).toBeVisible();
       const rows = sidebar.locator("[data-conversation-id]");
+      if ((await rows.count()) === 0) {
+        await recents.click();
+      }
       await expect(rows).toHaveCount(1);
       const row = sidebar.locator(
         `[data-conversation-id="${primaryConversation}"]`,
