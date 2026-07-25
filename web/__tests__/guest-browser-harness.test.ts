@@ -582,6 +582,8 @@ describe("Checks 6–20 harness guards", () => {
     const check10 = checkSource(10);
 
     expect(check10).toContain("searchSurface(page)");
+    expect(check10).toContain('"Preserved local QA result"');
+    expect(check10).not.toContain('"Preserved local QA strategy"');
     expect(check10).toContain(
       "closeSearchSurface(page, ownerSearchSurface)",
     );
@@ -589,6 +591,12 @@ describe("Checks 6–20 harness guards", () => {
       "closeSearchSurface(claimGuestPage, foreignSearchSurface)",
     );
     expect(check10).toContain("allowedGuestItemTypes");
+    expect(check10).toContain('item.type === "evidence"');
+    expect(check10).toContain("item.id === claimEvidenceId");
+    expect(check10).toContain(
+      "item.conversation_id === claimConversation",
+    );
+    expect(check10).toContain("foreignSearchResponse");
     expect(check10).toContain("deniedBodyContainsNoPrivatePayload");
     expect(check10).not.toContain(
       '.getByRole("button", { name: "Close search" })',

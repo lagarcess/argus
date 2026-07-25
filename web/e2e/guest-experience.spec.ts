@@ -863,14 +863,25 @@ test("@guest-experience exact-head 20-check matrix", async ({
           "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet.",
         ),
       ).toBeVisible();
-      await ownerSearchSurface.getByPlaceholder("Search Argus...").fill(
-        "Preserved local QA strategy",
+      const evidenceQuery = "Preserved local QA result";
+      const ownerSearchResponse = page.waitForResponse(
+        (response) => {
+          const url = new URL(response.url());
+          return (
+            response.request().method() === "GET" &&
+            url.pathname.endsWith("/api/v1/search") &&
+            url.searchParams.get("q") === evidenceQuery
+          );
+        },
       );
-
-      const ownerSearch = await apiJson<SearchList>(
-        page.context().request,
-        "/search?q=Preserved%20local%20QA%20strategy&limit=20&include_ledger_groups=true",
-      );
+      await ownerSearchSurface
+        .getByPlaceholder("Search Argus...")
+        .fill(evidenceQuery);
+      const ownerSearchHttpResponse = await ownerSearchResponse;
+      expect(ownerSearchHttpResponse.status()).toBe(200);
+      const ownerSearch = (await ownerSearchHttpResponse.json()) as SearchList;
+      expect(ownerSearch.items).toHaveLength(0);
+      expect(ownerSearch.ledger_groups ?? []).toHaveLength(0);
       await expect(ownerSearchSurface.getByText("No results found")).toBeVisible();
       await closeSearchSurface(page, ownerSearchSurface);
 
@@ -880,36 +891,45 @@ test("@guest-experience exact-head 20-check matrix", async ({
       if (await foreignExpand.isVisible()) await foreignExpand.click();
       await claimGuestPage.getByRole("button", { name: "Search" }).click();
       const foreignSearchSurface = searchSurface(claimGuestPage);
+      const foreignSearchResponse = claimGuestPage.waitForResponse(
+        (response) => {
+          const url = new URL(response.url());
+          return (
+            response.request().method() === "GET" &&
+            url.pathname.endsWith("/api/v1/search") &&
+            url.searchParams.get("q") === evidenceQuery
+          );
+        },
+      );
       await foreignSearchSurface
         .getByPlaceholder("Search Argus...")
-        .fill("Preserved local QA strategy");
+        .fill(evidenceQuery);
+      const foreignSearchHttpResponse = await foreignSearchResponse;
+      expect(foreignSearchHttpResponse.status()).toBe(200);
+      const foreignSearch =
+        (await foreignSearchHttpResponse.json()) as SearchList;
       await expect(
-        foreignSearchSurface.getByText("Preserved local QA strategy", {
+        foreignSearchSurface.getByText("Preserved local QA result", {
           exact: true,
         }),
       ).toHaveCount(1);
-      const foreignSearch = await apiJson<SearchList>(
-        claimGuestContext.request,
-        "/search?q=Preserved%20local%20QA%20strategy&limit=20&include_ledger_groups=true",
-      );
       const foreignRead = await apiJson<Record<string, unknown>>(
         claimGuestContext.request,
         `/conversations/${primaryConversation}/messages?limit=100`,
       );
-      expect(ownerSearch.status).toBe(200);
-      expect(ownerSearch.body.items).toHaveLength(0);
-      expect(ownerSearch.body.ledger_groups ?? []).toHaveLength(0);
-      expect(foreignSearch.status).toBe(200);
       const allowedGuestItemTypes = new Set<SearchList["items"][number]["type"]>(
         ["chat", "run", "backtest", "evidence", "decision", "idea"],
       );
+      expect(foreignSearch.items).toHaveLength(1);
+      const [item] = foreignSearch.items;
       expect(
-        foreignSearch.body.items.length > 0 &&
-          foreignSearch.body.items.every(
+        item.type === "evidence" &&
+          item.id === claimEvidenceId &&
+          item.conversation_id === claimConversation &&
+          foreignSearch.items.every(
             (item) =>
               allowedGuestItemTypes.has(item.type) &&
-              (item.id === claimConversation ||
-                item.conversation_id === claimConversation) &&
+              item.conversation_id === claimConversation &&
               !/(provider|model|receipt|prompt|runtime)/i.test(
                 JSON.stringify(item.preview ?? {}),
               ),
@@ -917,7 +937,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       ).toBe(true);
       expect(foreignRead.status).toBe(404);
       expect(deniedBodyContainsNoPrivatePayload(foreignRead.body)).toBe(true);
-      evidence.cross_owner_result_count += ownerSearch.body.items.length;
+      evidence.cross_owner_result_count += ownerSearch.items.length;
       await closeSearchSurface(claimGuestPage, foreignSearchSurface);
     });
 
