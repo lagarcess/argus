@@ -2094,11 +2094,12 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
 
 
 def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
+    from argus.api import rate_limits
     from argus.api.routers import auth as auth_router
 
     auth_router.reset_auth_attempt_limiter_for_tests()
-    monkeypatch.setattr(auth_router, "_AUTH_ATTEMPT_COMPACT_THRESHOLD", 1)
-    monkeypatch.setattr(auth_router, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(auth_router._AUTH_ATTEMPT_LIMITER, "_compact_threshold", 1)
+    monkeypatch.setattr(rate_limits, "monotonic", lambda: 0.0)
 
     assert (
         auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
@@ -2110,7 +2111,7 @@ def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
     )
 
     monkeypatch.setattr(
-        auth_router,
+        rate_limits,
         "monotonic",
         lambda: float(auth_router._AUTH_ATTEMPT_WINDOW_SECONDS + 1),
     )

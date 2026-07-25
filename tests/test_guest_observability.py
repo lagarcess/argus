@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
+from argus.api.chat.allowance import check_message_allowance
 from argus.api.dependencies import current_user
 from argus.api.guest_access import guest_account_context
 from argus.api.guest_observability import (
@@ -15,12 +16,13 @@ from argus.api.main import app
 from argus.api.routers import analytics as analytics_router
 from argus.api.schemas import GuestFunnelClientEventRequest, OnboardingState, User
 from argus.domain.guest_workspaces import GuestWorkspace
-from argus.domain.usage_limits import MESSAGE_USAGE_RESOURCE
+from argus.domain.usage_limits import MESSAGE_USAGE_RESOURCE, QuotaExceededError
 from argus.observability import sanitize_observability_attributes
 from argus.observability.guest_funnel import (
     GUEST_FUNNEL_EVENT_MAP,
     build_guest_funnel_event,
 )
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -241,6 +243,39 @@ def test_guest_event_endpoint_projects_verified_user_and_typed_properties() -> N
     ]
 
 
+def test_guest_event_endpoint_caps_authenticated_browser_relay_volume() -> None:
+    app.dependency_overrides[current_user] = _guest_profile
+    analytics_router.reset_guest_event_limiter_for_tests()
+    try:
+        with (
+            patch.object(
+                analytics_router, "account_context", return_value=_guest_context()
+            ),
+            patch.object(analytics_router, "capture_guest_funnel_event") as capture,
+            TestClient(app) as client,
+        ):
+            responses = [
+                client.post(
+                    "/api/v1/analytics/guest-events",
+                    json={
+                        "event": "conversion_prompt_shown",
+                        "language": "en",
+                        "surface": "conversion_modal",
+                        "conversion_reason": "keep_history",
+                        "terminal_outcome": "shown",
+                    },
+                )
+                for _ in range(analytics_router.GUEST_EVENT_ATTEMPT_LIMIT + 1)
+            ]
+    finally:
+        app.dependency_overrides.clear()
+        analytics_router.reset_guest_event_limiter_for_tests()
+
+    assert responses[-1].status_code == 429
+    assert responses[-1].json()["code"] == "too_many_requests"
+    assert capture.call_count == analytics_router.GUEST_EVENT_ATTEMPT_LIMIT
+
+
 def test_guest_event_endpoint_rejects_unapproved_browser_properties() -> None:
     app.dependency_overrides[current_user] = _guest_profile
     try:
@@ -384,6 +419,42 @@ def test_registered_context_never_emits_a_guest_event() -> None:
     capture.assert_not_called()
 
 
+def test_guest_message_limit_emits_from_authoritative_precheck() -> None:
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/chat/stream",
+            "headers": [],
+        }
+    )
+    request.state.request_id = "request-1"
+    account = _guest_context()
+    gateway = Mock()
+    gateway.check_allowance_windows.side_effect = QuotaExceededError(
+        "guest_session allowance exhausted"
+    )
+
+    with (
+        patch("argus.api.chat.allowance.api_state.supabase_gateway", gateway),
+        patch("argus.api.chat.allowance.account_context", return_value=account),
+        patch("argus.api.chat.allowance.emit_guest_funnel_event") as emit,
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        check_message_allowance(request, _guest_profile())
+
+    assert exc_info.value.status_code == 429
+    emit.assert_called_once_with(
+        account=account,
+        kind="guest_limit_reached",
+        user_id=GUEST_USER_ID,
+        surface="chat",
+        capability_category="chat",
+        conversion_reason="message_limit",
+        terminal_outcome="limit_reached",
+    )
+
+
 @pytest.mark.parametrize(
     ("relative_path", "events"),
     [
@@ -397,15 +468,12 @@ def test_registered_context_never_emits_a_guest_event() -> None:
             },
         ),
         (
-            "src/argus/api/routers/agent.py",
+            "src/argus/api/guest_observability.py",
             {
+                "first_useful_assistant_response_completed",
                 "confirmation_reached",
                 "first_result_completed",
             },
-        ),
-        (
-            "src/argus/api/guest_observability.py",
-            {"first_useful_assistant_response_completed"},
         ),
         (
             "src/argus/api/chat/backtest_admission_flow.py",
@@ -440,9 +508,11 @@ def test_authoritative_server_owners_emit_guest_funnel_events(
 
 
 def test_chat_owner_calls_first_settled_response_observer() -> None:
-    source = (Path(__file__).parents[1] / "src/argus/api/routers/agent.py").read_text()
+    source = (
+        Path(__file__).parents[1] / "src/argus/api/chat/measurement_events.py"
+    ).read_text()
 
-    assert "emit_first_guest_message_event(" in source
+    assert "emit_guest_turn_funnel_events(" in source
 
 
 def test_first_message_reader_uses_guest_session_counter_truth() -> None:
@@ -467,9 +537,9 @@ def test_first_message_reader_uses_guest_session_counter_truth() -> None:
 
 
 def test_checked_openapi_pins_the_guest_browser_event_contract() -> None:
-    checked = (
-        Path(__file__).parents[1] / "docs/api/openapi.yaml"
-    ).read_text(encoding="utf-8")
+    checked = (Path(__file__).parents[1] / "docs/api/openapi.yaml").read_text(
+        encoding="utf-8"
+    )
     generated = app.openapi()
 
     assert "/api/v1/analytics/guest-events" in generated["paths"]

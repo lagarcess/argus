@@ -20,15 +20,6 @@ export async function createGuestHandoff(payload: {
   );
 }
 
-export async function claimGuestHandoff(handoffId: string) {
-  return apiFetch<{
-    conversation_id: string;
-    pending_action: GuestPendingActionSummary | null;
-  }>(`/auth/guest/handoffs/${handoffId}/claim`, {
-    method: "POST",
-  });
-}
-
 export async function linkGuestIdentity(payload: {
   email: string;
   password: string;

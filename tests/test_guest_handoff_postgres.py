@@ -70,6 +70,11 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
     opaque_secret = f"secret-{uuid.uuid4()}"
     secret_hash = hashlib.sha256(opaque_secret.encode("utf-8")).hexdigest()
     with connection.cursor() as cursor:
+        cursor.execute("select email from auth.users where id = %s", (destination,))
+        destination_email = cursor.fetchone()[0]
+        destination_email_hash = hashlib.sha256(
+            str(destination_email).strip().lower().encode("utf-8")
+        ).hexdigest()
         cursor.execute(
             "insert into public.guest_workspaces"
             " (user_id, created_at, expires_at) values (%s, %s, %s)",
@@ -221,13 +226,15 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
         cursor.execute(
             "insert into public.guest_workspace_handoffs"
             " (id,secret_hash,source_user_id,destination_user_id,"
+            "  destination_email_hash,"
             "  source_conversation_id,pending_action,created_at,expires_at)"
-            " values (%s,%s,%s,%s,%s,%s::jsonb,%s,%s)",
+            " values (%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s)",
             (
                 ids["handoff"],
                 secret_hash,
                 source,
                 destination,
+                destination_email_hash,
                 ids["conversation"],
                 (
                     '{"reason":"save_decision",'
@@ -251,15 +258,26 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
 
 
 def _claim(connection, graph: dict[str, Any], *, destination: str | None = None):
+    return _claim_by_email(connection, graph, destination=destination)
+
+
+def _claim_by_email(
+    connection,
+    graph: dict[str, Any],
+    *,
+    destination: str | None = None,
+    allow_replay: bool = False,
+):
     with connection.cursor() as cursor:
         cursor.execute(
             "select source_user_id::text,destination_user_id::text,"
             " conversation_id::text,pending_action"
-            " from public.claim_guest_workspace_handoff(%s,%s,%s)",
+            " from public.claim_guest_workspace_handoff_by_email(%s,%s,%s,%s)",
             (
                 graph["handoff"],
                 graph["secret_hash"],
                 destination or graph["destination"],
+                allow_replay,
             ),
         )
         return cursor.fetchone()
@@ -306,6 +324,39 @@ def test_handoff_storage_and_privileged_claim_contract_exist() -> None:
     assert service_wrapper is not None
 
 
+def test_email_bound_claim_resolves_only_after_verified_login_and_reconciles_once() -> (
+    None
+):
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "update public.guest_workspace_handoffs"
+                    " set destination_user_id = null where id = %s",
+                    (graph["handoff"],),
+                )
+            with pytest.raises(psycopg.Error, match="wrong_destination"):
+                _claim_by_email(
+                    connection,
+                    graph,
+                    destination=graph["other_destination"],
+                )
+
+            first = _claim_by_email(connection, graph)
+            replay = _claim_by_email(connection, graph, allow_replay=True)
+            assert first == replay
+            assert first[:3] == (
+                graph["source"],
+                graph["destination"],
+                graph["conversation"],
+            )
+            with pytest.raises(psycopg.Error, match="guest_handoff_consumed"):
+                _claim_by_email(connection, graph)
+        finally:
+            _delete_fixture_identities(connection, graph)
+
+
 def test_handoff_table_and_claim_wrapper_are_not_client_executable() -> None:
     with _connect(autocommit=False) as connection:
         with connection.cursor() as cursor:
@@ -332,12 +383,27 @@ def test_handoff_table_and_claim_wrapper_are_not_client_executable() -> None:
                     'service_role',
                     'public.claim_guest_workspace_handoff(uuid,text,uuid)',
                     'execute'
+                  ),
+                  has_function_privilege(
+                    'anon',
+                    'public.claim_guest_workspace_handoff_by_email(uuid,text,uuid,boolean)',
+                    'execute'
+                  ),
+                  has_function_privilege(
+                    'authenticated',
+                    'public.claim_guest_workspace_handoff_by_email(uuid,text,uuid,boolean)',
+                    'execute'
+                  ),
+                  has_function_privilege(
+                    'service_role',
+                    'public.claim_guest_workspace_handoff_by_email(uuid,text,uuid,boolean)',
+                    'execute'
                   )
                 """
             )
             privileges = cursor.fetchone()
 
-    assert privileges == (False, False, False, False, True)
+    assert privileges == (False, False, False, False, True, False, False, True)
 
 
 def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
 from datetime import datetime, timezone
-from threading import Lock
-from time import monotonic
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -29,6 +26,7 @@ from argus.api.guest_observability import (
     emit_guest_funnel_event,
     emit_verified_guest_funnel_event,
 )
+from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import (
     GuestBootstrapRequest,
     GuestHandoffClaimResponse,
@@ -46,70 +44,14 @@ router = APIRouter(prefix="/api/v1", tags=["auth"])
 AUTH_LOGIN_ATTEMPT_LIMIT = 8
 AUTH_SIGNUP_ATTEMPT_LIMIT = 5
 AUTH_GUEST_ATTEMPT_LIMIT = 5
+AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT = 5
 _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
-_AUTH_ATTEMPT_RETRY_FLOOR_SECONDS = 1
-_AUTH_ATTEMPT_COMPACT_THRESHOLD = 2048
-_AuthAction = Literal["login", "signup"]
+_AuthAction = Literal["login", "signup", "handoff"]
 _GUEST_HANDOFF_COOKIE = "argus-guest-handoff"
+_GUEST_HANDOFF_ID_COOKIE = "argus-guest-handoff-id"
 _GUEST_HANDOFF_MAX_AGE_SECONDS = 10 * 60
 
-
-class _AuthAttemptLimiter:
-    def __init__(self) -> None:
-        self._attempts: defaultdict[str, deque[float]] = defaultdict(deque)
-        self._lock = Lock()
-
-    def record_or_retry_after(
-        self,
-        *,
-        keys: tuple[str, ...],
-        limit: int,
-        window_seconds: int,
-    ) -> int | None:
-        now = monotonic()
-        with self._lock:
-            if len(self._attempts) >= _AUTH_ATTEMPT_COMPACT_THRESHOLD:
-                self._compact(now=now, window_seconds=window_seconds)
-            retry_after = 0
-            for key in keys:
-                attempts = self._attempts[key]
-                self._prune(attempts, now=now, window_seconds=window_seconds)
-                if len(attempts) >= limit:
-                    retry_after = max(
-                        retry_after,
-                        int(window_seconds - (now - attempts[0])),
-                    )
-            if retry_after > 0:
-                return max(retry_after, _AUTH_ATTEMPT_RETRY_FLOOR_SECONDS)
-            for key in keys:
-                self._attempts[key].append(now)
-            return None
-
-    def reset(self) -> None:
-        with self._lock:
-            self._attempts.clear()
-
-    @staticmethod
-    def _prune(
-        attempts: deque[float],
-        *,
-        now: float,
-        window_seconds: int,
-    ) -> None:
-        while attempts and now - attempts[0] >= window_seconds:
-            attempts.popleft()
-
-    def _compact(self, *, now: float, window_seconds: int) -> None:
-        stale_keys: list[str] = []
-        for key, attempts in self._attempts.items():
-            self._prune(attempts, now=now, window_seconds=window_seconds)
-            if not attempts:
-                stale_keys.append(key)
-        for key in stale_keys:
-            self._attempts.pop(key, None)
-
-
-_AUTH_ATTEMPT_LIMITER = _AuthAttemptLimiter()
+_AUTH_ATTEMPT_LIMITER = SlidingWindowLimiter()
 
 
 def reset_auth_attempt_limiter_for_tests() -> None:
@@ -142,7 +84,12 @@ def _enforce_auth_attempt_limit(
     action: _AuthAction,
     email: str,
 ) -> None:
-    limit = AUTH_LOGIN_ATTEMPT_LIMIT if action == "login" else AUTH_SIGNUP_ATTEMPT_LIMIT
+    limits = {
+        "login": AUTH_LOGIN_ATTEMPT_LIMIT,
+        "signup": AUTH_SIGNUP_ATTEMPT_LIMIT,
+        "handoff": AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT,
+    }
+    limit = limits[action]
     retry_after = _AUTH_ATTEMPT_LIMITER.record_or_retry_after(
         keys=(
             f"{action}:ip:{_client_identity(request)}",
@@ -335,20 +282,20 @@ def create_guest_handoff(
             title="Account Already Registered",
             detail="This session already belongs to a permanent account.",
         )
+    _enforce_auth_attempt_limit(
+        request,
+        action="handoff",
+        email=body.destination_email,
+    )
     if not permanent_account_access_allowed(
         api_state.supabase_gateway,
         body.destination_email,
     ):
         raise _login_auth_problem(request)
     try:
-        destination_user_id = api_state.supabase_gateway.resolve_permanent_auth_user_id(
-            body.destination_email
-        )
-        if not destination_user_id:
-            raise RuntimeError("Destination account was not found.")
         created = api_state.supabase_gateway.create_guest_workspace_handoff(
             source_user_id=user.id,
-            destination_user_id=destination_user_id,
+            destination_email=body.destination_email,
             source_conversation_id=body.source_conversation_id,
             pending_action=(
                 body.pending_action.model_dump(mode="json", exclude_none=True)
@@ -378,7 +325,16 @@ def create_guest_handoff(
         secure=_session_cookie_secure(request),
         samesite="lax",
         max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
-        path="/api/v1/auth/guest/handoffs",
+        path="/api/v1/auth",
+    )
+    response.set_cookie(
+        _GUEST_HANDOFF_ID_COOKIE,
+        payload.handoff_id,
+        httponly=True,
+        secure=_session_cookie_secure(request),
+        samesite="lax",
+        max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
+        path="/api/v1/auth",
     )
     return response
 
@@ -418,30 +374,12 @@ def claim_guest_handoff(
             handoff_id=handoff_id,
             opaque_secret=opaque_secret,
             destination_user_id=user.id,
+            allow_same_destination_replay=False,
         )
     except Exception as exc:
         raise _guest_handoff_problem(request, str(exc)) from None
 
-    source_user_id = str(claimed.get("source_user_id") or "")
-    if not source_user_id:
-        raise _guest_handoff_problem(request, "guest_handoff_invalid")
-    try:
-        api_state.supabase_gateway.delete_anonymous_auth_user(source_user_id)
-    except Exception:
-        # The product graph is already safe and owned by the destination.
-        # Cleanup is idempotent and may be retried independently.
-        pass
-
-    pending_raw = claimed.get("pending_action")
-    pending_action = (
-        GuestPendingAction.model_validate(pending_raw)
-        if isinstance(pending_raw, dict)
-        else None
-    )
-    payload = GuestHandoffClaimResponse(
-        conversation_id=str(claimed["conversation_id"]),
-        pending_action=pending_action,
-    )
+    source_user_id, payload = _guest_handoff_claim_payload(request, claimed)
     emit_verified_guest_funnel_event(
         "existing_account_sign_in_completed",
         user_id=source_user_id,
@@ -463,14 +401,38 @@ def claim_guest_handoff(
     response = JSONResponse(
         content=jsonable_encoder(payload.model_dump(mode="json")),
     )
-    response.delete_cookie(
-        _GUEST_HANDOFF_COOKIE,
-        path="/api/v1/auth/guest/handoffs",
-        secure=_session_cookie_secure(request),
-        httponly=True,
-        samesite="lax",
-    )
+    _clear_guest_handoff_cookies(request, response)
     return response
+
+
+def _guest_handoff_claim_payload(
+    request: Request,
+    claimed: dict[str, object],
+) -> tuple[str, GuestHandoffClaimResponse]:
+    source_user_id = str(claimed.get("source_user_id") or "")
+    if not source_user_id:
+        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+    pending_raw = claimed.get("pending_action")
+    pending_action = (
+        GuestPendingAction.model_validate(pending_raw)
+        if isinstance(pending_raw, dict)
+        else None
+    )
+    return source_user_id, GuestHandoffClaimResponse(
+        conversation_id=str(claimed["conversation_id"]),
+        pending_action=pending_action,
+    )
+
+
+def _clear_guest_handoff_cookies(request: Request, response: JSONResponse) -> None:
+    for cookie_name in (_GUEST_HANDOFF_COOKIE, _GUEST_HANDOFF_ID_COOKIE):
+        response.delete_cookie(
+            cookie_name,
+            path="/api/v1/auth",
+            secure=_session_cookie_secure(request),
+            httponly=True,
+            samesite="lax",
+        )
 
 
 def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
@@ -540,6 +502,22 @@ def link_guest_identity(
         )
     guest_context = account_context(request)
     if guest_context.kind != "guest":
+        same_linked_identity = (
+            user.email is not None
+            and user.email.strip().lower() == body.email
+            and api_state.supabase_gateway.guest_identity_link_completed(user.id)
+        )
+        if same_linked_identity:
+            return JSONResponse(
+                jsonable_encoder(
+                    {
+                        "authenticated": True,
+                        "account_kind": "registered",
+                        "user": user.model_dump(mode="json"),
+                        "reconciled": True,
+                    }
+                )
+            )
         raise problem(
             request,
             status_code=409,
@@ -604,7 +582,10 @@ def link_guest_identity(
             status_code=400,
             code="guest_identity_link_failed",
             title="Account Creation Failed",
-            detail="Argus could not create this account. Your temporary chat is unchanged.",
+            detail=(
+                "Argus could not finish this account request. Your conversation "
+                "remains stored; retry to reconcile the account state."
+            ),
         ) from None
 
 
@@ -643,6 +624,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
 
 @router.post("/auth/login")
 def login(request: Request, body: LoginRequest) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
     if api_state.supabase_gateway is None:
         raise problem(
             request,
@@ -658,9 +640,53 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         result = api_state.supabase_gateway.login(
             email=body.email, password=body.password
         )
-        return auth_response(request, result)
     except Exception:
         raise _login_auth_problem(request) from None
+    handoff_id = request.cookies.get(_GUEST_HANDOFF_ID_COOKIE, "").strip()
+    opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
+    if bool(handoff_id) is not bool(opaque_secret):
+        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+    if not handoff_id:
+        return auth_response(request, result)
+
+    auth_user = result.get("user")
+    destination_user_id = (
+        str(auth_user.get("id") or "") if isinstance(auth_user, dict) else ""
+    )
+    if not destination_user_id:
+        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+    try:
+        claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
+            handoff_id=handoff_id,
+            opaque_secret=opaque_secret,
+            destination_user_id=destination_user_id,
+            allow_same_destination_replay=True,
+        )
+    except Exception as exc:
+        raise _guest_handoff_problem(request, str(exc)) from None
+
+    source_user_id, claim_payload = _guest_handoff_claim_payload(request, claimed)
+    result["guest_claim"] = claim_payload.model_dump(mode="json")
+    if claimed.get("replayed") is not True:
+        emit_verified_guest_funnel_event(
+            "existing_account_sign_in_completed",
+            user_id=source_user_id,
+            conversation_id=claim_payload.conversation_id,
+            surface="account_conversion",
+            capability_category="account",
+            terminal_outcome="completed",
+        )
+        emit_verified_guest_funnel_event(
+            "temporary_workspace_claimed",
+            user_id=source_user_id,
+            conversation_id=claim_payload.conversation_id,
+            surface="account_conversion",
+            capability_category="history",
+            terminal_outcome="claimed",
+        )
+    response = auth_response(request, result)
+    _clear_guest_handoff_cookies(request, response)
+    return response
 
 
 def _enforce_browser_auth_origin(request: Request) -> None:

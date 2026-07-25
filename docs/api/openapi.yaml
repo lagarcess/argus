@@ -15,7 +15,7 @@ paths:
     post:
       responses:
         "200":
-          description: Session created.
+          description: Session created. When a server-cookie-bound guest handoff exists, the product graph is claimed before the session response and `guest_claim` returns the original conversation plus optional typed pending action.
   /api/v1/auth/guest:
     post:
       description: Create or reuse one verified anonymous guest session when server policy permits it.
@@ -54,7 +54,7 @@ paths:
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/guest/handoffs:
     post:
-      description: Create a ten-minute, destination-bound guest handoff and store its opaque secret only in an HttpOnly cookie.
+      description: Create a ten-minute guest handoff bound to a normalized destination-email hash. Store its id and opaque secret only in HttpOnly cookies used by login reconciliation; account existence is not resolved at creation.
       requestBody:
         required: true
         content:
@@ -76,7 +76,7 @@ paths:
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/guest/handoffs/{handoff_id}/claim:
     post:
-      description: Atomically claim the complete guest product graph into the signed-in destination account.
+      description: Atomically claim the complete guest product graph into the signed-in destination account. Browser login performs this operation before returning its permanent session; this explicit endpoint remains a strict single-use compatibility boundary.
       parameters:
         - name: handoff_id
           in: path

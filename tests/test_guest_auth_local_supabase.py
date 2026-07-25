@@ -442,7 +442,6 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             ]
         ).execute()
         assert gateway.private_alpha_email_allowed(email) is True
-        assert gateway.resolve_permanent_auth_user_id(email) == destination_user_id
 
         with (
             patch.object(api_state, "supabase_gateway", gateway),
@@ -471,19 +470,32 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
                 headers={"origin": "http://localhost:3000"},
             )
             assert handoff.status_code == 201, handoff.json()
+            handoff_id = handoff.json()["handoff_id"]
+            handoff_secret = client.cookies.get("argus-guest-handoff")
+            assert handoff_secret
 
             signed_in = client.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": password},
             )
             assert signed_in.status_code == 200
-            claimed = client.post(
-                f"/api/v1/auth/guest/handoffs/{handoff.json()['handoff_id']}/claim",
+            claimed = signed_in.json()["guest_claim"]
+            assert claimed["conversation_id"] == conversation_id
+            assert claimed["pending_action"]["action_id"] == "keep-history-1"
+            client.cookies.set("argus-guest-handoff-id", handoff_id)
+            client.cookies.set("argus-guest-handoff", handoff_secret)
+            reconciled = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": password},
+            )
+            assert reconciled.status_code == 200
+            assert reconciled.json()["guest_claim"] == claimed
+            replay = client.post(
+                f"/api/v1/auth/guest/handoffs/{handoff_id}/claim",
                 headers={"origin": "http://localhost:3000"},
             )
-            assert claimed.status_code == 200
-            assert claimed.json()["conversation_id"] == conversation_id
-            assert claimed.json()["pending_action"]["action_id"] == "keep-history-1"
+            assert replay.status_code == 409
+            assert replay.json()["code"] == "guest_handoff_consumed"
 
             reloaded = client.get("/api/v1/me")
 
@@ -515,6 +527,22 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             "One durable response",
         ]
         assert all(row["user_id"] == destination_user_id for row in messages)
+        source_auth = gateway.client.auth.admin.get_user_by_id(source_user_id)
+        assert source_auth.user is not None
+        assert source_auth.user.is_anonymous is True
+        gateway.client.table("guest_workspaces").update(
+            {
+                "updated_at": (
+                    datetime.now(timezone.utc) - timedelta(minutes=20)
+                ).isoformat()
+            }
+        ).eq("user_id", source_user_id).execute()
+        cleanup = cleanup_expired_guest_workspaces(
+            gateway,
+            limit=25,
+            dry_run=False,
+        )
+        assert cleanup.auth_deleted == 1
         with pytest.raises(AuthApiError):
             gateway.client.auth.admin.get_user_by_id(source_user_id)
     finally:

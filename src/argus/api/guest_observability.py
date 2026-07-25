@@ -125,7 +125,7 @@ def emit_first_guest_message_event(
     user_id: str,
     conversation_id: str,
     message_id: str,
-    language: GuestFunnelLanguage,
+    language: GuestFunnelLanguage | None,
 ) -> None:
     try:
         used_count = current_guest_usage_count(
@@ -151,3 +151,51 @@ def emit_first_guest_message_event(
         capability_category="chat",
         terminal_outcome="completed",
     )
+
+
+def emit_guest_turn_funnel_events(
+    *,
+    account: AccountContext,
+    user_id: str,
+    conversation_id: str,
+    language: GuestFunnelLanguage | None,
+    assistant_message_id: str | None,
+    is_run_backtest_turn: bool,
+    confirmation_reached: bool,
+    backtest_run_id: str | None,
+    job_id: str | None,
+) -> None:
+    if assistant_message_id is not None and not is_run_backtest_turn:
+        emit_first_guest_message_event(
+            account=account,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=assistant_message_id,
+            language=language,
+        )
+    if confirmation_reached:
+        emit_guest_funnel_event(
+            account=account,
+            kind="confirmation_reached",
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=assistant_message_id,
+            language=language,
+            surface="confirmation",
+            capability_category="simulation",
+            terminal_outcome="completed",
+        )
+    if backtest_run_id is not None:
+        emit_guest_funnel_event(
+            account=account,
+            kind="first_result_completed",
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=assistant_message_id,
+            job_id=job_id,
+            backtest_run_id=backtest_run_id,
+            language=language,
+            surface="backtest",
+            capability_category="simulation",
+            terminal_outcome="completed",
+        )

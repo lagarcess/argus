@@ -1496,14 +1496,22 @@ to `false`; the frontend flag controls presentation only.
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
   checked before Auth creation. It uses the existing secure cookie rules.
+  Disabling the flag stops new anonymous identities while already-verified
+  guests remain usable until conversion, fixed expiry, or cleanup.
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
   update to add verified email/password credentials to the current anonymous
   identity. It is available only when the server enables public account access
   and preserves the Auth UUID.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
-  destination account, source conversation, and optional typed pending action
-  to a ten-minute handoff. The response exposes only the handoff id and expiry;
-  the opaque secret exists only in a Secure/SameSite/HttpOnly cookie.
+  normalized destination-email hash, source conversation, and optional typed
+  pending action to a ten-minute handoff without resolving whether that account
+  exists. The response exposes only the handoff id and expiry; the id and opaque
+  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+- `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
+  the permanent session. Its optional `guest_claim` contains the original
+  conversation id and verified typed pending action. Retrying the same login
+  after an ambiguous response returns the same claim result without repeating
+  transfer; the explicit claim endpoint remains strict single-use.
 - `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
@@ -1526,6 +1534,8 @@ former while the latter is false.
 
 All guest mutation failures use the existing Problem Details, request-ID,
 same-origin, secure-cookie, and idempotency conventions.
+The authenticated browser-event relay is additionally capped per verified
+guest; server-owned funnel events never depend on that convenience endpoint.
 
 `usage_counters.period = guest_session` adds the `guest_session` period. Its `period_start` is the
 guest workspace creation time and its `period_end` is the fixed seven-day

@@ -15,6 +15,7 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.dependencies import dev_memory_fallback_enabled, problem
 from argus.api.guest_access import AccountContext, account_context
+from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.schemas import User
 from argus.domain.usage_limits import (
     MESSAGE_ALLOWANCE_LIMITS,
@@ -44,6 +45,16 @@ def check_message_allowance(request: Request, user: User) -> None:
                 limits=MESSAGE_ALLOWANCE_LIMITS,
             )
     except QuotaExceededError as exc:
+        if context.kind == "guest":
+            emit_guest_funnel_event(
+                account=context,
+                kind="guest_limit_reached",
+                user_id=user.id,
+                surface="chat",
+                capability_category="chat",
+                conversion_reason="message_limit",
+                terminal_outcome="limit_reached",
+            )
         raise problem(
             request,
             status_code=429,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Protocol
@@ -56,6 +57,12 @@ class AccountContext:
     capabilities: AccountCapabilities
 
 
+_current_account_context: ContextVar[AccountContext | None] = ContextVar(
+    "argus_account_context",
+    default=None,
+)
+
+
 def guest_capabilities() -> AccountCapabilities:
     return AccountCapabilities(
         can_create_additional_conversation=False,
@@ -108,4 +115,9 @@ def account_context(request: Request) -> AccountContext:
     context = getattr(request.state, "account_context", None)
     if not isinstance(context, AccountContext):
         raise RuntimeError("Verified account context was not established.")
+    _current_account_context.set(context)
     return context
+
+
+def current_account_context() -> AccountContext | None:
+    return _current_account_context.get()

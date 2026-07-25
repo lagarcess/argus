@@ -156,13 +156,10 @@ describe("guest conversion contract", () => {
 
     expect(hook).toContain("createGuestHandoff");
     expect(hook).toContain("loginWithEmail");
-    expect(hook).toContain("claimGuestHandoff");
+    expect(hook).toContain("authenticated.guest_claim");
     const authenticate = hook.slice(hook.indexOf("const authenticate"));
     expect(authenticate.indexOf("createGuestHandoff")).toBeLessThan(
       authenticate.indexOf("loginWithEmail"),
-    );
-    expect(authenticate.indexOf("loginWithEmail")).toBeLessThan(
-      authenticate.indexOf("claimGuestHandoff"),
     );
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");

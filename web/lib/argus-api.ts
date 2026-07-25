@@ -12,6 +12,7 @@ import {
 } from "./language-features";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -184,6 +185,7 @@ type AuthSessionPayload = {
 export type AuthResponsePayload = {
   session?: AuthSessionPayload | null;
   user?: Record<string, unknown> | null;
+  guest_claim?: { conversation_id: string; pending_action: GuestPendingActionSummary | null } | null;
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */

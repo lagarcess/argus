@@ -136,11 +136,8 @@ def test_guest_identity_link_contract_requires_a_real_email_and_strong_password(
         GuestIdentityLinkRequest(email="new-member@example.com", password="short")
 
 
-def test_guest_creates_http_only_destination_bound_handoff_without_exposing_secret() -> (
-    None
-):
+def test_guest_creates_http_only_email_bound_handoff_without_account_oracle() -> None:
     gateway = MagicMock(spec=SupabaseGateway)
-    gateway.resolve_permanent_auth_user_id.return_value = REGISTERED_ID
     gateway.create_guest_workspace_handoff.return_value = {
         "id": HANDOFF_ID,
         "expires_at": utcnow() + timedelta(minutes=10),
@@ -180,16 +177,108 @@ def test_guest_creates_http_only_destination_bound_handoff_without_exposing_secr
     assert "secret" not in response.json()
     set_cookie = response.headers["set-cookie"]
     assert "argus-guest-handoff=" in set_cookie
+    assert "argus-guest-handoff-id=" in set_cookie
     assert "HttpOnly" in set_cookie
     assert "Secure" in set_cookie
     assert "SameSite=lax" in set_cookie
-    gateway.resolve_permanent_auth_user_id.assert_called_once_with("member@example.com")
     gateway.create_guest_workspace_handoff.assert_called_once()
     call = gateway.create_guest_workspace_handoff.call_args.kwargs
     assert call["source_user_id"] == GUEST_ID
-    assert call["destination_user_id"] == REGISTERED_ID
+    assert call["destination_email"] == "member@example.com"
     assert call["source_conversation_id"] == CONVERSATION_ID
     assert "secret" not in call["pending_action"]
+
+
+def test_login_reconciles_cookie_bound_handoff_before_returning_session() -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_allowed.return_value = True
+    gateway.login.return_value = {
+        "user": {
+            "id": REGISTERED_ID,
+            "email": "member@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+            "expires_in": 3600,
+        },
+    }
+    gateway.claim_guest_workspace_handoff.return_value = {
+        "source_user_id": GUEST_ID,
+        "destination_user_id": REGISTERED_ID,
+        "conversation_id": CONVERSATION_ID,
+        "pending_action": {
+            "reason": "keep_history",
+            "conversation_id": CONVERSATION_ID,
+            "action_id": "new-chat-1",
+        },
+    }
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        TestClient(app, base_url="http://localhost:3000") as client,
+    ):
+        client.cookies.set("argus-guest-handoff-id", HANDOFF_ID)
+        client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "member@example.com", "password": "strong-password"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["guest_claim"] == {
+        "conversation_id": CONVERSATION_ID,
+        "pending_action": {
+            "reason": "keep_history",
+            "conversation_id": CONVERSATION_ID,
+            "action_id": "new-chat-1",
+            "artifact_id": None,
+        },
+    }
+    gateway.claim_guest_workspace_handoff.assert_called_once_with(
+        handoff_id=HANDOFF_ID,
+        opaque_secret="opaque-cookie-secret",
+        destination_user_id=REGISTERED_ID,
+        allow_same_destination_replay=True,
+    )
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_login_handoff_reconciliation_does_not_duplicate_completion_events() -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_allowed.return_value = True
+    gateway.login.return_value = {
+        "user": {
+            "id": REGISTERED_ID,
+            "email": "member@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+        },
+    }
+    gateway.claim_guest_workspace_handoff.return_value = {
+        "source_user_id": GUEST_ID,
+        "destination_user_id": REGISTERED_ID,
+        "conversation_id": CONVERSATION_ID,
+        "pending_action": None,
+        "replayed": True,
+    }
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.routers.auth.emit_verified_guest_funnel_event") as emit,
+        TestClient(app) as client,
+    ):
+        client.cookies.set("argus-guest-handoff-id", HANDOFF_ID)
+        client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "member@example.com", "password": "strong-password"},
+        )
+
+    assert response.status_code == 200
+    emit.assert_not_called()
 
 
 def test_registered_claim_uses_cookie_secret_and_returns_the_bound_pending_action() -> (
@@ -234,8 +323,8 @@ def test_registered_claim_uses_cookie_secret_and_returns_the_bound_pending_actio
         handoff_id=HANDOFF_ID,
         opaque_secret="opaque-cookie-secret",
         destination_user_id=REGISTERED_ID,
+        allow_same_destination_replay=False,
     )
-    gateway.delete_anonymous_auth_user.assert_called_once_with(GUEST_ID)
     assert "Max-Age=0" in response.headers["set-cookie"]
 
 
@@ -280,3 +369,34 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
     assert failed.json()["code"] == "guest_identity_link_failed"
     gateway.link_anonymous_identity.assert_called_once()
     gateway.mark_guest_identity_linked.assert_not_called()
+
+
+def test_identity_link_retry_reconciles_provider_completed_same_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.guest_identity_link_completed.return_value = True
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _registered_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app) as client,
+        ):
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={
+                    "email": "member@example.com",
+                    "password": "strong-password",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["account_kind"] == "registered"
+    assert response.json()["user"]["id"] == REGISTERED_ID
+    gateway.link_anonymous_identity.assert_not_called()

@@ -181,11 +181,14 @@ Server-owned policy record for one temporary anonymous identity.
   conversation activity cannot extend it.
 - Browser roles may read only their own active workspace and cannot mutate
   expiry, claim, or cleanup state.
-- Cleanup re-verifies `auth.users.is_anonymous` and an unclaimed state while
-  locked. A converted or permanent account is never eligible for deletion.
+- Cleanup locks `auth.users` and the workspace, re-verifies anonymous identity
+  truth, removes the eligible graph, and deletes the Auth row in the same
+  database transaction. A converted or permanent account is never eligible.
 - Cleanup deletes conversation messages/jobs, guest feedback text, and the
   checkpoint rows whose `thread_id` matches the guest conversation before the
-  server-admin Auth deletion removes the remaining owner-scoped product rows.
+  transactional Auth deletion removes the remaining owner-scoped product rows.
+  It also removes safely transferred source identities after a fifteen-minute
+  reconciliation grace and abandoned bootstrap identities after five minutes.
   Privacy-safe append-only cost and route/security evidence may retain nullable
   attribution; transcript-bearing state may not.
 - Guest Start over is one service-owned transaction. It locks the workspace,
@@ -206,7 +209,10 @@ one existing permanent account.
 - `id`: `uuid` (Primary Key)
 - `secret_hash`: `text` (SHA-256 hex digest; the opaque secret is never stored)
 - `source_user_id`: `uuid` (References the anonymous `profiles.id`)
-- `destination_user_id`: `uuid` (References the permanent `profiles.id`)
+- `destination_email_hash`: `text` (SHA-256 of the normalized destination
+  email; required)
+- `destination_user_id`: `uuid` (Nullable until verified login resolves the
+  permanent `profiles.id`; cleared if that account is deleted)
 - `source_conversation_id`: `uuid` (References the one guest conversation)
 - `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
   decision artifact id when applicable)
@@ -219,15 +225,18 @@ one existing permanent account.
 - Browser roles cannot read or execute against this table. Only the service
   role may create or claim a handoff.
 - A pending source workspace has at most one handoff.
-- Claim locks the handoff and complete source product graph, verifies every
-  foreign owner, and transfers all mutable product rows in one transaction.
+- Claim locks the handoff and complete source product graph, resolves the
+  destination only from verified Auth email truth, verifies every foreign
+  owner, and transfers all mutable product rows in one transaction.
 - Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
   decision, and context ids do not change. Checkpoint rows keep
   `thread_id == conversation_id`.
 - Guest counters and feedback are not merged into registered allowances.
   Immutable cost, provider, security, and audit evidence is not rewritten.
-- Source anonymous Auth deletion occurs only after the product transaction
-  commits. Any claim failure changes zero owners.
+- Source anonymous Auth deletion occurs in bounded cleanup only after a
+  fifteen-minute claim-reconciliation grace, and in the same transaction that
+  re-verifies the source owns no transferred product row. Any claim or cleanup
+  failure changes zero owners.
 
 ---
 

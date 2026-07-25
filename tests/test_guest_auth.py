@@ -103,6 +103,28 @@ def test_guest_flag_off_creates_no_anonymous_auth_user(gateway) -> None:
     gateway.sign_in_anonymously.assert_not_called()
 
 
+def test_guest_flag_off_drains_an_existing_verified_guest_session(
+    gateway,
+) -> None:
+    gateway.get_auth_user_from_token.return_value = (
+        gateway.sign_in_anonymously.return_value["user"]
+    )
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        TestClient(app) as client,
+    ):
+        response = client.get(
+            "/api/v1/me",
+            headers={"Authorization": "Bearer existing-guest-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["account_kind"] == "guest"
+    assert response.json()["user"]["id"] == USER_ID
+    gateway.sign_in_anonymously.assert_not_called()
+
+
 def test_guest_bootstrap_creates_real_anonymous_identity_profile_and_workspace(
     gateway,
     monkeypatch: pytest.MonkeyPatch,

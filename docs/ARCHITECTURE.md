@@ -766,12 +766,17 @@ Two server flags control rollout and default off:
 client/server disagreement fails closed. Guest access may be enabled while
 public permanent accounts remain disabled; in that state the current
 private-alpha allowlist continues to own signup/login and role elevation.
+Turning the server guest flag off stops bootstrap only: active verified guests
+drain through their fixed expiry or conversion instead of being abruptly
+deauthorized.
 
-Cleanup is a bounded server-admin operation. It first marks an expired
-anonymous workspace inaccessible, removes its conversation-owned product
-graph, guest feedback text, and the matching LangGraph checkpoint thread, then
-deletes the anonymous Auth user. It re-verifies anonymous Auth truth and claim
-state under lock, so it cannot delete a converted or permanent account.
+Cleanup is a bounded privileged database operation. It locks the Auth identity
+and workspace, removes an eligible conversation graph, guest feedback text,
+and matching LangGraph checkpoint thread, then deletes the anonymous Auth row
+inside that same transaction. Claimed source identities receive a
+reconciliation grace and are deleted only after the transferred graph has zero
+remaining source owners. This closes the cross-system check/delete race and
+cannot delete a converted or permanent account.
 Append-only cost and route/security evidence may remain only with privacy-safe
 nullable attribution. No hosted Supabase setting is changed by the feature
 branch.

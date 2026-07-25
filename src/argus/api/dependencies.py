@@ -14,7 +14,6 @@ from argus.api.auth_sessions import (
     auth_session_is_active,
 )
 from argus.api.guest_access import (
-    guest_access_enabled,
     guest_account_context,
     permanent_account_access_allowed,
     registered_account_context,
@@ -214,14 +213,6 @@ def current_user(request: Request) -> User:
         )
 
     if auth_user.get("is_anonymous") is True:
-        if not guest_access_enabled():
-            raise problem(
-                request,
-                status_code=403,
-                code="guest_access_unavailable",
-                title="Guest Access Unavailable",
-                detail="Guest access is not available.",
-            )
         workspace = api_state.supabase_gateway.get_active_guest_workspace(
             user_id=auth_user_id,
             at=datetime.now(timezone.utc),

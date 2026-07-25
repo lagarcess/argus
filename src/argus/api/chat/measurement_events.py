@@ -5,6 +5,8 @@ from typing import Any
 
 from loguru import logger
 
+from argus.api.guest_access import AccountContext, current_account_context
+from argus.api.guest_observability import emit_guest_turn_funnel_events
 from argus.observability.product_events import capture_product_event
 
 
@@ -17,6 +19,7 @@ def schedule_runtime_measurement_events_after_stream(
 ) -> None:
     runtime_result_snapshot = dict(runtime_result)
     metadata_snapshot = dict(metadata)
+    account = current_account_context()
 
     async def _run() -> None:
         try:
@@ -26,6 +29,7 @@ def schedule_runtime_measurement_events_after_stream(
                 conversation_id=conversation_id,
                 runtime_result=runtime_result_snapshot,
                 metadata=metadata_snapshot,
+                account=account,
             )
         except Exception as exc:
             logger.warning(
@@ -49,7 +53,33 @@ def emit_runtime_measurement_events(
     conversation_id: str,
     runtime_result: dict[str, Any],
     metadata: dict[str, Any],
+    account: AccountContext | None = None,
 ) -> None:
+    if account is not None:
+        raw_run = runtime_result.get("run")
+        raw_job = runtime_result.get("backtest_job")
+        raw_action = metadata.get("chat_action")
+        emit_guest_turn_funnel_events(
+            account=account,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            language=None,
+            assistant_message_id=_clean_event_string(runtime_result.get("message_id")),
+            is_run_backtest_turn=(
+                isinstance(raw_action, dict) and raw_action.get("type") == "run_backtest"
+            ),
+            confirmation_reached=isinstance(metadata.get("confirmation_card"), dict),
+            backtest_run_id=(
+                _clean_event_string(raw_run.get("id"))
+                if isinstance(raw_run, dict)
+                else _clean_event_string(runtime_result.get("result_run_id"))
+            ),
+            job_id=(
+                _clean_event_string(raw_job.get("id"))
+                if isinstance(raw_job, dict)
+                else None
+            ),
+        )
     failure_code = _continuity_failure_code(metadata)
     if failure_code is not None:
         capture_product_event(
@@ -69,9 +99,7 @@ def emit_runtime_measurement_events(
     source = _clean_event_string(comparison_started.get("source")) or "workflow_boundary"
     attributes: dict[str, Any] = {
         "source": source,
-        "baseline_present": bool(
-            _clean_event_string(comparison_started.get("baseline"))
-        ),
+        "baseline_present": bool(_clean_event_string(comparison_started.get("baseline"))),
     }
     candidate_count = _positive_int(comparison_started.get("candidate_count"))
     if candidate_count is not None:

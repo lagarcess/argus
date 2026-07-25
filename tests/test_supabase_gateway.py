@@ -41,31 +41,6 @@ def test_batched_fetch_helper_exists_for_unbounded_queries():
     assert hasattr(gateway, "_fetch_all_rows")
 
 
-def test_delete_anonymous_auth_user_revalidates_before_admin_deletion() -> None:
-    client = MagicMock()
-    client.auth.admin.get_user_by_id.return_value = SimpleNamespace(
-        user=SimpleNamespace(is_anonymous=True)
-    )
-    gateway = SupabaseGateway(client=client)
-
-    assert gateway.delete_anonymous_auth_user("guest-1") is True
-
-    client.auth.admin.get_user_by_id.assert_called_once_with("guest-1")
-    client.auth.admin.delete_user.assert_called_once_with("guest-1")
-
-
-def test_delete_anonymous_auth_user_preserves_converted_identity() -> None:
-    client = MagicMock()
-    client.auth.admin.get_user_by_id.return_value = SimpleNamespace(
-        user=SimpleNamespace(is_anonymous=False)
-    )
-    gateway = SupabaseGateway(client=client)
-
-    assert gateway.delete_anonymous_auth_user("converted-1") is False
-
-    client.auth.admin.delete_user.assert_not_called()
-
-
 def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
     client = MagicMock()
     gateway = SupabaseGateway(client=client)

@@ -16,8 +16,6 @@ class GuestCleanupGateway(Protocol):
         dry_run: bool,
     ) -> list[dict[str, object]]: ...
 
-    def delete_anonymous_auth_user(self, user_id: str) -> bool: ...
-
 
 @dataclass(frozen=True)
 class GuestCleanupResult:
@@ -59,29 +57,25 @@ def cleanup_expired_guest_workspaces(
         user_id = str(candidate.get("user_id") or "")
         if not user_id:
             failed += 1
-            continue
-        try:
-            capture_guest_funnel_event(
-                "guest_session_expired",
-                user_id=user_id,
-                surface="cleanup",
-                capability_category="account",
-                terminal_outcome="expired",
-            )
-        except Exception:
-            logger.opt(exception=True).warning(
-                "Guest expiry event emission failed",
-                product_event="guest_session_expired",
-            )
-        try:
-            was_deleted = gateway.delete_anonymous_auth_user(user_id)
-        except Exception:
-            failed += 1
+        elif candidate.get("auth_deleted") is True:
+            deleted += 1
+            if candidate.get("cleanup_reason") != "expired_workspace":
+                continue
+            try:
+                capture_guest_funnel_event(
+                    "guest_session_expired",
+                    user_id=user_id,
+                    surface="cleanup",
+                    capability_category="account",
+                    terminal_outcome="expired",
+                )
+            except Exception:
+                logger.opt(exception=True).warning(
+                    "Guest expiry event emission failed",
+                    product_event="guest_session_expired",
+                )
         else:
-            if was_deleted:
-                deleted += 1
-            else:
-                preserved += 1
+            preserved += 1
     return GuestCleanupResult(
         dry_run=False,
         selected=len(candidates),

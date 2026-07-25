@@ -66,55 +66,11 @@ class GuestAccountPersistenceMixin:
     def delete_auth_user(self, user_id: str) -> None:
         self.client.auth.admin.delete_user(user_id)
 
-    def delete_anonymous_auth_user(self, user_id: str) -> bool:
-        response = self.client.auth.admin.get_user_by_id(user_id)
-        auth_user = getattr(response, "user", None)
-        if auth_user is None:
-            raise RuntimeError("Auth user revalidation returned no user.")
-        if hasattr(auth_user, "model_dump"):
-            auth_user = auth_user.model_dump(mode="json")
-        is_anonymous = (
-            auth_user.get("is_anonymous")
-            if isinstance(auth_user, dict)
-            else getattr(auth_user, "is_anonymous", None)
-        )
-        if is_anonymous is not True:
-            return False
-        self.delete_auth_user(user_id)
-        return True
-
-    def resolve_permanent_auth_user_id(self, email: str) -> str | None:
-        normalized = email.strip().lower()
-        profile = _row_one(
-            self.client.table("profiles")
-            .select("id,email")
-            .eq("email", normalized)
-            .limit(1)
-            .execute()
-        )
-        if not profile:
-            return None
-        user_id = str(profile.get("id") or "")
-        if not user_id:
-            return None
-        response = self.client.auth.admin.get_user_by_id(user_id)
-        auth_user = getattr(response, "user", None)
-        if auth_user is None:
-            return None
-        if hasattr(auth_user, "model_dump"):
-            auth_user = auth_user.model_dump(mode="json")
-        if not isinstance(auth_user, dict):
-            return None
-        auth_email = str(auth_user.get("email") or "").strip().lower()
-        if auth_user.get("is_anonymous") is True or auth_email != normalized:
-            return None
-        return user_id
-
     def create_guest_workspace_handoff(
         self,
         *,
         source_user_id: str,
-        destination_user_id: str,
+        destination_email: str,
         source_conversation_id: str,
         pending_action: dict[str, Any] | None,
         created_at: datetime,
@@ -147,7 +103,9 @@ class GuestAccountPersistenceMixin:
             .insert(
                 {
                     "source_user_id": source_user_id,
-                    "destination_user_id": destination_user_id,
+                    "destination_email_hash": hashlib.sha256(
+                        destination_email.strip().lower().encode("utf-8")
+                    ).hexdigest(),
                     "source_conversation_id": source_conversation_id,
                     "secret_hash": secret_hash,
                     "pending_action": pending_action,
@@ -172,15 +130,17 @@ class GuestAccountPersistenceMixin:
         handoff_id: str,
         opaque_secret: str,
         destination_user_id: str,
+        allow_same_destination_replay: bool = False,
     ) -> dict[str, Any]:
         secret_hash = hashlib.sha256(opaque_secret.encode("utf-8")).hexdigest()
         try:
             result = self.client.rpc(
-                "claim_guest_workspace_handoff",
+                "claim_guest_workspace_handoff_by_email",
                 {
                     "p_handoff_id": handoff_id,
                     "p_secret_hash": secret_hash,
                     "p_destination_user_id": destination_user_id,
+                    "p_allow_same_destination_replay": (allow_same_destination_replay),
                 },
             ).execute()
         except Exception as exc:
@@ -216,6 +176,18 @@ class GuestAccountPersistenceMixin:
             .eq("status", "active")
             .execute()
         )
+
+    def guest_identity_link_completed(self, user_id: str) -> bool:
+        row = _row_one(
+            self.client.table("guest_workspaces")
+            .select("user_id,status,claimed_by")
+            .eq("user_id", user_id)
+            .eq("status", "claimed")
+            .eq("claimed_by", user_id)
+            .limit(1)
+            .execute()
+        )
+        return row is not None
 
     def link_anonymous_identity(
         self,

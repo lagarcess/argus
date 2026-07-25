@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { AuthFormSubmission } from "@/components/auth/AuthForm";
 import {
-  claimGuestHandoff,
   createGuestHandoff,
   linkGuestIdentity,
 } from "@/lib/guest-api";
@@ -36,7 +35,7 @@ export function useGuestConversion({
   const [reason, setReason] =
     useState<GuestConversionReason>("keep_history");
   const latchRef = useRef<SingleUseGuestAction | null>(null);
-  const handoffIdRef = useRef<string | null>(null);
+  const handoffPreparedRef = useRef(false);
 
   const requestConversion = useCallback(
     (
@@ -56,7 +55,7 @@ export function useGuestConversion({
       latchRef.current = pendingAction
         ? new SingleUseGuestAction(pendingAction)
         : null;
-      handoffIdRef.current = null;
+      handoffPreparedRef.current = false;
       setIsOpen(true);
     },
     [account],
@@ -64,7 +63,7 @@ export function useGuestConversion({
 
   const close = useCallback(() => {
     setIsOpen(false);
-    handoffIdRef.current = null;
+    handoffPreparedRef.current = false;
   }, []);
 
   const authenticate = useCallback(
@@ -76,12 +75,12 @@ export function useGuestConversion({
           password: submission.password,
         });
       } else {
-        if (conversationId && !handoffIdRef.current) {
+        if (conversationId && !handoffPreparedRef.current) {
           const pending = latch?.take();
           if (pending) {
             latchRef.current = new SingleUseGuestAction(pending);
           }
-          const handoff = await createGuestHandoff({
+          await createGuestHandoff({
             destination_email: submission.email,
             source_conversation_id: conversationId,
             pending_action: pending
@@ -92,15 +91,18 @@ export function useGuestConversion({
                   action_id: crypto.randomUUID(),
                 },
           });
-          handoffIdRef.current = handoff.handoff_id;
+          handoffPreparedRef.current = true;
         }
 
-        await loginWithEmail({
+        const authenticated = await loginWithEmail({
           email: submission.email,
           password: submission.password,
         });
-        if (handoffIdRef.current) {
-          const claimed = await claimGuestHandoff(handoffIdRef.current);
+        if (handoffPreparedRef.current) {
+          const claimed = authenticated.guest_claim;
+          if (!claimed) {
+            throw new Error("The temporary conversation could not be claimed.");
+          }
           const expected = latchRef.current?.take();
           if (expected) {
             const claimedAction = claimed.pending_action;
@@ -121,7 +123,7 @@ export function useGuestConversion({
       const actionLatch = latchRef.current;
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
-      handoffIdRef.current = null;
+      handoffPreparedRef.current = false;
       if (action) {
         await onResume(action);
       }

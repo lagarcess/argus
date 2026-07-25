@@ -5,10 +5,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from argus.api.app_setup import cors_allow_origins
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
+from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import GuestFunnelClientEventRequest, SuccessResponse, User
 from argus.observability.guest_funnel import capture_guest_funnel_event
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
+GUEST_EVENT_ATTEMPT_LIMIT = 20
+_GUEST_EVENT_WINDOW_SECONDS = 10 * 60
+_GUEST_EVENT_LIMITER = SlidingWindowLimiter()
+
+
+def reset_guest_event_limiter_for_tests() -> None:
+    _GUEST_EVENT_LIMITER.reset()
 
 
 @router.post("/analytics/guest-events", response_model=SuccessResponse)
@@ -34,6 +42,20 @@ def guest_funnel_event(
             code="guest_account_required",
             title="Guest Session Required",
             detail="This event is available only for a verified guest session.",
+        )
+    retry_after = _GUEST_EVENT_LIMITER.record_or_retry_after(
+        keys=(f"guest-event:user:{user.id}",),
+        limit=GUEST_EVENT_ATTEMPT_LIMIT,
+        window_seconds=_GUEST_EVENT_WINDOW_SECONDS,
+    )
+    if retry_after is not None:
+        raise problem(
+            request,
+            status_code=429,
+            code="too_many_requests",
+            title="Too Many Requests",
+            detail="Too many guest analytics events. Please wait before trying again.",
+            headers={"Retry-After": str(retry_after)},
         )
     background_tasks.add_task(
         capture_guest_funnel_event,

@@ -394,7 +394,7 @@ def test_cleanup_dry_run_and_real_run_share_transition_grace_predicate() -> None
         connection.rollback()
 
 
-def test_cleanup_marks_expired_before_removing_conversation_graph() -> None:
+def test_cleanup_removes_expired_identity_after_conversation_graph() -> None:
     with _connect() as connection:
         guest = _seed_expired_guest(connection)
         with connection.cursor() as cursor:
@@ -407,13 +407,10 @@ def test_cleanup_marks_expired_before_removing_conversation_graph() -> None:
         assert rows == [(guest["user_id"], guest["conversation_id"])]
         with connection.cursor() as cursor:
             cursor.execute(
-                "select status, conversation_id from public.guest_workspaces"
-                " where user_id = %s",
+                "select count(*) from public.guest_workspaces" " where user_id = %s",
                 (guest["user_id"],),
             )
-            status, conversation_id = cursor.fetchone()
-            assert status == "expired"
-            assert conversation_id is None
+            assert cursor.fetchone()[0] == 0
             cursor.execute(
                 "select count(*) from public.conversations where id = %s",
                 (guest["conversation_id"],),
@@ -429,7 +426,85 @@ def test_cleanup_marks_expired_before_removing_conversation_graph() -> None:
                 (guest["user_id"],),
             )
             assert cursor.fetchone()[0] == 0
-            cursor.execute("delete from auth.users where id = %s", (guest["user_id"],))
+            cursor.execute(
+                "select count(*) from auth.users where id = %s",
+                (guest["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+
+
+def test_cleanup_deletes_expired_auth_identity_inside_the_database_claim() -> None:
+    with _connect() as connection:
+        guest = _seed_expired_guest(connection)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select user_id::text, conversation_id::text, auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(25, false)",
+            )
+            rows = cursor.fetchall()
+            selected = next(row for row in rows if row[0] == guest["user_id"])
+            assert selected == (
+                guest["user_id"],
+                guest["conversation_id"],
+                True,
+                "expired_workspace",
+            )
+            cursor.execute(
+                "select count(*) from auth.users where id = %s",
+                (guest["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+
+
+def test_cleanup_removes_claimed_source_identity_without_destination_graph() -> None:
+    with _connect() as connection:
+        source = _seed_expired_guest(connection)
+        destination_user_id = str(uuid.uuid4())
+        destination_email = f"destination-{destination_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (destination_user_id, destination_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (destination_user_id, destination_email),
+            )
+            cursor.execute(
+                "update public.conversations set user_id=%s where id=%s",
+                (destination_user_id, source["conversation_id"]),
+            )
+            cursor.execute(
+                "update public.messages set user_id=%s where conversation_id=%s",
+                (destination_user_id, source["conversation_id"]),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set status='claimed',claimed_by=%s,claimed_at=now()-interval '20 minutes',"
+                " updated_at=now()-interval '20 minutes'"
+                " where user_id=%s",
+                (destination_user_id, source["user_id"]),
+            )
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(25,false)",
+            )
+            selected = next(
+                row for row in cursor.fetchall() if row[0] == source["user_id"]
+            )
+            assert selected == (source["user_id"], True, "claimed_identity")
+            cursor.execute(
+                "select user_id::text from public.conversations where id=%s",
+                (source["conversation_id"],),
+            )
+            assert cursor.fetchone()[0] == destination_user_id
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (source["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+            cursor.execute("delete from auth.users where id=%s", (destination_user_id,))
 
 
 def test_cleanup_removes_conversation_checkpoint_graph() -> None:
@@ -497,9 +572,36 @@ def test_cleanup_cannot_select_a_converted_or_permanent_account() -> None:
                 (guest["user_id"],),
             )
             status, conversation_id = cursor.fetchone()
-            assert status == "active"
+            assert status == "claimed"
             assert str(conversation_id) == guest["conversation_id"]
             cursor.execute("delete from auth.users where id = %s", (guest["user_id"],))
+
+
+def test_auth_identity_link_finalizes_profile_and_workspace_in_auth_transaction() -> None:
+    with _connect() as connection:
+        guest = _seed_expired_guest(connection)
+        verified_email = f"linked-{guest['user_id'][:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update auth.users set is_anonymous=false,email=%s where id=%s",
+                (verified_email, guest["user_id"]),
+            )
+            cursor.execute(
+                "select email from public.profiles where id=%s",
+                (guest["user_id"],),
+            )
+            assert cursor.fetchone()[0] == verified_email
+            cursor.execute(
+                "select status,claimed_by::text,claimed_at is not null"
+                " from public.guest_workspaces where user_id=%s",
+                (guest["user_id"],),
+            )
+            assert cursor.fetchone() == ("claimed", guest["user_id"], True)
+            cursor.execute(
+                "select user_id::text from public.claim_expired_guest_workspaces(25,false)",
+            )
+            assert guest["user_id"] not in {row[0] for row in cursor.fetchall()}
+            cursor.execute("delete from auth.users where id=%s", (guest["user_id"],))
 
 
 def test_concurrent_cleanup_claims_each_guest_at_most_once() -> None:
