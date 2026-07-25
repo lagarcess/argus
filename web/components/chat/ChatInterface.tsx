@@ -79,6 +79,7 @@ import {
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   coverageRecoveryActionsFromMetadata,
+  noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
   visibleComposerResponseActions,
   unsupportedStrategyActionsFromMetadata,
@@ -1374,6 +1375,9 @@ export default function ChatInterface() {
         const finalCoverageActions = finalMessageId
           ? coverageRecoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
+        const finalNoProgressActions = finalMessageId
+          ? noProgressActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
         const finalUnsupportedTimeframeActions = finalMessageId
           ? unsupportedTimeframeActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1388,6 +1392,7 @@ export default function ChatInterface() {
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalTextActions = [
           ...finalCoverageActions,
+          ...finalNoProgressActions,
           ...finalUnsupportedTimeframeActions,
           ...finalUnsupportedStrategyActions,
           ...finalRetryActions,
@@ -1488,6 +1493,7 @@ export default function ChatInterface() {
           setInputActions(
             visibleComposerResponseActions([
               ...finalCoverageActions,
+              ...finalNoProgressActions,
               ...finalUnsupportedTimeframeActions,
               ...finalUnsupportedStrategyActions,
             ]),

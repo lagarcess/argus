@@ -3,6 +3,7 @@ import type { ChatActionOption } from "@/components/chat/types";
 import { visibleComposerActions } from "@/lib/chat-action-ownership";
 
 const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
+const NO_PROGRESS_ACTION_ID_PREFIX = "no-progress-";
 
 export type RecoveryDisplay =
   | {
@@ -315,6 +316,70 @@ export function coverageRecoveryActionsFromMetadata(
   });
 }
 
+export function noProgressActionsFromMetadata(
+  metadata: Record<string, unknown>,
+  sourceAssistantId: string,
+): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
+  const rootIntent = recordOrNull(metadata.response_intent);
+  const pendingIntent = recordOrNull(
+    recordOrNull(metadata.pending_strategy)?.response_intent,
+  );
+  if (
+    rootIntent &&
+    pendingIntent &&
+    canonicalJson(rootIntent) !== canonicalJson(pendingIntent)
+  ) {
+    return [];
+  }
+  const intent = rootIntent ?? pendingIntent;
+  const facts = recordOrNull(intent?.facts);
+  if (
+    stringOrNull(intent?.kind) !== "clarification" ||
+    stringOrNull(facts?.progress_outcome) !== "no_progress"
+  ) {
+    return [];
+  }
+  const requestedFields = new Set(stringArrayOrNull(intent?.requested_fields) ?? []);
+  const options = Array.isArray(intent?.options) ? intent.options : [];
+  const seen = new Set<string>();
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const optionId = stringOrNull(option?.id);
+    const label = stringOrNull(option?.label);
+    const replacementValues = recordOrNull(option?.replacement_values);
+    if (
+      !optionId ||
+      !label ||
+      !replacementValues ||
+      seen.has(optionId) ||
+      !isAllowedNoProgressReplacement(
+        optionId,
+        replacementValues,
+        requestedFields,
+      )
+    ) {
+      return [];
+    }
+    seen.add(optionId);
+    return [
+      {
+        id: `no-progress-${optionId.replaceAll("_", "-")}`,
+        label,
+        labelKey: `chat.clarification.no_progress_actions.${optionId}`,
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: sourceAssistantId,
+          option_id: optionId,
+          replacement_values: replacementValues,
+        },
+      },
+    ];
+  });
+}
+
 export function unsupportedTimeframeActionsFromMetadata(
   metadata: Record<string, unknown>,
   sourceAssistantId: string,
@@ -444,11 +509,20 @@ function isUnsupportedStrategyResponseAction(action: ChatActionOption): boolean 
   );
 }
 
+function isNoProgressResponseAction(action: ChatActionOption): boolean {
+  return (
+    action.type === "select_response_option" &&
+    Boolean(action.id?.startsWith(NO_PROGRESS_ACTION_ID_PREFIX))
+  );
+}
+
 export function visibleComposerResponseActions(
   actions: ChatActionOption[],
 ): ChatActionOption[] {
   return visibleComposerActions(actions).filter(
-    (action) => !isUnsupportedStrategyResponseAction(action),
+    (action) =>
+      !isUnsupportedStrategyResponseAction(action) &&
+      !isNoProgressResponseAction(action),
   );
 }
 
@@ -592,6 +666,42 @@ function looksLikeInternalCode(value: string): boolean {
     value === value.toLowerCase() &&
     !/\s/.test(value)
   );
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  const record = recordOrNull(value);
+  if (record) {
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function isAllowedNoProgressReplacement(
+  optionId: string,
+  values: Record<string, unknown>,
+  requestedFields: ReadonlySet<string>,
+): boolean {
+  const keys = Object.keys(values);
+  if (optionId === "supply_missing_value") {
+    const requestedField = stringOrNull(values.requested_field);
+    return (
+      keys.length === 1 &&
+      Boolean(requestedField && requestedFields.has(requestedField))
+    );
+  }
+  if (optionId === "keep_unchanged" || optionId === "cancel") {
+    return (
+      keys.length === 1 &&
+      stringOrNull(values.no_progress_action) === optionId
+    );
+  }
+  return false;
 }
 
 function optionDisplayText(

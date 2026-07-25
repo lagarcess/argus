@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   coverageRecoveryActionsFromMetadata,
+  noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
   unsupportedStrategyActionsFromMetadata,
@@ -52,6 +53,127 @@ function flattenedKeys(value: unknown, prefix = ""): string[] {
 }
 
 describe("chat recovery display", () => {
+  test("hydrates only the safe typed no-progress choices", () => {
+    const metadata = {
+      response_intent: {
+        kind: "clarification",
+        facts: { progress_outcome: "no_progress" },
+        requested_fields: ["date_range"],
+        options: [
+          {
+            id: "supply_missing_value",
+            label: "Provide the missing value",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "keep_unchanged",
+            label: "Keep the idea unchanged",
+            replacement_values: { no_progress_action: "keep_unchanged" },
+          },
+          {
+            id: "cancel",
+            label: "Cancel this flow",
+            replacement_values: { no_progress_action: "cancel" },
+          },
+          {
+            id: "unsafe",
+            label: "Run it anyway",
+            replacement_values: { run_backtest: true },
+          },
+        ],
+      },
+    };
+
+    expect(
+      noProgressActionsFromMetadata(metadata, "assistant-no-progress"),
+    ).toEqual([
+      {
+        id: "no-progress-supply-missing-value",
+        label: "Provide the missing value",
+        labelKey:
+          "chat.clarification.no_progress_actions.supply_missing_value",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "supply_missing_value",
+          replacement_values: { requested_field: "date_range" },
+        },
+      },
+      {
+        id: "no-progress-keep-unchanged",
+        label: "Keep the idea unchanged",
+        labelKey: "chat.clarification.no_progress_actions.keep_unchanged",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "keep_unchanged",
+          replacement_values: { no_progress_action: "keep_unchanged" },
+        },
+      },
+      {
+        id: "no-progress-cancel",
+        label: "Cancel this flow",
+        labelKey: "chat.clarification.no_progress_actions.cancel",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "cancel",
+          replacement_values: { no_progress_action: "cancel" },
+        },
+      },
+    ]);
+  });
+
+  test("fails closed on conflicting or malformed no-progress metadata", () => {
+    const validIntent = {
+      kind: "clarification",
+      facts: { progress_outcome: "no_progress" },
+      requested_fields: ["date_range"],
+      options: [
+        {
+          id: "supply_missing_value",
+          label: "Provide the missing value",
+          replacement_values: { requested_field: "date_range" },
+        },
+      ],
+    };
+
+    expect(
+      noProgressActionsFromMetadata(
+        {
+          response_intent: validIntent,
+          pending_strategy: {
+            response_intent: {
+              ...validIntent,
+              requested_fields: ["asset_universe"],
+            },
+          },
+        },
+        "assistant-no-progress",
+      ),
+    ).toEqual([]);
+    expect(
+      noProgressActionsFromMetadata(
+        {
+          response_intent: {
+            ...validIntent,
+            options: [
+              {
+                id: "supply_missing_value",
+                label: "Provide the missing value",
+                replacement_values: {
+                  requested_field: "date_range",
+                  run_backtest: true,
+                },
+              },
+            ],
+          },
+        },
+        "assistant-no-progress",
+      ),
+    ).toEqual([]);
+  });
+
   test("renders recovery codes through locale catalogs", () => {
     const display = recoveryDisplayFromMetadata({
       recovery: {

@@ -9,6 +9,7 @@ import {
 } from "./chat-retry-actions";
 import {
   coverageRecoveryActionsFromMetadata,
+  noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
@@ -299,6 +300,9 @@ export function hydrateTextMessageFromApi(
   const coverageActions = isAssistant
     ? coverageRecoveryActionsFromMetadata(metadata, message.id)
     : [];
+  const noProgressActions = isAssistant
+    ? noProgressActionsFromMetadata(metadata, message.id)
+    : [];
   const unsupportedTimeframeActions = isAssistant
     ? unsupportedTimeframeActionsFromMetadata(metadata, message.id)
     : [];
@@ -307,6 +311,7 @@ export function hydrateTextMessageFromApi(
     : [];
   const actions = [
     ...coverageActions,
+    ...noProgressActions,
     ...unsupportedTimeframeActions,
     ...unsupportedStrategyActions,
     ...retryActions,

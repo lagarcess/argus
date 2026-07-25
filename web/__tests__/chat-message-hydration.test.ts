@@ -31,6 +31,51 @@ function applyViewMessages(
 }
 
 describe("chat message hydration", () => {
+  test("reload hydrates no-progress choices on their owning assistant", () => {
+    const hydrated = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "assistant-no-progress",
+        content:
+          "I could not resolve that choice without changing your current idea. Choose one of the options below.",
+        metadata: {
+          pending_strategy: {
+            response_intent: {
+              kind: "clarification",
+              facts: { progress_outcome: "no_progress" },
+              requested_fields: ["date_range"],
+              options: [
+                {
+                  id: "supply_missing_value",
+                  label: "Provide the missing value",
+                  replacement_values: { requested_field: "date_range" },
+                },
+                {
+                  id: "keep_unchanged",
+                  label: "Keep the idea unchanged",
+                  replacement_values: {
+                    no_progress_action: "keep_unchanged",
+                  },
+                },
+                {
+                  id: "cancel",
+                  label: "Cancel this flow",
+                  replacement_values: { no_progress_action: "cancel" },
+                },
+              ],
+            },
+          },
+        },
+      }),
+    );
+
+    expect(hydrated.actions?.map((action) => action.id)).toEqual([
+      "no-progress-supply-missing-value",
+      "no-progress-keep-unchanged",
+      "no-progress-cancel",
+    ]);
+    expect(latestInputActions([hydrated])).toEqual([]);
+  });
+
   test("hydrates abandoned recovery on its owning persisted user message", () => {
     const hydrated = hydrateTextMessageFromApi(
       apiMessage({
