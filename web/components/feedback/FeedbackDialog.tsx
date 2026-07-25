@@ -227,7 +227,7 @@ export default function FeedbackDialog({
         : t("feedback.subheading.general", "Share feedback about your Argus experience.");
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
@@ -235,8 +235,8 @@ export default function FeedbackDialog({
         aria-label="Close feedback"
       />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24]">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 px-6 py-6 dark:border-white/5 sm:px-8">
+      <div className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24] sm:max-h-[82dvh]">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 px-5 py-5 dark:border-white/5 sm:px-6">
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-black/45 dark:text-white/45">
               <MessageCircle className="h-4 w-4" />
@@ -261,7 +261,7 @@ export default function FeedbackDialog({
           </button>
         </div>
 
-        <div className="argus-thin-scrollbar flex-1 overflow-y-auto p-6 sm:p-8">
+        <div className="argus-thin-scrollbar flex-1 overflow-y-auto p-5 sm:p-6">
           {isSuccess ? (
             <div className="py-12 text-center">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#5ba897]/10">

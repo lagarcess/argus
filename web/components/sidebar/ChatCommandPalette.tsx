@@ -600,7 +600,7 @@ export default function ChatCommandPalette({
   const footerCount = displayItems.length;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
@@ -609,10 +609,10 @@ export default function ChatCommandPalette({
       />
 
       <div
-        className={`relative flex flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white transition-all duration-300 dark:border-white/10 dark:bg-[#1b1d20] ${
+        className={`relative flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white transition-all duration-300 dark:border-white/10 dark:bg-[#1b1d20] ${
           layoutMode === "expanded"
-            ? "h-[85vh] w-[96vw] max-w-6xl"
-            : "h-[65vh] w-full max-w-lg"
+            ? "h-[78dvh] w-[94vw] max-w-6xl"
+            : "h-[60dvh] w-full max-w-lg"
         }`}
       >
         <div className="flex items-center gap-3 border-b border-black/5 px-5 py-3.5 dark:border-white/5">
