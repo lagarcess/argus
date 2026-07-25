@@ -10,7 +10,6 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _active_strategy_from_snapshot,
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (
-    _field_base,
     _selected_requested_field,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -22,7 +21,10 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
 )
 from argus.agent_runtime.strategy_contract import has_partial_explicit_date_range
-from argus.nlp.natural_time import resolve_date_range_text
+from argus.nlp.natural_time import (
+    resolve_date_range_intent,
+    resolve_date_range_text,
+)
 
 _DATE_RANGE_EVIDENCE_KEYS = (
     "date_range",
@@ -155,6 +157,15 @@ def _pending_date_claim_is_explicitly_owned(
             candidate_endpoints = _date_range_endpoints(resolved_candidate.payload)
     if candidate_endpoints is None:
         return False
+    resolved_message = resolve_date_range_text(
+        current_user_message,
+        languages=("en", "es"),
+    )
+    if (
+        resolved_message is not None
+        and _date_range_endpoints(resolved_message.payload) == candidate_endpoints
+    ):
+        return True
     if isinstance(intent, dict):
         evidence = str(intent.get("evidence") or "").strip()
         if evidence and evidence.casefold() in current_message:
@@ -169,6 +180,8 @@ def _pending_date_claim_is_explicitly_owned(
                 str(intent.get("start") or ""),
                 str(intent.get("end") or ""),
             ):
+                return True
+            if resolve_date_range_intent(intent) is not None:
                 return True
     for evidence in _strategy_date_evidence_candidates(strategy):
         normalized_evidence = evidence.strip().casefold()
@@ -278,9 +291,7 @@ def _pending_date_edit_reuses_prior_date_range(
         return False
     if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
         return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return False
     prior = _active_strategy_from_snapshot(snapshot)

@@ -252,6 +252,7 @@ from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
+    _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
     _strategy_supplies_explicit_turn_money,
@@ -1663,10 +1664,10 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
+        return interpretation
+    if "pending_date_answer_unowned_candidate_stripped" in interpretation.reason_codes:
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
@@ -1718,9 +1719,7 @@ def _repair_pending_date_answer_noop_from_current_message(
         return interpretation
     if interpretation.requires_clarification:
         return interpretation
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")

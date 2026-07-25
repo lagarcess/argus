@@ -11,7 +11,9 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
 from argus.agent_runtime.stages.interpret_internal.date_contract import (
     _date_range_endpoints,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import _field_base
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _selected_requested_field,
+)
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
 from argus.agent_runtime.strategy_contract import (
@@ -41,9 +43,7 @@ def pending_date_answer_interpretation(
         "misrouted the pending-field answer."
     ),
 ) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
