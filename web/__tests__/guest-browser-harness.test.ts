@@ -14,6 +14,7 @@ import {
   latestResultFacts,
   productFailedRequestsForCheck,
   resultTruthStayedStable,
+  strictUtcTimestampsEqual,
   type ConfirmationFacts,
   type PersistedMessageItem,
 } from "../e2e/support/guest-qa";
@@ -68,6 +69,41 @@ const refined = confirmationMessage(
   "confirmation-refined",
   "MSFT",
 );
+
+describe("guest QA strict UTC timestamp comparison", () => {
+  test("treats API and Postgres UTC encodings of the same microsecond as equal", () => {
+    expect(
+      strictUtcTimestampsEqual(
+        "2026-08-01T08:03:09.708198Z",
+        "2026-08-01 08:03:09.708198+00",
+      ),
+    ).toBe(true);
+  });
+
+  test("rejects a real one-microsecond difference", () => {
+    expect(
+      strictUtcTimestampsEqual(
+        "2026-08-01T08:03:09.708198Z",
+        "2026-08-01 08:03:09.708199+00",
+      ),
+    ).toBe(false);
+  });
+
+  test("fails closed for invalid timestamps and non-UTC offsets", () => {
+    expect(
+      strictUtcTimestampsEqual(
+        "not-a-timestamp",
+        "2026-08-01T08:03:09.708198Z",
+      ),
+    ).toBe(false);
+    expect(
+      strictUtcTimestampsEqual(
+        "2026-08-01T09:03:09.708198+01:00",
+        "2026-08-01T08:03:09.708198Z",
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("guest Check 4 confirmation selection", () => {
   test("rejects a stale confirmation while waiting for a distinct artifact", () => {

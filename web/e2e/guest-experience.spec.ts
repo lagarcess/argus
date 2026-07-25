@@ -46,6 +46,7 @@ import {
   sameGraphIds,
   seedClaimGraphFromConversation,
   seedDurableRetryableFailure,
+  strictUtcTimestampsEqual,
   waitForMe,
   workspaceFacts,
   writeEvidence,
@@ -689,7 +690,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await expect(card.getByTestId("result-equity-chart")).toBeVisible();
       await expect(card.getByText("MSFT", { exact: true })).toBeVisible();
       await expect(card.getByText(/Simulation Complete/i)).toBeVisible();
-      expect(database.expires_at).toBe(primaryExpiry);
+      expect(
+        strictUtcTimestampsEqual(database.expires_at, primaryExpiry),
+      ).toBe(true);
       await expect(page.getByTestId("guest-legal-after_message")).toBeVisible();
       await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
       evidence.simulation_usage_matches = true;

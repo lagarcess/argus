@@ -24,6 +24,64 @@ const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const STRICT_UTC_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(?:Z|\+00(?::?00)?)$/;
+
+function canonicalStrictUtcTimestamp(
+  value: string | null | undefined,
+): string | null {
+  if (typeof value !== "string") return null;
+  const match = STRICT_UTC_TIMESTAMP_PATTERN.exec(value);
+  if (!match) return null;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] =
+    match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return null;
+  }
+
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ][month - 1];
+  if (day < 1 || day > daysInMonth) return null;
+
+  const microseconds = (match[7] ?? "").padEnd(6, "0");
+  return `${yearText}-${monthText}-${dayText}T${hourText}:${minuteText}:${secondText}.${microseconds}Z`;
+}
+
+export function strictUtcTimestampsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const canonicalLeft = canonicalStrictUtcTimestamp(left);
+  const canonicalRight = canonicalStrictUtcTimestamp(right);
+  return canonicalLeft !== null && canonicalLeft === canonicalRight;
+}
 
 export const GUEST_ACCEPTANCE_CHECKS = [
   { number: 1, title: "Public entry opens chat without login" },
