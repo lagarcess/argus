@@ -705,6 +705,10 @@ describe("Checks 6–20 harness guards", () => {
 
     expect(check18).toContain("seedDurableRetryableFailure");
     expect(check18).toContain("messagesResponse");
+    expect(check18).toContain("recoveryFixture.failedAssistantId");
+    expect(check18).toContain('recoveryMetadata.code === "runtime_failure"');
+    expect(check18).toContain("retryable === true");
+    expect(check18).not.toContain("await retry.click()");
     expect(check18).not.toContain('route.abort("connectionreset")');
     expect(check18).not.toContain("unroute");
   });

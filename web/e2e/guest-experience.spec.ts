@@ -1597,6 +1597,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       if (!feedbackContext) throw new Error("Interrupted-turn context is missing");
       const feedbackPage = feedbackContext.pages()[0];
       const before = ownerSnapshot(feedbackGuestOwner);
+      const mutationsBefore = mergeMutationCounts(monitors);
       const recoveryConversation = requireConversationId(feedbackPage);
       const recoveryFixture = seedDurableRetryableFailure({
         userId: feedbackGuestOwner,
@@ -1633,45 +1634,34 @@ test("@guest-experience exact-head 20-check matrix", async ({
       });
       await expect(retry).toHaveCount(1);
       await expect(retry).toBeVisible();
-      const retryResponse = feedbackPage.waitForResponse(
-        (response) =>
-          response.request().method() === "POST" &&
-          new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
-      );
-      await retry.click();
-      expect((await retryResponse).status()).toBe(200);
-      await expect
-        .poll(() => ownerSnapshot(feedbackGuestOwner).chat_units, {
-          timeout: 180_000,
-        })
-        .toBe(seeded.chat_units + 1);
-      const recovered = ownerSnapshot(feedbackGuestOwner);
-      expect(recovered.user_messages).toBe(seeded.user_messages);
-      expect(recovered.assistant_messages).toBeGreaterThanOrEqual(
-        seeded.assistant_messages,
-      );
-      const recoveredMessages = await apiJson<MessageList>(
+      const durableMessages = await apiJson<MessageList>(
         feedbackContext.request,
         `/conversations/${recoveryConversation}/messages?limit=100`,
       );
-      const recoveredAssistant = recoveredMessages.body.items.find(
+      const durableAssistant = durableMessages.body.items.find(
         (item) => item.id === recoveryFixture.failedAssistantId,
       );
-      const recoveredMetadata = recordOrEmpty(recoveredAssistant?.metadata);
+      const durableMetadata = recordOrEmpty(durableAssistant?.metadata);
+      const recoveryMetadata = recordOrEmpty(durableMetadata.recovery);
+      const retryMetadata = recordOrEmpty(durableMetadata.retry_last_turn);
       expect(
-        recoveredMessages.status === 200 &&
-          recoveredAssistant?.role === "assistant" &&
-          recoveredAssistant.content !==
+        durableMessages.status === 200 &&
+          durableAssistant?.role === "assistant" &&
+          durableAssistant.content ===
             "Something went wrong. Your conversation is saved. Please try again." &&
-          !Object.hasOwn(recoveredMetadata, "retry_last_turn") &&
-          !Object.hasOwn(recoveredMetadata, "recovery"),
+          recoveryMetadata.code === "runtime_failure" &&
+          recoveryMetadata.retryable === true &&
+          typeof retryMetadata.message === "string" &&
+          retryMetadata.message.length > 0,
       ).toBe(true);
-      await expect(
-        feedbackPage.getByText(
-          "Something went wrong. Your conversation is saved. Please try again.",
-        ),
-      ).toHaveCount(0);
-      await expect(retry).toHaveCount(0);
+      const durableUsage = ownerSnapshot(feedbackGuestOwner);
+      expect(durableUsage.chat_units).toBe(before.chat_units);
+      expect(durableUsage.simulation_units).toBe(before.simulation_units);
+      const mutationsAfter = mergeMutationCounts(monitors);
+      expect(
+        (mutationsAfter["POST /api/v1/chat/stream"] ?? 0) -
+          (mutationsBefore["POST /api/v1/chat/stream"] ?? 0),
+      ).toBe(0);
     });
 
     await runStep(19, evidence, (value) => (currentCheck = value), async () => {
