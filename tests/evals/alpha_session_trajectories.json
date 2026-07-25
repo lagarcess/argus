@@ -10,12 +10,10 @@
       "tags": ["canonical_edit", "stale_action"],
       "expected_fail": {
         "issue": "#238",
-        "reason": "Atomic canonical edit ownership must land before this trajectory can close green.",
+        "reason": "The stale-action transport fallback still omits the canonical stage outcome and reports the wrong typed outcome.",
         "allowed_failures": [
-          {"step_id": "alpha_session_01:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_01:step:2", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_01:step:3", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_01:step:3", "prefix": "stale_action:"}
+          {"step_id": "alpha_session_01:step:3", "prefix": "stage_outcome:"},
+          {"step_id": "alpha_session_01:step:3", "prefix": "sse:"}
         ]
       },
       "steps": [
@@ -89,25 +87,6 @@
       "locale": "es-419",
       "purpose": "End an ambiguous Spanish turn within one bounded route and preserve typed recovery.",
       "tags": ["spanish", "turn_budget", "fingerprint"],
-      "expected_fail": {
-        "issue": "#239",
-        "reason": "The turn-wide deadline and semantic-loop terminal contract is owned by issue 239.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_02:step:1", "prefix": "budget.calls:"},
-          {"step_id": "alpha_session_02:step:1", "prefix": "budget.cost:"},
-          {"step_id": "alpha_session_02:step:1", "prefix": "budget.latency:"},
-          {"step_id": "alpha_session_02:step:1", "prefix": "fingerprint:"},
-          {"step_id": "alpha_session_02:step:1", "prefix": "terminal:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "budget.calls:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "budget.cost:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "budget.latency:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "fingerprint:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "terminal:"},
-          {"step_id": "alpha_session_02:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_02:step:3", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_02:step:4", "prefix": "artifact_identity:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
@@ -162,9 +141,7 @@
         "reason": "Typed capability and discovery ownership must land before this route is authoritative.",
         "allowed_failures": [
           {"step_id": "alpha_session_03:step:1", "prefix": "capability_route:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "capability_route:"},
-          {"step_id": "alpha_session_03:step:3", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_03:step:4", "prefix": "artifact_identity:"}
+          {"step_id": "alpha_session_03:step:2", "prefix": "capability_route:"}
         ]
       },
       "steps": [
@@ -218,14 +195,10 @@
         "reason": "Requested-versus-effective window truth is owned by issue 251.",
         "allowed_failures": [
           {"step_id": "alpha_session_04:step:1", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:1", "prefix": "artifact_identity:"},
           {"step_id": "alpha_session_04:step:2", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:2", "prefix": "artifact_identity:"},
           {"step_id": "alpha_session_04:step:3", "prefix": "effective_window:"},
           {"step_id": "alpha_session_04:step:3", "prefix": "persistence:"},
-          {"step_id": "alpha_session_04:step:4", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:4", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_04:step:4", "prefix": "reload:"}
+          {"step_id": "alpha_session_04:step:4", "prefix": "effective_window:"}
         ]
       },
       "steps": [
@@ -290,26 +263,6 @@
       "locale": "en",
       "purpose": "Reconcile an accepted Run after transport loss without inventing failure or duplicating execution.",
       "tags": ["run_action", "disconnect", "reload_reconciliation"],
-      "expected_fail": {
-        "issue": "#242",
-        "reason": "Ambiguous Run reconciliation is owned by issue 242 after admission and polling land.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_05:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_05:step:2", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_05:step:2", "prefix": "by_action:"},
-          {"step_id": "alpha_session_05:step:3", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_05:step:3", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_05:step:3", "prefix": "reload:"},
-          {"step_id": "alpha_session_05:step:3", "prefix": "by_action:"},
-          {"step_id": "alpha_session_05:step:4", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_05:step:4", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_05:step:4", "prefix": "admission:"},
-          {"step_id": "alpha_session_05:step:4", "prefix": "by_action:"},
-          {"step_id": "alpha_session_05:step:5", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_05:step:5", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_05:step:5", "prefix": "admission:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
@@ -398,24 +351,6 @@
       "locale": "es-419",
       "purpose": "Replay one Spanish Run admission with the same identity and consume one simulation.",
       "tags": ["spanish", "atomic_admission", "idempotency"],
-      "expected_fail": {
-        "issue": "#230",
-        "reason": "Database-owned atomic admission and replay identity are owned by issue 230 after issue 229 approval.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_06:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_06:step:2", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_06:step:2", "prefix": "admission:"},
-          {"step_id": "alpha_session_06:step:3", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_06:step:3", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_06:step:3", "prefix": "admission:"},
-          {"step_id": "alpha_session_06:step:4", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_06:step:4", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_06:step:4", "prefix": "persistence:"},
-          {"step_id": "alpha_session_06:step:5", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_06:step:5", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_06:step:5", "prefix": "admission:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
@@ -492,30 +427,6 @@
       "locale": "en",
       "purpose": "Reconcile a durably accepted turn after disconnect so no orphan stays accepted beyond the approved window.",
       "tags": ["accepted_turn", "disconnect", "orphan_reconciliation"],
-      "expected_fail": {
-        "issue": "#240",
-        "reason": "Durable accepted-turn lifecycle and orphan reconciliation are owned by issue 240 after issue 229 approval.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_07:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_07:step:2", "prefix": "persistence:"},
-          {"step_id": "alpha_session_07:step:2", "prefix": "agent_runtime_turn:"},
-          {"step_id": "alpha_session_07:step:2", "prefix": "orphan_turn:"},
-          {"step_id": "alpha_session_07:step:3", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_07:step:3", "prefix": "persistence:"},
-          {"step_id": "alpha_session_07:step:3", "prefix": "agent_runtime_turn:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "reload:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "recovery:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "terminal:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "agent_runtime_turn:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "retry_last_turn:"},
-          {"step_id": "alpha_session_07:step:4", "prefix": "orphan_turn:"},
-          {"step_id": "alpha_session_07:step:5", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_07:step:5", "prefix": "action_identity:"},
-          {"step_id": "alpha_session_07:step:5", "prefix": "retry_last_turn:"},
-          {"step_id": "alpha_session_07:step:5", "prefix": "orphan_turn:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",

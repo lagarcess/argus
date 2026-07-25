@@ -6,6 +6,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from tests.evals.chat_runtime_eval_harness import (
     ALPHA_TRAJECTORY_PATH,
     StepObservation,
@@ -15,9 +17,19 @@ from tests.evals.chat_runtime_eval_harness import (
     trajectory_scorecard_for_results,
     write_trajectory_scorecard,
 )
+from tests.evals.chat_runtime_trajectory_adapters import ConcreteTrajectoryRuntime
 
 EXPECTED_ALPHA_LABELS = {f"alpha_session_{index:02d}" for index in range(1, 8)}
-EXPECTED_OWNING_ISSUES = {"#230", "#238", "#239", "#240", "#241", "#242", "#251"}
+ISSUE_LABELS = {
+    "#238": "alpha_session_01",
+    "#239": "alpha_session_02",
+    "#241": "alpha_session_03",
+    "#251": "alpha_session_04",
+    "#242": "alpha_session_05",
+    "#230": "alpha_session_06",
+    "#240": "alpha_session_07",
+}
+EXPECTED_UNRESOLVED_ISSUES = {"#238", "#241", "#251"}
 EXPECTED_OPERATIONS = {
     "stream",
     "action",
@@ -26,6 +38,34 @@ EXPECTED_OPERATIONS = {
     "retry",
     "persistence",
 }
+
+
+def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        results = {
+            trajectory.label: run_alpha_trajectory(
+                trajectory=trajectory,
+                adapters=runtime.adapters,
+            )
+            for trajectory in load_alpha_trajectories()
+        }
+
+    assert {label: result.status for label, result in results.items()} == {
+        "alpha_session_01": "expected_failed",
+        "alpha_session_02": "passed",
+        "alpha_session_03": "expected_failed",
+        "alpha_session_04": "expected_failed",
+        "alpha_session_05": "passed",
+        "alpha_session_06": "passed",
+        "alpha_session_07": "passed",
+    }
+    assert all(
+        result.failed_checks
+        for label, result in results.items()
+        if label in {"alpha_session_03", "alpha_session_04"}
+    )
 
 
 def _matching_observation(step: Any) -> StepObservation:
@@ -95,7 +135,7 @@ def _trajectory_for_issue(issue: str) -> Any:
     return next(
         trajectory
         for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue == issue
+        if trajectory.label == ISSUE_LABELS[issue]
     )
 
 
@@ -125,9 +165,11 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
 
     assert {trajectory.label for trajectory in trajectories} == EXPECTED_ALPHA_LABELS
     assert {trajectory.locale for trajectory in trajectories} == {"en", "es-419"}
-    assert {trajectory.expected_fail.issue for trajectory in trajectories} == (
-        EXPECTED_OWNING_ISSUES
-    )
+    assert {
+        trajectory.expected_fail.issue
+        for trajectory in trajectories
+        if trajectory.expected_fail is not None
+    } == EXPECTED_UNRESOLVED_ISSUES
     assert {
         step.operation for trajectory in trajectories for step in trajectory.steps
     } == EXPECTED_OPERATIONS
@@ -156,14 +198,15 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
     for trajectory in trajectories:
         assert trajectory.purpose
         assert len(trajectory.steps) >= 3
-        assert trajectory.expected_fail.reason
-        assert trajectory.expected_fail.allowed_failures
-        assert re.fullmatch(r"#\d+", trajectory.expected_fail.issue)
-        assert all(
-            allowed_failure.step_id.startswith(f"{trajectory.label}:step:")
-            and allowed_failure.prefix.endswith(":")
-            for allowed_failure in trajectory.expected_fail.allowed_failures
-        )
+        if trajectory.expected_fail is not None:
+            assert trajectory.expected_fail.reason
+            assert trajectory.expected_fail.allowed_failures
+            assert re.fullmatch(r"#\d+", trajectory.expected_fail.issue)
+            assert all(
+                allowed_failure.step_id.startswith(f"{trajectory.label}:step:")
+                and allowed_failure.prefix.endswith(":")
+                for allowed_failure in trajectory.expected_fail.allowed_failures
+            )
         assert [step.index for step in trajectory.steps] == list(
             range(1, len(trajectory.steps) + 1)
         )
@@ -172,22 +215,14 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
             for step in trajectory.steps
         )
 
-    data_window = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#251"
-    )
+    data_window = _trajectory_for_issue("#251")
     assert "retail" in data_window.tags
     assert any(
         allowed_failure.prefix == "effective_window:"
         for allowed_failure in data_window.expected_fail.allowed_failures
     )
 
-    orphan_reconciliation = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#240"
-    )
+    orphan_reconciliation = _trajectory_for_issue("#240")
     assert orphan_reconciliation.steps[0].request == {
         "message": "Backtest holding MSFT for the past year."
     }
@@ -357,12 +392,7 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert "runtime_budget_exhausted" not in raw
     assert "asset_discovery_unavailable" not in raw
 
-    contract_neutral_issues = {"#239", "#241"}
-    trajectories = [
-        trajectory
-        for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue in contract_neutral_issues
-    ]
+    trajectories = [_trajectory_for_issue(issue) for issue in ("#239", "#241")]
     for trajectory in trajectories:
         for step in trajectory.steps:
             assert step.expectation.recovery_code is None
@@ -370,19 +400,11 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
                 assert step.expectation.persistence_state is None
                 assert step.expectation.reload_state is None
 
-    budget_retry = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#239"
-    ).steps[1]
+    budget_retry = _trajectory_for_issue("#239").steps[1]
     assert budget_retry.expectation.visible_response_category == "typed_recovery"
     assert budget_retry.expectation.stage_outcome == "ready_to_respond"
 
-    discovery_recovery = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#241"
-    ).steps[0]
+    discovery_recovery = _trajectory_for_issue("#241").steps[0]
     assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
     assert discovery_recovery.expectation.stage_outcome == "needs_clarification"
 
@@ -405,6 +427,8 @@ def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None
     }
 
     for trajectory in load_alpha_trajectories():
+        if trajectory.expected_fail is None:
+            continue
         supported_by_step: dict[str, set[str]] = {}
         for step in trajectory.steps:
             supported = {"stale_action:", "orphan_turn:", "fingerprint:"}
@@ -455,14 +479,14 @@ def test_trajectory_runner_dispatches_every_step_through_typed_adapters() -> Non
         len(result.step_results) == len(trajectory.steps)
         for result, trajectory in zip(results, trajectories, strict=True)
     )
-    assert {result.status for result in results} == {"unexpected_pass"}
+    assert {result.status for result in results} == {"passed", "unexpected_pass"}
+    assert sum(result.status == "passed" for result in results) == 4
+    assert sum(result.status == "unexpected_pass" for result in results) == 3
     assert all(result.failed_checks == () for result in results)
 
 
 def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     first_step = trajectory.steps[0]
     matching = _matching_observation(first_step)
     allowed_failure = replace(
@@ -496,9 +520,7 @@ def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
 
 
 def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     first_step = trajectory.steps[0]
     other_step = trajectory.steps[2]
     assert any(
@@ -535,9 +557,7 @@ def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
 
 
 def test_runner_rejects_disconnect_after_terminal_for_same_submission() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#242"
-    )
+    trajectory = _trajectory_for_issue("#242")
     terminal_step = replace(
         trajectory.steps[0],
         request={
@@ -593,16 +613,12 @@ def test_orphan_recovery_terminal_must_keep_the_same_durable_identity() -> None:
         ),
     )
 
-    assert result.status == "expected_failed"
+    assert result.status == "failed"
     assert any(check.startswith("agent_runtime_turn:") for check in result.failed_checks)
 
 
 def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
-    trajectories = load_alpha_trajectories()
-
-    budget_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#239"
-    )
+    budget_trajectory = _trajectory_for_issue("#239")
     budget_step = budget_trajectory.steps[0]
     budget_observation = replace(
         _matching_observation(budget_step),
@@ -617,12 +633,10 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
             [], overrides={budget_step.step_id: budget_observation}
         ),
     )
-    assert budget_result.status == "expected_failed"
+    assert budget_result.status == "failed"
     assert any(check.startswith("budget.calls:") for check in budget_result.failed_checks)
 
-    stale_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#238"
-    )
+    stale_trajectory = _trajectory_for_issue("#238")
     stale_step = stale_trajectory.steps[2]
     stale_observation = replace(
         _matching_observation(stale_step),
@@ -634,12 +648,10 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
             [], overrides={stale_step.step_id: stale_observation}
         ),
     )
-    assert stale_result.status == "expected_failed"
+    assert stale_result.status == "failed"
     assert any(check.startswith("stale_action:") for check in stale_result.failed_checks)
 
-    orphan_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#240"
-    )
+    orphan_trajectory = _trajectory_for_issue("#240")
     orphan_step = orphan_trajectory.steps[3]
     orphan_observation = replace(
         _matching_observation(orphan_step),
@@ -651,12 +663,10 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
             [], overrides={orphan_step.step_id: orphan_observation}
         ),
     )
-    assert orphan_result.status == "expected_failed"
+    assert orphan_result.status == "failed"
     assert any(check.startswith("orphan_turn:") for check in orphan_result.failed_checks)
 
-    sse_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#251"
-    )
+    sse_trajectory = _trajectory_for_issue("#251")
     sse_step = sse_trajectory.steps[0]
     invalid_sse = replace(
         _matching_observation(sse_step),
@@ -671,9 +681,7 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
 
 
 def test_canonical_sse_requires_framed_stage_sequence() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     matching = _matching_observation(step)
 
@@ -777,9 +785,7 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
 
 def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     matching = _matching_observation(step)
     invalid_events = (
@@ -836,9 +842,7 @@ def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None
 
 
 def test_route_budget_rejects_missing_or_invalid_measurements() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     malformed = replace(
         _matching_observation(step),
@@ -895,10 +899,10 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
 
     assert stored == scorecard | {"generated_at": stored["generated_at"]}
     assert stored["totals"] == {
-        "passed": 0,
+        "passed": 4,
         "failed": 0,
         "expected_failed": 0,
-        "unexpected_pass": 7,
+        "unexpected_pass": 3,
     }
     assert {result["label"] for result in stored["results"]} == EXPECTED_ALPHA_LABELS
     assert all(
