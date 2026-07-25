@@ -900,6 +900,7 @@ def _prepared_market_data_for_request(
             fetch_ohlcv_func=recorder.fetch_ohlcv,
             fetch_market_calendar_func=_market_calendar_for_preflight(),
             approved_coverage=request.coverage_preflight.model_dump(),
+            approved_adjustment_reason=request.coverage_preflight.adjustment_reason,
         )
     except MarketDataCoverageError as exc:
         if exc.code in {"no_common_data_window", "insufficient_common_data"}:
