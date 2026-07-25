@@ -51,6 +51,75 @@ export const GUEST_ACCEPTANCE_CHECKS = [
 export type GuestCheckNumber =
   (typeof GUEST_ACCEPTANCE_CHECKS)[number]["number"];
 
+export type PersistedMessageItem = {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type ConfirmationDateRange = {
+  start: string;
+  end: string;
+};
+
+export type ConfirmationFacts = {
+  messageId: string;
+  confirmationId: string;
+  assetUniverse: string[];
+  benchmark: string;
+  requestedDateRange: ConfirmationDateRange;
+  effectiveDateRange: ConfirmationDateRange;
+};
+
+export type ConfirmationContinuityChecks = {
+  updateMessagePersisted: boolean;
+  assetUniverseExactlyMsft: boolean;
+  benchmarkExactlySpy: boolean;
+  requestedDateRangeUnchanged: boolean;
+  effectiveDateRangeUnchanged: boolean;
+};
+
+export const CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES = {
+  updateMessagePersisted:
+    "The exact Check 4 update message was not durably persisted as a user message",
+  assetUniverseExactlyMsft:
+    'The refined confirmation asset universe must be exactly ["MSFT"]',
+  benchmarkExactlySpy:
+    "The refined confirmation typed benchmark must remain exactly SPY",
+  requestedDateRangeUnchanged:
+    "The refined confirmation requested date range must match the initial request",
+  effectiveDateRangeUnchanged:
+    "The refined confirmation effective canonical date range must remain unchanged",
+} satisfies Record<keyof ConfirmationContinuityChecks, string>;
+
+export type BrowserSafetyPhase = "product" | "teardown";
+
+export type BrowserSafetyContext = {
+  check: GuestCheckNumber | null;
+  phase: BrowserSafetyPhase;
+};
+
+export type BrowserSafetyDetail = {
+  event: "console_error" | "page_error" | "failed_request";
+  component: "browser_console" | "browser_page" | "network";
+  endpoint: string | null;
+  status: number | null;
+  category: string;
+  check: GuestCheckNumber | null;
+  phase: BrowserSafetyPhase;
+};
+
+type SafeConfirmationEvidence = {
+  message_label: string;
+  confirmation_label: string;
+  asset_universe: string[];
+  benchmark: string;
+  requested_date_range: ConfirmationDateRange;
+  effective_date_range: ConfirmationDateRange;
+};
+
 export type GuestMe = {
   account_kind: "guest" | "registered";
   public_account_access_enabled: boolean;
@@ -149,6 +218,8 @@ export type SafeEvidence = {
   owner_labels: string[];
   conversation_labels: string[];
   artifact_labels: string[];
+  check4_initial_confirmation: SafeConfirmationEvidence | null;
+  check4_refined_confirmation: SafeConfirmationEvidence | null;
   simulation_usage_matches: boolean;
   same_uuid_conversion: boolean;
   new_account_resume_count: number;
@@ -165,6 +236,7 @@ export type SafeEvidence = {
   console_error_count: number;
   page_error_count: number;
   failed_request_count: number;
+  browser_safety_details: BrowserSafetyDetail[];
   hosted_write_count: number;
   credential_exposure_count: number;
   provider_cost_usd: number;
@@ -172,6 +244,117 @@ export type SafeEvidence = {
   normalized_mutation_counts: Record<string, number>;
   teardown_clean: boolean;
 };
+
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function requiredDateRange(
+  value: unknown,
+  field: string,
+): ConfirmationDateRange {
+  const record = recordOrEmpty(value);
+  if (
+    typeof record.start !== "string" ||
+    record.start === "" ||
+    typeof record.end !== "string" ||
+    record.end === ""
+  ) {
+    throw new Error(`Canonical confirmation is missing typed ${field}`);
+  }
+  return { start: record.start, end: record.end };
+}
+
+export function latestConfirmationFacts(
+  items: PersistedMessageItem[],
+): ConfirmationFacts {
+  for (const item of [...items].reverse()) {
+    const metadata = recordOrEmpty(item.metadata);
+    const payload = recordOrEmpty(metadata.confirmation_payload);
+    const strategy = recordOrEmpty(payload.strategy);
+    if (Object.keys(strategy).length === 0) continue;
+    const launch = recordOrEmpty(payload.launch_payload);
+    const card = recordOrEmpty(metadata.confirmation_card);
+    const confirmationId = card.confirmation_id;
+    if (typeof confirmationId !== "string" || confirmationId === "") {
+      throw new Error(
+        "Canonical confirmation is missing a typed confirmation id",
+      );
+    }
+    const benchmark = launch.benchmark_symbol;
+    if (typeof benchmark !== "string" || benchmark === "") {
+      throw new Error("Canonical confirmation is missing a typed benchmark");
+    }
+    const assetUniverse = Array.isArray(strategy.asset_universe)
+      ? strategy.asset_universe.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+    return {
+      messageId: item.id,
+      confirmationId,
+      assetUniverse,
+      benchmark,
+      requestedDateRange: requiredDateRange(
+        launch.requested_date_range,
+        "requested date range",
+      ),
+      effectiveDateRange: requiredDateRange(
+        strategy.date_range,
+        "effective canonical date range",
+      ),
+    };
+  }
+  throw new Error("A canonical confirmation artifact was not persisted");
+}
+
+export function distinctConfirmationFacts(
+  items: PersistedMessageItem[],
+  initial: Pick<ConfirmationFacts, "messageId" | "confirmationId">,
+): ConfirmationFacts | null {
+  const latest = latestConfirmationFacts(items);
+  if (
+    latest.messageId === initial.messageId ||
+    latest.confirmationId === initial.confirmationId
+  ) {
+    return null;
+  }
+  return latest;
+}
+
+function sameDateRange(
+  left: ConfirmationDateRange,
+  right: ConfirmationDateRange,
+): boolean {
+  return left.start === right.start && left.end === right.end;
+}
+
+export function confirmationContinuityChecks(
+  initial: ConfirmationFacts,
+  refined: ConfirmationFacts,
+  items: PersistedMessageItem[],
+  updateMessage: string,
+): ConfirmationContinuityChecks {
+  return {
+    updateMessagePersisted: items.some(
+      (item) => item.role === "user" && item.content === updateMessage,
+    ),
+    assetUniverseExactlyMsft:
+      refined.assetUniverse.length === 1 &&
+      refined.assetUniverse[0] === "MSFT",
+    benchmarkExactlySpy: refined.benchmark === "SPY",
+    requestedDateRangeUnchanged: sameDateRange(
+      refined.requestedDateRange,
+      initial.requestedDateRange,
+    ),
+    effectiveDateRangeUnchanged: sameDateRange(
+      refined.effectiveDateRange,
+      initial.effectiveDateRange,
+    ),
+  };
+}
 
 type DisposableIdentity = {
   userId: string;
@@ -1026,9 +1209,93 @@ export function evidenceLabel(namespace: string, value: string): string {
     .slice(0, 20);
 }
 
+export function safeConfirmationEvidence(
+  facts: ConfirmationFacts,
+): SafeConfirmationEvidence {
+  return {
+    message_label: evidenceLabel("message", facts.messageId),
+    confirmation_label: evidenceLabel("confirmation", facts.confirmationId),
+    asset_universe: [...facts.assetUniverse],
+    benchmark: facts.benchmark,
+    requested_date_range: { ...facts.requestedDateRange },
+    effective_date_range: { ...facts.effectiveDateRange },
+  };
+}
+
 export function normalizeRoute(rawUrl: string): string {
   const url = new URL(rawUrl);
   return url.pathname.replace(UUID_PATTERN, ":id");
+}
+
+function sanitizedEndpoint(rawUrl: string, method: string): string {
+  let route = "unknown";
+  try {
+    route = normalizeRoute(rawUrl)
+      .replace(EMAIL_PATTERN, ":redacted")
+      .replace(JWT_PATTERN, ":redacted");
+  } catch {
+    route = "unknown";
+  } finally {
+    UUID_PATTERN.lastIndex = 0;
+    EMAIL_PATTERN.lastIndex = 0;
+    JWT_PATTERN.lastIndex = 0;
+  }
+  return `${method.toUpperCase()} ${route}`;
+}
+
+function browserErrorCategory(
+  event: BrowserSafetyDetail["event"],
+  rawError: string,
+): string {
+  const value = rawError.toLowerCase();
+  if (
+    value.includes("err_connection_refused") ||
+    value.includes("connection refused")
+  ) {
+    return "connection_refused";
+  }
+  if (value.includes("err_aborted") || value.includes("abort")) {
+    return "aborted";
+  }
+  if (value.includes("timeout") || value.includes("timed out")) {
+    return "timeout";
+  }
+  if (value.includes("hydration")) return "hydration_error";
+  if (value.includes("fetch") || value.includes("network")) {
+    return "network_error";
+  }
+  return event;
+}
+
+export function browserSafetyDetail(input: {
+  event: BrowserSafetyDetail["event"];
+  rawUrl?: string;
+  method?: string;
+  rawError?: string;
+  status?: number | null;
+  context: BrowserSafetyContext;
+}): BrowserSafetyDetail {
+  const isNetwork = input.event === "failed_request";
+  return {
+    event: input.event,
+    component:
+      input.event === "console_error"
+        ? "browser_console"
+        : input.event === "page_error"
+          ? "browser_page"
+          : "network",
+    endpoint:
+      isNetwork && input.rawUrl
+        ? sanitizedEndpoint(input.rawUrl, input.method ?? "REQUEST")
+        : null,
+    status:
+      typeof input.status === "number" && Number.isInteger(input.status)
+        ? input.status
+        : null,
+    category: browserErrorCategory(input.event, input.rawError ?? ""),
+    check: input.context.check,
+    phase: input.context.phase,
+  };
 }
 
 export class BrowserSafetyMonitor {
@@ -1038,18 +1305,51 @@ export class BrowserSafetyMonitor {
   hostedWrites = 0;
   credentialExposure = 0;
   readonly mutations = new Map<string, number>();
+  private readonly details: BrowserSafetyDetail[] = [];
+
+  constructor(
+    private readonly context: () => BrowserSafetyContext = () => ({
+      check: null,
+      phase: "product",
+    }),
+  ) {}
 
   attach(page: Page): void {
     page.on("console", (message) => {
-      if (message.type() === "error") this.consoleErrors += 1;
+      if (message.type() === "error") {
+        this.consoleErrors += 1;
+        this.details.push(
+          browserSafetyDetail({
+            event: "console_error",
+            rawError: message.text(),
+            context: this.context(),
+          }),
+        );
+      }
       this.scan(message.text());
     });
     page.on("pageerror", (error) => {
       this.pageErrors += 1;
+      this.details.push(
+        browserSafetyDetail({
+          event: "page_error",
+          rawError: error.message,
+          context: this.context(),
+        }),
+      );
       this.scan(error.message);
     });
-    page.on("requestfailed", () => {
+    page.on("requestfailed", (request) => {
       this.failedRequests += 1;
+      this.details.push(
+        browserSafetyDetail({
+          event: "failed_request",
+          rawUrl: request.url(),
+          method: request.method(),
+          rawError: request.failure()?.errorText ?? "",
+          context: this.context(),
+        }),
+      );
     });
     page.on("request", (request) => {
       const url = new URL(request.url());
@@ -1078,6 +1378,10 @@ export class BrowserSafetyMonitor {
 
   mutationSnapshot(): Record<string, number> {
     return Object.fromEntries([...this.mutations.entries()].sort());
+  }
+
+  detailSnapshot(): BrowserSafetyDetail[] {
+    return this.details.map((detail) => ({ ...detail }));
   }
 }
 
@@ -1276,6 +1580,8 @@ export function emptyEvidence(): SafeEvidence {
     owner_labels: [],
     conversation_labels: [],
     artifact_labels: [],
+    check4_initial_confirmation: null,
+    check4_refined_confirmation: null,
     simulation_usage_matches: false,
     same_uuid_conversion: false,
     new_account_resume_count: 0,
@@ -1292,6 +1598,7 @@ export function emptyEvidence(): SafeEvidence {
     console_error_count: 0,
     page_error_count: 0,
     failed_request_count: 0,
+    browser_safety_details: [],
     hosted_write_count: 0,
     credential_exposure_count: 0,
     provider_cost_usd: 0,

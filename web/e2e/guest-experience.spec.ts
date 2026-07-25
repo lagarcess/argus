@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import {
   BackendController,
   BrowserSafetyMonitor,
+  CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES,
   GUEST_ACCEPTANCE_CHECKS,
   apiJson,
   assertExactLocalCandidate,
@@ -9,10 +10,12 @@ import {
   assertZeroState,
   authUserExists,
   cleanupOneExpiredGuest,
+  confirmationContinuityChecks,
   conversationGraph,
   createDisposableRegisteredIdentity,
   decisionTargetsEvidence,
   deleteDisposableIdentity,
+  distinctConfirmationFacts,
   emptyEvidence,
   evidenceLabel,
   feedbackPrivacy,
@@ -20,12 +23,14 @@ import {
   graphDuplicateCount,
   handoffCount,
   handoffState,
+  latestConfirmationFacts,
   markWorkspaceExpired,
   newSignupCredentials,
   ownerSnapshot,
   profileAccountKind,
   purgeDisposableQaEvidence,
   resultSummaryCost,
+  safeConfirmationEvidence,
   safeScreenshot,
   sameGraphIds,
   seedClaimGraphFromConversation,
@@ -33,23 +38,19 @@ import {
   workspaceFacts,
   writeEvidence,
   type ConversationGraph,
+  type ConfirmationFacts,
   type GuestCheckNumber,
   type GuestMe,
   type GuestUsage,
   type OwnerSnapshot,
+  type PersistedMessageItem,
   type SafeEvidence,
 } from "./support/guest-qa";
 
 test.describe.configure({ mode: "serial" });
 
 type MessageList = {
-  items: Array<{
-    id: string;
-    conversation_id: string;
-    role: string;
-    content: string;
-    metadata?: Record<string, unknown>;
-  }>;
+  items: PersistedMessageItem[];
   next_cursor: string | null;
 };
 
@@ -71,44 +72,10 @@ type SearchList = {
   next_cursor: string | null;
 };
 
-type ConfirmationFacts = {
-  assetUniverse: string[];
-  benchmark: string;
-  dateRange: string;
-};
-
 function recordOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function latestConfirmationFacts(items: MessageList["items"]): ConfirmationFacts {
-  for (const item of [...items].reverse()) {
-    const metadata = recordOrEmpty(item.metadata);
-    const payload = recordOrEmpty(metadata.confirmation_payload);
-    const strategy = recordOrEmpty(payload.strategy);
-    const launch = recordOrEmpty(payload.launch_payload);
-    if (Object.keys(strategy).length === 0) continue;
-    const card = recordOrEmpty(metadata.confirmation_card);
-    const assetUniverse = Array.isArray(strategy.asset_universe)
-      ? strategy.asset_universe.filter(
-          (value): value is string => typeof value === "string",
-        )
-      : [];
-    const benchmark =
-      [strategy.benchmark_symbol, launch.benchmark_symbol].find(
-        (value): value is string => typeof value === "string" && value !== "",
-      ) ?? (JSON.stringify(card).includes("SPY") ? "SPY" : "");
-    return {
-      assetUniverse,
-      benchmark,
-      dateRange: JSON.stringify(
-        strategy.date_range ?? launch.date_range ?? null,
-      ),
-    };
-  }
-  throw new Error("A canonical confirmation artifact was not persisted");
 }
 
 function requireConversationId(page: Page): string {
@@ -157,6 +124,10 @@ function mergeMutationCounts(
   return Object.fromEntries([...merged.entries()].sort());
 }
 
+function mergeSafetyDetails(monitors: BrowserSafetyMonitor[]) {
+  return monitors.flatMap((monitor) => monitor.detailSnapshot());
+}
+
 async function runStep(
   number: GuestCheckNumber,
   evidence: SafeEvidence,
@@ -187,6 +158,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
   const monitors: BrowserSafetyMonitor[] = [];
   const disposableUserIds = new Set<string>();
   let currentCheck: GuestCheckNumber | null = null;
+  let safetyPhase: "product" | "teardown" = "product";
 
   let primaryMe: GuestMe | null = null;
   let primaryOwner = "";
@@ -196,6 +168,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
   let primaryEvidenceId = "";
   let postResultSnapshot: OwnerSnapshot | null = null;
   let initialConfirmationFacts: ConfirmationFacts | null = null;
+  let initialConfirmationCardCount = 0;
 
   let claimGuestContext: BrowserContext | null = null;
   let claimGuestPage: Page | null = null;
@@ -210,7 +183,10 @@ test("@guest-experience exact-head 20-check matrix", async ({
   let expectedInterruptedFailures = 0;
 
   const attachMonitor = (target: Page) => {
-    const monitor = new BrowserSafetyMonitor();
+    const monitor = new BrowserSafetyMonitor(() => ({
+      check: currentCheck,
+      phase: safetyPhase,
+    }));
     monitor.attach(target);
     monitors.push(monitor);
     return monitor;
@@ -359,12 +335,15 @@ test("@guest-experience exact-head 20-check matrix", async ({
       );
       expect(messages.status).toBe(200);
       initialConfirmationFacts = latestConfirmationFacts(messages.body.items);
-      expect(
-        initialConfirmationFacts.assetUniverse.length === 1 &&
-          initialConfirmationFacts.assetUniverse[0] === "AAPL" &&
-          initialConfirmationFacts.benchmark === "SPY" &&
-          initialConfirmationFacts.dateRange !== "null",
-      ).toBe(true);
+      expect(initialConfirmationFacts.assetUniverse).toEqual(["AAPL"]);
+      expect(initialConfirmationFacts.benchmark).toBe("SPY");
+      evidence.check4_initial_confirmation = safeConfirmationEvidence(
+        initialConfirmationFacts,
+      );
+      initialConfirmationCardCount = await page
+        .locator("section:has([data-confirmation-status])")
+        .count();
+      expect(initialConfirmationCardCount).toBeGreaterThan(0);
     });
 
     await runStep(4, evidence, (value) => (currentCheck = value), async () => {
@@ -372,29 +351,87 @@ test("@guest-experience exact-head 20-check matrix", async ({
         "Use MSFT instead of AAPL, keeping the 12-month period and SPY benchmark.";
       await page.getByTestId("chat-input").fill(updateMessage);
       await page.getByTestId("chat-send").click();
-      await expect(page.getByText(updateMessage, { exact: true })).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: /Run backtest/i }),
-      ).toBeVisible({ timeout: 180_000 });
-      await expect(page.getByText(/MSFT/i).first()).toBeVisible();
-      await expect(page.getByText(/SPY/i).first()).toBeVisible();
-
-      const messages = await apiJson<MessageList>(
-        page.context().request,
-        `/conversations/${primaryConversation}/messages?limit=100`,
-      );
-      expect(messages.status).toBe(200);
       if (!initialConfirmationFacts) {
         throw new Error("Initial canonical confirmation facts are missing");
       }
-      const latestFacts = latestConfirmationFacts(messages.body.items);
+      const initialFacts = initialConfirmationFacts;
+      const refinedState: {
+        facts: ConfirmationFacts | null;
+        messages: PersistedMessageItem[];
+      } = { facts: null, messages: [] };
+      await expect
+        .poll(
+          async () => {
+            const messages = await apiJson<MessageList>(
+              page.context().request,
+              `/conversations/${primaryConversation}/messages?limit=100`,
+            );
+            if (messages.status !== 200) return false;
+            const distinct = distinctConfirmationFacts(
+              messages.body.items,
+              initialFacts,
+            );
+            if (!distinct) return false;
+            refinedState.facts = distinct;
+            refinedState.messages = messages.body.items;
+            return true;
+          },
+          {
+            message:
+              "A new persisted confirmation must have distinct message and confirmation ids",
+            timeout: 180_000,
+          },
+        )
+        .toBe(true);
+      if (!refinedState.facts) {
+        throw new Error("The refined canonical confirmation was not selected");
+      }
+      const refinedFacts = refinedState.facts;
+      const checks = confirmationContinuityChecks(
+        initialFacts,
+        refinedFacts,
+        refinedState.messages,
+        updateMessage,
+      );
+
       expect(
-        messages.body.items.some((item) => item.content === updateMessage) &&
-          latestFacts.assetUniverse.length === 1 &&
-          latestFacts.assetUniverse[0] === "MSFT" &&
-          latestFacts.benchmark === initialConfirmationFacts.benchmark &&
-          latestFacts.dateRange === initialConfirmationFacts.dateRange,
+        checks.updateMessagePersisted,
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES.updateMessagePersisted,
       ).toBe(true);
+      expect(
+        refinedFacts.assetUniverse,
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES.assetUniverseExactlyMsft,
+      ).toEqual(["MSFT"]);
+      expect(
+        refinedFacts.benchmark,
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES.benchmarkExactlySpy,
+      ).toBe("SPY");
+      expect(
+        refinedFacts.requestedDateRange,
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES.requestedDateRangeUnchanged,
+      ).toEqual(initialFacts.requestedDateRange);
+      expect(
+        refinedFacts.effectiveDateRange,
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES.effectiveDateRangeUnchanged,
+      ).toEqual(initialFacts.effectiveDateRange);
+
+      const confirmationCards = page.locator(
+        "section:has([data-confirmation-status])",
+      );
+      await expect
+        .poll(() => confirmationCards.count(), {
+          message: "The refined confirmation card must render as a new card",
+          timeout: 30_000,
+        })
+        .toBeGreaterThan(initialConfirmationCardCount);
+      const refinedCard = confirmationCards.last();
+      await expect(refinedCard.getByText("MSFT", { exact: true })).toBeVisible();
+      await expect(refinedCard.getByText(/SPY/i)).toBeVisible();
+      await expect(
+        refinedCard.getByRole("button", { name: /Run backtest/i }),
+      ).toBeVisible();
+      evidence.check4_refined_confirmation =
+        safeConfirmationEvidence(refinedFacts);
     });
 
     await runStep(5, evidence, (value) => (currentCheck = value), async () => {
@@ -1132,9 +1169,17 @@ test("@guest-experience exact-head 20-check matrix", async ({
         (total, monitor) => total + monitor.credentialExposure,
         0,
       );
+      const productSafetyDetails = mergeSafetyDetails(monitors).filter(
+        (detail) => detail.phase === "product",
+      );
       expect(consoleErrors).toBe(0);
       expect(pageErrors).toBe(0);
       expect(failedRequests).toBe(expectedInterruptedFailures);
+      expect(
+        productSafetyDetails.filter(
+          (detail) => detail.event === "failed_request",
+        ),
+      ).toHaveLength(expectedInterruptedFailures);
       expect(hostedWrites).toBe(0);
       expect(credentialExposure).toBe(0);
       expect(evidence.cross_owner_result_count).toBe(0);
@@ -1143,6 +1188,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       evidence.console_error_count = consoleErrors;
       evidence.page_error_count = pageErrors;
       evidence.failed_request_count = failedRequests;
+      evidence.browser_safety_details = productSafetyDetails;
       evidence.hosted_write_count = hostedWrites;
       evidence.credential_exposure_count = credentialExposure;
       evidence.normalized_mutation_counts = mergeMutationCounts(monitors);
@@ -1150,6 +1196,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       evidence.status = "passed";
     });
   } finally {
+    safetyPhase = "teardown";
     if (currentCheck !== null) evidence.failure_check = currentCheck;
     const matrixPassed = evidence.status === "passed";
     let teardownFailed = false;
@@ -1205,6 +1252,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       (total, monitor) => total + monitor.failedRequests,
       0,
     );
+    evidence.browser_safety_details = mergeSafetyDetails(monitors);
     evidence.hosted_write_count = monitors.reduce(
       (total, monitor) => total + monitor.hostedWrites,
       0,
