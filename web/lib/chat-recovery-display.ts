@@ -502,6 +502,18 @@ export function unsupportedStrategyActionsFromMetadata(
   });
 }
 
+export function recoveryActionsFromMetadata(
+  metadata: Record<string, unknown>,
+  sourceAssistantId: string,
+): ChatActionOption[] {
+  return [
+    ...coverageRecoveryActionsFromMetadata(metadata, sourceAssistantId),
+    ...noProgressActionsFromMetadata(metadata, sourceAssistantId),
+    ...unsupportedTimeframeActionsFromMetadata(metadata, sourceAssistantId),
+    ...unsupportedStrategyActionsFromMetadata(metadata, sourceAssistantId),
+  ];
+}
+
 function isUnsupportedStrategyResponseAction(action: ChatActionOption): boolean {
   return (
     action.type === "select_response_option" &&

@@ -78,12 +78,9 @@ import {
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
-  coverageRecoveryActionsFromMetadata,
-  noProgressActionsFromMetadata,
+  recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
   visibleComposerResponseActions,
-  unsupportedStrategyActionsFromMetadata,
-  unsupportedTimeframeActionsFromMetadata,
 } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
@@ -1372,17 +1369,8 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
-        const finalCoverageActions = finalMessageId
-          ? coverageRecoveryActionsFromMetadata(finalPayload, finalMessageId)
-          : [];
-        const finalNoProgressActions = finalMessageId
-          ? noProgressActionsFromMetadata(finalPayload, finalMessageId)
-          : [];
-        const finalUnsupportedTimeframeActions = finalMessageId
-          ? unsupportedTimeframeActionsFromMetadata(finalPayload, finalMessageId)
-          : [];
-        const finalUnsupportedStrategyActions = finalMessageId
-          ? unsupportedStrategyActionsFromMetadata(finalPayload, finalMessageId)
+        const finalResponseActions = finalMessageId
+          ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
@@ -1391,10 +1379,7 @@ export default function ChatInterface() {
           }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalTextActions = [
-          ...finalCoverageActions,
-          ...finalNoProgressActions,
-          ...finalUnsupportedTimeframeActions,
-          ...finalUnsupportedStrategyActions,
+          ...finalResponseActions,
           ...finalRetryActions,
         ];
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
@@ -1491,12 +1476,7 @@ export default function ChatInterface() {
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
           setInputActions(
-            visibleComposerResponseActions([
-              ...finalCoverageActions,
-              ...finalNoProgressActions,
-              ...finalUnsupportedTimeframeActions,
-              ...finalUnsupportedStrategyActions,
-            ]),
+            visibleComposerResponseActions(finalResponseActions),
           );
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
