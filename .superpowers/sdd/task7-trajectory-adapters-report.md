@@ -1,113 +1,96 @@
 # Task 7 — Concrete session-trajectory adapters
 
-## Boundary
+## Boundary and checkpoints
 
-- Base: `1ea97afd7fa132d8022c4d0d5ef6f5ddedfdb8d7`
-- Production source changed: none
-- Runtime services, browser, providers, and databases used: none
-- The adapter uses the real FastAPI application with the in-memory test owners.
+- Task base: `1ea97afd7fa132d8022c4d0d5ef6f5ddedfdb8d7`
+- Initial adapter checkpoint: `78d5b7f56f57f11a0bff656dee1857967d72db40`
+- Layer 1 correction parent: `3a82579a7d6ec5340fdf7f36e1da5f6da8ce78d1`
+- Final correction: the commit containing this report; obtain its exact SHA
+  from `git log -1`.
+- External services, live providers, browser automation, and databases: not
+  used by Task 7.
+
+The complete Task 7 range changed the concrete eval adapter and fixtures, the
+stale-card backend redirect, its reload guardrail, and the frontend stale-card
+composition path. It did not change the interpreter, schema, RLS, lifecycle
+vocabulary, provider configuration, or public action contract.
 
 ## Red-before-green evidence
 
-The inherited exact-final test was run before the adapter existed:
+The initial adapter red was:
 
 ```text
 ModuleNotFoundError: No module named tests.evals.chat_runtime_trajectory_adapters
 ```
 
-The first concrete run then exposed:
+The first real-route implementation exposed stale masks and false evidence
+derived from adapter constants rather than production owners. The final review
+correction added adversarial reds that reproduced:
 
-- four trajectories whose issue masks were stale because every hard check passed;
-- the two still-owned `#241` capability-route gaps;
-- the seven still-owned `#251` effective-window/persistence gaps; and
-- one `#238` stale-action fallback mismatch: the production fallback emits the
-  final before a canonical `stage_outcome` and reports `needs_clarification`
-  instead of the fixture's approved `ready_to_respond`.
+- a stale Run job hidden by a persisted-execution constant;
+- a repeated private terminal fingerprint hidden by a constant;
+- duplicate lifecycle identity hidden by a durable-count constant;
+- a mismatched fixture Retry identity accepted without projected authority;
+- nine stale `#239` mask pairs; and
+- missing ChatInterface final-payload composition coverage.
 
-No production behavior was changed to make the trajectory harness pass.
+The backend private stale-card summary assertion was already green at the
+correction parent and confirmed both `progress_outcome` and `terminal` are
+`redirected`.
 
-## Concrete adapter contract
+## Concrete owner evidence
 
-`ConcreteTrajectoryRuntime`:
+`ConcreteTrajectoryRuntime` uses the real FastAPI application, real LangGraph
+workflow, canonical SSE parsing, actual message reload projection, structured
+actions, memory lifecycle rows, memory backtest jobs, usage counters, and
+private persisted execution summaries.
 
-- creates a real conversation per sanitized trajectory through the FastAPI app;
-- submits ordinary turns and structured actions to `/api/v1/chat/stream`;
-- parses the canonical SSE returned by that route;
-- reads persisted messages, lifecycle rows, job admission, usage counters, and
-  route receipts from their real in-memory owners;
-- performs reload through the conversation messages and by-action routes;
-- performs Run admission through the canonical `admit_backtest_job_memory`
-  owner rather than writing job or usage state directly;
-- uses a named clock advance to exercise stale-turn reconciliation;
-- replaces only the external LangGraph event source with deterministic typed
-  payloads and records one typed provider receipt per interpreted turn; and
-- emits only sanitized aliases in observations and scorecards.
+The final adapter is 1,562 lines. Its four former evidence constants now read:
 
-The repeated HTTP/SSE submission and observation paths were collapsed into
-shared helpers. The remaining trajectory-specific branches correspond to
-distinct production owners: stale confirmation admission, response-option
-authority, Run admission/replay, by-action reconciliation, and durable
-ordinary-turn reconciliation. The final adapter is 1,062 lines; no general
-attempt graph, alternate orchestrator, or fixture-only state repair was added.
+- stale execution from the conversation job owner keyed by the stale action;
+- repeated terminal fingerprints from private persisted execution summaries;
+- durable ordinary-turn identity from paired lifecycle and user-message
+  owners; and
+- duplicate Retry attempts from adjacent lifecycle rows with canonical
+  persisted content.
+
+The abandoned-turn Retry remains the founder-approved ordinary-text Retry. The
+adapter derives its request identity and canonical text from the persisted
+reload projection, submits once through `/chat/stream`, proves one new
+lifecycle in the normal case, and derives its terminal artifact from persisted
+messages. A proposed backend `retry_last_turn` action was rejected because that
+UI-only control is intentionally unwrapped by the frontend; adding it to the
+public backend action vocabulary would change product ownership.
 
 ## Mask disposition
 
-| Trajectory | Status | Mask |
+| Trajectory | Status | Disposition |
 | --- | --- | --- |
-| `alpha_session_01` | `expected_failed` | `#238`: step 3 `stage_outcome:` and `sse:` only |
-| `alpha_session_02` | `passed` | removed |
-| `alpha_session_03` | `expected_failed` | `#241`: steps 1–2 `capability_route:` only |
-| `alpha_session_04` | `expected_failed` | `#251`: effective-window checks and step 3 persistence only |
-| `alpha_session_05` | `passed` | removed |
-| `alpha_session_06` | `passed` | removed |
-| `alpha_session_07` | `passed` | removed |
+| `alpha_session_01` / `#238` | passed | stale-card correction is proven |
+| `alpha_session_02` / `#239` | expected failed | exact eight observed pairs remain |
+| `alpha_session_03` / `#241` | expected failed | exact capability-route failures remain |
+| `alpha_session_04` / `#251` | expected failed | exact window/persistence failures remain |
+| `alpha_session_05` / `#242` | passed | one admitted Run reconciles by action |
+| `alpha_session_06` / `#230` | passed | retry preserves one job and allowance |
+| `alpha_session_07` / `#240` | passed | abandoned recovery and one Retry are durable |
 
-The completed `#239`, `#242`, `#230`, and `#240` masks were removed because
-their concrete trajectories pass every hard check.
+The harness now asserts each expected-fail mask set exactly equals its observed
+`(step_id, prefix)` set. No unused mask can silently remain.
 
-## Verification
-
-Exact free gate:
+## Current verification
 
 ```text
-OPENROUTER_API_KEY= ALPACA_API_KEY= ALPACA_SECRET_KEY= \
-ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture \
-poetry run pytest \
-  tests/evals/test_measurement_eval_harness.py \
-  tests/evals/test_chat_runtime_eval_manifest.py \
-  tests/evals/test_chat_runtime_trajectory_harness.py \
-  -q --no-cov
-
-40 passed in 1.45s
+Exact free gate: 51 passed
+Focused reload guardrails: 66 passed
+Focused frontend composition/retry/hydration/jobs: 106 passed
+Hermetic agent-runtime and spine: 1220 passed
+Ruff: passed
+ESLint: passed
+Next.js production build: passed
+Modularity budget: passed; ChatInterface 2597 lines, limit 2598
+git diff --check: passed
 ```
 
-Static checks:
-
-```text
-poetry run ruff check \
-  tests/evals/chat_runtime_trajectory_adapters.py \
-  tests/evals/test_chat_runtime_trajectory_harness.py
-
-All checks passed!
-
-git diff --check
-
-passed
-```
-
-## Files
-
-- `tests/evals/chat_runtime_trajectory_adapters.py`: concrete FastAPI/memory
-  journey adapters.
-- `tests/evals/test_chat_runtime_trajectory_harness.py`: exact integrated
-  status assertion plus mask-aware fixture/harness regression maintenance.
-- `tests/evals/alpha_session_trajectories.json`: removed four completed masks
-  and narrowed the three remaining masks to observed failures.
-- `.superpowers/sdd/task7-trajectory-adapters-report.md`: durable Task 7
-  evidence.
-
-## Remaining boundary
-
-The `#238`, `#241`, and `#251` failures remain explicit evidence. Task 7 does
-not own their production corrections. The tests-only slice is coherent and
-independently reversible.
+No paid eval, browser QA, push, PR, hosted mutation, or Task 8 work occurred in
+this correction. A fresh independent delta review still owns the final Task 7
+review verdict.

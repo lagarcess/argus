@@ -767,12 +767,23 @@ class ConcreteTrajectoryRuntime:
         if trajectory.label == "alpha_session_01":
             return StepObservation(
                 persistence_state=artifact_alias,
-                checkpoints={"stale_action.persisted_execution_count": 0},
+                checkpoints={
+                    "stale_action.persisted_execution_count": (
+                        self._execution_count_for_action(
+                            state=state,
+                            action_alias=f"{trajectory.label}:confirmation:1",
+                        )
+                    )
+                },
             )
         if trajectory.label == "alpha_session_02":
             return StepObservation(
                 artifact_identity=artifact_alias,
-                checkpoints={"terminal.repeated_fingerprint_count": 0},
+                checkpoints={
+                    "terminal.repeated_fingerprint_count": (
+                        self._repeated_terminal_fingerprint_count(state=state)
+                    )
+                },
             )
         if trajectory.label == "alpha_session_03":
             return StepObservation(artifact_identity=artifact_alias)
@@ -799,7 +810,9 @@ class ConcreteTrajectoryRuntime:
                 "agent_runtime_turn.turn_id": alias,
                 "agent_runtime_turn.request_id": state.disconnected_request_id,
                 "agent_runtime_turn.status": lifecycle["status"],
-                "persistence.durable_identity_count": 1,
+                "persistence.durable_identity_count": (
+                    self._matching_lifecycle_identity_count(state=state)
+                ),
             },
         )
 
@@ -1041,7 +1054,19 @@ class ConcreteTrajectoryRuntime:
         step: TrajectoryStep,
     ) -> StepObservation:
         state = self._state(trajectory)
-        raw_turn_id = state.raw_artifact_ids[f"{trajectory.label}:turn:1"]
+        action = step.request.get("action")
+        payload = action.get("payload") if isinstance(action, dict) else None
+        requested_alias = (
+            payload.get("request_message_id") if isinstance(payload, dict) else None
+        )
+        expected_alias = f"{trajectory.label}:turn:1"
+        if (
+            not isinstance(action, dict)
+            or action.get("type") != "retry_last_turn"
+            or requested_alias != expected_alias
+        ):
+            raise AssertionError("projected retry authority does not match fixture")
+        raw_turn_id = state.raw_artifact_ids[expected_alias]
         request_message = next(
             (
                 message
@@ -1052,28 +1077,51 @@ class ConcreteTrajectoryRuntime:
         )
         if request_message is None:
             raise AssertionError("abandoned turn has no persisted request message")
+        projected = self._projected_retry_authority(
+            state=state,
+            raw_turn_id=raw_turn_id,
+        )
+        projected_message = projected.get("message")
+        if (
+            projected.get("request_message_id") != raw_turn_id
+            or not isinstance(projected_message, str)
+            or projected_message != request_message.content
+        ):
+            raise AssertionError("projected retry authority is not canonical")
+        before_retry_count = self._matching_retry_attempt_count(state=state)
         result = self._submit_stream(
             trajectory=trajectory,
             step=step,
             body={
                 "conversation_id": state.conversation_id,
                 "language": trajectory.locale,
-                "message": request_message.content,
+                "message": projected_message,
             },
         )
-        artifact_identity, action_identity = self._observe_artifact(
+        streamed_artifact_identity, _ = self._observe_artifact(
             trajectory=trajectory,
             state=state,
             final=result.final,
         )
+        artifact_identity, action_identity = self._persisted_artifact_identity(
+            state=state
+        )
+        if (
+            artifact_identity is None
+            or streamed_artifact_identity != artifact_identity
+        ):
+            raise AssertionError("retry terminal artifact is not durably persisted")
+        retry_count = self._matching_retry_attempt_count(state=state)
+        if retry_count <= before_retry_count:
+            raise AssertionError("retry did not create a lifecycle attempt")
         return self._stream_observation(
             result=result,
             state=state,
             artifact_identity=artifact_identity,
             action_identity=action_identity,
             checkpoints={
-                "retry_last_turn.request_message_id": f"{trajectory.label}:turn:1",
-                "orphan_turn.duplicate_turn_count": 0,
+                "retry_last_turn.request_message_id": expected_alias,
+                "orphan_turn.duplicate_turn_count": max(0, retry_count - 1),
                 "terminal.artifact_identity": artifact_identity,
             },
         )
@@ -1164,6 +1212,126 @@ class ConcreteTrajectoryRuntime:
             job.get("conversation_id") == state.conversation_id
             for job in api_state.store.backtest_jobs.values()
         )
+
+    @staticmethod
+    def _execution_count_for_action(
+        *,
+        state: _TrajectoryState,
+        action_alias: str,
+    ) -> int:
+        raw_action_id = state.raw_artifact_ids.get(action_alias)
+        if not isinstance(raw_action_id, str) or not raw_action_id:
+            raise AssertionError("trajectory action identity is not persisted")
+        return sum(
+            job.get("conversation_id") == state.conversation_id
+            and job.get("idempotency_key") == raw_action_id
+            for job in api_state.store.backtest_jobs.values()
+        )
+
+    def _repeated_terminal_fingerprint_count(
+        self,
+        *,
+        state: _TrajectoryState,
+    ) -> int:
+        evidence = self._persisted_route_evidence.get(state.conversation_id)
+        if not evidence:
+            raise AssertionError("trajectory has no persisted execution summaries")
+        fingerprints: list[str] = []
+        for item in evidence:
+            summary = item.get("turn_execution")
+            if not isinstance(summary, dict) or summary.get("terminal") is None:
+                raise AssertionError("persisted terminal execution summary is missing")
+            fingerprints.append(self._persisted_fingerprint(summary))
+        return len(fingerprints) - len(set(fingerprints))
+
+    @staticmethod
+    def _matching_lifecycle_rows(
+        *,
+        state: _TrajectoryState,
+    ) -> list[dict[str, Any]]:
+        if state.disconnected_turn_id is None:
+            raise AssertionError("trajectory has no disconnected turn")
+        request_message = next(
+            (
+                message
+                for message in api_state.store.messages.get(
+                    state.conversation_id,
+                    [],
+                )
+                if message.id == state.disconnected_turn_id
+                and message.role == "user"
+            ),
+            None,
+        )
+        if request_message is None:
+            raise AssertionError("disconnected request message is not persisted")
+        messages_by_id = {
+            message.id: message
+            for message in api_state.store.messages.get(state.conversation_id, [])
+        }
+        rows: list[dict[str, Any]] = []
+        for row in api_state.store.chat_turn_lifecycles.values():
+            if row.get("conversation_id") != state.conversation_id:
+                continue
+            turn_id = row.get("turn_id")
+            message = messages_by_id.get(turn_id)
+            if (
+                message is not None
+                and message.role == "user"
+                and message.content == request_message.content
+            ):
+                rows.append(row)
+        return rows
+
+    @classmethod
+    def _matching_lifecycle_identity_count(
+        cls,
+        *,
+        state: _TrajectoryState,
+    ) -> int:
+        return len(cls._matching_lifecycle_rows(state=state))
+
+    @classmethod
+    def _matching_retry_attempt_count(
+        cls,
+        *,
+        state: _TrajectoryState,
+    ) -> int:
+        rows = cls._matching_lifecycle_rows(state=state)
+        if not any(row.get("turn_id") == state.disconnected_turn_id for row in rows):
+            raise AssertionError("disconnected lifecycle identity is missing")
+        return sum(
+            row.get("turn_id") != state.disconnected_turn_id
+            for row in rows
+        )
+
+    def _projected_retry_authority(
+        self,
+        *,
+        state: _TrajectoryState,
+        raw_turn_id: str,
+    ) -> dict[str, Any]:
+        response = self._http.get(
+            f"/api/v1/conversations/{state.conversation_id}/messages"
+        )
+        response.raise_for_status()
+        projected = next(
+            (
+                message
+                for message in response.json()["items"]
+                if message.get("id") == raw_turn_id
+                and isinstance(message.get("metadata"), dict)
+            ),
+            None,
+        )
+        retry = (
+            projected["metadata"].get("retry_last_turn")
+            if projected is not None
+            else None
+        )
+        if not isinstance(retry, dict):
+            raise AssertionError("projected retry authority is missing")
+        return retry
 
     @staticmethod
     def _allowance_count() -> int:

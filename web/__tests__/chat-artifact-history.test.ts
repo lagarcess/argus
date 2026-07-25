@@ -11,6 +11,7 @@ import {
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
+import { settleOpenConfirmationsFromFinalPayload } from "../components/chat/ChatInterface";
 import type { ChatActionOption, Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
 import { hydrateTextMessageFromApi } from "../lib/chat-message-hydration";
@@ -413,6 +414,77 @@ describe("chat artifact history", () => {
     expect(settled[0]?.confirmation?.confirmation_state).toBe("superseded");
     expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
     expect(settled[1]?.actions).toHaveLength(1);
+  });
+
+  test("ChatInterface final payload composition preserves the newest confirmation after stale Run recovery", () => {
+    const oldCard: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+        actions: [],
+      },
+      actions: [],
+    };
+    const newestCard: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-new",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-nvda",
+        title: "NVDA buy and hold",
+        actions: [
+          {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirm-nvda" },
+          },
+        ],
+      },
+      actions: [
+        {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-nvda" },
+        },
+      ],
+    };
+
+    const settled = settleOpenConfirmationsFromFinalPayload(
+      [oldCard, newestCard],
+      {
+        stage_outcome: "ready_to_respond",
+        recovery: {
+          code: "confirmation_action_stale_card",
+          retryable: false,
+        },
+      },
+      {
+        action: {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-aapl" },
+        },
+        finalActions: [],
+        hasFailedAction: false,
+      },
+    );
+
+    expect(settled[0]?.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(settled[1]?.actions).toEqual([
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-nvda" },
+      },
+    ]);
   });
 
   test("transient edit actions do not reopen superseded cards during hydration", () => {

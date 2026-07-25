@@ -145,8 +145,6 @@ import {
   confirmationStatusFromPayload,
 } from "./confirmation-display";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 type View = "chat" | "strategies" | "settings";
 type SendOptions = {
   renderUserMessage?: boolean;
@@ -173,6 +171,9 @@ function chatActionRequestFromAction(action: ChatActionOption): ChatActionReques
   };
 }
 
+export function settleOpenConfirmationsFromFinalPayload(messages: Message[], finalPayload: Record<string, unknown>, options: Omit<Parameters<typeof settleOpenConfirmationsAfterTextFinal>[1], "stageOutcome" | "recoveryCode">): Message[] {
+  return settleOpenConfirmationsAfterTextFinal(messages, { ...options, stageOutcome: finalPayload.stage_outcome, recoveryCode: stringOrNull(recordOrNull(finalPayload.recovery)?.code) });
+}
 function readActiveConversationRouteState(): ActiveConversationRouteState {
   if (typeof window === "undefined") {
     return {
@@ -1528,12 +1529,10 @@ export default function ChatInterface() {
               finalStageOutcome === "needs_clarification"
             ) {
               return normalizeDurableRetryActionHistory(
-                settleOpenConfirmationsAfterTextFinal(nextMessages, {
+                settleOpenConfirmationsFromFinalPayload(nextMessages, finalPayload, {
                   action,
                   finalActions: finalTextActions,
                   hasFailedAction: finalHasFailedAction,
-                  stageOutcome: finalStageOutcome,
-                  recoveryCode: stringOrNull(recordOrNull(finalPayload.recovery)?.code),
                 }),
               );
             }

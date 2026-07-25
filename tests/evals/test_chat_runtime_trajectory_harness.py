@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -182,6 +183,257 @@ def test_direct_job_bypass_cannot_satisfy_persisted_trajectory_identity(
 
     assert observation.artifact_identity == confirmation_alias
     assert observation.artifact_identity != job_alias
+
+
+def test_concrete_expected_fail_masks_exactly_match_observed_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        results = {
+            trajectory.label: (
+                trajectory,
+                run_alpha_trajectory(
+                    trajectory=trajectory,
+                    adapters=runtime.adapters,
+                ),
+            )
+            for trajectory in load_alpha_trajectories()
+            if trajectory.expected_fail is not None
+        }
+
+    for trajectory, result in results.values():
+        assert trajectory.expected_fail is not None
+        configured = {
+            (allowed.step_id, allowed.prefix)
+            for allowed in trajectory.expected_fail.allowed_failures
+        }
+        observed = {
+            (step_result.step_id, f"{failure.split(':', 1)[0]}:")
+            for step_result in result.step_results
+            for failure in step_result.failed_checks
+        }
+        assert configured == observed, trajectory.label
+
+
+def test_concrete_persistence_counts_injected_stale_job_owner_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = next(
+        item
+        for item in load_alpha_trajectories()
+        if item.label == "alpha_session_01"
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:3]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        old_confirmation = state.raw_artifact_ids[
+            "alpha_session_01:confirmation:1"
+        ]
+        api_state.store.backtest_jobs["injected-stale-job"] = {
+            "id": "injected-stale-job",
+            "conversation_id": state.conversation_id,
+            "idempotency_key": old_confirmation,
+        }
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[3],
+            history=(),
+        )
+
+    assert observation.checkpoints["stale_action.persisted_execution_count"] == 1
+
+
+def test_concrete_persistence_counts_repeated_terminal_fingerprint_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#239")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:2]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        evidence = runtime._persisted_route_evidence[state.conversation_id]
+        evidence.append(deepcopy(evidence[-1]))
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.checkpoints["terminal.repeated_fingerprint_count"] == 1
+
+
+def test_concrete_persistence_counts_duplicate_lifecycle_identity_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        runtime.disconnect(
+            trajectory=trajectory,
+            step=trajectory.steps[1],
+            history=(),
+        )
+        state = runtime._state(trajectory)
+        assert state.disconnected_turn_id is not None
+        original = api_state.store.chat_turn_lifecycles[state.disconnected_turn_id]
+        original_message = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.id == state.disconnected_turn_id
+        )
+        duplicate_turn_id = "injected-duplicate-turn"
+        api_state.store.messages[state.conversation_id].append(
+            original_message.model_copy(update={"id": duplicate_turn_id})
+        )
+        api_state.store.chat_turn_lifecycles[duplicate_turn_id] = {
+            **original,
+            "turn_id": duplicate_turn_id,
+        }
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.checkpoints["persistence.durable_identity_count"] == 2
+
+
+def test_abandoned_retry_uses_projected_authority_and_creates_one_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        before_lifecycles = len(
+            [
+                row
+                for row in api_state.store.chat_turn_lifecycles.values()
+                if row["conversation_id"] == state.conversation_id
+            ]
+        )
+        observation = runtime.retry(
+            trajectory=trajectory,
+            step=trajectory.steps[4],
+            history=(),
+        )
+        after_rows = [
+            row
+            for row in api_state.store.chat_turn_lifecycles.values()
+            if row["conversation_id"] == state.conversation_id
+        ]
+        persisted_requests = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.content == "Change the active test to the last six months."
+        ]
+
+    assert len(after_rows) == before_lifecycles + 1
+    assert len(persisted_requests) == 2
+    assert observation.checkpoints == {
+        "retry_last_turn.request_message_id": "alpha_session_07:turn:1",
+        "orphan_turn.duplicate_turn_count": 0,
+        "terminal.artifact_identity": "alpha_session_07:confirmation:2",
+    }
+
+
+def test_abandoned_retry_reports_injected_duplicate_attempt_owner_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        submit_stream = runtime._submit_stream
+
+        def _submit_with_duplicate_owner(**kwargs: Any):
+            result = submit_stream(**kwargs)
+            retry_rows = [
+                row
+                for row in runtime._matching_lifecycle_rows(state=state)
+                if row["turn_id"] != state.disconnected_turn_id
+            ]
+            assert len(retry_rows) == 1
+            retry_row = retry_rows[0]
+            retry_message = next(
+                message
+                for message in api_state.store.messages[state.conversation_id]
+                if message.id == retry_row["turn_id"]
+            )
+            duplicate_turn_id = "injected-duplicate-retry"
+            api_state.store.messages[state.conversation_id].append(
+                retry_message.model_copy(update={"id": duplicate_turn_id})
+            )
+            api_state.store.chat_turn_lifecycles[duplicate_turn_id] = {
+                **retry_row,
+                "turn_id": duplicate_turn_id,
+                "request_id": "injected-duplicate-request",
+            }
+            return result
+
+        monkeypatch.setattr(runtime, "_submit_stream", _submit_with_duplicate_owner)
+        observation = runtime.retry(
+            trajectory=trajectory,
+            step=trajectory.steps[4],
+            history=(),
+        )
+
+    assert observation.checkpoints["orphan_turn.duplicate_turn_count"] == 1
+
+
+def test_abandoned_retry_rejects_a_fixture_identity_without_projected_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    retry_step = replace(
+        trajectory.steps[4],
+        request={
+            "action": {
+                "type": "retry_last_turn",
+                "payload": {"request_message_id": "alpha_session_07:turn:other"},
+            }
+        },
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+
+        with pytest.raises(
+            AssertionError,
+            match="projected retry authority",
+        ):
+            runtime.retry(
+                trajectory=trajectory,
+                step=retry_step,
+                history=(),
+            )
 
 
 def _matching_observation(step: Any) -> StepObservation:

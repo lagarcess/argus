@@ -1180,13 +1180,28 @@ def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
     from argus.api.routers import agent as agent_router
 
     runtime_calls = 0
+    persisted_turn_evidence: list[dict[str, Any]] = []
 
     async def _runtime(**_: Any):
         nonlocal runtime_calls
         runtime_calls += 1
         yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
 
+    def _capture_turn_evidence(
+        *,
+        metadata: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> None:
+        persisted_turn_evidence.append(
+            dict((metadata or {}).get("turn_execution") or {})
+        )
+
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "persist_route_receipts",
+        _capture_turn_evidence,
+    )
     client = _client()
     clear_openrouter_route_receipts()
     conversation = _conversation(client)
@@ -1268,6 +1283,9 @@ def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
     assert api_state.store.usage_counters == usage_before
     assert get_openrouter_route_receipts() == []
     assert api_state.store.backtest_jobs == {}
+    assert len(persisted_turn_evidence) == 1
+    assert persisted_turn_evidence[0]["progress_outcome"] == "redirected"
+    assert persisted_turn_evidence[0]["terminal"] == "redirected"
     assert (
         latest_active_confirmation_id(
             user_id=user_id,
