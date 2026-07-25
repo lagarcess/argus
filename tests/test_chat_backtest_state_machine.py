@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -690,6 +691,11 @@ def test_chat_stream_emits_structured_confirmation_actions(
 def test_chat_stream_persists_confirmation_metadata_and_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        validate_confirmation_execution_payload,
+    )
+    from argus.api import state as api_state
+    from argus.api.chat.backtest_jobs import payload_hash
     from argus.api.routers import agent as agent_router
 
     monkeypatch.setattr(
@@ -710,12 +716,36 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     )
 
     assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    raw_assistant = api_state.store.messages[conversation["id"]][-1]
+    validation = validate_confirmation_execution_payload(
+        raw_assistant.metadata["confirmation_payload"]
+    )
+    assert validation.launch_payload is not None
+    canonical_hash = payload_hash(validation.launch_payload)
+    assert (
+        raw_assistant.metadata["confirmation_card"][
+            "canonical_launch_payload_hash"
+        ]
+        == canonical_hash
+    )
+    assert (
+        raw_assistant.metadata["active_confirmation_reference"]["metadata"][
+            "canonical_launch_payload_hash"
+        ]
+        == canonical_hash
+    )
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
     assistant = messages[-1]
     assert assistant["role"] == "assistant"
     assert assistant["metadata"]["confirmation_card"]["title"] == "AAPL buy and hold"
+    assert final["confirmation"]["launch_payload_hash"]
+    assert assistant["metadata"]["confirmation_card"]["launch_payload_hash"]
+    public_payload = json.dumps({"final": final, "messages": messages})
+    assert "canonical_launch_payload_hash" not in public_payload
+    assert re.search(r"sha256:[0-9a-f]{64}", public_payload) is None
     conversations = client.get("/api/v1/conversations").json()["items"]
     assert conversations[0]["id"] == conversation["id"]
     assert conversations[0]["last_message_preview"] == assistant["content"]

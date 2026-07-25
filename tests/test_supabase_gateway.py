@@ -1499,6 +1499,7 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
         failure_detail="market_data_issue",
         retryable=True,
         execution_metadata={"workflow_backtest": {"failure_category": "market_data"}},
+        expected_status="running",
     )
 
     assert row["status"] == "failed"
@@ -1512,6 +1513,32 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
     }
     assert client.updated_jobs[0]["user_id"] == "user-1"
     assert client.updated_jobs[0]["id"] == "job-1"
+    assert client.updated_job_filters[0]["status"] == "running"
+
+
+def test_mark_backtest_job_failed_does_not_overwrite_status_after_cas_loss() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "succeeded",
+        "result_run_id": "run-1",
+        "execution_metadata": {},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_failed(
+        user_id="user-1",
+        job_id="job-1",
+        failure_code="workflow_dispatch_missing",
+        failure_detail="Dispatch response was lost.",
+        retryable=True,
+        expected_status="queued",
+    )
+
+    assert row == {}
+    assert client.updated_jobs == []
 
 
 class _MockAuthAdmin:

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.confirmation import public_confirmation_projection
 from argus.api.chat.onboarding import parse_onboarding_control_message
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
@@ -47,7 +48,9 @@ def _memory_conversation_owned_by(
 
 def _public_message_projection(messages: list[Message]) -> list[Message]:
     return [
-        message
+        message.model_copy(
+            update={"metadata": public_confirmation_projection(message.metadata)}
+        )
         for message in messages
         if not (
             message.role == "user"

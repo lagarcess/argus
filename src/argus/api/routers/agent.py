@@ -1290,7 +1290,14 @@ async def chat_stream(
                     and assistant_text
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
-                yield sse_data({"type": "final", "payload": runtime_result})
+                from argus.api.chat.confirmation import public_confirmation_projection
+
+                yield sse_data(
+                    {
+                        "type": "final",
+                        "payload": public_confirmation_projection(runtime_result),
+                    }
+                )
                 yield sse_done()
                 schedule_runtime_measurement_events_after_stream(
                     user_id=user.id,

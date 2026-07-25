@@ -28,6 +28,19 @@ from argus.domain.engine_launch.display import (
 )
 
 
+def public_confirmation_projection(value: Any) -> Any:
+    """Remove private durable confirmation identity from public transport data."""
+    if isinstance(value, dict):
+        return {
+            key: public_confirmation_projection(item)
+            for key, item in value.items()
+            if key != "canonical_launch_payload_hash"
+        }
+    if isinstance(value, list):
+        return [public_confirmation_projection(item) for item in value]
+    return value
+
+
 def runtime_confirmation_card(
     runtime_result: dict[str, Any],
     *,

@@ -266,8 +266,8 @@ def _reconcile_backpressure_blockers(
             continue
         owner_user_id = str(job.get("user_id") or user_id or fallback_user_id)
         before = str(job.get("status") or "").strip().lower()
-        if _should_fail_stale_proof_job_without_task_run(job):
-            reconciled = _fail_stale_proof_job_without_task_run(
+        if _should_fail_stale_job_without_task_run(job):
+            reconciled = _fail_job_without_task_run(
                 gateway=gateway,
                 user_id=owner_user_id,
                 job=job,
@@ -469,8 +469,8 @@ def scan_stale_backtest_jobs(
                 continue
 
             try:
-                if task_run_id is None and _is_workflow_proof_job(job):
-                    reconciled = _fail_stale_proof_job_without_task_run(
+                if _is_undispatched_workflow_job(job):
+                    reconciled = _fail_job_without_task_run(
                         gateway=gateway,
                         user_id=user_id,
                         job=job,
@@ -513,22 +513,31 @@ def scan_stale_backtest_jobs(
     return report
 
 
-def _is_workflow_proof_job(job: dict[str, Any]) -> bool:
+def _workflow_job_kind(job: dict[str, Any]) -> str:
     launch_payload = _dict_or_empty(job.get("launch_payload"))
-    return launch_payload.get("kind") == PROOF_JOB_KIND
+    return str(launch_payload.get("kind") or "")
 
 
-def _fail_stale_proof_job_without_task_run(
+def _is_undispatched_workflow_job(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    kind = _workflow_job_kind(job)
+    return _task_run_id_from_job(job) is None and (
+        (kind == PROOF_JOB_KIND and status in {"queued", "running"})
+        or (kind == REAL_BACKTEST_JOB_KIND and status == "queued")
+    )
+
+
+def _fail_job_without_task_run(
     *,
     gateway: Any,
     user_id: str,
     job: dict[str, Any],
 ) -> dict[str, Any]:
     failure_code = "workflow_dispatch_missing"
-    failure_detail = "Render workflow proof did not record a task run before the stale threshold."
+    kind = _workflow_job_kind(job)
+    failure_detail = "Backtest workflow did not record a task run."
     reconciled_at = _utcnow_iso()
     metadata = _dict_or_empty(job.get("execution_metadata"))
-
     workflow_dispatch = _dict_or_empty(metadata.get("workflow_dispatch"))
     workflow_dispatch.update(
         {
@@ -538,28 +547,34 @@ def _fail_stale_proof_job_without_task_run(
         }
     )
     metadata["workflow_dispatch"] = workflow_dispatch
-
-    workflow_metadata = _dict_or_empty(metadata.get("workflow_proof"))
+    workflow_key = "workflow_proof" if kind == PROOF_JOB_KIND else WORKFLOW_METADATA_KEY
+    workflow_metadata = _dict_or_empty(metadata.get(workflow_key))
     workflow_metadata.update(
         {
-            "kind": PROOF_JOB_KIND,
+            "kind": kind,
             "failure_code": failure_code,
             "finished_at": reconciled_at,
         }
     )
-    metadata["workflow_proof"] = workflow_metadata
+    metadata[workflow_key] = workflow_metadata
 
-    return dict(
-        gateway.mark_backtest_job_failed(
-            user_id=user_id,
-            job_id=str(job.get("id") or ""),
-            failure_code=failure_code,
-            failure_detail=failure_detail,
-            retryable=True,
-            finished_at=reconciled_at,
-            execution_metadata=metadata,
-        )
+    job_id = str(job.get("id") or "")
+    current_status = str(job.get("status") or "").strip().lower()
+    failed = gateway.mark_backtest_job_failed(
+        user_id=user_id,
+        job_id=job_id,
+        failure_code=failure_code,
+        failure_detail=failure_detail,
+        retryable=True,
+        finished_at=reconciled_at,
+        execution_metadata=metadata,
+        expected_status=current_status,
     )
+    if failed:
+        return dict(failed)
+    get_job = getattr(gateway, "get_backtest_job", None)
+    current = get_job(user_id=user_id, job_id=job_id) if get_job else None
+    return dict(current or job)
 
 
 def _stale_seconds_for_status(status: str) -> int:
@@ -568,13 +583,9 @@ def _stale_seconds_for_status(status: str) -> int:
     return DEFAULT_STALE_RUNNING_SECONDS
 
 
-def _should_fail_stale_proof_job_without_task_run(job: dict[str, Any]) -> bool:
+def _should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:
     status = str(job.get("status") or "").strip().lower()
-    if status not in {"queued", "running"}:
-        return False
-    if not _is_workflow_proof_job(job):
-        return False
-    if _task_run_id_from_job(job) is not None:
+    if not _is_undispatched_workflow_job(job):
         return False
     age_seconds = _job_age_seconds(
         job,
@@ -832,8 +843,9 @@ class ShadowBacktestJobTool:
             if job_id:
                 context.created_job_id = job_id
                 if admission.decision == "replay":
+                    self._restore_existing_dispatch_context(context=context, job=job)
                     return dict(job), None
-                self._maybe_dispatch_shadow_job(
+                job = self._maybe_dispatch_shadow_job(
                     gateway=gateway,
                     context=context,
                     job_id=job_id,
@@ -895,7 +907,7 @@ class ShadowBacktestJobTool:
         status = str(job.get("status") or "").strip().lower()
         if status in {"succeeded", "failed", "canceled", "expired"}:
             return True
-        return context.workflow_dispatch_started
+        return context.admission_decision == "admitted" or context.workflow_dispatch_started
 
     def _maybe_dispatch_shadow_job(
         self,
@@ -905,16 +917,16 @@ class ShadowBacktestJobTool:
         job_id: str,
         job: dict[str, Any],
         payload_digest: str,
-    ) -> None:
+    ) -> dict[str, Any]:
         if not backtest_jobs_dispatch_enabled():
-            return
+            return job
         if self._restore_existing_dispatch_context(context=context, job=job):
-            return
+            return job
         if job.get("result_run_id"):
-            return
+            return job
         job_status = str(job.get("status") or "").strip().lower()
         if job_status and job_status != "queued":
-            return
+            return job
 
         try:
             dispatcher = self._dispatcher_getter()
@@ -939,16 +951,20 @@ class ShadowBacktestJobTool:
                     }
                 },
             )
+            return job
         except Exception as exc:
             context.workflow_dispatch_error = str(exc)
-            if not self._dev_memory_fallback_getter():
-                raise
             logger.warning(
-                "Shadow backtest job dispatch failed; continuing in-process execution",
+                "Backtest workflow dispatch failed; terminalizing queued job",
                 error=str(exc),
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
                 job_id=job_id,
+            )
+            return _fail_job_without_task_run(
+                gateway=gateway,
+                user_id=context.user_id,
+                job=job,
             )
 
     @staticmethod

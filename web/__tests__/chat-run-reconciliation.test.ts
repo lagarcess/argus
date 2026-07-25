@@ -145,6 +145,66 @@ describe("ambiguous Run response reconciliation", () => {
     expect(replayCalls).toBe(1);
   });
 
+  test("HTTP-200 SSE error during the one replay continues bounded lookup-only recovery", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const rejectReplayError =
+      reconciliationModule.throwIfAmbiguousRunReplaySseError;
+    expect(typeof rejectReplayError).toBe("function");
+    const reconcile = await loadReconciler();
+    let lookupCalls = 0;
+    let replayCalls = 0;
+    const pauses: number[] = [];
+
+    const result = await reconcile({
+      lookup: async () => {
+        lookupCalls += 1;
+        throw statusError(404, "not_found");
+      },
+      replay: async () => {
+        replayCalls += 1;
+        rejectReplayError(
+          {
+            event: "error",
+            data: {
+              code: "idempotency_in_progress",
+              detail: "The durable job is still becoming visible.",
+            },
+          },
+          true,
+        );
+      },
+      pause: async (delayMs) => {
+        pauses.push(delayMs);
+      },
+    });
+
+    expect(result.kind).toBe("recoverable");
+    expect(lookupCalls).toBe(3);
+    expect(replayCalls).toBe(1);
+    expect(pauses).toEqual([250, 750]);
+  });
+
+  test("ordinary SSE errors keep their existing handler path", async () => {
+    const modulePath = "../lib/chat-run-reconciliation";
+    const reconciliationModule = await import(modulePath);
+    const rejectReplayError =
+      reconciliationModule.throwIfAmbiguousRunReplaySseError;
+    expect(typeof rejectReplayError).toBe("function");
+    const errorEvent = {
+      event: "error" as const,
+      data: { code: "runtime_failure", detail: "Could not complete the turn." },
+    };
+
+    expect(() => rejectReplayError(errorEvent, false)).not.toThrow();
+    expect(() =>
+      rejectReplayError(
+        { event: "final", data: { stage_outcome: "ready_to_respond" } },
+        true,
+      ),
+    ).not.toThrow();
+  });
+
   test("a second 404 exits through bounded recovery and never triggers a second replay", async () => {
     const reconcile = await loadReconciler();
     let lookupCalls = 0;

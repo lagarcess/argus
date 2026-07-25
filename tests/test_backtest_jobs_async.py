@@ -33,6 +33,8 @@ class _Gateway:
         self.events = events
         self.jobs: list[dict[str, object]] = []
         self.metadata_updates: list[dict[str, object]] = []
+        self.failure_attempts: list[dict[str, object]] = []
+        self.failed_updates: list[dict[str, object]] = []
 
     def create_backtest_job(self, **payload: object) -> dict[str, object]:
         self.events.append("job")
@@ -83,6 +85,36 @@ class _Gateway:
         del status, user_id, limit
         return 0
 
+    def get_backtest_job(
+        self, *, user_id: str, job_id: str
+    ) -> dict[str, object] | None:
+        return next(
+            (
+                dict(job)
+                for job in self.jobs
+                if job.get("user_id") == user_id and job.get("id") == job_id
+            ),
+            None,
+        )
+
+    def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+        self.failure_attempts.append(payload)
+        job = self.jobs[0]
+        expected_status = payload.get("expected_status")
+        if expected_status is not None and job.get("status") != expected_status:
+            return {}
+        job.update(
+            {
+                "status": "failed",
+                "failure_code": payload["failure_code"],
+                "failure_detail": payload["failure_detail"],
+                "retryable": payload["retryable"],
+                "finished_at": payload.get("finished_at"),
+            }
+        )
+        self.failed_updates.append(dict(job))
+        return dict(job)
+
 
 class _Dispatcher:
     def __init__(self, events: list[str]) -> None:
@@ -93,6 +125,28 @@ class _Dispatcher:
         self.events.append("dispatch")
         self.calls.append(payload)
         return {"id": "task-run-real-1", "status": "pending"}
+
+
+class _FailingDispatcher(_Dispatcher):
+    def __init__(
+        self,
+        events: list[str],
+        *,
+        gateway: _Gateway,
+        remote_status: str | None = None,
+    ) -> None:
+        super().__init__(events)
+        self.gateway = gateway
+        self.remote_status = remote_status
+
+    def dispatch(self, **payload: object) -> dict[str, object]:
+        self.events.append("dispatch")
+        self.calls.append(payload)
+        if self.remote_status is not None:
+            self.gateway.jobs[0]["status"] = self.remote_status
+            if self.remote_status == "succeeded":
+                self.gateway.jobs[0]["result_run_id"] = "run-remote-1"
+        raise TimeoutError("dispatch response was lost")
 
 
 class _AtomicReplayGateway(_Gateway):
@@ -496,6 +550,67 @@ def test_real_workflow_mode_returns_async_job_without_delegate(
     )
 
 
+def test_dispatch_exception_terminalizes_still_queued_job_without_delegate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events)
+    dispatcher = _FailingDispatcher(events, gateway=gateway)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+
+    with backtest_job_shadow_context(_context()):
+        result = tool.run(_payload())
+
+    assert result["payload"]["backtest_job"]["status"] == "failed"
+    assert result["payload"]["backtest_job"]["retryable"] is True
+    assert gateway.failure_attempts[0]["expected_status"] == "queued"
+    assert len(gateway.failed_updates) == 1
+    assert len(dispatcher.calls) == 1
+    assert delegate.calls == []
+
+
+@pytest.mark.parametrize("remote_status", ["running", "succeeded"])
+def test_dispatch_exception_does_not_overwrite_remote_terminal_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    remote_status: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events)
+    dispatcher = _FailingDispatcher(
+        events,
+        gateway=gateway,
+        remote_status=remote_status,
+    )
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+
+    with backtest_job_shadow_context(_context()):
+        result = tool.run(_payload())
+
+    assert result["payload"]["backtest_job"]["status"] == remote_status
+    assert gateway.failure_attempts[0]["expected_status"] == "queued"
+    assert gateway.failed_updates == []
+    assert len(dispatcher.calls) == 1
+    assert delegate.calls == []
+
+
 def test_atomic_replay_never_becomes_a_second_dispatch_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -751,15 +866,14 @@ def test_backtest_job_status_endpoint_reads_database_truth_without_render(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import state as api_state
-    from argus.api.routers import backtest as backtest_router
+    from argus.api.chat.backtest_jobs import RenderTaskRunClient
 
     gateway = _TimedOutJobGateway()
-    render_calls: list[dict[str, object]] = []
+    render_calls: list[str] = []
     monkeypatch.setattr(
-        backtest_router,
-        "reconcile_terminal_render_task_run",
-        lambda **payload: render_calls.append(payload),
-        raising=False,
+        RenderTaskRunClient,
+        "get_task_run",
+        lambda _self, task_run_id: render_calls.append(task_run_id),
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     client = TestClient(app)
@@ -894,4 +1008,42 @@ def test_stale_backtest_job_scan_fails_stale_proof_jobs_without_task_metadata() 
     assert report["unresolved_count"] == 0
     assert gateway.failed_updates[0]["job_id"] == "job-stale-proof"
     assert gateway.failed_updates[0]["failure_code"] == "workflow_dispatch_missing"
+    assert gateway.failed_updates[0]["retryable"] is True
+
+
+def test_stale_backtest_job_scan_fails_real_queued_job_without_dispatch_proof() -> None:
+    from argus.api.chat.backtest_jobs import scan_stale_backtest_jobs
+
+    gateway = _StaleJobScanGateway()
+    gateway.jobs = [
+        {
+            "id": "job-stale-real",
+            "user_id": "user-1",
+            "status": "queued",
+            "queued_at": "2026-06-06T12:00:00+00:00",
+            "created_at": "2026-06-06T12:00:00+00:00",
+            "updated_at": "2026-06-06T12:00:00+00:00",
+            "launch_payload": {"kind": "run_backtest_job"},
+            "execution_metadata": {},
+        }
+    ]
+    task_client = _FakeTerminalTaskRunClient(
+        {"id": "trn-never-created", "status": "failed"}
+    )
+
+    report = scan_stale_backtest_jobs(
+        gateway=gateway,
+        now=datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc),
+        queued_age_seconds=900,
+        running_age_seconds=900,
+        limit=20,
+        task_run_client=task_client,
+    )
+
+    assert task_client.calls == []
+    assert report["status"] == "ready"
+    assert report["reconciled_count"] == 1
+    assert report["unresolved_count"] == 0
+    assert gateway.failed_updates[0]["job_id"] == "job-stale-real"
+    assert gateway.failed_updates[0]["expected_status"] == "queued"
     assert gateway.failed_updates[0]["retryable"] is True

@@ -114,6 +114,7 @@ import {
   applyReconciledBacktestJobResponse,
   getBacktestJobByAction,
   reconcileAmbiguousRunResponse,
+  throwIfAmbiguousRunReplaySseError,
   useBacktestJobPolling,
 } from "@/lib/chat-run-reconciliation";
 import {
@@ -1285,8 +1286,8 @@ export default function ChatInterface() {
     const canApplyOwnedStreamUpdate = () =>
       activeStreamConversationIdRef.current === activeStreamTargetConversationId &&
       canApplyConversationOwnedUpdate(activeStreamTargetConversationId);
-
-    const handleStreamEvent = (event: ChatStreamEvent) => {
+    const handleStreamEvent = (event: ChatStreamEvent, ambiguityReplay = false) => {
+      throwIfAmbiguousRunReplaySseError(event, ambiguityReplay);
       const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
       const canApplyOwnedUpdate = canApplyOwnedStreamUpdate();
       if (event.event === "stage_start") {
@@ -1566,15 +1567,14 @@ export default function ChatInterface() {
         markSettledStreamAttention(activeStreamTargetConversationId);
       }
     };
-
-    const streamToConversation = (nextTargetConversationId: string) => {
+    const streamToConversation = (nextTargetConversationId: string, ambiguityReplay = false) => {
       activeStreamTargetConversationId = nextTargetConversationId;
       activeStreamConversationIdRef.current = nextTargetConversationId;
       return streamChatMessage(
         nextTargetConversationId,
         streamInput,
         i18n.language,
-        handleStreamEvent,
+        (event) => handleStreamEvent(event, ambiguityReplay),
         action?.type ? [] : mentions,
       );
     };
@@ -1638,7 +1638,7 @@ export default function ChatInterface() {
         }
         const reconciliation = await reconcileAmbiguousRunResponse({
           lookup: () => getBacktestJobByAction(confirmationId),
-          replay: () => streamToConversation(activeStreamTargetConversationId),
+          replay: () => streamToConversation(activeStreamTargetConversationId, true),
         });
         if (reconciliation.kind === "replayed") return;
         if (reconciliation.kind === "durable") {

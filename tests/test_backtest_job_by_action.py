@@ -230,21 +230,29 @@ def _mock_auth_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
 
 
-def test_by_action_lookup_returns_canonical_succeeded_job_without_render_reconcile(
+def test_by_action_lookup_reads_running_database_truth_without_render_reconcile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import state as api_state
-    from argus.api.routers import backtest as backtest_router
+    from argus.api.chat.backtest_jobs import RenderTaskRunClient
 
     gateway = _ByActionGateway()
+    gateway.job.update(
+        {
+            "status": "running",
+            "result_run_id": None,
+            "finished_at": None,
+            "execution_metadata": {
+                "workflow_dispatch": {"task_run_id": "task-run-private-1"}
+            },
+        }
+    )
+    render_calls: list[str] = []
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setattr(
-        backtest_router,
-        "reconcile_terminal_render_task_run",
-        lambda **_: (_ for _ in ()).throw(
-            AssertionError("fresh by-action lookup must not call Render")
-        ),
-        raising=False,
+        RenderTaskRunClient,
+        "get_task_run",
+        lambda _self, task_run_id: render_calls.append(task_run_id),
     )
 
     response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
@@ -252,8 +260,9 @@ def test_by_action_lookup_returns_canonical_succeeded_job_without_render_reconci
     assert response.status_code == 200
     payload = response.json()
     assert payload["job"]["id"] == "job-by-action-1"
-    assert payload["run"]["id"] == "run-by-action-1"
-    assert payload["result_readout"] == "**Quick take**\n\nOne canonical result."
+    assert payload["job"]["status"] == "running"
+    assert payload["run"] is None
+    assert render_calls == []
     assert gateway.reservation_calls == [
         {
             "user_id": "user-1",
@@ -401,6 +410,12 @@ def test_real_confirmation_persists_full_launch_identity_used_by_job_lookup(
         conversation_id="conversation-1",
         confirmation_id="confirmation-1",
         launch_payload_hash=admitted_payload_hash,
+    )
+    assert gateway.job["payload_hash"] == card["canonical_launch_payload_hash"]
+    assert gateway.job["identity_hash"] == chat_run_identity_hash(
+        conversation_id="conversation-1",
+        confirmation_id="confirmation-1",
+        launch_payload_hash=card["canonical_launch_payload_hash"],
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 

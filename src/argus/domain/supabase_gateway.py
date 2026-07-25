@@ -1141,11 +1141,11 @@ class SupabaseGateway(
         retryable: bool,
         execution_metadata: dict[str, Any] | None = None,
         finished_at: str | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, Any]:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
             raise ValueError("Backtest job not found or not owned by user.")
-
         metadata = dict(existing.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
         payload = {
@@ -1158,13 +1158,15 @@ class SupabaseGateway(
             "execution_metadata": metadata,
             "updated_at": _now_iso(),
         }
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
         )
+        if expected_status is not None:
+            update_query = update_query.eq("status", expected_status)
+        updated = update_query.execute()
         return dict(_row_one(updated) or {})
 
     def create_context_packet(

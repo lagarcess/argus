@@ -10,8 +10,10 @@ import type { ChatActionOption, Message } from "@/components/chat/types";
 import { normalizeConfirmationHistory } from "@/components/chat/artifact-history";
 import {
   apiFetch,
+  ChatStreamError,
   getBacktestJob,
   type BacktestJobResponse,
+  type ChatStreamEvent,
 } from "@/lib/argus-api";
 import {
   applyBacktestJobUpdate,
@@ -28,6 +30,18 @@ type ReconciliationResult =
   | { kind: "recoverable"; error: unknown };
 
 const LOOKUP_RETRY_DELAYS_MS = [250, 750] as const;
+
+export function throwIfAmbiguousRunReplaySseError(
+  event: ChatStreamEvent,
+  ambiguityReplay: boolean,
+): void {
+  if (!ambiguityReplay || event.event !== "error") return;
+  throw new ChatStreamError(
+    event.data.detail,
+    0,
+    event.data.code ?? "run_replay_sse_error",
+  );
+}
 
 export async function getBacktestJobByAction(
   confirmationId: string,
