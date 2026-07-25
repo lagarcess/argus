@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.domain.backtesting.coverage import _dataset_id
 from argus.domain.engine import _build_signals
 from argus.domain.engine_launch.adapter import (
@@ -117,12 +118,18 @@ def test_launch_validation_rejects_unsupported_timeframe_for_every_strategy(
 
 
 @pytest.mark.parametrize(
-    "adjustment_reason",
-    ["provider_coverage_adjustment", "calendar_alignment"],
+    ("approved_adjustment_reason", "expected_adjustment_reason"),
+    [
+        ("provider_coverage_adjustment", "provider_coverage_adjustment"),
+        ("calendar_alignment", "calendar_alignment"),
+        (None, None),
+    ],
+    ids=("modern-provider", "modern-calendar", "legacy-absent"),
 )
-def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart(
+def test_approved_launch_preserves_explicit_or_absent_coverage_reason(
     monkeypatch: pytest.MonkeyPatch,
-    adjustment_reason: str,
+    approved_adjustment_reason: str | None,
+    expected_adjustment_reason: str | None,
 ) -> None:
     calls: Counter[str] = Counter()
     index = pd.to_datetime(["2024-01-03", "2024-01-04", "2024-01-05"], utc=True)
@@ -154,6 +161,21 @@ def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart
         "argus.domain.engine_launch.adapter.fetch_ohlcv",
         fake_fetch,
     )
+    coverage_preflight: dict[str, Any] = {
+        "outcome": "adjusted_coverage",
+        "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-05",
+        },
+        "effective_date_range": {
+            "start": "2024-01-03",
+            "end": "2024-01-05",
+        },
+        "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+    }
+    if approved_adjustment_reason is not None:
+        coverage_preflight["adjustment_reason"] = approved_adjustment_reason
+
     request = LaunchBacktestRequest(
         strategy_type="buy_and_hold",
         symbol="AAPL",
@@ -162,19 +184,7 @@ def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart
         timeframe="1D",
         date_range={"start": "2024-01-03", "end": "2024-01-05"},
         requested_date_range={"start": "2024-01-01", "end": "2024-01-05"},
-        coverage_preflight={
-            "outcome": "adjusted_coverage",
-            "adjustment_reason": adjustment_reason,
-            "requested_date_range": {
-                "start": "2024-01-01",
-                "end": "2024-01-05",
-            },
-            "effective_date_range": {
-                "start": "2024-01-03",
-                "end": "2024-01-05",
-            },
-            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
-        },
+        coverage_preflight=coverage_preflight,
         entry_rule=None,
         exit_rule=None,
         sizing_mode="capital_amount",
@@ -199,11 +209,16 @@ def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart
         "start": "2024-01-03",
         "end": "2024-01-05",
     }
-    assert resolved["engine_config"]["data_coverage"]["dataset_id"].startswith("sha256:")
+    assert request.coverage_preflight is not None
     assert (
-        resolved["engine_config"]["data_coverage"]["adjustment_reason"]
-        == adjustment_reason
+        resolved["engine_config"]["data_coverage"]["dataset_id"]
+        == request.coverage_preflight.preflight_id
     )
+    resolved_coverage = resolved["engine_config"]["data_coverage"]
+    if expected_adjustment_reason is None:
+        assert "adjustment_reason" not in resolved_coverage
+    else:
+        assert resolved_coverage["adjustment_reason"] == expected_adjustment_reason
     assert result.result_card is not None
     assert result.result_card["chart"]["series"][0]["time"] == "2024-01-03"
     assert result.result_card["chart"]["series"][-1]["time"] == "2024-01-05"
@@ -229,10 +244,30 @@ def test_approved_launch_preserves_reason_with_one_dataset_for_metrics_and_chart
         "start": "2024-01-03",
         "end": "2024-01-05",
     }
-    assert (
-        run.config_snapshot["data_coverage"]["adjustment_reason"]
-        == adjustment_reason
-    )
+    run_coverage = run.config_snapshot["data_coverage"]
+    if expected_adjustment_reason is None:
+        assert "adjustment_reason" not in run_coverage
+        confirmation_card = runtime_confirmation_card(
+            {
+                "stage_outcome": "await_approval",
+                "confirmation_payload": {
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                        "date_range": request.date_range.model_dump(),
+                        "capital_amount": 10_000,
+                    },
+                    "optional_parameters": {},
+                    "launch_payload": request.model_dump(mode="python"),
+                    "validation": {"status": "ready_to_run", "executable": True},
+                },
+            }
+        )
+        assert confirmation_card is not None
+        assert "period_adjustment" not in confirmation_card
+    else:
+        assert run_coverage["adjustment_reason"] == expected_adjustment_reason
 
 
 def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(

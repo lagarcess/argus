@@ -39,7 +39,7 @@ class PreparedMarketData:
     requested_date_range: CoverageDateRange
     effective_date_range: CoverageDateRange
     outcome: str
-    adjustment_reason: CoverageAdjustmentReason
+    adjustment_reason: CoverageAdjustmentReason | None
     dataset_id: str
     bars_by_symbol: dict[str, pd.DataFrame]
     observations_by_symbol: dict[str, int]
@@ -55,15 +55,17 @@ class PreparedMarketData:
         return self.bars_for(symbol)["close"].copy()
 
     def coverage_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": "market_data_coverage_v1",
             "outcome": self.outcome,
-            "adjustment_reason": self.adjustment_reason,
             "requested_date_range": self.requested_date_range.model_dump(),
             "effective_date_range": self.effective_date_range.model_dump(),
             "dataset_id": self.dataset_id,
             "observations_by_symbol": dict(self.observations_by_symbol),
         }
+        if self.adjustment_reason is not None:
+            payload["adjustment_reason"] = self.adjustment_reason
+        return payload
 
 
 FetchOhlcv = Callable[..., pd.DataFrame]
@@ -158,7 +160,7 @@ def prepare_market_data(
         dataset_id=dataset_id,
     )
     outcome = "full_coverage" if effective == requested else "adjusted_coverage"
-    if approved_coverage is not None and approved_adjustment_reason is not None:
+    if approved_coverage is not None:
         adjustment_reason = approved_adjustment_reason
     else:
         adjustment_reason = _coverage_adjustment_reason(
