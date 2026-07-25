@@ -41,10 +41,42 @@ type OrdinaryTransportAmbiguityView = {
 
 type OrdinaryTransportAmbiguityOptions = {
   followUpDelayMs?: number;
-  wait?: (delayMs: number) => Promise<void>;
+  followUpDelaysMs?: readonly number[];
+  signal?: AbortSignal;
+  wait?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
 };
 
-const ORDINARY_TRANSPORT_FOLLOW_UP_DELAY_MS = 250;
+const ORDINARY_TRANSPORT_FOLLOW_UP_DELAYS_MS = [
+  250,
+  1_000,
+  4_000,
+  15_000,
+  40_000,
+  60_000,
+  120_000,
+  240_000,
+  // Final read: 900.25s, just beyond the backend's 15-minute stale reconciliation.
+  420_000,
+] as const;
+
+function waitForOrdinaryTransportFollowUp(
+  delayMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const finish = () => {
+      globalThis.clearTimeout(timerId);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timerId = globalThis.setTimeout(finish, delayMs);
+    signal?.addEventListener("abort", finish, { once: true });
+  });
+}
 
 function classifyOrdinaryTransportAmbiguity(
   items: ApiMessage[],
@@ -139,26 +171,30 @@ export async function resolveOrdinaryTransportAmbiguity(
     return initial;
   }
 
-  const wait =
-    options.wait ??
-    ((delayMs: number) =>
-      new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, delayMs);
-      }));
-  await wait(
-    options.followUpDelayMs ?? ORDINARY_TRANSPORT_FOLLOW_UP_DELAY_MS,
-  );
-  try {
-    const followUpItems = await loadMessages();
-    const followUp = classifyOrdinaryTransportAmbiguity(
-      followUpItems,
-      existingMessageIds,
-      expectedRequestId,
-    );
-    return followUp.kind === "unknown" ? initial : followUp;
-  } catch {
-    return initial;
+  const delays =
+    options.followUpDelaysMs ??
+    (options.followUpDelayMs === undefined
+      ? ORDINARY_TRANSPORT_FOLLOW_UP_DELAYS_MS
+      : [options.followUpDelayMs]);
+  const wait = options.wait ?? waitForOrdinaryTransportFollowUp;
+  let latest = initial;
+  for (const delayMs of delays) {
+    if (options.signal?.aborted) return latest;
+    await wait(delayMs, options.signal);
+    if (options.signal?.aborted) return latest;
+    try {
+      const followUp = classifyOrdinaryTransportAmbiguity(
+        await loadMessages(),
+        existingMessageIds,
+        expectedRequestId,
+      );
+      if (followUp.kind === "terminal") return followUp;
+      if (followUp.kind === "checking") latest = followUp;
+    } catch {
+      // A later owner-scoped read can still recover durable terminal truth.
+    }
   }
+  return latest;
 }
 
 export async function snapshotOrdinaryTransportMessageIds(
@@ -177,11 +213,13 @@ export async function resolveOrdinaryTransportAmbiguityView(
   fallback: { assistantId: string; message: Message },
   existingMessageIds: ReadonlySet<string> | null,
   expectedRequestId: string | null,
+  options: OrdinaryTransportAmbiguityOptions = {},
 ): Promise<OrdinaryTransportAmbiguityView> {
   const resolution = await resolveOrdinaryTransportAmbiguity(
     loadMessages,
     existingMessageIds,
     expectedRequestId,
+    options,
   );
   if (resolution.kind === "load_failed") {
     return {

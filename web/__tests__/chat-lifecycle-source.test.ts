@@ -177,6 +177,12 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch).toContain("loadAllConversationMessagePages");
     expect(sendCatch).toContain("conversationLoadFailureMessage");
     expect(sendCatch).toContain("t('chat.status.checking')");
+    expect(sendCatch.indexOf("setStreamStatus(t('chat.status.checking'))")).toBeLessThan(
+      sendCatch.indexOf("await resolveOrdinaryTransportAmbiguityView"),
+    );
+    expect(sendCatch).toContain("signal: reconciliationController.signal");
+    expect(sendCatch).toContain("if (!view.showChecking)");
+    expect(chat).toContain("cancelOrdinaryTransportReconciliation();");
     expect(hydration).toContain("resolveOrdinaryTransportAmbiguity");
     expect(hydration).toContain('resolution.kind !== "terminal"');
     expect(hydration).toContain("message.id !== fallback.assistantId");
@@ -200,7 +206,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     const ambiguityStart = send.indexOf("if (isOrdinaryTransportAmbiguity)");
     const ambiguityEnd = send.indexOf(
-      "const canApplyOwnedUpdate",
+      "const confirmationId = ambiguousRunConfirmationId",
       ambiguityStart,
     );
     expect(send.slice(ambiguityStart, ambiguityEnd)).not.toContain(

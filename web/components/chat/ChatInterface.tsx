@@ -643,6 +643,7 @@ export default function ChatInterface() {
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
   const activeStreamConversationIdRef = useRef<string | null>(null);
+  const ordinaryTransportReconciliationAbortRef = useRef<AbortController | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -700,6 +701,11 @@ export default function ChatInterface() {
     postTurnHistoryRefreshTimersRef.current = [];
   }
 
+  const cancelOrdinaryTransportReconciliation = useCallback(() => {
+    ordinaryTransportReconciliationAbortRef.current?.abort();
+    ordinaryTransportReconciliationAbortRef.current = null;
+  }, []);
+
   const retireActiveStreamForNavigation = useCallback(
     (nextConversationId?: string | null) => {
       if (
@@ -710,12 +716,13 @@ export default function ChatInterface() {
       ) {
         return;
       }
+      cancelOrdinaryTransportReconciliation();
       activeStreamConversationIdRef.current = null;
       setStreamStatus(null);
       setIsStreamingResponse(false);
       clearPostTurnHistoryRefreshTimers();
     },
-    [],
+    [cancelOrdinaryTransportReconciliation],
   );
 
   useEffect(() => {
@@ -817,6 +824,7 @@ export default function ChatInterface() {
   }
 
   function clearActiveStreamState() {
+    cancelOrdinaryTransportReconciliation();
     setStreamStatus(null);
     setIsStreamingResponse(false);
     activeStreamConversationIdRef.current = null;
@@ -839,8 +847,9 @@ export default function ChatInterface() {
         window.clearTimeout(timerId);
       }
       postTurnHistoryRefreshTimersRef.current = [];
+      cancelOrdinaryTransportReconciliation();
     },
-    [],
+    [cancelOrdinaryTransportReconciliation],
   );
 
   useEffect(() => {
@@ -1583,29 +1592,35 @@ export default function ChatInterface() {
         action?.type !== "run_backtest" &&
         (!(err instanceof ChatStreamError) || err.status === 0);
       if (isOrdinaryTransportAmbiguity) {
-        const view = await resolveOrdinaryTransportAmbiguityView(
-          async () =>
-            loadAllConversationMessagePages(activeStreamTargetConversationId),
-          hydrateMessagesFromApi,
-          {
-            assistantId,
-            message: conversationLoadFailureMessage(
-              activeStreamTargetConversationId,
-              t('chat.error_load'),
-            ),
-          },
-          ordinaryTransportMessageIds,
-          err instanceof ChatStreamError ? err.requestId : null,
-        );
-        const canApplyOwnedUpdate = canApplyConversationOwnedUpdate(
-          activeStreamTargetConversationId,
-        );
-        if (canApplyOwnedUpdate) {
-          setIsStreamingResponse(false);
-          activeStreamConversationIdRef.current = null;
-          setMessages(view.messages);
-          setInputActions(view.inputActions);
-          setStreamStatus(view.showChecking ? t('chat.status.checking') : null);
+        if (canApplyOwnedStreamUpdate()) setStreamStatus(t('chat.status.checking'));
+        const reconciliationController = new AbortController();
+        ordinaryTransportReconciliationAbortRef.current = reconciliationController;
+        try {
+          const view = await resolveOrdinaryTransportAmbiguityView(
+            async () => loadAllConversationMessagePages(activeStreamTargetConversationId),
+            hydrateMessagesFromApi,
+            {
+              assistantId,
+              message: conversationLoadFailureMessage(
+                activeStreamTargetConversationId,
+                t('chat.error_load'),
+              ),
+            },
+            ordinaryTransportMessageIds,
+            err instanceof ChatStreamError ? err.requestId : null,
+            { signal: reconciliationController.signal },
+          );
+          if (!reconciliationController.signal.aborted && canApplyOwnedStreamUpdate()) {
+            setMessages(view.messages);
+            setInputActions(view.inputActions);
+            if (!view.showChecking) {
+              clearActiveStreamState();
+            }
+          }
+        } finally {
+          if (ordinaryTransportReconciliationAbortRef.current === reconciliationController) {
+            ordinaryTransportReconciliationAbortRef.current = null;
+          }
         }
         markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
         return;

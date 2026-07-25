@@ -176,6 +176,7 @@ describe("chat message hydration", () => {
         async () => [durable],
         new Set(),
         "request-a",
+        { followUpDelaysMs: [] },
       );
 
       expect(resolution).toEqual({ kind: "checking", items: [durable] });
@@ -227,7 +228,7 @@ describe("chat message hydration", () => {
     expect(delays).toEqual([0]);
   });
 
-  test("stops after one follow-up read when the turn remains running", async () => {
+  test("hydrates completion on read three after two running reads", async () => {
     const running = apiMessage({
       id: "request-1",
       role: "user",
@@ -240,6 +241,101 @@ describe("chat message hydration", () => {
         },
       },
     });
+    const completed = apiMessage({
+      ...running,
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-1",
+          request_id: "request-a",
+          status: "completed",
+          terminal: true,
+        },
+      },
+    });
+    const snapshots = [[running], [running], [completed]];
+    let loads = 0;
+
+    const resolution = await resolveOrdinaryTransportAmbiguity(
+      async () => snapshots[loads++] ?? snapshots.at(-1)!,
+      new Set(),
+      "request-a",
+      { followUpDelaysMs: [0, 0], wait: async () => undefined },
+    );
+
+    expect(resolution).toEqual({ kind: "terminal", items: [completed] });
+    expect(loads).toBe(3);
+  });
+
+  test("continues beyond read two until stale running becomes abandoned", async () => {
+    const running = apiMessage({
+      id: "request-1",
+      role: "user",
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-1",
+          request_id: "request-a",
+          status: "running",
+          terminal: false,
+        },
+      },
+    });
+    const abandoned = apiMessage({
+      ...running,
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-1",
+          request_id: "request-a",
+          status: "abandoned",
+          terminal: true,
+        },
+      },
+    });
+    let loads = 0;
+    let elapsedMs = 0;
+    const staleBoundaryMs = 15 * 60 * 1_000;
+    const delays: number[] = [];
+
+    const resolution = await resolveOrdinaryTransportAmbiguity(
+      async () => {
+        loads += 1;
+        return elapsedMs > staleBoundaryMs ? [abandoned] : [running];
+      },
+      new Set(),
+      "request-a",
+      {
+        wait: async (delayMs) => {
+          delays.push(delayMs);
+          elapsedMs += delayMs;
+        },
+      },
+    );
+
+    expect(resolution).toEqual({ kind: "terminal", items: [abandoned] });
+    expect(loads).toBeGreaterThan(2);
+    expect(delays.length).toBe(loads - 1);
+    const readTimesMs = delays.reduce<number[]>(
+      (times, delayMs) => [...times, (times.at(-1) ?? 0) + delayMs],
+      [],
+    );
+    expect(readTimesMs).toContain(120_250);
+    expect(readTimesMs.at(-1)).toBe(900_250);
+    expect(elapsedMs).toBeGreaterThan(staleBoundaryMs);
+  });
+
+  test("stops reconciliation reads when stream ownership is cancelled", async () => {
+    const running = apiMessage({
+      id: "request-1",
+      role: "user",
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-1",
+          request_id: "request-a",
+          status: "running",
+          terminal: false,
+        },
+      },
+    });
+    const controller = new AbortController();
     let loads = 0;
 
     const resolution = await resolveOrdinaryTransportAmbiguity(
@@ -249,11 +345,16 @@ describe("chat message hydration", () => {
       },
       new Set(),
       "request-a",
-      { followUpDelayMs: 0, wait: async () => undefined },
+      {
+        signal: controller.signal,
+        wait: async () => {
+          controller.abort();
+        },
+      },
     );
 
     expect(resolution).toEqual({ kind: "checking", items: [running] });
-    expect(loads).toBe(2);
+    expect(loads).toBe(1);
   });
 
   test("distinguishes owner-scoped GET failure from unknown durable state", async () => {
@@ -577,6 +678,7 @@ describe("chat message hydration", () => {
         },
         new Set(),
         "request-a",
+        { followUpDelaysMs: [] },
       );
 
       expect(applyViewMessages(view.messages, optimistic)).toEqual(optimistic);
