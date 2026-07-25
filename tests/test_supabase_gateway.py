@@ -1085,6 +1085,8 @@ class _BacktestJobClient:
         self.inserted_jobs: list[dict[str, Any]] = []
         self.updated_jobs: list[dict[str, Any]] = []
         self.updated_job_filters: list[dict[str, object]] = []
+        self.select_calls: list[str] = []
+        self.in_filters: list[tuple[str, list[object]]] = []
 
     def table(self, table_name: str):
         assert table_name == "backtest_jobs"
@@ -1097,10 +1099,14 @@ class _BacktestJobTable:
         self.operation: str | None = None
         self.payload: dict[str, Any] | None = None
         self.filters: dict[str, object] = {}
+        self.in_filters: dict[str, list[object]] = {}
         self.limit_count: int | None = None
+        self.select_columns = "*"
 
-    def select(self, _columns: str):
+    def select(self, columns: str):
         self.operation = "select"
+        self.select_columns = columns
+        self.client.select_calls.append(columns)
         return self
 
     def insert(self, payload: dict[str, Any]):
@@ -1117,6 +1123,11 @@ class _BacktestJobTable:
         self.filters[key] = value
         return self
 
+    def in_(self, key: str, values: list[object]):
+        self.in_filters[key] = values
+        self.client.in_filters.append((key, values))
+        return self
+
     def limit(self, count: int):
         self.limit_count = count
         return self
@@ -1130,9 +1141,18 @@ class _BacktestJobTable:
                 row
                 for row in self.client.existing_jobs
                 if all(row.get(key) == value for key, value in self.filters.items())
+                and all(row.get(key) in values for key, values in self.in_filters.items())
             ]
             if self.limit_count is not None:
                 rows = rows[: self.limit_count]
+            if self.select_columns != "*":
+                selected = {
+                    column.strip() for column in self.select_columns.split(",")
+                }
+                rows = [
+                    {key: value for key, value in row.items() if key in selected}
+                    for row in rows
+                ]
             return SimpleNamespace(data=rows)
         if self.operation == "insert" and self.payload is not None:
             self.client.inserted_jobs.append(self.payload)
@@ -1193,6 +1213,67 @@ def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
             "execution_metadata": {"shadow_mode": True, "source": "api_chat"},
         }
     ]
+
+
+def test_backtest_reservation_query_includes_internal_launch_payload() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "operation_scope": "chat.run_backtest",
+        "idempotency_key": "confirmation-1",
+        "status": "queued",
+        "launch_payload": {"kind": "run_backtest_job"},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.get_backtest_job_reservation(
+        user_id="user-1",
+        operation_scope="chat.run_backtest",
+        idempotency_key="confirmation-1",
+    )
+
+    assert row is not None
+    assert row["launch_payload"] == {"kind": "run_backtest_job"}
+    assert "launch_payload" in client.select_calls[-1].split(",")
+
+
+def test_backtest_reservations_batch_query_is_owner_conversation_scope_and_key_bounded() -> None:
+    client = _BacktestJobClient(
+        existing_jobs=[
+            {
+                "id": "job-1",
+                "user_id": "user-1",
+                "conversation_id": "conversation-1",
+                "operation_scope": "chat.run_backtest",
+                "idempotency_key": "confirmation-1",
+                "launch_payload": {"kind": "run_backtest_job"},
+            },
+            {
+                "id": "job-foreign",
+                "user_id": "user-2",
+                "conversation_id": "conversation-1",
+                "operation_scope": "chat.run_backtest",
+                "idempotency_key": "confirmation-2",
+                "launch_payload": {"kind": "run_backtest_job"},
+            },
+        ]
+    )
+    gateway = SupabaseGateway(client=client)
+
+    rows = gateway.list_backtest_job_reservations(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        operation_scope="chat.run_backtest",
+        idempotency_keys=["confirmation-1", "confirmation-2", "confirmation-1"],
+    )
+
+    assert [row["id"] for row in rows] == ["job-1"]
+    assert client.in_filters == [
+        ("idempotency_key", ["confirmation-1", "confirmation-2"])
+    ]
+    assert "launch_payload" in client.select_calls[-1].split(",")
 
 
 def test_create_backtest_job_rejects_unowned_parent_conversation_before_insert() -> None:
@@ -1488,6 +1569,7 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
         "failure_detail": None,
         "retryable": False,
         "execution_metadata": {"shadow_mode": True},
+        "updated_at": "2026-07-24T12:00:01+00:00",
     }
     client = _BacktestJobClient(existing_jobs=[existing_job])
     gateway = SupabaseGateway(client=client)
@@ -1500,6 +1582,7 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
         retryable=True,
         execution_metadata={"workflow_backtest": {"failure_category": "market_data"}},
         expected_status="running",
+        expected_updated_at="2026-07-24T12:00:01+00:00",
     )
 
     assert row["status"] == "failed"
@@ -1514,6 +1597,9 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
     assert client.updated_jobs[0]["user_id"] == "user-1"
     assert client.updated_jobs[0]["id"] == "job-1"
     assert client.updated_job_filters[0]["status"] == "running"
+    assert client.updated_job_filters[0]["updated_at"] == (
+        "2026-07-24T12:00:01+00:00"
+    )
 
 
 def test_mark_backtest_job_failed_does_not_overwrite_status_after_cas_loss() -> None:

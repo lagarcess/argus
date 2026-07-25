@@ -393,6 +393,7 @@ def reconcile_terminal_render_task_run(
             reconciled_at=_utcnow_iso(),
         ),
         expected_status=status,
+        expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
     reconciled = reconciled or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or "")) or job
     return dict(reconciled)
@@ -571,6 +572,7 @@ def fail_job_without_task_run(
         finished_at=reconciled_at,
         execution_metadata=metadata,
         expected_status=current_status,
+        expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
     if failed:
         return dict(failed)
@@ -580,9 +582,7 @@ def fail_job_without_task_run(
 
 
 def _stale_seconds_for_status(status: str) -> int:
-    if status == "queued":
-        return DEFAULT_STALE_QUEUED_SECONDS
-    return DEFAULT_STALE_RUNNING_SECONDS
+    return DEFAULT_STALE_QUEUED_SECONDS if status == "queued" else DEFAULT_STALE_RUNNING_SECONDS
 
 
 def should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:

@@ -13,9 +13,6 @@ from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
 from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
 from argus.domain.backtest_admission import chat_run_identity_hash
-from argus.domain.backtest_message_projection import (
-    hydrate_backtest_job_action_messages,
-)
 from faker import Faker
 from fastapi.testclient import TestClient
 
@@ -254,6 +251,90 @@ def _run() -> BacktestRun:
     )
 
 
+class _ConversationReloadGateway(_ByActionGateway):
+    def __init__(self) -> None:
+        super().__init__()
+        self.raw_messages: list[Message] = []
+        self.jobs_by_action: dict[str, dict[str, object]] = {}
+        self.batch_reservation_calls: list[dict[str, object]] = []
+
+    def get_conversation(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+    ) -> Conversation | None:
+        if user_id != self.user.id or conversation_id != "conversation-1":
+            return None
+        now = datetime(2026, 7, 24, tzinfo=timezone.utc)
+        return Conversation(
+            id=conversation_id,
+            user_id=user_id,
+            title="AAPL idea",
+            title_source="system_default",
+            language="en",
+            created_at=now,
+            updated_at=now,
+        )
+
+    def list_messages(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int | None,
+    ) -> list[Message]:
+        assert user_id == self.user.id
+        assert conversation_id == "conversation-1"
+        assert limit is None
+        return list(self.raw_messages)
+
+    def list_backtest_job_reservations(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        operation_scope: str,
+        idempotency_keys: list[str],
+    ) -> list[dict[str, object]]:
+        self.batch_reservation_calls.append(
+            {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "operation_scope": operation_scope,
+                "idempotency_keys": list(idempotency_keys),
+            }
+        )
+        return [
+            dict(job)
+            for confirmation_id in idempotency_keys
+            for job in [self.jobs_by_action.get(confirmation_id)]
+            if job is not None
+        ]
+
+    def reconcile_stale_chat_turns(self, **_: object) -> list[dict[str, object]]:
+        return []
+
+    def list_projectable_chat_turns(self, **_: object) -> list[dict[str, object]]:
+        return []
+
+
+def _run_action_message(index: int, confirmation_id: str) -> Message:
+    return Message(
+        id=f"request-message-{index}",
+        conversation_id="conversation-1",
+        role="user",
+        content="Run backtest",
+        metadata={
+            "chat_action": {
+                "type": "run_backtest",
+                "payload": {"confirmation_id": confirmation_id},
+            }
+        },
+        created_at=datetime(2026, 7, 24, 12, 0, index, tzinfo=timezone.utc),
+    )
+
+
 @pytest.fixture(autouse=True)
 def _mock_auth_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "true")
@@ -360,69 +441,7 @@ def test_conversation_reload_projects_stale_run_job_without_assistant_message(
 ) -> None:
     from argus.api import state as api_state
 
-    class _ReloadGateway(_ByActionGateway):
-        def get_conversation(
-            self,
-            *,
-            user_id: str,
-            conversation_id: str,
-        ) -> Conversation | None:
-            if user_id != self.user.id or conversation_id != "conversation-1":
-                return None
-            now = datetime(2026, 7, 24, tzinfo=timezone.utc)
-            return Conversation(
-                id=conversation_id,
-                user_id=user_id,
-                title="AAPL idea",
-                title_source="system_default",
-                language="en",
-                created_at=now,
-                updated_at=now,
-            )
-
-        def list_messages(
-            self,
-            *,
-            user_id: str,
-            conversation_id: str,
-            limit: int | None,
-        ) -> list[Message]:
-            assert user_id == self.user.id
-            assert conversation_id == "conversation-1"
-            assert limit is None
-            messages = [
-                Message(
-                    id="request-message-1",
-                    conversation_id=conversation_id,
-                    role="user",
-                    content="Run backtest",
-                    metadata={
-                        "chat_action": {
-                            "type": "run_backtest",
-                            "payload": {"confirmation_id": "confirmation-1"},
-                        }
-                    },
-                    created_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
-                )
-            ]
-            return hydrate_backtest_job_action_messages(
-                messages,
-                load_job_by_action=lambda confirmation_id: (
-                    self.get_backtest_job_reservation(
-                        user_id=user_id,
-                        operation_scope="chat.run_backtest",
-                        idempotency_key=confirmation_id,
-                    )
-                ),
-            )
-
-        def reconcile_stale_chat_turns(self, **_: object) -> list[dict[str, object]]:
-            return []
-
-        def list_projectable_chat_turns(self, **_: object) -> list[dict[str, object]]:
-            return []
-
-    gateway = _ReloadGateway()
+    gateway = _ConversationReloadGateway()
     gateway.job.update(
         {
             "status": "queued",
@@ -433,6 +452,8 @@ def test_conversation_reload_projects_stale_run_job_without_assistant_message(
             "execution_metadata": {},
         }
     )
+    gateway.raw_messages = [_run_action_message(1, "confirmation-1")]
+    gateway.jobs_by_action = {"confirmation-1": gateway.job}
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 
     response = TestClient(app).get(
@@ -444,6 +465,15 @@ def test_conversation_reload_projects_stale_run_job_without_assistant_message(
     assert message["id"] == "request-message-1"
     assert message["metadata"]["backtest_job"]["status"] == "queued"
     assert message["metadata"]["backtest_job_id"] == "job-by-action-1"
+    assert gateway.reservation_calls == []
+    assert gateway.batch_reservation_calls == [
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "operation_scope": "chat.run_backtest",
+            "idempotency_keys": ["confirmation-1"],
+        }
+    ]
 
     job_response = TestClient(app).get(
         "/api/v1/backtest-jobs/job-by-action-1"
@@ -453,6 +483,139 @@ def test_conversation_reload_projects_stale_run_job_without_assistant_message(
     assert job_response.json()["job"]["status"] == "failed"
     assert job_response.json()["job"]["failure_code"] == "workflow_dispatch_missing"
     assert gateway.failure_updates[0]["expected_status"] == "queued"
+    assert gateway.failure_updates[0]["expected_updated_at"] == (
+        "2026-07-24T12:00:04+00:00"
+    )
+
+
+def test_conversation_reload_batches_only_page_run_actions_across_cursors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    gateway = _ConversationReloadGateway()
+    gateway.raw_messages = [
+        _run_action_message(index, f"confirmation-{index}")
+        for index in range(1, 5)
+    ]
+    gateway.jobs_by_action = {
+        f"confirmation-{index}": {
+            **gateway.job,
+            "id": f"job-{index}",
+            "request_message_id": f"request-message-{index}",
+            "idempotency_key": f"confirmation-{index}",
+        }
+        for index in range(1, 5)
+    }
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = TestClient(app)
+
+    first = client.get(
+        "/api/v1/conversations/conversation-1/messages",
+        params={"limit": 2},
+    )
+
+    assert first.status_code == 200
+    assert [
+        item["metadata"]["backtest_job"]["id"] for item in first.json()["items"]
+    ] == ["job-1", "job-2"]
+    assert first.json()["next_cursor"] is not None
+    assert gateway.reservation_calls == []
+    assert gateway.batch_reservation_calls == [
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "operation_scope": "chat.run_backtest",
+            "idempotency_keys": ["confirmation-1", "confirmation-2"],
+        }
+    ]
+
+    second = client.get(
+        "/api/v1/conversations/conversation-1/messages",
+        params={"limit": 2, "cursor": first.json()["next_cursor"]},
+    )
+
+    assert second.status_code == 200
+    assert [
+        item["metadata"]["backtest_job"]["id"] for item in second.json()["items"]
+    ] == ["job-3", "job-4"]
+    assert second.json()["next_cursor"] is None
+    assert gateway.batch_reservation_calls == [
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "operation_scope": "chat.run_backtest",
+            "idempotency_keys": ["confirmation-1", "confirmation-2"],
+        },
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "operation_scope": "chat.run_backtest",
+            "idempotency_keys": ["confirmation-3", "confirmation-4"],
+        },
+    ]
+
+
+def test_conversation_reload_keeps_global_assistant_job_representation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    gateway = _ConversationReloadGateway()
+    gateway.raw_messages = [
+        _run_action_message(1, "confirmation-1"),
+        Message(
+            id="assistant-job-1",
+            conversation_id="conversation-1",
+            role="assistant",
+            content="Queued.",
+            metadata={
+                "backtest_job_id": "job-by-action-1",
+                "backtest_job": gateway.job,
+            },
+            created_at=datetime(2026, 7, 24, 12, 0, 2, tzinfo=timezone.utc),
+        ),
+    ]
+    gateway.jobs_by_action = {"confirmation-1": gateway.job}
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    response = TestClient(app).get(
+        "/api/v1/conversations/conversation-1/messages",
+        params={"limit": 1},
+    )
+
+    assert response.status_code == 200
+    [message] = response.json()["items"]
+    assert "backtest_job" not in message["metadata"]
+    assert gateway.reservation_calls == []
+    assert gateway.batch_reservation_calls == []
+
+
+def test_conversation_reload_rejects_batch_job_for_wrong_request_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    gateway = _ConversationReloadGateway()
+    gateway.raw_messages = [_run_action_message(1, "confirmation-1")]
+    gateway.jobs_by_action = {
+        "confirmation-1": {
+            **gateway.job,
+            "request_message_id": "request-message-other",
+        }
+    }
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    response = TestClient(app).get(
+        "/api/v1/conversations/conversation-1/messages"
+    )
+
+    assert response.status_code == 200
+    [message] = response.json()["items"]
+    assert "backtest_job" not in message["metadata"]
+    assert gateway.batch_reservation_calls[0]["idempotency_keys"] == [
+        "confirmation-1"
+    ]
 
 
 def test_by_action_lookup_returns_409_without_job_disclosure_on_identity_collision(

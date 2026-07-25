@@ -6,6 +6,7 @@ import {
   normalizeConfirmationHistory,
   supersedePriorConfirmations,
 } from "../components/chat/artifact-history";
+import { hydrateMessagesFromApi } from "../components/chat/ChatInterface";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -187,6 +188,74 @@ describe("chat backtest jobs", () => {
     expect(message?.backtestJob?.status).toBe("failed");
     expect(message?.backtestJob?.retryable).toBe(true);
   });
+
+  for (const terminal of [
+    {
+      status: "failed" as const,
+      expectedStatus: "could_not_run",
+      expectedLabel: "Could not run",
+    },
+    {
+      status: "canceled" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+    {
+      status: "expired" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+  ]) {
+    test(`raw reload keeps ${terminal.status} durable truth after Run action effects`, () => {
+      const terminalJob = job({
+        status: terminal.status,
+        finished_at: "2026-06-06T12:00:04Z",
+      });
+      const rawItems: ApiMessage[] = [
+        {
+          id: "confirmation-message-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: "Ready to run.",
+          created_at: "2026-06-06T12:00:00Z",
+          metadata: {
+            confirmation_card: {
+              confirmation_id: "confirmation-1",
+              confirmation_state: "active",
+              title: "AAPL buy and hold",
+              status: "ready_to_run",
+              statusLabel: "Ready to run",
+              summary: "Ready to test AAPL.",
+              rows: [],
+              actions: [
+                {
+                  type: "run_backtest",
+                  label: "Run backtest",
+                  presentation: "confirmation",
+                  payload: { confirmation_id: "confirmation-1" },
+                },
+              ],
+            },
+          },
+        },
+        projectedUserActionWithJob(terminalJob),
+      ];
+
+      const hydrated = hydrateMessagesFromApi(rawItems);
+      const confirmation = hydrated.messages.find(
+        (message) => message.id === "confirmation-message-1",
+      );
+      const durableJob = hydrated.messages.find(
+        (message) => message.kind === "backtest_job",
+      );
+
+      expect(confirmation?.confirmation?.status).toBe(terminal.expectedStatus);
+      expect(confirmation?.confirmation?.statusLabel).toBe(terminal.expectedLabel);
+      expect(confirmation?.confirmation?.statusLabel).not.toBe("Running");
+      expect(durableJob?.backtestJob?.status).toBe(terminal.status);
+      expect(pendingBacktestJobIds(hydrated.messages)).toEqual([]);
+    });
+  }
 
   test("hydrates stream final job payloads into durable job state", () => {
     const currentJob = job({ status: "running" });

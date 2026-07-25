@@ -14,9 +14,9 @@
 ## Corrections
 
 1. **Exact Run action identity at the route boundary**
-   - `run_backtest` now requires the canonical `Idempotency-Key` before profile,
-     conversation, message, usage, lifecycle, persistence, provider, delegate,
-     dispatch, or compute work.
+   - After the authentication dependency, `run_backtest` requires the canonical
+     `Idempotency-Key` before route-owned profile/conversation, message, usage,
+     lifecycle, persistence, provider, delegate, dispatch, or compute work.
    - Missing or blank headers return `400 idempotency_key_required`.
    - Missing action `confirmation_id` returns `422 validation_error`.
    - Header/action mismatch returns `409 idempotency_conflict`.

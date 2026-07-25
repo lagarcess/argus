@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -32,7 +31,9 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_admission import CHAT_RUN_SCOPE
 from argus.domain.backtest_message_projection import (
+    backtest_job_action_confirmation_ids,
     hydrate_backtest_job_action_messages,
+    represented_backtest_job_request_ids,
 )
 from argus.domain.store import utcnow
 
@@ -69,25 +70,35 @@ def _project_backtest_job_actions(
     user_id: str,
     conversation_id: str,
     messages: list[Message],
+    represented_request_ids: set[str],
 ) -> list[Message]:
     gateway = api_state.supabase_gateway
-    load_reservation = getattr(gateway, "get_backtest_job_reservation", None)
-    if gateway is None or load_reservation is None:
+    list_reservations = getattr(gateway, "list_backtest_job_reservations", None)
+    if gateway is None or list_reservations is None:
         return messages
 
-    def load_job(confirmation_id: str) -> dict[str, Any] | None:
-        job = load_reservation(
-            user_id=user_id,
-            operation_scope=CHAT_RUN_SCOPE,
-            idempotency_key=confirmation_id,
-        )
-        if not isinstance(job, dict) or job.get("conversation_id") != conversation_id:
-            return None
-        return job
+    confirmation_ids = backtest_job_action_confirmation_ids(
+        messages,
+        represented_request_ids=represented_request_ids,
+    )
+    if not confirmation_ids:
+        return messages
+    jobs = list_reservations(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        operation_scope=CHAT_RUN_SCOPE,
+        idempotency_keys=confirmation_ids,
+    )
+    jobs_by_action = {
+        str(job.get("idempotency_key") or "").strip(): job
+        for job in jobs
+        if isinstance(job, dict) and str(job.get("idempotency_key") or "").strip()
+    }
 
     return hydrate_backtest_job_action_messages(
         messages,
-        load_job_by_action=load_job,
+        jobs_by_action=jobs_by_action,
+        represented_request_ids=represented_request_ids,
     )
 
 
@@ -397,11 +408,7 @@ def list_messages(
         conversation_id=conversation_id,
         messages=items,
     )
-    items = _project_backtest_job_actions(
-        user_id=user.id,
-        conversation_id=conversation_id,
-        messages=items,
-    )
+    represented_request_ids = represented_backtest_job_request_ids(items)
     items = _public_message_projection(items)
     filtered = items
     if cursor:
@@ -415,6 +422,12 @@ def list_messages(
     page = filtered[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
+    page_items = _project_backtest_job_actions(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        messages=page_items,
+        represented_request_ids=represented_request_ids,
+    )
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]

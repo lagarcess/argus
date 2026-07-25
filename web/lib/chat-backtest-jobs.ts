@@ -98,6 +98,15 @@ export function applyBacktestJobUpdate(
   return settleConfirmationLabelsForJob(updatedMessages, response.job);
 }
 
+export function applyHydratedBacktestJobTruth(messages: Message[]): Message[] {
+  return messages.reduce((projected, message) => {
+    if (message.kind !== "backtest_job" || !message.backtestJob) {
+      return projected;
+    }
+    return settleConfirmationLabelsForJob(projected, message.backtestJob);
+  }, messages);
+}
+
 function resultMessageFromRun(
   message: Message,
   run: BacktestRun,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -116,27 +116,24 @@ def hydrate_completed_backtest_job_messages(
 def hydrate_backtest_job_action_messages(
     messages: list[Message],
     *,
-    load_job_by_action: Callable[[str], dict[str, Any] | None],
+    jobs_by_action: Mapping[str, dict[str, Any]] | None = None,
+    load_job_by_action: Callable[[str], dict[str, Any] | None] | None = None,
+    represented_request_ids: set[str] | None = None,
 ) -> list[Message]:
     """Project a durable job when process loss skipped its assistant message."""
 
-    represented_request_ids = {
-        str(job.get("request_message_id") or "").strip()
-        for message in messages
-        if message.role == "assistant"
-        for job in [_backtest_job(message.metadata or {})]
-        if job is not None
-    }
-    jobs: dict[str, dict[str, Any] | None] = {}
+    represented_ids = represented_backtest_job_request_ids(messages)
+    represented_ids.update(represented_request_ids or ())
+    jobs: dict[str, dict[str, Any] | None] = dict(jobs_by_action or {})
     projected: list[Message] = []
     for message in messages:
         confirmation_id = _run_action_confirmation_id(message)
-        if confirmation_id is None or message.id in represented_request_ids:
+        if confirmation_id is None or message.id in represented_ids:
             projected.append(message)
             continue
-        if confirmation_id not in jobs:
+        if confirmation_id not in jobs and load_job_by_action is not None:
             jobs[confirmation_id] = load_job_by_action(confirmation_id)
-        job = jobs[confirmation_id]
+        job = jobs.get(confirmation_id)
         if not _job_matches_action_message(job, message):
             projected.append(message)
             continue
@@ -150,6 +147,36 @@ def hydrate_backtest_job_action_messages(
         )
         projected.append(message.model_copy(update={"metadata": metadata}))
     return projected
+
+
+def represented_backtest_job_request_ids(messages: list[Message]) -> set[str]:
+    return {
+        str(job.get("request_message_id") or "").strip()
+        for message in messages
+        if message.role == "assistant"
+        for job in [_backtest_job(message.metadata or {})]
+        if job is not None
+    }
+
+
+def backtest_job_action_confirmation_ids(
+    messages: list[Message],
+    *,
+    represented_request_ids: set[str] | None = None,
+) -> list[str]:
+    represented_ids = represented_backtest_job_request_ids(messages)
+    represented_ids.update(represented_request_ids or ())
+    confirmation_ids: list[str] = []
+    for message in messages:
+        confirmation_id = _run_action_confirmation_id(message)
+        if (
+            confirmation_id is None
+            or message.id in represented_ids
+            or confirmation_id in confirmation_ids
+        ):
+            continue
+        confirmation_ids.append(confirmation_id)
+    return confirmation_ids
 
 
 def _run_action_confirmation_id(message: Message) -> str | None:

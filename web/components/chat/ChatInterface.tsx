@@ -102,6 +102,7 @@ import {
 import { appendOrReplacePendingAssistantMessage, replaceOrAppendFinalAssistantMessage } from "@/lib/chat-send-state";
 import {
   applyBacktestJobUpdate,
+  applyHydratedBacktestJobTruth,
   backtestJobFromFinalPayload,
   backtestJobMessageFromApi,
 } from "@/lib/chat-backtest-jobs";
@@ -160,10 +161,7 @@ type OnboardingChoice = {
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
-type HydratedMessages = {
-  messages: Message[];
-  inputActions: ChatActionOption[];
-};
+type HydratedMessages = { messages: Message[]; inputActions: ChatActionOption[] };
 
 function chatActionRequestFromAction(action: ChatActionOption): ChatActionRequest {
   return {
@@ -449,7 +447,7 @@ function markResultCardSaving(
   });
 }
 
-function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
+export function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const consumedResultActions = consumedResultActionsFromApi(items);
   const confirmationActionEffects = confirmationActionEffectsFromApi(items);
   const hiddenMessageIds = new Set([
@@ -543,9 +541,11 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
 
   const normalized = normalizeDurableRetryActionHistory(
     applyConsumedResultActions(
-      applyConfirmationActionEffects(
-        normalizeConfirmationHistory(messages),
-        confirmationActionEffects.effects,
+      applyHydratedBacktestJobTruth(
+        applyConfirmationActionEffects(
+          normalizeConfirmationHistory(messages),
+          confirmationActionEffects.effects,
+        ),
       ),
       consumedResultActions,
     ),

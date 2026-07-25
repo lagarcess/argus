@@ -103,6 +103,9 @@ class _Gateway:
         expected_status = payload.get("expected_status")
         if expected_status is not None and job.get("status") != expected_status:
             return {}
+        expected_updated_at = payload.get("expected_updated_at")
+        if expected_updated_at is not None and job.get("updated_at") != expected_updated_at:
+            return {}
         job.update(
             {
                 "status": "failed",
@@ -432,6 +435,16 @@ class _StaleJobScanGateway:
         self.failed_updates.append(payload)
         for job in self.jobs:
             if job["id"] == payload["job_id"]:
+                if (
+                    payload.get("expected_status") is not None
+                    and job.get("status") != payload["expected_status"]
+                ):
+                    return {}
+                if (
+                    payload.get("expected_updated_at") is not None
+                    and job.get("updated_at") != payload["expected_updated_at"]
+                ):
+                    return {}
                 execution_metadata = dict(job.get("execution_metadata") or {})
                 execution_metadata.update(dict(payload.get("execution_metadata") or {}))
                 job.update(
@@ -446,6 +459,21 @@ class _StaleJobScanGateway:
                 )
                 return dict(job)
         raise AssertionError("unknown job")
+
+    def get_backtest_job(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+    ) -> dict[str, object] | None:
+        return next(
+            (
+                dict(job)
+                for job in self.jobs
+                if job.get("user_id") == user_id and job.get("id") == job_id
+            ),
+            None,
+        )
 
 
 def _payload() -> dict[str, object]:
@@ -1084,4 +1112,66 @@ def test_stale_backtest_job_scan_fails_real_queued_job_without_dispatch_proof() 
     assert report["unresolved_count"] == 0
     assert gateway.failed_updates[0]["job_id"] == "job-stale-real"
     assert gateway.failed_updates[0]["expected_status"] == "queued"
+    assert gateway.failed_updates[0]["expected_updated_at"] == (
+        "2026-06-06T12:00:00+00:00"
+    )
     assert gateway.failed_updates[0]["retryable"] is True
+
+
+def test_stale_undispatched_failure_loses_cas_to_concurrent_dispatch_metadata() -> None:
+    from argus.api.chat.backtest_jobs import scan_stale_backtest_jobs
+
+    class _ConcurrentDispatchGateway(_StaleJobScanGateway):
+        def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+            self.failed_updates.append(payload)
+            [job] = self.jobs
+            job.update(
+                {
+                    "status": "queued",
+                    "updated_at": "2026-06-06T12:30:01+00:00",
+                    "execution_metadata": {
+                        "workflow_dispatch": {"task_run_id": "trn-concurrent-1"}
+                    },
+                }
+            )
+            if job["updated_at"] != payload.get("expected_updated_at"):
+                return {}
+            raise AssertionError("stale failure overwrote concurrent dispatch")
+
+    gateway = _ConcurrentDispatchGateway()
+    gateway.jobs = [
+        {
+            "id": "job-stale-real",
+            "user_id": "user-1",
+            "status": "queued",
+            "queued_at": "2026-06-06T12:00:00+00:00",
+            "created_at": "2026-06-06T12:00:00+00:00",
+            "updated_at": "2026-06-06T12:00:00+00:00",
+            "launch_payload": {"kind": "run_backtest_job"},
+            "execution_metadata": {},
+        }
+    ]
+
+    report = scan_stale_backtest_jobs(
+        gateway=gateway,
+        now=datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc),
+        queued_age_seconds=900,
+        running_age_seconds=900,
+        limit=20,
+        task_run_client=_FakeTerminalTaskRunClient(
+            {"id": "trn-never-created", "status": "failed"}
+        ),
+    )
+
+    [job] = gateway.jobs
+    assert gateway.failed_updates[0]["expected_status"] == "queued"
+    assert gateway.failed_updates[0]["expected_updated_at"] == (
+        "2026-06-06T12:00:00+00:00"
+    )
+    assert job["status"] == "queued"
+    assert job.get("failure_code") is None
+    assert job["execution_metadata"] == {
+        "workflow_dispatch": {"task_run_id": "trn-concurrent-1"}
+    }
+    assert report["reconciled_count"] == 0
+    assert report["unresolved_count"] == 1

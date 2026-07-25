@@ -959,23 +959,24 @@ class SupabaseGateway(
         return dict(_row_one(created) or {})
 
     def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
+        return jobs.admit_backtest_job(self.client, **kwargs)
 
     def get_backtest_job_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.get_backtest_job_reservation(
-            self.client, **kwargs
-        )
+        return jobs.get_backtest_job_reservation(self.client, **kwargs)
+
+    def list_backtest_job_reservations(self, **kwargs: Any) -> list[dict[str, Any]]:
+        from argus.domain import backtest_admission_gateway as jobs
+
+        return jobs.list_backtest_job_reservations(self.client, **kwargs)
 
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.finalize_direct_backtest_job(
-            self.client, **kwargs
-        )
+        return jobs.finalize_direct_backtest_job(self.client, **kwargs)
 
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
@@ -990,11 +991,7 @@ class SupabaseGateway(
         return dict(row) if row is not None else None
 
     def count_backtest_jobs(
-        self,
-        *,
-        status: str,
-        user_id: str | None = None,
-        limit: int = 100,
+        self, *, status: str, user_id: str | None = None, limit: int = 100
     ) -> int:
         query = self.client.table("backtest_jobs").select("id").eq("status", status)
         if user_id is not None:
@@ -1142,6 +1139,7 @@ class SupabaseGateway(
         execution_metadata: dict[str, Any] | None = None,
         finished_at: str | None = None,
         expected_status: str | None = None,
+        expected_updated_at: str | None = None,
     ) -> dict[str, Any]:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
@@ -1166,6 +1164,8 @@ class SupabaseGateway(
         )
         if expected_status is not None:
             update_query = update_query.eq("status", expected_status)
+        if expected_updated_at is not None:
+            update_query = update_query.eq("updated_at", expected_updated_at)
         updated = update_query.execute()
         return dict(_row_one(updated) or {})
 
