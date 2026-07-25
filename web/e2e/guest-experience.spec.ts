@@ -175,6 +175,11 @@ function searchSurface(page: Page) {
   return page.locator("div.fixed.inset-0").filter({ has: searchInput }).first();
 }
 
+async function closeSearchSurface(page: Page, surface: Locator) {
+  await page.keyboard.press("Escape");
+  await expect(surface).toBeHidden();
+}
+
 function durableFailureMessage(page: Page) {
   const failureText = page.getByText(
     "Something went wrong. Your conversation is saved. Please try again.",
@@ -867,9 +872,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         "/search?q=Preserved%20local%20QA%20strategy&limit=20&include_ledger_groups=true",
       );
       await expect(ownerSearchSurface.getByText("No results found")).toBeVisible();
-      await ownerSearchSurface
-        .getByRole("button", { name: "Close search" })
-        .click();
+      await closeSearchSurface(page, ownerSearchSurface);
 
       const foreignExpand = claimGuestPage.getByRole("button", {
         name: "Expand sidebar",
@@ -915,9 +918,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(foreignRead.status).toBe(404);
       expect(deniedBodyContainsNoPrivatePayload(foreignRead.body)).toBe(true);
       evidence.cross_owner_result_count += ownerSearch.body.items.length;
-      await foreignSearchSurface
-        .getByRole("button", { name: "Close search" })
-        .click();
+      await closeSearchSurface(claimGuestPage, foreignSearchSurface);
     });
 
     await runStep(11, evidence, (value) => (currentCheck = value), async () => {

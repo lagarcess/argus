@@ -582,8 +582,17 @@ describe("Checks 6–20 harness guards", () => {
     const check10 = checkSource(10);
 
     expect(check10).toContain("searchSurface(page)");
+    expect(check10).toContain(
+      "closeSearchSurface(page, ownerSearchSurface)",
+    );
+    expect(check10).toContain(
+      "closeSearchSurface(claimGuestPage, foreignSearchSurface)",
+    );
     expect(check10).toContain("allowedGuestItemTypes");
     expect(check10).toContain("deniedBodyContainsNoPrivatePayload");
+    expect(check10).not.toContain(
+      '.getByRole("button", { name: "Close search" })',
+    );
     expect(check10).not.toContain("JSON.stringify(search.body).includes");
   });
 
