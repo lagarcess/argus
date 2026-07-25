@@ -18,8 +18,8 @@ pytestmark = pytest.mark.skipif(
 psycopg = pytest.importorskip("psycopg")
 
 
-def _connect():
-    return psycopg.connect(DSN, autocommit=True)
+def _connect(*, autocommit: bool = True):
+    return psycopg.connect(DSN, autocommit=autocommit)
 
 
 def _seed_expired_guest(connection) -> dict[str, str]:
@@ -60,6 +60,237 @@ def _seed_expired_guest(connection) -> dict[str, str]:
     return {"user_id": user_id, "conversation_id": conversation_id}
 
 
+def _seed_complete_expired_guest_graph(connection) -> dict[str, str]:
+    graph = _seed_expired_guest(connection)
+    graph.update(
+        {
+            name: str(uuid.uuid4())
+            for name in (
+                "assistant_message_id",
+                "strategy_id",
+                "run_id",
+                "job_id",
+                "idea_id",
+                "version_id",
+                "evidence_id",
+                "decision_id",
+                "context_packet_id",
+                "run_context_packet_id",
+                "route_receipt_id",
+                "cost_ledger_id",
+            )
+        }
+    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select id::text from public.messages"
+            " where conversation_id = %s and user_id = %s"
+            " order by created_at limit 1",
+            (graph["conversation_id"], graph["user_id"]),
+        )
+        graph["user_message_id"] = cursor.fetchone()[0]
+        cursor.execute(
+            "select created_at, expires_at from public.guest_workspaces"
+            " where user_id = %s",
+            (graph["user_id"],),
+        )
+        created_at, expires_at = cursor.fetchone()
+        cursor.execute(
+            "insert into public.messages"
+            " (id,conversation_id,user_id,role,content,metadata)"
+            " values (%s,%s,%s,'assistant','completed guest result','{}'::jsonb)",
+            (
+                graph["assistant_message_id"],
+                graph["conversation_id"],
+                graph["user_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.strategies"
+            " (id,user_id,conversation_id,name,template,asset_class,symbols,"
+            "  benchmark_symbol)"
+            " values (%s,%s,%s,'Expired AAPL test','buy_and_hold','equity',"
+            " array['AAPL'],'SPY')",
+            (
+                graph["strategy_id"],
+                graph["user_id"],
+                graph["conversation_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.backtest_runs"
+            " (id,user_id,conversation_id,strategy_id,status,asset_class,symbols,"
+            "  benchmark_symbol,config_snapshot,conversation_result_card)"
+            " values (%s,%s,%s,%s,'completed','equity',array['AAPL'],'SPY',"
+            " '{}'::jsonb,'{}'::jsonb)",
+            (
+                graph["run_id"],
+                graph["user_id"],
+                graph["conversation_id"],
+                graph["strategy_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.backtest_jobs"
+            " (id,user_id,conversation_id,request_message_id,"
+            "  confirmation_message_id,idempotency_key,payload_hash,"
+            "  launch_payload,status,result_run_id)"
+            " values (%s,%s,%s,%s,%s,'cleanup-run','cleanup-payload',"
+            " '{}'::jsonb,'succeeded',%s)",
+            (
+                graph["job_id"],
+                graph["user_id"],
+                graph["conversation_id"],
+                graph["user_message_id"],
+                graph["assistant_message_id"],
+                graph["run_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.ideas"
+            " (id,user_id,source_conversation_id,title,lifecycle)"
+            " values (%s,%s,%s,'Expired AAPL idea','decided')",
+            (graph["idea_id"], graph["user_id"], graph["conversation_id"]),
+        )
+        cursor.execute(
+            "insert into public.idea_versions"
+            " (id,user_id,idea_id,source_conversation_id,source_run_id,"
+            "  canonical_spec,strategy_snapshot,title,lifecycle)"
+            " values (%s,%s,%s,%s,%s,'{}'::jsonb,'{}'::jsonb,"
+            " 'Expired AAPL idea','decided')",
+            (
+                graph["version_id"],
+                graph["user_id"],
+                graph["idea_id"],
+                graph["conversation_id"],
+                graph["run_id"],
+            ),
+        )
+        cursor.execute(
+            "update public.ideas set active_version_id = %s where id = %s",
+            (graph["version_id"], graph["idea_id"]),
+        )
+        cursor.execute(
+            "insert into public.evidence_artifacts"
+            " (id,user_id,idea_id,idea_version_id,source_conversation_id,"
+            "  source_run_id,lifecycle,title,digest,payload)"
+            " values (%s,%s,%s,%s,%s,%s,'decided','Expired AAPL result',"
+            " 'cleanup-proof','{}'::jsonb)",
+            (
+                graph["evidence_id"],
+                graph["user_id"],
+                graph["idea_id"],
+                graph["version_id"],
+                graph["conversation_id"],
+                graph["run_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.decision_notes"
+            " (id,user_id,idea_id,idea_version_id,evidence_artifact_id,"
+            "  source_conversation_id,decision_state,note)"
+            " values (%s,%s,%s,%s,%s,%s,'watching','cleanup proof')",
+            (
+                graph["decision_id"],
+                graph["user_id"],
+                graph["idea_id"],
+                graph["version_id"],
+                graph["evidence_id"],
+                graph["conversation_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.context_packets"
+            " (id,user_id,provider,packet_type,retrieved_at)"
+            " values (%s,%s,'alpaca','news',%s)",
+            (graph["context_packet_id"], graph["user_id"], created_at),
+        )
+        cursor.execute(
+            "insert into public.run_context_packets"
+            " (id,user_id,run_id,context_packet_id)"
+            " values (%s,%s,%s,%s)",
+            (
+                graph["run_context_packet_id"],
+                graph["user_id"],
+                graph["run_id"],
+                graph["context_packet_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.feedback (user_id,type,message)"
+            " values (%s,'general','private cleanup proof')",
+            (graph["user_id"],),
+        )
+        cursor.execute(
+            "insert into public.usage_counters"
+            " (user_id,resource,period,period_start,period_end,"
+            "  used_count,limit_count)"
+            " values (%s,'chat_messages','guest_session',%s,%s,4,10),"
+            "        (%s,'backtest_runs','guest_session',%s,%s,1,1)",
+            (
+                graph["user_id"],
+                created_at,
+                expires_at,
+                graph["user_id"],
+                created_at,
+                expires_at,
+            ),
+        )
+        cursor.execute(
+            "insert into public.checkpoints"
+            " (thread_id,checkpoint_ns,checkpoint_id,checkpoint)"
+            " values (%s,'','cleanup-checkpoint','{}'::jsonb)",
+            (graph["conversation_id"],),
+        )
+        cursor.execute(
+            "insert into public.checkpoint_blobs"
+            " (thread_id,checkpoint_ns,channel,version,type,blob)"
+            " values (%s,'','messages','1','msgpack',null)",
+            (graph["conversation_id"],),
+        )
+        cursor.execute(
+            "insert into public.checkpoint_writes"
+            " (thread_id,checkpoint_ns,checkpoint_id,task_id,idx,"
+            "  channel,type,blob)"
+            " values (%s,'','cleanup-checkpoint','cleanup-task',0,"
+            "  'messages','msgpack',%s)",
+            (graph["conversation_id"], b"cleanup-checkpoint"),
+        )
+        cursor.execute(
+            "insert into public.route_receipts"
+            " (id,user_id,conversation_id,run_id,message_id,task,tier,mode,"
+            "  latency_ms,outcome,context_packet_ids)"
+            " values (%s,%s,%s,%s,%s,'interpretation','structured',"
+            " 'json_schema',12,'succeeded',array[%s])",
+            (
+                graph["route_receipt_id"],
+                graph["user_id"],
+                graph["conversation_id"],
+                graph["run_id"],
+                graph["assistant_message_id"],
+                graph["context_packet_id"],
+            ),
+        )
+        cursor.execute(
+            "insert into public.cost_ledger_entries"
+            " (id,source,service,provider,feature_area,user_id,conversation_id,"
+            "  message_id,backtest_run_id,backtest_job_id,route_receipt_id,"
+            "  correlation_id,billable_unit,status)"
+            " values (%s,'api_turn','openrouter','openrouter','guest_cleanup',"
+            " %s,%s,%s,%s,%s,%s,'cleanup-correlation','request','succeeded')",
+            (
+                graph["cost_ledger_id"],
+                graph["user_id"],
+                graph["conversation_id"],
+                graph["assistant_message_id"],
+                graph["run_id"],
+                graph["job_id"],
+                graph["route_receipt_id"],
+            ),
+        )
+    return graph
+
+
 def _claim_cleanup(connection, *, dry_run: bool) -> list[tuple[str, str | None]]:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -68,6 +299,421 @@ def _claim_cleanup(connection, *, dry_run: bool) -> list[tuple[str, str | None]]
             (25, dry_run),
         )
         return list(cursor.fetchall())
+
+
+def _complete_graph_state(connection, graph: dict[str, str]) -> dict[str, object]:
+    counts: dict[str, int] = {}
+    with connection.cursor() as cursor:
+        for table in (
+            "conversations",
+            "messages",
+            "strategies",
+            "backtest_jobs",
+            "backtest_runs",
+            "ideas",
+            "idea_versions",
+            "evidence_artifacts",
+            "decision_notes",
+            "context_packets",
+            "run_context_packets",
+            "feedback",
+            "usage_counters",
+            "guest_workspaces",
+        ):
+            cursor.execute(
+                f"select count(*) from public.{table} where user_id = %s",
+                (graph["user_id"],),
+            )
+            counts[table] = cursor.fetchone()[0]
+        for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
+            cursor.execute(
+                f"select count(*) from public.{table} where thread_id = %s",
+                (graph["conversation_id"],),
+            )
+            counts[table] = cursor.fetchone()[0]
+        cursor.execute(
+            "select count(*) from auth.users where id = %s",
+            (graph["user_id"],),
+        )
+        auth_count = cursor.fetchone()[0]
+        cursor.execute(
+            "select status,conversation_id::text from public.guest_workspaces"
+            " where user_id = %s",
+            (graph["user_id"],),
+        )
+        workspace = cursor.fetchone()
+        cursor.execute(
+            "select user_id::text,conversation_id::text,run_id::text,message_id::text"
+            " from public.route_receipts where id = %s",
+            (graph["route_receipt_id"],),
+        )
+        route_receipt = cursor.fetchone()
+        cursor.execute(
+            "select user_id::text,conversation_id::text,message_id::text,"
+            " backtest_run_id::text,backtest_job_id::text,route_receipt_id::text"
+            " from public.cost_ledger_entries where id = %s",
+            (graph["cost_ledger_id"],),
+        )
+        cost_ledger = cursor.fetchone()
+    return {
+        "counts": counts,
+        "auth_count": auth_count,
+        "workspace": workspace,
+        "route_receipt": route_receipt,
+        "cost_ledger": cost_ledger,
+    }
+
+
+def test_cleanup_removes_complete_graph_before_deleting_anonymous_auth() -> None:
+    with _connect(autocommit=False) as connection:
+        graph = _seed_complete_expired_guest_graph(connection)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                create function pg_temp.assert_guest_product_graph_removed()
+                returns trigger
+                language plpgsql
+                as $$
+                begin
+                  if old.id = '{graph["user_id"]}'::uuid then
+                    if not coalesce(old.is_anonymous, false) then
+                      raise exception 'cleanup attempted to delete permanent auth';
+                    end if;
+                    if exists (
+                      select 1 from public.conversations where user_id = old.id
+                      union all select 1 from public.messages where user_id = old.id
+                      union all select 1 from public.strategies where user_id = old.id
+                      union all select 1 from public.backtest_jobs where user_id = old.id
+                      union all select 1 from public.backtest_runs where user_id = old.id
+                      union all select 1 from public.ideas where user_id = old.id
+                      union all select 1 from public.idea_versions where user_id = old.id
+                      union all select 1 from public.evidence_artifacts where user_id = old.id
+                      union all select 1 from public.decision_notes where user_id = old.id
+                      union all select 1 from public.context_packets where user_id = old.id
+                      union all select 1 from public.run_context_packets where user_id = old.id
+                      union all select 1 from public.feedback where user_id = old.id
+                      union all select 1 from public.checkpoints
+                        where thread_id = '{graph["conversation_id"]}'
+                      union all select 1 from public.checkpoint_blobs
+                        where thread_id = '{graph["conversation_id"]}'
+                      union all select 1 from public.checkpoint_writes
+                        where thread_id = '{graph["conversation_id"]}'
+                    ) then
+                      raise exception 'anonymous auth deleted before product graph';
+                    end if;
+                  end if;
+                  return old;
+                end;
+                $$;
+
+                create trigger assert_guest_product_graph_removed
+                before delete on auth.users
+                for each row execute function pg_temp.assert_guest_product_graph_removed();
+                """
+            )
+
+        rows = _claim_cleanup(connection, dry_run=False)
+        selected = next(row for row in rows if row[0] == graph["user_id"])
+        assert selected == (graph["user_id"], graph["conversation_id"])
+
+        with connection.cursor() as cursor:
+            for table in (
+                "conversations",
+                "messages",
+                "strategies",
+                "backtest_jobs",
+                "backtest_runs",
+                "ideas",
+                "idea_versions",
+                "evidence_artifacts",
+                "decision_notes",
+                "context_packets",
+                "run_context_packets",
+                "feedback",
+                "usage_counters",
+                "guest_workspaces",
+            ):
+                cursor.execute(
+                    f"select count(*) from public.{table} where user_id = %s",
+                    (graph["user_id"],),
+                )
+                assert cursor.fetchone()[0] == 0
+            for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
+                cursor.execute(
+                    f"select count(*) from public.{table} where thread_id = %s",
+                    (graph["conversation_id"],),
+                )
+                assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select user_id,conversation_id,run_id,message_id"
+                " from public.route_receipts where id = %s",
+                (graph["route_receipt_id"],),
+            )
+            assert cursor.fetchone() == (None, None, None, None)
+            cursor.execute(
+                "select user_id,conversation_id,message_id,backtest_run_id,"
+                " backtest_job_id,route_receipt_id::text"
+                " from public.cost_ledger_entries where id = %s",
+                (graph["cost_ledger_id"],),
+            )
+            assert cursor.fetchone() == (
+                None,
+                None,
+                None,
+                None,
+                None,
+                graph["route_receipt_id"],
+            )
+            cursor.execute(
+                "select count(*) from auth.users where id = %s",
+                (graph["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+        connection.rollback()
+
+
+def test_cleanup_rolls_back_complete_graph_when_a_late_delete_fails() -> None:
+    with _connect(autocommit=False) as connection:
+        graph = _seed_complete_expired_guest_graph(connection)
+        before = _complete_graph_state(connection, graph)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                create function pg_temp.reject_guest_strategy_delete()
+                returns trigger
+                language plpgsql
+                as $$
+                begin
+                  raise exception 'injected guest cleanup failure';
+                end;
+                $$;
+                create trigger reject_guest_strategy_delete
+                before delete on public.strategies
+                for each row
+                when (old.user_id = '{graph["user_id"]}'::uuid)
+                execute function pg_temp.reject_guest_strategy_delete();
+                savepoint cleanup_attempt;
+                """
+            )
+
+        with pytest.raises(
+            psycopg.errors.RaiseException,
+            match="injected guest cleanup failure",
+        ):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+        assert _complete_graph_state(connection, graph) == before
+        connection.rollback()
+
+
+def test_cleanup_foreign_owner_injection_fails_closed_without_mutation() -> None:
+    with _connect(autocommit=False) as connection:
+        graph = _seed_complete_expired_guest_graph(connection)
+        foreign_user_id = str(uuid.uuid4())
+        foreign_message_id = str(uuid.uuid4())
+        foreign_email = f"foreign-{foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.messages"
+                " (id,conversation_id,user_id,role,content)"
+                " values (%s,%s,%s,'assistant','foreign owner sentinel')",
+                (
+                    foreign_message_id,
+                    graph["conversation_id"],
+                    foreign_user_id,
+                ),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+        before = _complete_graph_state(connection, graph)
+
+        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select user_id::text,conversation_id::text,content"
+                " from public.messages where id = %s",
+                (foreign_message_id,),
+            )
+            assert cursor.fetchone() == (
+                foreign_user_id,
+                graph["conversation_id"],
+                "foreign owner sentinel",
+            )
+        assert _complete_graph_state(connection, graph) == before
+        connection.rollback()
+
+
+def test_cleanup_foreign_relational_injection_fails_closed() -> None:
+    with _connect(autocommit=False) as connection:
+        graph = _seed_complete_expired_guest_graph(connection)
+        foreign_user_id = str(uuid.uuid4())
+        foreign_run_id = str(uuid.uuid4())
+        foreign_email = f"foreign-run-{foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.backtest_runs"
+                " (id,user_id,strategy_id,status,asset_class,symbols,"
+                "  benchmark_symbol,config_snapshot)"
+                " values (%s,%s,%s,'completed','equity',array['MSFT'],'SPY',"
+                " '{}'::jsonb)",
+                (foreign_run_id, foreign_user_id, graph["strategy_id"]),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+
+        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select user_id::text,strategy_id::text"
+                " from public.backtest_runs where id = %s",
+                (foreign_run_id,),
+            )
+            assert cursor.fetchone() == (foreign_user_id, graph["strategy_id"])
+            cursor.execute(
+                "select count(*) from auth.users where id = %s",
+                (graph["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+        connection.rollback()
+
+
+def test_cleanup_null_conversation_with_owned_graph_fails_closed() -> None:
+    with _connect(autocommit=False) as connection:
+        graph = _seed_complete_expired_guest_graph(connection)
+        foreign_user_id = str(uuid.uuid4())
+        foreign_run_id = str(uuid.uuid4())
+        foreign_email = f"foreign-null-workspace-{foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.backtest_runs"
+                " (id,user_id,strategy_id,status,asset_class,symbols,"
+                "  benchmark_symbol,config_snapshot)"
+                " values (%s,%s,%s,'completed','equity',array['MSFT'],'SPY',"
+                " '{}'::jsonb)",
+                (foreign_run_id, foreign_user_id, graph["strategy_id"]),
+            )
+            cursor.execute(
+                "update public.guest_workspaces set conversation_id=null"
+                " where user_id=%s",
+                (graph["user_id"],),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+        before = _complete_graph_state(connection, graph)
+
+        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select user_id::text,strategy_id::text"
+                " from public.backtest_runs where id=%s",
+                (foreign_run_id,),
+            )
+            assert cursor.fetchone() == (foreign_user_id, graph["strategy_id"])
+            cursor.execute(
+                "select conversation_id from public.guest_workspaces where user_id=%s",
+                (graph["user_id"],),
+            )
+            assert cursor.fetchone()[0] is None
+        assert _complete_graph_state(connection, graph) == before
+        connection.rollback()
+
+
+def test_cleanup_cross_owner_profile_references_fail_closed() -> None:
+    with _connect(autocommit=False) as connection:
+        candidate = _seed_expired_guest(connection)
+        other_user_id = str(uuid.uuid4())
+        other_conversation_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,null,true)",
+                (other_user_id,),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,null)",
+                (other_user_id,),
+            )
+            cursor.execute(
+                "insert into public.guest_workspaces"
+                " (user_id,created_at,expires_at)"
+                " values (%s,%s,%s)",
+                (other_user_id, now, now + timedelta(days=7)),
+            )
+            cursor.execute(
+                "insert into public.conversations (id,user_id,title)"
+                " values (%s,%s,'foreign profile reference')",
+                (other_conversation_id, other_user_id),
+            )
+            cursor.execute(
+                "update public.guest_workspaces set claimed_by=%s" " where user_id=%s",
+                (candidate["user_id"], other_user_id),
+            )
+            cursor.execute(
+                "insert into public.guest_workspace_handoffs"
+                " (secret_hash,source_user_id,destination_user_id,"
+                "  destination_email_hash,source_conversation_id)"
+                " values (%s,%s,%s,%s,%s)",
+                (
+                    "a" * 64,
+                    other_user_id,
+                    candidate["user_id"],
+                    "b" * 64,
+                    other_conversation_id,
+                ),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+
+        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select claimed_by::text from public.guest_workspaces"
+                " where user_id=%s",
+                (other_user_id,),
+            )
+            assert cursor.fetchone()[0] == candidate["user_id"]
+            cursor.execute(
+                "select destination_user_id::text"
+                " from public.guest_workspace_handoffs"
+                " where source_user_id=%s",
+                (other_user_id,),
+            )
+            assert cursor.fetchone()[0] == candidate["user_id"]
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (candidate["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+        connection.rollback()
 
 
 def test_replacing_empty_conversation_preserves_identity_expiry_and_counters() -> None:
@@ -319,6 +965,55 @@ def test_cleanup_dry_run_is_bounded_and_changes_nothing() -> None:
             cursor.execute("delete from auth.users where id = %s", (guest["user_id"],))
 
 
+def test_cleanup_batch_limit_order_reasons_and_counts_are_stable() -> None:
+    with _connect(autocommit=False) as connection:
+        guests = [_seed_expired_guest(connection) for _ in range(3)]
+        ordered = [
+            (guests[0]["user_id"], 30),
+            (guests[1]["user_id"], 20),
+            (guests[2]["user_id"], 10),
+        ]
+        with connection.cursor() as cursor:
+            for user_id, minutes in ordered:
+                cursor.execute(
+                    "update public.guest_workspaces"
+                    " set updated_at = now() - make_interval(mins => %s)"
+                    " where user_id = %s",
+                    (minutes, user_id),
+                )
+            cursor.execute(
+                "select user_id::text,conversation_id::text,auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,true)",
+            )
+            dry_run = cursor.fetchall()
+            cursor.execute(
+                "select user_id::text,conversation_id::text,auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,false)",
+            )
+            real_run = cursor.fetchall()
+
+        expected_ids = [guests[0]["user_id"], guests[1]["user_id"]]
+        assert [row[0] for row in dry_run] == expected_ids
+        assert [row[0] for row in real_run] == expected_ids
+        assert [row[2:] for row in dry_run] == [
+            (False, "expired_workspace"),
+            (False, "expired_workspace"),
+        ]
+        assert [row[2:] for row in real_run] == [
+            (True, "expired_workspace"),
+            (True, "expired_workspace"),
+        ]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from auth.users where id = %s",
+                (guests[2]["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+        connection.rollback()
+
+
 def test_cleanup_dry_run_and_real_run_share_transition_grace_predicate() -> None:
     with psycopg.connect(DSN, autocommit=False) as connection:
         active = _seed_expired_guest(connection)
@@ -391,6 +1086,142 @@ def test_cleanup_dry_run_and_real_run_share_transition_grace_predicate() -> None
                 stale_expired["user_id"],
             }
         )
+        connection.rollback()
+
+
+def test_cleanup_removes_empty_expired_workspace() -> None:
+    with _connect(autocommit=False) as connection:
+        user_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=8)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,null,true)",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,null)",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.guest_workspaces"
+                " (user_id,created_at,expires_at)"
+                " values (%s,%s,%s)",
+                (user_id, created_at, created_at + timedelta(days=7)),
+            )
+            cursor.execute(
+                "select user_id::text,conversation_id::text,auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(25,false)",
+            )
+            selected = next(row for row in cursor.fetchall() if row[0] == user_id)
+
+        assert selected == (user_id, None, True, "expired_workspace")
+        with connection.cursor() as cursor:
+            cursor.execute("select count(*) from auth.users where id = %s", (user_id,))
+            assert cursor.fetchone()[0] == 0
+        connection.rollback()
+
+
+def test_cleanup_removes_orphan_identity_feedback() -> None:
+    with _connect(autocommit=False) as connection:
+        user_id = str(uuid.uuid4())
+        feedback_id = str(uuid.uuid4())
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous,created_at)"
+                " values (%s,null,true,now()-interval '10 minutes')",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,null)",
+                (user_id,),
+            )
+            cursor.execute(
+                "insert into public.feedback (id,user_id,type,message)"
+                " values (%s,%s,'general','orphan private feedback')",
+                (feedback_id, user_id),
+            )
+            cursor.execute(
+                "select user_id::text,conversation_id::text,auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(25,false)",
+            )
+            selected = next(row for row in cursor.fetchall() if row[0] == user_id)
+
+        assert selected == (user_id, None, True, "orphan_identity")
+        with connection.cursor() as cursor:
+            cursor.execute("select count(*) from auth.users where id=%s", (user_id,))
+            assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select count(*) from public.feedback where id=%s",
+                (feedback_id,),
+            )
+            assert cursor.fetchone()[0] == 0
+        connection.rollback()
+
+
+def test_cleanup_orphan_with_foreign_relational_reference_fails_closed() -> None:
+    with _connect(autocommit=False) as connection:
+        orphan_user_id = str(uuid.uuid4())
+        strategy_id = str(uuid.uuid4())
+        foreign_user_id = str(uuid.uuid4())
+        foreign_run_id = str(uuid.uuid4())
+        foreign_email = f"foreign-orphan-{foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous,created_at)"
+                " values (%s,null,true,now()-interval '10 minutes')",
+                (orphan_user_id,),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,null)",
+                (orphan_user_id,),
+            )
+            cursor.execute(
+                "insert into public.strategies"
+                " (id,user_id,name,template,asset_class,symbols,benchmark_symbol)"
+                " values (%s,%s,'orphan strategy','buy_and_hold','equity',"
+                " array['AAPL'],'SPY')",
+                (strategy_id, orphan_user_id),
+            )
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.backtest_runs"
+                " (id,user_id,strategy_id,status,asset_class,symbols,"
+                "  benchmark_symbol,config_snapshot)"
+                " values (%s,%s,%s,'completed','equity',array['MSFT'],'SPY',"
+                " '{}'::jsonb)",
+                (foreign_run_id, foreign_user_id, strategy_id),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+
+        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select user_id::text,strategy_id::text"
+                " from public.backtest_runs where id=%s",
+                (foreign_run_id,),
+            )
+            assert cursor.fetchone() == (foreign_user_id, strategy_id)
+            cursor.execute(
+                "select user_id::text from public.strategies where id=%s",
+                (strategy_id,),
+            )
+            assert cursor.fetchone()[0] == orphan_user_id
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (orphan_user_id,),
+            )
+            assert cursor.fetchone()[0] == 1
         connection.rollback()
 
 
@@ -487,6 +1318,11 @@ def test_cleanup_removes_claimed_source_identity_without_destination_graph() -> 
                 (destination_user_id, source["user_id"]),
             )
             cursor.execute(
+                "insert into public.feedback (user_id,type,message)"
+                " values (%s,'general','claimed guest feedback')",
+                (source["user_id"],),
+            )
+            cursor.execute(
                 "select user_id::text,auth_deleted,cleanup_reason"
                 " from public.claim_expired_guest_workspaces(25,false)",
             )
@@ -504,7 +1340,61 @@ def test_cleanup_removes_claimed_source_identity_without_destination_graph() -> 
                 (source["user_id"],),
             )
             assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select count(*) from public.feedback"
+                " where message='claimed guest feedback'",
+            )
+            assert cursor.fetchone()[0] == 0
             cursor.execute("delete from auth.users where id=%s", (destination_user_id,))
+
+
+def test_cleanup_claimed_workspace_with_source_rows_fails_closed() -> None:
+    with _connect(autocommit=False) as connection:
+        source = _seed_expired_guest(connection)
+        destination_user_id = str(uuid.uuid4())
+        destination_email = f"destination-{destination_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (destination_user_id, destination_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (destination_user_id, destination_email),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set status='claimed',claimed_by=%s,"
+                " claimed_at=now()-interval '20 minutes',"
+                " updated_at=now()-interval '20 minutes'"
+                " where user_id=%s",
+                (destination_user_id, source["user_id"]),
+            )
+            cursor.execute("savepoint cleanup_attempt")
+
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="claimed guest identity still owns product rows",
+        ):
+            _claim_cleanup(connection, dry_run=False)
+        with connection.cursor() as cursor:
+            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select status,conversation_id::text,claimed_by::text"
+                " from public.guest_workspaces where user_id=%s",
+                (source["user_id"],),
+            )
+            assert cursor.fetchone() == (
+                "claimed",
+                source["conversation_id"],
+                destination_user_id,
+            )
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (source["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+        connection.rollback()
 
 
 def test_cleanup_removes_conversation_checkpoint_graph() -> None:
@@ -654,3 +1544,16 @@ def test_guest_privileged_functions_are_service_role_only() -> None:
                 assert anon is False
                 assert authenticated is False
                 assert service_role is True
+            cursor.execute(
+                "select routine.prosecdef, routine.proconfig"
+                " from pg_proc as routine"
+                " join pg_namespace as namespace"
+                "   on namespace.oid = routine.pronamespace"
+                " where namespace.nspname='public'"
+                "   and routine.proname='claim_expired_guest_workspaces'"
+                "   and pg_get_function_identity_arguments(routine.oid)"
+                "       = 'p_limit integer, p_dry_run boolean'"
+            )
+            security_definer, settings = cursor.fetchone()
+            assert security_definer is True
+            assert settings == ['search_path=""']
