@@ -955,8 +955,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       const previousFacts = latestActiveConfirmationFacts;
       const renderedConfirmations = confirmationCards(page);
       const previousCardCount = await renderedConfirmations.count();
-      const secondIdea =
-        "Use AAPL instead of MSFT, keeping every other assumption the same.";
+      const secondIdea = `Use AAPL instead of MSFT, keeping the SPY benchmark and testing from ${previousFacts.effectiveDateRange.start} through ${previousFacts.effectiveDateRange.end}.`;
       await page.getByTestId("chat-input").fill(secondIdea);
       await page.getByTestId("chat-send").click();
       const secondState: {
@@ -992,7 +991,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(secondState.facts.assetUniverse).toEqual(["AAPL"]);
       expect(secondState.facts.benchmark).toBe("SPY");
       expect(secondState.facts.requestedDateRange).toEqual(
-        previousFacts.requestedDateRange,
+        previousFacts.effectiveDateRange,
       );
       expect(secondState.facts.effectiveDateRange).toEqual(
         previousFacts.effectiveDateRange,

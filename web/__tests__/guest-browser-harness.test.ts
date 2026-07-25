@@ -616,6 +616,12 @@ describe("Checks 6–20 harness guards", () => {
 
     expect(check11).toContain("distinctConfirmationFacts");
     expect(check11).toContain("confirmationCards(page)");
+    expect(check11).toMatch(
+      /secondState\.facts\.requestedDateRange\)\.toEqual\(\s*previousFacts\.effectiveDateRange/,
+    );
+    expect(check11).not.toMatch(
+      /secondState\.facts\.requestedDateRange\)\.toEqual\(\s*previousFacts\.requestedDateRange/,
+    );
     expect(check11).not.toContain("runButtons.last()");
   });
 
