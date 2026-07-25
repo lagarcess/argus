@@ -4,6 +4,35 @@ End-to-end account-recovery and session-control QA against real Supabase Auth.
 Everything here targets the worktree-local Supabase stack (or one approved QA
 branch) and is blocked from production by `assert-nonprod-target.sh`.
 
+## Guest exact-head evidence
+
+Guest Block 4 QA uses the same non-production guard and local Supabase stack.
+After a zero-state `supabase db reset --local`, run the guest browser matrix
+only against the exact committed candidate SHA with mock Auth disabled. Enable
+guest access only in the backend/frontend process environment; keep checked-in
+defaults false. Public-account access stays false for staged-mode checks and is
+enabled only for the isolated new-account conversion case, then restored false.
+
+Store sanitized evidence under:
+
+```text
+temp/qa-evidence-guest/<candidate-sha>/
+```
+
+The evidence set may include screenshots, sanitized `/me` and usage shapes,
+hashed owner labels, counts, expiry facts, zero-cross-owner results,
+chart-interaction network method/path counts, and console status. It must not
+include passwords, email addresses, Auth UUIDs, raw conversation/artifact/job/
+run ids, cookies, bearer tokens, headers, handoff secrets, query strings, or raw
+transcript dumps.
+
+The exact-head matrix is one visible pass with Playwright retries disabled.
+Use deterministic database setup for quota, expiry, cleanup, and concurrency;
+use only one bounded real interpreter/provider journey. Stop on the first
+product failure and preserve the sanitized evidence without silently retrying.
+Passing local evidence does not authorize integration, deployment, public
+flags, or tester exposure.
+
 ## One-shot run
 
 ```bash

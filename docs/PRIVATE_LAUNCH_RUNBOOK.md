@@ -301,6 +301,78 @@ private-alpha launch; record any override in the release manifest.
   model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
   landing-gate run and every `main` promotion candidate.
 
+## Guest Staged Rollout
+
+Safe defaults:
+
+```bash
+ARGUS_GUEST_ACCESS_ENABLED=false
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false
+```
+
+The initial founder-approved staged mode, when explicitly enabled on a
+branch-deployed candidate, is guest access on and public-account access off.
+The frontend flag controls presentation only; the API remains authoritative.
+Permanent signup/login stays allowlist-gated, existing admin/developer behavior
+is unchanged, and no Create account promise is shown.
+
+Hosted Supabase prerequisites are external operations and must be recorded in
+the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
+provider anonymous-sign-in limits, Argus origin enforcement and per-IP attempt
+limits, and no direct anonymous-role access to product tables. Do not mutate
+hosted Auth configuration as part of a code promotion.
+
+Run guest cleanup first as a dry run:
+
+```bash
+poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
+```
+
+Then, only from the scheduled trusted operations environment:
+
+```bash
+poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
+```
+
+Schedule a bounded batch at least daily after public guest exposure. Record the
+owner, effective schedule, selected/deleted/preserved/failed counts, oldest
+eligible expiry, and alert destination. A nonzero `auth_delete_failed` result
+or a failed cleanup transaction must alert and retry; never compensate by
+deleting product rows manually. Product deletion, anonymous-identity
+revalidation, and Auth-row deletion are one database transaction. Claimed
+source identities use a fifteen-minute reconciliation grace; incomplete
+bootstrap identities use five minutes.
+
+Conversion safety is non-negotiable: new accounts link the anonymous identity
+in place; existing accounts use the email-hash-bound one-time handoff that
+login claims before returning a permanent session. Guest
+usage never merges into registered hour/day counters. Cleanup re-verifies
+anonymous and unclaimed truth and must not delete a converted or permanent
+account.
+
+Guest funnel capture uses the shared metadata-only server envelope. Only the two
+typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
+keys, autocapture, session replay, prompts, assistant prose, exact
+capital/dates, email, Auth material, private titles/previews, provider/model
+names, and raw transcripts stay out.
+
+Rollback order:
+
+1. set `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`;
+2. set `ARGUS_GUEST_ACCESS_ENABLED=false`;
+3. keep `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`;
+4. verify the preserved centered auth landing path;
+5. stop new guest creation while retaining existing rows for safe expiry,
+   conversion, or bounded cleanup.
+
+Step 2 is a drain, not an active-session kill switch: already-verified guests
+remain usable until their fixed policy boundary.
+
+Do not roll back by reversing migrations or deleting anonymous users in bulk.
+The registered onboarding path remains unchanged; its known stale behavior is
+outside the guest lane.
+
 ## Smoke Test
 
 Use an allowlisted account and verify:

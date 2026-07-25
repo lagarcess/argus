@@ -954,6 +954,36 @@ interim roadmap now selects **Argus always progresses** for specification.
   those product lanes land; instrumentation must not pretend an unbuilt surface
   exists.
 
+##### Guest experience — Blocks 1–4 local candidate (LOCAL EVIDENCE GATE)
+
+- Status: Blocks 1–3 implement verified anonymous identity, fixed temporary
+  workspace policy, lifetime allowances, cleanup, guest shell, conversion, and
+  owner-scoped capability gates on `codex/guest-experience`. Block 4 adds the
+  approved privacy-safe funnel through the existing observability envelope.
+  This is a local candidate only, not a public-ready or integrated release.
+- Checked-in defaults remain
+  `ARGUS_GUEST_ACCESS_ENABLED=false`,
+  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, and
+  `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`. The staged exposure target remains
+  guest access on with public-account access off only after founder approval.
+- Public exposure still requires the exact-head local browser matrix, clean
+  reconciliation with the moving integration branch, a branch-deployed
+  exact-SHA canary, hosted anonymous-Auth abuse controls, cleanup scheduling,
+  cost/latency calibration, and founder go/no-go.
+- Grounded Discovery remains a separate active dependency. Guest Omnisearch is
+  limited to the owned temporary workspace and must continue to describe
+  broader discovery as unavailable until that pillar lands.
+- Always Progresses remains a separate active dependency. Do not reconcile its
+  runtime work into the guest lane during this local evidence pass.
+- Known caveat: guest onboarding is bypassed by verified `account_kind`; the
+  stale registered onboarding/`primary_goal` path is unchanged and remains
+  outside the guest lane.
+- Founder decisions still open: first traffic size, CAPTCHA/provider posture,
+  acceptable cost and latency bands, cleanup cadence/owner, public-account
+  enablement timing, and canary approval. Public-account access must not be
+  enabled before its account-method and abuse-control gate is explicitly
+  approved.
+
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
 Status: BUILT + LANDED on `codex/private-alpha-next` (6 commits). Typed `EditOperation`

@@ -240,6 +240,51 @@ Codex should own or closely supervise this:
      branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
 
+## Guest Experience Local Candidate
+
+`codex/guest-experience` is a focused, unpushed local candidate built from the
+required integration checkpoint. Do not merge, rebase, or reconcile it in the
+Block 4 evidence pass.
+
+Migration order is fixed:
+
+1. `20260724101324_add_guest_workspaces.sql`
+2. `20260724102309_add_guest_session_allowances.sql`
+3. `20260724102645_guest_conversation_and_cleanup.sql`
+4. `20260724110000_restore_settle_only_usage.sql`
+5. `20260724110100_serialize_guest_feedback.sql`
+6. `20260724110200_align_guest_cleanup_candidates.sql`
+7. `20260724211312_guest_workspace_handoffs.sql`
+8. `20260724223000_replace_guest_conversation.sql`
+9. `20260724230000_harden_guest_public_boundaries.sql`
+
+The earlier message-settlement and atomic-backtest-admission migrations remain
+prerequisites and must retain their existing order. Integration must reset a
+fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
+promotion.
+
+The conversion contract has two owners:
+
+- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- an existing registered account claims the complete guest graph through the
+  short-lived, email-hash-bound, single-use server handoff. Login completes
+  the claim before returning its session and can reconcile one ambiguous
+  same-destination response without repeating transfer.
+
+Neither path copies visible prose in the browser or merges guest lifetime
+counters into registered hour/day counters. Rollback is flags first: disable
+the frontend guest presentation, then server guest bootstrap; keep public
+account access false. Do not roll back by deleting guest rows or reverting
+already-applied migrations.
+The server guest flag is the creation gate: disabling it stops new anonymous
+sessions while existing verified guests drain to conversion, fixed expiry, or
+transactional cleanup.
+
+Reconciliation gates remain external to this branch: Always Progresses,
+Grounded Discovery, the branch-deployed exact-SHA canary, hosted anonymous Auth
+and CAPTCHA/rate-limit configuration, scheduled cleanup ownership, and founder
+traffic/cost approval.
+
 ## Known Non-Blocking Debt
 
 Track these as future validation slices, not blockers for the current main
