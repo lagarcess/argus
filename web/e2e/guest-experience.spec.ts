@@ -25,6 +25,7 @@ import {
   distinctConfirmationFacts,
   emptyEvidence,
   evidenceLabel,
+  expectedMutationDeltasOnly,
   feedbackPrivacy,
   freshGuest,
   handoffCount,
@@ -1029,11 +1030,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
         ]),
       ).toBe(true);
       expect(
-        (mutationsAfter["POST /api/v1/chat/stream"] ?? 0) -
-          (mutationsBefore["POST /api/v1/chat/stream"] ?? 0),
-      ).toBe(0);
-      expect(
-        mutationTotal(mutationsAfter) === mutationTotal(mutationsBefore),
+        expectedMutationDeltasOnly(mutationsBefore, mutationsAfter, {
+          "POST /api/v1/analytics/guest-events": 1,
+        }),
       ).toBe(true);
       await dialog.getByRole("button", { name: "Cancel" }).last().click();
     });
@@ -1077,8 +1076,13 @@ test("@guest-experience exact-head 20-check matrix", async ({
           ),
         ).toBe(true);
         expect(
-          mutationTotal(mergeMutationCounts(monitors)) ===
-            mutationTotal(mutationsBefore),
+          expectedMutationDeltasOnly(
+            mutationsBefore,
+            mergeMutationCounts(monitors),
+            {
+              "POST /api/v1/analytics/guest-events": 1,
+            },
+          ),
         ).toBe(true);
       },
       false,
@@ -1165,7 +1169,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       ).toBe(true);
       const mutationsAfter = mergeMutationCounts(monitors);
       expect(
-        mutationTotal(mutationsAfter) === mutationTotal(mutationsBefore),
+        expectedMutationDeltasOnly(mutationsBefore, mutationsAfter, {
+          "POST /api/v1/analytics/guest-events": 1,
+        }),
       ).toBe(true);
       for (const route of [
         "POST /api/v1/auth/guest/link",

@@ -1837,6 +1837,22 @@ export function productFailedRequestsForCheck(
   );
 }
 
+export function expectedMutationDeltasOnly(
+  before: Record<string, number>,
+  after: Record<string, number>,
+  expected: Record<string, number>,
+): boolean {
+  const routes = new Set([
+    ...Object.keys(before),
+    ...Object.keys(after),
+    ...Object.keys(expected),
+  ]);
+  return [...routes].every(
+    (route) =>
+      (after[route] ?? 0) - (before[route] ?? 0) === (expected[route] ?? 0),
+  );
+}
+
 export class BrowserSafetyMonitor {
   consoleErrors = 0;
   pageErrors = 0;

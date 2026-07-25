@@ -10,6 +10,7 @@ import {
   confirmationContinuityChecks,
   distinctConfirmationFacts,
   emptyEvidence,
+  expectedMutationDeltasOnly,
   latestConfirmationFacts,
   latestResultFacts,
   productFailedRequestsForCheck,
@@ -238,6 +239,31 @@ describe("guest Check 4 continuity assertions", () => {
 });
 
 describe("browser safety evidence", () => {
+  test("allows only the expected sanitized analytics write at a conversion gate", () => {
+    const before = {
+      "POST /api/v1/analytics/guest-events": 2,
+      "POST /api/v1/chat/stream": 4,
+    };
+
+    expect(
+      expectedMutationDeltasOnly(before, {
+        ...before,
+        "POST /api/v1/analytics/guest-events": 3,
+      }, {
+        "POST /api/v1/analytics/guest-events": 1,
+      }),
+    ).toBe(true);
+    expect(
+      expectedMutationDeltasOnly(before, {
+        ...before,
+        "POST /api/v1/analytics/guest-events": 3,
+        "POST /api/v1/chat/stream": 5,
+      }, {
+        "POST /api/v1/analytics/guest-events": 1,
+      }),
+    ).toBe(false);
+  });
+
   test("records only sanitized endpoint, category, check, and phase detail", () => {
     const detail = browserSafetyDetail({
       event: "failed_request",
