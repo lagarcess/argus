@@ -17,6 +17,7 @@ import {
   authUserExists,
   binaryEvidenceDiffers,
   cleanupExpectedGuestCandidates,
+  cleanupRetentionState,
   confirmationContinuityChecks,
   conversationGraph,
   createDisposableRegisteredIdentity,
@@ -139,7 +140,10 @@ function mutableGraphRows(graph: ConversationGraph): number {
     graph.evidence.length +
     graph.decisions.length +
     graph.context_packets.length +
-    graph.run_context_packets.length
+    graph.run_context_packets.length +
+    graph.checkpoints.length +
+    graph.checkpoint_blobs.length +
+    graph.checkpoint_writes.length
   );
 }
 
@@ -1689,6 +1693,24 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expiredOwner,
         seeded.conversationId,
       );
+      const retentionBefore = cleanupRetentionState({
+        userId: expiredOwner,
+        feedbackId: seeded.feedbackId,
+        routeReceiptId: seeded.routeReceiptId,
+        costLedgerId: seeded.costLedgerId,
+      });
+      expect(retentionBefore).toEqual({
+        feedback_rows: 1,
+        usage_rows: 2,
+        retained_route_rows: 1,
+        attributed_route_rows: 1,
+        retained_cost_rows: 1,
+        attributed_cost_rows: 1,
+        retained_cost_route_links: 1,
+      });
+      expect(expiredGraph.checkpoints).toHaveLength(1);
+      expect(expiredGraph.checkpoint_blobs).toHaveLength(1);
+      expect(expiredGraph.checkpoint_writes).toHaveLength(1);
       const claimedDestinationBefore = conversationGraph(
         existingAccount.userId,
         claimConversation,
@@ -1724,14 +1746,26 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(authUserExists(claimGuestOwner)).toBe(false);
       disposableUserIds.delete(expiredOwner);
       disposableUserIds.delete(claimGuestOwner);
-      expect(
-        mutableGraphRows(
-          conversationGraph(expiredOwner, seeded.conversationId),
-        ),
-      ).toBe(0);
-      expect(
-        conversationGraph(expiredOwner, seeded.conversationId).checkpoints,
-      ).toHaveLength(0);
+      const expiredGraphAfter = conversationGraph(
+        expiredOwner,
+        seeded.conversationId,
+      );
+      const retentionAfter = cleanupRetentionState({
+        userId: expiredOwner,
+        feedbackId: seeded.feedbackId,
+        routeReceiptId: seeded.routeReceiptId,
+        costLedgerId: seeded.costLedgerId,
+      });
+      expect(mutableGraphRows(expiredGraphAfter)).toBe(0);
+      expect(retentionAfter).toEqual({
+        feedback_rows: 0,
+        usage_rows: 0,
+        retained_route_rows: 1,
+        attributed_route_rows: 0,
+        retained_cost_rows: 1,
+        attributed_cost_rows: 0,
+        retained_cost_route_links: 1,
+      });
       expect(mutableGraphRows(expiredGraph)).toBeGreaterThan(0);
       expect(
         sameGraphIds(
@@ -1749,6 +1783,22 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(authUserExists(primaryOwner)).toBe(true);
       evidence.cleanup_deleted_count = cleanup.deleted_count;
       evidence.cleanup_permanent_control_preserved = true;
+      evidence.cleanup_complete_graph_rows_before =
+        mutableGraphRows(expiredGraph);
+      evidence.cleanup_complete_graph_rows_after =
+        mutableGraphRows(expiredGraphAfter);
+      evidence.cleanup_feedback_deleted =
+        retentionBefore.feedback_rows === 1 &&
+        retentionAfter.feedback_rows === 0;
+      evidence.cleanup_usage_deleted =
+        retentionBefore.usage_rows === 2 && retentionAfter.usage_rows === 0;
+      evidence.cleanup_route_retained =
+        retentionAfter.retained_route_rows === 1 &&
+        retentionAfter.attributed_route_rows === 0;
+      evidence.cleanup_cost_retained =
+        retentionAfter.retained_cost_rows === 1 &&
+        retentionAfter.attributed_cost_rows === 0 &&
+        retentionAfter.retained_cost_route_links === 1;
     });
 
     await runStep(20, evidence, (value) => (currentCheck = value), async () => {

@@ -713,13 +713,20 @@ describe("Checks 6–20 harness guards", () => {
     expect(check18).not.toContain("unroute");
   });
 
-  test("uses the bounded cleanup predicate and preserves claimed graph ownership", () => {
+  test("uses the bounded cleanup predicate and proves complete cleanup retention", () => {
     const check19 = checkSource(19);
 
     expect(check19).toContain("cleanupExpectedGuestCandidates");
     expect(check19).toContain("markClaimedWorkspaceCleanupReady");
     expect(check19).toContain("claimedDestinationBefore");
     expect(check19).toContain("sameGraphIds");
+    expect(check19).toContain("cleanupRetentionState");
+    expect(check19).toContain("retentionBefore");
+    expect(check19).toContain("retentionAfter");
+    expect(check19).toContain("checkpoint_blobs");
+    expect(check19).toContain("checkpoint_writes");
+    expect(check19).toContain("retained_route_rows");
+    expect(check19).toContain("retained_cost_rows");
   });
 
   test("keeps product safety failures separate from sanitized teardown evidence", () => {

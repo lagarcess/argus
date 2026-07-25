@@ -267,6 +267,18 @@ export type ConversationGraph = {
   context_packets: string[];
   run_context_packets: string[];
   checkpoints: string[];
+  checkpoint_blobs: string[];
+  checkpoint_writes: string[];
+};
+
+export type CleanupRetentionState = {
+  feedback_rows: number;
+  usage_rows: number;
+  retained_route_rows: number;
+  attributed_route_rows: number;
+  retained_cost_rows: number;
+  attributed_cost_rows: number;
+  retained_cost_route_links: number;
 };
 
 export type ZeroStateSnapshot = {
@@ -303,6 +315,12 @@ export type SafeEvidence = {
   interrupted_usage_delta: number;
   cleanup_deleted_count: number;
   cleanup_permanent_control_preserved: boolean;
+  cleanup_complete_graph_rows_before: number;
+  cleanup_complete_graph_rows_after: number;
+  cleanup_feedback_deleted: boolean;
+  cleanup_usage_deleted: boolean;
+  cleanup_route_retained: boolean;
+  cleanup_cost_retained: boolean;
   cross_owner_result_count: number;
   console_error_count: number;
   page_error_count: number;
@@ -784,7 +802,23 @@ export function conversationGraph(
         where link.user_id = '${owner}'
           and run.conversation_id = '${conversation}'
       ), '[]'::json),
-      'checkpoints', coalesce((select json_agg(checkpoint_id order by checkpoint_id) from public.checkpoints where thread_id = '${conversation}'), '[]'::json)
+      'checkpoints', coalesce((select json_agg(checkpoint_id order by checkpoint_id) from public.checkpoints where thread_id = '${conversation}'), '[]'::json),
+      'checkpoint_blobs', coalesce((
+        select json_agg(
+          concat_ws(':', checkpoint_ns, channel, version)
+          order by checkpoint_ns, channel, version
+        )
+        from public.checkpoint_blobs
+        where thread_id = '${conversation}'
+      ), '[]'::json),
+      'checkpoint_writes', coalesce((
+        select json_agg(
+          concat_ws(':', checkpoint_ns, checkpoint_id, task_id, idx)
+          order by checkpoint_ns, checkpoint_id, task_id, idx
+        )
+        from public.checkpoint_writes
+        where thread_id = '${conversation}'
+      ), '[]'::json)
     )::text
   `);
 }
@@ -1289,7 +1323,13 @@ export function seedClaimGraphFromConversation(params: {
   sourceOwnerId: string;
   sourceConversationId: string;
   targetOwnerId: string;
-}): { conversationId: string; evidenceId: string } {
+}): {
+  conversationId: string;
+  evidenceId: string;
+  feedbackId: string;
+  routeReceiptId: string;
+  costLedgerId: string;
+} {
   const sourceOwner = requireUuid(params.sourceOwnerId, "source owner");
   const sourceConversation = requireUuid(
     params.sourceConversationId,
@@ -1310,6 +1350,9 @@ export function seedClaimGraphFromConversation(params: {
     decision: randomUUID(),
     contextPacket: randomUUID(),
     runContextPacket: randomUUID(),
+    feedback: randomUUID(),
+    routeReceipt: randomUUID(),
+    costLedger: randomUUID(),
   };
   const resultCardExpression = `
     jsonb_set(
@@ -1502,6 +1545,67 @@ export function seedClaimGraphFromConversation(params: {
       )
       returning 1
     ),
+    inserted_checkpoint_blob as (
+      insert into public.checkpoint_blobs (
+        thread_id, checkpoint_ns, channel, version, type, blob
+      )
+      select
+        '${ids.conversation}', '', 'messages', 'guest-qa-cleanup',
+        'msgpack', null
+      from inserted_checkpoint
+      returning 1
+    ),
+    inserted_checkpoint_write as (
+      insert into public.checkpoint_writes (
+        thread_id, checkpoint_ns, checkpoint_id, task_id, idx,
+        channel, type, blob
+      )
+      select
+        '${ids.conversation}', '', 'guest-qa-preserved-checkpoint',
+        'guest-qa-cleanup', 0, 'messages', 'msgpack', decode('01', 'hex')
+      from inserted_checkpoint
+      returning 1
+    ),
+    inserted_feedback as (
+      insert into public.feedback (
+        id, user_id, type, message, context
+      )
+      select
+        '${ids.feedback}', '${targetOwner}', 'general',
+        'Guest QA cleanup privacy sentinel', '{}'::jsonb
+      from inserted_assistant_message
+      returning 1
+    ),
+    inserted_route_receipt as (
+      insert into public.route_receipts (
+        id, user_id, conversation_id, run_id, message_id, task, tier, mode,
+        latency_ms, outcome, context_packet_ids
+      )
+      select
+        '${ids.routeReceipt}', '${targetOwner}', '${ids.conversation}',
+        '${ids.run}', '${ids.assistantMessage}', 'interpretation',
+        'structured', 'json_schema', 1, 'succeeded',
+        array['${ids.contextPacket}']::text[]
+      from inserted_assistant_message
+      cross join inserted_run_context_packet
+      returning 1
+    ),
+    inserted_cost_ledger as (
+      insert into public.cost_ledger_entries (
+        id, source, service, provider, feature_area, task, user_id,
+        conversation_id, message_id, backtest_run_id, backtest_job_id,
+        route_receipt_id, correlation_id, billable_unit, status
+      )
+      select
+        '${ids.costLedger}', 'api_turn', 'openrouter', 'openrouter',
+        'guest_cleanup_qa', 'cleanup_fixture', '${targetOwner}',
+        '${ids.conversation}', '${ids.assistantMessage}', '${ids.run}',
+        '${ids.job}', '${ids.routeReceipt}', 'guest-qa-cleanup',
+        'request', 'succeeded'
+      from inserted_route_receipt
+      cross join inserted_job
+      returning 1
+    ),
     inserted_usage as (
       insert into public.usage_counters (
         user_id, resource, period, period_start, period_end,
@@ -1536,6 +1640,11 @@ export function seedClaimGraphFromConversation(params: {
       and exists(select 1 from inserted_run_context_packet)
       and exists(select 1 from inserted_assistant_message)
       and exists(select 1 from inserted_checkpoint)
+      and exists(select 1 from inserted_checkpoint_blob)
+      and exists(select 1 from inserted_checkpoint_write)
+      and exists(select 1 from inserted_feedback)
+      and exists(select 1 from inserted_route_receipt)
+      and exists(select 1 from inserted_cost_ledger)
       and (select count(*) from inserted_usage) = 2
     )::text
   `);
@@ -1545,7 +1654,66 @@ export function seedClaimGraphFromConversation(params: {
   return {
     conversationId: ids.conversation,
     evidenceId: ids.evidence,
+    feedbackId: ids.feedback,
+    routeReceiptId: ids.routeReceipt,
+    costLedgerId: ids.costLedger,
   };
+}
+
+export function cleanupRetentionState(params: {
+  userId: string;
+  feedbackId: string;
+  routeReceiptId: string;
+  costLedgerId: string;
+}): CleanupRetentionState {
+  const owner = requireUuid(params.userId, "cleanup owner");
+  const feedback = requireUuid(params.feedbackId, "cleanup feedback");
+  const receipt = requireUuid(params.routeReceiptId, "cleanup route receipt");
+  const cost = requireUuid(params.costLedgerId, "cleanup cost ledger");
+  return psqlJson<CleanupRetentionState>(`
+    select json_build_object(
+      'feedback_rows', (
+        select count(*) from public.feedback where id = '${feedback}'
+      ),
+      'usage_rows', (
+        select count(*) from public.usage_counters where user_id = '${owner}'
+      ),
+      'retained_route_rows', (
+        select count(*) from public.route_receipts where id = '${receipt}'
+      ),
+      'attributed_route_rows', (
+        select count(*)
+        from public.route_receipts
+        where id = '${receipt}'
+          and (
+            user_id is not null
+            or conversation_id is not null
+            or run_id is not null
+            or message_id is not null
+          )
+      ),
+      'retained_cost_rows', (
+        select count(*) from public.cost_ledger_entries where id = '${cost}'
+      ),
+      'attributed_cost_rows', (
+        select count(*)
+        from public.cost_ledger_entries
+        where id = '${cost}'
+          and (
+            user_id is not null
+            or conversation_id is not null
+            or message_id is not null
+            or backtest_run_id is not null
+            or backtest_job_id is not null
+          )
+      ),
+      'retained_cost_route_links', (
+        select count(*)
+        from public.cost_ledger_entries
+        where id = '${cost}' and route_receipt_id = '${receipt}'
+      )
+    )::text
+  `);
 }
 
 export class BackendController {
@@ -2244,6 +2412,12 @@ export function emptyEvidence(): SafeEvidence {
     interrupted_usage_delta: 0,
     cleanup_deleted_count: 0,
     cleanup_permanent_control_preserved: false,
+    cleanup_complete_graph_rows_before: 0,
+    cleanup_complete_graph_rows_after: 0,
+    cleanup_feedback_deleted: false,
+    cleanup_usage_deleted: false,
+    cleanup_route_retained: false,
+    cleanup_cost_retained: false,
     cross_owner_result_count: 0,
     console_error_count: 0,
     page_error_count: 0,

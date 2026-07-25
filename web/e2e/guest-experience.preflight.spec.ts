@@ -7,6 +7,7 @@ import {
   assertExactLocalCandidate,
   assertFreshContext,
   assertZeroState,
+  cleanupRetentionState,
   conversationGraph,
   deleteDisposableIdentity,
   feedbackPrivacy,
@@ -284,8 +285,26 @@ test("complete claim graph fixture seeds and tears down without an interpreter t
         graph.decisions.length === 1 &&
         graph.context_packets.length === 1 &&
         graph.run_context_packets.length === 1 &&
-        graph.checkpoints.length === 1,
+        graph.checkpoints.length === 1 &&
+        graph.checkpoint_blobs.length === 1 &&
+        graph.checkpoint_writes.length === 1,
     ).toBe(true);
+    expect(
+      cleanupRetentionState({
+        userId: targetGuest.user.id,
+        feedbackId: seeded.feedbackId,
+        routeReceiptId: seeded.routeReceiptId,
+        costLedgerId: seeded.costLedgerId,
+      }),
+    ).toEqual({
+      feedback_rows: 1,
+      usage_rows: 2,
+      retained_route_rows: 1,
+      attributed_route_rows: 1,
+      retained_cost_rows: 1,
+      attributed_cost_rows: 1,
+      retained_cost_route_links: 1,
+    });
   } finally {
     await targetContext.close();
     await backend.stop();
