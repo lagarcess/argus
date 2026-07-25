@@ -946,22 +946,76 @@ export async function apiJson<T>(
   return { status: response.status(), body };
 }
 
-export async function waitForMe(page: Page): Promise<GuestMe> {
+export async function waitForMe(
+  page: Page,
+  timeoutMs = 60_000,
+): Promise<GuestMe> {
   const response = await page.waitForResponse(
     (candidate) =>
       candidate.request().method() === "GET" &&
       new URL(candidate.url()).pathname.endsWith("/api/v1/me") &&
       candidate.status() === 200,
+    { timeout: timeoutMs },
   );
   return (await response.json()) as GuestMe;
 }
 
-export async function freshGuest(page: Page): Promise<GuestMe> {
-  const mePromise = waitForMe(page);
+export async function freshGuest(
+  page: Page,
+  options: {
+    timeoutMs?: number;
+    onBootstrapOwner?: (owner: string) => void;
+  } = {},
+): Promise<GuestMe> {
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const bootstrapOwnerPromise = page
+    .waitForResponse(
+      (candidate) =>
+        candidate.request().method() === "POST" &&
+        new URL(candidate.url()).pathname.endsWith("/api/v1/auth/guest") &&
+        candidate.status() === 200,
+      { timeout: timeoutMs },
+    )
+    .then(async (response) => {
+      const payload = (await response.json()) as {
+        user?: { id?: unknown } | null;
+      };
+      const owner = requireUuid(
+        typeof payload.user?.id === "string" ? payload.user.id : "",
+        "guest bootstrap owner",
+      );
+      options.onBootstrapOwner?.(owner);
+      return owner;
+    });
+  const mePromise = Promise.all([
+    waitForMe(page, timeoutMs),
+    bootstrapOwnerPromise,
+  ]).then(([me, bootstrapOwner]) => {
+    if (me.user.id !== bootstrapOwner) {
+      throw new Error("Guest bootstrap and verified profile owners differ");
+    }
+    return { kind: "authenticated" as const, me };
+  });
+  const entryErrorPromise = page
+    .getByRole("button", { name: /Try again|Intentar de nuevo/i })
+    .waitFor({ state: "visible", timeout: timeoutMs })
+    .then(() => ({ kind: "entry_error" as const }));
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const me = await mePromise;
-  await expect(page).toHaveURL(/\/chat(?:\?|$)/);
-  return me;
+  let outcome:
+    | Awaited<typeof mePromise>
+    | Awaited<typeof entryErrorPromise>;
+  try {
+    outcome = await Promise.race([mePromise, entryErrorPromise]);
+  } catch (error) {
+    throw new Error("Guest public entry failed before authentication", {
+      cause: error,
+    });
+  }
+  if (outcome.kind === "entry_error") {
+    throw new Error("Guest public entry failed before authentication");
+  }
+  expect(new URL(page.url()).pathname).toBe("/chat");
+  return outcome.me;
 }
 
 export function evidenceLabel(namespace: string, value: string): string {

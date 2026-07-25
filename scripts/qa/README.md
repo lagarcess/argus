@@ -40,6 +40,11 @@ guest harness, rejects hosted targets, disables Playwright retries/traces/
 video, launches one headful Chromium worker, and keeps public-account access
 off except for the in-process isolated conversion step.
 
+The runner starts the frontend with the repository's canonical local QA
+command, `bun run dev`. This is intentional: the local anonymous-auth CAPTCHA
+bootstrap is unavailable under `next start`, while the backend still runs in
+strict production-parity QA mode.
+
 Before committing a harness correction, validate setup and teardown without a
 runtime turn:
 

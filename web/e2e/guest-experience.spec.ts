@@ -223,7 +223,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
     await runStep(1, evidence, (value) => (currentCheck = value), async () => {
       await assertFreshContext(page.context());
       evidence.fresh_context_verified = true;
-      primaryMe = await freshGuest(page);
+      primaryMe = await freshGuest(page, {
+        onBootstrapOwner(owner) {
+          primaryOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
       primaryOwner = primaryMe.user.id;
       primaryExpiry = primaryMe.guest?.expires_at ?? "";
       disposableUserIds.add(primaryOwner);
@@ -582,7 +587,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await assertFreshContext(claimGuestContext);
       claimGuestPage = await claimGuestContext.newPage();
       attachMonitor(claimGuestPage);
-      const foreignMe = await freshGuest(claimGuestPage);
+      const foreignMe = await freshGuest(claimGuestPage, {
+        onBootstrapOwner(owner) {
+          claimGuestOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
       claimGuestOwner = foreignMe.user.id;
       disposableUserIds.add(claimGuestOwner);
       evidence.owner_labels.push(evidenceLabel("owner", claimGuestOwner));
@@ -942,7 +952,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await assertFreshContext(feedbackContext);
       const feedbackPage = await feedbackContext.newPage();
       attachMonitor(feedbackPage);
-      const feedbackMe = await freshGuest(feedbackPage);
+      const feedbackMe = await freshGuest(feedbackPage, {
+        onBootstrapOwner(owner) {
+          feedbackGuestOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
       feedbackGuestOwner = feedbackMe.user.id;
       disposableUserIds.add(feedbackGuestOwner);
       const seeded = seedClaimGraphFromConversation({
@@ -1047,8 +1062,14 @@ test("@guest-experience exact-head 20-check matrix", async ({
       await assertFreshContext(expiryContext);
       const expiryPage = await expiryContext.newPage();
       attachMonitor(expiryPage);
-      const expiredMe = await freshGuest(expiryPage);
-      const expiredOwner = expiredMe.user.id;
+      let expiredOwner = "";
+      const expiredMe = await freshGuest(expiryPage, {
+        onBootstrapOwner(owner) {
+          expiredOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
+      expiredOwner = expiredMe.user.id;
       disposableUserIds.add(expiredOwner);
       const fixedExpiry = ownerSnapshot(expiredOwner).expires_at;
       await apiJson<HistoryList>(expiryContext.request, "/history?limit=20");

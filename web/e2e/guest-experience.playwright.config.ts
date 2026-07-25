@@ -35,18 +35,15 @@ export default defineConfig({
     screenshot: "off",
     serviceWorkers: "block",
   },
-  webServer: preflight
-    ? undefined
-    : {
-        command:
-          "bun run start --hostname 127.0.0.1 --port 3000",
-        cwd: path.join(repositoryRoot, "web"),
-        url: "http://localhost:3000",
-        reuseExistingServer: false,
-        timeout: 120_000,
-        stdout: "ignore",
-        stderr: "ignore",
-      },
+  webServer: {
+    command: "bun run dev --hostname 127.0.0.1 --port 3000",
+    cwd: path.join(repositoryRoot, "web"),
+    url: "http://localhost:3000",
+    reuseExistingServer: false,
+    timeout: 120_000,
+    stdout: "ignore",
+    stderr: "ignore",
+  },
   projects: [
     {
       name: "chromium",
