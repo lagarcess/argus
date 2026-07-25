@@ -43,7 +43,7 @@ def _coverage_launch_payload(
         "parameters": {},
         "risk_rules": [],
         "benchmark_symbol": "SPY",
-        "execution_realism": None,
+        "_execution_realism": None,
         "language": "en",
     }
 
