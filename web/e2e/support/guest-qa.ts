@@ -604,6 +604,7 @@ function psqlJson<T>(sql: string): T {
         "postgres",
         "-d",
         "postgres",
+        "-q",
         "-v",
         "ON_ERROR_STOP=1",
         "-A",
@@ -810,6 +811,9 @@ export function graphDuplicateCount(graph: ConversationGraph): number {
 export function markWorkspaceExpired(userId: string): void {
   const owner = requireUuid(userId, "owner");
   const changed = psqlJson<{ ok: boolean }>(`
+    begin;
+    alter table public.guest_workspaces
+      disable trigger protect_guest_workspace_policy_fields;
     with changed as (
       update public.guest_workspaces
          set created_at = now() - interval '7 days 20 minutes',
@@ -818,10 +822,34 @@ export function markWorkspaceExpired(userId: string): void {
        where user_id = '${owner}'
        returning 1
     )
-    select json_build_object('ok', exists(select 1 from changed))::text
+    select json_build_object('ok', exists(select 1 from changed))::text;
+    alter table public.guest_workspaces
+      enable trigger protect_guest_workspace_policy_fields;
+    commit;
   `);
   if (!changed.ok) {
     throw new Error("Local guest QA expiry fixture was incomplete");
+  }
+}
+
+export function guestWorkspaceExpiryIsImmutable(userId: string): boolean {
+  const owner = requireUuid(userId, "immutable workspace owner");
+  try {
+    psqlJson<{ changed: boolean }>(`
+      with changed as (
+        update public.guest_workspaces
+           set expires_at = expires_at + interval '1 microsecond'
+         where user_id = '${owner}'
+         returning 1
+      )
+      select json_build_object(
+        'changed',
+        exists(select 1 from changed)
+      )::text
+    `);
+    return false;
+  } catch {
+    return true;
   }
 }
 

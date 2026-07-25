@@ -11,10 +11,13 @@ import {
   deleteDisposableIdentity,
   feedbackPrivacy,
   freshGuest,
+  guestWorkspaceExpiryIsImmutable,
+  markWorkspaceExpired,
   purgeDisposableQaEvidence,
   seedClaimGraphFromConversation,
   seedClaimSourceResultFixture,
   seedDurableRetryableFailure,
+  workspaceFacts,
   zeroStateSnapshot,
 } from "./support/guest-qa";
 
@@ -128,6 +131,38 @@ test("guest entry errors fail promptly without minting an identity", async ({
     expect(zeroStateSnapshot().auth_users).toBe(0);
   } finally {
     await backend.stop();
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("expiry fixture preserves the fixed window and expires the local guest", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    markWorkspaceExpired(guestOwner);
+    expect(workspaceFacts(guestOwner).fixed_seven_days).toBe(true);
+    expect(guestWorkspaceExpiryIsImmutable(guestOwner)).toBe(true);
+    const denied = await apiJson<{ code?: string }>(
+      page.context().request,
+      "/me",
+    );
+    expect(denied.status).toBe(403);
+    expect(denied.body.code).toBe("guest_session_expired");
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
     purgeDisposableQaEvidence();
     assertZeroState();
   }
