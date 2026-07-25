@@ -844,6 +844,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       claimGuestOwner = foreignMe.user.id;
       disposableUserIds.add(claimGuestOwner);
       evidence.owner_labels.push(evidenceLabel("owner", claimGuestOwner));
+      await claimGuestPage.waitForLoadState("networkidle");
       const seeded = seedClaimGraphFromConversation({
         sourceOwnerId: primaryOwner,
         sourceConversationId: primaryConversation,
@@ -857,10 +858,19 @@ test("@guest-experience exact-head 20-check matrix", async ({
       evidence.artifact_labels.push(
         evidenceLabel("artifact", claimEvidenceId),
       );
+      const claimMessagesResponse = claimGuestPage.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.status() === 200 &&
+          new URL(response.url()).pathname.endsWith(
+            `/api/v1/conversations/${claimConversation}/messages`,
+          ),
+      );
       await claimGuestPage.goto(
         `/chat?conversation=${claimConversation}`,
         { waitUntil: "domcontentloaded" },
       );
+      expect((await claimMessagesResponse).status()).toBe(200);
       await expect(claimGuestPage.getByTestId("result-equity-chart")).toBeVisible(
         { timeout: 60_000 },
       );
@@ -1704,6 +1714,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       });
       expiredOwner = expiredMe.user.id;
       disposableUserIds.add(expiredOwner);
+      await expiryPage.waitForLoadState("networkidle");
       const seeded = seedClaimGraphFromConversation({
         sourceOwnerId: primaryOwner,
         sourceConversationId: primaryConversation,

@@ -635,6 +635,8 @@ describe("Checks 6–20 harness guards", () => {
       'evidenceRow.getByText("Preserved local QA result"',
     );
     expect(check10).toContain("deniedBodyContainsNoPrivatePayload");
+    expect(check10).toContain('waitForLoadState("networkidle")');
+    expect(check10).toContain("claimMessagesResponse");
     expect(check10).not.toContain(
       '.getByRole("button", { name: "Close search" })',
     );
@@ -748,6 +750,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check19).toContain("checkpoint_writes");
     expect(check19).toContain("cleanupGraphRows(expiredGraphAfter)");
     expect(check19).toContain("includeCleanupEvidence: true");
+    expect(check19).toContain('waitForLoadState("networkidle")');
     expect(check19).toContain("retained_route_rows");
     expect(check19).toContain("retained_cost_rows");
     expect(supportSource).toContain("includeCleanupEvidence?: boolean");
