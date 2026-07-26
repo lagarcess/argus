@@ -99,12 +99,6 @@ function mockUser(language = "en") {
     display_name: "Mock Developer",
     language,
     locale: language === "es-419" ? "es-419" : "en-US",
-    onboarding: {
-      completed: true,
-      stage: "completed",
-      language_confirmed: true,
-      primary_goal: "test_stock_idea",
-    },
   };
 }
 

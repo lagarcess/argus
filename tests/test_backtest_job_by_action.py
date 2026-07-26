@@ -13,7 +13,7 @@ from argus.agent_runtime.state.models import RunState
 from argus.api.chat.backtest_jobs import payload_hash
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
+from argus.api.schemas import BacktestRun, Conversation, Message, User
 from argus.domain.backtest_admission import chat_run_identity_hash
 from faker import Faker
 from fastapi.testclient import TestClient
@@ -55,7 +55,6 @@ class _ByActionGateway:
             locale="en-US",
             theme="dark",
             is_admin=True,
-            onboarding=OnboardingState(completed=True, stage="completed"),
             created_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
             updated_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
         )

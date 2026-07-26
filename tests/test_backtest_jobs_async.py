@@ -14,7 +14,7 @@ from argus.api.chat.backtest_jobs import (
     payload_hash,
 )
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, OnboardingState, User
+from argus.api.schemas import BacktestRun, User
 from fastapi.testclient import TestClient
 
 
@@ -267,7 +267,6 @@ class _HydrationGateway:
             locale="en-US",
             theme="dark",
             is_admin=True,
-            onboarding=OnboardingState(completed=True, stage="completed"),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
@@ -324,7 +323,6 @@ class _TimedOutJobGateway:
             locale="en-US",
             theme="dark",
             is_admin=True,
-            onboarding=OnboardingState(completed=True, stage="completed"),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
