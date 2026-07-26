@@ -41,6 +41,7 @@ import {
   type BacktestRun,
   type PrimaryGoal,
   type SearchItem,
+  type TitleSource,
 } from "@/lib/argus-api";
 import {
   chatExploratorySuggestionsEnabled,
@@ -117,8 +118,13 @@ import {
 import { actionHasCardScopedOwnership, isConfirmationAction } from "@/lib/chat-action-ownership";
 import { attentionAfterConversationOpen, attentionAfterTurnSettled } from "@/lib/chat-attention-state";
 import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
+import {
+  conversationDisplayTitle,
+  renamePrefillTitle,
+} from "@/lib/chat-title-display";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
+import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
@@ -2023,13 +2029,74 @@ export default function ChatInterface() {
     [conversationId, historyItems],
   );
 
+  // Deep-link/restore fallback: the active conversation can sit outside the
+  // loaded history page, which has no single-conversation GET to lean on.
+  const [fallbackTitleConversation, setFallbackTitleConversation] = useState<{
+    id: string;
+    title: string;
+    title_source: TitleSource | null;
+  } | null>(null);
+  const fallbackTitleFetchedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setFallbackTitleConversation((prev) =>
+      prev && prev.id === conversationId ? prev : null,
+    );
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (
+      !conversationId ||
+      activeHistoryChat ||
+      messages.length === 0 ||
+      isStreamingResponse
+    ) {
+      return;
+    }
+    if (fallbackTitleFetchedForRef.current === conversationId) return;
+    fallbackTitleFetchedForRef.current = conversationId;
+    let cancelled = false;
+    listConversations({ limit: 50 })
+      .then(({ items }) => {
+        if (cancelled) return;
+        const conversation = items.find((item) => item.id === conversationId);
+        if (!conversation) return;
+        setFallbackTitleConversation({
+          id: conversation.id,
+          title: conversation.title,
+          title_source: conversation.title_source,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, activeHistoryChat, messages.length, isStreamingResponse]);
+
+  const activeTitleRecord =
+    activeHistoryChat ??
+    (fallbackTitleConversation && fallbackTitleConversation.id === conversationId
+      ? fallbackTitleConversation
+      : null);
+  const headerConversationTitle = conversationDisplayTitle(
+    activeTitleRecord,
+    t("chat.new_chat", "New chat"),
+  );
+  const headerConversationTitleSource = activeTitleRecord?.title_source ?? null;
+
+  useEffect(() => {
+    const named =
+      currentView === "chat" &&
+      activeTitleRecord &&
+      (activeTitleRecord.title_source === "ai_generated" ||
+        activeTitleRecord.title_source === "user_renamed") &&
+      activeTitleRecord.title.trim();
+    document.title = named ? `${activeTitleRecord.title} · Argus` : "Argus";
+  }, [currentView, activeTitleRecord]);
+
   const handleStartHeaderRename = () => {
     if (!conversationId) return;
-    setHeaderRenameValue(
-      activeHistoryChat?.title && activeHistoryChat.title !== t('chat.new_chat')
-        ? activeHistoryChat.title
-        : "",
-    );
+    setHeaderRenameValue(renamePrefillTitle(activeTitleRecord));
     setIsRenamingHeaderChat(true);
   };
 
@@ -2211,20 +2278,23 @@ export default function ChatInterface() {
       >
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
-          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
-          {/* Empty space for sidebar toggle alignment balance */}
-          <div className="w-11 md:w-32" />
-
-          {/* Title (Always Centered relative to Content) */}
-          <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
-            {currentView === "chat" && messages.length > 0 && t('common.conversation', 'Conversation')}
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-4 px-4 pointer-events-none md:px-8">
+          {/* Title (left-aligned; truncates before the action cluster) */}
+          <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+            {currentView === "chat" && messages.length > 0 && (
+              <ChatHeaderTitle
+                conversationId={conversationId}
+                title={headerConversationTitle}
+                titleSource={headerConversationTitleSource}
+              />
+            )}
             {currentView === "strategies" && t('common.strategies')}
           </h1>
 
           {/* Action Button (Always Right-Anchored) */}
-          <div className="flex w-11 justify-end pointer-events-auto md:w-32">
-            {currentView === "chat" && (
-              <div className="relative" ref={chatOptionsRef}>
+          <div className="flex shrink-0 justify-end pointer-events-auto">
+            {currentView === "chat" && conversationId && (
+              <div className="relative animate-in fade-in duration-300" ref={chatOptionsRef}>
                 <button
                   type="button"
                   onClick={() => setShowChatOptions(!showChatOptions)}
