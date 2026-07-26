@@ -336,7 +336,7 @@ export default function ChatMessage({
                 {message.discovery.candidates.map((candidate) => {
                   const sendText = t("chat.discovery_results.test_candidate", {
                     symbol: candidate.symbol,
-                    defaultValue: "Test {{symbol}}",
+                    defaultValue: "Backtest {{symbol}}",
                   });
                   return (
                     <button

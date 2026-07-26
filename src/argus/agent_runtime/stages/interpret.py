@@ -1081,7 +1081,9 @@ async def _stage_result_from_interpretation(
     discovery_result = await discovery_stage_result_if_applicable(
         decision=decision,
         current_user_message=state.current_user_message,
-        language=user.language_preference,
+        language=(
+            interpretation.detected_user_language or user.language_preference
+        ),
         discovery_allowance_available=state.discovery_allowance_available,
     )
     if discovery_result is not None:

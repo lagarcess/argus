@@ -164,6 +164,15 @@ async def discovery_stage_result_if_applicable(
         candidates=validated,
         unverified_names=unverified,
     )
+    logger.info(
+        "Grounded discovery response composed",
+        relationship=request.relationship,
+        result_count=len(packet.results),
+        extracted_count=len(extraction.candidates),
+        validated_count=len(validated),
+        unverified_count=len(unverified),
+        search_latency_ms=packet.latency_ms,
+    )
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
@@ -215,11 +224,11 @@ async def _recovery_result(
         language=language,
         unverified_names=unverified_names or [],
     )
+    # Voiced recovery is the user-facing prose (llm_generated pattern). Only
+    # the deterministic fallback carries the typed recovery object, which the
+    # frontend then renders from its localized catalogs.
     assistant_response = voiced or recovery_message(code, retryable=retryable)
-    stage_patch: dict[str, Any] = {
-        "assistant_response": assistant_response,
-        "recovery": {"code": code, "retryable": retryable},
-    }
+    stage_patch: dict[str, Any] = {"assistant_response": assistant_response}
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(

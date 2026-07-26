@@ -113,6 +113,27 @@ class TestDiscoveryRouteFlagOff:
         assert result.outcome == "ready_to_respond"
         assert result.patch["recovery"]["code"] == "discovery_unavailable"
 
+    def test_detected_turn_language_reaches_discovery_composer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from argus.agent_runtime.stages import interpret as interpret_module
+
+        captured: dict[str, Any] = {}
+        original = interpret_module.discovery_stage_result_if_applicable
+
+        async def _spy(**kwargs: Any):
+            captured["language"] = kwargs.get("language")
+            return await original(**kwargs)
+
+        monkeypatch.setattr(
+            interpret_module, "discovery_stage_result_if_applicable", _spy
+        )
+        _run(
+            message="¿Qué acciones de ciberseguridad podría probar?",
+            response=_discovery_interpretation(language="es-419"),
+        )
+        assert captured["language"] == "es-419"
+
     def test_discovery_patch_never_touches_pending_or_result_state(self) -> None:
         snapshot = TaskSnapshot(
             pending_strategy_summary=StrategySummary(
