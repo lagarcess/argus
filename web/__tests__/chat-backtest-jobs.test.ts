@@ -609,6 +609,49 @@ describe("chat backtest jobs", () => {
     expect(resultMessage?.result?.evidenceArtifactId).toBe("evidence-1");
   });
 
+  test("completed job recovery chooses one stable fallback owner when aliases share a run", () => {
+    const completedJob = job({
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const projection = (id: string): ApiMessage => ({
+      id,
+      conversation_id: "conversation-1",
+      role: "assistant",
+      content: "",
+      created_at: "2026-06-06T12:00:03Z",
+      metadata: {
+        backtest_job_id: "job-1",
+        backtest_job: completedJob,
+        result_card: {
+          ...run().conversation_result_card,
+          evidence_artifact_id: "evidence-1",
+        },
+        result_run_id: "run-1",
+        latest_run_id: "run-1",
+        result_conversation_id: "conversation-1",
+        result_fact_bank: {
+          run_id: "run-1",
+          symbols: ["MSFT"],
+          benchmark_symbol: "SPY",
+          asset_class: "equity",
+          config_snapshot: { template: "buy_and_hold" },
+        },
+      },
+    });
+
+    const resultMessages = hydrateMessagesFromApi([
+      projection("assistant-job-z"),
+      projection("assistant-job-a"),
+    ]).messages.filter((message) => message.kind === "strategy_result");
+
+    expect(resultMessages).toHaveLength(1);
+    expect(resultMessages[0]?.id).toBe("assistant-job-a");
+    expect(resultMessages[0]?.result?.runId).toBe("run-1");
+    expect(resultMessages[0]?.result?.evidenceArtifactId).toBe("evidence-1");
+  });
+
   test("durable job hydration does not generate backend-owned quick takes in the frontend", () => {
     const source = readFileSync(join(root, "lib/chat-backtest-jobs.ts"), "utf-8");
 

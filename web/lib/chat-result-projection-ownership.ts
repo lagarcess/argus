@@ -7,7 +7,7 @@ import {
 
 type ResultProjectionIdentity = {
   runId: string;
-  isCompletedJobProjection: boolean;
+  completedJobId: string | null;
 };
 
 function resultProjectionIdentity(
@@ -27,10 +27,12 @@ function resultProjectionIdentity(
   const completedJobRunId = stringOrNull(backtestJob?.result_run_id);
   return {
     runId,
-    isCompletedJobProjection:
+    completedJobId:
       backtestJobId !== null &&
       backtestJob?.status === "succeeded" &&
-      completedJobRunId === runId,
+      completedJobRunId === runId
+        ? backtestJobId
+        : null,
   };
 }
 
@@ -51,16 +53,46 @@ export function retainCanonicalResultProjectionOwners(
         (
           identity,
         ): identity is ResultProjectionIdentity =>
-          identity !== null && !identity.isCompletedJobProjection,
+          identity !== null && identity.completedJobId === null,
       )
       .map((identity) => identity.runId),
   );
+  const fallbackOwnerByRunId = new Map<
+    string,
+    { jobId: string; messageId: string }
+  >();
+  // Recovery aliases carry the same canonical run truth. Stable job/message
+  // identities choose one fallback owner without depending on API or DOM order.
+  for (const message of messages) {
+    const identity = resultProjectionIdentity(message);
+    if (
+      identity === null ||
+      identity.completedJobId === null ||
+      durableResultRunIds.has(identity.runId)
+    ) {
+      continue;
+    }
+    const current = fallbackOwnerByRunId.get(identity.runId);
+    if (
+      current === undefined ||
+      identity.completedJobId < current.jobId ||
+      (identity.completedJobId === current.jobId &&
+        message.id < current.messageId)
+    ) {
+      fallbackOwnerByRunId.set(identity.runId, {
+        jobId: identity.completedJobId,
+        messageId: message.id,
+      });
+    }
+  }
 
   return messages.filter((message) => {
     const identity = resultProjectionIdentity(message);
-    return !(
-      identity?.isCompletedJobProjection &&
-      durableResultRunIds.has(identity.runId)
+    if (identity === null || identity.completedJobId === null) return true;
+    const fallbackOwner = fallbackOwnerByRunId.get(identity.runId);
+    return (
+      fallbackOwner?.jobId === identity.completedJobId &&
+      fallbackOwner.messageId === message.id
     );
   });
 }
