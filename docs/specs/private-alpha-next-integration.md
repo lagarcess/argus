@@ -2,15 +2,18 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-23
+Last reconciled: 2026-07-26
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `bbd1d2b`. The accepted post-promotion
+Current stable integration checkpoint: `2d5a2b52`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
-executable capability truth (PR #266). This is an integration checkpoint, not
-a deployed or tester-exposed SHA.
+executable capability truth (PR #266), the Always Progresses continuity
+baseline (PR #268), calendar-materiality classification (PR #267), chat-header
+title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
+and truthful stale Run settlement (PR #277). This is an integration checkpoint,
+not a deployed or tester-exposed SHA.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -200,6 +203,22 @@ Do not reopen these as debt unless a new bug is reproduced:
   supported alternative plus a historical period creates a new confirmation.
   Final candidate `e10bdd2` passed founder-visible browser QA and landed as
   `bbd1d2b`.
+- The Always Progresses continuity baseline is complete at PR #268: ordinary
+  and action retries are durable, Run admission/reconciliation is exact-once,
+  completed results remain immutable, and the bounded EN/ES browser matrix
+  passed. It landed as `847c413b` and remains a standing quality bar rather
+  than an open-ended repair program.
+- Calendar-materiality classification is complete at PR #267: routine
+  exchange-calendar alignment stays quiet while provider-coverage truncation
+  receives one typed, reload-stable notice. It landed as `d6d1134`.
+- The bounded chat-header and onboarding cleanup is complete through PRs #274
+  and #275: owner controls follow the active chat, and the explicit
+  private-alpha onboarding product has been removed. They landed as
+  `291b58f7` and `88ae8c77`.
+- Stale Run settlement is complete at PR #277 / issue #273: stale actions
+  create no compute, settle to typed Updated truth, preserve the latest
+  actionable confirmation, and remain stable after reload. It landed as
+  `2d5a2b52`.
 
 ## P0 Reintegration Checkpoint
 
@@ -216,18 +235,26 @@ The clean reintegration strategy is now part of the process model:
 
 Codex should own or closely supervise this:
 
-1. **Argus always progresses — next pillar, ready to spec**
-   - No old readiness branch or issue wave is automatically active.
-   - Select one representative conversational journey from
-     `docs/specs/private-alpha-interim-roadmap.md` and prove that each accepted
-     turn advances typed state or reaches a clear, actionable stopping point.
-   - Start from `bbd1d2b`, use historical issues and archived work only as
-     evidence, and require proportional production-parity browser QA.
-   - Do not implement until the founder approves a bounded vertical-slice
-     contract with allowed surfaces, no-touch areas, rollback, and stop
-     conditions.
+1. **Finish the two remaining interim founder outcomes**
+   - Grounded discovery is already owned by PR #276. Do not create a duplicate
+     lane while that owner is unavailable.
+   - Full Omnisearch remains product-dependent on the accepted grounded
+     discovery contract. It may be discussed or inventoried, but its
+     implementation must not invent discovery truth.
+   - Always Progresses is delivered and now acts as the quality bar for these
+     slices; it is not the next broad pillar to redispatch.
 
-2. **Evidence-aware idea loop source thesis**
+2. **Advance bounded continuity follow-ups by owner**
+   - Guest PR #279 owns the proven #269 settlement correction. Do not open a
+     second runtime lane.
+   - PR #278 owns #270. After it lands, start #271 from the updated integration
+     checkpoint; start #272 only after #271 lands.
+   - #273 is closed at `2d5a2b52`. Start #249 only after Guest PR #279 lands,
+     because both touch chat-shell and recovery presentation.
+   - The exact handoff table lives in
+     `docs/specs/private-alpha-interim-roadmap.md`.
+
+3. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring remain design/reference material until the
      active roadmap starts a bounded slice.
@@ -239,6 +266,19 @@ Codex should own or closely supervise this:
      `docs/specs/private-alpha-next-roadmap.md` for current execution. This
      branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
+
+## Historical Evidence Retention
+
+Completed specs, plans, and browser reports remain in place when GitHub issues,
+PR descriptions, or closure ledgers link to their paths. Their status banners
+mark them as completed execution records or superseded observations. Moving
+those files into `docs/archive/` would break evidence lineage without reducing
+active ambiguity.
+
+The active command sources are only the interim roadmap, the parent roadmap,
+the decision memo, and this integration-process document. Completed
+Always Progresses plans and dated reports are regression evidence, not active
+dispatch instructions.
 
 ## Known Non-Blocking Debt
 
