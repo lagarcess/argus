@@ -432,6 +432,8 @@ class HistoryItem(BaseModel):
     type: Literal["chat", "strategy", "collection", "run"]
     id: str
     title: str
+    # Chat items only; lets clients render unnamed chats without title heuristics.
+    title_source: NameSource | None = None
     subtitle: str
     pinned: bool = False
     created_at: datetime

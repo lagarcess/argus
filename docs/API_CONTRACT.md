@@ -2838,6 +2838,7 @@ Mixed recent activity feed.
       "type": "chat",
       "id": "uuid",
       "title": "Tesla dip thread",
+      "title_source": "ai_generated",
       "subtitle": "Last message or metric preview",
       "pinned": false,
       "created_at": "timestamp"
@@ -2846,6 +2847,11 @@ Mixed recent activity feed.
   "next_cursor": null
 }
 ```
+
+`title_source` is present on `chat` items only (`system_default | ai_generated
+| user_renamed`, mirroring the conversation record). While it is
+`system_default`, clients should render a localized "New chat" placeholder
+instead of the stored default title.
 
 ---
 

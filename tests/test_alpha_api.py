@@ -526,6 +526,26 @@ def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
     assert chat_titles == ["Active idea"]
 
 
+def test_history_chat_items_carry_title_source() -> None:
+    client = _client()
+
+    unnamed = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    renamed = client.post(
+        "/api/v1/conversations", json={"title": "My renamed idea"}
+    ).json()["conversation"]
+
+    response = client.get("/api/v1/history")
+
+    assert response.status_code == 200
+    sources = {
+        item["id"]: item.get("title_source")
+        for item in response.json()["items"]
+        if item["type"] == "chat"
+    }
+    assert sources[unnamed["id"]] == "system_default"
+    assert sources[renamed["id"]] == "user_renamed"
+
+
 def test_deleted_conversation_restore_moves_chat_back_to_recents() -> None:
     client = _client()
 

@@ -1421,7 +1421,9 @@ class SupabaseGateway(
         )
         query_chats = (
             self.client.table("conversations")
-            .select("id,title,last_message_preview,pinned,updated_at,deleted_at,archived")
+            .select(
+                "id,title,title_source,last_message_preview,pinned,updated_at,deleted_at,archived"
+            )
             .eq("user_id", user_id)
             .eq("archived", archived)
         )
