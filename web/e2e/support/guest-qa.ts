@@ -1,11 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import {
-  chmodSync,
-  mkdirSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -96,13 +91,19 @@ export const GUEST_ACCEPTANCE_CHECKS = [
   { number: 6, title: "Chart switching creates zero writes" },
   { number: 7, title: "UI API and Postgres usage agree" },
   { number: 8, title: "Reload restores the exact conversation and result" },
-  { number: 9, title: "Recents restores the temporary conversation and expiry" },
+  {
+    number: 9,
+    title: "Recents restores the temporary conversation and expiry",
+  },
   { number: 10, title: "Omnisearch is owner scoped and honest" },
   { number: 11, title: "Second simulation converts before admission" },
   { number: 12, title: "Add decision preserves typed action identity" },
   { number: 13, title: "New chat choices match account-access mode" },
   { number: 14, title: "Canceling authentication loses nothing" },
-  { number: 15, title: "New account conversion preserves UUID and resumes once" },
+  {
+    number: 15,
+    title: "New account conversion preserves UUID and resumes once",
+  },
   { number: 16, title: "Existing account claim is atomic and lossless" },
   { number: 17, title: "Guest feedback is private and allowance neutral" },
   { number: 18, title: "Interrupted turn charges nothing and recovers" },
@@ -252,6 +253,7 @@ export type OwnerSnapshot = {
   chat_units: number;
   simulation_units: number;
   feedback_units: number;
+  route_receipts: number;
   cost_rows: number;
   provider_cost_usd: number;
   provider_latency_ms: number;
@@ -352,6 +354,68 @@ function recordOrEmpty(value: unknown): Record<string, unknown> {
     : {};
 }
 
+export function rekeyGuestQaConfirmationMetadata(
+  metadata: Record<string, unknown>,
+  nextConfirmationId: string,
+): Record<string, unknown> {
+  if (!nextConfirmationId.trim()) {
+    throw new Error("Guest QA confirmation identity is required");
+  }
+  const sourceCard = recordOrEmpty(metadata.confirmation_card);
+  const sourcePayload = recordOrEmpty(metadata.confirmation_payload);
+  const sourceConfirmationId = sourceCard.confirmation_id;
+  if (
+    typeof sourceConfirmationId !== "string" ||
+    !sourceConfirmationId.trim() ||
+    sourcePayload.confirmation_id !== sourceConfirmationId ||
+    sourcePayload.artifact_id !== sourceConfirmationId
+  ) {
+    throw new Error("Guest QA confirmation identity mismatch");
+  }
+  const sourceValidation = recordOrEmpty(sourcePayload.validation);
+  if (
+    sourceValidation.executable !== true ||
+    sourceCard.status !== "ready_to_run"
+  ) {
+    throw new Error("Guest QA source confirmation is not executable");
+  }
+  const rekeyExactIdentity = (value: unknown): unknown => {
+    if (value === sourceConfirmationId) return nextConfirmationId;
+    if (Array.isArray(value)) return value.map(rekeyExactIdentity);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+          key,
+          rekeyExactIdentity(item),
+        ]),
+      );
+    }
+    return value;
+  };
+  const clone = rekeyExactIdentity(structuredClone(metadata)) as Record<
+    string,
+    unknown
+  >;
+  const card = recordOrEmpty(clone.confirmation_card);
+  const actions = Array.isArray(card.actions) ? card.actions : [];
+  let runActions = 0;
+  card.confirmation_state = "active";
+  card.actions = actions.map((value) => {
+    const action = recordOrEmpty(value);
+    if (action.type !== "run_backtest") return action;
+    runActions += 1;
+    const payload = recordOrEmpty(action.payload);
+    payload.idempotency_key = nextConfirmationId;
+    action.payload = payload;
+    return action;
+  });
+  if (runActions !== 1) {
+    throw new Error("Guest QA confirmation must contain one typed run action");
+  }
+  clone.confirmation_card = card;
+  return clone;
+}
+
 function requiredDateRange(
   value: unknown,
   field: string,
@@ -443,8 +507,7 @@ export function confirmationContinuityChecks(
       (item) => item.role === "user" && item.content === updateMessage,
     ),
     assetUniverseExactlyMsft:
-      refined.assetUniverse.length === 1 &&
-      refined.assetUniverse[0] === "MSFT",
+      refined.assetUniverse.length === 1 && refined.assetUniverse[0] === "MSFT",
     benchmarkExactlySpy: refined.benchmark === "SPY",
     requestedDateRangeUnchanged: sameDateRange(
       refined.requestedDateRange,
@@ -457,9 +520,7 @@ export function confirmationContinuityChecks(
   };
 }
 
-export function latestResultFacts(
-  items: PersistedMessageItem[],
-): ResultFacts {
+export function latestResultFacts(items: PersistedMessageItem[]): ResultFacts {
   for (const item of [...items].reverse()) {
     const metadata = recordOrEmpty(item.metadata);
     if (!Object.hasOwn(metadata, "result_card")) continue;
@@ -545,7 +606,9 @@ export function assertExactLocalCandidate(
   options: { allowMockBrowserAuth?: boolean } = {},
 ): void {
   if (process.env.ARGUS_QA_APPROVED_SUPABASE_REF) {
-    throw new Error("Hosted Supabase approval is forbidden for guest browser QA");
+    throw new Error(
+      "Hosted Supabase approval is forbidden for guest browser QA",
+    );
   }
   const candidate = requireCandidateSha();
   const head = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -723,6 +786,7 @@ export function ownerSnapshot(userId: string): OwnerSnapshot {
       'chat_units', coalesce((select sum(used_count) from public.usage_counters where user_id = '${owner}' and resource = 'chat_messages'), 0),
       'simulation_units', coalesce((select sum(used_count) from public.usage_counters where user_id = '${owner}' and resource = 'backtest_runs'), 0),
       'feedback_units', coalesce((select sum(used_count) from public.usage_counters where user_id = '${owner}' and resource = 'feedback'), 0),
+      'route_receipts', (select count(*) from public.route_receipts where user_id = '${owner}'),
       'cost_rows', (select count(*) from public.cost_ledger_entries where user_id = '${owner}'),
       'provider_cost_usd', coalesce((select sum(cost_amount) from public.cost_ledger_entries where user_id = '${owner}' and status = 'succeeded'), 0),
       'provider_latency_ms', coalesce((select sum(latency_ms) from public.cost_ledger_entries where user_id = '${owner}' and status = 'succeeded'), 0),
@@ -848,8 +912,7 @@ export function sameGraphIds(
 
 export function graphDuplicateCount(graph: ConversationGraph): number {
   return (Object.keys(graph) as Array<keyof ConversationGraph>).reduce(
-    (total, key) =>
-      total + graph[key].length - new Set(graph[key]).size,
+    (total, key) => total + graph[key].length - new Set(graph[key]).size,
     0,
   );
 }
@@ -918,9 +981,7 @@ export function markClaimedWorkspaceCleanupReady(userId: string): void {
   }
 }
 
-export function cleanupExpectedGuestCandidates(
-  userIds: string[],
-): {
+export function cleanupExpectedGuestCandidates(userIds: string[]): {
   dry_run_count: number;
   deleted_count: number;
   claimed_identity_count: number;
@@ -934,9 +995,7 @@ export function cleanupExpectedGuestCandidates(
   if (expectedSet.size !== expected.length) {
     throw new Error("Cleanup fixture owners must be unique");
   }
-  const dryRun = psqlJson<
-    Array<{ user_id: string; cleanup_reason: string }>
-  >(`
+  const dryRun = psqlJson<Array<{ user_id: string; cleanup_reason: string }>>(`
     select coalesce(
       json_agg(
         json_build_object(
@@ -1252,6 +1311,305 @@ export function seedDurableRetryableFailure(params: {
     inserted: true,
     failedAssistantId: assistantMessage,
   };
+}
+
+export function seedDistinctGuestConfirmation(params: {
+  userId: string;
+  conversationId: string;
+  sourceMessageId: string;
+}): {
+  messageId: string;
+  confirmationId: string;
+} {
+  const owner = requireUuid(params.userId, "confirmation owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "confirmation conversation",
+  );
+  const sourceMessage = requireUuid(
+    params.sourceMessageId,
+    "source confirmation message",
+  );
+  const messageId = randomUUID();
+  const confirmationId = `confirmation-${randomUUID()}`;
+  const source = psqlJson<{
+    metadata: Record<string, unknown> | null;
+    workspace_active: boolean;
+    completed_runs: number;
+    simulation_units: number;
+  }>(`
+    select json_build_object(
+      'metadata', (
+        select metadata
+        from public.messages
+        where id = '${sourceMessage}'
+          and user_id = '${owner}'
+          and conversation_id = '${conversation}'
+          and role = 'assistant'
+      ),
+      'workspace_active', exists(
+        select 1
+        from public.guest_workspaces as workspace
+        join auth.users as auth_user on auth_user.id = workspace.user_id
+        where workspace.user_id = '${owner}'
+          and workspace.conversation_id = '${conversation}'
+          and workspace.status = 'active'
+          and workspace.expires_at > now()
+          and auth_user.is_anonymous
+      ),
+      'completed_runs', (
+        select count(*)
+        from public.backtest_runs
+        where user_id = '${owner}'
+          and conversation_id = '${conversation}'
+          and status = 'completed'
+      ),
+      'simulation_units', coalesce((
+        select sum(used_count)
+        from public.usage_counters
+        where user_id = '${owner}'
+          and resource = 'backtest_runs'
+      ), 0)
+    )::text
+  `);
+  if (
+    !source.metadata ||
+    !source.workspace_active ||
+    source.completed_runs !== 1 ||
+    source.simulation_units !== 1
+  ) {
+    throw new Error(
+      "Distinct guest confirmation requires an active owner with one settled run",
+    );
+  }
+  const metadata = rekeyGuestQaConfirmationMetadata(
+    source.metadata,
+    confirmationId,
+  );
+  const encodedMetadata = Buffer.from(
+    JSON.stringify(metadata),
+    "utf8",
+  ).toString("base64");
+  const seeded = psqlJson<{ inserted: boolean }>(`
+    with owned_source as (
+      select 1
+      from public.messages as message
+      join public.guest_workspaces as workspace
+        on workspace.user_id = message.user_id
+       and workspace.conversation_id = message.conversation_id
+      join auth.users as auth_user on auth_user.id = workspace.user_id
+      where message.id = '${sourceMessage}'
+        and message.user_id = '${owner}'
+        and message.conversation_id = '${conversation}'
+        and message.role = 'assistant'
+        and workspace.status = 'active'
+        and workspace.expires_at > now()
+        and auth_user.is_anonymous
+        and message.metadata -> 'confirmation_payload' -> 'validation'
+          ->> 'executable' = 'true'
+        and message.metadata -> 'confirmation_card' ->> 'status'
+          = 'ready_to_run'
+        and (
+          select count(*)
+          from jsonb_array_elements(
+            coalesce(
+              message.metadata -> 'confirmation_card' -> 'actions',
+              '[]'::jsonb
+            )
+          ) as action
+          where action ->> 'type' = 'run_backtest'
+        ) = 1
+        and (
+          select count(*)
+          from public.backtest_runs
+          where user_id = '${owner}'
+            and conversation_id = '${conversation}'
+            and status = 'completed'
+        ) = 1
+        and coalesce((
+          select sum(used_count)
+          from public.usage_counters
+          where user_id = '${owner}'
+            and resource = 'backtest_runs'
+        ), 0) = 1
+    ),
+    inserted_confirmation as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        '${messageId}', '${conversation}', '${owner}', 'assistant',
+        'A distinct local QA confirmation is ready.',
+        convert_from(decode('${encodedMetadata}', 'base64'), 'UTF8')::jsonb,
+        (
+          select coalesce(max(created_at), now()) + interval '1 millisecond'
+          from public.messages
+          where conversation_id = '${conversation}'
+        )
+      from owned_source
+      returning 1
+    )
+    select json_build_object(
+      'inserted',
+      exists(select 1 from inserted_confirmation)
+    )::text
+  `);
+  if (!seeded.inserted) {
+    throw new Error("Distinct guest confirmation fixture was not inserted");
+  }
+  return { messageId, confirmationId };
+}
+
+export function seedGuestSimulationExhaustionFixture(params: {
+  userId: string;
+  conversationId: string;
+}): {
+  sourceMessageId: string;
+  confirmationId: string;
+} {
+  const owner = requireUuid(params.userId, "simulation fixture owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "simulation fixture conversation",
+  );
+  const strategyId = randomUUID();
+  const runId = randomUUID();
+  const sourceMessageId = randomUUID();
+  const confirmationId = `confirmation-${randomUUID()}`;
+  const metadata = {
+    confirmation_payload: {
+      confirmation_id: confirmationId,
+      artifact_id: confirmationId,
+      strategy: {
+        asset_universe: ["MSFT"],
+        date_range: {
+          start: "2025-07-25",
+          end: "2026-07-24",
+        },
+      },
+      launch_payload: {
+        symbols: ["MSFT"],
+        benchmark_symbol: "SPY",
+        requested_date_range: {
+          start: "2025-07-25",
+          end: "2026-07-25",
+        },
+      },
+      validation: {
+        status: "ready_to_run",
+        executable: true,
+      },
+    },
+    confirmation_card: {
+      confirmation_id: confirmationId,
+      confirmation_state: "active",
+      status: "ready_to_run",
+      title: "MSFT compared with SPY",
+      actions: [
+        {
+          type: "run_backtest",
+          label: "Run backtest",
+          payload: {
+            confirmation_id: confirmationId,
+            artifact_id: confirmationId,
+            idempotency_key: confirmationId,
+          },
+        },
+      ],
+    },
+    active_confirmation_reference: {
+      artifact_id: confirmationId,
+      metadata: { confirmation_id: confirmationId },
+    },
+    artifact_references: [
+      {
+        artifact_id: confirmationId,
+        metadata: { confirmation_id: confirmationId },
+      },
+    ],
+  };
+  const encodedMetadata = Buffer.from(
+    JSON.stringify(metadata),
+    "utf8",
+  ).toString("base64");
+  const seeded = psqlJson<{ ok: boolean }>(`
+    with active_owner as (
+      select workspace.created_at, workspace.expires_at
+      from public.guest_workspaces as workspace
+      join auth.users as auth_user on auth_user.id = workspace.user_id
+      join public.conversations as conversation
+        on conversation.id = workspace.conversation_id
+       and conversation.user_id = workspace.user_id
+      where workspace.user_id = '${owner}'
+        and workspace.conversation_id = '${conversation}'
+        and workspace.status = 'active'
+        and workspace.expires_at > now()
+        and auth_user.is_anonymous
+    ),
+    inserted_strategy as (
+      insert into public.strategies (
+        id, user_id, conversation_id, name, template, asset_class,
+        symbols, benchmark_symbol
+      )
+      select
+        '${strategyId}', '${owner}', '${conversation}',
+        'Guest QA exhausted simulation', 'buy_and_hold', 'equity',
+        array['MSFT']::text[], 'SPY'
+      from active_owner
+      returning 1
+    ),
+    inserted_run as (
+      insert into public.backtest_runs (
+        id, user_id, conversation_id, strategy_id, status, asset_class,
+        symbols, benchmark_symbol, config_snapshot, conversation_result_card
+      )
+      select
+        '${runId}', '${owner}', '${conversation}', '${strategyId}',
+        'completed', 'equity', array['MSFT']::text[], 'SPY',
+        '{}'::jsonb,
+        jsonb_build_object(
+          'status', 'completed',
+          'symbols', jsonb_build_array('MSFT'),
+          'benchmark_symbol', 'SPY'
+        )
+      from inserted_strategy
+      returning 1
+    ),
+    inserted_source as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata
+      )
+      select
+        '${sourceMessageId}', '${conversation}', '${owner}', 'assistant',
+        'A local QA confirmation is ready.',
+        convert_from(decode('${encodedMetadata}', 'base64'), 'UTF8')::jsonb
+      from inserted_run
+      returning 1
+    ),
+    inserted_usage as (
+      insert into public.usage_counters (
+        user_id, resource, period, period_start, period_end,
+        used_count, limit_count
+      )
+      select
+        '${owner}', 'backtest_runs', 'guest_session',
+        active_owner.created_at, active_owner.expires_at, 1, 1
+      from active_owner
+      cross join inserted_source
+      returning 1
+    )
+    select json_build_object(
+      'ok',
+      exists(select 1 from inserted_strategy)
+      and exists(select 1 from inserted_run)
+      and exists(select 1 from inserted_source)
+      and exists(select 1 from inserted_usage)
+    )::text
+  `);
+  if (!seeded.ok) {
+    throw new Error("Guest simulation exhaustion fixture was incomplete");
+  }
+  return { sourceMessageId, confirmationId };
 }
 
 export function seedClaimSourceResultFixture(params: {
@@ -1919,9 +2277,7 @@ export async function freshGuest(
     .waitFor({ state: "visible", timeout: timeoutMs })
     .then(() => ({ kind: "entry_error" as const }));
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  let outcome:
-    | Awaited<typeof mePromise>
-    | Awaited<typeof entryErrorPromise>;
+  let outcome: Awaited<typeof mePromise> | Awaited<typeof entryErrorPromise>;
   try {
     outcome = await Promise.race([mePromise, entryErrorPromise]);
   } catch (error) {
@@ -2209,7 +2565,9 @@ export class BrowserSafetyMonitor {
     if (
       JWT_PATTERN.test(value) ||
       EMAIL_PATTERN.test(value) ||
-      /refresh[_ -]?token|service[_ -]?role|authorization:\s*bearer/i.test(value)
+      /refresh[_ -]?token|service[_ -]?role|authorization:\s*bearer/i.test(
+        value,
+      )
     ) {
       this.credentialExposure += 1;
     }
@@ -2250,7 +2608,7 @@ export async function safeScreenshot(
     page.locator('input[type="email"]'),
     page.locator('input[type="password"]'),
     page.locator("textarea"),
-    page.locator('[data-conversation-id]'),
+    page.locator("[data-conversation-id]"),
   ];
   if (target) {
     await target.screenshot({ path: destination, mask });
@@ -2440,7 +2798,9 @@ export async function deleteDisposableIdentity(userId: string): Promise<void> {
 export function purgeDisposableQaEvidence(): void {
   const state = zeroStateSnapshot();
   if (state.auth_users !== 0 || state.profiles !== 0) {
-    throw new Error("Guest QA refused to purge evidence before identity cleanup");
+    throw new Error(
+      "Guest QA refused to purge evidence before identity cleanup",
+    );
   }
   const purged = psqlJson<{ ok: boolean }>(`
     with deleted_cost as (

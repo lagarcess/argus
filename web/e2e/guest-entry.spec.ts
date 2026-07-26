@@ -241,8 +241,7 @@ test("@guest-shell verified starter actions use the same ordinary localized send
   const starterCases = [
     {
       label: "Test Apple vs SPY",
-      value:
-        "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
+      value: "Compare Apple with SPY over the last 12 months.",
     },
     {
       label: "Test Bitcoin (BTC) hold",
@@ -261,9 +260,9 @@ test("@guest-shell verified starter actions use the same ordinary localized send
     await page.getByRole("button", { name: starter.label }).click();
     await expect(page.getByText("Let’s test that idea.")).toBeVisible();
     expect(evidence.sentMessages.at(-1)).toBe(starter.value);
-    await expect(
-      page.getByRole("button", { name: starter.label }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: starter.label })).toHaveCount(
+      0,
+    );
   }
 });
 
@@ -296,6 +295,8 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
   const messageLoadPending = new Promise<void>((resolve) => {
     messageLoadStarted = resolve;
   });
+  let messageLoadCount = 0;
+  let streamPostCount = 0;
 
   await page.route("**/api/v1/me", async (route) => {
     await fulfillJson(route, {
@@ -333,6 +334,11 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
   await page.route("**/api/v1/conversations**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith(`/${CONVERSATION_ID}/messages`)) {
+      messageLoadCount += 1;
+      if (messageLoadCount > 1) {
+        await fulfillJson(route, { items: [], next_cursor: null });
+        return;
+      }
       messageLoadStarted();
       await hydrationBlocked;
       await fulfillJson(route, {
@@ -361,6 +367,7 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
     await fulfillJson(route, { items: [], next_cursor: null });
   });
   await page.route("**/api/v1/chat/stream", async (route) => {
+    streamPostCount += 1;
     const body = route.request().postDataJSON() as { message?: string };
     expect(body.message).toBe("Accepted while reload is pending");
     await route.fulfill({
@@ -390,6 +397,8 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
     await input.fill("Accepted while reload is pending");
     await input.press("Enter");
     await expect(page.getByText("Local accepted response")).toBeVisible();
+    expect(messageLoadCount).toBe(2);
+    expect(streamPostCount).toBe(1);
 
     releaseHydration();
 
@@ -435,10 +444,16 @@ for (const expiredCase of [
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByRole("heading", { name: expiredCase.title })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: expiredCase.title }),
+    ).toBeVisible();
     await expect(page.getByText(expiredCase.detail)).toBeVisible();
-    await expect(page.getByRole("button", { name: expiredCase.restart })).toBeVisible();
-    await expect(page.getByRole("button", { name: expiredCase.signIn })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: expiredCase.restart }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: expiredCase.signIn }),
+    ).toBeVisible();
     await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
     await expect(page.getByTestId("chat-input")).toHaveCount(0);
   });
@@ -514,9 +529,13 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
     "aria-label",
     "What do you want to test?",
   );
-  await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Guest settings" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Chat options" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Chat options" })).toHaveCount(
+    0,
+  );
   const temporaryNotice = page.getByTestId("guest-temporary-notice");
   await expect(temporaryNotice).toHaveCount(1);
   await expect(temporaryNotice).toHaveText(
@@ -534,12 +553,18 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
     "By messaging Argus",
   );
   await expect(
-    page.getByTestId("guest-legal-before_message").getByRole("link", { name: "Terms" }),
+    page
+      .getByTestId("guest-legal-before_message")
+      .getByRole("link", { name: "Terms" }),
   ).toHaveAttribute("href", "/terms");
   await expect(
-    page.getByTestId("guest-legal-before_message").getByRole("link", { name: "Privacy" }),
+    page
+      .getByTestId("guest-legal-before_message")
+      .getByRole("link", { name: "Privacy" }),
   ).toHaveAttribute("href", "/privacy");
-  await expect(page.getByTestId("guest-legal-before_message")).toContainText("2026");
+  await expect(page.getByTestId("guest-legal-before_message")).toContainText(
+    "2026",
+  );
 
   await page.getByRole("button", { name: "Sign in" }).click();
   const signInDialog = page.getByRole("dialog", { name: "Sign in" });
@@ -554,11 +579,15 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
 
   const settingsTrigger = page.getByRole("button", { name: "Guest settings" });
   await settingsTrigger.click();
-  await expect(page.getByRole("menu", { name: "Guest settings" })).toBeVisible();
+  await expect(
+    page.getByRole("menu", { name: "Guest settings" }),
+  ).toBeVisible();
   await expect(page.getByText("Theme", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem")).toHaveCount(2);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu", { name: "Guest settings" })).toHaveCount(0);
+  await expect(page.getByRole("menu", { name: "Guest settings" })).toHaveCount(
+    0,
+  );
   await expect(settingsTrigger).toBeFocused();
   await settingsTrigger.click();
   await page.getByRole("button", { name: "Dark" }).click();
@@ -566,7 +595,9 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
   await page.getByRole("menuitem", { name: "Language" }).click();
   await expect(page.getByRole("dialog", { name: "Language" })).toBeVisible();
   await page.getByRole("button", { name: /Español/ }).click();
-  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Iniciar sesión" }),
+  ).toBeVisible();
   await expect(page.getByTestId("guest-temporary-notice")).toHaveText(
     `Chat temporal · disponible hasta ${ES_EXPIRY_DATE}`,
   );
@@ -611,7 +642,9 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
   );
   await expect(page.getByTestId("guest-legal-before_message")).toHaveCount(0);
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Opciones de chat" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Opciones de chat" }),
+  ).toHaveCount(0);
   expect(evidence.profilePatches).toEqual([]);
 
   await page.getByRole("button", { name: "Nuevo chat" }).click();
@@ -650,7 +683,9 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   await expect(page.getByTestId("guest-legal-before_message")).toBeVisible();
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   await expect(page.getByTestId("guest-sidebar-expiry")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Guest settings" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Guest settings" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 
   const mobileSettingsTrigger = page.getByRole("button", {
@@ -664,9 +699,9 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   const mobileMenuBox = await mobileSettingsMenu.boundingBox();
   const mobileViewportWidth = await page.evaluate(() => window.innerWidth);
   expect(mobileMenuBox?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect((mobileMenuBox?.x ?? 0) + (mobileMenuBox?.width ?? 0)).toBeLessThanOrEqual(
-    mobileViewportWidth,
-  );
+  expect(
+    (mobileMenuBox?.x ?? 0) + (mobileMenuBox?.width ?? 0),
+  ).toBeLessThanOrEqual(mobileViewportWidth);
   await mobileSettingsTrigger.click();
 
   // The in-app browser reserves a narrow browser rail inside a 390px device
@@ -674,7 +709,9 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   await page.setViewportSize({ width: 354, height: 844 });
   await mobileSettingsTrigger.click();
   const narrowMobileMenuBox = await mobileSettingsMenu.boundingBox();
-  const narrowMobileViewportWidth = await page.evaluate(() => window.innerWidth);
+  const narrowMobileViewportWidth = await page.evaluate(
+    () => window.innerWidth,
+  );
   expect(narrowMobileMenuBox?.x ?? -1).toBeGreaterThanOrEqual(0);
   expect(
     (narrowMobileMenuBox?.x ?? 0) + (narrowMobileMenuBox?.width ?? 0),
@@ -695,7 +732,9 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
   }
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
   ).toBe(true);
 
   await page.getByRole("button", { name: "Expand sidebar" }).click();
@@ -705,12 +744,16 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Recents" })).toBeVisible();
-  await expect(page.locator("aside").getByText(/Temporary chat/)).toHaveCount(0);
+  await expect(page.locator("aside").getByText(/Temporary chat/)).toHaveCount(
+    0,
+  );
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
   ).toBe(true);
 });
 
@@ -809,9 +852,7 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
   );
   await page.getByRole("button", { name: "Add decision" }).click();
   const decisionDialog = page.getByRole("dialog", { name: "Sign in" });
-  await expect(decisionDialog).toContainText(
-    "Sign in to save this decision.",
-  );
+  await expect(decisionDialog).toContainText("Sign in to save this decision.");
   await decisionDialog.getByRole("button", { name: "Cancel" }).click();
   await expect(decisionDialog).toHaveCount(0);
   expect(durableHintWrites).toBe(0);

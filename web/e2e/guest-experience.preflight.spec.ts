@@ -16,10 +16,13 @@ import {
   LOCAL_API_BASE,
   LOCAL_APP_ORIGIN,
   markWorkspaceExpired,
+  ownerSnapshot,
   purgeDisposableQaEvidence,
   seedClaimGraphFromConversation,
   seedClaimSourceResultFixture,
+  seedDistinctGuestConfirmation,
   seedDurableRetryableFailure,
+  seedGuestSimulationExhaustionFixture,
   workspaceFacts,
   zeroStateSnapshot,
 } from "./support/guest-qa";
@@ -57,7 +60,7 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
           return response?.status ?? 0;
         },
         { timeout: 5_000, intervals: [100, 250, 500] },
-    )
+      )
       .toBe(200);
     await assertFreshContext(page.context());
     const guest = await freshGuest(page, {
@@ -195,10 +198,9 @@ test("durable retry fixture hydrates without sending an interpreter turn", async
         conversationId: created.body.conversation.id,
       }).inserted,
     ).toBe(true);
-    await page.goto(
-      `/chat?conversation=${created.body.conversation.id}`,
-      { waitUntil: "domcontentloaded" },
-    );
+    await page.goto(`/chat?conversation=${created.body.conversation.id}`, {
+      waitUntil: "domcontentloaded",
+    });
     await expect(
       page.getByText(
         "Something went wrong. Your conversation is saved. Please try again.",
@@ -216,6 +218,72 @@ test("durable retry fixture hydrates without sending an interpreter turn", async
     await expect(
       failureMessage.getByRole("button", { name: /Retry|Try again/i }),
     ).toHaveCount(1);
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("second-simulation gate fixture rekeys one durable confirmation without work", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    const created = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(created.status).toBe(200);
+    const fixture = seedGuestSimulationExhaustionFixture({
+      userId: guestOwner,
+      conversationId: created.body.conversation.id,
+    });
+    const before = ownerSnapshot(guestOwner);
+    const beforeGraph = conversationGraph(
+      guestOwner,
+      created.body.conversation.id,
+    );
+    const seeded = seedDistinctGuestConfirmation({
+      userId: guestOwner,
+      conversationId: created.body.conversation.id,
+      sourceMessageId: fixture.sourceMessageId,
+    });
+    const after = ownerSnapshot(guestOwner);
+    const afterGraph = conversationGraph(
+      guestOwner,
+      created.body.conversation.id,
+    );
+    expect(seeded.confirmationId).not.toBe(fixture.confirmationId);
+    expect(after.messages - before.messages).toBe(1);
+    expect(after.assistant_messages - before.assistant_messages).toBe(1);
+    expect(after.jobs).toBe(before.jobs);
+    expect(after.runs).toBe(before.runs);
+    expect(after.simulation_units).toBe(before.simulation_units);
+    expect(after.route_receipts).toBe(before.route_receipts);
+    expect(after.cost_rows).toBe(before.cost_rows);
+    expect(
+      afterGraph.messages.filter((id) => !beforeGraph.messages.includes(id)),
+    ).toEqual([seeded.messageId]);
+    for (const key of Object.keys(beforeGraph) as Array<
+      keyof typeof beforeGraph
+    >) {
+      if (key === "messages") continue;
+      expect(afterGraph[key]).toEqual(beforeGraph[key]);
+    }
   } finally {
     await backend.stop();
     if (guestOwner) await deleteDisposableIdentity(guestOwner);
@@ -268,10 +336,7 @@ test("complete claim graph fixture seeds and tears down without an interpreter t
       targetOwnerId: targetGuest.user.id,
       includeCleanupEvidence: true,
     });
-    const graph = conversationGraph(
-      targetGuest.user.id,
-      seeded.conversationId,
-    );
+    const graph = conversationGraph(targetGuest.user.id, seeded.conversationId);
     expect(
       graph.conversation.length === 1 &&
         graph.messages.length === 2 &&
@@ -412,9 +477,9 @@ test("guest entry without a terminal signal fails within its bounded deadline", 
       body: "<!doctype html><title>Blank local QA entry</title>",
     });
   });
-  await expect(
-    freshGuest(page, { timeoutMs: 1_000 }),
-  ).rejects.toThrow("Guest public entry failed before authentication");
+  await expect(freshGuest(page, { timeoutMs: 1_000 })).rejects.toThrow(
+    "Guest public entry failed before authentication",
+  );
   assertZeroState();
 });
 

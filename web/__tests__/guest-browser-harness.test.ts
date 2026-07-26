@@ -15,6 +15,7 @@ import {
   latestConfirmationFacts,
   latestResultFacts,
   productFailedRequestsForCheck,
+  rekeyGuestQaConfirmationMetadata,
   resultTruthStayedStable,
   strictUtcTimestampsEqual,
   type ConfirmationFacts,
@@ -48,16 +49,45 @@ function confirmationMessage(
     content: "redacted fixture prose",
     metadata: {
       confirmation_payload: {
+        confirmation_id: confirmationId,
+        artifact_id: confirmationId,
         strategy: {
           asset_universe: [symbol],
           date_range: overrides.effective ?? effectiveRange,
         },
         launch_payload: launchPayload,
+        validation: {
+          status: "ready_to_run",
+          executable: true,
+        },
       },
       confirmation_card: {
         confirmation_id: confirmationId,
+        confirmation_state: "active",
+        status: "ready_to_run",
         assumptions: ["Benchmark: SPY"],
+        actions: [
+          {
+            type: "run_backtest",
+            label: "Run backtest",
+            payload: {
+              confirmation_id: confirmationId,
+              artifact_id: confirmationId,
+              idempotency_key: confirmationId,
+            },
+          },
+        ],
       },
+      active_confirmation_reference: {
+        artifact_id: confirmationId,
+        metadata: { confirmation_id: confirmationId },
+      },
+      artifact_references: [
+        {
+          artifact_id: confirmationId,
+          metadata: { confirmation_id: confirmationId },
+        },
+      ],
     },
   };
 }
@@ -90,8 +120,7 @@ describe("guest QA isolated endpoint configuration", () => {
       guestQaEndpointConfig({
         ARGUS_GUEST_QA_APP_PORT: "59900",
         ARGUS_GUEST_QA_API_PORT: "59901",
-        ARGUS_GUEST_QA_DB_CONTAINER:
-          "supabase_db_argus-guest-settlement-proof",
+        ARGUS_GUEST_QA_DB_CONTAINER: "supabase_db_argus-guest-settlement-proof",
       }),
     ).toEqual({
       appOrigin: "http://localhost:59900",
@@ -224,6 +253,81 @@ describe("guest Check 4 confirmation selection", () => {
   });
 });
 
+describe("guest Check 11 deterministic confirmation setup", () => {
+  test("creates a distinct run identity without changing typed strategy facts", () => {
+    const metadata = structuredClone(initial.metadata ?? {});
+
+    const rekeyed = rekeyGuestQaConfirmationMetadata(
+      metadata,
+      "confirmation-second",
+    );
+    const originalFacts = latestConfirmationFacts([initial]);
+    const rekeyedFacts = latestConfirmationFacts([
+      {
+        ...initial,
+        id: "message-second",
+        metadata: rekeyed,
+      },
+    ]);
+    const runAction = (
+      (rekeyed.confirmation_card as Record<string, unknown>).actions as Array<
+        Record<string, unknown>
+      >
+    ).find((action) => action.type === "run_backtest");
+
+    expect(rekeyedFacts.confirmationId).toBe("confirmation-second");
+    expect(rekeyedFacts.assetUniverse).toEqual(originalFacts.assetUniverse);
+    expect(rekeyedFacts.benchmark).toBe(originalFacts.benchmark);
+    expect(rekeyedFacts.requestedDateRange).toEqual(
+      originalFacts.requestedDateRange,
+    );
+    expect(rekeyedFacts.effectiveDateRange).toEqual(
+      originalFacts.effectiveDateRange,
+    );
+    expect(runAction?.payload).toEqual({
+      confirmation_id: "confirmation-second",
+      artifact_id: "confirmation-second",
+      idempotency_key: "confirmation-second",
+    });
+    expect(
+      (rekeyed.confirmation_payload as Record<string, unknown>).confirmation_id,
+    ).toBe("confirmation-second");
+    expect(
+      (rekeyed.confirmation_payload as Record<string, unknown>).artifact_id,
+    ).toBe("confirmation-second");
+    expect(
+      (rekeyed.active_confirmation_reference as Record<string, unknown>)
+        .artifact_id,
+    ).toBe("confirmation-second");
+    expect(
+      (rekeyed.artifact_references as Array<Record<string, unknown>>)[0]
+        .artifact_id,
+    ).toBe("confirmation-second");
+    expect(
+      (initial.metadata?.confirmation_card as Record<string, unknown>)
+        .confirmation_id,
+    ).toBe("confirmation-initial");
+  });
+
+  test("fails closed when the source has no typed run action", () => {
+    const metadata = structuredClone(initial.metadata ?? {});
+    (metadata.confirmation_card as Record<string, unknown>).actions = [];
+    expect(() =>
+      rekeyGuestQaConfirmationMetadata(metadata, "confirmation-second"),
+    ).toThrow("typed run action");
+  });
+
+  test("fails closed when confirmation identities disagree", () => {
+    const metadata = structuredClone(initial.metadata ?? {});
+    (metadata.confirmation_payload as Record<string, unknown>).artifact_id =
+      "confirmation-other";
+
+    expect(() =>
+      rekeyGuestQaConfirmationMetadata(metadata, "confirmation-second"),
+    ).toThrow("identity mismatch");
+  });
+});
+
 describe("guest Check 4 continuity assertions", () => {
   const exactUpdate = "Use MSFT instead of AAPL.";
   const updateMessage: PersistedMessageItem = {
@@ -279,19 +383,22 @@ describe("guest Check 4 continuity assertions", () => {
         effectiveDateRange: { ...effectiveRange, end: "2026-07-23" },
       },
     },
-  ])("$name fails independently with a useful assertion", ({ key, messages, facts }) => {
-    const checks = confirmationContinuityChecks(
-      initialFacts,
-      facts as ConfirmationFacts,
-      messages,
-      exactUpdate,
-    );
+  ])(
+    "$name fails independently with a useful assertion",
+    ({ key, messages, facts }) => {
+      const checks = confirmationContinuityChecks(
+        initialFacts,
+        facts as ConfirmationFacts,
+        messages,
+        exactUpdate,
+      );
 
-    expect(checks).toEqual({ ...expectedPassing, [key]: false });
-    expect(CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES[key].length).toBeGreaterThan(
-      20,
-    );
-  });
+      expect(checks).toEqual({ ...expectedPassing, [key]: false });
+      expect(
+        CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES[key].length,
+      ).toBeGreaterThan(20);
+    },
+  );
 });
 
 describe("browser safety evidence", () => {
@@ -329,21 +436,29 @@ describe("browser safety evidence", () => {
     };
 
     expect(
-      expectedMutationDeltasOnly(before, {
-        ...before,
-        "POST /api/v1/analytics/guest-events": 3,
-      }, {
-        "POST /api/v1/analytics/guest-events": 1,
-      }),
+      expectedMutationDeltasOnly(
+        before,
+        {
+          ...before,
+          "POST /api/v1/analytics/guest-events": 3,
+        },
+        {
+          "POST /api/v1/analytics/guest-events": 1,
+        },
+      ),
     ).toBe(true);
     expect(
-      expectedMutationDeltasOnly(before, {
-        ...before,
-        "POST /api/v1/analytics/guest-events": 3,
-        "POST /api/v1/chat/stream": 5,
-      }, {
-        "POST /api/v1/analytics/guest-events": 1,
-      }),
+      expectedMutationDeltasOnly(
+        before,
+        {
+          ...before,
+          "POST /api/v1/analytics/guest-events": 3,
+          "POST /api/v1/chat/stream": 5,
+        },
+        {
+          "POST /api/v1/analytics/guest-events": 1,
+        },
+      ),
     ).toBe(false);
   });
 
@@ -353,8 +468,7 @@ describe("browser safety evidence", () => {
       rawUrl:
         "http://127.0.0.1:8000/api/v1/conversations/4f8c3dea-c926-4e33-9d50-959bd43d4868/messages?email=founder@example.com&token=secret",
       method: "POST",
-      rawError:
-        "net::ERR_CONNECTION_REFUSED bearer secret founder@example.com",
+      rawError: "net::ERR_CONNECTION_REFUSED bearer secret founder@example.com",
       status: null,
       context: { check: 4, phase: "teardown" },
     });
@@ -378,8 +492,7 @@ describe("browser safety evidence", () => {
     expect(
       browserSafetyDetail({
         event: "console_error",
-        rawError:
-          "Hydration failed with bearer secret founder@example.com",
+        rawError: "Hydration failed with bearer secret founder@example.com",
         context: { check: 2, phase: "product" },
       }),
     ).toEqual({
@@ -664,12 +777,8 @@ describe("Checks 6–20 harness guards", () => {
   };
 
   test("does not use hidden range details or the permanent spacer as evidence", () => {
-    expect(source).not.toContain(
-      'getByTestId("result-chart-visible-period")',
-    );
-    expect(source).not.toContain(
-      '".argus-scrollbar > .space-y-8 > *"',
-    );
+    expect(source).not.toContain('getByTestId("result-chart-visible-period")');
+    expect(source).not.toContain('".argus-scrollbar > .space-y-8 > *"');
     expect(source).toContain('toHaveAttribute("aria-pressed", "true")');
     expect(source).toContain("binaryEvidenceDiffers");
   });
@@ -687,12 +796,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(source).toContain(
       'page.locator("section.argus-confirmation-reveal")',
     );
-    expect(source).not.toContain(
-      'section:has([data-confirmation-status])',
-    );
-    expect(check7).toContain(
-      "expect(uiMessageUnits).toBe(messageWindow.used)",
-    );
+    expect(source).not.toContain("section:has([data-confirmation-status])");
+    expect(check7).toContain("expect(uiMessageUnits).toBe(messageWindow.used)");
     expect(check7).toContain(
       "expect(uiSimulationUnits).toBe(simulationWindow.used)",
     );
@@ -713,22 +818,16 @@ describe("Checks 6–20 harness guards", () => {
     expect(check10).toContain("searchSurface(page)");
     expect(check10).toContain('"Preserved local QA result"');
     expect(check10).not.toContain('"Preserved local QA strategy"');
-    expect(check10).toContain(
-      "closeSearchSurface(page, ownerSearchSurface)",
-    );
+    expect(check10).toContain("closeSearchSurface(page, ownerSearchSurface)");
     expect(check10).toContain(
       "closeSearchSurface(claimGuestPage, foreignSearchSurface)",
     );
     expect(check10).toContain("allowedGuestItemTypes");
     expect(check10).toContain('item.type === "evidence"');
     expect(check10).toContain("item.id === claimEvidenceId");
-    expect(check10).toContain(
-      "item.conversation_id === claimConversation",
-    );
+    expect(check10).toContain("item.conversation_id === claimConversation");
     expect(check10).toContain("foreignSearchResponse");
-    expect(check10).toContain(
-      "const evidenceRow = foreignSearchSurface",
-    );
+    expect(check10).toContain("const evidenceRow = foreignSearchSurface");
     expect(check10).toContain("await expect(evidenceRow).toHaveCount(1)");
     expect(check10).toContain(
       'evidenceRow.getByText("Preserved local QA result"',
@@ -745,14 +844,24 @@ describe("Checks 6–20 harness guards", () => {
   test("binds Check 11 to a distinct persisted confirmation before clicking Run", () => {
     const check11 = checkSource(11);
 
+    expect(check11).toContain("seedDistinctGuestConfirmation");
     expect(check11).toContain("distinctConfirmationFacts");
     expect(check11).toContain("confirmationCards(page)");
-    expect(check11).toMatch(
-      /secondState\.facts\.requestedDateRange\)\.toEqual\(\s*previousFacts\.effectiveDateRange/,
+    expect(check11).toContain(
+      "secondState.facts.messageId).toBe(seededConfirmation.messageId)",
     );
-    expect(check11).not.toMatch(
-      /secondState\.facts\.requestedDateRange\)\.toEqual\(\s*previousFacts\.requestedDateRange/,
-    );
+    expect(check11).toContain("secondState.facts.confirmationId).toBe(");
+    expect(check11).toContain("previousFacts.requestedDateRange");
+    expect(check11).toContain("graphAfterSeed.messages");
+    expect(check11).toContain("seededConfirmation.messageId");
+    expect(check11).toContain("hydrationResponse");
+    expect(check11).toContain('data-confirmation-status="ready_to_run"');
+    expect(check11).toContain("usageAtGate.allowances.backtests");
+    expect(check11).toContain("graphBeforeClick");
+    expect(check11).toContain('"route_receipts"');
+    expect(check11).toContain('"POST /api/v1/chat/stream"');
+    expect(check11).not.toContain('getByTestId("chat-send")');
+    expect(check11).not.toContain('getByTestId("chat-input")');
     expect(check11).not.toContain("runButtons.last()");
   });
 
@@ -889,9 +998,7 @@ describe("Checks 6–20 harness guards", () => {
       'allowMockBrowserAuth: process.env.ARGUS_GUEST_QA_ENTRY === "true"',
     );
     expect(support).toContain("allowMockBrowserAuth?: boolean");
-    expect(support).toContain(
-      'process.env.NEXT_PUBLIC_MOCK_AUTH !== "true"',
-    );
+    expect(support).toContain('process.env.NEXT_PUBLIC_MOCK_AUTH !== "true"');
     expect(entrySpec).toContain('page.route("**/api/v1/me/usage"');
     expect(entrySpec).toContain("guest_session:");
     expect(entrySpec).toContain("available_now: true");
