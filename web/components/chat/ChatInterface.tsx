@@ -2261,7 +2261,7 @@ export default function ChatInterface() {
         description={t(
           "sidebar.delete_confirm.description",
           "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          { title: t("common.conversation", "Conversation") },
+          { title: headerConversationTitle },
         )}
         confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
         cancelLabel={t("common.cancel", "Cancel")}

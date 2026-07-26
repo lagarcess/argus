@@ -173,6 +173,11 @@ describe("chat header wiring", () => {
     expect(chat).toContain('{currentView === "chat" && conversationId && (');
   });
 
+  test("header delete dialog names the active chat", () => {
+    expect(chat).toContain("{ title: headerConversationTitle }");
+    expect(chat).not.toContain('{ title: t("common.conversation", "Conversation") }');
+  });
+
   test("rename prefill trusts title_source, not string comparison", () => {
     expect(chat).toContain("renamePrefillTitle(activeTitleRecord)");
     expect(chat).not.toContain("activeHistoryChat.title !== t('chat.new_chat')");
