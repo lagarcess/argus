@@ -138,9 +138,8 @@ def safe_conflict_strategy_type(
         )
     if strategy_type in {"buy_and_hold", "dca_accumulation"}:
         return strategy_type
-    if (
-        strategy_type == "signal_strategy"
-        and executable_strategy_type(strategy) == strategy_type
+    if strategy_type == "signal_strategy" and _has_executable_signal_rule(
+        _strategy_payload(strategy)
     ):
         return strategy_type
     return None

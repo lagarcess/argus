@@ -411,6 +411,71 @@ async def test_complete_crossover_conflict_audit_does_not_invent_comparison(
     assert repaired.candidate_strategy_draft.rule_spec == RULE_SPEC
 
 
+@pytest.mark.asyncio
+async def test_conflict_audit_keeps_unsupported_signal_without_executable_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A declared signal type cannot erase an unsupported custom-rule boundary."""
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Trade a custom sentiment signal.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Buy AAPL whenever social sentiment turns positive.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Trade AAPL from a custom social-sentiment signal.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            timeframe="1D",
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            capital_amount=12000,
+        ),
+        unsupported_constraints=[
+            LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="social sentiment turns positive",
+                explanation="Social-sentiment signals are not executable.",
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            selected_strategy_type="signal_strategy",
+            drop_unsupported_strategy_logic=True,
+            keep_unsupported_strategy_logic=False,
+            confidence=0.98,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    repaired = await interpreter_module._audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model="test-model",
+        request=interpreter_module.InterpretationRequest(
+            current_user_message=response.candidate_strategy_draft.raw_user_phrasing,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            selected_thread_metadata={},
+            user=UserState(user_id="u-270", language_preference="en"),
+        ),
+    )
+
+    assert repaired is None
+    assert [item.category for item in response.unsupported_constraints] == [
+        "unsupported_strategy_logic"
+    ]
+
+
 def test_crossover_confirmation_launch_and_reload_share_one_typed_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
