@@ -1222,6 +1222,9 @@ def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
         metadata=new_metadata,
     )
     usage_before = deepcopy(api_state.store.usage_counters)
+    messages_before = len(api_state.store.messages[conversation["id"]])
+    jobs_before = len(api_state.store.backtest_jobs)
+    runs_before = len(api_state.store.backtest_runs)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -1268,10 +1271,28 @@ def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
     assert persisted_assistant["metadata"]["chat_action"]["payload"] == {
         "confirmation_id": "confirm-old"
     }
+    run_action_messages = [
+        message
+        for message in persisted
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type") == "run_backtest"
+    ]
+    stale_recoveries = [
+        message
+        for message in persisted
+        if message["role"] == "assistant"
+        and message["metadata"].get("recovery", {}).get("code")
+        == "confirmation_action_stale_card"
+    ]
+    assert messages_before == 2
+    assert len(persisted) == messages_before + 2
+    assert len(run_action_messages) == 1
+    assert len(stale_recoveries) == 1
     assert api_state.store.chat_turn_lifecycles == {}
     assert api_state.store.usage_counters == usage_before
     assert get_openrouter_route_receipts() == []
-    assert api_state.store.backtest_jobs == {}
+    assert len(api_state.store.backtest_jobs) == jobs_before == 0
+    assert len(api_state.store.backtest_runs) == runs_before == 0
     assert len(persisted_turn_evidence) == 1
     assert persisted_turn_evidence[0]["progress_outcome"] == "redirected"
     assert persisted_turn_evidence[0]["terminal"] == "redirected"
@@ -1282,6 +1303,12 @@ def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
         )
         == "confirm-new"
     )
+    reloaded = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in reloaded] == [
+        message["id"] for message in persisted
+    ]
 
 
 def test_response_option_action_rejects_an_older_recovery_message_identity(

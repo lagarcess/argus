@@ -129,6 +129,7 @@ import {
   consumedResultActionsFromApi,
   hiddenSaveActionMessageIdsFromApi,
   isBreakdownActionMetadata,
+  isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
   resultActionRunId,
@@ -1636,6 +1637,9 @@ export default function ChatInterface() {
       }
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
+      const rejectionCode = err instanceof ChatStreamError ? err.code : null;
+      const staleConfirmationRejected =
+        isStaleConfirmationActionRejectionCode(rejectionCode);
       const fallbackMessage =
         err instanceof ChatStreamError && err.message
           ? err.message
@@ -1648,14 +1652,23 @@ export default function ChatInterface() {
                 m.id === assistantId
                   ? {
                       ...m,
-                      content: isRateLimit
-                        ? t('chat.rate_limit_error')
-                        : fallbackMessage,
+                      content: staleConfirmationRejected
+                        ? ""
+                        : isRateLimit
+                          ? t('chat.rate_limit_error')
+                          : fallbackMessage,
+                      recoveryDisplay: staleConfirmationRejected
+                        ? {
+                            kind: "recovery_code" as const,
+                            code: rejectionCode,
+                          }
+                        : m.recoveryDisplay,
                       actions: m.actions,
                     }
                   : m,
               ),
               action,
+              { rejectionCode },
             ),
           ),
         );
