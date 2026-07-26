@@ -69,6 +69,13 @@ StrategyTemplate = Annotated[
 
 
 class OnboardingState(BaseModel):
+    """Legacy/inert compatibility state; no product behavior reads or writes it.
+
+    The explicit onboarding flow is removed. The field survives only because
+    old profile rows carry it and deployed clients may still read the `/me`
+    shape during a rollout.
+    """
+
     completed: bool = False
     stage: Literal[
         "language_selection", "primary_goal_selection", "ready", "completed"
@@ -98,10 +105,6 @@ class User(BaseModel):
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
-
-    @property
-    def is_onboarding_complete(self) -> bool:
-        return self.onboarding.completed
 
 
 class UserResponse(BaseModel):
@@ -147,7 +150,6 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
-    onboarding: dict[str, Any] | None = None
 
 
 class ConversationCreate(BaseModel):

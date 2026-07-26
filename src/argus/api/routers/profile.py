@@ -156,12 +156,7 @@ def patch_me(
     data = current.model_dump()
     updates = patch.model_dump(exclude_unset=True)
     updated_fields = sorted(updates)
-    onboarding_patch = updates.pop("onboarding", None)
     data.update(updates)
-    if onboarding_patch:
-        onboarding = current.onboarding.model_dump()
-        onboarding.update(onboarding_patch)
-        data["onboarding"] = onboarding
     data["updated_at"] = utcnow()
     try:
         updated = User.model_validate(data)
@@ -193,6 +188,5 @@ def patch_me(
         "Profile updated",
         user_id=user.id,
         fields=updated_fields,
-        onboarding_fields=sorted(onboarding_patch or {}),
     )
     return UserResponse(user=updated)
