@@ -425,9 +425,7 @@ def _current_turn_names_foreign_ticker(
     except Exception:
         return False
     return any(
-        _compact_asset_evidence_token(
-            getattr(mention.asset, "canonical_symbol", None)
-        )
+        _compact_asset_evidence_token(getattr(mention.asset, "canonical_symbol", None))
         not in prior_symbols
         for mention in mentions
     )
@@ -735,6 +733,8 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
     rule_spec = executable_rule_spec_from_strategy(strategy)
     if entry_rule is None and rule_spec is None:
         return
+    if strategy.rule_spec is None:
+        strategy.rule_spec = rule_spec
     if strategy.entry_rule is None:
         strategy.entry_rule = entry_rule
     if strategy.exit_rule is None:

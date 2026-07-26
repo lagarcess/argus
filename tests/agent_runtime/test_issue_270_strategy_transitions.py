@@ -482,7 +482,12 @@ def test_complete_fresh_crossover_recovers_registry_template_from_typed_rules() 
 
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    draft = _crossover_draft().model_copy(update={"requested_strategy_template": None})
+    draft = _crossover_draft().model_copy(
+        update={
+            "requested_strategy_template": None,
+            "rule_spec": None,
+        }
+    )
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -510,6 +515,7 @@ def test_complete_fresh_crossover_recovers_registry_template_from_typed_rules() 
         interpretation.candidate_strategy_draft.requested_strategy_template
         == "moving_average_crossover"
     )
+    assert interpretation.candidate_strategy_draft.rule_spec == RULE_SPEC
 
     malformed = interpretation.candidate_strategy_draft.model_copy(
         update={"exit_rule": dict(ENTRY_RULE)}
