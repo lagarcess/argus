@@ -251,4 +251,32 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
+  discovery?: DiscoverySidecar | null;
+};
+
+export type DiscoverySource = {
+  title: string;
+  domain: string;
+  url: string;
+  source_date?: string | null;
+};
+
+export type DiscoveryCandidate = {
+  symbol: string;
+  name: string;
+  asset_class: AssetClass;
+  reason_text: string;
+  source_indices?: number[];
+};
+
+export type DiscoverySidecar = {
+  schema_version: string;
+  kind: "asset_discovery";
+  relationship: "category" | "peer" | "comparison";
+  query_summary: string;
+  retrieved_at: string;
+  sources: DiscoverySource[];
+  candidates: DiscoveryCandidate[];
+  unverified_names: string[];
 };

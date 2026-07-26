@@ -329,6 +329,11 @@
     "result_readout": {
       "quick_take": "Lectura rápida"
     },
+    "discovery_results": {
+      "test_candidate": "Probar {{symbol}}",
+      "sources_line": "Fuentes: {{domains}} · al {{date}}",
+      "sources_line_undated": "Fuentes: {{domains}}"
+    },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",
       "label": "Desglose"

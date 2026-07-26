@@ -77,6 +77,7 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
@@ -529,13 +530,20 @@ export function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         actions: confirmation.actions ?? [],
       };
     }
-    return hydrateTextMessageFromApi(m, {
+    const hydratedText = hydrateTextMessageFromApi(m, {
       contentPresentation:
         m.role !== "user" && isBreakdownActionMetadata(metadata)
           ? "result_breakdown"
           : undefined,
       retryRequestMessage: retryRequestMessageForAssistant(items, m),
     });
+    if (m.role !== "user") {
+      const discovery = discoverySidecarFromMetadata(metadata);
+      if (discovery) {
+        return { ...hydratedText, discovery };
+      }
+    }
+    return hydratedText;
   });
 
   const normalized = normalizeDurableRetryActionHistory(
@@ -1378,6 +1386,7 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1496,6 +1505,7 @@ export default function ChatInterface() {
                   finalText,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
+                  discovery: finalDiscovery,
                   contentPresentation:
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
@@ -1511,6 +1521,7 @@ export default function ChatInterface() {
                 content: finalText,
                 actions: finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
+                discovery: finalDiscovery,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"

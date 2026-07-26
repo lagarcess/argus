@@ -329,6 +329,11 @@
     "result_readout": {
       "quick_take": "Quick take"
     },
+    "discovery_results": {
+      "test_candidate": "Test {{symbol}}",
+      "sources_line": "Sources: {{domains}} · as of {{date}}",
+      "sources_line_undated": "Sources: {{domains}}"
+    },
     "result_breakdown": {
       "aria_label": "Result breakdown",
       "label": "Breakdown"
