@@ -278,6 +278,142 @@ def test_strategy_transition_expectations_assert_typed_rules_not_prose() -> None
     assert any(item.startswith("entry_rule:") for item in failures)
 
 
+def test_modeled_cost_expectations_assert_canonical_and_launch_truth() -> None:
+    expected_provenance = {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    expected_realism = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+    case = harness.EvalCase(
+        id="issue-271-modeled-cost-preservation",
+        category="action_chip_semantics",
+        prompt="Add AAPL and keep my modeled costs.",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            fee_rate=0.001,
+            slippage=0.0005,
+            cost_provenance=expected_provenance,
+            launch_execution_realism=expected_realism,
+        ),
+    )
+    truthful = {
+        "intent": "backtest_execution",
+        "capability_verdict": "executable",
+        "fee_rate": 0.001,
+        "slippage": 0.0005,
+        "cost_provenance": expected_provenance,
+        "launch_execution_realism": expected_realism,
+    }
+
+    assert harness.typed_expectation_failures(case=case, outcome=truthful) == []
+
+    failures = harness.typed_expectation_failures(
+        case=case,
+        outcome={
+            **truthful,
+            "fee_rate": None,
+            "slippage": None,
+            "cost_provenance": {},
+            "launch_execution_realism": None,
+        },
+    )
+
+    assert any(item.startswith("fee_rate:") for item in failures)
+    assert any(item.startswith("slippage:") for item in failures)
+    assert any(item.startswith("cost_provenance.") for item in failures)
+    assert any(item.startswith("launch_execution_realism") for item in failures)
+
+
+def test_issue_271_case_is_on_the_live_measurement_surface() -> None:
+    case = next(
+        case
+        for case in load_eval_cases()
+        if case.id == "action_chip_add_asset_preserves_modeled_costs_issue_271"
+    )
+
+    assert case.expected.fee_rate == 0.001
+    assert case.expected.slippage == 0.0005
+    assert case.expected.cost_provenance == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert case.expected.launch_execution_realism == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+
+
+def test_typed_outcome_projects_modeled_costs_from_confirmation() -> None:
+    case = harness.EvalCase(
+        id="issue-271-outcome-projection",
+        category="action_chip_semantics",
+        prompt="Add AAPL and keep my modeled costs.",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            fee_rate=0.001,
+            slippage=0.0005,
+            cost_provenance={
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+            launch_execution_realism={
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+        ),
+    )
+    interpret_result = SimpleNamespace(
+        outcome="ready_for_confirmation",
+        patch={"intent": "backtest_execution"},
+    )
+    confirm_result = SimpleNamespace(
+        outcome="await_approval",
+        patch={
+            "confirmation_payload": {
+                "strategy": {
+                    "extra_parameters": {
+                        "fee_rate": 0.001,
+                        "slippage": 0.0005,
+                        "field_provenance": {
+                            "fee_rate": "explicit_user",
+                            "slippage": "explicit_user",
+                        },
+                    }
+                },
+                "launch_payload": {
+                    "_execution_realism": {
+                        "enabled": True,
+                        "fee_bps": 10.0,
+                        "slippage_bps": 5.0,
+                    }
+                },
+                "validation": {"executable": True},
+            }
+        },
+    )
+
+    outcome = harness._typed_outcome(
+        case=case,
+        interpret_result=interpret_result,
+        confirm_result=confirm_result,
+        clarify_result=None,
+    )
+
+    assert harness.typed_expectation_failures(case=case, outcome=outcome) == []
+
+
 def test_measurement_comparisons_report_swapped_windows_and_reason_separately() -> None:
     requested = {"start": "2024-01-01", "end": "2024-01-05"}
     effective = {"start": "2024-01-03", "end": "2024-01-05"}

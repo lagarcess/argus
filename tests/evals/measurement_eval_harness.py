@@ -91,6 +91,10 @@ class TypedExpectations:
     adjustment_reason: str | None = None
     benchmark_symbol: str | None = None
     capital_amount: float | None = None
+    fee_rate: float | None = None
+    slippage: float | None = None
+    cost_provenance: dict[str, str] | None = None
+    launch_execution_realism: dict[str, Any] | None = None
     stage_outcomes: tuple[str, ...] = ()
     clarification: dict[str, Any] | None = None
 
@@ -338,6 +342,22 @@ def typed_expectation_failures(
         outcome.get("capital_amount"),
         failures,
     )
+    _compare("fee_rate", expected.fee_rate, outcome.get("fee_rate"), failures)
+    _compare("slippage", expected.slippage, outcome.get("slippage"), failures)
+    if expected.cost_provenance is not None:
+        _compare_subset(
+            "cost_provenance",
+            expected.cost_provenance,
+            outcome.get("cost_provenance"),
+            failures,
+        )
+    if expected.launch_execution_realism is not None:
+        _compare_subset(
+            "launch_execution_realism",
+            expected.launch_execution_realism,
+            outcome.get("launch_execution_realism"),
+            failures,
+        )
     if expected.stage_outcomes:
         _compare(
             "stage_outcomes",
@@ -641,6 +661,10 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),
+            fee_rate=expected.get("fee_rate"),
+            slippage=expected.get("slippage"),
+            cost_provenance=expected.get("cost_provenance"),
+            launch_execution_realism=expected.get("launch_execution_realism"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
             clarification=expected.get("clarification"),
         ),
@@ -816,6 +840,12 @@ def _typed_outcome(
         strategy = {}
     if not isinstance(launch_payload, dict):
         launch_payload = {}
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        extra_parameters = {}
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
     coverage_preflight = launch_payload.get("coverage_preflight")
     if not isinstance(coverage_preflight, dict):
         coverage_preflight = {}
@@ -860,6 +890,14 @@ def _typed_outcome(
         "capital_amount": (
             launch_payload.get("capital_amount") or strategy.get("capital_amount")
         ),
+        "fee_rate": extra_parameters.get("fee_rate"),
+        "slippage": extra_parameters.get("slippage"),
+        "cost_provenance": {
+            key: field_provenance[key]
+            for key in ("fee_rate", "slippage")
+            if key in field_provenance
+        },
+        "launch_execution_realism": launch_payload.get("_execution_realism"),
         "capability_verdict": _capability_verdict(
             outcome=_last_stage_outcome(
                 interpret_result=payload_interpret_result,
