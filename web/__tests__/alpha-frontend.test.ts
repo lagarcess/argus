@@ -367,8 +367,9 @@ describe("Argus Alpha frontend contract", () => {
       "{action.label}\n                          </button>",
     );
     expect(message).toContain(
-      "action.labelKey ? t(action.labelKey, action.label) : action.label",
+      "? t(action.labelKey, {",
     );
+    expect(message).toContain("defaultValue: action.label,");
     expect(message).toContain(
       '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
     );
