@@ -181,8 +181,12 @@ function graphIdentityDifferenceCount(
   );
 }
 
-function resultCard(page: Page) {
+function resultCards(page: Page) {
   return page.locator('section[aria-label="Hero + Delta Evidence Card"]');
+}
+
+function latestResultCard(page: Page) {
+  return resultCards(page).last();
 }
 
 function confirmationCards(page: Page) {
@@ -377,7 +381,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       });
       expect((await primaryHydration).status()).toBe(200);
       await expect(
-        resultCard(page).getByTestId("result-equity-chart"),
+        latestResultCard(page).getByTestId("result-equity-chart"),
       ).toBeVisible({ timeout: 60_000 });
 
       const primaryMessages = await apiJson<MessageList>(
@@ -789,8 +793,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
           primaryConversation,
         );
         const mutationsBefore = mergeMutationCounts(monitors);
-        const card = resultCard(page);
-        await expect(card).toHaveCount(1);
+        const cards = resultCards(page);
+        await expect(cards).toHaveCount(1);
+        const card = latestResultCard(page);
         const chart = card.getByTestId("result-equity-chart");
         const chartBefore = await chart.screenshot();
         const range = card.getByTestId("result-chart-range-1M");
@@ -896,7 +901,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
             primaryResultFacts.runId === graph.runs[0] &&
             primaryResultFacts.evidenceId === graph.evidence[0],
         ).toBe(true);
-        const card = resultCard(page);
+        const card = resultCards(page);
         const uiMessageUnits = await confirmationCards(page).count();
         const uiSimulationUnits = await card.count();
         expect(uiMessageUnits).toBe(messageWindow.used);
@@ -952,8 +957,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
             resultFactsAfter.runId === resultFactsBefore.runId &&
             resultFactsAfter.evidenceId === resultFactsBefore.evidenceId,
         ).toBe(true);
-        const card = resultCard(page);
-        await expect(card).toHaveCount(1);
+        const cards = resultCards(page);
+        await expect(cards).toHaveCount(1);
+        const card = latestResultCard(page);
         await expect(card.getByTestId("result-equity-chart")).toBeVisible({
           timeout: 60_000,
         });
@@ -1034,7 +1040,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
           })
           .toBe(true);
         await expect(
-          resultCard(page).getByTestId("result-equity-chart"),
+          latestResultCard(page).getByTestId("result-equity-chart"),
         ).toBeVisible();
       },
     );
@@ -1357,7 +1363,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
         await expect(
           dialog.getByText("Sign in to run another simulation."),
         ).toBeVisible();
-        await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+        await expect(
+          latestResultCard(page).getByTestId("result-equity-chart"),
+        ).toBeVisible();
         const after = ownerSnapshot(primaryOwner);
         const mutationsAfter = mergeMutationCounts(monitors);
         expect(
@@ -1405,7 +1413,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         );
         const mutationsBefore = mergeMutationCounts(monitors);
         expect(primaryResultFacts?.evidenceId === primaryEvidenceId).toBe(true);
-        const card = resultCard(page);
+        const card = latestResultCard(page);
         await card.getByRole("button", { name: "Add decision" }).click();
         const dialog = page.getByRole("dialog", { name: "Sign in" });
         await expect(dialog).toBeVisible();
@@ -1481,9 +1489,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expect(publicModeMe.user.id === primaryOwner).toBe(true);
         expect(publicModeMe.public_account_access_enabled).toBe(true);
         expect(requireConversationId(page)).toBe(primaryConversation);
-        await expect(resultCard(page)).toHaveCount(1);
+        await expect(resultCards(page)).toHaveCount(1);
         await expect(
-          resultCard(page).getByTestId("result-equity-chart"),
+          latestResultCard(page).getByTestId("result-equity-chart"),
         ).toBeVisible();
         await page.getByRole("button", { name: "New chat" }).click();
         const publicDialog = page.getByRole("dialog", {
@@ -1523,7 +1531,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         );
         const handoffsBefore = handoffCount(primaryOwner);
         const mutationsBefore = mergeMutationCounts(monitors);
-        const card = resultCard(page);
+        const card = latestResultCard(page);
         await card.getByRole("button", { name: "Add decision" }).click();
         const dialog = page.getByRole("dialog", { name: "Sign in" });
         await expect(dialog).toBeVisible();
@@ -1577,7 +1585,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         const beforeDecisions = ownerSnapshot(primaryOwner).decisions;
         const mutationsBefore = mergeMutationCounts(monitors);
         const signup = newSignupCredentials();
-        const card = resultCard(page);
+        const card = latestResultCard(page);
         await card.getByRole("button", { name: "Add decision" }).click();
         const loginDialog = page.getByRole("dialog", { name: "Sign in" });
         await loginDialog.getByRole("button", { name: "Sign up" }).click();
@@ -1680,7 +1688,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         const reloadedMePromise = waitForMe(page);
         await page.reload({ waitUntil: "domcontentloaded" });
         expect((await reloadedMePromise).account_kind).toBe("registered");
-        const reloadedCard = resultCard(page);
+        const reloadedCard = latestResultCard(page);
         await expect(
           reloadedCard.getByTestId("result-equity-chart"),
         ).toBeVisible();
@@ -1729,7 +1737,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         await expect(
           claimGuestPage.getByTestId("result-equity-chart"),
         ).toBeVisible();
-        const card = resultCard(claimGuestPage);
+        const card = latestResultCard(claimGuestPage);
         await card.getByRole("button", { name: "Add decision" }).click();
         const modal = claimGuestPage.getByRole("dialog", { name: "Sign in" });
         await expect(modal).toBeVisible();
@@ -1864,7 +1872,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expect(
           requireConversationId(claimGuestPage) === claimConversation,
         ).toBe(true);
-        const reloadedCard = resultCard(claimGuestPage);
+        const reloadedCard = latestResultCard(claimGuestPage);
         await expect(
           reloadedCard.getByTestId("result-equity-chart"),
         ).toBeVisible();

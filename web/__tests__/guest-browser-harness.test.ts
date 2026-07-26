@@ -869,6 +869,12 @@ describe("Checks 6–20 harness guards", () => {
   test("binds Check 11 to a distinct persisted confirmation before clicking Run", () => {
     const check11 = checkSource(11);
 
+    expect(source).toMatch(
+      /function resultCards\(page: Page\)[\s\S]{0,180}Hero \+ Delta Evidence Card/,
+    );
+    expect(source).toMatch(
+      /function latestResultCard\(page: Page\)[\s\S]{0,100}resultCards\(page\)\.last\(\)/,
+    );
     expect(check11).toContain("seedDistinctGuestConfirmation");
     expect(check11).toContain("distinctConfirmationFacts");
     expect(check11).toContain("confirmationCards(page)");
@@ -885,18 +891,28 @@ describe("Checks 6–20 harness guards", () => {
     expect(check11).toContain("graphBeforeClick");
     expect(check11).toContain('"route_receipts"');
     expect(check11).toContain('"POST /api/v1/chat/stream"');
+    expect(check11).toContain(
+      'latestResultCard(page).getByTestId("result-equity-chart")',
+    );
+    expect(check11).not.toContain(
+      'page.getByTestId("result-equity-chart")',
+    );
     expect(check11).not.toContain('getByTestId("chat-send")');
     expect(check11).not.toContain('getByTestId("chat-input")');
     expect(check11).not.toContain("runButtons.last()");
+    expect(checkSource(7)).toContain(
+      "const uiSimulationUnits = await card.count()",
+    );
+    expect(checkSource(7)).toContain("const card = resultCards(page)");
   });
 
   test("keeps decision and cancel assertions scoped to the typed result artifact", () => {
     const check12 = checkSource(12);
     const check14 = checkSource(14);
 
-    expect(check12).toContain("resultCard(page)");
+    expect(check12).toContain("latestResultCard(page)");
     expect(check12).toContain("primaryEvidenceId");
-    expect(check14).toContain("resultCard(page)");
+    expect(check14).toContain("latestResultCard(page)");
     expect(check14).toContain("handoffCount");
     expect(check14).toContain("snapshotStayedStable");
     expect(check14).toContain("toHaveText(draft)");
@@ -913,7 +929,7 @@ describe("Checks 6–20 harness guards", () => {
       'getByRole("button", { name: "Sign in to keep it" })',
     );
     expect(check13).toContain("publicHydrationResponse");
-    expect(check13).toContain("resultCard(page)");
+    expect(check13).toContain("latestResultCard(page)");
   });
 
   test("proves typed exactly-once conversion and complete atomic claim graphs", () => {
