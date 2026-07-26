@@ -1,8 +1,9 @@
 # Always Progresses Closure Evidence
 
-Status: Task 8 gates passed; candidate ready for final review
+Status: Task 8 complete; internal review clear; ready for independent review
 
-Product-code HEAD: `d6b57f3ee35dda4ea959fb61ce3d4d6b47ec90a7`
+Candidate HEAD before this evidence-only update:
+`cadb1759bf82f4f2a84eff17197ac56d805ddf88`
 
 Final authorized real-Run HEAD: `e73350f065f9b258d0927b735123f73e21af617e`
 
@@ -60,9 +61,9 @@ and a pre-click screenshot proved the Edit costs button rather than its adjacent
 Run action was activated.
 
 After the authorized `e73350f` Run, product corrections were limited to the
-browser-reproduced no-progress/result-refinement continuity boundaries and a
-modularity-preserving frontend refactor. No later real Run occurred. On
-product HEAD `d6b57f3`:
+browser-reproduced no-progress/result-refinement continuity boundaries,
+modularity-preserving frontend composition, and the internal-review correction
+described below. No later real Run occurred. On the final candidate:
 
 - the final Journey 2 recovery UI survived reload;
 - a zero-Run edited-cost replacement confirmation preserved its facts before
@@ -73,6 +74,11 @@ product HEAD `d6b57f3`:
   the three session controls, no Run control, and the same state after reload
   (`task8-security-spanish-d6b57f3.png`,
   `trace-1785021776585.trace`).
+- interrupted ordinary turns keep one request-correlated, owner-scoped Checking
+  path until durable completion, failure, or abandonment; navigation cancels
+  the reads, and correlation/read exhaustion falls back to the existing
+  same-conversation load Retry without replaying the turn or inventing runtime
+  failure.
 
 ## Deterministic current-head browser harness
 
@@ -97,7 +103,7 @@ PLAYWRIGHT_REUSE_EXISTING_SERVER=false \
 bunx playwright test e2e/always-progresses.spec.ts \
   --project=chromium --workers=1 --reporter=list
 
-Result: 1 passed (4.6s)
+Result at `cadb175`: 1 passed (5.2s)
 ```
 
 ## Integrated verification
@@ -107,7 +113,7 @@ Result: 1 passed (4.6s)
 | Hermetic runtime/spine/admission/reload/jobs/state-machine/mocked-eval matrix | `1521 passed in 16.07s` with dev-mode export, provider keys blank, and `synthetic_unit_fixture` |
 | Disposable PostgreSQL lifecycle | `38 passed` against `postgresql://127.0.0.1:57532/postgres` |
 | Canonical modularity | `scripts/check_modularity_budget.py` passed; `interpret.py` 3232/3234 lines and `ChatInterface.tsx` 2583/2598 lines |
-| Full frontend | `498 pass, 0 fail` |
+| Full frontend | `502 pass, 0 fail` |
 | Frontend lint and production build | passed |
 | Chart/Security/Usage focused units | `72 passed` |
 | Chart and Usage Playwright | `12 passed` |
@@ -121,14 +127,34 @@ leakage, not product evidence. The corrected invocation explicitly called
 `argus_export_dev_mode`, blanked provider keys, forced
 `synthetic_unit_fixture`, and produced the 1,521-pass result above.
 
+## Internal review disposition
+
+The final whole-branch internal review found one Important reachable issue:
+ordinary stream interruption stopped durable reconciliation after two reads
+and could leave Checking static until reload. The bounded correction:
+
+- shows Checking before reconciliation and keeps the composer locked only while
+  durable state remains unresolved;
+- continues exact request-correlated owner reads near the 120-second runtime
+  deadline and just beyond the existing 15-minute stale-turn boundary;
+- hydrates later terminal truth automatically;
+- cancels on navigation/unmount;
+- maps uncorrelated, failed-read, or exhausted resolution to the existing
+  same-conversation load Retry without inferring failure or replaying the turn.
+
+Mutation-catching red tests proved the old two-read stop and locked exhaustion.
+The corrected focused suite passed 55 tests; full frontend passed 502; lint,
+build, modularity, diff check, and the deterministic browser harness passed.
+Two delta reviews cleared the terminal path and then the exhaustion boundary
+with no remaining Critical, Important, or Minor finding.
+
 ## Pending and external gates
 
 - The one sanctioned paid interpreter eval is intentionally still unrun in this
   commit. It must run once only after the independent review is clear and the
   exact candidate HEAD is clean. Its result belongs in the Draft PR and founder
   handoff so the evaluated HEAD is not changed afterward.
-- Final whole-branch internal review and the single independent
-  `argus-review-contract` layer are pending.
+- The single independent `argus-review-contract` layer is pending.
 - Push, Draft PR, and exact-head CI are pending.
 - Tester exposure, Render canary, Ready-for-review promotion, merge, and
   deployment remain separate founder-directed gates.
