@@ -703,6 +703,32 @@ def test_create_message_writes_empty_metadata_object_when_omitted():
     assert message.metadata == {}
 
 
+def test_create_message_replays_one_server_owned_message_identity() -> None:
+    client = _SerializedMessageRpcClient(messages=[])
+    gateway = SupabaseGateway(client=client)
+    message_id = "00000000-0000-0000-0000-000000000401"
+    payload = {
+        "user_id": "00000000-0000-0000-0000-000000000303",
+        "conversation_id": "00000000-0000-0000-0000-000000000302",
+        "role": "user",
+        "content": "Run backtest",
+        "metadata": {
+            "chat_action": {
+                "type": "run_backtest",
+                "payload": {"confirmation_id": "confirmation-replay-1"},
+            }
+        },
+        "message_id": message_id,
+    }
+
+    first = gateway.create_message(**payload)
+    replay = gateway.create_message(**payload)
+
+    assert first.id == message_id
+    assert replay == first
+    assert [message["id"] for message in client.messages] == [message_id]
+
+
 def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     client = _RecordingSupabaseClient()
     gateway = SupabaseGateway(client=client)

@@ -307,9 +307,10 @@ def prepare_message(
     role: str,
     content: str,
     metadata: dict[str, Any] | None = None,
+    message_id: str | None = None,
 ) -> Message:
     return Message(
-        id=api_state.store.new_id(),
+        id=message_id or api_state.store.new_id(),
         conversation_id=conversation_id,
         role=cast(MessageRole, role),
         content=content,
@@ -533,6 +534,7 @@ def create_message(
     content: str,
     metadata: dict[str, Any] | None = None,
     settle_usage: dict[str, Any] | None = None,
+    message_id: str | None = None,
 ) -> Message:
     if _should_suppress_late_success_artifact(
         user_id=user_id,
@@ -564,6 +566,7 @@ def create_message(
                 content=content,
                 metadata=metadata,
                 settle_usage=settle_usage,
+                message_id=message_id,
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
@@ -573,6 +576,25 @@ def create_message(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
+    if message_id is not None:
+        message, replayed = _append_idempotent_memory_message(
+            user_id=user_id,
+            message=prepare_message(
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                metadata=metadata,
+                message_id=message_id,
+            ),
+        )
+        if settle_usage is not None and not replayed:
+            settle_memory_usage(
+                api_state.store.usage_counters,
+                user_id=user_id,
+                resource=settle_usage["resource"],
+                limits=settle_usage["limits"],
+            )
+        return message
     if settle_usage is not None:
         settle_memory_usage(
             api_state.store.usage_counters,
@@ -586,6 +608,32 @@ def create_message(
         content=content,
         metadata=metadata,
     )
+
+
+def _append_idempotent_memory_message(
+    *,
+    user_id: str,
+    message: Message,
+) -> tuple[Message, bool]:
+    with api_state.store.conversation_message_lock:
+        if api_state.store.conversation_owners.get(message.conversation_id) != user_id:
+            raise ValueError("Conversation not found or not owned by user.")
+        existing = next(
+            (
+                item
+                for messages in api_state.store.messages.values()
+                for item in messages
+                if item.id == message.id
+            ),
+            None,
+        )
+        if existing is not None:
+            if not _same_immutable_message(existing, message):
+                raise ValueError(
+                    "Message identity collided with different immutable payload."
+                )
+            return existing, True
+        return _append_memory_message(message), False
 
 
 def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:

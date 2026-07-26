@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
+from uuid import UUID, uuid5
 
 from fastapi import Request
 
@@ -11,6 +12,7 @@ from argus.agent_runtime.state.models import ResolutionProvenance
 from argus.api.chat.actions import (
     ValidatedResponseOptionSource,
     _response_option_source_context,
+    chat_display_message,
     confirmation_action_id,
     is_response_option_action,
     persisted_chat_action,
@@ -27,6 +29,8 @@ from argus.api.message_store import (
 from argus.api.schemas import ChatStreamRequest, Message
 
 AdmissionOwner = Literal["ordinary_turn", "message_only"]
+_RUN_ACTION_MESSAGE_NAMESPACE = UUID("9ae3396d-9c69-41ab-9ffd-a40adf9d2fd1")
+_RUN_ACTION_LABEL_KEY = "chat.confirmation.actions.run_backtest"
 _NON_RUN_CONFIRMATION_ACTIONS = {
     "adjust_assumptions",
     "cancel_confirmation",
@@ -70,6 +74,7 @@ class ChatRequestAdmission:
                     role=candidate.role,
                     content=candidate.content,
                     metadata=candidate.metadata,
+                    message_id=candidate.id,
                 )
         return self.request_message_record
 
@@ -250,28 +255,22 @@ def prepare_chat_request_admission(
 ) -> ChatRequestAdmission:
     candidate = None
     if enabled:
-        user_metadata: dict[str, Any] = {
-            "agent_runtime_turn": {
-                "status": "started",
-                "conversation_id": conversation_id,
-                "request_id": request.state.request_id,
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            }
-        }
-        if mention_provenance:
-            user_metadata["mentions"] = [
-                mention.model_dump(mode="python") for mention in payload.mentions
-            ]
-            user_metadata["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in mention_provenance
-            ]
-        if payload.action is not None:
-            user_metadata["chat_action"] = persisted_chat_action(payload)
-        candidate = prepare_message(
-            conversation_id=conversation_id,
-            role="user",
-            content=display_message,
-            metadata=user_metadata,
+        candidate = (
+            _canonical_run_action_message(
+                payload=payload,
+                conversation_id=conversation_id,
+                language=language,
+            )
+            if owner == "message_only"
+            and payload.action is not None
+            and payload.action.type == "run_backtest"
+            else _ordinary_request_message(
+                payload=payload,
+                request=request,
+                conversation_id=conversation_id,
+                display_message=display_message,
+                mention_provenance=mention_provenance,
+            )
         )
     return ChatRequestAdmission(
         payload=payload,
@@ -281,4 +280,70 @@ def prepare_chat_request_admission(
         language=language,
         request_message_candidate=candidate,
         owner=owner,
+    )
+
+
+def _canonical_run_action_message(
+    *,
+    payload: ChatStreamRequest,
+    conversation_id: str,
+    language: str | None,
+) -> Message:
+    confirmation_id = confirmation_action_id(payload)
+    if confirmation_id is None:
+        raise RuntimeError("Run action admission requires a confirmation identity.")
+    canonical_payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": conversation_id,
+            "language": language,
+            "action": {
+                "type": "run_backtest",
+                "labelKey": _RUN_ACTION_LABEL_KEY,
+                "payload": {"confirmation_id": confirmation_id},
+                "presentation": "confirmation",
+            },
+        }
+    )
+    content = chat_display_message(canonical_payload, language=language or "en")
+    assert canonical_payload.action is not None
+    canonical_payload.action.label = content
+    return prepare_message(
+        conversation_id=conversation_id,
+        role="user",
+        content=content,
+        metadata={"chat_action": persisted_chat_action(canonical_payload)},
+        message_id=str(uuid5(_RUN_ACTION_MESSAGE_NAMESPACE, confirmation_id)),
+    )
+
+
+def _ordinary_request_message(
+    *,
+    payload: ChatStreamRequest,
+    request: Request,
+    conversation_id: str,
+    display_message: str,
+    mention_provenance: list[ResolutionProvenance],
+) -> Message:
+    user_metadata: dict[str, Any] = {
+        "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": conversation_id,
+            "request_id": request.state.request_id,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }
+    if mention_provenance:
+        user_metadata["mentions"] = [
+            mention.model_dump(mode="python") for mention in payload.mentions
+        ]
+        user_metadata["resolution_provenance"] = [
+            item.model_dump(mode="python") for item in mention_provenance
+        ]
+    if payload.action is not None:
+        user_metadata["chat_action"] = persisted_chat_action(payload)
+    return prepare_message(
+        conversation_id=conversation_id,
+        role="user",
+        content=display_message,
+        metadata=user_metadata,
     )

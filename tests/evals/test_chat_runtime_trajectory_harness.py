@@ -147,6 +147,140 @@ def test_run_disconnect_submits_once_through_the_real_route(
     assert len(jobs) == 1
 
 
+def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat.request_admission import ChatRequestAdmission
+
+    from tests.evals.chat_runtime_trajectory_adapters import _TransportCut
+
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        raw_confirmation_id = state.raw_artifact_ids[
+            "alpha_session_05:confirmation:1"
+        ]
+        action = deepcopy(
+            trajectory.steps[1].request["submission"]["request"]["action"]
+        )
+        action.update(
+            label="Run backtest",
+            presentation="confirmation",
+            payload={"confirmation_id": raw_confirmation_id},
+        )
+        request = {
+            "conversation_id": state.conversation_id,
+            "language": trajectory.locale,
+            "action": action,
+        }
+        headers = {"Idempotency-Key": raw_confirmation_id}
+        original_persist = ChatRequestAdmission.persist
+
+        def persist_then_disconnect(admission: ChatRequestAdmission):
+            message = original_persist(admission)
+            if admission.owner == "message_only":
+                raise _TransportCut("after_action_message_persistence")
+            return message
+
+        with monkeypatch.context() as cut:
+            cut.setattr(ChatRequestAdmission, "persist", persist_then_disconnect)
+            try:
+                runtime._http.post(
+                    "/api/v1/chat/stream",
+                    headers=headers,
+                    json=request,
+                )
+            except BaseException as exc:
+                assert runtime._contains_transport_cut(exc)
+            else:
+                raise AssertionError("action transport cut did not fire")
+
+        run_actions_before = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        assert len(run_actions_before) == 1
+        assert api_state.store.backtest_jobs == {}
+        assert api_state.store.backtest_job_reservations == {}
+        assert all(
+            key[1] != "backtest_runs"
+            for key in api_state.store.usage_counters
+        )
+
+        with monkeypatch.context() as lookup_patch:
+            lookup_patch.setattr(
+                api_state,
+                "supabase_gateway",
+                runtime._backtest_gateway,
+            )
+            lookup = runtime._http.get(
+                f"/api/v1/backtest-jobs/by-action/{raw_confirmation_id}"
+            )
+        assert lookup.status_code == 404
+
+        admission_calls: list[dict[str, Any]] = []
+        original_admit = runtime._backtest_gateway.admit_backtest_job
+
+        def counted_admit(**kwargs: Any) -> dict[str, Any]:
+            admission_calls.append(kwargs)
+            return original_admit(**kwargs)
+
+        monkeypatch.setattr(
+            runtime._backtest_gateway,
+            "admit_backtest_job",
+            counted_admit,
+        )
+        replay = runtime._http.post(
+            "/api/v1/chat/stream",
+            headers=headers,
+            json=request,
+        )
+        replay.raise_for_status()
+        reload_response = runtime._http.get(
+            f"/api/v1/conversations/{state.conversation_id}/messages"
+        )
+        reload_response.raise_for_status()
+
+        run_actions_after = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        reloaded_run_actions = [
+            message
+            for message in reload_response.json()["items"]
+            if message["role"] == "user"
+            and message["metadata"].get("chat_action", {}).get("type")
+            == "run_backtest"
+        ]
+        jobs = [
+            job
+            for job in api_state.store.backtest_jobs.values()
+            if job.get("conversation_id") == state.conversation_id
+        ]
+
+    assert [message.id for message in run_actions_after] == [
+        run_actions_before[0].id
+    ]
+    assert [message["id"] for message in reloaded_run_actions] == [
+        run_actions_before[0].id
+    ]
+    assert len(admission_calls) == 1
+    assert len(jobs) == 1
+    assert len(api_state.store.backtest_job_reservations) == 1
+    assert {
+        int(row.get("used_count", 0))
+        for key, row in api_state.store.usage_counters.items()
+        if key[1] == "backtest_runs"
+    } == {1}
+    assert api_state.store.backtest_runs == {}
+    assert api_state.store.backtest_finalizations == {}
+
+
 def test_direct_job_bypass_cannot_satisfy_persisted_trajectory_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
