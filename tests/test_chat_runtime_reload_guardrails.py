@@ -2038,47 +2038,6 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
     }
 
 
-def test_cancel_confirmation_replay_returns_the_existing_tombstone() -> None:
-    client = _client()
-    conversation = _conversation(client)
-    user_id = _user_id(client)
-    create_message(
-        user_id=user_id,
-        conversation_id=conversation["id"],
-        role="assistant",
-        content="I read this as AAPL using a buy and hold approach.",
-        metadata=_confirmation_metadata(),
-    )
-    request = {
-        "conversation_id": conversation["id"],
-        "action": {
-            "type": "cancel_confirmation",
-            "label": "Cancel",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": "confirm-aapl"},
-        },
-        "language": "en",
-    }
-
-    first = client.post("/api/v1/chat/stream", json=request)
-    replay = client.post("/api/v1/chat/stream", json=request)
-
-    assert first.status_code == replay.status_code == 200
-    first_final = _stream_payloads(first.text, "final")[0]
-    replay_final = _stream_payloads(replay.text, "final")[0]
-    assert replay_final == first_final
-    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
-        "items"
-    ]
-    tombstones = [
-        message
-        for message in messages
-        if message["metadata"].get("artifact_event", {}).get("type")
-        == "confirmation_cancelled"
-    ]
-    assert len(tombstones) == 1
-
-
 def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 

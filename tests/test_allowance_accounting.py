@@ -145,6 +145,17 @@ def _assistant_settlements(gateway: MagicMock) -> list[dict[str, Any]]:
     return settlements
 
 
+def _stream_events(stream: str, event_type: str) -> list[dict[str, Any]]:
+    events = []
+    for line in stream.splitlines():
+        if not line.startswith("data: ") or line == "data: [DONE]":
+            continue
+        event = json.loads(line.removeprefix("data: "))
+        if event.get("type") == event_type:
+            events.append(event["payload"])
+    return events
+
+
 def _configure_guest_account(mock_gateway: MagicMock) -> GuestWorkspace:
     profile = _profile().model_copy(
         update={
@@ -381,6 +392,73 @@ def test_cancel_confirmation_rejects_unverified_identity_without_writing(
 
     assert response.status_code == 409
     assert response.json()["code"] == "confirmation_required"
+    mock_gateway.create_message.assert_not_called()
+
+
+def test_cancel_confirmation_replay_returns_the_existing_tombstone(mock_gateway):
+    confirmation = Message(
+        id="confirmation-message",
+        conversation_id="conv-1",
+        role="assistant",
+        content="Ready to run.",
+        metadata={
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": "past year",
+                },
+                "optional_parameters": {},
+                "launch_payload": {},
+                "validation": {"status": "ready_to_run", "executable": True},
+            },
+            "confirmation_card": {
+                "confirmation_id": "active-confirmation",
+            },
+        },
+        created_at=utcnow(),
+    )
+    mock_gateway.list_messages.return_value = [confirmation]
+    request = {
+        "conversation_id": "conv-1",
+        "action": {
+            "type": "cancel_confirmation",
+            "label": "Cancel",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "active-confirmation"},
+        },
+        "language": "en",
+    }
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json=request,
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first.status_code == 200
+    first_final = _stream_events(first.text, "final")[0]
+    tombstone_call = mock_gateway.create_message.call_args_list[-1]
+    tombstone = Message(
+        id=first_final["message_id"],
+        conversation_id="conv-1",
+        role="assistant",
+        content="",
+        metadata=tombstone_call.kwargs["metadata"],
+        created_at=utcnow(),
+    )
+    mock_gateway.list_messages.return_value = [confirmation, tombstone]
+    mock_gateway.create_message.reset_mock()
+
+    replay = client.post(
+        "/api/v1/chat/stream",
+        json=request,
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert replay.status_code == 200
+    assert _stream_events(replay.text, "final")[0] == first_final
     mock_gateway.create_message.assert_not_called()
 
 
