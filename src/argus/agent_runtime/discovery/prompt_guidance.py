@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-# Interpreter system-prompt guidance for the unsupported_request tail and the
-# asset_discovery semantic act. Kept beside the discovery composer so the
-# classification boundary and the route that consumes it evolve together.
+# Tail of the interpreter's semantic_turn_act enumeration (retry_failed_action,
+# unsupported_request, asset_discovery). Kept beside the discovery composer so
+# the classification boundary and the route that consumes it evolve together.
 DISCOVERY_ACT_GUIDANCE = (
+    "retry_failed_action when the user asks to try again, retry, rerun the same "
+    "one, or otherwise repeat the latest failed run without changing the idea, "
     "unsupported_request when the user asks for unsupported capabilities, "
     "and asset_discovery when the user explicitly asks Argus to find, "
     "discover, list, or suggest which assets exist to test (set intent "

@@ -952,8 +952,6 @@ class OpenRouterStructuredInterpreter:
             "for a fresh testable idea, answer_pending_need when the user answers the "
             "latest missing fact, educational_question for product or investing concept "
             "questions, result_followup for questions about the latest completed run, "
-            "retry_failed_action when the user asks to try again, retry, rerun the same "
-            "one, or otherwise repeat the latest failed run without changing the idea, "
             + DISCOVERY_ACT_GUIDANCE
             + "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
