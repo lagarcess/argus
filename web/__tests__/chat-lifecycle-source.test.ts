@@ -137,7 +137,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
     expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
     expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
-    expect(chat).toContain('{currentView === "chat" && conversationId && (');
+    expect(chat).toContain(') : currentView === "chat" &&');
+    expect(chat).toContain("conversationId &&");
+    expect(chat).toContain("canManageConversation ? (");
     expect(chat).toContain("isDeleting={isDeletingHeaderChat}");
     expect(headerMenu).toContain("disabled={isDeleting}");
   });
