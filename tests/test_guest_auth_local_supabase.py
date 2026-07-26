@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
@@ -37,6 +38,33 @@ pytestmark = pytest.mark.skipif(
     not all((LOCAL_URL, LOCAL_ANON_KEY, LOCAL_SERVICE_KEY, LOCAL_DATABASE_URL)),
     reason="local Supabase Auth proof is not configured",
 )
+
+
+def _parse_postgrest_utc_timestamp(value: str) -> datetime:
+    match = re.fullmatch(
+        r"(?P<base>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"
+        r"\.(?P<fraction>\d{1,6})(?:Z|\+00(?::00)?)",
+        value,
+    )
+    if match is None:
+        raise ValueError("expected a UTC timestamp with microsecond precision")
+    fraction = match.group("fraction").ljust(6, "0")
+    return datetime.fromisoformat(f"{match.group('base')}.{fraction}+00:00")
+
+
+def test_postgrest_utc_timestamp_normalizes_fraction_width() -> None:
+    assert _parse_postgrest_utc_timestamp(
+        "2026-07-26T07:57:19.59304+00:00"
+    ) == _parse_postgrest_utc_timestamp("2026-07-26T07:57:19.593040+00:00")
+
+
+def test_postgrest_utc_timestamp_rejects_real_differences_and_invalid_input() -> None:
+    baseline = _parse_postgrest_utc_timestamp("2026-07-26T07:57:19.593040Z")
+    assert baseline != _parse_postgrest_utc_timestamp("2026-07-26T07:57:19.593041+00")
+    with pytest.raises(ValueError):
+        _parse_postgrest_utc_timestamp("2026-07-26T07:57:19.593040-05:00")
+    with pytest.raises(ValueError):
+        _parse_postgrest_utc_timestamp("not-a-timestamp")
 
 
 def _gateway() -> SupabaseGateway:
@@ -215,15 +243,25 @@ def test_real_guest_terminal_message_settles_fixed_lifetime_window(
                 "status": "completed",
                 "assistant_message_id": assistant.id,
             }
-            assert counters == [
-                {
-                    "period": "guest_session",
-                    "period_start": workspace.created_at.isoformat(),
-                    "period_end": workspace.expires_at.isoformat(),
-                    "used_count": 1,
-                    "limit_count": 10,
-                }
-            ]
+            assert len(counters) == 1
+            counter = counters[0]
+            assert (
+                _parse_postgrest_utc_timestamp(counter["period_start"])
+                == workspace.created_at
+            )
+            assert (
+                _parse_postgrest_utc_timestamp(counter["period_end"])
+                == workspace.expires_at
+            )
+            assert {
+                "period": counter["period"],
+                "used_count": counter["used_count"],
+                "limit_count": counter["limit_count"],
+            } == {
+                "period": "guest_session",
+                "used_count": 1,
+                "limit_count": 10,
+            }
     finally:
         if user_id:
             with suppress(Exception):
