@@ -593,6 +593,35 @@ cases:
       stage_outcomes:
         ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
 
+  - id: natural_language_establishes_modeled_costs_issue_271
+    prompt: "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage."
+    user_language: en
+    ui_language: en
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 12000
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+      launch_execution_realism:
+        enabled: true
+        fee_bps: 10.0
+        slippage_bps: 5.0
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
   - id: action_chip_add_asset_preserves_modeled_costs_issue_271
     prompt: ""
     followup_prompt: "Add AAPL and keep every other assumption unchanged."

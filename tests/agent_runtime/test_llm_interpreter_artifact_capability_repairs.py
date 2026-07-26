@@ -5723,4 +5723,7 @@ def test_llm_system_prompt_instructs_cost_capture_when_flag_on(
     assert "extra_parameters.fee_rate" in prompt
     assert "extra_parameters.slippage" in prompt
     assert "0.1% fees means 0.001" in prompt
+    assert "one basis point is 0.0001" in prompt
+    assert "10 bps fees means 0.001" in prompt
+    assert "5 bps slippage means 0.0005" in prompt
     assert "explicit_user" in prompt

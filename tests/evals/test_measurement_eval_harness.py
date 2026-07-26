@@ -331,24 +331,25 @@ def test_modeled_cost_expectations_assert_canonical_and_launch_truth() -> None:
     assert any(item.startswith("launch_execution_realism") for item in failures)
 
 
-def test_issue_271_case_is_on_the_live_measurement_surface() -> None:
-    case = next(
-        case
-        for case in load_eval_cases()
-        if case.id == "action_chip_add_asset_preserves_modeled_costs_issue_271"
-    )
+def test_issue_271_cases_are_on_the_live_measurement_surface() -> None:
+    cases = {case.id: case for case in load_eval_cases()}
+    establishment = cases["natural_language_establishes_modeled_costs_issue_271"]
+    preservation = cases[
+        "action_chip_add_asset_preserves_modeled_costs_issue_271"
+    ]
 
-    assert case.expected.fee_rate == 0.001
-    assert case.expected.slippage == 0.0005
-    assert case.expected.cost_provenance == {
-        "fee_rate": "explicit_user",
-        "slippage": "explicit_user",
-    }
-    assert case.expected.launch_execution_realism == {
-        "enabled": True,
-        "fee_bps": 10.0,
-        "slippage_bps": 5.0,
-    }
+    for case in (establishment, preservation):
+        assert case.expected.fee_rate == 0.001
+        assert case.expected.slippage == 0.0005
+        assert case.expected.cost_provenance == {
+            "fee_rate": "explicit_user",
+            "slippage": "explicit_user",
+        }
+        assert case.expected.launch_execution_realism == {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        }
 
 
 def test_typed_outcome_projects_modeled_costs_from_confirmation() -> None:
