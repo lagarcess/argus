@@ -137,7 +137,6 @@ export default function SettingsView({
     }
   };
 
-
   const handleUnarchive = async (id: string) => {
     try {
       await patchConversation(id, { archived: false });

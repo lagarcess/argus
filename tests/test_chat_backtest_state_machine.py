@@ -1727,6 +1727,29 @@ def test_chat_stream_requires_message_or_action() -> None:
     assert response.status_code == 422
 
 
+def test_bare_symbol_turn_uses_reliable_setup_fallback_without_jargon(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "apple",
+            "language": "en",
+        },
+    )
+
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "reliable test setup" in text
+    assert "draft" not in text.lower()
+    assert "interpreter" not in text.lower()
+
+
 def test_discovery_endpoints_return_assets_and_indicators(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

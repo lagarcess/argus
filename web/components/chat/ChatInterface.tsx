@@ -576,6 +576,9 @@ export default function ChatInterface() {
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  // First paint waits for the authenticated profile language so a fresh
+  // browser cannot send starter prompts in the wrong language.
+  const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
@@ -872,10 +875,33 @@ export default function ChatInterface() {
     let cancelled = false;
     (async () => {
       try {
-        const meResponse = await getMe().catch(() => null);
+        let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
+        let profileUnreachable = false;
+        try {
+          meResponse = await getMe();
+        } catch (error) {
+          const status =
+            typeof error === "object" && error !== null && "status" in error
+              ? (error as { status?: number }).status
+              : undefined;
+          profileUnreachable = status !== 401 && status !== 403;
+        }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
+        }
+        if (cancelled) return;
+        setIsBootstrappingProfile(false);
+        if (profileUnreachable) {
+          setMessages([
+            {
+              id: "offline",
+              role: "ai",
+              kind: "text",
+              content: t('chat.error_offline'),
+            },
+          ]);
+          return;
         }
         const activeConversationId = readActiveConversationIdFromUrl();
         if (activeConversationId) {
@@ -916,6 +942,7 @@ export default function ChatInterface() {
         resetToEmptyChatSurface();
       } catch {
         if (cancelled) return;
+        setIsBootstrappingProfile(false);
         setMessages([
           {
             id: "offline",
@@ -1964,6 +1991,14 @@ export default function ChatInterface() {
       : t("chat.followup_placeholder", "Ask a follow-up...");
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (isBootstrappingProfile) {
+    return (
+      <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">

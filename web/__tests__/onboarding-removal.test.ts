@@ -88,6 +88,26 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
     expect(es.chat.starter_actions.tsla.value.length).toBeGreaterThan(0);
   });
 
+  test("chat first paint waits for the authenticated profile language", () => {
+    const chat = read("components/chat/ChatInterface.tsx");
+    expect(chat).toContain("isBootstrappingProfile");
+    const bootstrapFlip = chat.indexOf("setIsBootstrappingProfile(false)");
+    const languageApply = chat.indexOf("await i18n.changeLanguage(resolvedLanguage)");
+    expect(languageApply).toBeGreaterThan(-1);
+    expect(bootstrapFlip).toBeGreaterThan(languageApply);
+    expect(chat).toContain("if (isBootstrappingProfile) {");
+  });
+
+  test("an unreachable backend surfaces the offline message, not a healthy chat", () => {
+    const chat = read("components/chat/ChatInterface.tsx");
+    expect(chat).toContain("profileUnreachable = status !== 401 && status !== 403");
+    const unreachableBranch = chat.indexOf("if (profileUnreachable) {");
+    expect(unreachableBranch).toBeGreaterThan(-1);
+    expect(
+      chat.slice(unreachableBranch, unreachableBranch + 400),
+    ).toContain("chat.error_offline");
+  });
+
   test("legacy persisted marker content still cannot become a retry action", () => {
     expect(retryLastTurnActionFromMessage("__ONBOARDING_SKIP__")).toBeNull();
     expect(
