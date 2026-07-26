@@ -224,7 +224,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
-        "value": "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia."
+        "value": "Compara Apple con SPY durante los últimos 12 meses."
       },
       "btc": {
         "label": "Prueba mantener Bitcoin (BTC)",

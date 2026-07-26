@@ -224,7 +224,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
-        "value": "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+        "value": "Compare Apple with SPY over the last 12 months."
       },
       "btc": {
         "label": "Test Bitcoin (BTC) hold",

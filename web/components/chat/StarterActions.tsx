@@ -25,7 +25,7 @@ export default function StarterActions({
       label: t("chat.starter_actions.tsla.label", "Test Apple vs SPY"),
       value: t(
         "chat.starter_actions.tsla.value",
-        "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
+        "Compare Apple with SPY over the last 12 months.",
       ),
     },
     {

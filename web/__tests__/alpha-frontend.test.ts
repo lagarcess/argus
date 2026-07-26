@@ -238,7 +238,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(starterAndPlaceholderText).not.toContain("Activo:");
     expect(starterAndPlaceholderText).not.toContain("Periodo:");
     expect(en.chat.starter_actions.tsla.value).toBe(
-      "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
+      "Compare Apple with SPY over the last 12 months.",
     );
     expect(en.chat.starter_actions.btc.value).toBe(
       "What if I bought Bitcoin this year so far?",
@@ -247,7 +247,7 @@ describe("Argus Alpha frontend contract", () => {
       "What if I bought $250 of Nvidia every week over the last 12 months?",
     );
     expect(es.chat.starter_actions.tsla.value).toBe(
-      "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia.",
+      "Compara Apple con SPY durante los últimos 12 meses.",
     );
     expect(es.chat.starter_actions.btc.value).toBe(
       "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
