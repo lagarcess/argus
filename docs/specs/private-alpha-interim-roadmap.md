@@ -93,6 +93,62 @@ and [guest post-integration runtime observation](../reports/2026-07-25-guest-pos
 record later signals without assigning unproven causality or authorizing a
 broad repair lane.
 
+### Continuity Follow-up Ownership Queues
+
+These issues are bounded follow-ups to reproduced post-merge findings. They do
+not reopen the completed Always Progresses baseline as one broad runtime
+program.
+
+The three ownership queues may run independently when their files and
+canonical owners remain distinct. Issues **within one queue execute serially**
+in the order below. After an issue lands, the next issue starts from the
+updated integration checkpoint rather than stacking unreviewed worker branches.
+This is shared-owner serialization, not a native GitHub `blocked-by` graph.
+
+#### Runtime reliability
+
+1. [#269 — Diagnose ordinary starter failures at the call ceiling](https://github.com/lagarcess/argus/issues/269)
+   is `triage`. Prove integration versus Guest versus provider/configuration
+   ownership before changing runtime policy. Do not raise the turn allowance
+   from receipt count alone.
+
+This queue may run independently of the two queues below. Guest publication
+remains stopped until #269 classifies and clears the ordinary-starter journey
+on the relevant candidate.
+
+#### Protected interpreter/edit spine
+
+Execute serially:
+
+1. [#270 — Preserve supported strategy transitions through confirmation](https://github.com/lagarcess/argus/issues/270).
+2. [#271 — Preserve modeled costs across asset edits](https://github.com/lagarcess/argus/issues/271).
+3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
+
+Only one agent owns the interpreter/edit spine at a time. Do not combine these
+issues into another open-ended continuity rewrite.
+
+#### Artifact lifecycle and presentation
+
+Execute serially:
+
+1. [#273 — Settle stale Run rejection to the latest usable artifact](https://github.com/lagarcess/argus/issues/273).
+2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249).
+
+Issue #249 was updated instead of duplicating presentation ownership. It
+records:
+
+- `TRY NEXT` / `WHAT HAPPENED` leakage on generic recovery;
+- compact recovery parity between ownership paths;
+- malformed option presentation; and
+- Quick take quality drift as an observation, not yet a separate regression or
+  blocker.
+
+[Coordination issue #237](https://github.com/lagarcess/argus/issues/237)
+records all three queues. Lineage notes on #238, #239, and #242 preserve the
+relationship to delivered work without reopening those completed boundaries.
+Each correction still requires exact-head browser QA and integration
+reverification before its issue can close.
+
 ## Product Relationships, Not An Issue Order
 
 ```mermaid
