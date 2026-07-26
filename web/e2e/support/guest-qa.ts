@@ -537,7 +537,9 @@ function localUrl(value: string | undefined, label: string): URL {
   return parsed;
 }
 
-export function assertExactLocalCandidate(): void {
+export function assertExactLocalCandidate(
+  options: { allowMockBrowserAuth?: boolean } = {},
+): void {
   if (process.env.ARGUS_QA_APPROVED_SUPABASE_REF) {
     throw new Error("Hosted Supabase approval is forbidden for guest browser QA");
   }
@@ -588,7 +590,11 @@ export function assertExactLocalCandidate(): void {
   if (`${api.origin}${api.pathname.replace(/\/$/, "")}` !== LOCAL_API_BASE) {
     throw new Error("Guest QA API must be http://localhost:8000/api/v1");
   }
-  if (process.env.NEXT_PUBLIC_MOCK_AUTH !== "false") {
+  if (options.allowMockBrowserAuth) {
+    if (process.env.NEXT_PUBLIC_MOCK_AUTH !== "true") {
+      throw new Error("Guest-entry fixtures require mock browser Auth");
+    }
+  } else if (process.env.NEXT_PUBLIC_MOCK_AUTH !== "false") {
     throw new Error("Guest QA requires real browser Auth");
   }
   if (process.env.ARGUS_MOCK_AUTH !== "false") {

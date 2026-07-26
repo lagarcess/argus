@@ -5,7 +5,9 @@ import {
 } from "./support/guest-qa";
 
 export default async function guestExperienceGlobalSetup() {
-  assertExactLocalCandidate();
+  assertExactLocalCandidate({
+    allowMockBrowserAuth: process.env.ARGUS_GUEST_QA_ENTRY === "true",
+  });
   if (process.env.ARGUS_GUEST_QA_REQUIRE_ZERO_STATE === "true") {
     assertZeroState();
   } else {

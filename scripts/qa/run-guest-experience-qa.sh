@@ -7,9 +7,9 @@ cd "$ROOT_DIR"
 
 mode="${1:-}"
 case "$mode" in
-  list|preflight|authoritative) ;;
+  list|preflight|entry|authoritative) ;;
   *)
-    echo "usage: scripts/qa/run-guest-experience-qa.sh list|preflight|authoritative" >&2
+    echo "usage: scripts/qa/run-guest-experience-qa.sh list|preflight|entry|authoritative" >&2
     exit 2
     ;;
 esac
@@ -130,13 +130,22 @@ build_frontend() {
 if [ "$mode" = "authoritative" ]; then
   argus_require_qa_env
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=true
+  unset ARGUS_GUEST_QA_ENTRY || true
+  unset ARGUS_GUEST_QA_PREFLIGHT || true
+  build_frontend
+elif [ "$mode" = "entry" ]; then
+  export ARGUS_GUEST_QA_ENTRY=true
+  export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
+  export NEXT_PUBLIC_MOCK_AUTH=true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
   build_frontend
 elif [ "$mode" = "preflight" ]; then
   export ARGUS_GUEST_QA_PREFLIGHT=true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
+  unset ARGUS_GUEST_QA_ENTRY || true
   build_frontend
 else
+  unset ARGUS_GUEST_QA_ENTRY || true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
 fi

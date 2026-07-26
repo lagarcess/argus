@@ -3,13 +3,16 @@ import { defineConfig, devices } from "@playwright/test";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const preflight = process.env.ARGUS_GUEST_QA_PREFLIGHT === "true";
+const entry = process.env.ARGUS_GUEST_QA_ENTRY === "true";
 const runId = `${Date.now()}-${process.pid}`;
 
 export default defineConfig({
   testDir: path.join(repositoryRoot, "web/e2e"),
   testMatch: preflight
     ? "guest-experience.preflight.spec.ts"
-    : ["guest-entry.spec.ts", "guest-experience.spec.ts"],
+    : entry
+      ? "guest-entry.spec.ts"
+      : "guest-experience.spec.ts",
   globalSetup: path.join(
     repositoryRoot,
     "web/e2e/guest-experience.global-setup.ts",

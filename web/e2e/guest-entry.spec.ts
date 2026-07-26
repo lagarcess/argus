@@ -95,6 +95,37 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
     await fulfillJson(route, guestMe());
   });
 
+  await page.route("**/api/v1/me/usage", async (route) => {
+    await fulfillJson(route, {
+      allowances: {
+        messages: {
+          hour: null,
+          day: null,
+          guest_session: {
+            used: 0,
+            limit: 10,
+            remaining: 10,
+            period_end: EXPIRES_AT,
+          },
+          available_now: true,
+          limiting_window: "guest_session",
+        },
+        backtests: {
+          hour: null,
+          day: null,
+          guest_session: {
+            used: 0,
+            limit: 1,
+            remaining: 1,
+            period_end: EXPIRES_AT,
+          },
+          available_now: true,
+          limiting_window: "guest_session",
+        },
+      },
+    });
+  });
+
   await page.route("**/api/v1/conversations**", async (route) => {
     const url = new URL(route.request().url());
     const pathname = url.pathname;
@@ -402,7 +433,7 @@ for (const expiredCase of [
       });
     });
 
-    await page.goto("/chat", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByRole("heading", { name: expiredCase.title })).toBeVisible();
     await expect(page.getByText(expiredCase.detail)).toBeVisible();
@@ -427,7 +458,7 @@ test("@guest-expiry public account capability offers in-place account creation",
     });
   });
 
-  await page.goto("/chat", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(
     page.getByRole("button", { name: "Create account" }),
@@ -463,7 +494,7 @@ test("@guest-shell frontend-on server-off mismatch stays on a retry surface", as
   await expect(page.getByRole("button", { name: "Sign up" })).toHaveCount(0);
 });
 
-test("@guest-shell capability chrome stays visible and fail closed before conversion", async ({
+test("@guest-shell capability chrome stays visible and opens typed conversion", async ({
   page,
 }) => {
   const evidence = await mockGuestJourney(page);
@@ -511,9 +542,14 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
   await expect(page.getByTestId("guest-legal-before_message")).toContainText("2026");
 
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(
-    page.getByText("Sign in is not available in this preview."),
-  ).toBeVisible();
+  const signInDialog = page.getByRole("dialog", { name: "Sign in" });
+  await expect(signInDialog).toBeVisible();
+  await expect(signInDialog).toContainText(
+    "Sign in to keep this conversation and start another.",
+  );
+  await signInDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(signInDialog).toHaveCount(0);
+  await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   await expect(page).toHaveURL(/\/chat$/);
 
   const settingsTrigger = page.getByRole("button", { name: "Guest settings" });
@@ -555,9 +591,15 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
   await expect(page.locator("aside").getByText(/Chat temporal/)).toHaveCount(0);
   await page.getByRole("button", { name: "Buscar" }).click();
   await expect(
-    page.getByText("La búsqueda aún no está disponible para chats temporales."),
+    page.getByText(
+      "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible.",
+    ),
   ).toBeVisible();
   expect(searchCalls).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Cerrar búsqueda" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
 
@@ -573,9 +615,22 @@ test("@guest-shell capability chrome stays visible and fail closed before conver
   expect(evidence.profilePatches).toEqual([]);
 
   await page.getByRole("button", { name: "Nuevo chat" }).click();
+  const newChatDialog = page.getByRole("dialog", {
+    name: "¿Quieres iniciar otra conversación?",
+  });
+  await expect(newChatDialog).toContainText(
+    "Empezar de nuevo reemplaza esta conversación temporal. Inicia sesión para conservarla y comenzar otra.",
+  );
   await expect(
-    page.getByText("Inicia sesión para conservar esta conversación y comenzar otra."),
+    newChatDialog.getByRole("button", { name: "Empezar de nuevo" }),
   ).toBeVisible();
+  await expect(
+    newChatDialog.getByRole("button", {
+      name: "Iniciar sesión para conservarla",
+    }),
+  ).toBeVisible();
+  await newChatDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(newChatDialog).toHaveCount(0);
   await expect(page.getByText("Compara Apple con SPY")).toBeVisible();
 });
 
@@ -753,7 +808,12 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
     "Change the chart range",
   );
   await page.getByRole("button", { name: "Add decision" }).click();
-  await expect(page.getByText("Sign in to save this decision.")).toBeVisible();
+  const decisionDialog = page.getByRole("dialog", { name: "Sign in" });
+  await expect(decisionDialog).toContainText(
+    "Sign in to save this decision.",
+  );
+  await decisionDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(decisionDialog).toHaveCount(0);
   expect(durableHintWrites).toBe(0);
 
   await page

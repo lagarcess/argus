@@ -776,7 +776,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check18).not.toContain("unroute");
   });
 
-  test("serves the authoritative matrix from one compiled production build", () => {
+  test("serves guest-entry fixtures and the authoritative matrix in their real auth modes", () => {
     const runner = readFileSync(
       join(import.meta.dir, "../../scripts/qa/run-guest-experience-qa.sh"),
       "utf-8",
@@ -785,12 +785,43 @@ describe("Checks 6–20 harness guards", () => {
       join(import.meta.dir, "../e2e/guest-experience.playwright.config.ts"),
       "utf-8",
     );
+    const globalSetup = readFileSync(
+      join(import.meta.dir, "../e2e/guest-experience.global-setup.ts"),
+      "utf-8",
+    );
+    const support = readFileSync(
+      join(import.meta.dir, "../e2e/support/guest-qa.ts"),
+      "utf-8",
+    );
+    const entrySpec = readFileSync(
+      join(import.meta.dir, "../e2e/guest-entry.spec.ts"),
+      "utf-8",
+    );
 
     expect(runner.match(/bun run build/g)?.length).toBe(1);
+    expect(runner).toContain("list|preflight|entry|authoritative");
+    expect(runner).toContain("ARGUS_GUEST_QA_ENTRY=true");
+    expect(runner).toContain("NEXT_PUBLIC_MOCK_AUTH=true");
     expect(config).toContain("bun run start");
     expect(config).not.toContain("bun run dev");
+    expect(config).toContain(
+      'const entry = process.env.ARGUS_GUEST_QA_ENTRY === "true"',
+    );
     expect(config).toContain('"guest-experience.spec.ts"');
     expect(config).toContain('"guest-entry.spec.ts"');
+    expect(config).not.toContain(
+      '["guest-entry.spec.ts", "guest-experience.spec.ts"]',
+    );
+    expect(globalSetup).toContain(
+      'allowMockBrowserAuth: process.env.ARGUS_GUEST_QA_ENTRY === "true"',
+    );
+    expect(support).toContain("allowMockBrowserAuth?: boolean");
+    expect(support).toContain(
+      'process.env.NEXT_PUBLIC_MOCK_AUTH !== "true"',
+    );
+    expect(entrySpec).toContain('page.route("**/api/v1/me/usage"');
+    expect(entrySpec).toContain("guest_session:");
+    expect(entrySpec).toContain("available_now: true");
     expect(config).toContain("workers: 1");
     expect(config).toContain("retries: 0");
   });
