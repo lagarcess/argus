@@ -253,6 +253,11 @@ def patched_draft_from_candidate(
         if _blank(candidate_value):
             continue
         anchored_value = getattr(anchor.draft, field_name)
+        if field_name == "extra_parameters":
+            candidate_value = _merged_extra_parameters(
+                anchored=anchored_value,
+                candidate=candidate_value,
+            )
         if _equivalent_strategy_value(field_name, candidate_value, anchored_value):
             continue
         patch_values[field_name] = candidate_value
@@ -267,6 +272,26 @@ def patched_draft_from_candidate(
         return None
     patch = ArtifactPatch(source=source, **patch_values)
     return apply_artifact_patch(anchor.draft, patch)
+
+
+def _merged_extra_parameters(
+    *,
+    anchored: Any,
+    candidate: Any,
+) -> dict[str, Any]:
+    merged = _dict(anchored)
+    incoming = _dict(candidate)
+    incoming.pop("asset_universe_operation", None)
+    for key, value in incoming.items():
+        if (
+            key == "field_provenance"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            merged[key] = {**merged[key], **value}
+            continue
+        merged[key] = value
+    return merged
 
 
 def _equivalent_strategy_value(

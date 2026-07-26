@@ -1849,6 +1849,11 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
         "capital_amount": 1000,
         "benchmark_symbol": "SPY",
         "language": "en",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
     }
 
     result = await run_agent_turn(
@@ -1878,6 +1883,18 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     launch = confirmation_payload["launch_payload"]
     assert launch["symbol"] == "MSFT"
     assert launch["date_range"] == {"start": "2025-05-13", "end": "2026-05-13"}
+    strategy = confirmation_payload["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.001
+    assert strategy["extra_parameters"]["slippage"] == 0.0005
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert result["confirmation_payload"]["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     state_snapshot = await workflow.aget_state(
         {"configurable": {"thread_id": "thread-retry-failed-action"}}
     )
@@ -1885,6 +1902,19 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     active_confirmation = snapshot.active_confirmation_reference
     assert active_confirmation is not None
     assert active_confirmation.artifact_kind == "confirmation"
+    persisted_confirmation = active_confirmation.metadata["confirmation_payload"]
+    persisted_costs = persisted_confirmation["strategy"]["extra_parameters"]
+    assert persisted_costs["fee_rate"] == 0.001
+    assert persisted_costs["slippage"] == 0.0005
+    assert persisted_costs["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert persisted_confirmation["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     assert snapshot.latest_failed_action_reference is None
 
 

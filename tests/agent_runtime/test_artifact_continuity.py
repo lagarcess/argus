@@ -191,6 +191,79 @@ def test_result_draft_preserves_position_sizing_from_config_snapshot() -> None:
     assert draft.position_size == 10
 
 
+def test_result_draft_preserves_modeled_costs_and_explicit_provenance() -> None:
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "equity",
+            "symbols": ["MSFT"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["MSFT"],
+                "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+                "resolved_strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 12000,
+                    "benchmark_symbol": "SPY",
+                    "engine_config": {
+                        "_execution_realism": {
+                            "enabled": True,
+                            "fee_bps": 10.0,
+                            "slippage_bps": 5.0,
+                        }
+                    },
+                },
+                "engine_config": {
+                    "_execution_realism": {
+                        "enabled": True,
+                        "fee_bps": 10.0,
+                        "slippage_bps": 5.0,
+                    }
+                },
+            },
+        }
+    )
+
+    assert draft.extra_parameters["fee_rate"] == 0.001
+    assert draft.extra_parameters["slippage"] == 0.0005
+    assert draft.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
+def test_failed_launch_draft_preserves_modeled_costs_and_explicit_provenance() -> None:
+    draft = draft_from_failed_launch_payload(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 12000,
+            "benchmark_symbol": "SPY",
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+        }
+    )
+
+    assert draft.extra_parameters["fee_rate"] == 0.001
+    assert draft.extra_parameters["slippage"] == 0.0005
+    assert draft.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
 def test_confirmation_draft_prefers_visible_strategy_and_fills_launch_defaults() -> None:
     draft = draft_from_confirmation_payload(
         {

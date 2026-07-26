@@ -88,6 +88,7 @@ def confirm_stage(
     optional_parameters = _resolve_optional_parameters(
         contract=contract,
         optional_parameter_status=state.optional_parameter_status,
+        strategy=strategy,
     )
     unsupported_assumption = _unsupported_execution_assumption(
         optional_parameters,
@@ -896,13 +897,21 @@ def _resolve_optional_parameters(
     *,
     contract: CapabilityContract,
     optional_parameter_status: dict[str, Any],
+    strategy: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
     resolved: dict[str, dict[str, Any]] = {}
     default_values = contract.optional_defaults
     for field_name in default_values:
         source = "default"
         value = default_values[field_name]
-        if field_name in optional_parameter_status:
+        strategy_owns_value, strategy_value = _strategy_cost_parameter(
+            strategy,
+            field_name,
+        )
+        if strategy_owns_value:
+            value = strategy_value
+            source = "user"
+        elif field_name in optional_parameter_status:
             value = optional_parameter_status[field_name]
             source = "user"
         field_description = contract.describe_field(field_name)
@@ -921,6 +930,24 @@ def _resolve_optional_parameters(
             ),
         }
     return resolved
+
+
+def _strategy_cost_parameter(
+    strategy: dict[str, Any],
+    field_name: str,
+) -> tuple[bool, Any]:
+    if not _execution_realism_feature_enabled():
+        return False, None
+    key = {
+        "fees": "fee_rate",
+        "slippage": "slippage",
+    }.get(field_name)
+    if key is None:
+        return False, None
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict) or key not in extra_parameters:
+        return False, None
+    return True, extra_parameters[key]
 
 
 def _unsupported_execution_assumption(
@@ -1084,13 +1111,19 @@ def _visible_card_assumptions(
     if data_through_assumption:
         assumptions.append(data_through_assumption)
 
-    fees = _parameter_value(optional_parameters, "fees")
-    if fees in (0, 0.0, "0", "0.0"):
-        assumptions.append("No fees")
-
-    slippage = _parameter_value(optional_parameters, "slippage")
-    if slippage in (0, 0.0, "0", "0.0"):
-        assumptions.append("No slippage")
+    fees = _numeric_cost_value(_parameter_value(optional_parameters, "fees"))
+    slippage = _numeric_cost_value(_parameter_value(optional_parameters, "slippage"))
+    if (fees is not None and fees > 0.0) or (slippage is not None and slippage > 0.0):
+        assumptions.append(
+            "Modeled costs: "
+            f"{_format_basis_points(fees)} bps fee + "
+            f"{_format_basis_points(slippage)} bps slippage"
+        )
+    else:
+        if fees == 0.0:
+            assumptions.append("No fees")
+        if slippage == 0.0:
+            assumptions.append("No slippage")
 
     benchmark_assumption = _visible_card_benchmark_assumption(
         strategy=strategy,
@@ -1099,6 +1132,22 @@ def _visible_card_assumptions(
     if benchmark_assumption:
         assumptions.append(benchmark_assumption)
     return assumptions
+
+
+def _numeric_cost_value(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_basis_points(value: float | None) -> str:
+    bps = round(float(value or 0.0) * 10000.0, 2)
+    if bps.is_integer():
+        return str(int(bps))
+    return f"{bps:g}"
 
 
 def _data_through_assumption(strategy: dict[str, Any]) -> str | None:
