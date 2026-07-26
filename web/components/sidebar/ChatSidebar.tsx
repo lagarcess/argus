@@ -24,6 +24,10 @@ import {
   patchConversation,
   deleteConversation as apiDeleteConversation,
 } from "@/lib/argus-api";
+import {
+  conversationDisplayTitle,
+  renamePrefillTitle,
+} from "@/lib/chat-title-display";
 
 import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 
@@ -329,7 +333,7 @@ export default function ChatSidebar({
   const handleStartRename = useCallback((id: string) => {
     const item = chatItems.find((i) => i.id === id);
     setRenamingId(id);
-    setRenameValue(item?.title ?? "");
+    setRenameValue(renamePrefillTitle(item));
     setRenameError(null);
   }, [chatItems]);
 
@@ -503,9 +507,13 @@ export default function ChatSidebar({
                         const hasConversationAttention =
                           !isActiveConversation && attentionConversationIds.has(itemConversationId);
                         const attentionLabel = t("chat.history.new_activity", "New activity");
+                        const displayTitle = conversationDisplayTitle(
+                          item,
+                          t("chat.new_chat", "New chat"),
+                        );
                         const rowAriaLabel = hasConversationAttention
-                          ? `${item.title}. ${attentionLabel}.`
-                          : item.title;
+                          ? `${displayTitle}. ${attentionLabel}.`
+                          : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
 
@@ -577,8 +585,11 @@ export default function ChatSidebar({
                               </>
                             ) : (
                               <>
-                                <span className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white">
-                                  {item.title}
+                                <span
+                                  key={displayTitle}
+                                  className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white animate-in fade-in duration-300"
+                                >
+                                  {displayTitle}
                                 </span>
                                 <span className={`mt-0.5 block truncate text-[12px] ${
                                   hasConversationAttention
@@ -628,7 +639,14 @@ export default function ChatSidebar({
         description={t(
           "sidebar.delete_confirm.description",
           "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
+          {
+            title: pendingDeleteItem
+              ? conversationDisplayTitle(
+                  pendingDeleteItem,
+                  t("chat.new_chat", "New chat"),
+                )
+              : t("common.conversation", "Conversation"),
+          },
         )}
         confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
         cancelLabel={t("common.cancel", "Cancel")}

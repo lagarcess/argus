@@ -257,6 +257,8 @@ export type HistoryItem = {
   type: HistoryItemType;
   id: string;
   title: string;
+  /** Chat items only; mirrors the conversation record. */
+  title_source?: TitleSource | null;
   subtitle: string;
   pinned: boolean;
   created_at: string;

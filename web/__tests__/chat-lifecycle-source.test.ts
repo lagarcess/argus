@@ -107,6 +107,10 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const headerMenu = readFileSync(
+      join(root, "components/chat/ChatHeaderMenu.tsx"),
+      "utf-8",
+    );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
     expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
@@ -116,7 +120,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
     expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
     expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
-    expect(chat).toContain("disabled={!conversationId || isDeletingHeaderChat}");
+    expect(chat).toContain('{currentView === "chat" && conversationId && (');
+    expect(chat).toContain("isDeleting={isDeletingHeaderChat}");
+    expect(headerMenu).toContain("disabled={isDeleting}");
   });
 
   test("chat disclaimer appears only after conversation activity and is localized", () => {

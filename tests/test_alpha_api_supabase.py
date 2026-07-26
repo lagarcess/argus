@@ -2734,6 +2734,48 @@ def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
     )
 
 
+def test_history_supabase_chat_items_carry_title_source(mock_gateway):
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [
+            {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "title": "NVDA Buy and Hold",
+                "title_source": "ai_generated",
+                "last_message_preview": "Use NVDA from January 3, 2023",
+                "pinned": False,
+                "updated_at": "2026-07-01T00:00:00+00:00",
+            }
+        ],
+        "strategies": [
+            {
+                "id": "33333333-3333-3333-3333-333333333333",
+                "name": "NVDA momentum",
+                "symbols": ["NVDA"],
+                "pinned": False,
+                "updated_at": "2026-07-01T00:00:00+00:00",
+            }
+        ],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    chat_items = [
+        item for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert [item["title_source"] for item in chat_items] == ["ai_generated"]
+    non_chat_items = [
+        item for item in response.json()["items"] if item["type"] != "chat"
+    ]
+    assert non_chat_items
+    assert all("title_source" not in item for item in non_chat_items)
+
+
 def test_history_supabase_can_request_archived_rows(mock_gateway):
     mock_gateway.list_history_rows.return_value = {
         "runs": [],
