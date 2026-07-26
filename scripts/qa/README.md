@@ -92,6 +92,12 @@ bash scripts/qa/write-local-env.sh               # untracked .env + web/.env.loc
 bash scripts/qa/run-local-auth-qa.sh             # guard -> backend -> identities -> journeys
 ```
 
+New worktrees normally inherit `.env` and `web/.env.local` as symlinks to the
+canonical integration worktree. `write-local-env.sh` safely detaches those
+links and writes regular lane-local files before local-stack QA. Do not replace
+this command with `cat > .env` or similar redirection, which follows symlinks
+and can corrupt the shared canonical environment.
+
 The local stack uses the stable `project_id = "argus-qa"` (containers such as
 `supabase_db_argus-qa`) and a same-site topology — app on
 `http://localhost:3000`, API on `http://localhost:8000` — so the Argus

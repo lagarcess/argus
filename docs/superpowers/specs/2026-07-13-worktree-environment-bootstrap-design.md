@@ -1,6 +1,6 @@
 # Worktree Environment Bootstrap Design
 
-**Status:** Approved for implementation on 2026-07-13
+**Status:** Implemented; canonical-link overwrite guard added 2026-07-26
 
 ## Goal
 
@@ -30,6 +30,9 @@ The helper is an implementation detail, not a second user workflow. Running
   warn and continue with the current setup behavior.
 - In the canonical integration worktree itself, existing files remain regular
   files and setup is a no-op.
+- A lane-local QA env writer must atomically replace the lane's symlinks with
+  regular local files. It must never truncate or overwrite the canonical
+  symlink target.
 - Clean checkouts and CI continue without environment provisioning when no
   canonical integration worktree exists.
 - An explicit `ARGUS_CANONICAL_WORKTREE_ROOT` may override discovery for local
