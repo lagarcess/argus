@@ -22,6 +22,7 @@ import {
   seedClaimSourceResultFixture,
   seedDistinctGuestConfirmation,
   seedDurableRetryableFailure,
+  seedGuestActiveConfirmationFixture,
   seedGuestSimulationExhaustionFixture,
   workspaceFacts,
   zeroStateSnapshot,
@@ -252,6 +253,31 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
       userId: guestOwner,
       conversationId: created.body.conversation.id,
     });
+    const activeConfirmation = seedGuestActiveConfirmationFixture({
+      userId: guestOwner,
+      conversationId: created.body.conversation.id,
+    });
+    expect(activeConfirmation.confirmationId).not.toBe(fixture.confirmationId);
+    const hydrationResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        response.status() === 200 &&
+        new URL(response.url()).pathname.endsWith(
+          `/api/v1/conversations/${created.body.conversation.id}/messages`,
+        ),
+    );
+    await page.goto(
+      `/chat?conversation=${created.body.conversation.id}`,
+      { waitUntil: "domcontentloaded" },
+    );
+    expect((await hydrationResponse).status()).toBe(200);
+    const activeCard = page.locator("section.argus-confirmation-reveal").filter({
+      has: page.locator('[data-confirmation-status="ready_to_run"]'),
+    });
+    await expect(activeCard).toHaveCount(1);
+    await expect(
+      activeCard.getByText("Benchmark: SPY", { exact: true }),
+    ).toBeVisible();
     const before = ownerSnapshot(guestOwner);
     const beforeGraph = conversationGraph(
       guestOwner,
@@ -260,14 +286,16 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
     const seeded = seedDistinctGuestConfirmation({
       userId: guestOwner,
       conversationId: created.body.conversation.id,
-      sourceMessageId: fixture.sourceMessageId,
+      sourceMessageId: activeConfirmation.messageId,
     });
     const after = ownerSnapshot(guestOwner);
     const afterGraph = conversationGraph(
       guestOwner,
       created.body.conversation.id,
     );
-    expect(seeded.confirmationId).not.toBe(fixture.confirmationId);
+    expect(seeded.confirmationId).not.toBe(
+      activeConfirmation.confirmationId,
+    );
     expect(after.messages - before.messages).toBe(1);
     expect(after.assistant_messages - before.assistant_messages).toBe(1);
     expect(after.jobs).toBe(before.jobs);

@@ -49,8 +49,6 @@ function confirmationMessage(
     content: "redacted fixture prose",
     metadata: {
       confirmation_payload: {
-        confirmation_id: confirmationId,
-        artifact_id: confirmationId,
         strategy: {
           asset_universe: [symbol],
           date_range: overrides.effective ?? effectiveRange,
@@ -291,10 +289,10 @@ describe("guest Check 11 deterministic confirmation setup", () => {
     });
     expect(
       (rekeyed.confirmation_payload as Record<string, unknown>).confirmation_id,
-    ).toBe("confirmation-second");
+    ).toBeUndefined();
     expect(
       (rekeyed.confirmation_payload as Record<string, unknown>).artifact_id,
-    ).toBe("confirmation-second");
+    ).toBeUndefined();
     expect(
       (rekeyed.active_confirmation_reference as Record<string, unknown>)
         .artifact_id,
@@ -317,9 +315,36 @@ describe("guest Check 11 deterministic confirmation setup", () => {
     ).toThrow("typed run action");
   });
 
-  test("fails closed when confirmation identities disagree", () => {
+  test("fails closed when the typed run action identity disagrees", () => {
     const metadata = structuredClone(initial.metadata ?? {});
-    (metadata.confirmation_payload as Record<string, unknown>).artifact_id =
+    const card = metadata.confirmation_card as Record<string, unknown>;
+    const actions = card.actions as Array<Record<string, unknown>>;
+    const runAction = actions.find((action) => action.type === "run_backtest");
+    if (!runAction) throw new Error("fixture is missing its run action");
+    (runAction.payload as Record<string, unknown>).confirmation_id =
+      "confirmation-other";
+
+    expect(() =>
+      rekeyGuestQaConfirmationMetadata(metadata, "confirmation-second"),
+    ).toThrow("identity mismatch");
+  });
+
+  test("accepts a typed run action without its optional artifact alias", () => {
+    const metadata = structuredClone(initial.metadata ?? {});
+    const card = metadata.confirmation_card as Record<string, unknown>;
+    const actions = card.actions as Array<Record<string, unknown>>;
+    const runAction = actions.find((action) => action.type === "run_backtest");
+    if (!runAction) throw new Error("fixture is missing its run action");
+    delete (runAction.payload as Record<string, unknown>).artifact_id;
+
+    expect(
+      rekeyGuestQaConfirmationMetadata(metadata, "confirmation-second"),
+    ).toBeDefined();
+  });
+
+  test("fails closed when an optional payload identity alias disagrees", () => {
+    const metadata = structuredClone(initial.metadata ?? {});
+    (metadata.confirmation_payload as Record<string, unknown>).confirmation_id =
       "confirmation-other";
 
     expect(() =>
@@ -937,6 +962,9 @@ describe("Checks 6–20 harness guards", () => {
     expect(check18).not.toContain("seedDurableRetryableFailure");
     expect(check18).toContain('openRouterApiKey: ""');
     expect(check18).toContain('getByTestId("chat-input")');
+    expect(check18).toContain('getByTestId("user-turn-recovery")');
+    expect(check18).toContain('getByTestId("user-turn-retry")');
+    expect(check18).not.toContain('locator("div.group.relative")');
     expect(check18).toContain("POST /api/v1/chat/stream");
     expect(check18).toContain("durableMessages");
     expect(check18).toContain('recoveryMetadata.code === "runtime_failure"');
@@ -947,7 +975,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check18).not.toContain("unroute");
   });
 
-  test("serves guest-entry fixtures and the authoritative matrix in their real auth modes", () => {
+  test("serves entry, provider-free continuation, and authoritative modes safely", () => {
     const runner = readFileSync(
       join(import.meta.dir, "../../scripts/qa/run-guest-experience-qa.sh"),
       "utf-8",
@@ -974,8 +1002,14 @@ describe("Checks 6–20 harness guards", () => {
     );
 
     expect(runner.match(/bun run build/g)?.length).toBe(1);
-    expect(runner).toContain("list|preflight|entry|authoritative");
+    expect(runner).toContain(
+      "list|preflight|entry|continuation|authoritative",
+    );
     expect(runner).toContain("ARGUS_GUEST_QA_ENTRY=true");
+    expect(runner).toContain("ARGUS_GUEST_QA_START_CHECK=11");
+    expect(runner).toContain(
+      "ARGUS_GUEST_QA_EVIDENCE_SEGMENT=provider-free-11-20",
+    );
     expect(runner).toContain("NEXT_PUBLIC_MOCK_AUTH=true");
     expect(runner).toContain("ARGUS_GUEST_QA_SUPABASE_WORKDIR");
     expect(runner).toContain('supabase status --workdir "$supabase_workdir"');
@@ -999,6 +1033,10 @@ describe("Checks 6–20 harness guards", () => {
     );
     expect(support).toContain("allowMockBrowserAuth?: boolean");
     expect(support).toContain('process.env.NEXT_PUBLIC_MOCK_AUTH !== "true"');
+    expect(support).toContain("Guest QA evidence segment is invalid");
+    expect(source).toContain("if (number < START_CHECK) return");
+    expect(source).toContain("seedGuestActiveConfirmationFixture");
+    expect(source).toContain("seedGuestSimulationExhaustionFixture");
     expect(entrySpec).toContain('page.route("**/api/v1/me/usage"');
     expect(entrySpec).toContain("guest_session:");
     expect(entrySpec).toContain("available_now: true");

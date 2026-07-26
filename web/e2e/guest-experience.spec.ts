@@ -47,6 +47,8 @@ import {
   safeConfirmationEvidence,
   safeScreenshot,
   sameGraphIds,
+  seedGuestActiveConfirmationFixture,
+  seedGuestSimulationExhaustionFixture,
   seedClaimGraphFromConversation,
   seedDistinctGuestConfirmation,
   strictUtcTimestampsEqual,
@@ -65,6 +67,13 @@ import {
 } from "./support/guest-qa";
 
 test.describe.configure({ mode: "serial" });
+
+const START_CHECK = (() => {
+  const value = process.env.ARGUS_GUEST_QA_START_CHECK;
+  if (value === undefined || value === "" || value === "1") return 1;
+  if (value === "11") return 11;
+  throw new Error("ARGUS_GUEST_QA_START_CHECK must be 1 or 11");
+})();
 
 type MessageList = {
   items: PersistedMessageItem[];
@@ -190,17 +199,6 @@ async function closeSearchSurface(page: Page, surface: Locator) {
   await expect(surface).toBeHidden();
 }
 
-function durableFailureMessage(page: Page) {
-  const failureText = page.getByText(
-    "Something went wrong. Your conversation is saved. Please try again.",
-    { exact: true },
-  );
-  return page
-    .locator("div.group.relative")
-    .filter({ has: failureText })
-    .first();
-}
-
 function deniedBodyContainsNoPrivatePayload(body: unknown): boolean {
   const record = recordOrEmpty(body);
   const forbiddenKeys = [
@@ -243,6 +241,7 @@ async function runStep(
   body: () => Promise<void>,
   recordCompletion = true,
 ): Promise<void> {
+  if (number < START_CHECK) return;
   const contract = GUEST_ACCEPTANCE_CHECKS[number - 1];
   setCurrent(number);
   await test.step(
@@ -304,6 +303,155 @@ test("@guest-experience exact-head 20-check matrix", async ({
 
   try {
     await backend.start(false);
+
+    if (START_CHECK === 11) {
+      await assertFreshContext(page.context());
+      evidence.fresh_context_verified = true;
+      primaryMe = await freshGuest(page, {
+        onBootstrapOwner(owner) {
+          primaryOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
+      primaryOwner = primaryMe.user.id;
+      primaryExpiry = primaryMe.guest?.expires_at ?? "";
+      disposableUserIds.add(primaryOwner);
+      evidence.owner_labels.push(evidenceLabel("owner", primaryOwner));
+
+      const sourceContext = await browser.newContext();
+      contexts.push(sourceContext);
+      await assertFreshContext(sourceContext);
+      const sourcePage = await sourceContext.newPage();
+      attachMonitor(sourcePage);
+      let sourceOwner = "";
+      const sourceMe = await freshGuest(sourcePage, {
+        onBootstrapOwner(owner) {
+          sourceOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
+      sourceOwner = sourceMe.user.id;
+      disposableUserIds.add(sourceOwner);
+      const sourceConversationResponse = await apiJson<{
+        conversation: { id: string };
+      }>(sourceContext.request, "/conversations", {
+        method: "POST",
+        data: { title: null, language: "en" },
+      });
+      expect(sourceConversationResponse.status).toBe(200);
+      const sourceConversation = sourceConversationResponse.body.conversation.id;
+      seedGuestSimulationExhaustionFixture({
+        userId: sourceOwner,
+        conversationId: sourceConversation,
+      });
+
+      const seededPrimary = seedClaimGraphFromConversation({
+        sourceOwnerId: sourceOwner,
+        sourceConversationId: sourceConversation,
+        targetOwnerId: primaryOwner,
+        includeCleanupEvidence: true,
+      });
+      primaryConversation = seededPrimary.conversationId;
+      primaryEvidenceId = seededPrimary.evidenceId;
+      evidence.conversation_labels.push(
+        evidenceLabel("conversation", primaryConversation),
+      );
+      evidence.artifact_labels.push(
+        evidenceLabel("artifact", primaryEvidenceId),
+      );
+      seedGuestActiveConfirmationFixture({
+        userId: primaryOwner,
+        conversationId: primaryConversation,
+      });
+
+      const primaryHydration = page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.status() === 200 &&
+          new URL(response.url()).pathname.endsWith(
+            `/api/v1/conversations/${primaryConversation}/messages`,
+          ),
+      );
+      await page.goto(`/chat?conversation=${primaryConversation}`, {
+        waitUntil: "domcontentloaded",
+      });
+      expect((await primaryHydration).status()).toBe(200);
+      await expect(
+        resultCard(page).getByTestId("result-equity-chart"),
+      ).toBeVisible({ timeout: 60_000 });
+
+      const primaryMessages = await apiJson<MessageList>(
+        page.context().request,
+        `/conversations/${primaryConversation}/messages?limit=100`,
+      );
+      expect(primaryMessages.status).toBe(200);
+      latestActiveConfirmationFacts = latestConfirmationFacts(
+        primaryMessages.body.items,
+      );
+      primaryResultFacts = latestResultFacts(primaryMessages.body.items);
+      primaryGraph = conversationGraph(primaryOwner, primaryConversation);
+      postResultSnapshot = ownerSnapshot(primaryOwner);
+      expect(primaryResultFacts.evidenceId).toBe(primaryEvidenceId);
+      expect(primaryGraph.runs).toHaveLength(1);
+      expect(postResultSnapshot.completed_runs).toBe(1);
+      expect(postResultSnapshot.simulation_units).toBe(1);
+      const resumedUsage = await apiJson<GuestUsage>(
+        page.context().request,
+        "/me/usage",
+      );
+      expect(resumedUsage.status).toBe(200);
+      expect(
+        resumedUsage.body.allowances.backtests.guest_session,
+      ).toMatchObject({
+        limit: 1,
+        used: 1,
+        remaining: 0,
+      });
+      evidence.simulation_usage_matches = true;
+
+      claimGuestContext = await browser.newContext();
+      contexts.push(claimGuestContext);
+      await assertFreshContext(claimGuestContext);
+      claimGuestPage = await claimGuestContext.newPage();
+      attachMonitor(claimGuestPage);
+      const claimMe = await freshGuest(claimGuestPage, {
+        onBootstrapOwner(owner) {
+          claimGuestOwner = owner;
+          disposableUserIds.add(owner);
+        },
+      });
+      claimGuestOwner = claimMe.user.id;
+      disposableUserIds.add(claimGuestOwner);
+      evidence.owner_labels.push(evidenceLabel("owner", claimGuestOwner));
+      const seededClaim = seedClaimGraphFromConversation({
+        sourceOwnerId: primaryOwner,
+        sourceConversationId: primaryConversation,
+        targetOwnerId: claimGuestOwner,
+      });
+      claimConversation = seededClaim.conversationId;
+      claimEvidenceId = seededClaim.evidenceId;
+      evidence.conversation_labels.push(
+        evidenceLabel("conversation", claimConversation),
+      );
+      evidence.artifact_labels.push(
+        evidenceLabel("artifact", claimEvidenceId),
+      );
+      const claimHydration = claimGuestPage.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.status() === 200 &&
+          new URL(response.url()).pathname.endsWith(
+            `/api/v1/conversations/${claimConversation}/messages`,
+          ),
+      );
+      await claimGuestPage.goto(`/chat?conversation=${claimConversation}`, {
+        waitUntil: "domcontentloaded",
+      });
+      expect((await claimHydration).status()).toBe(200);
+      await expect(
+        claimGuestPage.getByTestId("result-equity-chart"),
+      ).toBeVisible({ timeout: 60_000 });
+    }
 
     await runStep(
       1,
@@ -1175,7 +1323,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
           secondCard.getByText(strategySymbol, { exact: true }),
         ).toBeVisible();
         await expect(
-          secondCard.getByText(secondState.facts.benchmark, { exact: true }),
+          secondCard.getByText(`Benchmark: ${secondState.facts.benchmark}`, {
+            exact: true,
+          }),
         ).toBeVisible();
         const secondRunButton = secondCard.getByRole("button", {
           name: /Run backtest/i,
@@ -1876,6 +2026,8 @@ test("@guest-experience exact-head 20-check matrix", async ({
         const mutationsBefore = mergeMutationCounts(monitors);
         const recoveryConversation = requireConversationId(feedbackPage);
         const recoveryInput = "Test a provider-failure recovery path for QQQ";
+        const recoveryText =
+          "Something went wrong. Your conversation is saved. Please try again.";
         let chatStreamStatus = 0;
         try {
           await backend.start(false, { openRouterApiKey: "" });
@@ -1896,16 +2048,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
           await backend.start(false);
         }
         expect(chatStreamStatus).toBe(200);
-        await expect(
-          feedbackPage.getByText(
-            "Something went wrong. Your conversation is saved. Please try again.",
-          ),
-        ).toBeVisible();
-        const failureMessage = durableFailureMessage(feedbackPage);
-        await expect(failureMessage).toBeVisible();
-        const retry = failureMessage.getByRole("button", {
-          name: /Retry|Try again/i,
-        });
+        const recovery = feedbackPage
+          .getByTestId("user-turn-recovery")
+          .filter({ hasText: recoveryText });
+        await expect(recovery).toHaveCount(1);
+        await expect(recovery).toHaveText(recoveryText);
+        const retry = recovery.locator("..").getByTestId("user-turn-retry");
         await expect(retry).toHaveCount(1);
         await expect(retry).toBeVisible();
         const durableMessages = await apiJson<MessageList>(

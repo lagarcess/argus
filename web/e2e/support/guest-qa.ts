@@ -366,9 +366,40 @@ export function rekeyGuestQaConfirmationMetadata(
   const sourceConfirmationId = sourceCard.confirmation_id;
   if (
     typeof sourceConfirmationId !== "string" ||
-    !sourceConfirmationId.trim() ||
-    sourcePayload.confirmation_id !== sourceConfirmationId ||
-    sourcePayload.artifact_id !== sourceConfirmationId
+    !sourceConfirmationId.trim()
+  ) {
+    throw new Error("Guest QA confirmation identity mismatch");
+  }
+  const sourceActions = Array.isArray(sourceCard.actions)
+    ? sourceCard.actions
+    : [];
+  const sourceRunActions = sourceActions
+    .map(recordOrEmpty)
+    .filter((action) => action.type === "run_backtest");
+  if (sourceRunActions.length !== 1) {
+    throw new Error("Guest QA confirmation must contain one typed run action");
+  }
+  const sourceRunPayload = recordOrEmpty(sourceRunActions[0]?.payload);
+  const activeReference = recordOrEmpty(metadata.active_confirmation_reference);
+  const activeReferenceMetadata = recordOrEmpty(activeReference.metadata);
+  const artifactReferences = Array.isArray(metadata.artifact_references)
+    ? metadata.artifact_references.map(recordOrEmpty)
+    : [];
+  const payloadConfirmationId = sourcePayload.confirmation_id;
+  const payloadArtifactId = sourcePayload.artifact_id;
+  const runArtifactId = sourceRunPayload.artifact_id;
+  if (
+    (payloadConfirmationId !== undefined &&
+      payloadConfirmationId !== sourceConfirmationId) ||
+    (payloadArtifactId !== undefined &&
+      payloadArtifactId !== sourceConfirmationId) ||
+    sourceRunPayload.confirmation_id !== sourceConfirmationId ||
+    (runArtifactId !== undefined && runArtifactId !== sourceConfirmationId) ||
+    activeReference.artifact_id !== sourceConfirmationId ||
+    activeReferenceMetadata.confirmation_id !== sourceConfirmationId ||
+    !artifactReferences.some(
+      (reference) => reference.artifact_id === sourceConfirmationId,
+    )
   ) {
     throw new Error("Guest QA confirmation identity mismatch");
   }
@@ -398,20 +429,15 @@ export function rekeyGuestQaConfirmationMetadata(
   >;
   const card = recordOrEmpty(clone.confirmation_card);
   const actions = Array.isArray(card.actions) ? card.actions : [];
-  let runActions = 0;
   card.confirmation_state = "active";
   card.actions = actions.map((value) => {
     const action = recordOrEmpty(value);
     if (action.type !== "run_backtest") return action;
-    runActions += 1;
     const payload = recordOrEmpty(action.payload);
     payload.idempotency_key = nextConfirmationId;
     action.payload = payload;
     return action;
   });
-  if (runActions !== 1) {
-    throw new Error("Guest QA confirmation must contain one typed run action");
-  }
   clone.confirmation_card = card;
   return clone;
 }
@@ -1475,7 +1501,53 @@ export function seedGuestSimulationExhaustionFixture(params: {
   const strategyId = randomUUID();
   const runId = randomUUID();
   const sourceMessageId = randomUUID();
+  const resultMessageId = randomUUID();
   const confirmationId = `confirmation-${randomUUID()}`;
+  const resultCard = {
+    title: "MSFT buy and hold",
+    symbols: ["MSFT"],
+    strategy_label: "Buy and hold",
+    asset_class: "equity",
+    date_range: {
+      start: "2025-07-25",
+      end: "2026-07-24",
+      display: "July 25, 2025 to July 24, 2026",
+    },
+    status_label: "Simulation Complete",
+    rows: [
+      { key: "ending_value", label: "Ending value", value: "$11,120" },
+      { key: "total_return_pct", label: "Total return", value: "+11.2%" },
+      {
+        key: "benchmark_delta_pct",
+        label: "Vs benchmark",
+        value: "+2.1 pts",
+      },
+      {
+        key: "max_drawdown_pct",
+        label: "Max drawdown",
+        value: "-7.4%",
+      },
+    ],
+    assumptions: [
+      "$10,000 starting capital",
+      "Long-only, equal-weight run",
+      "No fees or slippage",
+      "Benchmark: SPY",
+    ],
+    actions: [],
+    chart: {
+      kind: "portfolio_equity",
+      currency: "USD",
+      base_value: 10_000,
+      series: [
+        { time: "2025-07-25", value: 10_000 },
+        { time: "2025-10-24", value: 10_380 },
+        { time: "2026-01-23", value: 10_120 },
+        { time: "2026-04-24", value: 10_760 },
+        { time: "2026-07-24", value: 11_120 },
+      ],
+    },
+  };
   const metadata = {
     confirmation_payload: {
       confirmation_id: confirmationId,
@@ -1532,6 +1604,10 @@ export function seedGuestSimulationExhaustionFixture(params: {
     JSON.stringify(metadata),
     "utf8",
   ).toString("base64");
+  const encodedResultCard = Buffer.from(
+    JSON.stringify(resultCard),
+    "utf8",
+  ).toString("base64");
   const seeded = psqlJson<{ ok: boolean }>(`
     with active_owner as (
       select workspace.created_at, workspace.expires_at
@@ -1566,12 +1642,15 @@ export function seedGuestSimulationExhaustionFixture(params: {
       select
         '${runId}', '${owner}', '${conversation}', '${strategyId}',
         'completed', 'equity', array['MSFT']::text[], 'SPY',
-        '{}'::jsonb,
         jsonb_build_object(
-          'status', 'completed',
+          'template', 'buy_and_hold',
           'symbols', jsonb_build_array('MSFT'),
           'benchmark_symbol', 'SPY'
-        )
+        ),
+        convert_from(
+          decode('${encodedResultCard}', 'base64'),
+          'UTF8'
+        )::jsonb
       from inserted_strategy
       returning 1
     ),
@@ -1586,6 +1665,27 @@ export function seedGuestSimulationExhaustionFixture(params: {
       from inserted_run
       returning 1
     ),
+    inserted_result as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata
+      )
+      select
+        '${resultMessageId}', '${conversation}', '${owner}', 'assistant',
+        'The local QA simulation completed.',
+        jsonb_build_object(
+          'result_run_id', '${runId}',
+          'latest_run_id', '${runId}',
+          'result_strategy_id', '${strategyId}',
+          'result_conversation_id', '${conversation}',
+          'result_card',
+            convert_from(
+              decode('${encodedResultCard}', 'base64'),
+              'UTF8'
+            )::jsonb
+        )
+      from inserted_source
+      returning 1
+    ),
     inserted_usage as (
       insert into public.usage_counters (
         user_id, resource, period, period_start, period_end,
@@ -1595,7 +1695,7 @@ export function seedGuestSimulationExhaustionFixture(params: {
         '${owner}', 'backtest_runs', 'guest_session',
         active_owner.created_at, active_owner.expires_at, 1, 1
       from active_owner
-      cross join inserted_source
+      cross join inserted_result
       returning 1
     )
     select json_build_object(
@@ -1610,6 +1710,167 @@ export function seedGuestSimulationExhaustionFixture(params: {
     throw new Error("Guest simulation exhaustion fixture was incomplete");
   }
   return { sourceMessageId, confirmationId };
+}
+
+export function seedGuestActiveConfirmationFixture(params: {
+  userId: string;
+  conversationId: string;
+}): {
+  messageId: string;
+  confirmationId: string;
+} {
+  const owner = requireUuid(params.userId, "confirmation fixture owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "confirmation fixture conversation",
+  );
+  const messageId = randomUUID();
+  const confirmationId = `confirmation-${randomUUID()}`;
+  const actionPayload = {
+    confirmation_id: confirmationId,
+    artifact_id: confirmationId,
+    conversation_id: conversation,
+  };
+  const metadata = {
+    confirmation_payload: {
+      strategy: {
+        strategy_type: "buy_and_hold",
+        strategy_thesis: "Buy and hold Microsoft.",
+        asset_universe: ["MSFT"],
+        asset_class: "equity",
+        date_range: {
+          start: "2025-07-28",
+          end: "2026-07-24",
+        },
+      },
+      optional_parameters: {},
+      launch_payload: {
+        strategy_type: "buy_and_hold",
+        symbol: "MSFT",
+        symbols: ["MSFT"],
+        timeframe: "1D",
+        date_range: {
+          start: "2025-07-28",
+          end: "2026-07-24",
+        },
+        requested_date_range: {
+          start: "2025-07-26",
+          end: "2026-07-26",
+        },
+        benchmark_symbol: "SPY",
+        language: "en",
+      },
+      validation: {
+        status: "ready_to_run",
+        executable: true,
+      },
+    },
+    confirmation_card: {
+      confirmation_id: confirmationId,
+      confirmation_state: "active",
+      status: "ready_to_run",
+      title: "MSFT buy and hold",
+      rows: [
+        { key: "strategy", label: "Strategy", value: "Buy and hold" },
+        { key: "assets", label: "Assets", value: "MSFT" },
+        {
+          key: "period",
+          label: "Period",
+          value: "July 28, 2025 to July 24, 2026",
+        },
+      ],
+      display_facts: {
+        timeframe: "1D",
+        benchmark_symbol: "SPY",
+      },
+      assumptions: ["Benchmark: SPY"],
+      actions: [
+        {
+          id: "run-backtest",
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: actionPayload,
+        },
+      ],
+    },
+    active_confirmation_reference: {
+      artifact_kind: "confirmation",
+      artifact_id: confirmationId,
+      artifact_status: "active",
+      metadata: {
+        confirmation_id: confirmationId,
+        artifact_type: "confirmation",
+      },
+    },
+    artifact_references: [
+      {
+        artifact_kind: "confirmation",
+        artifact_id: confirmationId,
+        artifact_status: "active",
+        metadata: {
+          confirmation_id: confirmationId,
+          artifact_type: "confirmation",
+        },
+      },
+    ],
+  };
+  const encodedMetadata = Buffer.from(
+    JSON.stringify(metadata),
+    "utf8",
+  ).toString("base64");
+  const seeded = psqlJson<{ inserted: boolean }>(`
+    with active_owner as (
+      select 1
+      from public.guest_workspaces as workspace
+      join auth.users as auth_user on auth_user.id = workspace.user_id
+      join public.conversations as conversation
+        on conversation.id = workspace.conversation_id
+       and conversation.user_id = workspace.user_id
+      where workspace.user_id = '${owner}'
+        and workspace.conversation_id = '${conversation}'
+        and workspace.status = 'active'
+        and workspace.expires_at > now()
+        and auth_user.is_anonymous
+        and (
+          select count(*)
+          from public.backtest_runs
+          where user_id = '${owner}'
+            and conversation_id = '${conversation}'
+            and status = 'completed'
+        ) = 1
+        and coalesce((
+          select sum(used_count)
+          from public.usage_counters
+          where user_id = '${owner}'
+            and resource = 'backtest_runs'
+        ), 0) = 1
+    ),
+    inserted_confirmation as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        '${messageId}', '${conversation}', '${owner}', 'assistant',
+        'A deterministic local QA confirmation is ready.',
+        convert_from(decode('${encodedMetadata}', 'base64'), 'UTF8')::jsonb,
+        (
+          select coalesce(max(created_at), now()) + interval '1 millisecond'
+          from public.messages
+          where conversation_id = '${conversation}'
+        )
+      from active_owner
+      returning 1
+    )
+    select json_build_object(
+      'inserted',
+      exists(select 1 from inserted_confirmation)
+    )::text
+  `);
+  if (!seeded.inserted) {
+    throw new Error("Active guest confirmation fixture was not inserted");
+  }
+  return { messageId, confirmationId };
 }
 
 export function seedClaimSourceResultFixture(params: {
@@ -2585,12 +2846,17 @@ export class BrowserSafetyMonitor {
 }
 
 function evidenceDirectory(): string {
+  const segment =
+    process.env.ARGUS_GUEST_QA_EVIDENCE_SEGMENT?.trim() || "authoritative";
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(segment)) {
+    throw new Error("Guest QA evidence segment is invalid");
+  }
   const directory = path.join(
     REPOSITORY_ROOT,
     "temp",
     "qa-evidence-guest",
     requireCandidateSha(),
-    "authoritative",
+    segment,
   );
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   chmodSync(directory, 0o700);

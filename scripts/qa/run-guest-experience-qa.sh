@@ -7,9 +7,9 @@ cd "$ROOT_DIR"
 
 mode="${1:-}"
 case "$mode" in
-  list|preflight|entry|authoritative) ;;
+  list|preflight|entry|continuation|authoritative) ;;
   *)
-    echo "usage: scripts/qa/run-guest-experience-qa.sh list|preflight|entry|authoritative" >&2
+    echo "usage: scripts/qa/run-guest-experience-qa.sh list|preflight|entry|continuation|authoritative" >&2
     exit 2
     ;;
 esac
@@ -217,21 +217,36 @@ if [ "$mode" = "authoritative" ]; then
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=true
   unset ARGUS_GUEST_QA_ENTRY || true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
+  unset ARGUS_GUEST_QA_START_CHECK || true
+  unset ARGUS_GUEST_QA_EVIDENCE_SEGMENT || true
+  build_frontend
+elif [ "$mode" = "continuation" ]; then
+  export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=true
+  export ARGUS_GUEST_QA_START_CHECK=11
+  export ARGUS_GUEST_QA_EVIDENCE_SEGMENT=provider-free-11-20
+  unset ARGUS_GUEST_QA_ENTRY || true
+  unset ARGUS_GUEST_QA_PREFLIGHT || true
   build_frontend
 elif [ "$mode" = "entry" ]; then
   export ARGUS_GUEST_QA_ENTRY=true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
   export NEXT_PUBLIC_MOCK_AUTH=true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
+  unset ARGUS_GUEST_QA_START_CHECK || true
+  unset ARGUS_GUEST_QA_EVIDENCE_SEGMENT || true
   build_frontend
 elif [ "$mode" = "preflight" ]; then
   export ARGUS_GUEST_QA_PREFLIGHT=true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
   unset ARGUS_GUEST_QA_ENTRY || true
+  unset ARGUS_GUEST_QA_START_CHECK || true
+  unset ARGUS_GUEST_QA_EVIDENCE_SEGMENT || true
   build_frontend
 else
   unset ARGUS_GUEST_QA_ENTRY || true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
+  unset ARGUS_GUEST_QA_START_CHECK || true
+  unset ARGUS_GUEST_QA_EVIDENCE_SEGMENT || true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
 fi
 
