@@ -12,6 +12,7 @@ export type ConfirmationActionEffect = {
   confirmationId?: string;
   status?: StrategyConfirmationStatus;
   statusLabel: string;
+  settlesRejectedStaleAction?: boolean;
 };
 
 export type ConsumedResultAction = {
@@ -43,6 +44,7 @@ const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "not_completed",
   "run_complete",
 ]);
+const STALE_CONFIRMATION_RECOVERY_CODE = "confirmation_action_stale_card";
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
@@ -101,24 +103,29 @@ export function confirmationActionEffectsFromApi(items: ApiMessage[]) {
   const hiddenMessageIds = new Set<string>();
   for (const item of items) {
     const metadata = item.metadata ?? {};
-    if (metadata.recovery_reason) {
-      continue;
-    }
     const action = chatActionFromMetadata(metadata);
     const effect = confirmationActionEffectFromAction(action);
     if (!effect) {
       continue;
     }
+    const staleRecoveryEffect =
+      item.role === "assistant" &&
+      recoveryCodeFromMetadata(metadata) === STALE_CONFIRMATION_RECOVERY_CODE
+        ? rejectedStaleActionEffect(effect)
+        : null;
+    if (metadata.recovery_reason && !staleRecoveryEffect) {
+      continue;
+    }
     const failedAction = recordOrNull(metadata.failed_action);
     const authoritativeEffect =
-      item.role === "assistant" &&
-      failedAction?.action_type === action?.type
+      staleRecoveryEffect ??
+      (item.role === "assistant" && failedAction?.action_type === action?.type
         ? {
             ...effect,
             status: "could_not_run" as const,
             statusLabel: confirmationStatusLabel("could_not_run"),
           }
-        : effect;
+        : effect);
     effects.push(authoritativeEffect);
     if (effect.type === "cancel_confirmation") {
       hiddenMessageIds.add(item.id);
@@ -241,14 +248,23 @@ export function applyConfirmationActionEffects(
       return message;
     }
     const confirmationId = message.confirmation.confirmation_id;
+    const effect = strongestEffectForConfirmation(confirmationId, effects);
+    if (!effect) {
+      return message;
+    }
     if (
-      message.confirmation.confirmation_state &&
-      message.confirmation.confirmation_state !== "active"
+      effect.settlesRejectedStaleAction &&
+      (!confirmationId ||
+        !effect.confirmationId ||
+        confirmationId !== effect.confirmationId)
     ) {
       return message;
     }
-    const effect = strongestEffectForConfirmation(confirmationId, effects);
-    if (!effect) {
+    if (
+      message.confirmation.confirmation_state &&
+      message.confirmation.confirmation_state !== "active" &&
+      !effect.settlesRejectedStaleAction
+    ) {
       return message;
     }
     return closeConfirmationForAction(message, effect);
@@ -468,8 +484,16 @@ export function settleOpenConfirmationsAfterTextFinal(
     recoveryCode?: string | null;
   },
 ): Message[] {
-  if (recoveryCode === "confirmation_action_stale_card") {
-    return messages;
+  if (recoveryCode === STALE_CONFIRMATION_RECOVERY_CODE) {
+    const effect = confirmationActionEffectFromAction(action);
+    if (!effect) {
+      return messages;
+    }
+    return normalizeConfirmationHistory(
+      applyConfirmationActionEffects(messages, [
+        rejectedStaleActionEffect(effect),
+      ]),
+    );
   }
   const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
   const hasFailedActionFinal =
@@ -498,11 +522,21 @@ export function settleOpenConfirmationsAfterStreamError(
 export function settleConfirmationAfterActionTransportError(
   messages: Message[],
   action: ChatActionOption | undefined,
-  options: { durableStateUnknown?: boolean } = {},
+  options: {
+    durableStateUnknown?: boolean;
+    rejectionCode?: string | null;
+  } = {},
 ): Message[] {
   const effect = confirmationActionEffectFromAction(action);
   if (!effect) {
     return messages;
+  }
+  if (isStaleConfirmationActionRejectionCode(options.rejectionCode)) {
+    return normalizeConfirmationHistory(
+      applyConfirmationActionEffects(messages, [
+        rejectedStaleActionEffect(effect),
+      ]),
+    );
   }
   if (effect.type === "run_backtest" && options.durableStateUnknown) {
     return messages;
@@ -608,6 +642,29 @@ function confirmationTextFinalStatus(
     return "could_not_run";
   }
   return confirmationActionStatus(action);
+}
+
+function rejectedStaleActionEffect(
+  effect: ConfirmationActionEffect,
+): ConfirmationActionEffect {
+  return {
+    ...effect,
+    status: "updated",
+    statusLabel: confirmationStatusLabel("updated"),
+    settlesRejectedStaleAction: true,
+  };
+}
+
+export function isStaleConfirmationActionRejectionCode(
+  value: unknown,
+): value is typeof STALE_CONFIRMATION_RECOVERY_CODE {
+  return value === STALE_CONFIRMATION_RECOVERY_CODE;
+}
+
+function recoveryCodeFromMetadata(
+  metadata: Record<string, unknown>,
+): string | null {
+  return stringOrNull(recordOrNull(metadata.recovery)?.code);
 }
 
 function isFailedActionRetry(action: ChatActionOption | undefined) {

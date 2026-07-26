@@ -1,6 +1,16 @@
 # Guest post-integration runtime regression observation
 
-Status: **OPEN DIAGNOSIS — GUEST PUBLICATION STOPPED — NO FIX AUTHORIZED**
+Status: **HISTORICAL DIAGNOSIS — ROOT CAUSE PROVEN GUEST-ONLY; FIX CARRIED BY
+PR #279**
+
+Disposition (2026-07-26): issue #269 proved that the seven receipts belonged to
+two Guest requests, not one exhausted runtime turn. The failure occurred after
+successful interpretation when Guest terminal settlement tried to serialize a
+mapping-shaped `guest_session` allowance as a tuple. Guest commit `5adff1f4`
+uses the existing allowance serializer and owns the focused correction.
+Integration runtime policy, the seven-call allowance, fallback accounting, and
+provider routing require no change. This report remains at its original path
+for evidence lineage; use issue #269 and PR #279 for current status.
 
 - Recorded: 2026-07-25
 - Stable integration checkpoint: `b7fd6f08c2fb28166bc67a808ffdad0d65164f06`
@@ -38,9 +48,11 @@ The guest agent reported the following green evidence at the same candidate:
 - focused backend reconciliation: 480 passed; and
 - production build, TypeScript, Ruff, and diff checks passed.
 
-The current remote safekeeping ref matches local guest head `3f8e61a5`. No guest
-PR, merge, deployment, feature activation, or tester exposure is authorized
-while this diagnosis remains open.
+The original remote safekeeping ref matched local guest head `3f8e61a5`.
+Publication later moved to PR #279, which must preserve `5adff1f4`, resolve its
+current review/integration conflicts, and repeat the relevant Guest acceptance
+before landing. No deployment, feature activation, or tester exposure is
+claimed here.
 
 ## What the seven receipts do and do not prove
 
@@ -61,9 +73,10 @@ provider attempt should emit a separate skipped receipt with
 Do not increase the allowance, change fallback policy, or weaken no-progress
 behavior merely because the count equals seven.
 
-## Attribution limits
+## Historical attribution limits
 
-Pure integration at `b7fd6f08` has completed real-provider turns and the
+At the time of observation, pure integration at `b7fd6f08` had completed
+real-provider turns and the
 same-conversation stress journey recorded in
 [the Always Progresses stress audit](2026-07-25-always-progresses-post-merge-stress-audit.md).
 The guest branch is not byte-identical to integration when its public flags are
@@ -77,28 +90,24 @@ The failure may therefore be:
 3. provider instability exposing a bounded fallback edge; or
 4. a configuration-propagation mismatch.
 
-No category is accepted without exact evidence.
+No category was accepted until the exact evidence below completed.
 
-## Bounded next proof
+## Completed bounded proof
 
-Use the same user prompt, identity class, provider configuration, runtime flags,
-and isolated infrastructure on:
+The completed #269 proof compared the retained Guest evidence with exact
+integration head `88ae8c77`, then traced the terminal boundary:
 
-1. pure integration `b7fd6f08`; and
-2. guest `3f8e61a5` with guest flags disabled.
+- the integration starter completed without a call-ceiling failure;
+- the seven retained receipts came from two anonymous Guest requests;
+- no `turn_call_allowance_exhausted` receipt or legitimate eighth attempt
+  existed; and
+- Guest finalization raised while tuple-unpacking a mapping-shaped
+  `guest_session` allowance before terminal persistence.
 
-Reuse existing receipts when sufficient. At most one additional reproduction is
-permitted solely to close an evidence gap.
-
-- If integration reproduces, a runtime-owner branch makes the smallest
-  correction and proves the exact journey.
-- If only guest reproduces, the guest lane owns the correction.
-- If neither reproduces and the evidence isolates transient provider failure,
-  record the incident without changing runtime policy.
-
-Guest implementation must not absorb a speculative runtime fix. Grounded
-discovery and other provider-facing runtime work must preserve this regression
-as a focused check, not restart a broad continuity audit.
+Guest commit `5adff1f4` applies the existing serializer to that shape. PR #279
+must retain the regression and repeat integrated Guest acceptance. Grounded
+discovery and other provider-facing runtime work may retain this journey as a
+focused regression, but must not restart a broad continuity audit.
 
 ## Separate presentation observation
 

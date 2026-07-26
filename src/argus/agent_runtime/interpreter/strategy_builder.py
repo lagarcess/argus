@@ -44,6 +44,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
+    executable_strategy_template_from_typed_rules,
     executable_strategy_type,
     normalize_date_range_candidate,
 )
@@ -425,9 +426,7 @@ def _current_turn_names_foreign_ticker(
     except Exception:
         return False
     return any(
-        _compact_asset_evidence_token(
-            getattr(mention.asset, "canonical_symbol", None)
-        )
+        _compact_asset_evidence_token(getattr(mention.asset, "canonical_symbol", None))
         not in prior_symbols
         for mention in mentions
     )
@@ -735,6 +734,8 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
     rule_spec = executable_rule_spec_from_strategy(strategy)
     if entry_rule is None and rule_spec is None:
         return
+    if strategy.rule_spec is None:
+        strategy.rule_spec = rule_spec
     if strategy.entry_rule is None:
         strategy.entry_rule = entry_rule
     if strategy.exit_rule is None:
@@ -757,6 +758,10 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
         exit_text
         or moving_average_crossover_text(strategy.exit_rule)
         or strategy.exit_logic
+    )
+    strategy.requested_strategy_template = (
+        strategy.requested_strategy_template
+        or executable_strategy_template_from_typed_rules(strategy)
     )
 
 

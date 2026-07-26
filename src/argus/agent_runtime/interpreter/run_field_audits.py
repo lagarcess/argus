@@ -52,6 +52,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
 )
 from argus.agent_runtime.result_followups import result_followup_fact_bank
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
 )
@@ -59,10 +60,12 @@ from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
+    executable_strategy_type,
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 from argus.nlp.natural_time import resolve_date_range_intent
 
 
@@ -74,10 +77,16 @@ def _structured_supported_strategy_capability_conflict_fallback(
     if not response_has_only_unsupported_strategy_logic_constraints(response):
         return None
     draft = response.candidate_strategy_draft
-    strategy_type = canonical_strategy_type(draft.strategy_type)
-    if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in {
+        "buy_and_hold",
+        "dca_accumulation",
+        "signal_strategy",
+    }:
         return None
-    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+    if strategy_type in {"buy_and_hold", "dca_accumulation"} and (
+        _llm_strategy_draft_has_rule_or_indicator_fields(draft)
+    ):
         return None
     if not (draft.asset_universe or draft.asset_class):
         return None
@@ -92,6 +101,12 @@ def _structured_supported_strategy_capability_conflict_fallback(
         or draft.capital_amount is not None
         or draft.total_capital is not None
         or draft.initial_capital is not None
+    ):
+        return None
+    if strategy_type == "signal_strategy" and not (
+        draft.requested_strategy_template in EXECUTABLE_TEMPLATES
+        and executable_rule_spec_from_strategy(draft.model_dump(mode="python"))
+        is not None
     ):
         return None
     repaired = _response_with_supported_strategy_capability_conflict_removed(
@@ -131,9 +146,10 @@ def _response_needs_supported_strategy_capability_conflict_audit(
     if not has_unsupported_strategy_logic:
         return response_needs_inverse_capability_conflict_audit(response)
     draft = response.candidate_strategy_draft
-    if canonical_strategy_type(draft.strategy_type) in {
+    if executable_strategy_type(draft.model_dump(mode="python")) in {
         "buy_and_hold",
         "dca_accumulation",
+        "signal_strategy",
     }:
         return True
     if response.semantic_turn_act != "unsupported_request":
@@ -319,18 +335,15 @@ def _response_from_current_message_run_field_contract(
     )
     if date_range is None:
         return None
-    if (
-        date_range is not None
-        and (
-            _draft_date_range_needs_stated_run_field_audit(
-                draft,
-                current_message=current_message,
-            )
-            or _response_needs_current_message_date_repair(
-                response=repaired,
-                current_message=current_message,
-                language=request.user.language_preference,
-            )
+    if date_range is not None and (
+        _draft_date_range_needs_stated_run_field_audit(
+            draft,
+            current_message=current_message,
+        )
+        or _response_needs_current_message_date_repair(
+            response=repaired,
+            current_message=current_message,
+            language=request.user.language_preference,
         )
     ):
         draft.date_range = date_range
@@ -402,9 +415,7 @@ def _response_with_resolved_runtime_date_range(
     if date_range is None:
         return response
     draft = response.candidate_strategy_draft
-    if _normalized_stated_field(draft.date_range) == _normalized_stated_field(
-        date_range
-    ):
+    if _normalized_stated_field(draft.date_range) == _normalized_stated_field(date_range):
         return response
     repaired = response.model_copy(deep=True)
     repaired.candidate_strategy_draft.date_range = date_range
@@ -460,11 +471,9 @@ def _resolved_runtime_date_range_from_draft(
                     request=request,
                 )
             )
-            if (
-                current_message_range is not None
-                and _normalized_stated_field(resolved.payload)
-                != _normalized_stated_field(current_message_range)
-            ):
+            if current_message_range is not None and _normalized_stated_field(
+                resolved.payload
+            ) != _normalized_stated_field(current_message_range):
                 return current_message_range
             return resolved.payload
     return _date_range_from_intent_or_bounded_evidence(
@@ -525,9 +534,10 @@ def _pending_dca_assumption_reply_needs_stated_run_field_audit(
     )
     if requested_field != "assumption":
         return False
-    return canonical_strategy_type(
-        response.candidate_strategy_draft.strategy_type
-    ) == "dca_accumulation"
+    return (
+        canonical_strategy_type(response.candidate_strategy_draft.strategy_type)
+        == "dca_accumulation"
+    )
 
 
 def _focused_repair_capital_needs_stated_run_field_audit(
@@ -554,7 +564,9 @@ def _draft_capital_needs_stated_run_field_audit(
         return False
     if _text_contains_capital_audit_signal(current_message, draft=draft):
         return True
-    return draft.capital_amount is None and _draft_contains_structured_capital_context(draft)
+    return draft.capital_amount is None and _draft_contains_structured_capital_context(
+        draft
+    )
 
 
 def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
@@ -566,11 +578,7 @@ def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
         candidate = token.strip().lstrip("$")
         if not candidate:
             continue
-        compact = "".join(
-            character
-            for character in candidate
-            if character.isalnum()
-        )
+        compact = "".join(character for character in candidate if character.isalnum())
         if len(compact) < 2 or not any(character.isalpha() for character in compact):
             continue
         previous = tokens[index - 1].strip().casefold() if index > 0 else ""
@@ -580,8 +588,7 @@ def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
             and len(compact) <= 5
         )
         if not (
-            _asset_recovery_query_is_explicit_ticker(token)
-            or is_cued_lowercase_ticker
+            _asset_recovery_query_is_explicit_ticker(token) or is_cued_lowercase_ticker
         ):
             continue
         normalized = candidate.upper()
@@ -608,8 +615,9 @@ def _response_needs_current_message_date_repair(
         return True
     if _response_has_pending_base_field(response, "date_range"):
         return True
-    return response.requires_clarification and _llm_strategy_draft_has_concrete_execution_target(
-        draft
+    return (
+        response.requires_clarification
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
     )
 
 
@@ -693,9 +701,8 @@ def _draft_date_range_needs_stated_run_field_audit(
         != _normalized_stated_field(current_message_range)
     ):
         return True
-    if (
-        current_message_range is None
-        and _draft_date_range_has_unstated_current_endpoint(draft.date_range)
+    if current_message_range is None and _draft_date_range_has_unstated_current_endpoint(
+        draft.date_range
     ):
         return True
     if has_partial_explicit_date_range(draft.date_range):
@@ -704,7 +711,9 @@ def _draft_date_range_needs_stated_run_field_audit(
         )
     if isinstance(draft.date_range, str) and current_message_range is not None:
         normalized_range = draft.date_range.strip().casefold()
-        return bool(normalized_range and normalized_range not in current_message.casefold())
+        return bool(
+            normalized_range and normalized_range not in current_message.casefold()
+        )
     return False
 
 
@@ -859,10 +868,7 @@ def _response_needs_latest_result_routing_audit(
         return True
     return bool(
         response.capability_question_focus is not None
-        or (
-            response.task_relation == "continue"
-            and response.assistant_response is None
-        )
+        or (response.task_relation == "continue" and response.assistant_response is None)
     )
 
 

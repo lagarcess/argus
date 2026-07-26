@@ -18,16 +18,19 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-25
+## Active Post-Promotion Pointer — 2026-07-26
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `b7fd6f08`.
+`main` at `217ead12`. The current stable integration checkpoint is `b80d95a2`.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
 #259, #266, and #268, plus the bounded calendar-materiality correction from
-PR #267. This pointer does not claim that the integration checkpoint is
-deployed or exposed to testers.
+PR #267. It also contains the bounded chat-header correction from PR #274,
+explicit onboarding removal from PR #275, and stale Run settlement from PR
+#277, plus supported strategy-transition preservation from PR #278. This
+pointer does not claim that the integration checkpoint is deployed or exposed
+to testers.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
@@ -917,8 +920,14 @@ above remains valid, but a longer same-conversation exploration at integration
 SHA `b7fd6f08` exposed untriaged gaps in cost preservation, stale-action
 presentation, fact-preserving recovery, supported strategy transitions, and
 recovery-heading ownership. Quick take voice variance and one provider-timeout
-fallback were recorded separately from confirmed continuity defects. No fix or
-GitHub issue is authorized by this note. See
+fallback were recorded separately from confirmed continuity defects. Those
+observations are now owner-bounded as #269-#273 and updated #249. Stale-action
+settlement (#273) is complete through PR #277 at `2d5a2b52`; #269 was
+classified as a Guest-only settlement defect and is carried by Guest PR #279.
+Supported strategy-transition preservation (#270) is complete through PR #278
+at `b80d95a2`; #271 is now the next protected interpreter/edit-spine issue,
+#272 remains serialized after it, and #249 waits for the overlapping Guest
+shell to land. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)

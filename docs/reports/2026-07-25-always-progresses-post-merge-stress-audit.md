@@ -1,6 +1,14 @@
 # Always Progresses post-merge same-conversation stress audit
 
-Status: **OPEN OBSERVATION LOG — NO FIX OR GITHUB ISSUE AUTHORIZED**
+Status: **HISTORICAL INTAKE EVIDENCE — FINDINGS ROUTED TO OWNERS**
+
+Disposition (2026-07-26): this audit produced the bounded ownership queues now
+recorded in the interim roadmap. #269 is proven Guest-only and carried by PR
+#279; #270 is complete after PR #278 landed as `b80d95a2`; #271 is next and
+#272 follows serially; #273 is closed after PR #277 landed as `2d5a2b52`; and
+updated #249 owns the remaining result/recovery presentation concerns. This
+report remains at its original path because issues and PRs cite its exact
+observations. It is not an active implementation plan.
 
 - Recorded: 2026-07-25
 - Integration branch: `codex/private-alpha-next`
@@ -11,13 +19,14 @@ Status: **OPEN OBSERVATION LOG — NO FIX OR GITHUB ISSUE AUTHORIZED**
 
 This report is the issue-intake precursor for the founder-visible stress test
 performed after PR #268 landed. It records what worked, what failed, and what
-remains uncertain. It deliberately proposes no implementation and creates no
-GitHub issue.
+remained uncertain at capture time. It deliberately proposed no implementation
+itself; the later ownership pass created #269-#273 and updated #249.
 
 A later guest-lane reconciliation found a separate ordinary-starter runtime
-failure after merging the integration checkpoint. That unclassified signal,
-including the bounded integration-versus-guest diagnosis, lives in
-[the guest post-integration runtime observation](2026-07-25-guest-post-integration-runtime-regression.md).
+failure after merging the integration checkpoint. That signal was later
+classified as Guest-only terminal-settlement serialization in #269. Its
+original observation and bounded proof live in
+[`2026-07-25-guest-post-integration-runtime-regression.md`](2026-07-25-guest-post-integration-runtime-regression.md).
 It is not evidence that every finding in this report shares one cause.
 
 ## Executive verdict
@@ -306,24 +315,25 @@ not yet prove every behavior was introduced by PR #268.
 - Screenshots support visible UX findings but do not establish accessibility
   compliance.
 
-Until that comparison exists, future issues should say **observed after the
-Always Progresses integration**, not **introduced by Always Progresses**.
+The resulting issue bodies therefore say **observed after the Always Progresses
+integration**, not **introduced by Always Progresses**, unless later bounded
+evidence proves causality.
 
-## Proposed issue-intake groups
+## Completed issue-intake mapping
 
-No GitHub issue is created by this report. When the founder is ready, the
-findings should be triaged into coherent ownership groups:
+The later ownership pass routed the findings without turning this report into a
+single implementation lane:
 
-1. **Durable assumption preservation** — AP-STRESS-01.
-2. **Artifact action reconciliation and truthful status** — AP-STRESS-02.
-3. **Semantic continuation and strategy transitions** — AP-STRESS-03 and
-   AP-STRESS-04.
+1. **Durable assumption preservation** — AP-STRESS-01 is #271, serialized after
+   completed #270.
+2. **Artifact action reconciliation and truthful status** — AP-STRESS-02 was
+   #273 and is complete through PR #277 at `2d5a2b52`.
+3. **Semantic continuation and strategy transitions** — AP-STRESS-04 and the
+   semantic part of AP-STRESS-06 were completed by #270; AP-STRESS-03 is #272.
 4. **Recovery voice and heading ownership** — AP-STRESS-05 and the formatting
-   part of AP-STRESS-06.
-5. **Interpreter clarification correctness** — the semantic part of
-   AP-STRESS-06.
-6. **Result voice quality observation** — AP-STRESS-07, retained separately
-   unless repeated evidence proves a product regression.
+   part of AP-STRESS-06 are recorded in updated #249.
+5. **Result voice quality observation** — AP-STRESS-07 remains an observation
+   inside #249 rather than a separate blocker.
 
 ## Recommended acceptance surface before issue closure
 

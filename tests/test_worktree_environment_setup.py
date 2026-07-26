@@ -76,14 +76,19 @@ def _run_helper(
     target: Path,
     *,
     canonical_override: Path | None = None,
+    check_only: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env.pop("ARGUS_CANONICAL_WORKTREE_ROOT", None)
     if canonical_override is not None:
         env["ARGUS_CANONICAL_WORKTREE_ROOT"] = str(canonical_override)
 
+    command = ["bash", str(HELPER)]
+    if check_only:
+        command.append("--check")
+    command.append(str(target))
     return subprocess.run(
-        ["bash", str(HELPER), str(target)],
+        command,
         cwd=target,
         env=env,
         capture_output=True,
@@ -130,9 +135,7 @@ def test_links_missing_environment_files_from_integration_worktree(
     assert (worker / ".env").is_symlink()
     assert (worker / "web" / ".env.local").is_symlink()
     assert (worker / ".env").resolve() == canonical / ".env"
-    assert (worker / "web" / ".env.local").resolve() == (
-        canonical / "web" / ".env.local"
-    )
+    assert (worker / "web" / ".env.local").resolve() == (canonical / "web" / ".env.local")
     assert BACKEND_SECRET not in _combined_output(result)
     assert FRONTEND_SECRET not in _combined_output(result)
 
@@ -154,6 +157,50 @@ def test_rerun_keeps_existing_canonical_links(tmp_path: Path) -> None:
     assert os.readlink(worker / "web" / ".env.local") == frontend_link
     assert BACKEND_SECRET not in _combined_output(second)
     assert FRONTEND_SECRET not in _combined_output(second)
+
+
+def test_check_mode_reports_canonical_links_without_mutating_them(
+    tmp_path: Path,
+) -> None:
+    canonical, worker = _create_worktrees(tmp_path)
+    _write_canonical_env(canonical)
+    setup = _run_helper(worker)
+    backend_link = os.readlink(worker / ".env") if setup.returncode == 0 else ""
+    frontend_link = (
+        os.readlink(worker / "web" / ".env.local") if setup.returncode == 0 else ""
+    )
+
+    result = _run_helper(worker, check_only=True)
+
+    assert setup.returncode == 0, _combined_output(setup)
+    assert result.returncode == 0, _combined_output(result)
+    assert "root .env: canonical-linked" in result.stdout
+    assert "web/.env.local: canonical-linked" in result.stdout
+    assert os.readlink(worker / ".env") == backend_link
+    assert os.readlink(worker / "web" / ".env.local") == frontend_link
+    assert BACKEND_SECRET not in _combined_output(result)
+    assert FRONTEND_SECRET not in _combined_output(result)
+
+
+def test_check_mode_fails_for_missing_or_conflicting_topology_without_repair(
+    tmp_path: Path,
+) -> None:
+    canonical, worker = _create_worktrees(tmp_path)
+    _write_canonical_env(canonical)
+    alternate_frontend_env = tmp_path / "alternate-frontend.env"
+    alternate_frontend_env.write_text("alternate-owned\n", encoding="utf-8")
+    (worker / "web").mkdir(exist_ok=True)
+    (worker / "web" / ".env.local").symlink_to(alternate_frontend_env)
+
+    result = _run_helper(worker, check_only=True)
+
+    assert result.returncode == 1, _combined_output(result)
+    assert "root .env: missing" in result.stdout
+    assert "web/.env.local: conflicting-link" in result.stdout
+    assert not (worker / ".env").exists()
+    assert (worker / "web" / ".env.local").resolve() == alternate_frontend_env
+    assert BACKEND_SECRET not in _combined_output(result)
+    assert FRONTEND_SECRET not in _combined_output(result)
 
 
 def test_preserves_existing_file_and_conflicting_symlink(tmp_path: Path) -> None:

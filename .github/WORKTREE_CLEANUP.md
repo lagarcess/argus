@@ -15,6 +15,24 @@ unchanged. If the canonical integration worktree is not available, setup warns
 and continues without provisioning secrets, which keeps clean checkouts and CI
 safe.
 
+At agent Phase 0, make the topology explicit without reading any values:
+
+```bash
+bash .github/setup-worktree-env.sh "$PWD"
+bash .github/setup-worktree-env.sh --check "$PWD"
+```
+
+The read-only check reports `canonical-linked`, `canonical-source`,
+`worktree-local`, `missing`, or `conflicting-link`. Missing and conflicting
+topology return a nonzero status; intentional canonical or worktree-local files
+remain valid.
+
+When a lane needs its own disposable local-Supabase configuration, run
+`scripts/qa/write-local-env.sh`. It atomically replaces that lane's symlinks
+with regular worktree-local files; it must never write through a symlink into
+the canonical integration environment. Do not use direct shell redirection to
+rewrite a linked `.env` or `web/.env.local`.
+
 For local recovery only, `ARGUS_CANONICAL_WORKTREE_ROOT=/absolute/path` can
 select the canonical source explicitly. Normal sibling worktrees do not need
 this override.

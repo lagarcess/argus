@@ -4,10 +4,10 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-25
+Last reconciled: 2026-07-26
 
 Current stable integration checkpoint: `codex/private-alpha-next` at
-`b7fd6f08c2fb28166bc67a808ffdad0d65164f06`.
+`b80d95a2212a054d59de99d27371039108584019`.
 
 That checkpoint contains four founder-accepted outcomes delivered through five
 independently revertible vertical slices:
@@ -21,7 +21,11 @@ independently revertible vertical slices:
 
 The checkpoint also contains the bounded calendar-materiality correction from
 PR #267 at `d6d1134` and the environment-documentation checkpoint at
-`b7fd6f08`.
+`b7fd6f08`. Since that checkpoint, integration also received the chat-header
+title/owner-menu correction from PR #274 at `291b58f7`, removal of the explicit
+private-alpha onboarding product from PR #275 at `88ae8c77`, and truthful stale
+Run settlement from PR #277 at `2d5a2b52`. Supported strategy transitions
+through confirmation then landed from PR #278 at `b80d95a2`.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -108,21 +112,30 @@ This is shared-owner serialization, not a native GitHub `blocked-by` graph.
 #### Runtime reliability
 
 1. [#269 — Diagnose ordinary starter failures at the call ceiling](https://github.com/lagarcess/argus/issues/269)
-   is `triage`. Prove integration versus Guest versus provider/configuration
-   ownership before changing runtime policy. Do not raise the turn allowance
-   from receipt count alone.
+   is **classified and fixed on the Guest owner, pending Guest integration**.
+   The seven receipts covered two Guest requests rather than one exhausted
+   turn. Guest terminal settlement failed while serializing the
+   `guest_session` allowance; Guest commit `5adff1f4` owns the correction.
+   Integration runtime policy, the seven-call allowance, provider routing, and
+   fallback accounting were exonerated.
 
 This queue may run independently of the two queues below. Guest publication
-remains stopped until #269 classifies and clears the ordinary-starter journey
-on the relevant candidate.
+remains stopped until PR #279 resolves its current review and integration
+conflicts, preserves `5adff1f4`, and clears the ordinary-starter journey on its
+exact integrated candidate. Do not open a second #269 runtime lane.
 
 #### Protected interpreter/edit spine
 
 Execute serially:
 
-1. [#270 — Preserve supported strategy transitions through confirmation](https://github.com/lagarcess/argus/issues/270).
+1. [#270 — Preserve supported strategy transitions through confirmation](https://github.com/lagarcess/argus/issues/270)
+   is **complete**. PR #278 landed as `b80d95a2`; its eight acceptance criteria
+   were reconciled and #270 is closed.
 2. [#271 — Preserve modeled costs across asset edits](https://github.com/lagarcess/argus/issues/271).
+   This is now the next issue in the protected interpreter/edit-spine queue and
+   must start from `b80d95a2` or a later clean integration checkpoint.
 3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
+   Start only after #271 lands.
 
 Only one agent owns the interpreter/edit spine at a time. Do not combine these
 issues into another open-ended continuity rewrite.
@@ -131,8 +144,13 @@ issues into another open-ended continuity rewrite.
 
 Execute serially:
 
-1. [#273 — Settle stale Run rejection to the latest usable artifact](https://github.com/lagarcess/argus/issues/273).
-2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249).
+1. [#273 — Settle stale Run rejection to the latest usable artifact](https://github.com/lagarcess/argus/issues/273)
+   is **complete**. PR #277 landed as `2d5a2b52`; all eight acceptance criteria
+   were reconciled and #273 is closed.
+2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249)
+   is the next issue in this queue, but it must not start while PR #279 is still
+   changing overlapping chat-shell and recovery-presentation surfaces. Start it
+   from the updated integration checkpoint after Guest lands.
 
 Issue #249 was updated instead of duplicating presentation ownership. It
 records:
@@ -148,6 +166,22 @@ records all three queues. Lineage notes on #238, #239, and #242 preserve the
 relationship to delivered work without reopening those completed boundaries.
 Each correction still requires exact-head browser QA and integration
 reverification before its issue can close.
+
+### Next Ownership Handoffs
+
+This is the current dispatch gate, not another speculative backlog:
+
+| Ownership lane | Current owner | Next handoff |
+| --- | --- | --- |
+| Runtime reliability | Guest PR #279 carries the proven #269 fix | Close #269 only after PR #279 lands and the integrated Guest starter passes. Do not open another runtime lane. |
+| Protected interpreter/edit spine | #270 is complete at `b80d95a2`; no active owner | Start #271 from `b80d95a2` or a later clean integration checkpoint. Open #272 only after #271 lands. |
+| Artifact lifecycle and presentation | #273 is complete at `2d5a2b52`; Guest PR #279 still overlaps the shell | Open #249 from the integration merge of PR #279. |
+| Grounded discovery | Existing PR #276 owns the active slice | Do not duplicate it. Resume its owner when available. |
+| Full Omnisearch | Product-dependent on accepted grounded discovery | Do not promote an implementation ahead of the grounded-discovery contract. |
+
+Therefore no additional continuity implementation lane should be opened at this
+exact checkpoint. The next lanes are already named; their clean integration
+bases are produced by the currently open owners.
 
 ## Product Relationships, Not An Issue Order
 

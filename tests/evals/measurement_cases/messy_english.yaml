@@ -40,6 +40,64 @@ cases:
       benchmark_symbol: SPY
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
 
+  - id: messy_english_complete_sma_crossover_benchmark_issue_270
+    prompt: "Backtest AAPL, MSFT, and NVDA with $12,000 from Jan 3, 2023 through Dec 31, 2024 using daily data and SPY as the benchmark. Enter when the 50-day SMA crosses above the 200-day SMA and exit when it crosses below."
+    user_language: en
+    ui_language: en
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["AAPL", "MSFT", "NVDA"]
+      asset_class: equity
+      requested_strategy_template: moving_average_crossover
+      strategy_type: signal_strategy
+      entry_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bullish
+      exit_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bearish
+      rule_spec:
+        entry:
+          conditions:
+            - left:
+                kind: indicator
+                key: sma
+                period: 50
+              operator: cross_above
+              right:
+                kind: indicator
+                key: sma
+                period: 200
+        exit:
+          conditions:
+            - left:
+                kind: indicator
+                key: sma
+                period: 50
+              operator: cross_below
+              right:
+                kind: indicator
+                key: sma
+                period: 200
+      date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 12000
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
   - id: messy_english_post_result_fact_then_capital_edit_issue_160
     prompt: "ok now change the starting capital to $2,000"
     user_language: en

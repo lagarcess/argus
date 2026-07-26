@@ -380,6 +380,41 @@ manually juggle backend mode flags for normal work.
   keys. A clean mocked sweep should be seconds-scale; a run stretching into
   minutes means stop and check for leaked credentials or live provider paths.
 
+### Worktree Environment Contract
+
+The worktree checked out on `codex/private-alpha-next` owns the canonical local
+`.env` and `web/.env.local`. Codex worktree setup automatically runs
+`.github/setup.sh`, which delegates to `.github/setup-worktree-env.sh` and links
+missing worker environment files to that canonical source. Existing regular
+files and links to another source are preserved because they may be intentional
+lane-local configuration.
+
+At every worktree Phase 0, run the idempotent setup and read-only topology
+check:
+
+```bash
+bash .github/setup-worktree-env.sh "$PWD"
+bash .github/setup-worktree-env.sh --check "$PWD"
+```
+
+The check reports topology only and never prints values:
+
+- `canonical-linked`: the worker uses the shared integration file.
+- `canonical-source`: this is the integration worktree's regular source file.
+- `worktree-local`: the lane intentionally owns a regular local file.
+- `missing` or `conflicting-link`: stop and correct the environment topology
+  before running services, tests, or provider-backed QA.
+
+Shared links are not safe write targets. Never rewrite a linked `.env` or
+`web/.env.local` with `cat >`, shell redirection, `sed -i`, or similar in-place
+writes. If every lane needs a new value, update the canonical integration file
+once. If only one launched process needs an override, inject it at runtime. If
+a disposable local-Supabase lane needs generated files, use
+`scripts/qa/write-local-env.sh`; it atomically detaches that lane's links before
+writing regular worktree-local files. Never print, inspect, or persist secret
+values in task output. See [`.github/WORKTREE_CLEANUP.md`](.github/WORKTREE_CLEANUP.md)
+for the detailed lifecycle and recovery rules.
+
 ### Fast Iteration (Dev Mode)
 **Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
 
