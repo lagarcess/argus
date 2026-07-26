@@ -41,8 +41,15 @@ describe("guest shell contract", () => {
   });
 
   test("hides owner menus without changing registered menu implementations", () => {
+    const chat = source("components/chat/ChatInterface.tsx");
     const sidebar = source("components/sidebar/ChatSidebar.tsx");
 
+    expect(chat).toMatch(
+      /currentView === "chat" && isGuest \?[\s\S]{0,300}<GuestHeader/,
+    );
+    expect(chat).toMatch(
+      /currentView === "chat" &&\s*conversationId &&\s*canManageConversation \?[\s\S]{0,300}<ChatHeaderMenu/,
+    );
     expect(sidebar).toContain("canManageConversation");
     expect(sidebar).toContain("showProfileMenu");
     expect(sidebar).toMatch(

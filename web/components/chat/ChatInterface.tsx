@@ -1986,33 +1986,33 @@ export default function ChatInterface() {
 
             {/* Action cluster (guest settings or durable owner menu) */}
             <div className="flex shrink-0 justify-end pointer-events-auto">
-              {currentView === "chat" && conversationId && (
-                isGuest ? (
-                  <GuestHeader
-                    expiresAt={account?.guest?.expires_at ?? null}
-                    onFeedback={requestGuestFeedback}
-                    onSignIn={requestGuestSignIn}
-                  />
-                ) : conversationId && canManageConversation ? (
-                  <ChatHeaderMenu
-                    isOpen={showChatOptions}
-                    onToggleOpen={() => setShowChatOptions(!showChatOptions)}
-                    onRequestClose={closeChatOptions}
-                    isRenaming={isRenamingHeaderChat}
-                    renameValue={headerRenameValue}
-                    onRenameValueChange={setHeaderRenameValue}
-                    onStartRename={handleStartHeaderRename}
-                    onSaveRename={() => void handleSaveHeaderRename()}
-                    onCancelRename={() => setIsRenamingHeaderChat(false)}
-                    isSavingRename={isSavingHeaderRename}
-                    pinned={Boolean(activeHistoryChat?.pinned)}
-                    isPinning={isPinningHeaderChat}
-                    onTogglePin={() => void handleToggleHeaderPin()}
-                    isDeleting={isDeletingHeaderChat}
-                    onRequestDelete={handleRequestHeaderDelete}
-                  />
-                ) : null
-              )}
+              {currentView === "chat" && isGuest ? (
+                <GuestHeader
+                  expiresAt={account?.guest?.expires_at ?? null}
+                  onFeedback={requestGuestFeedback}
+                  onSignIn={requestGuestSignIn}
+                />
+              ) : currentView === "chat" &&
+                conversationId &&
+                canManageConversation ? (
+                <ChatHeaderMenu
+                  isOpen={showChatOptions}
+                  onToggleOpen={() => setShowChatOptions(!showChatOptions)}
+                  onRequestClose={closeChatOptions}
+                  isRenaming={isRenamingHeaderChat}
+                  renameValue={headerRenameValue}
+                  onRenameValueChange={setHeaderRenameValue}
+                  onStartRename={handleStartHeaderRename}
+                  onSaveRename={() => void handleSaveHeaderRename()}
+                  onCancelRename={() => setIsRenamingHeaderChat(false)}
+                  isSavingRename={isSavingHeaderRename}
+                  pinned={Boolean(activeHistoryChat?.pinned)}
+                  isPinning={isPinningHeaderChat}
+                  onTogglePin={() => void handleToggleHeaderPin()}
+                  isDeleting={isDeletingHeaderChat}
+                  onRequestDelete={handleRequestHeaderDelete}
+                />
+              ) : null}
               {strategiesEnabled && currentView === "strategies" && (
                 <button
                   onClick={() => handleTriggerPrompt("strategy")}
