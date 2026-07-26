@@ -4,11 +4,11 @@ Status: **HISTORICAL INTAKE EVIDENCE — FINDINGS ROUTED TO OWNERS**
 
 Disposition (2026-07-26): this audit produced the bounded ownership queues now
 recorded in the interim roadmap. #269 is proven Guest-only and carried by PR
-#279; #270 is active in PR #278; #271 and #272 follow serially; #273 is closed
-after PR #277 landed as `2d5a2b52`; and updated #249 owns the remaining
-result/recovery presentation concerns. This report remains at its original path
-because issues and PRs cite its exact observations. It is not an active
-implementation plan.
+#279; #270 is complete after PR #278 landed as `b80d95a2`; #271 is next and
+#272 follows serially; #273 is closed after PR #277 landed as `2d5a2b52`; and
+updated #249 owns the remaining result/recovery presentation concerns. This
+report remains at its original path because issues and PRs cite its exact
+observations. It is not an active implementation plan.
 
 - Recorded: 2026-07-25
 - Integration branch: `codex/private-alpha-next`
@@ -325,11 +325,11 @@ The later ownership pass routed the findings without turning this report into a
 single implementation lane:
 
 1. **Durable assumption preservation** — AP-STRESS-01 is #271, serialized after
-   #270.
+   completed #270.
 2. **Artifact action reconciliation and truthful status** — AP-STRESS-02 was
    #273 and is complete through PR #277 at `2d5a2b52`.
 3. **Semantic continuation and strategy transitions** — AP-STRESS-04 and the
-   semantic part of AP-STRESS-06 are #270; AP-STRESS-03 is #272.
+   semantic part of AP-STRESS-06 were completed by #270; AP-STRESS-03 is #272.
 4. **Recovery voice and heading ownership** — AP-STRESS-05 and the formatting
    part of AP-STRESS-06 are recorded in updated #249.
 5. **Result voice quality observation** — AP-STRESS-07 remains an observation

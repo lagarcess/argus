@@ -24,7 +24,10 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
 )
 from argus.agent_runtime.resolution import AssetResolution
-from argus.agent_runtime.rule_specs import indicator_parameters_from_strategy
+from argus.agent_runtime.rule_specs import (
+    indicator_parameters_from_strategy,
+    moving_average_crossover_text,
+)
 from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
     strategy_from_result_reference,
@@ -178,6 +181,18 @@ def _apply_resolved_edit_to_draft(
     allow_indicator_parameters: bool = False,
     latest_result_window: dict[str, str] | None = None,
 ) -> None:
+    if resolved.requested_strategy_template is not None:
+        draft.requested_strategy_template = resolved.requested_strategy_template
+        draft.strategy_type = resolved.strategy_type
+        draft.entry_rule = resolved.entry_rule
+        draft.exit_rule = resolved.exit_rule
+        draft.rule_spec = resolved.rule_spec
+        draft.entry_logic = moving_average_crossover_text(resolved.entry_rule)
+        draft.exit_logic = moving_average_crossover_text(resolved.exit_rule)
+        field_provenance["requested_strategy_template"] = "explicit_user"
+        field_provenance["strategy_type"] = "explicit_user"
+        field_provenance["entry_rule"] = "explicit_user"
+        field_provenance["exit_rule"] = "explicit_user"
     if resolved.asset_universe is not None:
         draft.asset_universe = list(resolved.asset_universe)
         draft.asset_universe_operation = "replace"
@@ -242,10 +257,14 @@ def _apply_resolved_edit_to_draft(
             **resolved.indicator_parameters,
         }
         if "indicator_period" in resolved.indicator_parameters:
-            draft.indicator_period = int(resolved.indicator_parameters["indicator_period"])
+            draft.indicator_period = int(
+                resolved.indicator_parameters["indicator_period"]
+            )
             field_provenance["indicator_period"] = "explicit_user"
         if "entry_threshold" in resolved.indicator_parameters:
-            draft.entry_threshold = float(resolved.indicator_parameters["entry_threshold"])
+            draft.entry_threshold = float(
+                resolved.indicator_parameters["entry_threshold"]
+            )
             field_provenance["entry_threshold"] = "explicit_user"
         if "exit_threshold" in resolved.indicator_parameters:
             draft.exit_threshold = float(resolved.indicator_parameters["exit_threshold"])
@@ -263,9 +282,7 @@ def _apply_legacy_flat_edit_fields(
     extra_parameters: dict[str, Any],
 ) -> None:
     if plan.asset_universe:
-        operation = normalized_asset_universe_operation(
-            plan.asset_universe_operation
-        )
+        operation = normalized_asset_universe_operation(plan.asset_universe_operation)
         draft.asset_universe = list(plan.asset_universe)
         if operation is not None:
             draft.asset_universe_operation = operation
@@ -334,11 +351,15 @@ def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
     if strategy is None:
         return False
     parameters = indicator_parameters_from_strategy(strategy)
-    indicator = str(
-        parameters.get("indicator")
-        or strategy.extra_parameters.get("indicator")
-        or ""
-    ).strip().casefold()
+    indicator = (
+        str(
+            parameters.get("indicator")
+            or strategy.extra_parameters.get("indicator")
+            or ""
+        )
+        .strip()
+        .casefold()
+    )
     return indicator == "rsi"
 
 
@@ -350,7 +371,14 @@ def _response_from_artifact_assumption_edit_plan(
 ) -> LLMInterpretationResponse:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     artifact_target = (
-        "latest_result" if _request_targets_post_result_artifact_edit(request) else None
+        "latest_result"
+        if _request_targets_post_result_artifact_edit(request)
+        else (
+            "active_confirmation"
+            if request.latest_task_snapshot is not None
+            and request.latest_task_snapshot.active_confirmation_reference is not None
+            else None
+        )
     )
     current_strategy = _current_artifact_strategy(request)
     if current_strategy is not None and current_strategy.strategy_type:
@@ -409,7 +437,8 @@ def _response_from_artifact_assumption_edit_plan(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary=(
-                plan.user_goal_summary or "User changed a visible confirmation assumption."
+                plan.user_goal_summary
+                or "User changed a visible confirmation assumption."
             ),
             candidate_strategy_draft=draft,
             # Surface the model's note when an applied edit also had a part it could

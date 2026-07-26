@@ -88,6 +88,63 @@ def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     )
 
 
+def executable_strategy_template_from_typed_rules(
+    strategy: StrategySummary | dict[str, Any],
+) -> str | None:
+    """Recover a named executable template only from its canonical typed shape."""
+
+    payload = _strategy_payload(strategy)
+    entry_rule = payload.get("entry_rule")
+    exit_rule = payload.get("exit_rule")
+    if not (
+        isinstance(entry_rule, dict)
+        and isinstance(exit_rule, dict)
+        and entry_rule.get("type") == "moving_average_crossover"
+        and exit_rule.get("type") == "moving_average_crossover"
+    ):
+        return None
+    try:
+        generated_rule_spec = rule_spec_from_moving_average_crossover_rules(
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+        )
+    except (TypeError, ValueError):
+        return None
+    if generated_rule_spec is None:
+        return None
+    stated_rule_spec = payload.get("rule_spec")
+    if stated_rule_spec is not None and stated_rule_spec != generated_rule_spec:
+        return None
+    template = "moving_average_crossover"
+    capability = STRATEGY_CAPABILITIES[template]
+    if (
+        capability.status != "executable"
+        or capability.execution_strategy_type != executable_strategy_type(payload)
+    ):
+        return None
+    return template
+
+
+def safe_conflict_strategy_type(
+    selected_strategy_type: Any,
+    strategy: StrategySummary | dict[str, Any],
+) -> str | None:
+    """Return only a capability-conflict selection safe to project."""
+
+    strategy_type = canonical_strategy_type(selected_strategy_type)
+    if not strategy_type:
+        strategy_type = canonical_strategy_type(
+            _strategy_payload(strategy).get("strategy_type")
+        )
+    if strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        return strategy_type
+    if strategy_type == "signal_strategy" and _has_executable_signal_rule(
+        _strategy_payload(strategy)
+    ):
+        return strategy_type
+    return None
+
+
 def executable_strategy_type_from_extracted_fields(
     fields: Mapping[str, Any],
 ) -> str | None:
@@ -140,6 +197,21 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
 
 def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     payload = _strategy_payload(strategy)
+    canonical = executable_strategy_type(payload)
+    requested_template = payload.get("requested_strategy_template")
+    requested_capability = (
+        STRATEGY_CAPABILITIES.get(requested_template)
+        if isinstance(requested_template, str)
+        else None
+    )
+    if (
+        requested_template == "moving_average_crossover"
+        and requested_capability is not None
+        and requested_capability.execution_strategy_type == canonical
+    ):
+        return requested_capability.display_name
+    if canonical == "signal_strategy" and _has_structured_moving_average_rule(payload):
+        return STRATEGY_CAPABILITIES["moving_average_crossover"].display_name
     extra_parameters = payload.get("extra_parameters")
     raw_type = (
         extra_parameters.get("raw_strategy_type")
@@ -152,7 +224,6 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
         return "Dip Buying"
     if normalized in {"rsi_threshold", "rsi_mean_reversion"}:
         return "RSI Threshold"
-    canonical = executable_strategy_type(payload)
     thesis_text = " ".join(
         str(value)
         for value in [

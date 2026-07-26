@@ -6,14 +6,15 @@ Last reconciled: 2026-07-26
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `2d5a2b52`. The accepted post-promotion
+Current stable integration checkpoint: `b80d95a2`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
 baseline (PR #268), calendar-materiality classification (PR #267), chat-header
 title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
-and truthful stale Run settlement (PR #277). This is an integration checkpoint,
-not a deployed or tester-exposed SHA.
+truthful stale Run settlement (PR #277), and supported strategy-transition
+preservation (PR #278). This is an integration checkpoint, not a deployed or
+tester-exposed SHA.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -219,6 +220,11 @@ Do not reopen these as debt unless a new bug is reproduced:
   create no compute, settle to typed Updated truth, preserve the latest
   actionable confirmation, and remain stable after reload. It landed as
   `2d5a2b52`.
+- Supported strategy-transition preservation is complete at PR #278 / issue
+  #270: buy-and-hold can transition to a typed 50/200 SMA crossover while
+  preserving assets, capital, dates, daily timeframe, benchmark, and modeled
+  costs through confirmation, launch projection, and reload. It landed as
+  `b80d95a2`.
 
 ## P0 Reintegration Checkpoint
 
@@ -247,7 +253,7 @@ Codex should own or closely supervise this:
 2. **Advance bounded continuity follow-ups by owner**
    - Guest PR #279 owns the proven #269 settlement correction. Do not open a
      second runtime lane.
-   - PR #278 owns #270. After it lands, start #271 from the updated integration
+   - #270 is complete at `b80d95a2`. Start #271 from this updated integration
      checkpoint; start #272 only after #271 lands.
    - #273 is closed at `2d5a2b52`. Start #249 only after Guest PR #279 lands,
      because both touch chat-shell and recovery presentation.

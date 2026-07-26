@@ -359,6 +359,7 @@ from argus.agent_runtime.strategy_contract import (
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
+    safe_conflict_strategy_type,
 )
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
@@ -1389,15 +1390,19 @@ def _response_without_ungrounded_symbols(
                 dict.fromkeys([*missing_required_fields, "asset_universe"])
             )
             requires_clarification = True
-    return _response_with_canonical_interpreter_assets(response.model_copy(
-        update={
-            "candidate_strategy_draft": draft,
-            "assistant_response": None,
-            "requires_clarification": requires_clarification,
-            "missing_required_fields": missing_required_fields,
-            "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
-        }
-    ))
+    return _response_with_canonical_interpreter_assets(
+        response.model_copy(
+            update={
+                "candidate_strategy_draft": draft,
+                "assistant_response": None,
+                "requires_clarification": requires_clarification,
+                "missing_required_fields": missing_required_fields,
+                "reason_codes": list(
+                    dict.fromkeys([*response.reason_codes, reason_code])
+                ),
+            }
+        )
+    )
 
 
 def _response_with_mixed_asset_guardrail_from_symbols(
@@ -4089,12 +4094,9 @@ async def _audit_supported_strategy_capability_conflict(
         and not audit.keep_unsupported_strategy_logic
         and audit.confidence >= 0.7
     ):
-        strategy_type = canonical_strategy_type(audit.selected_strategy_type)
-        if not strategy_type:
-            strategy_type = canonical_strategy_type(
-                response.candidate_strategy_draft.strategy_type
-            )
-        if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+        draft = response.candidate_strategy_draft
+        strategy_type = safe_conflict_strategy_type(audit.selected_strategy_type, draft)
+        if strategy_type is None:
             return None
         repaired = _response_with_supported_strategy_capability_conflict_removed(
             response=response,

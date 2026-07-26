@@ -7,7 +7,7 @@ Original roadmap date: 2026-07-16
 Last reconciled: 2026-07-26
 
 Current stable integration checkpoint: `codex/private-alpha-next` at
-`2d5a2b5291c829ac2fb80a023413a4b59685f70d`.
+`b80d95a2212a054d59de99d27371039108584019`.
 
 That checkpoint contains four founder-accepted outcomes delivered through five
 independently revertible vertical slices:
@@ -24,7 +24,8 @@ PR #267 at `d6d1134` and the environment-documentation checkpoint at
 `b7fd6f08`. Since that checkpoint, integration also received the chat-header
 title/owner-menu correction from PR #274 at `291b58f7`, removal of the explicit
 private-alpha onboarding product from PR #275 at `88ae8c77`, and truthful stale
-Run settlement from PR #277 at `2d5a2b52`.
+Run settlement from PR #277 at `2d5a2b52`. Supported strategy transitions
+through confirmation then landed from PR #278 at `b80d95a2`.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -128,10 +129,13 @@ exact integrated candidate. Do not open a second #269 runtime lane.
 Execute serially:
 
 1. [#270 — Preserve supported strategy transitions through confirmation](https://github.com/lagarcess/argus/issues/270)
-   is active in PR #278. Resolve its remaining review finding and land it
-   before starting the next issue.
+   is **complete**. PR #278 landed as `b80d95a2`; its eight acceptance criteria
+   were reconciled and #270 is closed.
 2. [#271 — Preserve modeled costs across asset edits](https://github.com/lagarcess/argus/issues/271).
+   This is now the next issue in the protected interpreter/edit-spine queue and
+   must start from `b80d95a2` or a later clean integration checkpoint.
 3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
+   Start only after #271 lands.
 
 Only one agent owns the interpreter/edit spine at a time. Do not combine these
 issues into another open-ended continuity rewrite.
@@ -170,7 +174,7 @@ This is the current dispatch gate, not another speculative backlog:
 | Ownership lane | Current owner | Next handoff |
 | --- | --- | --- |
 | Runtime reliability | Guest PR #279 carries the proven #269 fix | Close #269 only after PR #279 lands and the integrated Guest starter passes. Do not open another runtime lane. |
-| Protected interpreter/edit spine | PR #278 owns #270 | Open #271 from the integration merge of #270. Open #272 only after #271 lands. |
+| Protected interpreter/edit spine | #270 is complete at `b80d95a2`; no active owner | Start #271 from `b80d95a2` or a later clean integration checkpoint. Open #272 only after #271 lands. |
 | Artifact lifecycle and presentation | #273 is complete at `2d5a2b52`; Guest PR #279 still overlaps the shell | Open #249 from the integration merge of PR #279. |
 | Grounded discovery | Existing PR #276 owns the active slice | Do not duplicate it. Resume its owner when available. |
 | Full Omnisearch | Product-dependent on accepted grounded discovery | Do not promote an implementation ahead of the grounded-discovery contract. |
