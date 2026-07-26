@@ -7,7 +7,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.chat.confirmation import public_confirmation_projection
-from argus.api.chat.onboarding import parse_onboarding_control_message
+from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
 )
@@ -66,7 +66,7 @@ def _public_message_projection(messages: list[Message]) -> list[Message]:
         for message in messages
         if not (
             message.role == "user"
-            and parse_onboarding_control_message(message.content) is not None
+            and is_legacy_onboarding_marker(message.content)
         )
     ]
 

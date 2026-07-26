@@ -215,7 +215,7 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
   return evidence;
 }
 
-test("@guest-shell guest entry bootstraps once and bypasses onboarding without profile mutation", async ({
+test("@guest-shell guest entry bootstraps once into ordinary chat without profile mutation", async ({
   page,
 }) => {
   const evidence = await mockGuestJourney(page);
@@ -223,8 +223,6 @@ test("@guest-shell guest entry bootstraps once and bypasses onboarding without p
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
-  await expect(page.getByTestId("onboarding-skip")).toHaveCount(0);
   expect(evidence.bootstrapCalls).toBe(1);
   expect(evidence.profilePatches).toEqual([]);
 
@@ -426,7 +424,7 @@ for (const expiredCase of [
     signIn: "Iniciar sesión",
   },
 ] as const) {
-  test(`@guest-expiry ${expiredCase.language} shows honest recovery without onboarding`, async ({
+  test(`@guest-expiry ${expiredCase.language} shows honest recovery`, async ({
     page,
   }) => {
     await page.addInitScript((language) => {
@@ -454,7 +452,6 @@ for (const expiredCase of [
     await expect(
       page.getByRole("button", { name: expiredCase.signIn }),
     ).toBeVisible();
-    await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
     await expect(page.getByTestId("chat-input")).toHaveCount(0);
   });
 }

@@ -1,5 +1,8 @@
 # Argus Always Progresses Continuity Implementation Plan
 
+Status: **COMPLETED EXECUTION RECORD — PR #268 merged as `847c413b`; use for
+bounded regression comparison, not wholesale re-execution**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.

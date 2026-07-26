@@ -33,17 +33,6 @@ export type BacktestJobStatus =
   | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
-export type OnboardingStage =
-  | "language_selection"
-  | "primary_goal_selection"
-  | "ready"
-  | "completed";
-export type PrimaryGoal =
-  | "learn_basics"
-  | "build_passive_strategy"
-  | "test_stock_idea"
-  | "explore_crypto"
-  | "surprise_me";
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -244,6 +233,8 @@ export type HistoryItem = {
   type: HistoryItemType;
   id: string;
   title: string;
+  /** Chat items only; mirrors the conversation record. */
+  title_source?: TitleSource | null;
   subtitle: string;
   pinned: boolean;
   created_at: string;
@@ -650,12 +641,6 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
-  onboarding?: Partial<{
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  }>;
 };
 
 export async function getMe() {

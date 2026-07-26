@@ -4,22 +4,29 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-23
+Last reconciled: 2026-07-25
 
 Current stable integration checkpoint: `codex/private-alpha-next` at
-`bbd1d2bb44a298de2f048e361c92d5851e4c38d1`.
+`b7fd6f08c2fb28166bc67a808ffdad0d65164f06`.
 
-That checkpoint contains four founder-accepted, independently revertible
-vertical slices:
+That checkpoint contains four founder-accepted outcomes delivered through five
+independently revertible vertical slices:
 
 - adaptive result-chart range switching from PR #264 at `0c0d481`;
-- account recovery and session controls from PR #261 at `a639566`; and
-- truthful Usage allowances and accounting from PR #259 at `2eb6874`; and
+- account recovery and session controls from PR #261 at `a639566`;
+- truthful Usage allowances and accounting from PR #259 at `2eb6874`;
 - executable capability truth from PR #266, with final candidate `e10bdd2` and
-  integration merge `bbd1d2b`.
+  integration merge `bbd1d2b`; and
+- the Always Progresses continuity baseline from PR #268 at `847c413`.
 
-Read-only audit donor: `claude/argus-alpha-audit-c2d919` at
-`f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`.
+The checkpoint also contains the bounded calendar-materiality correction from
+PR #267 at `d6d1134` and the environment-documentation checkpoint at
+`b7fd6f08`.
+
+Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
+`f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
+comparison only, not as an active donor or implementation base for the remaining
+outcomes.
 
 Last promoted `main` checkpoint: functional promotion merge `5d1eec11`, with
 the [production-promotion record](https://github.com/lagarcess/argus/blob/main/docs/release-manifests/2026-07-14-main-production-promotion.md)
@@ -66,22 +73,87 @@ deterministic test result by itself.
 
 | Founder outcome | State | Completion evidence |
 | --- | --- | --- |
-| 1. Argus always progresses | **Complete** | PR #268 delivered bounded semantic progress, durable ordinary-turn recovery, exact-once Run reconciliation, stale-authority rejection, fact-preserving refinement, concrete trajectory adapters, EN/ES browser proof, one authorized real Run, and reload-stable result truth. Reviewed head `5585c6a` landed on integration as `847c413b`. |
+| 1. Argus always progresses | **Baseline delivered; standing quality bar** | PR #268 delivered bounded semantic progress, durable ordinary-turn recovery, exact-once Run reconciliation, stale-authority rejection, fact-preserving refinement, concrete trajectory adapters, EN/ES browser proof, one authorized real Run, and reload-stable result truth. Reviewed head `5585c6a` landed on integration as `847c413b`. Later reproduced defects receive bounded follow-ups; they do not reopen an unbounded search for every possible conversational edge case. |
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
 | 5. Discovery is grounded and Argus can suggest | Not yet accepted complete | No founder-accepted slice yet proves grounded suggestions end to end on the current checkpoint. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
-Outcomes 1, 2, 3, and 4 must not be redispatched unless a new regression is
-reproduced. Their evidence remains useful as a regression baseline for later
-slices.
+Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
+reproduced. Outcome 1 is a standing quality bar applied to each later slice:
+fix a reproduced violation at its owner, but do not redispatch a broad,
+open-ended continuity program. Existing evidence remains the regression
+baseline.
+
+The bounded [Always Progresses closure evidence](../reports/always-progresses-closure-evidence.md)
+remains valid. The
+[same-conversation stress audit](../reports/2026-07-25-always-progresses-post-merge-stress-audit.md)
+and [guest post-integration runtime observation](../reports/2026-07-25-guest-post-integration-runtime-regression.md)
+record later signals without assigning unproven causality or authorizing a
+broad repair lane.
+
+### Continuity Follow-up Ownership Queues
+
+These issues are bounded follow-ups to reproduced post-merge findings. They do
+not reopen the completed Always Progresses baseline as one broad runtime
+program.
+
+The three ownership queues may run independently when their files and
+canonical owners remain distinct. Issues **within one queue execute serially**
+in the order below. After an issue lands, the next issue starts from the
+updated integration checkpoint rather than stacking unreviewed worker branches.
+This is shared-owner serialization, not a native GitHub `blocked-by` graph.
+
+#### Runtime reliability
+
+1. [#269 — Diagnose ordinary starter failures at the call ceiling](https://github.com/lagarcess/argus/issues/269)
+   is `triage`. Prove integration versus Guest versus provider/configuration
+   ownership before changing runtime policy. Do not raise the turn allowance
+   from receipt count alone.
+
+This queue may run independently of the two queues below. Guest publication
+remains stopped until #269 classifies and clears the ordinary-starter journey
+on the relevant candidate.
+
+#### Protected interpreter/edit spine
+
+Execute serially:
+
+1. [#270 — Preserve supported strategy transitions through confirmation](https://github.com/lagarcess/argus/issues/270).
+2. [#271 — Preserve modeled costs across asset edits](https://github.com/lagarcess/argus/issues/271).
+3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
+
+Only one agent owns the interpreter/edit spine at a time. Do not combine these
+issues into another open-ended continuity rewrite.
+
+#### Artifact lifecycle and presentation
+
+Execute serially:
+
+1. [#273 — Settle stale Run rejection to the latest usable artifact](https://github.com/lagarcess/argus/issues/273).
+2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249).
+
+Issue #249 was updated instead of duplicating presentation ownership. It
+records:
+
+- `TRY NEXT` / `WHAT HAPPENED` leakage on generic recovery;
+- compact recovery parity between ownership paths;
+- malformed option presentation; and
+- Quick take quality drift as an observation, not yet a separate regression or
+  blocker.
+
+[Coordination issue #237](https://github.com/lagarcess/argus/issues/237)
+records all three queues. Lineage notes on #238, #239, and #242 preserve the
+relationship to delivered work without reopening those completed boundaries.
+Each correction still requires exact-head browser QA and integration
+reverification before its issue can close.
 
 ## Product Relationships, Not An Issue Order
 
 ```mermaid
 flowchart LR
-    LIVE["Argus always progresses — complete"]
+    LIVE["Argus always progresses — baseline delivered / standing bar"]
     ACCESS["Security and usage unlocked — complete"]
     RANGE["Graph range switching — complete"]
     TRUTH["Capability truth — complete"]
@@ -237,7 +309,8 @@ Completion evidence:
 
 ### Completed slice: Argus always progresses
 
-Status: **COMPLETE — PR #268 merged as `847c413b`**
+Status: **BASELINE DELIVERED — PR #268 merged as `847c413b`; standing quality
+bar remains active**
 
 This pillar protects every later conversational surface.
 The founder-approved end-to-end contract is

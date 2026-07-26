@@ -30,9 +30,7 @@ describe("shared starter actions", () => {
 
     expect(chat).toContain("<StarterActions");
     expect(chat).toContain("onSelect={handleSend}");
-    expect(chat).toContain(
-      "const [isHydratingConversation, setIsHydratingConversation] = useState(true)",
-    );
+    expect(chat).toContain("if (isBootstrappingProfile) {");
     expect(chat).toContain(
       "disabled={isStreamingResponse || isHydratingConversation}",
     );

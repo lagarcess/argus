@@ -11,15 +11,13 @@ const root = join(import.meta.dir, "..");
 describe("guest session entry contract", () => {
   test("keeps the auth landing as rollback and makes guest entry dynamic", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
-    const landingPath = join(root, "components/auth/AuthLanding.tsx");
     const guestEntryPath = join(root, "components/guest/GuestEntry.tsx");
 
-    expect(existsSync(landingPath)).toBe(true);
     expect(existsSync(guestEntryPath)).toBe(true);
-    expect(page).toContain('export const dynamic = "force-dynamic"');
-    expect(page).toContain("<AuthLanding");
     expect(page).toContain("<GuestEntry");
     expect(page).toContain("NEXT_PUBLIC_GUEST_ACCESS_ENABLED");
+    expect(page).toContain("loginWithEmail");
+    expect(page).toContain("signupWithEmail");
   });
 
   test("owns one idempotent bootstrap and fails closed without a production captcha", () => {
@@ -107,27 +105,4 @@ describe("guest session entry contract", () => {
     expect(entry).not.toContain("router.refresh()");
   });
 
-  test("guest onboarding depends on verified account kind and never patches profile truth", () => {
-    const gate = readFileSync(
-      join(root, "components/onboarding/OnboardingGate.tsx"),
-      "utf-8",
-    );
-    const contextPath = join(root, "lib/account-context.tsx");
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
-
-    expect(gate).toContain('me.account_kind === "guest"');
-    expect(gate).toContain("setStep(\"done\")");
-    expect(existsSync(contextPath)).toBe(true);
-    expect(gate).toContain("<AccountProvider");
-    expect(chat).toContain("useAccount()");
-    expect(gate.indexOf('me.account_kind === "guest"')).toBeLessThan(
-      gate.indexOf("const profileLanguage"),
-    );
-    expect(gate).not.toMatch(
-      /me\.account_kind === "guest"[\s\S]{0,500}patchMe\(\{[\s\S]{0,300}primary_goal/,
-    );
-  });
 });

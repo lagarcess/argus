@@ -7,7 +7,6 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api import state as api_state
-from argus.api.guest_access import guest_account_context
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
 from argus.api.schemas import (
@@ -20,7 +19,6 @@ from argus.api.schemas import (
     IdeaVersion,
     Strategy,
 )
-from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
@@ -203,44 +201,11 @@ async def _runtime_success_events(**kwargs: Any):
 
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import main as api_main
     from argus.api import state as api_state
     from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
-    monkeypatch.setattr(
-        api_main,
-        "".join(["orchestrate_chat", "_turn"]),
-        lambda message, language, onboarding_required, primary_goal, **kwargs: (
-            dict(
-                intent="onboarding_prompt",
-                assistant_message=(
-                    "What is your current primary goal? Don't worry, "
-                    "you can change it later in Settings."
-                ),
-                strategy_draft=None,
-                title_suggestion=None,
-            )
-            if onboarding_required
-            else dict(
-                intent="run_backtest",
-                assistant_message=(
-                    "Probé la idea con TSLA."
-                    if str(language).lower().startswith("es")
-                    else "I tested that idea with TSLA."
-                ),
-                strategy_draft=dict(
-                    template=dict(source="user_supplied", value="rsi_mean_reversion"),
-                    asset_class=dict(source="user_supplied", value="equity"),
-                    symbols=dict(source="user_supplied", value=["TSLA"]),
-                    parameters={},
-                ),
-                title_suggestion="TSLA idea",
-            )
-        ),
-        raising=False,
-    )
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -251,21 +216,6 @@ def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
     return client
-
-
-def _set_onboarding_ready(client: TestClient, primary_goal: str = "surprise_me") -> None:
-    response = client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": primary_goal,
-                "completed": False,
-            }
-        },
-    )
-    assert response.status_code == 200
 
 
 def test_me_returns_contract_user_profile() -> None:
@@ -287,38 +237,18 @@ def test_me_returns_contract_user_profile() -> None:
     }
 
 
-def test_patch_me_merges_nested_onboarding_state() -> None:
+def test_patch_me_updates_language_preferences() -> None:
     client = _client()
 
     response = client.patch(
         "/api/v1/me",
-        json={
-            "language": "es-419",
-            "onboarding": {"language_confirmed": True},
-        },
+        json={"language": "es-419", "locale": "es-419"},
     )
 
     assert response.status_code == 200
     user = response.json()["user"]
     assert user["language"] == "es-419"
-    assert user["onboarding"] == {
-        "completed": False,
-        "stage": "language_selection",
-        "language_confirmed": True,
-        "primary_goal": None,
-    }
-
-
-def test_patch_me_rejects_invalid_nested_onboarding_state() -> None:
-    client = _client()
-
-    response = client.patch(
-        "/api/v1/me",
-        json={"onboarding": {"stage": "complete"}},
-    )
-
-    assert response.status_code == 422
-    assert response.json()["code"] == "invalid_profile_patch"
+    assert user["locale"] == "es-419"
 
 
 def test_conversation_messages_and_patch_follow_contract() -> None:
@@ -358,7 +288,6 @@ def test_unknown_conversation_messages_return_not_found() -> None:
 
 def test_deleted_conversation_messages_return_not_found() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     stream = client.post(
@@ -526,6 +455,26 @@ def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
         item["title"] for item in response.json()["items"] if item["type"] == "chat"
     ]
     assert chat_titles == ["Active idea"]
+
+
+def test_history_chat_items_carry_title_source() -> None:
+    client = _client()
+
+    unnamed = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    renamed = client.post(
+        "/api/v1/conversations", json={"title": "My renamed idea"}
+    ).json()["conversation"]
+
+    response = client.get("/api/v1/history")
+
+    assert response.status_code == 200
+    sources = {
+        item["id"]: item.get("title_source")
+        for item in response.json()["items"]
+        if item["type"] == "chat"
+    }
+    assert sources[unnamed["id"]] == "system_default"
+    assert sources[renamed["id"]] == "user_renamed"
 
 
 def test_deleted_conversation_restore_moves_chat_back_to_recents() -> None:
@@ -1035,7 +984,6 @@ def test_collection_attach_rejects_unowned_memory_strategy() -> None:
 
 def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -1074,7 +1022,6 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
 
 def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -1099,7 +1046,6 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
 
 def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -1121,7 +1067,7 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     assert "I tested that idea with TSLA." in assistant_message["content"]
 
 
-def test_chat_stream_sends_normal_onboarding_language_to_runtime() -> None:
+def test_chat_stream_sends_profile_language_to_runtime() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
@@ -1156,116 +1102,6 @@ def test_chat_stream_sends_normal_onboarding_language_to_runtime() -> None:
     assert runtime_turn["terminal"] is True
 
 
-def test_guest_chat_bypasses_registered_onboarding_without_profile_mutation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api.routers import agent as agent_router
-
-    client = _client()
-    before = client.get("/api/v1/me").json()["user"]
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-    created_at = utcnow()
-    workspace = GuestWorkspace(
-        user_id=before["id"],
-        conversation_id=conversation["id"],
-        status="active",
-        created_at=created_at,
-        expires_at=created_at + timedelta(days=7),
-        claimed_by=None,
-        claimed_at=None,
-        updated_at=created_at,
-    )
-    monkeypatch.setattr(
-        agent_router,
-        "account_context",
-        lambda request: guest_account_context(workspace),
-    )
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "Backtest Tesla when it dips",
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    assert "primary goal" not in response.text
-    assert "I tested that idea with TSLA." in response.text
-    after = client.get("/api/v1/me").json()["user"]
-    assert after["onboarding"] == before["onboarding"]
-    assert after["onboarding"]["completed"] is False
-    assert after["onboarding"]["primary_goal"] is None
-
-
-def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "__ONBOARDING_GOAL__:test_stock_idea",
-            "language": "en",
-        },
-    )
-    assert response.status_code == 200
-    stream = response.text
-    assert "event:" not in stream
-    assert stream.count("data: [DONE]") == 1
-    events = _stream_events(stream)
-    token_events = [event for event in events if event.get("type") == "token"]
-    assert len(token_events) == 1
-    assert "stock idea" in token_events[0]["content"]
-    final_payload = _final_payload(stream)
-    assert set(final_payload) == {
-        "stage_outcome",
-        "assistant_response",
-        "message_id",
-    }
-    assert final_payload["stage_outcome"] == "ready_to_respond"
-    assert final_payload["assistant_response"] == token_events[0]["content"]
-    assert final_payload["message_id"]
-
-    me = client.get("/api/v1/me")
-    onboarding = me.json()["user"]["onboarding"]
-    assert onboarding["stage"] == "ready"
-    assert onboarding["primary_goal"] == "test_stock_idea"
-    assert onboarding["completed"] is False
-
-    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
-    assert messages.status_code == 200
-    items = messages.json()["items"]
-    assert all(not message["content"].startswith("__ONBOARDING_") for message in items)
-
-
-def test_first_successful_backtest_transitions_onboarding_to_completed() -> None:
-    client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "Backtest Tesla when it dips",
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    assert '"type":"final"' in response.text
-    assert '"run"' in response.text
-
-    me = client.get("/api/v1/me")
-    onboarding = me.json()["user"]["onboarding"]
-    assert onboarding["stage"] == "completed"
-    assert onboarding["completed"] is True
-    assert onboarding["primary_goal"] == "test_stock_idea"
-
-
 def test_conversations_cursor_pagination_is_stable() -> None:
     client = _client()
     for idx in range(3):
@@ -1294,7 +1130,6 @@ def test_conversations_cursor_pagination_is_stable() -> None:
 
 def test_messages_cursor_pagination_is_stable() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
     for idx in range(3):
         response = client.post(
@@ -1328,7 +1163,6 @@ def test_messages_cursor_pagination_is_stable() -> None:
 
 def test_search_supports_cursor_and_mixed_types() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post(
         "/api/v1/conversations", json={"title": "Tesla alpha chat"}
     ).json()["conversation"]
@@ -1377,7 +1211,6 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     # Memory mode shares the Supabase matcher semantics: a multi-word query
     # matches when every token appears, not only as one contiguous substring.
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post(
         "/api/v1/conversations", json={"title": "Tesla alpha chat"}
     ).json()["conversation"]
@@ -1896,7 +1729,6 @@ def test_search_preserves_exact_chat_above_lower_relevance_p1_artifacts() -> Non
 
 def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     other_user_id = "00000000-0000-0000-0000-000000000099"
     now = utcnow()
     memory_conversation(
@@ -1954,7 +1786,6 @@ def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
 
 def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -2016,7 +1847,6 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
 
 def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -2076,7 +1906,6 @@ def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
 
 def test_search_returns_typed_p1_artifacts() -> None:
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -2135,7 +1964,6 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 
     client = _client()
-    _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     async def _missing_symbol_events(**_: Any):
@@ -2173,7 +2001,6 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
     from argus.api.routers import agent as agent_router
 
     client = _client()
-    _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     async def _btc_1h_events(**_: Any):
@@ -2200,7 +2027,6 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 
     client = _client()
-    _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     # Insert a message into memory store manually
@@ -2245,21 +2071,13 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
     assert captured_runtime["message"] == "Backtest it"
 
 
-def test_starter_prompts_returns_personalized_suggestions() -> None:
+def test_starter_prompts_returns_generic_suggestions() -> None:
     client = _client()
 
-    # Default goal: surprise_me (via OnboardingState default in Profile)
-    # Actually OnboardingState primary_goal is None by default, which maps to surprise_me
     resp = client.get("/api/v1/chat/starter-prompts")
     assert resp.status_code == 200
     assert len(resp.json()["prompts"]) == 4
     assert "Test Apple against SPY over the last 12 months." in resp.json()["prompts"]
-
-    # Set specific goal
-    _set_onboarding_ready(client, primary_goal="explore_crypto")
-    resp = client.get("/api/v1/chat/starter-prompts")
-    assert resp.status_code == 200
-    assert "Hold Bitcoin this year so far." in resp.json()["prompts"]
 
 
 def test_starter_prompts_follow_profile_language() -> None:
@@ -2267,15 +2085,7 @@ def test_starter_prompts_follow_profile_language() -> None:
 
     response = client.patch(
         "/api/v1/me",
-        json={
-            "language": "es-419",
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "explore_crypto",
-                "completed": False,
-            },
-        },
+        json={"language": "es-419"},
     )
     assert response.status_code == 200
 
@@ -2283,5 +2093,5 @@ def test_starter_prompts_follow_profile_language() -> None:
     assert resp.status_code == 200
     prompts = resp.json()["prompts"]
     assert len(prompts) == 4
-    assert "Mantén Bitcoin en lo que va del año." in prompts
+    assert "Prueba Bitcoin en lo que va del año." in prompts
     assert all("2024" not in prompt for prompt in prompts)

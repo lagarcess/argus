@@ -2238,6 +2238,7 @@ def test_p1_decision_gateway_upsert_keeps_one_current_decision() -> None:
 
 class _HistoryClient:
     def __init__(self) -> None:
+        self.selected_columns: dict[str, list[str]] = {}
         self.rows_by_table: dict[str, list[dict[str, Any]]] = {
             "conversations": [
                 {
@@ -2338,14 +2339,25 @@ class _HistoryClient:
         }
 
     def table(self, table_name: str):
-        return _HistoryTable(self.rows_by_table[table_name])
+        return _HistoryTable(self.rows_by_table[table_name], table_name, self)
 
 
 class _HistoryTable:
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, Any]],
+        table_name: str | None = None,
+        client: _HistoryClient | None = None,
+    ) -> None:
         self.rows = list(rows)
+        self.table_name = table_name
+        self.client = client
 
-    def select(self, *_args: object, **_kwargs: object):
+    def select(self, *args: object, **_kwargs: object):
+        if self.client is not None and self.table_name is not None and args:
+            self.client.selected_columns.setdefault(self.table_name, []).append(
+                str(args[0])
+            )
         return self
 
     def eq(self, key: str, value: object):
@@ -2393,6 +2405,21 @@ class _HistoryNotFilter:
         if value == "null":
             self.query.rows = [row for row in self.query.rows if row.get(key) is not None]
         return self.query
+
+
+def test_gateway_history_selects_conversation_title_source() -> None:
+    client = _HistoryClient()
+    gateway = SupabaseGateway(client=client)
+
+    gateway.list_history_rows(user_id="user-1", limit=100)
+
+    title_selects = [
+        columns
+        for columns in client.selected_columns["conversations"]
+        if "title" in columns.split(",")
+    ]
+    assert title_selects
+    assert all("title_source" in columns.split(",") for columns in title_selects)
 
 
 def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:

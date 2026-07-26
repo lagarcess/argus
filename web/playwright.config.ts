@@ -29,7 +29,6 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_MOCK_AUTH: mockAuth,
       NEXT_PUBLIC_ENABLE_SPANISH: "true",
-      NEXT_PUBLIC_ENABLE_DEV_ONBOARDING_RESET: "true",
     },
   },
   projects: [

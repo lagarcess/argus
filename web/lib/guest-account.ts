@@ -1,4 +1,15 @@
-import type { OnboardingStage, PrimaryGoal } from "./argus-api";
+type LegacyOnboardingStage =
+  | "language_selection"
+  | "primary_goal_selection"
+  | "ready"
+  | "completed";
+
+type LegacyPrimaryGoal =
+  | "learn_basics"
+  | "build_passive_strategy"
+  | "test_stock_idea"
+  | "explore_crypto"
+  | "surprise_me";
 
 export type ApiUser = {
   id: string;
@@ -9,9 +20,9 @@ export type ApiUser = {
   locale: "en-US" | "es-419";
   onboarding: {
     completed: boolean;
-    stage: OnboardingStage;
+    stage: LegacyOnboardingStage;
     language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
+    primary_goal: LegacyPrimaryGoal | null;
   };
 };
 

@@ -60,12 +60,6 @@ async function mockUsageShell(
           display_name: "Usage User",
           language,
           locale,
-          onboarding: {
-            completed: true,
-            stage: "completed",
-            language_confirmed: true,
-            primary_goal: "test_stock_idea",
-          },
         },
       }),
     }),

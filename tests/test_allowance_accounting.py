@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
+from argus.api.schemas import BacktestRun, Conversation, Message, User
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.guest_workspaces import GuestWorkspace
@@ -41,12 +41,6 @@ def _profile() -> User:
         locale="en-US",
         theme="dark",
         is_admin=True,
-        onboarding=OnboardingState(
-            completed=True,
-            stage="ready",
-            language_confirmed=True,
-            primary_goal="test_stock_idea",
-        ),
         created_at=now,
         updated_at=now,
     )

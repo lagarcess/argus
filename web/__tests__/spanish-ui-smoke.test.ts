@@ -57,8 +57,6 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.languages.es-419",
     "command_palette.ledger.decision_filters",
     "command_palette.ledger.no_saved_ideas",
-    "onboarding.language.title",
-    "onboarding.language.continue_in",
     "chat.result_followup.headings.general",
     "chat.result_followup.headings.next_experiment",
     "chat.history.pinned",

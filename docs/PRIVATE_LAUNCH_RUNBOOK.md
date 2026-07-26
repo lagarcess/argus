@@ -370,8 +370,9 @@ Step 2 is a drain, not an active-session kill switch: already-verified guests
 remain usable until their fixed policy boundary.
 
 Do not roll back by reversing migrations or deleting anonymous users in bulk.
-The registered onboarding path remains unchanged; its known stale behavior is
-outside the guest lane.
+Authentication continues to land both guest and registered identities directly
+in ordinary chat. Guest behavior differs through verified identity,
+persistence, allowances, and conversion policy, not through onboarding.
 
 ## Smoke Test
 

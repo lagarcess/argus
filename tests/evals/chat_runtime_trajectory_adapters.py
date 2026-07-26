@@ -412,17 +412,6 @@ class ConcreteTrajectoryRuntime:
         clear_openrouter_route_receipts()
         self._client = TestClient(app)
         self._client.post("/api/v1/dev/reset")
-        self._client.patch(
-            "/api/v1/me",
-            json={
-                "onboarding": {
-                    "stage": "ready",
-                    "language_confirmed": True,
-                    "primary_goal": "test_stock_idea",
-                    "completed": False,
-                }
-            },
-        )
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -483,17 +472,6 @@ class ConcreteTrajectoryRuntime:
         if state is not None:
             return state
         self._http.post("/api/v1/dev/reset").raise_for_status()
-        self._http.patch(
-            "/api/v1/me",
-            json={
-                "onboarding": {
-                    "stage": "ready",
-                    "language_confirmed": True,
-                    "primary_goal": "test_stock_idea",
-                    "completed": False,
-                }
-            },
-        ).raise_for_status()
         clear_openrouter_route_receipts()
         response = self._http.post(
             "/api/v1/conversations",

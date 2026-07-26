@@ -130,11 +130,17 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
 - `is_admin`: `boolean` (Default: `false`)
-- `onboarding`: `jsonb` (Default: `{}`)
+- `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
+  to the historical shape below)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
-### Onboarding Shape
+### Legacy Onboarding Shape (inert compatibility state)
+
+The explicit onboarding flow is removed. This column persists only because
+existing rows carry it and removing it would be a destructive migration. No
+product behavior reads it, and no API path writes it.
+
 ```json
 {
   "completed": false,

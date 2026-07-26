@@ -5,13 +5,11 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { getMe, type HistoryItem } from "@/lib/argus-api";
-import { privateAlphaOnboardingEnabled } from "@/lib/private-alpha-flags";
+import type { HistoryItem } from "@/lib/argus-api";
 
 type UseChatSurfaceLifecycleInput = {
   conversationId: string | null;
   setHistoryItems: Dispatch<SetStateAction<HistoryItem[]>>;
-  setShowOnboardingGoalCards: Dispatch<SetStateAction<boolean>>;
   resetToEmptyChatSurface: (conversationId?: string | null) => void;
   closeTransientSidebar: () => void;
   refreshHistory: () => void;
@@ -20,7 +18,6 @@ type UseChatSurfaceLifecycleInput = {
 export function useChatSurfaceLifecycle({
   conversationId,
   setHistoryItems,
-  setShowOnboardingGoalCards,
   resetToEmptyChatSurface,
   closeTransientSidebar,
   refreshHistory,
@@ -28,25 +25,12 @@ export function useChatSurfaceLifecycle({
   const startNewChat = useCallback(async () => {
     resetToEmptyChatSurface();
     closeTransientSidebar();
-    try {
-      const me = await getMe();
-      const stage = me.user.onboarding.stage;
-      setShowOnboardingGoalCards(
-        me.account_kind !== "guest" &&
-          privateAlphaOnboardingEnabled &&
-          (stage === "language_selection" ||
-            stage === "primary_goal_selection"),
-      );
-    } catch {
-      setShowOnboardingGoalCards(false);
-    }
     refreshHistory();
     return null;
   }, [
     closeTransientSidebar,
     refreshHistory,
     resetToEmptyChatSurface,
-    setShowOnboardingGoalCards,
   ]);
 
   const handleConversationRemoved = useCallback(

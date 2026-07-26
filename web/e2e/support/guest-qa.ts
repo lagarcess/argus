@@ -2385,7 +2385,6 @@ export class BackendController {
           ...process.env,
           ARGUS_GUEST_ACCESS_ENABLED: "true",
           ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED: String(publicAccountsEnabled),
-          ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED: "false",
           ARGUS_MOCK_AUTH: "false",
           ...(options.openRouterApiKey !== undefined
             ? { OPENROUTER_API_KEY: options.openRouterApiKey }

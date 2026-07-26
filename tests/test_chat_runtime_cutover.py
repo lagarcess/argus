@@ -19,21 +19,6 @@ def _client() -> TestClient:
     return client
 
 
-def _set_onboarding_ready(client: TestClient, primary_goal: str = "surprise_me") -> None:
-    response = client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": primary_goal,
-                "completed": False,
-            }
-        },
-    )
-    assert response.status_code == 200
-
-
 def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
     monkeypatch,
 ) -> None:
@@ -97,7 +82,6 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
     )
 
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -198,7 +182,6 @@ def test_inline_and_threaded_streams_use_one_scope(
     monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
 
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
     response = client.post(
         "/api/v1/chat/stream",
@@ -251,7 +234,6 @@ def test_post_admission_builder_failure_owns_recovery_and_evidence(
     monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
 
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
     response = client.post(
         "/api/v1/chat/stream",
@@ -288,7 +270,6 @@ def test_post_admission_builder_failure_owns_recovery_and_evidence(
 @pytest.mark.parametrize(
     ("route", "expected_terminal"),
     [
-        ("onboarding_goal", "advanced"),
         ("cancel", "finished"),
         ("deterministic_recovery", "redirected"),
     ],
@@ -323,21 +304,7 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
         "conversation_id": conversation["id"],
         "language": "en",
     }
-    if route == "onboarding_goal":
-        client.patch(
-            "/api/v1/me",
-            json={
-                "onboarding": {
-                    "stage": "primary_goal_selection",
-                    "language_confirmed": True,
-                    "primary_goal": None,
-                    "completed": False,
-                }
-            },
-        )
-        request_payload["message"] = "__ONBOARDING_GOAL__:test_stock_idea"
-    elif route == "cancel":
-        _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    if route == "cancel":
         api_state.store.messages[conversation["id"]].append(
             prepare_message(
                 conversation_id=conversation["id"],
@@ -367,7 +334,6 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
             "payload": {"confirmation_id": "confirmation-1"},
         }
     else:
-        _set_onboarding_ready(client, primary_goal="test_stock_idea")
         monkeypatch.setattr(
             agent_router,
             "stale_confirmation_action_message",
@@ -400,12 +366,11 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
     assert summary["calls_reserved"] == 0
     assert summary["provider_receipt_count"] == 0
     summary_json = json.dumps(summary)
-    assert "__ONBOARDING_GOAL__" not in summary_json
     assert "That draft is no longer active." not in summary_json
     assert active_turn_execution() is None
 
 
-def test_normal_onboarding_language_enters_runtime_and_persists_summary(
+def test_ordinary_message_enters_runtime_and_persists_summary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.turn_execution import active_turn_execution
@@ -440,17 +405,6 @@ def test_normal_onboarding_language_enters_runtime_and_persists_summary(
 
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "primary_goal_selection",
-                "language_confirmed": True,
-                "primary_goal": None,
-                "completed": False,
-            }
-        },
-    )
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -514,7 +468,6 @@ def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
     )
 
     client = _client()
-    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(

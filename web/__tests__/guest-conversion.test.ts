@@ -114,10 +114,7 @@ describe("guest conversion contract", () => {
   test("uses one shared validated auth form in landing and centered modal", () => {
     const sharedPath = join(root, "components/auth/AuthForm.tsx");
     const modalPath = join(root, "components/guest/GuestConversionModal.tsx");
-    const landing = readFileSync(
-      join(root, "components/auth/AuthLanding.tsx"),
-      "utf-8",
-    );
+    const landing = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
     expect(existsSync(sharedPath)).toBe(true);
     expect(existsSync(modalPath)).toBe(true);

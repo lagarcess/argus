@@ -299,6 +299,7 @@ def test_guest_history_returns_only_the_bound_conversation_with_expiry(
                 "type": "chat",
                 "id": CONVERSATION_ID,
                 "title": "Temporary idea",
+                "title_source": "system_default",
                 "subtitle": "A truthful preview",
                 "pinned": False,
                 "created_at": conversation.updated_at.isoformat().replace("+00:00", "Z"),

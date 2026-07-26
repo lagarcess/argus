@@ -14,7 +14,6 @@ from argus.api.schemas import (
     Idea,
     IdeaVersion,
     Message,
-    OnboardingState,
     Strategy,
     User,
 )
@@ -118,7 +117,6 @@ class AlphaStore:
                 locale="en-US",
                 theme="dark",
                 is_admin=True,
-                onboarding=OnboardingState(),
                 created_at=now,
                 updated_at=now,
             )

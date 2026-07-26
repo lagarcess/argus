@@ -54,3 +54,12 @@ Added in the 2026-07-23 interim-slate reconciliation:
 
 Compatibility pointers remain at the former spec/plan paths where existing
 issues, PRs, or historical plans link to them.
+
+## Active regression contracts retained outside this archive
+
+The completed Always Progresses design and implementation plan remain under
+`docs/superpowers/` because guest mode and later conversational slices still use
+their typed lifecycle, recovery, retry, and reload requirements as a standing
+quality bar. Their status headers mark the implementation complete and forbid
+wholesale redispatch. Move them here only after no active or planned product
+surface consumes that regression contract.

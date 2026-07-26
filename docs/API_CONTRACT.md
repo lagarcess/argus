@@ -45,13 +45,15 @@ Metrics are context-specific at the presentation layer but canonical at the engi
 
 Every backtest run must be reproducible from its `config_snapshot`. Defaults must be persisted, and result cards must show the assumptions used during execution.
 
-## Conversational Onboarding
+## First Use Is Ordinary Chat
 
-Onboarding is a conversational state machine, not a rigid form wizard. AI can guide progression dynamically, and the profile state exists to personalize prompts and improve recommendations.
+There is no explicit onboarding flow. Authentication leads directly into
+normal chat, localized generic starter prompts reduce blank-page friction,
+and the first successful backtest is the meaningful onboarding milestone.
 
 ## Ask Only What Improves the Next Useful Response
 
-Do not block users with friction. Language improves comprehension; primary goal improves the quality of the first AI prompt. Everything else should be delayed until contextually useful or derived through conversation.
+Do not block users with friction. Language is chosen at signup and improves comprehension. Everything else should be delayed until contextually useful or derived through conversation.
 
 ## Language & Locale Consistency
 
@@ -708,6 +710,9 @@ Application-facing user object.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
 - Argus `profiles` table owns product preferences.
+- `onboarding` is deprecated legacy compatibility state from the removed
+  explicit onboarding flow. It stays in responses so deployed clients keep a
+  stable `/me` shape, but no product behavior reads it and no API writes it.
 
 ## Conversation
 
@@ -1817,7 +1822,7 @@ fabricate registered hour/day windows.
 
 ## `PATCH /me`
 
-Update profile preferences and onboarding state. Partial update semantics are supported; clients do not need to resend the full onboarding object.
+Update profile preferences. Partial update semantics are supported.
 
 **Request:**
 ```json
@@ -1825,21 +1830,7 @@ Update profile preferences and onboarding state. Partial update semantics are su
   "display_name": "Lucas",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark",
-  "onboarding": {
-    "stage": "primary_goal_selection",
-    "language_confirmed": true
-  }
-}
-```
-
-**Example primary_goal update:**
-```json
-{
-  "onboarding": {
-    "stage": "ready",
-    "primary_goal": "test_stock_idea"
-  }
+  "theme": "dark"
 }
 ```
 
@@ -1851,10 +1842,11 @@ Update profile preferences and onboarding state. Partial update semantics are su
 ```
 
 **Partial Update Behavior:**
-- Backend merges nested `onboarding` safely.
-- Null values are allowed where fields are unknown.
 - Clients may send only the fields that changed.
+- Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- A legacy `onboarding` object from an old client is ignored; the API cannot
+  write onboarding state.
 
 ---
 
@@ -1894,38 +1886,31 @@ Argus supports English and Spanish (Latin America) in Alpha.
 
 ---
 
-# 10. Onboarding State Machine
+# 10. Legacy Onboarding Compatibility (Removed Flow)
 
-Alpha onboarding is designed to reduce friction and get users into the chat experience immediately. The real onboarding is the first successful backtest.
+The explicit private-alpha onboarding product (language/goal gate, chat goal
+cards, and the hidden `__ONBOARDING_*` control-message protocol) is removed.
+Authentication leads directly into normal chat; localized generic starter
+prompts reduce blank-page friction; and the first successful backtest is the
+meaningful onboarding milestone.
 
-## Supported Onboarding Stages
-- `language_selection`
-- `primary_goal_selection`
-- `ready`
-- `completed`
+What remains is inert compatibility state only:
 
-*Note: User should reach the chat surface immediately after language and primary goal selection.*
-
-## Primary Goals (Alpha Enum)
-The `primary_goal` field routes the initial AI behavior and reduces "blank page" friction.
-
-- `learn_basics`: Suggest beginner-safe concepts and simple explainers.
-- `test_stock_idea`: Invite user to name a symbol or investment thesis.
-- `build_passive_strategy`: Suggest long-term DCA or index-tracking starters.
-- `explore_crypto`: Prioritize crypto-supported templates and symbols.
-- `surprise_me`: Provide guided, diverse starter prompts.
-
-## AI Behavior Guidance
-After onboarding, the AI should use the `primary_goal` to personalize the first prompt:
-
-- **learn_basics** -> "Welcome! Let's start simple. Want to see how a basic 'Buy the Dip' strategy works with Apple?"
-- **test_stock_idea** -> "I'm ready. What's a stock or crypto you're watching, and what's your idea for it?"
-- **explore_crypto** -> "Crypto markets are active. Want to test an RSI strategy on Bitcoin or Solana?"
+- `profiles.onboarding` stays as legacy JSON on existing rows (the applied
+  migration's column default still materializes the historical shape on new
+  rows). No product behavior reads it, and no API path can write it.
+- `GET /me` keeps returning the deprecated `onboarding` object so deployed
+  clients retain a stable shape during rollouts.
+- Legacy persisted `__ONBOARDING_SKIP__` / `__ONBOARDING_GOAL__:<goal>` user
+  messages must remain hidden from conversation history, previews, retry
+  projections, and search. Read surfaces share one legacy filter
+  (`argus.api.chat.legacy_onboarding_markers`); it cannot create, accept,
+  route, or persist an onboarding turn. Marker-shaped text typed today is an
+  ordinary chat message.
 
 ## Product & Architecture Notes
 - **Frictionless**: Do not collect age, phone numbers, or complex risk tolerance profiles in Alpha.
-- **Conversational**: Further personalization happens contextually inside the chat.
-- **Storage**: Onboarding state belongs in the canonical Supabase profile store.
+- **Conversational**: Personalization happens contextually inside the chat.
 - **Future Compatibility**: Richer preferences (watchlists, memory) may be added later as conversation-derived data.
 
 ---
@@ -2928,6 +2913,7 @@ Mixed recent activity feed.
       "type": "chat",
       "id": "uuid",
       "title": "Tesla dip thread",
+      "title_source": "ai_generated",
       "subtitle": "Last message or metric preview",
       "pinned": false,
       "created_at": "timestamp",
@@ -2938,6 +2924,11 @@ Mixed recent activity feed.
   "next_cursor": null
 }
 ```
+
+`title_source` is present on `chat` items only (`system_default | ai_generated
+| user_renamed`, mirroring the conversation record). While it is
+`system_default`, clients should render a localized "New chat" placeholder
+instead of the stored default title.
 
 A verified guest receives at most its one workspace-bound conversation.
 `expires_at` is the exact fixed workspace expiry. Clients may localize its

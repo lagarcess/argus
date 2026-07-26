@@ -1,6 +1,7 @@
 # Argus Always Progresses: End-to-End Conversation Continuity Design
 
-Status: **FOUNDER-APPROVED DESIGN — implementation handoff authorized**
+Status: **BASELINE DELIVERED — active regression contract; do not redispatch as
+an open-ended implementation program**
 
 Date: 2026-07-23
 
@@ -8,6 +9,9 @@ Authoritative roadmap outcome: **Argus always progresses**
 
 Design baseline: `codex/private-alpha-next` at
 `9bcdb8ee06b61381b6915f6e68a89ba5073a609d`
+
+Delivered by PR #268 at reviewed head `5585c6a`; merged into
+`codex/private-alpha-next` as `847c413b`.
 
 Primary coordination issue:
 [#237](https://github.com/lagarcess/argus/issues/237)

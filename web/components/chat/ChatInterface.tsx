@@ -3,11 +3,7 @@
 import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
-  Edit2,
-  MoreVertical,
-  Pin,
   Plus,
-  Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -29,7 +25,6 @@ import {
   useGuestSendBridge,
   type GuestResumeSend,
 } from "@/components/guest/useGuestExperience";
-import { useAccount, useAccountRefresh } from "@/lib/account-context";
 import {
   createConversation,
   deleteConversation,
@@ -38,7 +33,7 @@ import {
   listHistory,
   logoutFromApi,
   patchConversation,
-  patchMe,
+  getMe,
   resultCardFromRun,
   streamChatMessage,
   ChatStreamError,
@@ -46,14 +41,12 @@ import {
   type ChatActionRequest,
   type HistoryItem,
   type BacktestRun,
-  type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
 import {
   chatExploratorySuggestionsEnabled,
   collectionsEnabled,
   omnisearchEnabled,
-  privateAlphaOnboardingEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
@@ -124,8 +117,12 @@ import {
   attentionAfterTurnSettled,
 } from "@/lib/chat-attention-state";
 import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
+import { renamePrefillTitle } from "@/lib/chat-title-display";
+import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
+import ChatHeaderMenu from "./ChatHeaderMenu";
+import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
@@ -169,12 +166,6 @@ type SendOptions = {
   replacementAssistantId?: string;
   bypassGuestGate?: boolean;
 };
-type OnboardingChoice = {
-  goal: PrimaryGoal;
-  title: string;
-  description: string;
-};
-
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
@@ -273,55 +264,20 @@ function isMissingConversationLoadError(error: unknown) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
-  const account = useAccount();
-  const refreshAccount = useAccountRefresh();
   const { t, i18n } = useTranslation();
   const router = useRouter();
-
-  const onboardingChoices = useMemo<OnboardingChoice[]>(
-    () => [
-      {
-        goal: "learn_basics",
-        title: t(
-          "onboarding.goals.learn_basics.title",
-          "Learn investing basics",
-        ),
-        description: t(
-          "onboarding.goals.learn_basics.description",
-          "Start with simple ideas and clear explanations.",
-        ),
-      },
-      {
-        goal: "build_passive_strategy",
-        title: t(
-          "onboarding.goals.build_passive_strategy.title",
-          "Build a passive strategy",
-        ),
-        description: t(
-          "onboarding.goals.build_passive_strategy.description",
-          "Focus on long-term, low-maintenance ideas.",
-        ),
-      },
-      {
-        goal: "test_stock_idea",
-        title: t("onboarding.goals.test_stock_idea.title", "Test a stock idea"),
-        description: t(
-          "onboarding.goals.test_stock_idea.description",
-          "Validate a thesis on symbols you follow.",
-        ),
-      },
-      {
-        goal: "explore_crypto",
-        title: t("onboarding.goals.explore_crypto.title", "Explore crypto"),
-        description: t(
-          "onboarding.goals.explore_crypto.description",
-          "Try crypto-focused strategy starters.",
-        ),
-      },
-    ],
-    [t],
-  );
-
+  const [account, setAccount] = useState<Awaited<
+    ReturnType<typeof getMe>
+  > | null>(null);
+  const refreshAccount = useCallback(async () => {
+    const nextAccount = await getMe();
+    setAccount(nextAccount);
+    const resolvedLanguage = nextAccount.user.language ?? i18n.language;
+    if (resolvedLanguage && resolvedLanguage !== i18n.language) {
+      await i18n.changeLanguage(resolvedLanguage);
+    }
+    return nextAccount;
+  }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -348,9 +304,11 @@ export default function ChatInterface() {
   );
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
-  const [isHydratingConversation, setIsHydratingConversation] = useState(true);
+  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  // First paint waits for the authenticated profile language so a fresh
+  // browser cannot send starter prompts in the wrong language.
+  const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
@@ -365,7 +323,6 @@ export default function ChatInterface() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
-  const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
   const activeStreamConversationIdRef = useRef<string | null>(null);
@@ -662,20 +619,35 @@ export default function ChatInterface() {
     let cancelled = false;
     (async () => {
       try {
-        const meResponse = account;
-        if (!meResponse) {
-          throw new Error("Verified account context is unavailable.");
+        let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
+        let profileUnreachable = false;
+        try {
+          meResponse = await getMe();
+          if (!cancelled) setAccount(meResponse);
+        } catch (error) {
+          const status =
+            typeof error === "object" && error !== null && "status" in error
+              ? (error as { status?: number }).status
+              : undefined;
+          profileUnreachable = status !== 401 && status !== 403;
         }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
         }
-        const stage = meResponse?.user?.onboarding?.stage;
-        const showRegisteredOnboarding =
-          meResponse?.account_kind !== "guest" &&
-          privateAlphaOnboardingEnabled &&
-          (stage === "language_selection" ||
-            stage === "primary_goal_selection");
+        if (cancelled) return;
+        setIsBootstrappingProfile(false);
+        if (profileUnreachable) {
+          setMessages([
+            {
+              id: "offline",
+              role: "ai",
+              kind: "text",
+              content: t('chat.error_offline'),
+            },
+          ]);
+          return;
+        }
         let activeConversationId = readActiveConversationIdFromUrl();
         if (!activeConversationId && meResponse?.account_kind === "guest") {
           const { items } = await listConversations({ limit: 2 });
@@ -691,7 +663,6 @@ export default function ChatInterface() {
             if (hydrated.messages.length === 0) {
               // clear empty persisted conversations from the active route.
               resetToEmptyChatSurface();
-              setShowOnboardingGoalCards(showRegisteredOnboarding);
               return;
             }
             rememberActiveConversationId(activeConversationId);
@@ -699,8 +670,6 @@ export default function ChatInterface() {
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
             setIsHydratingConversation(false);
-            setShowOnboardingGoalCards(showRegisteredOnboarding);
-
             return;
           } catch (error) {
             if (cancelled) return;
@@ -715,7 +684,6 @@ export default function ChatInterface() {
                 ),
               );
               resetToEmptyChatSurface();
-              setShowOnboardingGoalCards(showRegisteredOnboarding);
               return;
             }
             rememberActiveConversationId(activeConversationId);
@@ -728,16 +696,15 @@ export default function ChatInterface() {
             ]);
             setInputActions([]);
             setIsHydratingConversation(false);
-            setShowOnboardingGoalCards(false);
             return;
           }
         }
 
         if (cancelled || hasAcceptedUserInputRef.current) return;
         resetToEmptyChatSurface();
-        setShowOnboardingGoalCards(showRegisteredOnboarding);
       } catch {
         if (cancelled) return;
+        setIsBootstrappingProfile(false);
         setMessages([
           {
             id: "offline",
@@ -871,7 +838,6 @@ export default function ChatInterface() {
   } = useChatSurfaceLifecycle({
     conversationId,
     setHistoryItems,
-    setShowOnboardingGoalCards,
     resetToEmptyChatSurface,
     closeTransientSidebar,
     refreshHistory,
@@ -1558,117 +1524,6 @@ export default function ChatInterface() {
   };
 
   useGuestSendBridge(guestSendRef, handleSend);
-  const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
-    let targetConversationId = conversationId;
-    if (!targetConversationId) {
-      try {
-        const { conversation } = await createConversation(i18n.language);
-        targetConversationId = conversation.id;
-        rememberActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-      } catch {
-        showToast(t("chat.error_generic"));
-        return;
-      }
-    }
-    const isSkip = goal === "surprise_me";
-    const hiddenMessage = isSkip
-      ? "__ONBOARDING_SKIP__"
-      : `__ONBOARDING_GOAL__:${goal}`;
-    const userCopy = isSkip
-      ? t("onboarding.skip", "Skip for now")
-      : (onboardingChoices.find((choice) => choice.goal === goal)?.title ??
-        goal);
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      kind: "text",
-      content: userCopy,
-    };
-    const assistantId = crypto.randomUUID();
-
-    setMessages((prev) => {
-      shouldAutoScrollRef.current = true;
-      const base = markComposerActionsInactive(prev);
-      if (isSkip)
-        return [
-          ...base,
-          { id: assistantId, role: "ai", kind: "text", content: "" },
-        ];
-      return [
-        ...base,
-        userMsg,
-        { id: assistantId, role: "ai", kind: "text", content: "" },
-      ];
-    });
-    setStreamStatus(t("chat.status.understanding"));
-    setIsStreamingResponse(true);
-    closeTransientSidebar();
-    let onboardingStreamFailed = false;
-
-    try {
-      await streamChatMessage(
-        targetConversationId,
-        hiddenMessage,
-        i18n.language,
-        (event) => {
-          if (event.event === "token") {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
-                  : m,
-              ),
-            );
-          }
-          if (event.event === "error") {
-            onboardingStreamFailed = true;
-            setStreamStatus(null);
-            setIsStreamingResponse(false);
-            setShowOnboardingGoalCards(true);
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: t("chat.error_backtest") }
-                  : m,
-              ),
-            );
-            markConversationAttentionIfOutOfFocus(targetConversationId);
-          }
-          if (event.event === "done") {
-            if (onboardingStreamFailed) return;
-            setStreamStatus(null);
-            setIsStreamingResponse(false);
-            setShowOnboardingGoalCards(false);
-            schedulePostTurnHistoryRefresh(targetConversationId);
-            markConversationAttentionIfOutOfFocus(targetConversationId);
-          }
-        },
-      );
-      if (onboardingStreamFailed) return;
-      await patchMe({
-        onboarding: {
-          stage: "ready",
-          language_confirmed: true,
-          primary_goal: goal,
-          completed: true,
-        },
-      });
-    } catch {
-      setStreamStatus(null);
-      setIsStreamingResponse(false);
-      setShowOnboardingGoalCards(true);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: t("chat.error_backtest") }
-            : m,
-        ),
-      );
-      markConversationAttentionIfOutOfFocus(targetConversationId);
-    }
-  };
-
   // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
@@ -1912,13 +1767,22 @@ export default function ChatInterface() {
     [conversationId, historyItems],
   );
 
+  const {
+    activeTitleRecord,
+    headerConversationTitle,
+    headerConversationTitleSource,
+  } = useActiveConversationTitle({
+    conversationId,
+    activeHistoryChat,
+    messageCount: messages.length,
+    isStreamingResponse,
+    isChatViewActive: currentView === "chat",
+    placeholder: t("chat.new_chat", "New chat"),
+  });
+
   const handleStartHeaderRename = () => {
     if (!conversationId) return;
-    setHeaderRenameValue(
-      activeHistoryChat?.title && activeHistoryChat.title !== t("chat.new_chat")
-        ? activeHistoryChat.title
-        : "",
-    );
+    setHeaderRenameValue(renamePrefillTitle(activeTitleRecord));
     setIsRenamingHeaderChat(true);
   };
 
@@ -1979,23 +1843,6 @@ export default function ChatInterface() {
     }
   };
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        chatOptionsRef.current &&
-        !chatOptionsRef.current.contains(event.target as Node)
-      ) {
-        closeChatOptions();
-      }
-    }
-    if (showChatOptions) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [closeChatOptions, showChatOptions]);
-
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
     : visibleComposerResponseActions(inputActions);
@@ -2021,6 +1868,14 @@ export default function ChatInterface() {
       : t("chat.followup_placeholder", "Ask a follow-up...");
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (isBootstrappingProfile) {
+    return (
+      <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
@@ -2098,7 +1953,7 @@ export default function ChatInterface() {
         description={t(
           "sidebar.delete_confirm.description",
           "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          { title: t("common.conversation", "Conversation") },
+          { title: headerConversationTitle },
         )}
         confirmLabel={t(
           "sidebar.delete_confirm.confirm",
@@ -2116,124 +1971,48 @@ export default function ChatInterface() {
       <section className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]">
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
-          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
-            {/* Empty space for sidebar toggle alignment balance */}
-            <div className="w-11 md:w-32" />
-
-            {/* Title (Always Centered relative to Content) */}
-            <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
-              {currentView === "chat" &&
-                messages.length > 0 &&
-                t("common.conversation", "Conversation")}
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-4 px-4 pointer-events-none md:px-8">
+            {/* Title (left-aligned; truncates before the action cluster) */}
+            <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+              {currentView === "chat" && messages.length > 0 && (
+                <ChatHeaderTitle
+                  conversationId={conversationId}
+                  title={headerConversationTitle}
+                  titleSource={headerConversationTitleSource}
+                />
+              )}
               {currentView === "strategies" && t("common.strategies")}
             </h1>
 
-            {/* Action Button (Always Right-Anchored) */}
-            <div
-              className={`flex justify-end pointer-events-auto ${
-                isGuest ? "w-auto md:w-64" : "w-11 md:w-32"
-              }`}
-            >
-              {currentView === "chat" &&
-                (isGuest ? (
+            {/* Action cluster (guest settings or durable owner menu) */}
+            <div className="flex shrink-0 justify-end pointer-events-auto">
+              {currentView === "chat" && conversationId && (
+                isGuest ? (
                   <GuestHeader
                     expiresAt={account?.guest?.expires_at ?? null}
                     onFeedback={requestGuestFeedback}
                     onSignIn={requestGuestSignIn}
                   />
-                ) : (
-                  <div className="relative" ref={chatOptionsRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowChatOptions(!showChatOptions)}
-                      className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                      aria-label={t("chat.chat_options", "Chat options")}
-                    >
-                      <MoreVertical className="h-5 w-5" />
-                    </button>
-                    {showChatOptions && (
-                      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2">
-                        <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
-                        {!isRenamingHeaderChat ? (
-                          <div className="py-1">
-                            <button
-                              type="button"
-                              disabled={!conversationId}
-                              onClick={handleStartHeaderRename}
-                              className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                            >
-                              <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                              {t("chat.rename_chat", "Rename chat")}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!conversationId || isPinningHeaderChat}
-                              onClick={() => {
-                                void handleToggleHeaderPin();
-                              }}
-                              className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                            >
-                              <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                              {activeHistoryChat?.pinned
-                                ? t("chat.unpin_chat", "Unpin chat")
-                                : t("chat.pin_chat", "Pin chat")}
-                            </button>
-                            <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
-                            <button
-                              type="button"
-                              disabled={!conversationId || isDeletingHeaderChat}
-                              onClick={handleRequestHeaderDelete}
-                              className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
-                            >
-                              <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
-                              {t("chat.delete_chat")}
-                            </button>
-                          </div>
-                        ) : (
-                          <form
-                            className="space-y-2 px-5 py-3"
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              void handleSaveHeaderRename();
-                            }}
-                          >
-                            <label className="block text-[12px] font-medium text-black/45 dark:text-white/45">
-                              {t("chat.rename_chat", "Rename chat")}
-                            </label>
-                            <input
-                              autoFocus
-                              value={headerRenameValue}
-                              onChange={(event) =>
-                                setHeaderRenameValue(
-                                  event.target.value.slice(0, 80),
-                                )
-                              }
-                              className="w-full rounded-[12px] border border-black/10 bg-black/[0.02] px-3 py-2 text-[14px] font-medium text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-white/25"
-                              maxLength={80}
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                type="submit"
-                                disabled={isSavingHeaderRename}
-                                className="min-h-9 flex-1 rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50 dark:bg-white dark:text-black"
-                              >
-                                {t("common.save")}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isSavingHeaderRename}
-                                onClick={() => setIsRenamingHeaderChat(false)}
-                                className="min-h-9 flex-1 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
-                              >
-                                {t("common.cancel")}
-                              </button>
-                            </div>
-                          </form>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                ) : conversationId && canManageConversation ? (
+                  <ChatHeaderMenu
+                    isOpen={showChatOptions}
+                    onToggleOpen={() => setShowChatOptions(!showChatOptions)}
+                    onRequestClose={closeChatOptions}
+                    isRenaming={isRenamingHeaderChat}
+                    renameValue={headerRenameValue}
+                    onRenameValueChange={setHeaderRenameValue}
+                    onStartRename={handleStartHeaderRename}
+                    onSaveRename={() => void handleSaveHeaderRename()}
+                    onCancelRename={() => setIsRenamingHeaderChat(false)}
+                    isSavingRename={isSavingHeaderRename}
+                    pinned={Boolean(activeHistoryChat?.pinned)}
+                    isPinning={isPinningHeaderChat}
+                    onTogglePin={() => void handleToggleHeaderPin()}
+                    isDeleting={isDeletingHeaderChat}
+                    onRequestDelete={handleRequestHeaderDelete}
+                  />
+                ) : null
+              )}
               {strategiesEnabled && currentView === "strategies" && (
                 <button
                   onClick={() => handleTriggerPrompt("strategy")}
@@ -2266,52 +2045,6 @@ export default function ChatInterface() {
                     variant="before_message"
                   />
                 </div>
-
-                {showOnboardingGoalCards && (
-                  <div
-                    className="mt-6 w-full max-w-2xl"
-                    data-testid="onboarding-goal-cards"
-                  >
-                    <p className="mb-3 text-center text-[14px] text-black/60 dark:text-white/60">
-                      {t(
-                        "onboarding.prompt",
-                        "What is your current primary goal? Don't worry, you can change it later.",
-                      )}
-                    </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {onboardingChoices.map((choice) => (
-                        <button
-                          key={choice.goal}
-                          type="button"
-                          data-testid={`onboarding-goal-${choice.goal}`}
-                          onClick={() =>
-                            handleOnboardingGoalChoice(choice.goal)
-                          }
-                          className="rounded-[14px] border border-black/10 bg-white/70 px-3 py-3 text-left transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/70 dark:hover:bg-white/5"
-                        >
-                          <p className="text-[14px] font-medium text-black dark:text-white">
-                            {choice.title}
-                          </p>
-                          <p className="mt-1 text-[12px] text-black/55 dark:text-white/55">
-                            {choice.description}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-2 flex justify-center">
-                      <button
-                        type="button"
-                        data-testid="onboarding-skip"
-                        onClick={() =>
-                          handleOnboardingGoalChoice("surprise_me")
-                        }
-                        className="text-[13px] font-medium text-black/55 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-white/55 dark:hover:text-white"
-                      >
-                        {t("onboarding.skip", "Skip for now")}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 <StarterActions
                   disabled={isStreamingResponse || isHydratingConversation}

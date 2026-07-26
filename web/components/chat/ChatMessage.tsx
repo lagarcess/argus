@@ -178,13 +178,6 @@ export default function ChatMessage({
 
   const getDisplayContent = () => {
     const content = message.content ?? "";
-    if (content.startsWith("__ONBOARDING_SKIP__")) {
-      return t("onboarding.skip", "Skip for now");
-    }
-    if (content.startsWith("__ONBOARDING_GOAL__:")) {
-      const goal = content.split(":")[1];
-      return t(`onboarding.goals.${goal}.title`, goal);
-    }
     if (!isUser && message.recoveryDisplay) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t);
       if (recovered.trim()) {

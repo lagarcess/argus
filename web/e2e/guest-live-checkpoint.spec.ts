@@ -22,18 +22,16 @@ test("@guest-live thin anonymous entry, turn, and reload checkpoint", async ({
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const firstMe = (await (await firstMeResponse).json()) as {
     account_kind: string;
-    user: { id: string; onboarding: { primary_goal: string | null } };
+    user: { id: string };
     guest: { expires_at: string } | null;
   };
 
   expect(firstMe.account_kind).toBe("guest");
-  expect(firstMe.user.onboarding.primary_goal).toBeNull();
   expect(firstMe.guest?.expires_at).toBeTruthy();
   await expect(page.getByTestId("chat-input")).toBeVisible({
     timeout: 30_000,
   });
   await expect(page).toHaveURL(/\/chat(?:\?|$)/);
-  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 
   const streamResponse = page.waitForResponse(
     (response) =>

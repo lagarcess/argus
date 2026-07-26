@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import ChatInterface from "@/components/chat/ChatInterface";
-import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
+import { DevModeBadge } from "@/components/ui/DevModeBadge";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,9 +24,8 @@ export default async function ChatPage() {
 
   return (
     <main className="min-h-[100dvh] bg-background text-foreground selection:bg-black/10 dark:selection:bg-white/20">
-      <OnboardingGate>
-        <ChatInterface />
-      </OnboardingGate>
+      <DevModeBadge />
+      <ChatInterface />
     </main>
   );
 }

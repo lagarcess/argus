@@ -427,40 +427,9 @@ async def _runtime_success_events(**kwargs: Any):
 
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import main as api_main
     from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
 
-    monkeypatch.setattr(
-        api_main,
-        "".join(["orchestrate_chat", "_turn"]),
-        lambda **kwargs: (
-            dict(
-                intent="onboarding_prompt",
-                assistant_message=(
-                    "What is your current primary goal? Don't worry, "
-                    "you can change it later in Settings."
-                ),
-                strategy_draft=None,
-                title_suggestion=None,
-            )
-            if kwargs.get("onboarding_required")
-            else dict(
-                intent="run_backtest",
-                assistant_message=(
-                    "Probé la idea con TSLA."
-                    if str(kwargs.get("language")).lower().startswith("es")
-                    else "I tested that idea with TSLA."
-                ),
-                strategy_draft=dict(
-                    template=dict(value="rsi_mean_reversion", source="user_supplied"),
-                    symbols=dict(value=["TSLA"], source="user_supplied"),
-                ),
-                title_suggestion="TSLA idea",
-            )
-        ),
-        raising=False,
-    )
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -902,7 +871,7 @@ def test_me_usage_returns_problem_details_when_durable_truth_is_unavailable(
     assert response.headers["X-Request-Id"] == "usage-read-failure"
 
 
-def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
+def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
     before = _mock_profile(stage="language_selection")
     mock_gateway.get_user.return_value = before
 
@@ -913,15 +882,14 @@ def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
 
     response = client.patch(
         "/api/v1/me",
-        json={"onboarding": {"language_confirmed": True}},
+        json={"theme": "light", "onboarding": {"language_confirmed": False}},
         headers={"Authorization": "Bearer test-token"},
     )
 
     assert response.status_code == 200
-    onboarding = response.json()["user"]["onboarding"]
-    assert onboarding["stage"] == "language_selection"
-    assert onboarding["language_confirmed"] is True
-    assert onboarding["primary_goal"] is None
+    user = response.json()["user"]
+    assert user["theme"] == "light"
+    assert user["onboarding"] == before.onboarding.model_dump()
     mock_gateway.update_user.assert_called_once()
 
 
@@ -1484,7 +1452,7 @@ def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
     mock_gateway.create_message.assert_not_called()
 
 
-def test_chat_stream_supabase_sends_normal_onboarding_language_to_runtime(mock_gateway):
+def test_chat_stream_supabase_sends_legacy_stage_profile_to_runtime(mock_gateway):
     now = utcnow()
     conversation = Conversation(
         id="conv-2",
@@ -1534,7 +1502,7 @@ def test_chat_stream_supabase_sends_normal_onboarding_language_to_runtime(mock_g
     mock_gateway.finalize_backtest_completion.assert_called_once()
 
 
-def test_chat_stream_supabase_does_not_persist_hidden_onboarding_messages(mock_gateway):
+def test_chat_stream_supabase_treats_marker_text_as_ordinary_turn(mock_gateway):
     now = utcnow()
     conversation = Conversation(
         id="conv-3",
@@ -2770,6 +2738,48 @@ def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
         deleted=False,
         archived=False,
     )
+
+
+def test_history_supabase_chat_items_carry_title_source(mock_gateway):
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [
+            {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "title": "NVDA Buy and Hold",
+                "title_source": "ai_generated",
+                "last_message_preview": "Use NVDA from January 3, 2023",
+                "pinned": False,
+                "updated_at": "2026-07-01T00:00:00+00:00",
+            }
+        ],
+        "strategies": [
+            {
+                "id": "33333333-3333-3333-3333-333333333333",
+                "name": "NVDA momentum",
+                "symbols": ["NVDA"],
+                "pinned": False,
+                "updated_at": "2026-07-01T00:00:00+00:00",
+            }
+        ],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    chat_items = [
+        item for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert [item["title_source"] for item in chat_items] == ["ai_generated"]
+    non_chat_items = [
+        item for item in response.json()["items"] if item["type"] != "chat"
+    ]
+    assert non_chat_items
+    assert all("title_source" not in item for item in non_chat_items)
 
 
 def test_history_supabase_can_request_archived_rows(mock_gateway):

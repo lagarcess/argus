@@ -18,15 +18,16 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-22
+## Active Post-Promotion Pointer — 2026-07-25
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `bbd1d2b`.
-It contains the founder-accepted graph-range, account-security, Usage, and
-capability-truth vertical slices from PRs #264, #261, #259, and #266. This
-pointer does not claim that the integration checkpoint is deployed or exposed
-to testers.
+`main` at `217ead12`. The current stable integration checkpoint is `b7fd6f08`.
+It contains the founder-accepted graph-range, account-security, Usage,
+capability-truth, and Always Progresses baseline slices from PRs #264, #261,
+#259, #266, and #268, plus the bounded calendar-materiality correction from
+PR #267. This pointer does not claim that the integration checkpoint is
+deployed or exposed to testers.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
@@ -121,6 +122,16 @@ slice, it must read the relevant memo sections and addenda for that slice.
 ## Current Checkpoint
 
 P0 continuity is complete on the clean reintegration line at `bbd9f10`.
+
+The explicit private-alpha onboarding product was removed as a bounded
+strip-out lane (2026-07): no language/goal gate, no chat goal cards, no hidden
+`__ONBOARDING_*` control protocol, no onboarding flags. Authentication lands
+directly in normal chat with localized generic starter prompts; the first
+successful backtest is the meaningful onboarding milestone. Legacy persisted
+onboarding profile JSON and marker messages remain inert and hidden
+(`docs/API_CONTRACT.md` section 10). Any lane that previously special-cased
+onboarding (for example a guest-mode bypass) must reconcile against this
+checkpoint when it next rebases.
 
 Done behavior:
 
@@ -901,6 +912,15 @@ independent review. Deployment and tester exposure remain separate release
 gates. The active interim roadmap now has two unfinished founder outcomes:
 **grounded discovery and suggestions** and **full Omnisearch capability**.
 
+Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
+above remains valid, but a longer same-conversation exploration at integration
+SHA `b7fd6f08` exposed untriaged gaps in cost preservation, stale-action
+presentation, fact-preserving recovery, supported strategy transitions, and
+recovery-heading ownership. Quick take voice variance and one provider-timeout
+fallback were recorded separately from confirmed continuity defects. No fix or
+GitHub issue is authorized by this note. See
+`docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
+
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
 
 - Status: DONE (PR #178, 9 atomic commits). Fees + slippage model end to end
@@ -984,9 +1004,10 @@ gates. The active interim roadmap now has two unfinished founder outcomes:
   broader discovery as unavailable until that pillar lands.
 - Always Progresses remains a separate active dependency. Do not reconcile its
   runtime work into the guest lane during this local evidence pass.
-- Known caveat: guest onboarding is bypassed by verified `account_kind`; the
-  stale registered onboarding/`primary_goal` path is unchanged and remains
-  outside the guest lane.
+- Authentication now lands both guest and registered identities directly in
+  ordinary chat. There is no guest onboarding bypass or registered
+  onboarding/`primary_goal` branch; guest behavior differs only through
+  verified identity, persistence, allowances, and conversion policy.
 - Founder decisions still open: first traffic size, CAPTCHA/provider posture,
   acceptable cost and latency bands, cleanup cadence/owner, public-account
   enablement timing, and canary approval. Public-account access must not be

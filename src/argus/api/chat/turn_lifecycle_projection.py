@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.api.chat.onboarding import parse_onboarding_control_message
+from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.retry import durable_retry_last_turn_metadata
 from argus.api.message_store import (
     list_projectable_chat_turns,
@@ -50,7 +50,7 @@ def project_chat_turn_lifecycle_messages(
         message.id
         for message in messages
         if message.role == "user"
-        and parse_onboarding_control_message(message.content) is not None
+        and is_legacy_onboarding_marker(message.content)
     }
     by_assistant_message_id = {
         str(row["assistant_message_id"]): row

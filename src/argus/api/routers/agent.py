@@ -64,13 +64,6 @@ from argus.api.chat.cancellation import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
-from argus.api.chat.onboarding import (
-    onboarding_goal_for_account,
-    parse_onboarding_control_message,
-    persist_registered_onboarding_update,
-    primary_goal_for_account,
-    registered_onboarding_required,
-)
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -113,7 +106,7 @@ from argus.api.message_store import (
     load_runtime_thread_history,
     reconcile_stale_chat_turns,
 )
-from argus.api.naming import get_starter_prompts, resolve_language
+from argus.api.naming import get_starter_prompts
 from argus.api.schemas import (
     BacktestRun,
     ChatStreamRequest,
@@ -124,7 +117,6 @@ from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
-    message_usage_settlement,
 )
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
@@ -251,8 +243,7 @@ def list_starter_prompts(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> StarterPromptsResponse:
-    context = account_context(request)
-    prompts = get_starter_prompts(primary_goal_for_account(context, user), user.language)
+    prompts = get_starter_prompts(user.language)
     return StarterPromptsResponse(prompts=prompts)
 
 
@@ -305,7 +296,6 @@ async def chat_stream(
     language = payload.language or current_user_profile.language or "en"
     request_message = chat_request_message(payload, language=language)
     display_message = chat_display_message(payload, language=language)
-    onboarding_goal = onboarding_goal_for_account(turn_account, request_message)
 
     conversation = None
     if api_state.supabase_gateway is not None:
@@ -421,15 +411,15 @@ async def chat_stream(
             raise RuntimeError("Response-option admission returned no request.")
         request_message = accepted_option_request.content
         display_message = accepted_option_request.content
-        onboarding_goal = parse_onboarding_control_message(request_message)
-        if payload.action is not None and payload.action.payload.get(
-            "request_message_id"
+        if (
+            payload.action is not None
+            and payload.action.payload.get("request_message_id")
         ):
             mention_provenance = []
     lifecycle_hooks = (
         None if is_run_backtest_turn else request_admission.lifecycle_hooks()
     )
-    deterministic_control_turn = onboarding_goal is not None or cancel_confirmation_action
+    deterministic_control_turn = cancel_confirmation_action
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
@@ -634,16 +624,6 @@ async def chat_stream(
     lifecycle_hooks = request_admission.lifecycle_hooks()
     request_message_record = lifecycle_hooks.request_message
 
-    # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
-    # flow; dev mode sets it false. The deployed API must set this to match the web
-    # service's NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED — enforced by the API release
-    # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
-    # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
-    # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
-    onboarding_required = registered_onboarding_required(
-        turn_account,
-        current_user_profile.onboarding.stage,
-    )
     action_context = request_admission.runtime_action_context()
 
     async def accepted_turn_events(
@@ -712,125 +692,6 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     saved_strategy_id=saved_strategy_id,
                 )
-
-        if onboarding_required and onboarding_goal is None:
-            lang = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            is_es = resolve_language(lang) == "es-419"
-            msg = (
-                "\u00bfCu\u00e1l es tu objetivo principal ahora? No te preocupes, "
-                "podr\u00e1s cambiarlo despu\u00e9s en Settings."
-                if is_es
-                else "What is your current primary goal? Don't worry, "
-                "you can change it later in Settings."
-            )
-            yield sse_data({"type": "stage_start", "stage": "clarify"})
-            assistant_message = lifecycle_hooks.complete(
-                content=msg,
-                metadata={
-                    "conversation_mode": "guide",
-                    "agent_runtime_stage_outcome": "await_user_reply",
-                },
-                settle_usage=message_usage_settlement(turn_account),
-            )
-            yield sse_data({"type": "token", "content": msg})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "await_user_reply",
-                        "assistant_response": msg,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            return
-
-        if onboarding_goal is not None:
-            persist_registered_onboarding_update(
-                turn_account,
-                current_user_profile,
-                {
-                    "stage": "ready",
-                    "language_confirmed": True,
-                    "primary_goal": onboarding_goal,
-                    "completed": False,
-                },
-            )
-            lang = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            is_es = resolve_language(lang) == "es-419"
-            if is_es:
-                mapping = {
-                    "learn_basics": (
-                        "Perfecto. Te ayudar\u00e9 con ideas simples para empezar. "
-                        "\u00bfQu\u00e9 activo te interesa?"
-                    ),
-                    "test_stock_idea": (
-                        "Perfecto. Cu\u00e9ntame tu idea de acci\u00f3n y la probamos."
-                    ),
-                    "build_passive_strategy": (
-                        "Perfecto. Podemos empezar con una idea pasiva tipo DCA."
-                    ),
-                    "explore_crypto": (
-                        "Perfecto. Empecemos con una idea de cripto que quieras validar."
-                    ),
-                    "surprise_me": (
-                        "Genial. Te propondr\u00e9 una idea inicial guiada para comenzar."
-                    ),
-                }
-            else:
-                mapping = {
-                    "learn_basics": (
-                        "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
-                        "walk through an asset in plain language, or set up a simple historical test. "
-                        "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
-                    ),
-                    "test_stock_idea": (
-                        "Great. Share the stock idea you want to test and I'll run it."
-                    ),
-                    "build_passive_strategy": (
-                        "Great. We can start with a passive DCA-style idea."
-                    ),
-                    "explore_crypto": (
-                        "Great. Let's start with a crypto idea you want to validate."
-                    ),
-                    "surprise_me": "Great. I'll guide you with a starter idea to begin.",
-                }
-            follow_up = mapping.get(onboarding_goal, mapping["surprise_me"])
-            assistant_message = lifecycle_hooks.complete(
-                content=follow_up,
-                metadata={
-                    "conversation_mode": "guide",
-                    "agent_runtime_stage_outcome": "ready_to_respond",
-                },
-                settle_usage=message_usage_settlement(turn_account),
-            )
-            record_control_exit("new_idea", "advanced")
-            persist_turn_evidence()
-            yield sse_data({"type": "stage_start", "stage": "next_step"})
-            yield sse_data({"type": "token", "content": follow_up})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": follow_up,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            return
 
         if runtime_fallback.recovery_message:
             assistant_text = runtime_fallback.recovery_message
@@ -1039,19 +900,6 @@ async def chat_stream(
                         envelope=envelope,
                         quick_take=assistant_text,
                         execution_identity=active_finalization_execution_identity,
-                    )
-                    persist_registered_onboarding_update(
-                        turn_account,
-                        current_user_profile,
-                        {
-                            "stage": "completed",
-                            "completed": True,
-                            "language_confirmed": True,
-                            "primary_goal": (
-                                current_user_profile.onboarding.primary_goal
-                                or "surprise_me"
-                            ),
-                        },
                     )
 
                 metadata: dict[str, Any] = {
