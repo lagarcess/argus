@@ -201,7 +201,6 @@ async def _runtime_success_events(**kwargs: Any):
 
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import main as api_main
     from argus.api import state as api_state
     from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
