@@ -141,6 +141,15 @@ class _Dispatcher:
         return {"id": "task-run-real-1", "status": "pending"}
 
 
+class _MetadataFailingGateway(_Gateway):
+    def merge_backtest_job_execution_metadata(
+        self, **payload: object
+    ) -> dict[str, object]:
+        self.events.append("metadata")
+        self.metadata_updates.append(payload)
+        raise RuntimeError("metadata write failed")
+
+
 class _FailingDispatcher(_Dispatcher):
     def __init__(
         self,
@@ -695,6 +704,39 @@ def test_dispatch_exception_terminalizes_still_queued_job_without_delegate(
     assert result["payload"]["backtest_job"]["retryable"] is True
     assert gateway.failure_attempts[0]["expected_status"] == "queued"
     assert len(gateway.failed_updates) == 1
+    assert len(dispatcher.calls) == 1
+    assert delegate.calls == []
+
+
+def test_dispatch_metadata_failure_preserves_dispatched_queued_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _MetadataFailingGateway(events)
+    dispatcher = _Dispatcher(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    context = _context()
+
+    with backtest_job_shadow_context(context):
+        result = tool.run(_payload())
+
+    assert result["payload"]["backtest_job"]["status"] == "queued"
+    assert gateway.jobs[0]["status"] == "queued"
+    assert gateway.failure_attempts == []
+    assert gateway.failed_updates == []
+    assert context.workflow_dispatch_started is True
+    assert context.workflow_task_run_id == "task-run-real-1"
+    assert context.workflow_dispatch_error is None
+    assert events == ["job", "dispatch", "metadata"]
     assert len(dispatcher.calls) == 1
     assert delegate.calls == []
 

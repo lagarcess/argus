@@ -925,18 +925,26 @@ class ShadowBacktestJobTool:
         job_status = str(job.get("status") or "").strip().lower()
         if job_status and job_status != "queued":
             return job
-
         try:
             dispatcher = self._dispatcher_getter()
             if dispatcher is None:
                 raise RuntimeError("Backtest job dispatch is not configured.")
             result = dispatcher.dispatch(
-                job_id=job_id,
-                nonce=payload_digest.removeprefix("sha256:"),
+                job_id=job_id, nonce=payload_digest.removeprefix("sha256:")
             )
-            task_run_id = str(result.get("id") or "").strip() or None
-            context.workflow_dispatch_started = True
-            context.workflow_task_run_id = task_run_id
+        except Exception as exc:
+            context.workflow_dispatch_error = str(exc)
+            logger.warning(
+                "Workflow dispatch failed; terminalizing queued job",
+                error=str(exc),
+                user_id=context.user_id,
+                conversation_id=context.conversation_id,
+                job_id=job_id,
+            )
+            return fail_job_without_task_run(gateway=gateway, user_id=context.user_id, job=job)
+        task_run_id = str(result.get("id") or "").strip() or None
+        context.workflow_dispatch_started, context.workflow_task_run_id = True, task_run_id
+        try:
             gateway.merge_backtest_job_execution_metadata(
                 user_id=context.user_id,
                 job_id=job_id,
@@ -949,21 +957,17 @@ class ShadowBacktestJobTool:
                     }
                 },
             )
-            return job
         except Exception as exc:
-            context.workflow_dispatch_error = str(exc)
             logger.warning(
-                "Backtest workflow dispatch failed; terminalizing queued job",
+                "Workflow dispatch metadata persistence failed",
                 error=str(exc),
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
                 job_id=job_id,
+                workflow_task_run_id=task_run_id,
+                workflow_dispatch_started=True,
             )
-            return fail_job_without_task_run(
-                gateway=gateway,
-                user_id=context.user_id,
-                job=job,
-            )
+        return job
 
     @staticmethod
     def _restore_existing_dispatch_context(
