@@ -8,6 +8,8 @@ import pytest
 from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
+from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
+from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -126,6 +128,64 @@ def _cost_strategy() -> StrategySummary:
             },
         },
     )
+
+
+def test_nonzero_llm_costs_gain_explicit_provenance_at_canonical_boundary() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            capital_amount=12000,
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+            },
+        )
+    )
+
+    assert strategy.extra_parameters["fee_rate"] == 0.001
+    assert strategy.extra_parameters["slippage"] == 0.0005
+    assert strategy.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
+def test_default_zero_llm_costs_do_not_gain_explicit_provenance() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            extra_parameters={
+                "fee_rate": 0.0,
+                "slippage": 0.0,
+            },
+        )
+    )
+
+    assert strategy.extra_parameters["fee_rate"] == 0.0
+    assert strategy.extra_parameters["slippage"] == 0.0
+    assert "field_provenance" not in strategy.extra_parameters
+
+
+def test_flag_off_llm_costs_do_not_gain_explicit_provenance(monkeypatch) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+            },
+        )
+    )
+
+    assert "field_provenance" not in strategy.extra_parameters
 
 
 def _active_confirmation_snapshot(strategy: StrategySummary) -> TaskSnapshot:

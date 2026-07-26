@@ -48,6 +48,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     normalize_date_range_candidate,
 )
+from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.rules import describe_rule_spec
 from argus.domain.indicators import (
     executable_indicator_spec,
@@ -59,6 +60,17 @@ from argus.nlp.natural_time import resolve_date_range_intent
 def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     payload = draft.model_dump(mode="python")
     field_provenance = payload.pop("field_provenance", {}) or {}
+    extra_parameters = payload.get("extra_parameters")
+    if _execution_realism_feature_enabled() and isinstance(extra_parameters, dict):
+        for field_name in ("fee_rate", "slippage"):
+            value = extra_parameters.get(field_name)
+            if (
+                field_name not in field_provenance
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and value > 0
+            ):
+                field_provenance[field_name] = "explicit_user"
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
     date_range_intent = _clean_date_range_intent_payload(
