@@ -535,10 +535,9 @@ def test_cleanup_foreign_owner_injection_fails_closed_without_mutation() -> None
             cursor.execute("savepoint cleanup_attempt")
         before = _complete_graph_state(connection, graph)
 
-        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
-            _claim_cleanup(connection, dry_run=False)
+        rows = _claim_cleanup(connection, dry_run=False)
+        assert (graph["user_id"], graph["conversation_id"]) in rows
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
             cursor.execute(
                 "select user_id::text,conversation_id::text,content"
                 " from public.messages where id = %s",
@@ -550,6 +549,154 @@ def test_cleanup_foreign_owner_injection_fails_closed_without_mutation() -> None
                 "foreign owner sentinel",
             )
         assert _complete_graph_state(connection, graph) == before
+        connection.rollback()
+
+
+def test_poisoned_cleanup_candidate_does_not_wedge_healthy_expired_guest() -> None:
+    with _connect(autocommit=False) as connection:
+        poisoned = _seed_expired_guest(connection)
+        healthy = _seed_expired_guest(connection)
+        foreign_user_id = str(uuid.uuid4())
+        foreign_message_id = str(uuid.uuid4())
+        foreign_email = f"poison-{foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (foreign_user_id, foreign_email),
+            )
+            cursor.execute(
+                "insert into public.messages"
+                " (id,conversation_id,user_id,role,content)"
+                " values (%s,%s,%s,'assistant','foreign poison sentinel')",
+                (
+                    foreign_message_id,
+                    poisoned["conversation_id"],
+                    foreign_user_id,
+                ),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set updated_at=now()-interval '30 minutes'"
+                " where user_id=%s",
+                (poisoned["user_id"],),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set updated_at=now()-interval '20 minutes'"
+                " where user_id=%s",
+                (healthy["user_id"],),
+            )
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,true)",
+            )
+            dry_rows = [
+                row
+                for row in cursor.fetchall()
+                if row[0] in {poisoned["user_id"], healthy["user_id"]}
+            ]
+
+        assert dry_rows == [
+            (poisoned["user_id"], False, "expired_workspace"),
+            (healthy["user_id"], False, "expired_workspace"),
+        ]
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,false)",
+            )
+            real_rows = [
+                row
+                for row in cursor.fetchall()
+                if row[0] in {poisoned["user_id"], healthy["user_id"]}
+            ]
+
+        assert real_rows == [
+            (poisoned["user_id"], False, "unsafe_product_graph"),
+            (healthy["user_id"], True, "expired_workspace"),
+        ]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (poisoned["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (healthy["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(1,false)",
+            )
+            repeat_rows = [
+                row for row in cursor.fetchall() if row[0] == poisoned["user_id"]
+            ]
+            assert repeat_rows == [(poisoned["user_id"], False, "unsafe_product_graph")]
+
+        healthy_first = _seed_expired_guest(connection)
+        poisoned_later = _seed_expired_guest(connection)
+        second_foreign_user_id = str(uuid.uuid4())
+        second_foreign_message_id = str(uuid.uuid4())
+        second_foreign_email = f"poison-later-{second_foreign_user_id[:8]}@example.com"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into auth.users (id,email,is_anonymous)" " values (%s,%s,false)",
+                (second_foreign_user_id, second_foreign_email),
+            )
+            cursor.execute(
+                "insert into public.profiles (id,email) values (%s,%s)",
+                (second_foreign_user_id, second_foreign_email),
+            )
+            cursor.execute(
+                "insert into public.messages"
+                " (id,conversation_id,user_id,role,content)"
+                " values (%s,%s,%s,'assistant','later poison sentinel')",
+                (
+                    second_foreign_message_id,
+                    poisoned_later["conversation_id"],
+                    second_foreign_user_id,
+                ),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set updated_at=now()-interval '40 minutes'"
+                " where user_id=%s",
+                (healthy_first["user_id"],),
+            )
+            cursor.execute(
+                "update public.guest_workspaces"
+                " set updated_at=now()-interval '30 minutes'"
+                " where user_id=%s",
+                (poisoned_later["user_id"],),
+            )
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,false)",
+            )
+            ordered_rows = cursor.fetchall()
+
+        assert ordered_rows == [
+            (healthy_first["user_id"], True, "expired_workspace"),
+            (poisoned_later["user_id"], False, "unsafe_product_graph"),
+        ]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (healthy_first["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (poisoned_later["user_id"],),
+            )
+            assert cursor.fetchone()[0] == 1
         connection.rollback()
 
 
@@ -578,10 +725,9 @@ def test_cleanup_foreign_relational_injection_fails_closed() -> None:
             )
             cursor.execute("savepoint cleanup_attempt")
 
-        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
-            _claim_cleanup(connection, dry_run=False)
+        rows = _claim_cleanup(connection, dry_run=False)
+        assert (graph["user_id"], graph["conversation_id"]) in rows
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
             cursor.execute(
                 "select user_id::text,strategy_id::text"
                 " from public.backtest_runs where id = %s",
@@ -627,10 +773,9 @@ def test_cleanup_null_conversation_with_owned_graph_fails_closed() -> None:
             cursor.execute("savepoint cleanup_attempt")
         before = _complete_graph_state(connection, graph)
 
-        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
-            _claim_cleanup(connection, dry_run=False)
+        rows = _claim_cleanup(connection, dry_run=False)
+        assert (graph["user_id"], None) in rows
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
             cursor.execute(
                 "select user_id::text,strategy_id::text"
                 " from public.backtest_runs where id=%s",
@@ -691,10 +836,9 @@ def test_cleanup_cross_owner_profile_references_fail_closed() -> None:
             )
             cursor.execute("savepoint cleanup_attempt")
 
-        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
-            _claim_cleanup(connection, dry_run=False)
+        rows = _claim_cleanup(connection, dry_run=False)
+        assert (candidate["user_id"], candidate["conversation_id"]) in rows
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
             cursor.execute(
                 "select claimed_by::text from public.guest_workspaces"
                 " where user_id=%s",
@@ -1202,10 +1346,9 @@ def test_cleanup_orphan_with_foreign_relational_reference_fails_closed() -> None
             )
             cursor.execute("savepoint cleanup_attempt")
 
-        with pytest.raises(psycopg.Error, match="guest_cleanup_unsafe_product_graph"):
-            _claim_cleanup(connection, dry_run=False)
+        rows = _claim_cleanup(connection, dry_run=False)
+        assert all(row[0] != orphan_user_id for row in rows)
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
             cursor.execute(
                 "select user_id::text,strategy_id::text"
                 " from public.backtest_runs where id=%s",
@@ -1372,13 +1515,20 @@ def test_cleanup_claimed_workspace_with_source_rows_fails_closed() -> None:
             )
             cursor.execute("savepoint cleanup_attempt")
 
-        with pytest.raises(
-            psycopg.errors.CheckViolation,
-            match="claimed guest identity still owns product rows",
-        ):
-            _claim_cleanup(connection, dry_run=False)
         with connection.cursor() as cursor:
-            cursor.execute("rollback to savepoint cleanup_attempt")
+            cursor.execute(
+                "select user_id::text,auth_deleted,cleanup_reason"
+                " from public.claim_expired_guest_workspaces(25,false)",
+            )
+            selected = next(
+                row for row in cursor.fetchall() if row[0] == source["user_id"]
+            )
+        assert selected == (
+            source["user_id"],
+            False,
+            "claimed_identity_has_product_rows",
+        )
+        with connection.cursor() as cursor:
             cursor.execute(
                 "select status,conversation_id::text,claimed_by::text"
                 " from public.guest_workspaces where user_id=%s",

@@ -462,3 +462,46 @@ def test_concurrent_guest_conversation_creation_allows_exactly_one(identities) -
                 (identities["guest"],),
             )
             assert cursor.fetchone()[0] == 1
+
+
+def test_in_place_converted_guest_can_create_additional_conversation(
+    identities,
+) -> None:
+    converted_email = f"converted-{identities['guest'][:8]}@example.com"
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into public.conversations (user_id,title)"
+                " values (%s,'temporary conversation') returning id::text",
+                (identities["guest"],),
+            )
+            original_conversation_id = cursor.fetchone()[0]
+            cursor.execute(
+                "update auth.users" " set is_anonymous=false,email=%s" " where id=%s",
+                (converted_email, identities["guest"]),
+            )
+            cursor.execute(
+                "select status,claimed_by::text,conversation_id::text"
+                " from public.guest_workspaces where user_id=%s",
+                (identities["guest"],),
+            )
+            assert cursor.fetchone() == (
+                "claimed",
+                identities["guest"],
+                original_conversation_id,
+            )
+            cursor.execute(
+                "insert into public.conversations (user_id,title)"
+                " values (%s,'registered conversation') returning id::text",
+                (identities["guest"],),
+            )
+            additional_conversation_id = cursor.fetchone()[0]
+            cursor.execute(
+                "select id::text from public.conversations"
+                " where user_id=%s order by created_at,id",
+                (identities["guest"],),
+            )
+            assert {row[0] for row in cursor.fetchall()} == {
+                original_conversation_id,
+                additional_conversation_id,
+            }

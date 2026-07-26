@@ -248,7 +248,7 @@ def test_settlement_charges_both_windows_once_and_replays_zero(owner):
         assert windows["day"]["used_count"] == 1
 
 
-def test_guest_completed_terminals_settle_truthfully_at_and_over_limit(guest_owner):
+def test_guest_completed_terminals_stop_atomically_at_limit(guest_owner):
     with _connect() as connection:
         for _ in range(10):
             _settle_message(
@@ -267,33 +267,28 @@ def test_guest_completed_terminals_settle_truthfully_at_and_over_limit(guest_own
         assert windows["guest_session"]["limit_count"] == 10
 
         overage_message_id = str(uuid.uuid4())
-        settled = _settle_message(
-            connection,
-            guest_owner,
-            overage_message_id,
-            limits=_guest_limits(guest_owner, 10),
-        )
-        assert settled[2] is False
-        replay = _settle_message(
-            connection,
-            guest_owner,
-            overage_message_id,
-            limits=_guest_limits(guest_owner, 10),
-        )
-        assert replay[2] is True
+        with pytest.raises(
+            psycopg.Error,
+            match="guest message allowance exhausted",
+        ):
+            _settle_message(
+                connection,
+                guest_owner,
+                overage_message_id,
+                limits=_guest_limits(guest_owner, 10),
+            )
         windows = _usage_rows(
             connection,
             guest_owner["user_id"],
             "chat_messages",
         )
-        assert windows["guest_session"]["used_count"] == 11
+        assert windows["guest_session"]["used_count"] == 10
         with connection.cursor() as cursor:
             cursor.execute(
-                "select count(*) from public.messages"
-                " where user_id = %s and role = 'assistant'",
-                (guest_owner["user_id"],),
+                "select count(*) from public.messages where id=%s",
+                (overage_message_id,),
             )
-            assert cursor.fetchone()[0] == 11
+            assert cursor.fetchone()[0] == 0
 
 
 def test_registered_completed_terminals_settle_truthful_small_overage(owner):
@@ -624,6 +619,76 @@ def test_concurrent_settlements_of_distinct_turns_count_exactly(owner):
         windows = _usage_rows(connection, owner["user_id"], "chat_messages")
         assert windows["hour"]["used_count"] == 10
         assert windows["day"]["used_count"] == 10
+
+
+def test_guest_concurrent_terminal_settlement_stops_atomically_at_limit(
+    guest_owner,
+) -> None:
+    message_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    barrier = Barrier(2)
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into public.usage_counters"
+                " (user_id,resource,period,period_start,period_end,"
+                "  used_count,limit_count)"
+                " values (%s,'chat_messages','guest_session',%s,%s,9,10)",
+                (
+                    guest_owner["user_id"],
+                    guest_owner["period_start"],
+                    guest_owner["period_end"],
+                ),
+            )
+
+    def settle(message_id: str) -> str:
+        try:
+            with _connect() as connection:
+                barrier.wait(timeout=30)
+                _settle_message(
+                    connection,
+                    guest_owner,
+                    message_id,
+                    limits=_guest_limits(guest_owner, 10),
+                )
+            return "settled"
+        except psycopg.Error as exc:
+            assert "guest message allowance exhausted" in str(exc)
+            return "rejected"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(settle, message_ids))
+
+    assert sorted(outcomes) == ["rejected", "settled"]
+    with _connect() as connection:
+        windows = _usage_rows(
+            connection,
+            guest_owner["user_id"],
+            "chat_messages",
+        )
+        assert windows["guest_session"]["used_count"] == 10
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select id::text from public.messages"
+                " where id=any(%s::uuid[]) order by id",
+                (message_ids,),
+            )
+            durable_ids = [row[0] for row in cursor.fetchall()]
+        assert len(durable_ids) == 1
+        replay = _settle_message(
+            connection,
+            guest_owner,
+            durable_ids[0],
+            limits=_guest_limits(guest_owner, 10),
+        )
+        assert replay[2] is True
+        assert (
+            _usage_rows(
+                connection,
+                guest_owner["user_id"],
+                "chat_messages",
+            )["guest_session"]["used_count"]
+            == 10
+        )
 
 
 def test_ten_concurrent_same_identity_admissions_charge_once(owner):
