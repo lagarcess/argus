@@ -358,6 +358,9 @@ class ThreadState(BaseModel):
 class RunState(BaseModel):
     current_user_message: str
     recent_thread_history: list[ConversationMessage] = Field(default_factory=list)
+    # Backend-derived per-turn discovery allowance truth; the runtime consumes
+    # it and never computes quota itself.
+    discovery_allowance_available: bool = True
     normalized_signals: dict[str, Any] = Field(default_factory=dict)
     intent: IntentName | None = None
     task_relation: TaskRelation | None = None

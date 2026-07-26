@@ -38,6 +38,8 @@ OpenRouterTask = Literal[
     "result_summary",
     "result_breakdown",
     "name_suggestion",
+    "discovery_extraction",
+    "discovery_voicing",
 ]
 _OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
@@ -148,6 +150,15 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "name_suggestion": OpenRouterProfile(
         "name_suggestion", temperature=0, max_tokens=400
     ),
+    "discovery_extraction": OpenRouterProfile(
+        "discovery_extraction",
+        temperature=0,
+        max_tokens=1200,
+        timeout_seconds=20,
+    ),
+    "discovery_voicing": OpenRouterProfile(
+        "discovery_voicing", temperature=0.2, max_tokens=900, timeout_seconds=20
+    ),
 }
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
@@ -160,6 +171,8 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "result_summary": "chat",
     "result_breakdown": "context",
     "name_suggestion": "utility",
+    "discovery_extraction": "structured",
+    "discovery_voicing": "chat",
 }
 
 _TIER_PRIMARY_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {

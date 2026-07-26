@@ -55,6 +55,10 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.discovery_evidence import (
+    discovery_allowance_available,
+    record_discovery_search_evidence,
+)
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
@@ -979,6 +983,7 @@ async def chat_stream(
 
                 final_seen = True
                 apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
+                discovery_usage_evidence = runtime_event.get("_discovery_usage")
                 runtime_result = dict(runtime_event.get("payload") or {})
                 recovery = runtime_result.get("recovery")
                 if (
@@ -1156,6 +1161,7 @@ async def chat_stream(
                     "result_fact_bank",
                     "response_intent",
                     "clarification",
+                    "discovery",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:
@@ -1285,6 +1291,15 @@ async def chat_stream(
                     if lifecycle_hooks.turn_id is not None:
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
+                record_discovery_search_evidence(
+                    usage=discovery_usage_evidence,
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    message_id=(
+                        assistant_message.id if assistant_message is not None else None
+                    ),
+                    request_id=request.state.request_id,
+                )
                 receipt_metadata = {
                     "request_id": request.state.request_id,
                     "source": "api_turn",
@@ -1438,6 +1453,9 @@ async def chat_stream(
                     user=runtime_user,
                     message=request_message,
                     recent_thread_history=recent_thread_history,
+                    discovery_allowance_available=discovery_allowance_available(
+                        user.id
+                    ),
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
                     ],

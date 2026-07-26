@@ -257,7 +257,10 @@ Represents individual messages within a conversation.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
-  `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
+  `retry_last_turn`, `recovery`, `clarification`, and the additive
+  `discovery` sidecar (`argus_discovery/v1`: bounded sources, provider-resolved
+  candidates, and unverified names for grounded asset discovery; the Search
+  provider id is excluded by contract). These fields hydrate the
   transcript, action affordances, and localized degraded-fallback UI; they do
   not make free-form transcript text the source of truth for strategy state.
   A typed `clarification.prompt_source` distinguishes exact LLM-authored prose
@@ -768,6 +771,9 @@ Append-only rules:
 
 Current write hooks:
 - API chat turns append OpenRouter cost rows from persisted route receipts.
+- Grounded-discovery turns append one `source = "research"` row per attempted
+  Search call with `feature_area = "discovery"`, provider identity, latency,
+  and provider-reported or documented cost.
 - Render workflow result-readout LLM calls append rows correlated to
   `backtest_job_id` and `backtest_run_id`.
 - Eval harness judge calls can append rows with `source = "eval_harness"` and a
@@ -953,8 +959,18 @@ Tracks resource consumption for quotas and limits.
 - **Cleanup Index**: `(period_end)`
 
 ### Alpha Enums
-- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`
+- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`,
+  `discovery_searches`
 - **Period**: `hour`, `day`
+
+### Discovery Search Accounting
+- `discovery_searches` counts grounded-discovery Search attempts (10/hour,
+  25/day defaults from `ARGUS_DISCOVERY_HOURLY_LIMIT` /
+  `ARGUS_DISCOVERY_DAILY_LIMIT`). Availability is read before the turn runs;
+  the charge settles best-effort after the terminal assistant message commits,
+  only when a Search call was actually attempted. This is an operational abuse
+  guard with truthful attempt accounting, not billing truth; failed settlement
+  never breaks the user turn.
 
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.

@@ -44,6 +44,7 @@ def build_workflow_input(
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
     | None = None,
     fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
+    discovery_allowance_available: bool = True,
 ) -> WorkflowState:
     normalized_message = " ".join(message.strip().split())
     run_state = RunState.new(
@@ -54,6 +55,7 @@ def build_workflow_input(
         context_hints=list(context_hints or []),
         action_context=action_context,
     )
+    run_state.discovery_allowance_available = discovery_allowance_available
     if fallback_confirmation_payload is not None:
         run_state.confirmation_payload = ConfirmationPayload.model_validate(
             fallback_confirmation_payload
@@ -158,6 +160,7 @@ async def stream_agent_turn_events(
         "type": "final",
         "payload": _public_result(final_state),
         "_turn_progress": turn_progress_evidence(),
+        "_discovery_usage": final_state.get("discovery_usage"),
     }
 
 
@@ -314,6 +317,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "result_action_request",
         "retry_last_turn",
         "recovery",
+        "discovery",
     }
     serialized = {
         key: _serialize_public_value(key, value)
