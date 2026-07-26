@@ -168,7 +168,7 @@ export const CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES = {
     "The refined confirmation effective canonical date range must remain unchanged",
 } satisfies Record<keyof ConfirmationContinuityChecks, string>;
 
-export type BrowserSafetyPhase = "product" | "teardown";
+export type BrowserSafetyPhase = "product" | "fault_injection" | "teardown";
 
 export type BrowserSafetyContext = {
   check: GuestCheckNumber | null;
@@ -2676,6 +2676,12 @@ export function productFailedRequestsForCheck(
       detail.check === check &&
       detail.phase === "product",
   );
+}
+
+export function productExecutionSafetyDetails(
+  details: BrowserSafetyDetail[],
+): BrowserSafetyDetail[] {
+  return details.filter((detail) => detail.phase === "product");
 }
 
 export function benignLoopbackNavigationAbort(input: {

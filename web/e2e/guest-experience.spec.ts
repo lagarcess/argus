@@ -39,6 +39,7 @@ import {
   newSignupCredentials,
   ownerSnapshot,
   profileAccountKind,
+  productExecutionSafetyDetails,
   productFailedRequestsForCheck,
   purgeDisposableQaEvidence,
   resultTruthFingerprint,
@@ -269,7 +270,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
   const monitors: BrowserSafetyMonitor[] = [];
   const disposableUserIds = new Set<string>();
   let currentCheck: GuestCheckNumber | null = null;
-  let safetyPhase: "product" | "teardown" = "product";
+  let safetyPhase: "product" | "fault_injection" | "teardown" = "product";
 
   let primaryMe: GuestMe | null = null;
   let primaryOwner = "";
@@ -2038,7 +2039,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
           "Something went wrong. Your conversation is saved. Please try again.";
         let chatStreamStatus = 0;
         try {
+          safetyPhase = "fault_injection";
           await backend.start(false, { openRouterApiKey: "" });
+          safetyPhase = "product";
           const streamResponse = feedbackPage.waitForResponse(
             (response) =>
               response.request().method() === "POST" &&
@@ -2053,7 +2056,12 @@ test("@guest-experience exact-head 20-check matrix", async ({
             })
             .toBe(before.messages + 2);
         } finally {
-          await backend.start(false);
+          safetyPhase = "fault_injection";
+          try {
+            await backend.start(false);
+          } finally {
+            safetyPhase = "product";
+          }
         }
         expect(chatStreamStatus).toBe(200);
         const recovery = feedbackPage
@@ -2275,8 +2283,8 @@ test("@guest-experience exact-head 20-check matrix", async ({
           Number(registeredRead.status !== 404) +
           Number(claimedRead.status !== 404);
 
-        const productSafetyDetails = mergeSafetyDetails(monitors).filter(
-          (detail) => detail.phase === "product",
+        const productSafetyDetails = productExecutionSafetyDetails(
+          mergeSafetyDetails(monitors),
         );
         const consoleErrors = productSafetyDetails.filter(
           (detail) => detail.event === "console_error",

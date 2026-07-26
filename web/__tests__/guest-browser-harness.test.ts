@@ -14,6 +14,7 @@ import {
   expectedMutationDeltasOnly,
   latestConfirmationFacts,
   latestResultFacts,
+  productExecutionSafetyDetails,
   productFailedRequestsForCheck,
   rekeyGuestQaConfirmationMetadata,
   resultTruthStayedStable,
@@ -631,6 +632,39 @@ describe("browser safety evidence", () => {
     ]);
   });
 
+  test("preserves controlled fault-injection errors without treating them as product failures", () => {
+    const product = browserSafetyDetail({
+      event: "page_error",
+      rawError: "Hydration failed",
+      context: { check: 18, phase: "product" },
+    });
+    const controlled = browserSafetyDetail({
+      event: "failed_request",
+      rawUrl: "http://127.0.0.1:8000/api/v1/conversations",
+      method: "GET",
+      rawError: "net::ERR_CONNECTION_REFUSED",
+      context: { check: 18, phase: "fault_injection" },
+    });
+    const teardown = browserSafetyDetail({
+      event: "console_error",
+      rawError: "net::ERR_CONNECTION_REFUSED",
+      context: { check: 18, phase: "teardown" },
+    });
+    const details = [product, controlled, teardown];
+
+    expect(productExecutionSafetyDetails(details)).toEqual([product]);
+    expect(details).toContain(controlled);
+    expect(controlled).toEqual({
+      event: "failed_request",
+      component: "network",
+      endpoint: "GET /api/v1/conversations",
+      status: null,
+      category: "connection_refused",
+      check: 18,
+      phase: "fault_injection",
+    });
+  });
+
   test("detects credential-shaped data on a non-loopback request without retaining it", () => {
     type StubHandler = (payload: unknown) => void;
     const handlers = new Map<string, StubHandler[]>();
@@ -1084,10 +1118,12 @@ describe("Checks 6–20 harness guards", () => {
   });
 
   test("keeps product safety failures separate from sanitized teardown evidence", () => {
+    const check18 = checkSource(18);
     const check20 = checkSource(20);
     const teardown = source.slice(source.indexOf("  } finally {"));
 
-    expect(check20).toContain('detail.phase === "product"');
+    expect(check18).toContain('safetyPhase = "fault_injection"');
+    expect(check20).toContain("productExecutionSafetyDetails");
     expect(check20).toContain("server_product_analytics_disabled");
     expect(check20).toContain("deniedBodyContainsNoPrivatePayload");
     expect(teardown).toContain('detail.phase === "teardown"');
