@@ -3,6 +3,11 @@
 set -euo pipefail
 
 INTEGRATION_BRANCH="codex/private-alpha-next"
+CHECK_ONLY=false
+if [ "${1:-}" = "--check" ]; then
+    CHECK_ONLY=true
+    shift
+fi
 TARGET_ROOT="${1:-}"
 
 warn() {
@@ -61,12 +66,42 @@ link_environment_file() {
     echo "🟢 [Setup] Linked $label from the canonical worktree"
 }
 
+check_environment_file() {
+    local source="$1"
+    local destination="$2"
+    local label="$3"
+
+    if [ -L "$destination" ]; then
+        if [ -e "$source" ] && [ "$destination" -ef "$source" ]; then
+            echo "$label: canonical-linked"
+            return 0
+        fi
+        echo "$label: conflicting-link"
+        return 1
+    fi
+
+    if [ -e "$destination" ]; then
+        if [ -e "$source" ] && [ "$destination" -ef "$source" ]; then
+            echo "$label: canonical-source"
+        else
+            echo "$label: worktree-local"
+        fi
+        return 0
+    fi
+
+    echo "$label: missing"
+    return 1
+}
+
 if [ -z "$TARGET_ROOT" ]; then
     TARGET_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 fi
 
 if [ -z "$TARGET_ROOT" ] || ! TARGET_ROOT="$(normalize_directory "$TARGET_ROOT")"; then
     warn "target worktree was not found; environment files were not linked"
+    if [ "$CHECK_ONLY" = true ]; then
+        exit 1
+    fi
     exit 0
 fi
 
@@ -77,6 +112,29 @@ fi
 
 if [ -z "$CANONICAL_ROOT" ] || ! CANONICAL_ROOT="$(normalize_directory "$CANONICAL_ROOT")"; then
     warn "canonical integration worktree was not found; environment files were not linked"
+    if [ "$CHECK_ONLY" = true ]; then
+        exit 1
+    fi
+    exit 0
+fi
+
+if [ "$CHECK_ONLY" = true ]; then
+    CHECK_FAILED=false
+    if ! check_environment_file \
+        "$CANONICAL_ROOT/.env" \
+        "$TARGET_ROOT/.env" \
+        "root .env"; then
+        CHECK_FAILED=true
+    fi
+    if ! check_environment_file \
+        "$CANONICAL_ROOT/web/.env.local" \
+        "$TARGET_ROOT/web/.env.local" \
+        "web/.env.local"; then
+        CHECK_FAILED=true
+    fi
+    if [ "$CHECK_FAILED" = true ]; then
+        exit 1
+    fi
     exit 0
 fi
 

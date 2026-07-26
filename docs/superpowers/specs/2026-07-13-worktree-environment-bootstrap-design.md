@@ -30,6 +30,10 @@ The helper is an implementation detail, not a second user workflow. Running
   warn and continue with the current setup behavior.
 - In the canonical integration worktree itself, existing files remain regular
   files and setup is a no-op.
+- `setup-worktree-env.sh --check [worktree]` is a read-only Phase 0 preflight.
+  It reports canonical links/sources, intentional worktree-local files, missing
+  files, and conflicting links without reading or printing environment values.
+  Missing or conflicting topology returns a nonzero status.
 - A lane-local QA env writer must atomically replace the lane's symlinks with
   regular local files. It must never truncate or overwrite the canonical
   symlink target.
