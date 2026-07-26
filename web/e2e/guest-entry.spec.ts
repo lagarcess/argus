@@ -254,6 +254,122 @@ test("@guest-shell root re-entry restores the one server-owned guest conversatio
   expect(evidence.profilePatches).toEqual([]);
 });
 
+test("@registered-hydration an accepted local turn wins a delayed reload without wedging the composer", async ({
+  page,
+}) => {
+  let releaseHydration!: () => void;
+  const hydrationBlocked = new Promise<void>((resolve) => {
+    releaseHydration = resolve;
+  });
+  let messageLoadStarted!: () => void;
+  const messageLoadPending = new Promise<void>((resolve) => {
+    messageLoadStarted = resolve;
+  });
+
+  await page.route("**/api/v1/me", async (route) => {
+    await fulfillJson(route, {
+      user: {
+        id: GUEST_ID,
+        email: "registered@example.test",
+        username: null,
+        display_name: null,
+        language: "en",
+        locale: "en-US",
+        onboarding: {
+          completed: true,
+          stage: "ready",
+          language_confirmed: true,
+          primary_goal: "test_stock_idea",
+        },
+      },
+      account_kind: "registered",
+      guest: null,
+      capabilities: {
+        can_create_additional_conversation: true,
+        can_manage_conversation: true,
+        can_save_decision: true,
+        can_manage_account: true,
+        can_use_omnisearch: true,
+        can_search_current_workspace: true,
+        can_use_grounded_discovery: false,
+        can_submit_feedback: true,
+      },
+    });
+  });
+  await page.route("**/api/v1/history**", async (route) => {
+    await fulfillJson(route, { items: [], next_cursor: null });
+  });
+  await page.route("**/api/v1/conversations**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith(`/${CONVERSATION_ID}/messages`)) {
+      messageLoadStarted();
+      await hydrationBlocked;
+      await fulfillJson(route, {
+        items: [
+          {
+            id: "stale-user",
+            conversation_id: CONVERSATION_ID,
+            role: "user",
+            content: "Persisted stale turn",
+            created_at: "2026-07-24T17:00:00Z",
+            metadata: {},
+          },
+          {
+            id: "stale-assistant",
+            conversation_id: CONVERSATION_ID,
+            role: "assistant",
+            content: "Persisted stale response",
+            created_at: "2026-07-24T17:00:01Z",
+            metadata: {},
+          },
+        ],
+        next_cursor: null,
+      });
+      return;
+    }
+    await fulfillJson(route, { items: [], next_cursor: null });
+  });
+  await page.route("**/api/v1/chat/stream", async (route) => {
+    const body = route.request().postDataJSON() as { message?: string };
+    expect(body.message).toBe("Accepted while reload is pending");
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: [
+        'data: {"type":"stage_start","stage":"clarify"}',
+        "",
+        'data: {"type":"token","content":"Local accepted response"}',
+        "",
+        `data: {"type":"final","payload":{"stage_outcome":"ready_to_respond","assistant_response":"Local accepted response","message_id":"local-assistant","conversation_id":"${CONVERSATION_ID}"}}`,
+        "",
+        "data: [DONE]",
+        "",
+      ].join("\n"),
+    });
+  });
+
+  try {
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await messageLoadPending;
+    const input = page.getByTestId("chat-input");
+    await expect(input).toBeVisible();
+    await expect(input).toBeEnabled();
+    await input.fill("Accepted while reload is pending");
+    await input.press("Enter");
+    await expect(page.getByText("Local accepted response")).toBeVisible();
+
+    releaseHydration();
+
+    await expect(page.getByText("Persisted stale turn")).toHaveCount(0);
+    await expect(page.getByText("Persisted stale response")).toHaveCount(0);
+    await expect(input).toBeEnabled();
+  } finally {
+    releaseHydration();
+  }
+});
+
 test("@guest-shell frontend-on server-off mismatch stays on a retry surface", async ({
   page,
 }) => {

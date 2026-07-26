@@ -1266,6 +1266,7 @@ export default function ChatInterface() {
       return false;
     }
     hasAcceptedUserInputRef.current = true;
+    setIsHydratingConversation(false);
     const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;
     const routeState = readActiveConversationRouteState();
     let targetConversationId = targetConversationIdForSend({
