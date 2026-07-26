@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argus.agent_runtime.confirmation_artifacts import (
+    canonical_launch_identity_payload,
     stable_payload_hash,
     validate_confirmation_execution_payload,
 )
@@ -43,7 +44,7 @@ def _coverage_launch_payload(
         "parameters": {},
         "risk_rules": [],
         "benchmark_symbol": "SPY",
-        "execution_realism": None,
+        "_execution_realism": None,
         "language": "en",
     }
 
@@ -61,6 +62,13 @@ def test_legacy_coverage_reason_omission_is_accepted_without_hash_drift() -> Non
     assert stable_payload_hash(validation.launch_payload) == stable_payload_hash(
         legacy_launch_payload
     )
+
+
+def test_canonical_launch_identity_excludes_coverage_provenance() -> None:
+    without_reason = _coverage_launch_payload()
+    with_reason = _coverage_launch_payload(adjustment_reason="calendar_alignment")
+
+    assert canonical_launch_identity_payload(with_reason) == without_reason
 
 
 def test_unknown_coverage_adjustment_reason_is_rejected() -> None:

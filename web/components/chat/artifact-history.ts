@@ -109,7 +109,17 @@ export function confirmationActionEffectsFromApi(items: ApiMessage[]) {
     if (!effect) {
       continue;
     }
-    effects.push(effect);
+    const failedAction = recordOrNull(metadata.failed_action);
+    const authoritativeEffect =
+      item.role === "assistant" &&
+      failedAction?.action_type === action?.type
+        ? {
+            ...effect,
+            status: "could_not_run" as const,
+            statusLabel: confirmationStatusLabel("could_not_run"),
+          }
+        : effect;
+    effects.push(authoritativeEffect);
     if (effect.type === "cancel_confirmation") {
       hiddenMessageIds.add(item.id);
     }
@@ -449,13 +459,18 @@ export function settleOpenConfirmationsAfterTextFinal(
     action,
     finalActions = [],
     hasFailedAction = false,
+    recoveryCode,
   }: {
     action?: ChatActionOption;
     finalActions?: ChatActionOption[];
     hasFailedAction?: boolean;
     stageOutcome?: unknown;
+    recoveryCode?: string | null;
   },
 ): Message[] {
+  if (recoveryCode === "confirmation_action_stale_card") {
+    return messages;
+  }
   const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
   const hasFailedActionFinal =
     hasFailedAction || finalActions.some(isFailedActionRetry);
@@ -483,9 +498,13 @@ export function settleOpenConfirmationsAfterStreamError(
 export function settleConfirmationAfterActionTransportError(
   messages: Message[],
   action: ChatActionOption | undefined,
+  options: { durableStateUnknown?: boolean } = {},
 ): Message[] {
   const effect = confirmationActionEffectFromAction(action);
   if (!effect) {
+    return messages;
+  }
+  if (effect.type === "run_backtest" && options.durableStateUnknown) {
     return messages;
   }
   const failedEffect: ConfirmationActionEffect = {

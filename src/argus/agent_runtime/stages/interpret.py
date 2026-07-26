@@ -80,6 +80,9 @@ from argus.agent_runtime.stages.interpret_actions import (
     artifact_followup_stage_result_if_applicable as _artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
+    final_interpret_stage_result as _final_interpret_stage_result,
+)
+from argus.agent_runtime.stages.interpret_actions import (
     pending_artifact_followup_stage_result_if_applicable as _pending_artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
@@ -232,6 +235,7 @@ from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noq
     _strategy_date_evidence_candidates,
     _strategy_date_range_needs_current_message_repair,
     _strategy_has_non_executable_timeframe_label,
+    _strip_unowned_pending_date_candidate,
 )
 from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # noqa: F401
     _LATEST_RESULT_SAVE_REQUESTED_REASON,
@@ -248,6 +252,7 @@ from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
+    _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
     _strategy_supplies_explicit_turn_money,
@@ -460,6 +465,11 @@ async def _stage_result_from_interpretation(
     interpretation = _repair_fresh_restatement_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _strip_unowned_pending_date_candidate(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
         selected_thread_metadata=selected_thread_metadata,
     )
     interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
@@ -1231,26 +1241,13 @@ async def _stage_result_from_interpretation(
     )
     if admission_result is not None:
         return admission_result
-    if requires_clarification:
-        stage_patch = dict(optional_parameter_stage_patch)
-        if interpretation.assistant_response:
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="needs_clarification",
-            decision=decision,
-            stage_patch=stage_patch,
-        )
-    return StageResult(
-        outcome="ready_to_respond",
+    return _final_interpret_stage_result(
         decision=decision,
-        stage_patch=(
-            {
-                **optional_parameter_stage_patch,
-                "assistant_response": interpretation.assistant_response,
-            }
-            if interpretation.assistant_response
-            else optional_parameter_stage_patch
-        ),
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        optional_parameter_stage_patch=optional_parameter_stage_patch,
+        assistant_response=interpretation.assistant_response,
+        language=user.language_preference,
     )
 
 
@@ -1667,9 +1664,7 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
@@ -1696,6 +1691,10 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
         today=date.today(),
+        require_explicit_range=(
+            "pending_date_answer_unowned_candidate_stripped"
+            in interpretation.reason_codes
+        ),
         reason_code=(
             "pending_date_answer_current_message_repaired"
             if interpretation.semantic_turn_act == "answer_pending_need"
@@ -1704,6 +1703,9 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     )
     if repaired is None:
         return interpretation
+    repaired.reason_codes = list(
+        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
+    )
     return repaired
 
 
@@ -1719,9 +1721,7 @@ def _repair_pending_date_answer_noop_from_current_message(
         return interpretation
     if interpretation.requires_clarification:
         return interpretation
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")

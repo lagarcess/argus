@@ -33,6 +33,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.nlp.natural_time import parse_date_text, shift_months
@@ -5095,7 +5096,14 @@ def test_pending_date_answer_uses_structured_interpreter_before_updating_draft(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary="User answered the pending date question.",
-            candidate_strategy_draft=StrategySummary(date_range="past month"),
+            candidate_strategy_draft=StrategySummary(
+                date_range="last month",
+                extra_parameters={
+                    "date_range_raw_text": "last month",
+                    "evidence_spans": {"date_range": "last month"},
+                    "field_provenance": {"date_range": "explicit_user"},
+                },
+            ),
             semantic_turn_act="answer_pending_need",
         )
     )
@@ -5116,7 +5124,7 @@ def test_pending_date_answer_uses_structured_interpreter_before_updating_draft(
 
     assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
-    assert result.decision.candidate_strategy_draft.date_range == "past month"
+    assert result.decision.candidate_strategy_draft.date_range == "last month"
     assert "typed_pending_date_answer_applied" not in result.decision.reason_codes
 
 
@@ -5166,7 +5174,14 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary="User changed only the date on the pending draft.",
-            candidate_strategy_draft=StrategySummary(date_range="past year"),
+            candidate_strategy_draft=StrategySummary(
+                date_range="past year",
+                extra_parameters={
+                    "date_range_raw_text": "past year",
+                    "evidence_spans": {"date_range": "past year"},
+                    "field_provenance": {"date_range": "explicit_user"},
+                },
+            ),
             semantic_turn_act="answer_pending_need",
         )
     )
@@ -5382,6 +5397,444 @@ def test_pending_spanish_date_answer_repairs_missing_llm_date_range(
         result.decision.reason_codes
     )
     assert "pending_date_edit_noop_rejected" not in result.decision.reason_codes
+
+
+def test_equivalent_pending_need_stops_with_no_progress_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        comparison_baseline="SPY",
+    )
+    prior_response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": {
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    }
+                },
+            }
+        ],
+    }
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The period is still unresolved.",
+            candidate_strategy_draft=pending.model_copy(deep=True),
+            missing_required_fields=["date_range"],
+            assistant_response=(
+                "I still need a historical period. You can give exact dates "
+                "or a window such as the past year."
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+    selected_thread_metadata = {
+        "requested_field": "date_range",
+        "last_stage_outcome": "await_user_reply",
+        "response_intent": prior_response_intent,
+    }
+    workflow_input = {
+        "run_state": RunState.new(
+            current_user_message="Use a reasonable period.",
+            recent_thread_history=[],
+        ),
+        "latest_task_snapshot": TaskSnapshot(pending_strategy_summary=pending),
+        "selected_thread_metadata": selected_thread_metadata,
+    }
+
+    with turn_execution_scope(entry_state=workflow_input) as execution:
+        input_fingerprint = execution.entry_fingerprint
+        result = interpret_stage(
+            state=workflow_input["run_state"],
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=workflow_input["latest_task_snapshot"],
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=interpreter,
+        )
+
+        assert result.outcome == "ready_to_respond"
+        response_intent = result.patch["response_intent"]
+        assert response_intent["facts"]["progress_outcome"] == "no_progress"
+        assert [option["id"] for option in response_intent["options"]] == [
+            "supply_missing_value",
+            "calendar_year_2024",
+            "keep_unchanged",
+            "cancel",
+        ]
+        assert response_intent["options"][0]["replacement_values"] == {
+            "requested_field": "date_range"
+        }
+        assert input_fingerprint is not None
+        assert execution.entry_fingerprint == input_fingerprint
+        assert execution.terminal == "no_progress"
+
+
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
+@pytest.mark.parametrize(
+    "provenance",
+    [None, "default_assumption", "assistant_suggestion", "explicit_user"],
+)
+def test_pending_date_answer_rejects_unowned_window(
+    monkeypatch: pytest.MonkeyPatch,
+    provenance: str | None,
+    metadata_shape: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="Use a reasonable historical period.",
+            candidate_strategy_draft=pending.model_copy(
+                update={
+                    "date_range": {
+                        "start": "2021-07-25",
+                        "end": "2026-07-25",
+                    },
+                    "extra_parameters": {
+                        "date_range_raw_text": "last five years",
+                        "date_range_intent": {
+                            "kind": "rolling_window",
+                            "count": 5,
+                            "unit": "year",
+                            "anchor": "today",
+                            "confidence": 0.85,
+                            "evidence": "user requested a reasonable period",
+                        },
+                        "evidence_spans": {
+                            "date_range": "last five years",
+                        },
+                        **(
+                            {"field_provenance": {"date_range": provenance}}
+                            if provenance is not None
+                            else {}
+                        ),
+                    },
+                },
+                deep=True,
+            ),
+            assistant_response="I used the last five years.",
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [],
+    }
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+        "response_intent": response_intent,
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata["requested_field"] = "date_range"
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Use a reasonable period.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=interpreter,
+        )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft.date_range is None
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert result.decision.candidate_strategy_draft.capital_amount == 25_000
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
+    assert result.decision.candidate_strategy_draft.timeframe == "1D"
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert "date_range" in result.patch["response_intent"]["requested_fields"]
+
+
+def test_pending_date_typed_option_preserves_selected_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    selected_date_range = {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    replacement_values = {"date_range": selected_date_range}
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": replacement_values,
+            }
+        ],
+    }
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use calendar year 2024",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": "Use calendar year 2024",
+                "payload": {
+                    "source_assistant_id": "assistant-date",
+                    "validated_source_assistant_id": "assistant-date",
+                    "replacement_values": replacement_values,
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-date",
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": response_intent,
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="The period is unresolved.",
+                candidate_strategy_draft=pending,
+                missing_required_fields=["date_range"],
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == selected_date_range
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 25_000
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.timeframe == "1D"
+    assert "pending_response_option_selected" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
+def test_interpreter_unavailable_pending_date_stops_with_no_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_shape: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": {
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    }
+                },
+            }
+        ],
+    }
+
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata.update(
+            {
+                "requested_field": "date_range",
+                "response_intent": response_intent,
+            }
+        )
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Use a reasonable period.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=RecordingInterpreter(None),
+        )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft == pending
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert result.patch["response_intent"]["requested_fields"] == ["date_range"]
+    assert result.patch["requested_field"] == "date_range"
+    assert "recovery" not in result.patch
+
+
+def test_answered_fields_survive_no_progress_stop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Compra y conserva Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The period remains ambiguous.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+            ),
+            missing_required_fields=["date_range"],
+            assistant_response=(
+                "Todavía necesito el período histórico. Puedes darme fechas "
+                "exactas o una ventana como el último año."
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Usa un período normal.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1", language_preference="es-419"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "requested_field": "date_range",
+                "last_stage_outcome": "await_user_reply",
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["period"],
+                    "requested_fields": ["date_range"],
+                    "facts": {"strategy": pending.model_dump(mode="python")},
+                    "options": [],
+                },
+            },
+            structured_interpreter=interpreter,
+        )
+
+    assert result.outcome == "ready_to_respond"
+    preserved = result.decision.candidate_strategy_draft
+    assert preserved.asset_universe == ["AAPL"]
+    assert preserved.asset_class == "equity"
+    assert preserved.capital_amount == 25_000
+    assert preserved.comparison_baseline == "SPY"
+    assert preserved.timeframe == "1D"
+    assert result.patch["candidate_strategy_draft"] == preserved.model_dump(
+        mode="python"
+    )
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert result.patch["assistant_response"].startswith(
+        "Todavía necesito el período histórico."
+    )
 
 
 def test_pending_spanish_date_answer_repairs_reload_thinned_metadata(
@@ -9912,7 +10365,12 @@ def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) 
         user_goal_summary="User answered the missing date range.",
         semantic_turn_act="retry_failed_action",
         candidate_strategy_draft=StrategySummary(
-            date_range={"start": "2025-05-19", "end": "2026-05-19"},
+            date_range="past year",
+            extra_parameters={
+                "date_range_raw_text": "past year",
+                "evidence_spans": {"date_range": "past year"},
+                "field_provenance": {"date_range": "explicit_user"},
+            },
         ),
     )
 
@@ -9931,7 +10389,7 @@ def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) 
     assert "retry_route_repaired_to_pending_need" in result.patch["reason_codes"]
     draft = result.patch["candidate_strategy_draft"]
     assert draft["asset_universe"] == ["TSLA"]
-    assert draft["date_range"] == {"start": "2025-05-19", "end": "2026-05-19"}
+    assert draft["date_range"] == "past year"
     assert "assistant_response" not in result.stage_patch
 
 

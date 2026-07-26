@@ -19,9 +19,11 @@ from argus.agent_runtime.artifacts.strategy_edits import (
 )
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    ResponseIntent,
     StrategySummary,
     TaskSnapshot,
 )
+from argus.agent_runtime.turn_progress import assess_progress, semantic_progress_snapshot
 
 ArtifactAnchorKind = Literal[
     "confirmation",
@@ -38,6 +40,150 @@ class ArtifactAnchor:
     artifact_id: str | None
     draft: StrategySummary | None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class NoProgressResponse:
+    assistant_response: str
+    response_intent: dict[str, Any]
+
+
+def no_progress_response_if_equivalent(
+    *,
+    snapshot: TaskSnapshot,
+    prior_strategy: StrategySummary,
+    candidate_strategy: StrategySummary,
+    prior_response_intent: dict[str, Any],
+    missing_fields: list[str],
+    semantic_turn_act: str | None,
+    optional_parameter_status: dict[str, Any],
+    assistant_response: str | None,
+    language: str,
+) -> NoProgressResponse | None:
+    if not missing_fields or semantic_turn_act != "answer_pending_need":
+        return None
+    try:
+        prior_intent = ResponseIntent.model_validate(
+            prior_response_intent
+        ).model_dump(mode="python")
+    except ValueError:
+        return None
+
+    is_spanish = language.lower().startswith("es")
+    facts = dict(prior_intent["facts"])
+    facts.update(
+        {
+            "progress_outcome": "no_progress",
+            "strategy": candidate_strategy.model_dump(mode="python"),
+        }
+    )
+    alternatives = [
+        dict(option)
+        for option in prior_intent["options"]
+        if option.get("id") not in {"supply_missing_value", "keep_unchanged", "cancel"}
+        and isinstance(option.get("replacement_values"), dict)
+    ]
+    response_intent = {
+        "kind": prior_intent["kind"],
+        "semantic_needs": list(prior_intent["semantic_needs"]),
+        "requested_fields": list(missing_fields),
+        "facts": facts,
+        "options": [
+            _no_progress_option(
+                "supply_missing_value",
+                "Proporcionar el valor que falta"
+                if is_spanish
+                else "Provide the missing value",
+                {"requested_field": missing_fields[0]},
+            ),
+            *alternatives,
+            _no_progress_option(
+                "keep_unchanged",
+                "Mantener la idea sin cambios"
+                if is_spanish
+                else "Keep the idea unchanged",
+                {"no_progress_action": "keep_unchanged"},
+            ),
+            _no_progress_option(
+                "cancel",
+                "Cancelar este flujo" if is_spanish else "Cancel this flow",
+                {"no_progress_action": "cancel"},
+            ),
+        ],
+    }
+    entry = _pending_progress_state(
+        snapshot=snapshot,
+        strategy=prior_strategy,
+        response_intent=prior_intent,
+        semantic_turn_act=semantic_turn_act,
+    )
+    exit_state = _pending_progress_state(
+        snapshot=snapshot,
+        strategy=candidate_strategy,
+        response_intent=response_intent,
+        semantic_turn_act=semantic_turn_act,
+        optional_parameter_status=optional_parameter_status,
+    )
+    assessment = assess_progress(
+        semantic_progress_snapshot(entry),
+        semantic_progress_snapshot(exit_state),
+        terminal=None,
+    )
+    if assessment.outcome != "no_progress":
+        return None
+    prompt = (
+        assistant_response.strip()
+        if isinstance(assistant_response, str) and assistant_response.strip()
+        else _no_progress_fallback_message(is_spanish=is_spanish)
+    )
+    return NoProgressResponse(
+        assistant_response=prompt,
+        response_intent=response_intent,
+    )
+
+
+def _pending_progress_state(
+    *,
+    snapshot: TaskSnapshot,
+    strategy: StrategySummary,
+    response_intent: dict[str, Any],
+    semantic_turn_act: str | None,
+    optional_parameter_status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "run_state": {
+            "candidate_strategy_draft": strategy.model_dump(mode="python"),
+            "missing_required_fields": list(response_intent["requested_fields"]),
+            "optional_parameter_status": dict(optional_parameter_status or {}),
+            "response_intent": response_intent,
+            "semantic_turn_act": semantic_turn_act,
+        },
+        "latest_task_snapshot": snapshot,
+    }
+
+
+def _no_progress_option(
+    option_id: str,
+    label: str,
+    replacement_values: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "id": option_id,
+        "label": label,
+        "replacement_values": replacement_values,
+    }
+
+
+def _no_progress_fallback_message(*, is_spanish: bool) -> str:
+    if is_spanish:
+        return (
+            "No pude resolver esa opción sin cambiar tu idea actual. "
+            "Elige una de las opciones siguientes."
+        )
+    return (
+        "I could not resolve that choice without changing your current idea. "
+        "Choose one of the options below."
+    )
 
 
 def resolve_artifact_anchor(

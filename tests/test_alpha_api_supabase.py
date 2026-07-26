@@ -20,6 +20,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
+from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
@@ -213,7 +214,7 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
     gateway.private_alpha_role_for_email = MagicMock(return_value="user")
     gateway.get_user = MagicMock(return_value=None)
     now = utcnow().isoformat()
-    service_client.table.return_value.insert.return_value.execute.return_value.data = [
+    service_client.table.return_value.upsert.return_value.execute.return_value.data = [
         {
             "id": "00000000-0000-0000-0000-000000000009",
             "email": "alpha@example.com",
@@ -242,9 +243,48 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
 
     assert profile.language == "es-419"
     assert profile.locale == "es-419"
-    persisted = service_client.table.return_value.insert.call_args.args[0]
+    persisted = service_client.table.return_value.upsert.call_args.args[0]
     assert persisted["language"] == "es-419"
     assert persisted["locale"] == "es-419"
+
+
+def test_gateway_profile_bootstrap_rereads_winner_after_concurrent_create():
+    service_client = MagicMock()
+    gateway = SupabaseGateway(client=service_client)
+    gateway.private_alpha_role_for_email = MagicMock(return_value="user")
+    canonical_profile = _mock_profile().model_copy(
+        update={
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "is_admin": False,
+        }
+    )
+    gateway.get_user = MagicMock(side_effect=[None, canonical_profile])
+    service_client.table.return_value.insert.return_value.execute.side_effect = (
+        RuntimeError("duplicate key value violates unique constraint profiles_pkey")
+    )
+    service_client.table.return_value.upsert.return_value.execute.return_value.data = []
+
+    profile = gateway.get_or_create_profile_for_auth_user(
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "user_metadata": {
+                "display_name": "Racing Alpha",
+                "language": "es-419",
+            },
+        }
+    )
+
+    assert profile is canonical_profile
+    assert gateway.get_user.call_count == 2
+    service_client.table.return_value.upsert.assert_called_once()
+    _, upsert_kwargs = service_client.table.return_value.upsert.call_args
+    assert upsert_kwargs == {
+        "on_conflict": "id",
+        "ignore_duplicates": True,
+    }
+    service_client.table.return_value.insert.assert_not_called()
 
 
 def test_gateway_private_alpha_role_reads_active_allowlist_row():
@@ -404,7 +444,12 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.reconcile_stale_chat_turns.return_value = []
+    gateway.list_projectable_chat_turns.return_value = []
     gateway.get_latest_completed_run_for_conversation.return_value = None
+    gateway.accept_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
+    gateway.transition_chat_turn.return_value = TransitionResult(outcome="applied")
+    gateway.finalize_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
     gateway.finalize_backtest_completion.side_effect = (
         lambda *, finalization: MemoryBacktestFinalizationGateway(
             finalization_store
@@ -1129,7 +1174,9 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
         "finalization"
     ].run
     final_payload = _final_payload(response.text)
-    assert final_payload["message_id"] == "msg-1"
+    terminal = mock_gateway.finalize_chat_turn.call_args.kwargs
+    assert terminal["to_status"] == "completed"
+    assert final_payload["message_id"] == terminal["message"].id
     assert final_payload["run"]["id"] == persisted_run.id
     assert final_payload["run"]["conversation_result_card"]["title"] == (
         "TSLA RSI Mean Reversion"
@@ -1296,7 +1343,14 @@ def test_chat_stream_finalization_retry_reuses_original_execution_identity(
         persisted_messages.append(message)
         return message
 
+    def persist_lifecycle_message(**kwargs) -> Message:
+        message = kwargs["message"]
+        persisted_messages.append(message)
+        return message
+
     mock_gateway.create_message.side_effect = create_message
+    mock_gateway.accept_chat_turn.side_effect = persist_lifecycle_message
+    mock_gateway.finalize_chat_turn.side_effect = persist_lifecycle_message
     mock_gateway.list_messages.side_effect = lambda **_: list(persisted_messages)
     finalization_store = AlphaStore()
     finalization_calls = []
@@ -1352,6 +1406,8 @@ def test_chat_stream_finalization_retry_reuses_original_execution_identity(
     assert finalization_calls[1].run.id == finalization_calls[0].run.id
     assert len(finalization_store.backtest_runs) == 1
     assert len(finalization_store.evidence_artifacts) == 1
+    assert mock_gateway.accept_chat_turn.call_count == 2
+    assert mock_gateway.finalize_chat_turn.call_count == 2
 
 
 def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
@@ -1391,7 +1447,7 @@ def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
     mock_gateway.create_message.assert_not_called()
 
 
-def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_gateway):
+def test_chat_stream_supabase_sends_normal_onboarding_language_to_runtime(mock_gateway):
     now = utcnow()
     conversation = Conversation(
         id="conv-2",
@@ -1428,14 +1484,17 @@ def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_ga
     events = _stream_events(response.text)
     token_events = [event for event in events if event.get("type") == "token"]
     assert len(token_events) == 1
-    assert "primary goal" in token_events[0]["content"]
+    assert token_events[0]["content"] == "I tested that idea with TSLA."
+    accepted = mock_gateway.accept_chat_turn.call_args.kwargs["message"]
+    assert accepted.role == "user"
+    assert accepted.content == "Test TSLA dip idea"
     final_payload = _final_payload(response.text)
-    assert final_payload == {
-        "stage_outcome": "await_user_reply",
-        "assistant_response": token_events[0]["content"],
-        "message_id": "msg-2",
-    }
-    mock_gateway.finalize_backtest_completion.assert_not_called()
+    terminal = mock_gateway.finalize_chat_turn.call_args.kwargs
+    assert terminal["to_status"] == "completed"
+    assert final_payload["stage_outcome"] == "ready_to_respond"
+    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["message_id"] == terminal["message"].id
+    mock_gateway.finalize_backtest_completion.assert_called_once()
 
 
 def test_chat_stream_supabase_does_not_persist_hidden_onboarding_messages(mock_gateway):
@@ -1473,8 +1532,13 @@ def test_chat_stream_supabase_does_not_persist_hidden_onboarding_messages(mock_g
     )
 
     assert response.status_code == 200
-    roles = [call.kwargs["role"] for call in mock_gateway.create_message.call_args_list]
-    assert "user" not in roles
+    mock_gateway.create_message.assert_not_called()
+    accepted = mock_gateway.accept_chat_turn.call_args.kwargs["message"]
+    assert accepted.role == "user"
+    assert accepted.content == "__ONBOARDING_GOAL__:test_stock_idea"
+    terminal = mock_gateway.finalize_chat_turn.call_args.kwargs
+    assert terminal["to_status"] == "completed"
+    assert terminal["message"].role == "assistant"
 
 
 def test_unauthorized_missing_token(mock_gateway):

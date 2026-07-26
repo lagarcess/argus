@@ -5,7 +5,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from argus.api import state as api_state
-from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
+from argus.api.chat.backtest_jobs import (
+    fail_job_without_task_run,
+    should_fail_stale_job_without_task_run,
+)
 from argus.api.dependencies import current_user, problem
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
@@ -16,6 +19,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain import backtest_admission
+from argus.domain.backtest_admission import CHAT_RUN_SCOPE, chat_run_identity_hash
 from argus.domain.backtest_finalization import (
     BacktestFinalizationError,
     stable_backtest_run_id,
@@ -24,6 +28,17 @@ from argus.domain.supabase_gateway import QuotaExceededError
 from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
+
+
+def _reconcile_stale_owner_job(
+    *,
+    gateway: Any,
+    user_id: str,
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    if not should_fail_stale_job_without_task_run(job):
+        return job
+    return fail_job_without_task_run(gateway=gateway, user_id=user_id, job=job)
 
 
 @router.post("/backtests/run", response_model=BacktestRunResponse)
@@ -519,6 +534,74 @@ def _finalize_direct_job(
     )
 
 
+@router.get(
+    "/backtest-jobs/by-action/{confirmation_id}",
+    response_model=BacktestJobResponse,
+)
+def get_backtest_job_by_action(
+    confirmation_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> BacktestJobResponse:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        raise _by_action_internal_error(request)
+
+    try:
+        job = gateway.get_backtest_job_reservation(
+            user_id=user.id,
+            operation_scope=CHAT_RUN_SCOPE,
+            idempotency_key=confirmation_id,
+        )
+    except Exception:
+        raise _by_action_internal_error(request) from None
+    if not job:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="Backtest job not found.",
+        )
+
+    launch_payload_hash = _linked_confirmation_launch_hash(
+        request=request,
+        gateway=gateway,
+        user_id=user.id,
+        confirmation_id=confirmation_id,
+        job=job,
+    )
+    expected_identity_hash = chat_run_identity_hash(
+        conversation_id=str(job.get("conversation_id") or ""),
+        confirmation_id=confirmation_id,
+        launch_payload_hash=launch_payload_hash,
+    )
+    if (
+        job.get("identity_hash") != expected_identity_hash
+        or job.get("payload_hash") != launch_payload_hash
+    ):
+        raise problem(
+            request,
+            status_code=409,
+            code="idempotency_conflict",
+            title="Idempotency Conflict",
+            detail="This action identity is already linked to different inputs.",
+        )
+
+    job = _reconcile_stale_owner_job(
+        gateway=gateway,
+        user_id=user.id,
+        job=job,
+    )
+    return _backtest_job_response(
+        request=request,
+        gateway=gateway,
+        user_id=user.id,
+        job=job,
+        require_succeeded_run=True,
+    )
+
+
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)
 def get_backtest_job(
     job_id: str,
@@ -543,38 +626,17 @@ def get_backtest_job(
             title="Not Found",
             detail="Backtest job not found.",
         )
-    job = reconcile_terminal_render_task_run(
+    job = _reconcile_stale_owner_job(
         gateway=api_state.supabase_gateway,
         user_id=user.id,
         job=job,
     )
-    if not job:
-        raise problem(
-            request,
-            status_code=404,
-            code="not_found",
-            title="Not Found",
-            detail="Backtest job not found.",
-        )
-
-    run = None
-    result_run_id = job.get("result_run_id")
-    if (
-        job.get("status") == "succeeded"
-        and isinstance(result_run_id, str)
-        and result_run_id
-    ):
-        run = api_state.supabase_gateway.get_backtest_run(
-            user_id=user.id,
-            run_id=result_run_id,
-        )
-    readout = _result_readout_from_job(job) if run is not None else None
-    readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
-    return BacktestJobResponse(
-        job=BacktestJob.model_validate(job),
-        run=run,
-        result_readout=readout,
-        **readout_metadata,
+    return _backtest_job_response(
+        request=request,
+        gateway=api_state.supabase_gateway,
+        user_id=user.id,
+        job=job,
+        require_succeeded_run=False,
     )
 
 
@@ -614,14 +676,14 @@ def _result_readout_from_job(job: dict[str, object]) -> str | None:
     return normalized or None
 
 
-def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, object]:
+def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, Any]:
     execution_metadata = job.get("execution_metadata")
     if not isinstance(execution_metadata, dict):
         return {}
     workflow_metadata = execution_metadata.get("workflow_backtest")
     if not isinstance(workflow_metadata, dict):
         return {}
-    metadata: dict[str, object] = {}
+    metadata: dict[str, Any] = {}
     source = workflow_metadata.get("result_readout_source")
     if isinstance(source, str) and source.strip():
         metadata["result_readout_source"] = source.strip()
@@ -632,3 +694,127 @@ def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, objec
     if isinstance(failure_mode, str) and failure_mode.strip():
         metadata["result_readout_failure_mode"] = failure_mode.strip()
     return metadata
+
+
+def _linked_confirmation_launch_hash(
+    *,
+    request: Request,
+    gateway: Any,
+    user_id: str,
+    confirmation_id: str,
+    job: dict[str, object],
+) -> str:
+    conversation_id = job.get("conversation_id")
+    confirmation_message_id = job.get("confirmation_message_id")
+    if (
+        job.get("operation_scope") != CHAT_RUN_SCOPE
+        or job.get("idempotency_key") != confirmation_id
+        or not isinstance(conversation_id, str)
+        or not conversation_id
+        or not isinstance(confirmation_message_id, str)
+        or not confirmation_message_id
+    ):
+        raise _by_action_internal_error(request)
+
+    try:
+        message = gateway.get_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=confirmation_message_id,
+        )
+    except Exception:
+        raise _by_action_internal_error(request) from None
+    if (
+        message is None
+        or message.id != confirmation_message_id
+        or message.conversation_id != conversation_id
+        or message.role != "assistant"
+        or not isinstance(message.metadata, dict)
+    ):
+        raise _by_action_internal_error(request)
+
+    card = message.metadata.get("confirmation_card")
+    if not isinstance(card, dict) or card.get("confirmation_id") != confirmation_id:
+        raise _by_action_internal_error(request)
+
+    launch_payload_hash = card.get("canonical_launch_payload_hash")
+    if not _is_full_payload_hash(launch_payload_hash):
+        raise _by_action_internal_error(request)
+    active_reference = message.metadata.get("active_confirmation_reference")
+    if not isinstance(active_reference, dict):
+        raise _by_action_internal_error(request)
+    reference_metadata = active_reference.get("metadata")
+    if (
+        active_reference.get("artifact_kind") != "confirmation"
+        or active_reference.get("artifact_id") != confirmation_id
+        or not isinstance(reference_metadata, dict)
+        or reference_metadata.get("canonical_launch_payload_hash")
+        != launch_payload_hash
+    ):
+        raise _by_action_internal_error(request)
+    return str(launch_payload_hash)
+
+
+def _is_full_payload_hash(value: object) -> bool:
+    if not isinstance(value, str) or not value.startswith("sha256:"):
+        return False
+    digest = value.removeprefix("sha256:")
+    return len(digest) == 64 and all(
+        character in "0123456789abcdef" for character in digest
+    )
+
+
+def _backtest_job_response(
+    *,
+    request: Request,
+    gateway: Any,
+    user_id: str,
+    job: dict[str, object],
+    require_succeeded_run: bool,
+) -> BacktestJobResponse:
+    run = None
+    result_run_id = job.get("result_run_id")
+    if (
+        job.get("status") == "succeeded"
+        and isinstance(result_run_id, str)
+        and result_run_id
+    ):
+        try:
+            run = gateway.get_backtest_run(
+                user_id=user_id,
+                run_id=result_run_id,
+            )
+        except Exception:
+            if require_succeeded_run:
+                raise _by_action_internal_error(request) from None
+            raise
+    if job.get("status") == "succeeded" and require_succeeded_run:
+        if (
+            run is None
+            or run.id != result_run_id
+            or run.conversation_id != job.get("conversation_id")
+        ):
+            raise _by_action_internal_error(request)
+    readout = _result_readout_from_job(job) if run is not None else None
+    readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
+    try:
+        return BacktestJobResponse(
+            job=BacktestJob.model_validate(job),
+            run=run,
+            result_readout=readout,
+            **readout_metadata,
+        )
+    except Exception:
+        if require_succeeded_run:
+            raise _by_action_internal_error(request) from None
+        raise
+
+
+def _by_action_internal_error(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=500,
+        code="internal_error",
+        title="Internal Error",
+        detail="Backtest job state is inconsistent.",
+    )

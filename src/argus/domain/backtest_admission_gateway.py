@@ -9,6 +9,13 @@ from typing import Any
 from argus.domain.backtest_admission import admission_limits
 from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 
+_BACKTEST_JOB_RESERVATION_COLUMNS = (
+    "id,conversation_id,request_message_id,confirmation_message_id,"
+    "operation_scope,idempotency_key,identity_hash,payload_hash,launch_payload,status,"
+    "result_run_id,failure_code,failure_detail,retryable,queued_at,"
+    "started_at,finished_at,created_at,updated_at,execution_metadata"
+)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -79,7 +86,7 @@ def get_backtest_job_reservation(
 ) -> dict[str, Any] | None:
     result = (
         client.table("backtest_jobs")
-        .select("id,status,identity_hash")
+        .select(_BACKTEST_JOB_RESERVATION_COLUMNS)
         .eq("user_id", user_id)
         .eq("operation_scope", operation_scope)
         .eq("idempotency_key", idempotency_key)
@@ -88,6 +95,29 @@ def get_backtest_job_reservation(
     )
     row = _row_one(result)
     return dict(row) if row is not None else None
+
+
+def list_backtest_job_reservations(
+    client: Any,
+    *,
+    user_id: str,
+    conversation_id: str,
+    operation_scope: str,
+    idempotency_keys: list[str],
+) -> list[dict[str, Any]]:
+    keys = list(dict.fromkeys(key.strip() for key in idempotency_keys if key.strip()))
+    if not keys:
+        return []
+    result = (
+        client.table("backtest_jobs")
+        .select(_BACKTEST_JOB_RESERVATION_COLUMNS)
+        .eq("user_id", user_id)
+        .eq("conversation_id", conversation_id)
+        .eq("operation_scope", operation_scope)
+        .in_("idempotency_key", keys)
+        .execute()
+    )
+    return [dict(row) for row in result.data or []]
 
 
 def finalize_direct_backtest_job(

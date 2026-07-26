@@ -11,7 +11,9 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
 from argus.agent_runtime.stages.interpret_internal.date_contract import (
     _date_range_endpoints,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import _field_base
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _selected_requested_field,
+)
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
 from argus.agent_runtime.strategy_contract import (
@@ -35,15 +37,14 @@ def pending_date_answer_interpretation(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
     today: date | None = None,
+    require_explicit_range: bool = False,
     reason_code: str = "pending_date_answer_route_repaired",
     user_goal_summary: str = (
         "User supplied the requested date range after structured interpretation "
         "misrouted the pending-field answer."
     ),
 ) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
@@ -76,6 +77,8 @@ def pending_date_answer_interpretation(
     date_range_intent: dict[str, Any] | None = None
     if resolved_range is not None:
         date_range = resolved_range.payload
+    elif require_explicit_range:
+        return None
     else:
         year_intent = resolve_calendar_year_intent_text(
             text,

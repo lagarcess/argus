@@ -4,8 +4,10 @@ import { join } from "node:path";
 
 import {
   coverageRecoveryActionsFromMetadata,
+  noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
+  unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "../lib/chat-recovery-display";
 
@@ -51,6 +53,127 @@ function flattenedKeys(value: unknown, prefix = ""): string[] {
 }
 
 describe("chat recovery display", () => {
+  test("hydrates only the safe typed no-progress choices", () => {
+    const metadata = {
+      response_intent: {
+        kind: "clarification",
+        facts: { progress_outcome: "no_progress" },
+        requested_fields: ["date_range"],
+        options: [
+          {
+            id: "supply_missing_value",
+            label: "Provide the missing value",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "keep_unchanged",
+            label: "Keep the idea unchanged",
+            replacement_values: { no_progress_action: "keep_unchanged" },
+          },
+          {
+            id: "cancel",
+            label: "Cancel this flow",
+            replacement_values: { no_progress_action: "cancel" },
+          },
+          {
+            id: "unsafe",
+            label: "Run it anyway",
+            replacement_values: { run_backtest: true },
+          },
+        ],
+      },
+    };
+
+    expect(
+      noProgressActionsFromMetadata(metadata, "assistant-no-progress"),
+    ).toEqual([
+      {
+        id: "no-progress-supply-missing-value",
+        label: "Provide the missing value",
+        labelKey:
+          "chat.clarification.no_progress_actions.supply_missing_value",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "supply_missing_value",
+          replacement_values: { requested_field: "date_range" },
+        },
+      },
+      {
+        id: "no-progress-keep-unchanged",
+        label: "Keep the idea unchanged",
+        labelKey: "chat.clarification.no_progress_actions.keep_unchanged",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "keep_unchanged",
+          replacement_values: { no_progress_action: "keep_unchanged" },
+        },
+      },
+      {
+        id: "no-progress-cancel",
+        label: "Cancel this flow",
+        labelKey: "chat.clarification.no_progress_actions.cancel",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-no-progress",
+          option_id: "cancel",
+          replacement_values: { no_progress_action: "cancel" },
+        },
+      },
+    ]);
+  });
+
+  test("fails closed on conflicting or malformed no-progress metadata", () => {
+    const validIntent = {
+      kind: "clarification",
+      facts: { progress_outcome: "no_progress" },
+      requested_fields: ["date_range"],
+      options: [
+        {
+          id: "supply_missing_value",
+          label: "Provide the missing value",
+          replacement_values: { requested_field: "date_range" },
+        },
+      ],
+    };
+
+    expect(
+      noProgressActionsFromMetadata(
+        {
+          response_intent: validIntent,
+          pending_strategy: {
+            response_intent: {
+              ...validIntent,
+              requested_fields: ["asset_universe"],
+            },
+          },
+        },
+        "assistant-no-progress",
+      ),
+    ).toEqual([]);
+    expect(
+      noProgressActionsFromMetadata(
+        {
+          response_intent: {
+            ...validIntent,
+            options: [
+              {
+                id: "supply_missing_value",
+                label: "Provide the missing value",
+                replacement_values: {
+                  requested_field: "date_range",
+                  run_backtest: true,
+                },
+              },
+            ],
+          },
+        },
+        "assistant-no-progress",
+      ),
+    ).toEqual([]);
+  });
+
   test("renders recovery codes through locale catalogs", () => {
     const display = recoveryDisplayFromMetadata({
       recovery: {
@@ -64,6 +187,27 @@ describe("chat recovery display", () => {
     );
     expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
       "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.",
+    );
+  });
+
+  test("renders abandoned owning-row recovery in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      agent_runtime_turn: {
+        status: "abandoned",
+        failure_code: "turn_abandoned",
+        retryable: true,
+      },
+      recovery: {
+        code: "turn_abandoned",
+        retryable: true,
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "That turn stopped before finishing. Your message is saved, so you can retry.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "Ese turno se detuvo antes de terminar. Tu mensaje está guardado, así que puedes reintentarlo.",
     );
   });
 
@@ -484,6 +628,101 @@ describe("chat recovery display", () => {
         },
       }),
     ).toBeNull();
+  });
+
+  test("projects supported strategy options with exact server replacement values", () => {
+    const movingAverageReplacementValues = {
+      strategy_type: "signal_strategy",
+      rule_family: "moving_average_crossover",
+    };
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        prompt_source: "llm_generated",
+        options: [
+          {
+            id: "rsi_threshold",
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: { strategy_type: "buy_and_hold" },
+          },
+          {
+            id: "moving_average_crossover",
+            replacement_values: movingAverageReplacementValues,
+          },
+        ],
+      },
+    };
+
+    expect(
+      unsupportedStrategyActionsFromMetadata(metadata, "assistant-strategy"),
+    ).toEqual([
+      {
+        id: "unsupported-strategy-rsi-threshold",
+        label: "Use a supported RSI threshold rule",
+        labelKey: "chat.simplification_options.rsi_threshold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "rsi_threshold",
+          replacement_values: { simplify_logic: "rsi_only" },
+        },
+      },
+      {
+        id: "unsupported-strategy-buy-and-hold",
+        label: "Compare with buy and hold",
+        labelKey: "chat.simplification_options.buy_and_hold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "buy_and_hold",
+          replacement_values: { strategy_type: "buy_and_hold" },
+        },
+      },
+      {
+        id: "unsupported-strategy-moving-average-crossover",
+        label: "Use a supported moving-average crossover",
+        labelKey: "chat.simplification_options.moving_average_crossover",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "moving_average_crossover",
+          replacement_values: movingAverageReplacementValues,
+        },
+      },
+    ]);
+  });
+
+  test("does not project unknown or untyped unsupported strategy options", () => {
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        options: [
+          {
+            id: "unknown_strategy",
+            replacement_values: { strategy_type: "buy_and_hold" },
+          },
+          {
+            id: "rsi_threshold",
+          },
+          {
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+        ],
+      },
+    };
+
+    expect(
+      unsupportedStrategyActionsFromMetadata(metadata, "assistant-strategy"),
+    ).toEqual([]);
   });
 
   test("recovery locale keys stay in parity", () => {

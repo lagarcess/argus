@@ -1119,7 +1119,7 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     assert "I tested that idea with TSLA." in assistant_message["content"]
 
 
-def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
+def test_chat_stream_sends_normal_onboarding_language_to_runtime() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
@@ -1139,16 +1139,19 @@ def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
     events = _stream_events(stream)
     token_events = [event for event in events if event.get("type") == "token"]
     assert len(token_events) == 1
-    assert "primary goal" in token_events[0]["content"]
+    assert token_events[0]["content"] == "I tested that idea with TSLA."
     final_payload = _final_payload(stream)
-    assert set(final_payload) == {
-        "stage_outcome",
-        "assistant_response",
-        "message_id",
-    }
-    assert final_payload["stage_outcome"] == "await_user_reply"
+    assert final_payload["stage_outcome"] == "ready_to_respond"
     assert final_payload["assistant_response"] == token_events[0]["content"]
     assert final_payload["message_id"]
+    assert final_payload["run"]["conversation_id"] == conversation["id"]
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["role"] for message in messages] == ["user", "assistant"]
+    runtime_turn = messages[-1]["metadata"]["agent_runtime_turn"]
+    assert runtime_turn["status"] == "completed"
+    assert runtime_turn["terminal"] is True
 
 
 def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:

@@ -6,6 +6,7 @@ import {
   normalizeConfirmationHistory,
   supersedePriorConfirmations,
 } from "../components/chat/artifact-history";
+import { hydrateMessagesFromApi } from "../components/chat/ChatInterface";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -100,6 +101,25 @@ function apiMessageWithJob(currentJob: BacktestJob): ApiMessage {
   };
 }
 
+function projectedUserActionWithJob(currentJob: BacktestJob): ApiMessage {
+  return {
+    ...apiMessageWithJob(currentJob),
+    id: "request-message-1",
+    role: "user",
+    content: "Run backtest",
+    metadata: {
+      chat_action: {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirmation-1" },
+      },
+      backtest_job: currentJob,
+      backtest_job_id: currentJob.id,
+    },
+  };
+}
+
 function queuedJobMessage(): Message {
   const message = backtestJobMessageFromApi(apiMessageWithJob(job()));
   if (!message) {
@@ -151,6 +171,91 @@ describe("chat backtest jobs", () => {
     expect(message?.backtestJob?.status).toBe("queued");
     expect(pendingBacktestJobIds([message!])).toEqual(["job-1"]);
   });
+
+  test("hydrates owner-scoped missing-message Run projection into a job card", () => {
+    const message = backtestJobMessageFromApi(
+      projectedUserActionWithJob(
+        job({
+          status: "failed",
+          failure_code: "workflow_dispatch_missing",
+          retryable: true,
+        }),
+      ),
+    );
+
+    expect(message?.role).toBe("ai");
+    expect(message?.kind).toBe("backtest_job");
+    expect(message?.backtestJob?.status).toBe("failed");
+    expect(message?.backtestJob?.retryable).toBe(true);
+  });
+
+  for (const terminal of [
+    {
+      status: "failed" as const,
+      expectedStatus: "could_not_run",
+      expectedLabel: "Could not run",
+    },
+    {
+      status: "canceled" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+    {
+      status: "expired" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+  ]) {
+    test(`raw reload keeps ${terminal.status} durable truth after Run action effects`, () => {
+      const terminalJob = job({
+        status: terminal.status,
+        finished_at: "2026-06-06T12:00:04Z",
+      });
+      const rawItems: ApiMessage[] = [
+        {
+          id: "confirmation-message-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: "Ready to run.",
+          created_at: "2026-06-06T12:00:00Z",
+          metadata: {
+            confirmation_card: {
+              confirmation_id: "confirmation-1",
+              confirmation_state: "active",
+              title: "AAPL buy and hold",
+              status: "ready_to_run",
+              statusLabel: "Ready to run",
+              summary: "Ready to test AAPL.",
+              rows: [],
+              actions: [
+                {
+                  type: "run_backtest",
+                  label: "Run backtest",
+                  presentation: "confirmation",
+                  payload: { confirmation_id: "confirmation-1" },
+                },
+              ],
+            },
+          },
+        },
+        projectedUserActionWithJob(terminalJob),
+      ];
+
+      const hydrated = hydrateMessagesFromApi(rawItems);
+      const confirmation = hydrated.messages.find(
+        (message) => message.id === "confirmation-message-1",
+      );
+      const durableJob = hydrated.messages.find(
+        (message) => message.kind === "backtest_job",
+      );
+
+      expect(confirmation?.confirmation?.status).toBe(terminal.expectedStatus);
+      expect(confirmation?.confirmation?.statusLabel).toBe(terminal.expectedLabel);
+      expect(confirmation?.confirmation?.statusLabel).not.toBe("Running");
+      expect(durableJob?.backtestJob?.status).toBe(terminal.status);
+      expect(pendingBacktestJobIds(hydrated.messages)).toEqual([]);
+    });
+  }
 
   test("hydrates stream final job payloads into durable job state", () => {
     const currentJob = job({ status: "running" });
@@ -615,15 +720,62 @@ describe("chat backtest jobs", () => {
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const polling = readFileSync(
+      join(root, "lib/chat-run-reconciliation.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("getBacktestJob");
+    expect(chat).toContain("useBacktestJobPolling");
+    expect(polling).toContain("getBacktestJob");
     expect(chat).toContain("backtestJobMessageFromApi(m)");
+    expect(chat.indexOf("backtestJobMessageFromApi(m)")).toBeLessThan(
+      chat.indexOf('m.role === "user" && chatAction'),
+    );
     expect(chat).toContain("const finalBacktestJob = backtestJobFromFinalPayload(finalPayload)");
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
-    expect(chat).toContain("pendingBacktestJobKey");
-    expect(chat).toContain("response.job.status === \"succeeded\" && !response.run");
-    expect(chat).toContain("response.job.status === \"running\"");
+    expect(polling).toContain("pendingBacktestJobKey");
+    expect(polling).toContain("response.job.status === \"succeeded\" && !response.run");
+    expect(polling).toContain("response.job.status === \"running\"");
     expect(chat).not.toContain('workflow_proof');
+  });
+
+  test("ChatInterface exits ambiguous Run checking through typed recovery", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const ambiguityStart = chat.indexOf(
+      "const confirmationId = ambiguousRunConfirmationId",
+    );
+    const ambiguityEnd = chat.indexOf(
+      "const canApplyOwnedUpdate",
+      ambiguityStart,
+    );
+    const ambiguity = chat.slice(ambiguityStart, ambiguityEnd);
+    const recoveryStart = ambiguity.indexOf(
+      'reconciliation.kind === "recoverable"',
+    );
+    const recovery = ambiguity.slice(recoveryStart);
+    const clearStart = chat.indexOf("function clearActiveStreamState()");
+    const clearEnd = chat.indexOf("const loadMoreHistory", clearStart);
+    const clearState = chat.slice(clearStart, clearEnd);
+
+    expect(ambiguityStart).toBeGreaterThan(-1);
+    expect(ambiguity).toContain("applyRecoverableRunReconciliation");
+    expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
+    expect(ambiguity).toContain("clearActiveStreamState()");
+    expect(ambiguity).toContain(
+      "streamToConversation(activeStreamTargetConversationId)",
+    );
+    expect(chat).toContain(
+      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
+    );
+    expect(clearState).toContain("setStreamStatus(null)");
+    expect(clearState).toContain("setIsStreamingResponse(false)");
+    expect(ambiguity).toContain("durableStateUnknown: true");
+    expect(recovery).not.toContain(
+      "settleConfirmationAfterActionTransportError(",
+    );
   });
 });

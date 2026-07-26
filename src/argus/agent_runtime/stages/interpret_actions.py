@@ -4,6 +4,7 @@ import asyncio
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
+    no_progress_response_if_equivalent,
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -69,6 +70,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
+from argus.agent_runtime.turn_execution import claim_turn_terminal
 from argus.domain.backtesting.config import normalize_timeframe
 
 CONFIRMATION_EDIT_ACTION_FIELDS = {
@@ -84,6 +86,62 @@ COVERAGE_RECOVERY_ACTION_FIELDS = {
 }
 
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
+
+
+def final_interpret_stage_result(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    optional_parameter_stage_patch: dict[str, Any],
+    assistant_response: str | None,
+    language: str,
+) -> StageResult:
+    prior_intent = selected_thread_metadata.get("response_intent")
+    no_progress = (
+        no_progress_response_if_equivalent(
+            snapshot=snapshot,
+            prior_strategy=snapshot.pending_strategy_summary,
+            candidate_strategy=decision.candidate_strategy_draft,
+            prior_response_intent=prior_intent,
+            missing_fields=decision.missing_required_fields,
+            semantic_turn_act=decision.semantic_turn_act,
+            optional_parameter_status=decision.to_patch()["optional_parameter_status"],
+            assistant_response=assistant_response,
+            language=language,
+        )
+        if decision.requires_clarification
+        and snapshot is not None
+        and snapshot.pending_strategy_summary is not None
+        and selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
+        and isinstance(prior_intent, dict)
+        else None
+    )
+    if no_progress is not None:
+        claim_turn_terminal("no_progress", "unchanged_typed_state")
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={
+                "candidate_strategy_draft": decision.candidate_strategy_draft.model_dump(
+                    mode="python"
+                ),
+                "assistant_response": no_progress.assistant_response,
+                "response_intent": no_progress.response_intent,
+                "requested_field": decision.missing_required_fields[0],
+                "missing_required_fields": list(decision.missing_required_fields),
+            },
+        )
+    stage_patch = dict(optional_parameter_stage_patch)
+    if assistant_response:
+        stage_patch["assistant_response"] = assistant_response
+    return StageResult(
+        outcome="needs_clarification"
+        if decision.requires_clarification
+        else "ready_to_respond",
+        decision=decision,
+        stage_patch=stage_patch,
+    )
 
 
 def _result_followup_decision(

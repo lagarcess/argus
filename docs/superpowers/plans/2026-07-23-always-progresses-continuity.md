@@ -677,9 +677,11 @@ the deadline or allowance is exhausted. Without an active visible-turn context,
 after-stream/background work keeps its existing task-local behavior.
 
 The default absolute deadline is the existing
-`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` value. Derive the default call allowance
-by recording the exact maximal legitimate current route in the Phase 0 ledger;
-do not invent a larger arbitrary ceiling.
+`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` value. Set the default call allowance to
+the smallest evidence-calibrated safety policy that covers the proven
+legitimate production-builder corridor. This policy is not a mathematical
+maximum of every theoretical predicate combination; do not invent a larger
+arbitrary ceiling.
 
 - [ ] **Step 4: Reserve at every actual OpenRouter attempt**
 
@@ -1046,6 +1048,32 @@ proof.
 - Consumes Task 4 lifecycle gateway.
 - Produces atomic acceptance, `running`, durable terminal transitions, stale
   reconciliation on next POST/read, and one persisted-content Retry action.
+
+**Founder-approved daily-only acceptance boundary (2026-07-24):**
+
+Validate this Always Progresses slice against Argus's established daily-bar
+(`1D`) product loop. Non-daily timeframe interpretation,
+unsupported-granularity recovery, and intraday product readiness are deferred
+to a dedicated future roadmap. The observed silent `5m` to `1D` substitution
+is known behavior, not a fixed or accepted capability claim for this slice.
+Task 5's response-option Retry browser proof must therefore use the daily-bar
+unsupported momentum-breakout journey recorded in the Task 5 browser runbook;
+it must not depend on unsupported timeframe recovery.
+
+**Non-negotiable Tasks 4-5 integration acceptance:**
+
+Using the real lifecycle owner and the real route-receipt and cost-ledger sinks,
+prove that onboarding, cancellation, deterministic recovery, and
+post-admission builder failure each produce:
+
+- exactly one durable lifecycle terminal;
+- zero route-receipt rows;
+- zero cost-ledger rows;
+- the correct typed terminal and progress outcome; and
+- no fingerprint or internal runtime state in SSE or public message metadata.
+
+This acceptance belongs to `chat_turn_lifecycles`. Never satisfy it with a
+synthetic provider receipt.
 
 - [ ] **Step 1: Write the red route matrix**
 

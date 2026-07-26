@@ -18,6 +18,7 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import Conversation, Message, OnboardingState, User
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
+from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi.testclient import TestClient
@@ -77,6 +78,8 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.get_conversation.return_value = _conversation()
     gateway.list_messages.return_value = []
+    gateway.reconcile_stale_chat_turns.return_value = []
+    gateway.list_projectable_chat_turns.return_value = []
     gateway.count_completed_runs.return_value = 1
     gateway.get_latest_completed_run_for_conversation.return_value = None
     gateway.create_message.side_effect = lambda **kwargs: Message(
@@ -87,6 +90,11 @@ def mock_gateway():
         created_at=utcnow(),
         metadata=kwargs.get("metadata"),
     )
+    gateway.accept_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
+    gateway.transition_chat_turn.return_value = TransitionResult(
+        outcome="applied",
+    )
+    gateway.finalize_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
     gateway.get_backtest_job_reservation.return_value = None
     gateway.admit_backtest_job.return_value = {
         "decision": "admitted",
@@ -137,6 +145,10 @@ def _assistant_settlements(gateway: MagicMock) -> list[dict[str, Any]]:
     for call in gateway.create_message.call_args_list:
         if call.kwargs.get("role") != "assistant":
             continue
+        settle = call.kwargs.get("settle_usage")
+        if settle is not None:
+            settlements.append(dict(settle))
+    for call in gateway.finalize_chat_turn.call_args_list:
         settle = call.kwargs.get("settle_usage")
         if settle is not None:
             settlements.append(dict(settle))
