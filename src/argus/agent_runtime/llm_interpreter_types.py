@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
+    AssetDiscoveryRequest,
     CapabilityQuestionFocus,
     ContextQuestionFocus,
     ResultFollowupFocus,
@@ -269,9 +270,26 @@ class LLMInterpretationResponse(BaseModel):
             "retry_failed_action",
             "approval",
             "unsupported_request",
+            "asset_discovery",
         ]
         | None
     ) = None
+    asset_discovery: AssetDiscoveryRequest | None = Field(
+        default=None,
+        description=(
+            "Typed payload required when semantic_turn_act=asset_discovery: the "
+            "user explicitly asks Argus to find, discover, or list assets by "
+            "category ('what cybersecurity stocks could I test?'), by peer "
+            "similarity ('companies like Nvidia'), or for comparison candidates "
+            "('what else in Costco's category could I compare?'), in any "
+            "language. Set relationship to category, peer, or comparison; put "
+            "the plain category phrase in category_description; put known "
+            "anchor tickers in anchor_symbols; leave candidate_strategy_draft "
+            "empty for these turns. Ordinary 'what should I try next?' "
+            "follow-ups, capability questions, and direct backtest requests are "
+            "NOT asset discovery."
+        ),
+    )
     result_followup_focus: ResultFollowupFocus | None = None
     result_followup_fact_key: str | None = Field(
         default=None,

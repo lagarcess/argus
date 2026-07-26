@@ -32,6 +32,7 @@ RecoveryMessageCode = Literal[
     "artifact_action_retry_rebuilt_confirmation",
     "artifact_action_retry_inactive",
     "execution_data_unavailable",
+    "discovery_unavailable",
 ]
 
 
@@ -155,6 +156,11 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "right now. Try again, change the dates, or choose a different supported "
         "asset."
     ),
+    "discovery_unavailable": (
+        "I cannot look up current source-backed candidates yet, and I do not "
+        "want to guess from memory. Name a symbol or company you already have "
+        "in mind and I can test it. Everything in this chat is unchanged."
+    ),
 }
 
 
@@ -216,9 +222,7 @@ def recovery_state(
         "retryable": retryable,
     }
     cleaned_params = {
-        key: value
-        for key, value in params.items()
-        if value is not None and value != ""
+        key: value for key, value in params.items() if value is not None and value != ""
     }
     if cleaned_params:
         state["params"] = cleaned_params

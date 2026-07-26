@@ -952,7 +952,22 @@ class OpenRouterStructuredInterpreter:
             "questions, result_followup for questions about the latest completed run, "
             "retry_failed_action when the user asks to try again, retry, rerun the same "
             "one, or otherwise repeat the latest failed run without changing the idea, "
-            "and unsupported_request when the user asks for unsupported capabilities. "
+            "unsupported_request when the user asks for unsupported capabilities, "
+            "and asset_discovery when the user explicitly asks Argus to find, "
+            "discover, list, or suggest which assets exist to test — by category "
+            "('what cybersecurity stocks could I test?'), by peer similarity "
+            "('find companies similar to Nvidia'), or for comparison candidates "
+            "('what else in Costco's category could I compare?'), in any language. "
+            "For asset_discovery turns, always fill the asset_discovery payload: "
+            "relationship (category, peer, or comparison), category_description "
+            "with the plain category phrase when one exists, anchor_symbols with "
+            "known tickers the user is anchoring on, and asset_class_hint when "
+            "clear. Leave candidate_strategy_draft empty on asset_discovery "
+            "turns; the user is asking who exists, not yet configuring a test. "
+            "Ordinary 'what should I try next?' follow-ups stay result_followup "
+            "with next_experiment; questions about what Argus supports stay "
+            "educational_question; a direct request to test a named asset is "
+            "never asset_discovery. "
             "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
             "peak_date, peak_value, result_card_fact, what_tested, "
@@ -1084,6 +1099,7 @@ class OpenRouterStructuredInterpreter:
             capability_question_focus=response.capability_question_focus,
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
+            asset_discovery=response.asset_discovery,
         )
 
 

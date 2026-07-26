@@ -25,6 +25,7 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.discovery import discovery_stage_result_if_applicable
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
@@ -1025,6 +1026,7 @@ async def _stage_result_from_interpretation(
         capability_question_focus=interpretation.capability_question_focus,
         context_question_focus=interpretation.context_question_focus,
         artifact_target=artifact_target,
+        asset_discovery=interpretation.asset_discovery,
     )
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
@@ -1076,6 +1078,13 @@ async def _stage_result_from_interpretation(
     )
     if retry_result is not None:
         return retry_result
+    discovery_result = await discovery_stage_result_if_applicable(
+        decision=decision,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+    )
+    if discovery_result is not None:
+        return discovery_result
     pending_artifact_followup_result = (
         _pending_artifact_followup_stage_result_if_applicable(
             decision=decision,
