@@ -137,17 +137,6 @@ class _OrderingMemoryGateway(_EvidenceCountingMemoryGateway):
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "test_stock_idea",
-                "completed": False,
-            }
-        },
-    )
     clear_openrouter_route_receipts()
     return client
 
@@ -430,7 +419,6 @@ def test_message_only_hooks_never_create_a_chat_turn_lifecycle() -> None:
 @pytest.mark.parametrize(
     ("route", "expected_stage", "expected_status"),
     [
-        ("onboarding", "ready_to_respond", "completed"),
         ("cancel", "ready_to_respond", "completed"),
         ("deterministic_recovery", "await_user_reply", "completed"),
         ("builder_failure", "agent_runtime_failure", "recoverable_failed"),
@@ -462,20 +450,7 @@ def test_zero_provider_routes_have_one_durable_terminal_and_no_public_internals(
         _provider_must_not_run,
     )
 
-    if route == "onboarding":
-        client.patch(
-            "/api/v1/me",
-            json={
-                "onboarding": {
-                    "stage": "primary_goal_selection",
-                    "language_confirmed": True,
-                    "primary_goal": None,
-                    "completed": False,
-                }
-            },
-        )
-        request_payload["message"] = "__ONBOARDING_GOAL__:test_stock_idea"
-    elif route == "cancel":
+    if route == "cancel":
         api_state.store.messages[conversation["id"]].append(
             prepare_message(
                 conversation_id=conversation["id"],
@@ -681,7 +656,7 @@ def test_owner_message_read_reconciles_stale_terminal_evidence(
 
 
 @pytest.mark.parametrize("language", ["en", "es-419"])
-def test_hidden_onboarding_protocol_does_not_leak_through_terminal_projection(
+def test_legacy_onboarding_markers_do_not_leak_through_terminal_projection(
     language: str,
 ) -> None:
     client = _client()
@@ -755,7 +730,7 @@ def test_hidden_onboarding_protocol_does_not_leak_through_terminal_projection(
     ],
 )
 @pytest.mark.parametrize("status", ["accepted", "running", "abandoned"])
-def test_hidden_onboarding_process_loss_never_updates_public_preview_surfaces(
+def test_legacy_onboarding_marker_process_loss_never_updates_public_previews(
     language: str,
     protocol_message: str,
     status: str,
@@ -820,10 +795,8 @@ def test_hidden_onboarding_process_loss_never_updates_public_preview_surfaces(
         assert protocol_message not in response.text
 
 
-@pytest.mark.parametrize("route", ["onboarding_goal", "cancel"])
 def test_valid_deterministic_controls_finish_without_workflow_initialization(
     monkeypatch: pytest.MonkeyPatch,
-    route: str,
 ) -> None:
     from argus.api.routers import agent as agent_router
 
@@ -847,43 +820,29 @@ def test_valid_deterministic_controls_finish_without_workflow_initialization(
         "conversation_id": conversation["id"],
         "language": "en",
     }
-    if route == "onboarding_goal":
-        client.patch(
-            "/api/v1/me",
-            json={
-                "onboarding": {
-                    "stage": "primary_goal_selection",
-                    "language_confirmed": True,
-                    "primary_goal": None,
-                    "completed": False,
-                },
+    api_state.store.messages[conversation["id"]].append(
+        prepare_message(
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="Review this draft.",
+            metadata={
+                "confirmation_card": {
+                    "confirmation_id": "confirmation-1",
+                }
             },
         )
-        request_payload["message"] = "__ONBOARDING_GOAL__:test_stock_idea"
-    else:
-        api_state.store.messages[conversation["id"]].append(
-            prepare_message(
-                conversation_id=conversation["id"],
-                role="assistant",
-                content="Review this draft.",
-                metadata={
-                    "confirmation_card": {
-                        "confirmation_id": "confirmation-1",
-                    }
-                },
-            )
-        )
-        request_payload["action"] = {
-            "type": "cancel_confirmation",
-            "label": "Cancel",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": "confirmation-1"},
-        }
-        monkeypatch.setattr(
-            agent_router,
-            "confirmation_metadata_fallback_context",
-            lambda **_: None,
-        )
+    )
+    request_payload["action"] = {
+        "type": "cancel_confirmation",
+        "label": "Cancel",
+        "presentation": "confirmation",
+        "payload": {"confirmation_id": "confirmation-1"},
+    }
+    monkeypatch.setattr(
+        agent_router,
+        "confirmation_metadata_fallback_context",
+        lambda **_: None,
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -901,34 +860,18 @@ def test_valid_deterministic_controls_finish_without_workflow_initialization(
         evidence_gateway=evidence_gateway,
     )
     assert lifecycle["retryable"] is False
-    profile_onboarding = client.get("/api/v1/me").json()["user"]["onboarding"]
-    if route == "onboarding_goal":
-        assert profile_onboarding["stage"] == "ready"
-        assert profile_onboarding["primary_goal"] == "test_stock_idea"
-    else:
-        assert final["confirmation_cancelled"] == {
-            "confirmation_id": "confirmation-1"
-        }
+    assert final["confirmation_cancelled"] == {
+        "confirmation_id": "confirmation-1"
+    }
 
 
-def test_normal_onboarding_language_reaches_workflow_initialization(
+def test_ordinary_message_reaches_workflow_initialization(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = _client()
     conversation = _conversation(client)
     evidence_gateway = _EvidenceCountingMemoryGateway()
     monkeypatch.setattr(api_state, "supabase_gateway", evidence_gateway)
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "primary_goal_selection",
-                "language_confirmed": True,
-                "primary_goal": None,
-                "completed": False,
-            },
-        },
-    )
     workflow_calls = 0
 
     def _unavailable_workflow(_request: Any) -> Any:

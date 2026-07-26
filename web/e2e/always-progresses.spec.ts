@@ -262,12 +262,6 @@ async function installMockApi(page: Page) {
           display_name: "Continuity User",
           language: "en",
           locale: "en-US",
-          onboarding: {
-            completed: true,
-            stage: "completed",
-            language_confirmed: true,
-            primary_goal: "test_stock_idea",
-          },
         },
       });
     }

@@ -101,17 +101,6 @@ def test_timeframe_recovery_action_uses_localized_typed_label(
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "test_stock_idea",
-                "completed": False,
-            }
-        },
-    )
     return client
 
 
@@ -1738,34 +1727,15 @@ def test_chat_stream_requires_message_or_action() -> None:
     assert response.status_code == 422
 
 
-def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
+def test_bare_symbol_turn_uses_reliable_setup_fallback_without_jargon(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "primary_goal_selection",
-                "language_confirmed": True,
-                "primary_goal": None,
-                "completed": False,
-            }
-        },
-    )
     conversation = _conversation(client)
 
-    first = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "__ONBOARDING_GOAL__:learn_basics",
-            "language": "en",
-        },
-    )
-    second = client.post(
+    response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
@@ -1774,13 +1744,10 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
         },
     )
 
-    first_text = _stream_payloads(first.text, "token")[0]["text"]
-    second_text = _stream_payloads(second.text, "token")[0]["text"]
-    assert "help you choose a sensible next step" in first_text
-    assert "What should trigger the buy?" not in second_text
-    assert "reliable test setup" in second_text
-    assert "draft" not in second_text.lower()
-    assert "interpreter" not in second_text.lower()
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "reliable test setup" in text
+    assert "draft" not in text.lower()
+    assert "interpreter" not in text.lower()
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

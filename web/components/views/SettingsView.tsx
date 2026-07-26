@@ -19,7 +19,6 @@ import {
   Loader2,
   MessageSquare,
   BarChart2,
-  Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -75,8 +74,6 @@ export default function SettingsView({
   const { theme, setTheme } = useTheme();
   const showSubscriptionSection =
     process.env.NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION === "true";
-  const showDevOnboardingReset =
-    process.env.NEXT_PUBLIC_ENABLE_DEV_ONBOARDING_RESET === "true";
   const [activeSubView, setActiveSubView] = useState<SubView>("main");
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
@@ -138,17 +135,6 @@ export default function SettingsView({
     } catch {
       // Silently ignore if not logged in
     }
-  };
-
-  const resetOnboardingForDev = async () => {
-    await patchMe({
-      onboarding: {
-        completed: false,
-        stage: "language_selection",
-        language_confirmed: true,
-        primary_goal: null,
-      },
-    });
   };
 
   const handleUnarchive = async (id: string) => {
@@ -468,19 +454,6 @@ export default function SettingsView({
             <span className="text-[14px] font-medium text-red-600 dark:text-red-400">{t("settings.logout")}</span>
           </button>
 
-          {showDevOnboardingReset && (
-            <button
-              onClick={() => {
-                void resetOnboardingForDev();
-              }}
-              className="w-fit mt-2 py-3 px-6 bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-[12px] hover:opacity-80 transition-opacity text-center flex items-center justify-center gap-2 whitespace-nowrap"
-            >
-              <Sparkles className="w-4 h-4 text-black/70 dark:text-white/80" />
-              <span className="text-[14px] font-medium text-black/70 dark:text-white/80">
-                {t("settings.dev.reset_onboarding", "Reset onboarding (dev)")}
-              </span>
-            </button>
-          )}
         </div>
       </div>
 

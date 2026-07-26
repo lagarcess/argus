@@ -24,7 +24,6 @@ import {
   listHistory,
   logoutFromApi,
   patchConversation,
-  patchMe,
   resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
@@ -35,14 +34,12 @@ import {
   type ChatActionRequest,
   type HistoryItem,
   type BacktestRun,
-  type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
 import {
   chatExploratorySuggestionsEnabled,
   collectionsEnabled,
   omnisearchEnabled,
-  privateAlphaOnboardingEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
@@ -148,12 +145,6 @@ type SendOptions = {
   renderUserMessage?: boolean;
   replacementAssistantId?: string;
 };
-type OnboardingChoice = {
-  goal: PrimaryGoal;
-  title: string;
-  description: string;
-};
-
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
@@ -562,44 +553,6 @@ export default function ChatInterface() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
-  const onboardingChoices = useMemo<OnboardingChoice[]>(
-    () => [
-      {
-        goal: "learn_basics",
-        title: t("onboarding.goals.learn_basics.title", "Learn investing basics"),
-        description: t(
-          "onboarding.goals.learn_basics.description",
-          "Start with simple ideas and clear explanations.",
-        ),
-      },
-      {
-        goal: "build_passive_strategy",
-        title: t("onboarding.goals.build_passive_strategy.title", "Build a passive strategy"),
-        description: t(
-          "onboarding.goals.build_passive_strategy.description",
-          "Focus on long-term, low-maintenance ideas.",
-        ),
-      },
-      {
-        goal: "test_stock_idea",
-        title: t("onboarding.goals.test_stock_idea.title", "Test a stock idea"),
-        description: t(
-          "onboarding.goals.test_stock_idea.description",
-          "Validate a thesis on symbols you follow.",
-        ),
-      },
-      {
-        goal: "explore_crypto",
-        title: t("onboarding.goals.explore_crypto.title", "Explore crypto"),
-        description: t(
-          "onboarding.goals.explore_crypto.description",
-          "Try crypto-focused strategy starters.",
-        ),
-      },
-    ],
-    [t],
-  );
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -623,8 +576,10 @@ export default function ChatInterface() {
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  // First paint waits for the authenticated profile language so a fresh
+  // browser cannot send starter prompts in the wrong language.
+  const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
@@ -919,12 +874,34 @@ export default function ChatInterface() {
     let cancelled = false;
     (async () => {
       try {
-        const meResponse = await getMe().catch(() => null);
+        let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
+        let profileUnreachable = false;
+        try {
+          meResponse = await getMe();
+        } catch (error) {
+          const status =
+            typeof error === "object" && error !== null && "status" in error
+              ? (error as { status?: number }).status
+              : undefined;
+          profileUnreachable = status !== 401 && status !== 403;
+        }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
         }
-        const stage = meResponse?.user?.onboarding?.stage;
+        if (cancelled) return;
+        setIsBootstrappingProfile(false);
+        if (profileUnreachable) {
+          setMessages([
+            {
+              id: "offline",
+              role: "ai",
+              kind: "text",
+              content: t('chat.error_offline'),
+            },
+          ]);
+          return;
+        }
         const activeConversationId = readActiveConversationIdFromUrl();
         if (activeConversationId) {
           try {
@@ -934,21 +911,12 @@ export default function ChatInterface() {
             if (hydrated.messages.length === 0) {
               // clear empty persisted conversations from the active route.
               resetToEmptyChatSurface();
-              setShowOnboardingGoalCards(
-                privateAlphaOnboardingEnabled &&
-                (stage === "language_selection" || stage === "primary_goal_selection"),
-              );
               return;
             }
             rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
-            setShowOnboardingGoalCards(
-              privateAlphaOnboardingEnabled &&
-              (stage === "language_selection" || stage === "primary_goal_selection"),
-            );
-
             return;
           } catch (error) {
             if (cancelled) return;
@@ -957,10 +925,6 @@ export default function ChatInterface() {
                 prev.filter((item) => !historyItemBelongsToConversation(item, activeConversationId)),
               );
               resetToEmptyChatSurface();
-              setShowOnboardingGoalCards(
-                privateAlphaOnboardingEnabled &&
-                (stage === "language_selection" || stage === "primary_goal_selection"),
-              );
               return;
             }
             rememberActiveConversationId(activeConversationId);
@@ -969,20 +933,15 @@ export default function ChatInterface() {
               conversationLoadFailureMessage(activeConversationId, t('chat.error_load')),
             ]);
             setInputActions([]);
-            setShowOnboardingGoalCards(false);
             return;
           }
         }
 
         if (cancelled) return;
         resetToEmptyChatSurface();
-        setShowOnboardingGoalCards(
-          privateAlphaOnboardingEnabled &&
-          (stage === "language_selection" || stage === "primary_goal_selection"),
-        );
-
       } catch {
         if (cancelled) return;
+        setIsBootstrappingProfile(false);
         setMessages([
           {
             id: "offline",
@@ -1104,16 +1063,6 @@ export default function ChatInterface() {
   const startNewChat = useCallback(async () => {
     resetToEmptyChatSurface();
     closeTransientSidebar();
-    try {
-      const me = await getMe();
-      const stage = me.user.onboarding.stage;
-      setShowOnboardingGoalCards(
-        privateAlphaOnboardingEnabled &&
-        (stage === "language_selection" || stage === "primary_goal_selection"),
-      );
-    } catch {
-      setShowOnboardingGoalCards(false);
-    }
     void refreshHistory();
     return null;
   }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
@@ -1715,88 +1664,6 @@ export default function ChatInterface() {
     }
   };
 
-  const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
-    let targetConversationId = conversationId;
-    if (!targetConversationId) {
-      try {
-        const { conversation } = await createConversation(i18n.language);
-        targetConversationId = conversation.id;
-        rememberActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-      } catch {
-        showToast(t('chat.error_generic'));
-        return;
-      }
-    }
-    const isSkip = goal === "surprise_me";
-    const hiddenMessage = isSkip ? "__ONBOARDING_SKIP__" : `__ONBOARDING_GOAL__:${goal}`;
-    const userCopy = isSkip ? t("onboarding.skip", "Skip for now")
-      : onboardingChoices.find((choice) => choice.goal === goal)?.title ?? goal;
-    const userMsg: Message = { id: crypto.randomUUID(), role: "user", kind: "text", content: userCopy };
-    const assistantId = crypto.randomUUID();
-
-    setMessages((prev) => {
-      shouldAutoScrollRef.current = true;
-      const base = markComposerActionsInactive(prev);
-      if (isSkip) return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
-      return [...base, userMsg, { id: assistantId, role: "ai", kind: "text", content: "" }];
-    });
-    setStreamStatus(t("chat.status.understanding"));
-    setIsStreamingResponse(true);
-    closeTransientSidebar();
-    let onboardingStreamFailed = false;
-
-    try {
-      await streamChatMessage(targetConversationId, hiddenMessage, i18n.language, (event) => {
-        if (event.event === "token") {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "error") {
-          onboardingStreamFailed = true;
-          setStreamStatus(null);
-          setIsStreamingResponse(false);
-          setShowOnboardingGoalCards(true);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: t('chat.error_backtest') } : m,
-            ),
-          );
-          markConversationAttentionIfOutOfFocus(targetConversationId);
-        }
-        if (event.event === "done") {
-          if (onboardingStreamFailed) return;
-          setStreamStatus(null);
-          setIsStreamingResponse(false);
-          setShowOnboardingGoalCards(false);
-          schedulePostTurnHistoryRefresh(targetConversationId);
-          markConversationAttentionIfOutOfFocus(targetConversationId);
-        }
-      });
-      if (onboardingStreamFailed) return;
-      await patchMe({ onboarding: {
-        stage: "ready", language_confirmed: true, primary_goal: goal, completed: true,
-      } });
-    } catch {
-      setStreamStatus(null);
-      setIsStreamingResponse(false);
-      setShowOnboardingGoalCards(true);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: t("chat.error_backtest") }
-            : m,
-        ),
-      );
-      markConversationAttentionIfOutOfFocus(targetConversationId);
-    }
-  };
-
   // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
@@ -2119,6 +1986,14 @@ export default function ChatInterface() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  if (isBootstrappingProfile) {
+    return (
+      <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
 
@@ -2269,48 +2144,6 @@ export default function ChatInterface() {
                     onToast={showToast}
                   />
                 </div>
-
-                {showOnboardingGoalCards && (
-                  <div
-                    className="mt-6 w-full max-w-2xl"
-                    data-testid="onboarding-goal-cards"
-                  >
-                    <p className="mb-3 text-center text-[14px] text-black/60 dark:text-white/60">
-                      {t(
-                        "onboarding.prompt",
-                        "What is your current primary goal? Don't worry, you can change it later.",
-                      )}
-                    </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {onboardingChoices.map((choice) => (
-                        <button
-                          key={choice.goal}
-                          type="button"
-                          data-testid={`onboarding-goal-${choice.goal}`}
-                          onClick={() => handleOnboardingGoalChoice(choice.goal)}
-                          className="rounded-[14px] border border-black/10 bg-white/70 px-3 py-3 text-left transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/70 dark:hover:bg-white/5"
-                        >
-                          <p className="text-[14px] font-medium text-black dark:text-white">
-                            {choice.title}
-                          </p>
-                          <p className="mt-1 text-[12px] text-black/55 dark:text-white/55">
-                            {choice.description}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-2 flex justify-center">
-                      <button
-                        type="button"
-                        data-testid="onboarding-skip"
-                        onClick={() => handleOnboardingGoalChoice("surprise_me")}
-                        className="text-[13px] font-medium text-black/55 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-white/55 dark:hover:text-white"
-                      >
-                        {t("onboarding.skip", "Skip for now")}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

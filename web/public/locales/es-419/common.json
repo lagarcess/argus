@@ -587,7 +587,6 @@
       "checking": "Comprobando lo que se guardó...",
       "preparing": "Preparando resultados",
       "intent_run_backtest": "Diseñando tu estrategia...",
-      "intent_onboarding_prompt": "Personalizando tu experiencia...",
       "intent_education": "Pensando...",
       "intent_unsupported_request": "Pensando..."
     },
@@ -817,9 +816,6 @@
     },
     "logout": "Cerrar sesión",
     "logout_error": "No pudimos cerrar la sesión en este navegador. Inténtalo de nuevo.",
-    "dev": {
-      "reset_onboarding": "Restablecer onboarding (dev)"
-    },
     "search_language": "Buscar idioma",
     "no_languages": "No se encontraron idiomas.",
     "languages": {
@@ -896,43 +892,6 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
-  },
-  "onboarding": {
-    "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",
-    "language": {
-      "title": "Elige tu idioma",
-      "subtitle": "Argus habla varios idiomas. ¿Cuál prefieres?",
-      "description": "Esto nos ayuda a personalizar tu experiencia.",
-      "continue_in": "Continuar en {{language}}",
-      "en": "Inglés",
-      "es-419": "Español"
-    },
-    "primary_goal": "¿Cuál es tu objetivo principal?",
-    "goal_description": "Adaptaremos tus perspectivas de estrategia en función de esto.",
-    "skip": "Omitir por ahora",
-    "goals": {
-      "learn_basics": {
-        "title": "Aprender conceptos básicos de inversión",
-        "description": "Comienza con ideas sencillas y explicaciones claras."
-      },
-      "build_passive_strategy": {
-        "title": "Crear una estrategia pasiva",
-        "description": "Céntrate en ideas de largo plazo y bajo mantenimiento."
-      },
-      "test_stock_idea": {
-        "title": "Probar una idea de acciones",
-        "description": "Valida una tesis sobre los símbolos que sigues."
-      },
-      "explore_crypto": {
-        "title": "Explorar criptomonedas",
-        "description": "Prueba iniciadores de estrategias centrados en cripto."
-      }
-    },
-    "error": {
-      "title": "API no disponible",
-      "description": "No pudimos conectarnos al motor de Argus. Asegúrate de que el servicio backend esté funcionando e inténtalo de nuevo.",
-      "retry": "Reintentar"
     }
   },
   "auth": {

@@ -256,12 +256,6 @@ class PostgresProofJobGateway:
     def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
         from psycopg.types.json import Jsonb
 
-        onboarding = {
-            "completed": False,
-            "stage": "language_selection",
-            "language_confirmed": False,
-            "primary_goal": None,
-        }
         with self._connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -308,8 +302,7 @@ class PostgresProofJobGateway:
                       display_name,
                       language,
                       locale,
-                      theme,
-                      onboarding
+                      theme
                     )
                     values (
                       %(user_id)s,
@@ -317,15 +310,13 @@ class PostgresProofJobGateway:
                       'Render Workflow Proof',
                       'en',
                       'en-US',
-                      'dark',
-                      %(onboarding)s
+                      'dark'
                     )
                     on conflict (id) do nothing
                     """,
                     {
                         "user_id": user_id,
                         "email": email,
-                        "onboarding": Jsonb(onboarding),
                     },
                 )
 

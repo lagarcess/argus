@@ -32,17 +32,6 @@ export type BacktestJobStatus =
   | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
-export type OnboardingStage =
-  | "language_selection"
-  | "primary_goal_selection"
-  | "ready"
-  | "completed";
-export type PrimaryGoal =
-  | "learn_basics"
-  | "build_passive_strategy"
-  | "test_stock_idea"
-  | "explore_crypto"
-  | "surprise_me";
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -182,12 +171,6 @@ export type ApiUser = {
   display_name: string | null;
   language: "en" | "es-419";
   locale: "en-US" | "es-419";
-  onboarding: {
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  };
 };
 
 type AuthSessionPayload = {
@@ -661,12 +644,6 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
-  onboarding?: Partial<{
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  }>;
 };
 
 export async function getMe() {

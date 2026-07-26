@@ -130,16 +130,21 @@ type RetryLastTurnOptions = {
   requestMessageId?: string;
 };
 
+// Retired onboarding rows persist in old conversations; they must never
+// resurface as retryable turns.
+function isLegacyOnboardingMarker(content: string): boolean {
+  return (
+    content === "__ONBOARDING_SKIP__" ||
+    content.startsWith("__ONBOARDING_GOAL__:")
+  );
+}
+
 export function retryLastTurnActionFromMessage(
   message: string,
   options?: RetryLastTurnOptions,
 ): ChatActionOption | null {
   const trimmed = message.trim();
-  if (
-    !trimmed ||
-    trimmed === "__ONBOARDING_SKIP__" ||
-    trimmed.startsWith("__ONBOARDING_GOAL__:")
-  ) {
+  if (!trimmed || isLegacyOnboardingMarker(trimmed)) {
     return null;
   }
   const failedAssistantId = options?.assistantMessageId?.trim();

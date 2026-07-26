@@ -110,11 +110,6 @@ function assistantTerminalCount(items: Array<Record<string, unknown>>): number {
 
 export async function startNewChat(page: Page) {
   await page.goto("/chat");
-  const skip = page.locator('[data-testid="onboarding-skip"]');
-  if (await skip.count()) {
-    await skip.first().click();
-    await page.waitForTimeout(1_000);
-  }
   const newChat = page.getByRole("button", { name: /new chat|nueva conversaci/i });
   if (await newChat.count()) {
     await newChat.first().click();

@@ -212,8 +212,8 @@ language LLM-first while preventing repeated binary clarifications.
 
 Collections remain in the schema, but Collections are indefinitely deferred from
 private alpha. Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no sidebar entry,
-settings link, picker, command/search result, result action, onboarding path, or
-empty state should expose Collections.
+settings link, picker, command/search result, result action, or empty state
+should expose Collections.
 
 ## Fully Supported
 
