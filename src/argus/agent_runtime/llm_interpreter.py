@@ -354,12 +354,12 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
-    executable_strategy_template_from_typed_rules,
     executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
+    safe_conflict_strategy_type,
 )
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
@@ -1058,10 +1058,6 @@ class OpenRouterStructuredInterpreter:
             response=response,
             request=request,
         )
-        if strategy.requested_strategy_template is None:
-            strategy.requested_strategy_template = (
-                executable_strategy_template_from_typed_rules(strategy)
-            )
         unsupported = [
             _unsupported_from_llm(item) for item in response.unsupported_constraints
         ]
@@ -4098,23 +4094,9 @@ async def _audit_supported_strategy_capability_conflict(
         and not audit.keep_unsupported_strategy_logic
         and audit.confidence >= 0.7
     ):
-        strategy_type = canonical_strategy_type(audit.selected_strategy_type)
-        if not strategy_type:
-            strategy_type = canonical_strategy_type(
-                response.candidate_strategy_draft.strategy_type
-            )
-        if strategy_type not in {
-            "buy_and_hold",
-            "dca_accumulation",
-            "signal_strategy",
-        }:
-            return None
-        if strategy_type == "signal_strategy" and (
-            executable_strategy_type(
-                response.candidate_strategy_draft.model_dump(mode="python")
-            )
-            != strategy_type
-        ):
+        draft = response.candidate_strategy_draft
+        strategy_type = safe_conflict_strategy_type(audit.selected_strategy_type, draft)
+        if strategy_type is None:
             return None
         repaired = _response_with_supported_strategy_capability_conflict_removed(
             response=response,

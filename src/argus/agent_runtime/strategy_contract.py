@@ -125,6 +125,27 @@ def executable_strategy_template_from_typed_rules(
     return template
 
 
+def safe_conflict_strategy_type(
+    selected_strategy_type: Any,
+    strategy: StrategySummary | dict[str, Any],
+) -> str | None:
+    """Return only a capability-conflict selection safe to project."""
+
+    strategy_type = canonical_strategy_type(selected_strategy_type)
+    if not strategy_type:
+        strategy_type = canonical_strategy_type(
+            _strategy_payload(strategy).get("strategy_type")
+        )
+    if strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        return strategy_type
+    if (
+        strategy_type == "signal_strategy"
+        and executable_strategy_type(strategy) == strategy_type
+    ):
+        return strategy_type
+    return None
+
+
 def executable_strategy_type_from_extracted_fields(
     fields: Mapping[str, Any],
 ) -> str | None:

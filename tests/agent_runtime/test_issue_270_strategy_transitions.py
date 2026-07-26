@@ -481,6 +481,9 @@ def test_complete_fresh_crossover_recovers_registry_template_from_typed_rules() 
     """Executable typed rules must retain their named capability identity."""
 
     from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.strategy_contract import (
+        executable_strategy_template_from_typed_rules,
+    )
 
     draft = _crossover_draft().model_copy(
         update={
@@ -520,7 +523,4 @@ def test_complete_fresh_crossover_recovers_registry_template_from_typed_rules() 
     malformed = interpretation.candidate_strategy_draft.model_copy(
         update={"exit_rule": dict(ENTRY_RULE)}
     )
-    assert (
-        interpreter_module.executable_strategy_template_from_typed_rules(malformed)
-        is None
-    )
+    assert executable_strategy_template_from_typed_rules(malformed) is None

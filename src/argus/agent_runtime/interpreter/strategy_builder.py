@@ -44,6 +44,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
+    executable_strategy_template_from_typed_rules,
     executable_strategy_type,
     normalize_date_range_candidate,
 )
@@ -757,6 +758,10 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
         exit_text
         or moving_average_crossover_text(strategy.exit_rule)
         or strategy.exit_logic
+    )
+    strategy.requested_strategy_template = (
+        strategy.requested_strategy_template
+        or executable_strategy_template_from_typed_rules(strategy)
     )
 
 
