@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { TitleSource } from "@/lib/argus-api";
 import {
   shouldPlayTitleReveal,
@@ -34,19 +34,35 @@ export default function ChatHeaderTitle({
   const [fadeTick, setFadeTick] = useState(0);
   const previousStateRef = useRef<HeaderTitleState | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const settleTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  // Layout effect so the reveal's first frame paints instead of the final
+  // title flashing for one frame before the animation starts.
+  useLayoutEffect(() => {
     const next: HeaderTitleState | null = conversationId
       ? { conversationId, title, titleSource }
       : null;
     const previous = previousStateRef.current;
     previousStateRef.current = next;
 
-    if (animationFrameRef.current !== null) {
-      window.cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+    const cancelTimers = () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      if (settleTimeoutRef.current !== null) {
+        window.clearTimeout(settleTimeoutRef.current);
+        settleTimeoutRef.current = null;
+      }
+    };
+    cancelTimers();
+
     if (!next || !shouldPlayTitleReveal(previous, next)) {
+      setFrame(null);
+      return;
+    }
+    // Hidden tabs pause rAF; nobody is watching, so skip straight to the name.
+    if (document.visibilityState !== "visible") {
       setFrame(null);
       return;
     }
@@ -64,8 +80,8 @@ export default function ChatHeaderTitle({
     const tick = (now: number) => {
       const progress = (now - start) / TITLE_REVEAL_DURATION_MS;
       if (progress >= 1) {
+        cancelTimers();
         setFrame(null);
-        animationFrameRef.current = null;
         return;
       }
       if (now - lastCycleAt >= TITLE_REVEAL_CHAR_CYCLE_MS) {
@@ -78,13 +94,13 @@ export default function ChatHeaderTitle({
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
     animationFrameRef.current = window.requestAnimationFrame(tick);
+    // rAF stops in backgrounded tabs; this guarantees the name still settles.
+    settleTimeoutRef.current = window.setTimeout(() => {
+      cancelTimers();
+      setFrame(null);
+    }, TITLE_REVEAL_DURATION_MS + 250);
 
-    return () => {
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
+    return cancelTimers;
   }, [conversationId, title, titleSource]);
 
   if (frame !== null) {

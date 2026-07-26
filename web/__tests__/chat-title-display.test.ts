@@ -183,4 +183,16 @@ describe("chat header wiring", () => {
     expect(sidebar).toContain("conversationDisplayTitle(");
     expect(sidebar).toContain("{displayTitle}");
   });
+
+  test("reveal animation cannot strand scrambled glyphs", () => {
+    const headerTitle = readFileSync(
+      join(root, "components/chat/ChatHeaderTitle.tsx"),
+      "utf-8",
+    );
+    expect(headerTitle).toContain("useLayoutEffect(");
+    expect(headerTitle).toContain('document.visibilityState !== "visible"');
+    expect(headerTitle).toContain("TITLE_REVEAL_DURATION_MS + 250");
+    expect(headerTitle).toContain("prefers-reduced-motion");
+    expect(headerTitle).toContain('aria-hidden="true"');
+  });
 });
