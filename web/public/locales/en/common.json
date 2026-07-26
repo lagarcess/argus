@@ -1041,6 +1041,14 @@
       "loading": "Opening Argus",
       "error": "Argus couldn't open a temporary chat. Try again."
     },
+    "expired": {
+      "title": "This temporary chat has expired",
+      "detail": "Its messages and results can’t be recovered.",
+      "start_new": "Start a new temporary chat",
+      "sign_in": "Sign in",
+      "create_account": "Create account",
+      "restart_error": "Argus could not start a new temporary chat. Try again."
+    },
     "conversion": {
       "eyebrow": "Keep going with Argus",
       "sign_in_title": "Sign in",

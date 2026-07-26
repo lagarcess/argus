@@ -1506,6 +1506,10 @@ to `false`; the frontend flag controls presentation only.
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
   checked before Auth creation. It uses the existing secure cookie rules.
+  The response always includes `renewed_after_expiry` and the server-owned
+  `public_account_access_enabled` presentation permission. An expired verified
+  anonymous session is replaced with a fresh guest identity and returns
+  `renewed_after_expiry=true`; the expired workspace is never revived.
   Disabling the flag stops new anonymous identities while already-verified
   guests remain usable until conversion, fixed expiry, or cleanup.
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
@@ -1530,6 +1534,10 @@ to `false`; the frontend flag controls presentation only.
   mutation. It locks the active workspace, removes the current temporary
   conversation graph, creates one replacement conversation, and preserves the
   anonymous identity, fixed expiry, and lifetime usage counters.
+- Conversation create/manage and evidence-decision routes enforce the same
+  server capabilities returned by `GET /api/v1/me`. Direct guest requests for
+  gated durable mutations fail with `403 account_conversion_required`;
+  owner-scoped reads and the guest Start over route remain available.
 - `GET /api/v1/me` returns the verified account kind, guest expiry and limits,
   and server capabilities with the ordinary profile.
 

@@ -1041,6 +1041,14 @@
       "loading": "Abriendo Argus",
       "error": "Argus no pudo abrir un chat temporal. Inténtalo de nuevo."
     },
+    "expired": {
+      "title": "Este chat temporal venció",
+      "detail": "Sus mensajes y resultados no se pueden recuperar.",
+      "start_new": "Iniciar un nuevo chat temporal",
+      "sign_in": "Iniciar sesión",
+      "create_account": "Crear cuenta",
+      "restart_error": "Argus no pudo iniciar un nuevo chat temporal. Inténtalo de nuevo."
+    },
     "conversion": {
       "eyebrow": "Sigue con Argus",
       "sign_in_title": "Iniciar sesión",

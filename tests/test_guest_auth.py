@@ -141,6 +141,8 @@ def test_guest_bootstrap_creates_real_anonymous_identity_profile_and_workspace(
         )
 
     assert response.status_code == 200
+    assert response.json()["renewed_after_expiry"] is False
+    assert response.json()["public_account_access_enabled"] is False
     assert response.cookies.get("sb-auth-token") == "guest-access-token"
     assert response.cookies.get("sb-refresh-token") == "guest-refresh-token"
     gateway.sign_in_anonymously.assert_called_once_with(
@@ -198,6 +200,8 @@ def test_valid_guest_cookie_reuses_identity_across_reload(
 
     assert response.status_code == 200
     assert response.json()["reused"] is True
+    assert response.json()["renewed_after_expiry"] is False
+    assert response.json()["public_account_access_enabled"] is False
     assert response.json()["user"]["id"] == USER_ID
     gateway.sign_in_anonymously.assert_not_called()
     gateway.create_guest_workspace.assert_not_called()
@@ -227,6 +231,7 @@ def test_expired_verified_guest_session_mints_a_fresh_anonymous_identity(
 
     assert response.status_code == 200
     assert response.json()["reused"] is False
+    assert response.json()["renewed_after_expiry"] is True
     assert response.json()["user"]["email"] is None
     gateway.sign_in_anonymously.assert_called_once()
     gateway.create_guest_workspace.assert_called_once()

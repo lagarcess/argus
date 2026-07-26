@@ -370,6 +370,75 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
   }
 });
 
+for (const expiredCase of [
+  {
+    language: "en",
+    title: "This temporary chat has expired",
+    detail: "Its messages and results can’t be recovered.",
+    restart: "Start a new temporary chat",
+    signIn: "Sign in",
+  },
+  {
+    language: "es-419",
+    title: "Este chat temporal venció",
+    detail: "Sus mensajes y resultados no se pueden recuperar.",
+    restart: "Iniciar un nuevo chat temporal",
+    signIn: "Iniciar sesión",
+  },
+] as const) {
+  test(`@guest-expiry ${expiredCase.language} shows honest recovery without onboarding`, async ({
+    page,
+  }) => {
+    await page.addInitScript((language) => {
+      window.localStorage.setItem("i18nextLng", language);
+    }, expiredCase.language);
+    await page.route("**/api/v1/auth/guest", async (route) => {
+      await fulfillJson(route, {
+        authenticated: true,
+        reused: false,
+        renewed_after_expiry: true,
+        account_kind: "guest",
+        user: guestMe().user,
+      });
+    });
+
+    await page.goto("/chat", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { name: expiredCase.title })).toBeVisible();
+    await expect(page.getByText(expiredCase.detail)).toBeVisible();
+    await expect(page.getByRole("button", { name: expiredCase.restart })).toBeVisible();
+    await expect(page.getByRole("button", { name: expiredCase.signIn })).toBeVisible();
+    await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
+    await expect(page.getByTestId("chat-input")).toHaveCount(0);
+  });
+}
+
+test("@guest-expiry public account capability offers in-place account creation", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/auth/guest", async (route) => {
+    await fulfillJson(route, {
+      authenticated: true,
+      reused: false,
+      renewed_after_expiry: true,
+      public_account_access_enabled: true,
+      account_kind: "guest",
+      user: guestMe().user,
+    });
+  });
+
+  await page.goto("/chat", { waitUntil: "domcontentloaded" });
+
+  await expect(
+    page.getByRole("button", { name: "Create account" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(
+    page.getByRole("button", { name: "Sign up", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByPlaceholder("Name")).toBeVisible();
+});
+
 test("@guest-shell frontend-on server-off mismatch stays on a retry surface", async ({
   page,
 }) => {

@@ -155,7 +155,7 @@ class GuestAccountPersistenceMixin:
                 "guest_handoff_invalid",
             )
             code = next((value for value in known_codes if value in detail), None)
-            raise RuntimeError(code or "guest_handoff_invalid") from None
+            raise RuntimeError(code or "guest_handoff_claim_unavailable") from None
         row = _row_one(result)
         if row is None:
             raise RuntimeError("guest_handoff_invalid")

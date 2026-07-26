@@ -4,12 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { retryGuestSession, startGuestSession } from "@/lib/guest-session";
+import ExpiredGuestSession from "@/components/guest/ExpiredGuestSession";
 
 export default function GuestEntry() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [renewedAfterExpiry, setRenewedAfterExpiry] = useState(false);
+  const [publicAccountAccessEnabled, setPublicAccountAccessEnabled] =
+    useState(false);
 
   const openChat = useCallback(
     async (retry = false) => {
@@ -17,7 +21,14 @@ export default function GuestEntry() {
       setRetrying(retry);
       try {
         const bootstrap = retry ? retryGuestSession : startGuestSession;
-        await bootstrap(i18n.resolvedLanguage ?? i18n.language);
+        const result = await bootstrap(i18n.resolvedLanguage ?? i18n.language);
+        if (result.renewed_after_expiry) {
+          setPublicAccountAccessEnabled(
+            result.public_account_access_enabled ?? false,
+          );
+          setRenewedAfterExpiry(true);
+          return;
+        }
         router.replace("/chat");
       } catch (cause) {
         setError(
@@ -38,6 +49,14 @@ export default function GuestEntry() {
   useEffect(() => {
     void openChat();
   }, [openChat]);
+
+  if (renewedAfterExpiry) {
+    return (
+      <ExpiredGuestSession
+        publicAccountAccessEnabled={publicAccountAccessEnabled}
+      />
+    );
+  }
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-background px-6 text-foreground">

@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.dependencies import (
+    current_user,
+    dev_memory_fallback_enabled,
+    problem,
+    require_account_capability,
+)
 from argus.api.guest_access import account_context
 from argus.api.message_store import (
     memory_conversation,
@@ -72,7 +77,22 @@ def create_conversation(
                     conversation_id=workspace.conversation_id,
                 )
                 if existing is not None:
-                    return ConversationResponse(conversation=existing)
+                    messages = api_state.supabase_gateway.list_messages(
+                        user_id=user.id,
+                        conversation_id=workspace.conversation_id,
+                        limit=None,
+                    )
+                    if not any(message.role == "user" for message in messages):
+                        return ConversationResponse(conversation=existing)
+                    require_account_capability(
+                        request,
+                        "can_create_additional_conversation",
+                        detail=(
+                            "Sign in to keep this temporary conversation "
+                            "and start another."
+                        ),
+                        reason="new_conversation",
+                    )
         try:
             conversation = api_state.supabase_gateway.create_conversation(
                 user_id=user.id,
@@ -207,8 +227,15 @@ def list_conversations(
 
 @router.delete("/conversations", response_model=BulkConversationDeleteResponse)
 def delete_all_conversations(
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> BulkConversationDeleteResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     if api_state.supabase_gateway is not None:
         deleted_count = api_state.supabase_gateway.soft_delete_all_conversations(
             user_id=user.id,
@@ -239,6 +266,12 @@ def patch_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
@@ -291,6 +324,12 @@ def delete_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> SuccessResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,

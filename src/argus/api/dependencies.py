@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -66,11 +66,58 @@ def private_alpha_access_problem(request: Request) -> HTTPException:
     )
 
 
+AccountCapabilityName = Literal[
+    "can_create_additional_conversation",
+    "can_manage_conversation",
+    "can_save_decision",
+    "can_manage_account",
+]
+
+
+def require_account_capability(
+    request: Request,
+    capability: AccountCapabilityName,
+    *,
+    detail: str,
+    reason: str,
+) -> None:
+    from argus.api.guest_access import account_context
+
+    capabilities = account_context(request).capabilities
+    allowed = {
+        "can_create_additional_conversation": (
+            capabilities.can_create_additional_conversation
+        ),
+        "can_manage_conversation": capabilities.can_manage_conversation,
+        "can_save_decision": capabilities.can_save_decision,
+        "can_manage_account": capabilities.can_manage_account,
+    }[capability]
+    if allowed:
+        return
+    raise problem(
+        request,
+        status_code=403,
+        code="account_conversion_required",
+        title="Account Required",
+        detail=detail,
+        context={"reason": reason},
+    )
+
+
 def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
     response = JSONResponse(payload)
+    _apply_auth_session_cookies(request, response, payload)
+    return response
+
+
+def _apply_auth_session_cookies(
+    request: Request,
+    response: JSONResponse,
+    payload: dict[str, Any],
+) -> None:
     session = payload.get("session")
     if not isinstance(session, dict):
-        return response
+        return
 
     access_token = session.get("access_token")
     refresh_token = session.get("refresh_token")
@@ -88,7 +135,6 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
         response.set_cookie("sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
         response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
-    return response
 
 
 def _session_cookie_secure(request: Request) -> bool:

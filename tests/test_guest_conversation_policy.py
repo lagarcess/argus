@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.schemas import Conversation, OnboardingState, User
+from argus.api.schemas import Conversation, Message, OnboardingState, User
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
@@ -92,6 +92,123 @@ def test_guest_create_conversation_reuses_the_single_bound_conversation(
     assert response.status_code == 200
     assert response.json()["conversation"]["id"] == CONVERSATION_ID
     gateway.create_conversation.assert_not_called()
+
+
+def test_guest_direct_durable_conversation_mutations_require_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    profile = _profile()
+    conversation = _conversation()
+    workspace = GuestWorkspace(
+        user_id=USER_ID,
+        conversation_id=CONVERSATION_ID,
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.get_auth_user_from_token.return_value = {
+        "id": USER_ID,
+        "email": None,
+        "is_anonymous": True,
+    }
+    gateway.get_or_create_profile_for_auth_user.return_value = profile
+    gateway.get_active_guest_workspace.return_value = workspace
+    gateway.get_conversation.return_value = conversation
+    gateway.list_messages.return_value = [
+        Message(
+            id="00000000-0000-0000-0000-000000000064",
+            conversation_id=CONVERSATION_ID,
+            role="user",
+            content="Accepted guest content",
+            metadata={},
+            created_at=profile.created_at,
+        )
+    ]
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        TestClient(app) as client,
+    ):
+        responses = [
+            client.post(
+                "/api/v1/conversations",
+                json={"title": "Second conversation", "language": "en"},
+                headers={"Authorization": "Bearer verified-guest"},
+            ),
+            client.patch(
+                f"/api/v1/conversations/{CONVERSATION_ID}",
+                json={"title": "Renamed"},
+                headers={"Authorization": "Bearer verified-guest"},
+            ),
+            client.delete(
+                f"/api/v1/conversations/{CONVERSATION_ID}",
+                headers={"Authorization": "Bearer verified-guest"},
+            ),
+            client.delete(
+                "/api/v1/conversations",
+                headers={"Authorization": "Bearer verified-guest"},
+            ),
+        ]
+
+    assert [response.status_code for response in responses] == [403, 403, 403, 403]
+    assert all(
+        response.json()["code"] == "account_conversion_required" for response in responses
+    )
+    gateway.create_conversation.assert_not_called()
+    gateway.patch_conversation.assert_not_called()
+    gateway.soft_delete_conversation.assert_not_called()
+    gateway.soft_delete_all_conversations.assert_not_called()
+
+
+def test_guest_direct_decision_capture_requires_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    profile = _profile()
+    workspace = GuestWorkspace(
+        user_id=USER_ID,
+        conversation_id=CONVERSATION_ID,
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.get_auth_user_from_token.return_value = {
+        "id": USER_ID,
+        "email": None,
+        "is_anonymous": True,
+    }
+    gateway.get_or_create_profile_for_auth_user.return_value = profile
+    gateway.get_active_guest_workspace.return_value = workspace
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/v1/evidence-artifacts/00000000-0000-0000-0000-000000000065/decision",
+            json={"decision_state": "watching", "note": "Guest decision"},
+            headers={"Authorization": "Bearer verified-guest"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "account_conversion_required"
 
 
 def test_guest_start_over_replaces_the_bound_conversation_in_place(

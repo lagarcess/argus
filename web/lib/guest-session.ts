@@ -11,6 +11,8 @@ type GuestSessionInput = {
 export type GuestBootstrapResponse = {
   authenticated: true;
   reused: boolean;
+  renewed_after_expiry?: boolean;
+  public_account_access_enabled?: boolean;
   account_kind: "guest";
   session?: {
     access_token?: string;

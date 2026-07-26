@@ -7,7 +7,12 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.dependencies import (
+    current_user,
+    dev_memory_fallback_enabled,
+    problem,
+    require_account_capability,
+)
 from argus.api.guest_access import (
     AccountContext,
     account_context,
@@ -237,14 +242,12 @@ def patch_me(
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
     context = account_context(request)
-    if not context.capabilities.can_manage_account:
-        raise problem(
-            request,
-            status_code=403,
-            code="account_conversion_required",
-            title="Account Required",
-            detail="Sign in to manage a permanent profile.",
-        )
+    require_account_capability(
+        request,
+        "can_manage_account",
+        detail="Sign in to manage a permanent profile.",
+        reason="manage_account",
+    )
     current = (
         api_state.supabase_gateway.get_user(user_id=user.id)
         if api_state.supabase_gateway is not None

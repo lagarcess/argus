@@ -281,6 +281,104 @@ def test_login_handoff_reconciliation_does_not_duplicate_completion_events() -> 
     emit.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("handoff_error", "expected_status"),
+    [
+        ("guest_handoff_invalid", 400),
+        ("guest_handoff_expired", 410),
+        ("guest_handoff_consumed", 409),
+        ("guest_handoff_wrong_destination", 403),
+    ],
+)
+def test_terminal_login_handoff_failure_keeps_login_and_clears_stale_cookies(
+    handoff_error: str,
+    expected_status: int,
+) -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_allowed.return_value = True
+    gateway.login.return_value = {
+        "user": {
+            "id": REGISTERED_ID,
+            "email": "member@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+            "expires_in": 3600,
+        },
+    }
+    gateway.claim_guest_workspace_handoff.side_effect = RuntimeError(handoff_error)
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        TestClient(app, base_url="http://localhost:3000") as client,
+    ):
+        client.cookies.set("argus-guest-handoff-id", HANDOFF_ID)
+        client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "member@example.com", "password": "strong-password"},
+        )
+
+    assert response.status_code == expected_status
+    assert response.json()["code"] == handoff_error
+    set_cookie = response.headers.get_list("set-cookie")
+    assert any(value.startswith("sb-auth-token=") for value in set_cookie)
+    assert any(value.startswith("sb-refresh-token=") for value in set_cookie)
+    assert any(
+        value.startswith("argus-guest-handoff=") and "Max-Age=0" in value
+        for value in set_cookie
+    )
+    assert any(
+        value.startswith("argus-guest-handoff-id=") and "Max-Age=0" in value
+        for value in set_cookie
+    )
+    assert "guest_claim" not in response.json()
+
+
+def test_retryable_login_handoff_failure_keeps_login_and_handoff_cookie() -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_allowed.return_value = True
+    gateway.login.return_value = {
+        "user": {
+            "id": REGISTERED_ID,
+            "email": "member@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+            "expires_in": 3600,
+        },
+    }
+    gateway.claim_guest_workspace_handoff.side_effect = RuntimeError(
+        "guest_handoff_claim_unavailable"
+    )
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        TestClient(app, base_url="http://localhost:3000") as client,
+    ):
+        client.cookies.set("argus-guest-handoff-id", HANDOFF_ID)
+        client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "member@example.com", "password": "strong-password"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "guest_handoff_claim_unavailable"
+    set_cookie = response.headers.get_list("set-cookie")
+    assert any(value.startswith("sb-auth-token=") for value in set_cookie)
+    assert any(value.startswith("sb-refresh-token=") for value in set_cookie)
+    assert not any(
+        value.startswith("argus-guest-handoff=") and "Max-Age=0" in value
+        for value in set_cookie
+    )
+    assert "guest_claim" not in response.json()
+
+
 def test_registered_claim_uses_cookie_secret_and_returns_the_bound_pending_action() -> (
     None
 ):
@@ -326,6 +424,45 @@ def test_registered_claim_uses_cookie_secret_and_returns_the_bound_pending_actio
         allow_same_destination_replay=False,
     )
     assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_terminal_direct_handoff_claim_clears_stale_cookies() -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.claim_guest_workspace_handoff.side_effect = RuntimeError(
+        "guest_handoff_expired"
+    )
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _registered_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
+            client.cookies.set("argus-guest-handoff-id", HANDOFF_ID)
+            response = client.post(
+                f"/api/v1/auth/guest/handoffs/{HANDOFF_ID}/claim",
+                headers={
+                    "origin": "http://localhost:3000",
+                    "x-forwarded-proto": "https",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 410
+    assert response.json()["code"] == "guest_handoff_expired"
+    set_cookie = response.headers.get_list("set-cookie")
+    assert any(
+        value.startswith("argus-guest-handoff=") and "Max-Age=0" in value
+        for value in set_cookie
+    )
+    assert any(
+        value.startswith("argus-guest-handoff-id=") and "Max-Age=0" in value
+        for value in set_cookie
+    )
 
 
 def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_mutating(

@@ -373,7 +373,8 @@ async def chat_stream(
     is_run_backtest_turn = (
         payload.action is not None and payload.action.type == "run_backtest"
     )
-    if not is_run_backtest_turn:
+    cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    if not is_run_backtest_turn and not cancel_confirmation_action:
         check_message_allowance(request, user)
 
     current_user_profile = None
@@ -432,7 +433,6 @@ async def chat_stream(
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
     ]
-    cancel_confirmation_action = is_cancel_confirmation_action(payload)
     runtime_user = UserState(
         user_id=user.id,
         display_name=current_user_profile.display_name,
@@ -918,7 +918,6 @@ async def chat_stream(
                 role="assistant",
                 content="",
                 metadata=metadata,
-                settle_usage=message_usage_settlement(turn_account),
             )
             yield sse_data(
                 {

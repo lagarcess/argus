@@ -182,7 +182,7 @@ def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
         headers={"Authorization": "Bearer test-token"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
     mock_gateway.check_usage_limits.assert_called_once_with(
         user_id=USER_ID,
@@ -268,6 +268,65 @@ def test_message_quota_exhaustion_rejects_at_entry_without_charging(mock_gateway
     assert response.headers.get("Retry-After") == "60"
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
     mock_gateway.create_message.assert_not_called()
+
+
+def test_cancel_confirmation_bypasses_quota_and_settles_zero_units(mock_gateway):
+    from argus.domain.supabase_gateway import QuotaExceededError
+
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
+        "Quota exceeded for chat_messages (hour)"
+    )
+    mock_gateway.list_messages.return_value = [
+        Message(
+            id="confirmation-message",
+            conversation_id="conv-1",
+            role="assistant",
+            content="Ready to run.",
+            metadata={
+                "confirmation_payload": {
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "strategy_thesis": "Buy and hold Apple.",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                        "date_range": "past year",
+                    },
+                    "optional_parameters": {},
+                    "launch_payload": {},
+                    "validation": {"status": "ready_to_run", "executable": True},
+                },
+                "confirmation_card": {
+                    "confirmation_id": "confirmation-limit-proof",
+                },
+            },
+            created_at=utcnow(),
+        )
+    ]
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": "conv-1",
+            "action": {
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirmation-limit-proof"},
+            },
+            "language": "en",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert "confirmation_cancelled" in response.text
+    mock_gateway.check_usage_limits.assert_not_called()
+    assistant_calls = [
+        call
+        for call in mock_gateway.create_message.call_args_list
+        if call.kwargs.get("role") == "assistant"
+    ]
+    assert len(assistant_calls) == 1
+    assert assistant_calls[0].kwargs.get("settle_usage") is None
 
 
 def test_gateway_owns_an_atomic_admission_operation():

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
 from argus.api.dependencies import (
+    _apply_auth_session_cookies,
     _session_cookie_secure,
     auth_response,
     current_user,
@@ -167,6 +168,7 @@ def guest_bootstrap(
             detail="Supabase persistence is required for guest authentication.",
         )
 
+    expired_guest = False
     try:
         existing = current_user(request)
     except HTTPException as exc:
@@ -191,6 +193,8 @@ def guest_bootstrap(
                 {
                     "authenticated": True,
                     "reused": True,
+                    "renewed_after_expiry": False,
+                    "public_account_access_enabled": public_account_access_enabled(),
                     "user": existing.model_dump(mode="json"),
                     "account_kind": "guest",
                 }
@@ -233,6 +237,8 @@ def guest_bootstrap(
             {
                 "authenticated": True,
                 "reused": False,
+                "renewed_after_expiry": expired_guest,
+                "public_account_access_enabled": public_account_access_enabled(),
                 "account_kind": "guest",
             }
         )
@@ -368,7 +374,10 @@ def claim_guest_handoff(
         )
     opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
     if not opaque_secret:
-        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+        return _guest_handoff_failure_response(
+            request,
+            "guest_handoff_invalid",
+        )
     try:
         claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
             handoff_id=handoff_id,
@@ -377,7 +386,7 @@ def claim_guest_handoff(
             allow_same_destination_replay=False,
         )
     except Exception as exc:
-        raise _guest_handoff_problem(request, str(exc)) from None
+        return _guest_handoff_failure_response(request, str(exc))
 
     source_user_id, payload = _guest_handoff_claim_payload(request, claimed)
     emit_verified_guest_funnel_event(
@@ -462,6 +471,11 @@ def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
             "Workspace Unavailable",
             "This temporary workspace is no longer available.",
         ),
+        "guest_handoff_claim_unavailable": (
+            503,
+            "Handoff Temporarily Unavailable",
+            "The temporary workspace could not be claimed right now.",
+        ),
     }
     code = next((value for value in known if value in raw_code), "guest_handoff_invalid")
     status, title, detail = known.get(
@@ -475,6 +489,40 @@ def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
         title=title,
         detail=detail,
     )
+
+
+_TERMINAL_GUEST_HANDOFF_CODES = frozenset(
+    {
+        "guest_handoff_invalid",
+        "guest_handoff_expired",
+        "guest_handoff_consumed",
+        "guest_handoff_wrong_destination",
+        "guest_handoff_source_not_anonymous",
+        "guest_handoff_workspace_unavailable",
+    }
+)
+
+
+def _guest_handoff_failure_response(
+    request: Request,
+    raw_code: str,
+    *,
+    auth_payload: dict[str, object] | None = None,
+) -> JSONResponse:
+    handoff_problem = _guest_handoff_problem(request, raw_code)
+    detail = handoff_problem.detail
+    body = detail if isinstance(detail, dict) else {}
+    response = JSONResponse(
+        content=jsonable_encoder(body),
+        status_code=handoff_problem.status_code,
+        headers=handoff_problem.headers,
+    )
+    if auth_payload is not None:
+        _apply_auth_session_cookies(request, response, auth_payload)
+    code = str(body.get("code") or "")
+    if code in _TERMINAL_GUEST_HANDOFF_CODES:
+        _clear_guest_handoff_cookies(request, response)
+    return response
 
 
 @router.post("/auth/guest/link")
@@ -645,7 +693,11 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
     handoff_id = request.cookies.get(_GUEST_HANDOFF_ID_COOKIE, "").strip()
     opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
     if bool(handoff_id) is not bool(opaque_secret):
-        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+        return _guest_handoff_failure_response(
+            request,
+            "guest_handoff_invalid",
+            auth_payload=result,
+        )
     if not handoff_id:
         return auth_response(request, result)
 
@@ -654,7 +706,11 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         str(auth_user.get("id") or "") if isinstance(auth_user, dict) else ""
     )
     if not destination_user_id:
-        raise _guest_handoff_problem(request, "guest_handoff_invalid")
+        return _guest_handoff_failure_response(
+            request,
+            "guest_handoff_invalid",
+            auth_payload=result,
+        )
     try:
         claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
             handoff_id=handoff_id,
@@ -663,7 +719,11 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             allow_same_destination_replay=True,
         )
     except Exception as exc:
-        raise _guest_handoff_problem(request, str(exc)) from None
+        return _guest_handoff_failure_response(
+            request,
+            str(exc),
+            auth_payload=result,
+        )
 
     source_user_id, claim_payload = _guest_handoff_claim_payload(request, claimed)
     result["guest_claim"] = claim_payload.model_dump(mode="json")
