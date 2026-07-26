@@ -2747,7 +2747,15 @@ def test_history_supabase_chat_items_carry_title_source(mock_gateway):
                 "updated_at": "2026-07-01T00:00:00+00:00",
             }
         ],
-        "strategies": [],
+        "strategies": [
+            {
+                "id": "33333333-3333-3333-3333-333333333333",
+                "name": "NVDA momentum",
+                "symbols": ["NVDA"],
+                "pinned": False,
+                "updated_at": "2026-07-01T00:00:00+00:00",
+            }
+        ],
         "collections": [],
     }
 
@@ -2761,6 +2769,11 @@ def test_history_supabase_chat_items_carry_title_source(mock_gateway):
         item for item in response.json()["items"] if item["type"] == "chat"
     ]
     assert [item["title_source"] for item in chat_items] == ["ai_generated"]
+    non_chat_items = [
+        item for item in response.json()["items"] if item["type"] != "chat"
+    ]
+    assert non_chat_items
+    assert all("title_source" not in item for item in non_chat_items)
 
 
 def test_history_supabase_can_request_archived_rows(mock_gateway):

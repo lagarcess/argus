@@ -9,8 +9,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    SerializerFunctionWrapHandler,
     WithJsonSchema,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -438,6 +440,16 @@ class HistoryItem(BaseModel):
     pinned: bool = False
     created_at: datetime
     conversation_id: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_title_source(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> dict[str, Any]:
+        # The contract keeps title_source absent, not null, on non-chat items.
+        data = handler(self)
+        if data.get("title_source") is None:
+            data.pop("title_source", None)
+        return data
 
 
 class PaginatedHistory(BaseModel):
