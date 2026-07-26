@@ -263,7 +263,7 @@ saved-idea recall and decision-state browsing live in Omnisearch/Idea Ledger.
 
 - **Supported Languages**: English (`en`) and Spanish (`es-419`).
 - **Standardized i18n**: All static UI strings must be translatable.
-- **Language Selection**: Should feel premium and be accessible from the onboarding flow and settings.
+- **Language Selection**: Should feel premium and be accessible at signup and in settings.
 - **Consistency**: The AI response language must always mirror the UI language preference.
 - **Locale Logic**: Date, number, and currency formatting must adapt to the `locale` token.
 

@@ -142,16 +142,18 @@ Alpha launches on web/PWA for speed. Long-term direction is mobile + web.
 
 A new user can:
 
-1. Enter Argus
-2. Select preferred language
-3. Be onboarded through chat
-4. Interact with **starter prompts** designed to reduce blank-page friction
-5. Describe or choose an investing idea
-6. Receive AI guidance
-7. Run a backtest using supported strategies
-8. View results clearly through **high-fidelity metrics cards, AI explanations, and follow-up questions**
-9. Revisit the conversation later
-10. See prior runs and saved items
+1. Enter Argus and sign up (language is chosen at signup and changeable in Settings)
+2. Arrive directly in normal chat
+3. Interact with **starter prompts** designed to reduce blank-page friction
+4. Describe or choose an investing idea
+5. Receive AI guidance
+6. Run a backtest using supported strategies
+7. View results clearly through **high-fidelity metrics cards, AI explanations, and follow-up questions**
+8. Revisit the conversation later
+9. See prior runs and saved items
+
+There is no separate onboarding flow. Activation begins in normal chat, and
+the first successful backtest is the meaningful onboarding milestone.
 
 ## Included Product Surfaces
 
@@ -183,7 +185,7 @@ Argus should feel globally accessible from first launch.
 
 - Language selection should be intuitive and premium.
 - New users should clearly understand multilingual support.
-- Onboarding should occur in selected language.
+- First use should occur in the selected language.
 - Surface UI should reflect selected language.
 - AI should mirror user language preference dynamically.
 
@@ -328,10 +330,10 @@ Deleted and archived surfaces should remain accessible where supported.
 
 The AI assistant should:
 
-- onboard new users
+- welcome first-time users into ordinary conversation
 - explain financial terms simply
 - gather requirements for supported backtests
-- recommend **API-driven starter prompts** (personalized by language/goal)
+- recommend **localized generic starter prompts**
 - guide users toward successful flows
 - explain results
 - suggest next experiments
@@ -439,7 +441,9 @@ We are optimizing for:
 
 ## Activation
 
-Users complete onboarding and run first backtest.
+Users reach normal chat directly after authentication and complete their
+first successful backtest — that first successful backtest is the meaningful
+onboarding milestone.
 
 ## Delight
 
