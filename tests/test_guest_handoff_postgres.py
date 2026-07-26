@@ -55,6 +55,7 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
             "conversation",
             "user_message",
             "assistant_message",
+            "lifecycle",
             "strategy",
             "run",
             "job",
@@ -97,6 +98,23 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
                 ids["assistant_message"],
                 ids["conversation"],
                 source,
+            ),
+        )
+        cursor.execute(
+            "insert into public.chat_turn_lifecycles"
+            " (turn_id,user_id,conversation_id,assistant_message_id,request_id,"
+            "  status,accepted_at,terminal_at,created_at,updated_at)"
+            " values (%s,%s,%s,%s,'request-guest-handoff','completed',"
+            "  %s,%s,%s,%s)",
+            (
+                ids["user_message"],
+                source,
+                ids["conversation"],
+                ids["assistant_message"],
+                created_at,
+                created_at,
+                created_at,
+                created_at,
             ),
         )
         cursor.execute(
@@ -422,6 +440,7 @@ def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:
                 for table, expected_count in (
                     ("conversations", 1),
                     ("messages", 2),
+                    ("chat_turn_lifecycles", 1),
                     ("strategies", 1),
                     ("backtest_runs", 1),
                     ("backtest_jobs", 1),
@@ -473,6 +492,12 @@ def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:
                     (graph["conversation"],),
                 )
                 assert cursor.fetchone()[0] == 1
+                cursor.execute(
+                    "select count(*) from public.chat_turn_lifecycles"
+                    " where turn_id = %s and user_id = %s",
+                    (graph["user_message"], graph["destination"]),
+                )
+                assert cursor.fetchone()[0] == 1
 
             with pytest.raises(psycopg.Error, match="guest_handoff_consumed"):
                 _claim(connection, graph)
@@ -490,6 +515,12 @@ def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:
                 cursor.execute(
                     "select count(*) from public.checkpoints where thread_id = %s",
                     (graph["conversation"],),
+                )
+                assert cursor.fetchone()[0] == 1
+                cursor.execute(
+                    "select count(*) from public.chat_turn_lifecycles"
+                    " where turn_id = %s and user_id = %s",
+                    (graph["user_message"], graph["destination"]),
                 )
                 assert cursor.fetchone()[0] == 1
         finally:
@@ -596,10 +627,39 @@ def test_foreign_row_injection_fails_closed() -> None:
             _delete_fixture_identities(connection, graph)
 
 
+def test_lifecycle_foreign_row_injection_fails_closed() -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "update public.chat_turn_lifecycles set user_id = %s"
+                    " where turn_id = %s",
+                    (graph["other_destination"], graph["user_message"]),
+                )
+            with pytest.raises(psycopg.Error, match="unsafe_product_graph"):
+                _claim(connection, graph)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select user_id::text from public.conversations where id=%s",
+                    (graph["conversation"],),
+                )
+                assert cursor.fetchone()[0] == graph["source"]
+                cursor.execute(
+                    "select user_id::text from public.chat_turn_lifecycles"
+                    " where turn_id=%s",
+                    (graph["user_message"],),
+                )
+                assert cursor.fetchone()[0] == graph["other_destination"]
+        finally:
+            _delete_fixture_identities(connection, graph)
+
+
 @pytest.mark.parametrize(
     ("table", "trigger_column"),
     (
         ("conversations", "user_id"),
+        ("chat_turn_lifecycles", "user_id"),
         ("backtest_jobs", "user_id"),
         ("evidence_artifacts", "user_id"),
         ("context_packets", "user_id"),
@@ -639,6 +699,7 @@ def test_failure_at_each_transfer_group_rolls_back_every_owner(
             for owner_table in (
                 "conversations",
                 "messages",
+                "chat_turn_lifecycles",
                 "strategies",
                 "backtest_runs",
                 "backtest_jobs",

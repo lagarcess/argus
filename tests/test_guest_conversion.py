@@ -469,6 +469,7 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_disabled.return_value = False
     gateway.link_anonymous_identity.side_effect = RuntimeError("provider rejected")
     app.dependency_overrides.clear()
     from argus.api.dependencies import current_user
@@ -505,6 +506,55 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
     assert failed.status_code == 400
     assert failed.json()["code"] == "guest_identity_link_failed"
     gateway.link_anonymous_identity.assert_called_once()
+    gateway.mark_guest_identity_linked.assert_not_called()
+
+
+def test_public_account_link_rejects_explicitly_disabled_email_before_auth_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_disabled.return_value = True
+    gateway.link_anonymous_identity.return_value = {
+        "user": {
+            "id": GUEST_ID,
+            "email": "disabled@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+        },
+    }
+    gateway.get_or_create_profile_for_auth_user.return_value = _profile(
+        user_id=GUEST_ID,
+        email="disabled@example.com",
+    )
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _guest_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app) as client,
+        ):
+            client.cookies.set("sb-refresh-token", "guest-refresh-token")
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={
+                    "email": "disabled@example.com",
+                    "password": "strong-password",
+                },
+                headers={"Authorization": "Bearer guest-token"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "guest_identity_link_failed"
+    gateway.private_alpha_email_disabled.assert_called_once_with("disabled@example.com")
+    gateway.link_anonymous_identity.assert_not_called()
     gateway.mark_guest_identity_linked.assert_not_called()
 
 

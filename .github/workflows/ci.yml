@@ -142,6 +142,7 @@ jobs:
       - name: Run provider-free guest backend tests
         run: |
           poetry run pytest \
+            tests/evals/test_chat_runtime_trajectory_harness.py \
             tests/test_allowance_accounting.py \
             tests/test_guest_access_policy.py \
             tests/test_guest_allowance_accounting.py \
@@ -156,6 +157,7 @@ jobs:
         run: |
           poetry run pytest \
             tests/test_allowance_accounting_postgres.py \
+            tests/test_chat_turn_lifecycle_postgres.py \
             tests/test_guest_cleanup_postgres.py \
             tests/test_guest_handoff_postgres.py \
             tests/test_guest_workspace_postgres.py \

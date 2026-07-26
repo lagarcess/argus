@@ -573,6 +573,17 @@ def link_guest_identity(
             title="Account Already Registered",
             detail="This session already belongs to a permanent account.",
         )
+    if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
+        raise problem(
+            request,
+            status_code=400,
+            code="guest_identity_link_failed",
+            title="Account Creation Failed",
+            detail=(
+                "Argus could not finish this account request. Your conversation "
+                "remains stored; retry to reconcile the account state."
+            ),
+        )
     access_token = _request_access_token(request)
     refresh_token = request.cookies.get("sb-refresh-token", "").strip()
     if not access_token or not refresh_token:

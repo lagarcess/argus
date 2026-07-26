@@ -318,8 +318,32 @@ def test_expired_guest_cannot_read_or_write_product_rows() -> None:
             cursor.execute(
                 "insert into public.messages"
                 " (conversation_id, user_id, role, content)"
-                " values (%s, %s, 'user', 'expired private message')",
+                " values (%s, %s, 'user', 'expired private message')"
+                " returning id",
                 (conversation_id, guest_id),
+            )
+            user_message_id = cursor.fetchone()[0]
+            cursor.execute(
+                "insert into public.messages"
+                " (conversation_id, user_id, role, content)"
+                " values (%s, %s, 'assistant', 'expired private reply')"
+                " returning id",
+                (conversation_id, guest_id),
+            )
+            assistant_message_id = cursor.fetchone()[0]
+            cursor.execute(
+                "insert into public.chat_turn_lifecycles"
+                " (turn_id,user_id,conversation_id,assistant_message_id,request_id,"
+                "  status,accepted_at,terminal_at)"
+                " values (%s,%s,%s,%s,'expired-request','completed',%s,%s)",
+                (
+                    user_message_id,
+                    guest_id,
+                    conversation_id,
+                    assistant_message_id,
+                    created_at,
+                    created_at,
+                ),
             )
             cursor.execute(
                 "insert into public.backtest_runs"
@@ -368,6 +392,26 @@ def test_expired_guest_cannot_read_or_write_product_rows() -> None:
             )
             == []
         )
+        with connection.transaction():
+            with connection.cursor() as cursor:
+                cursor.execute("set local role authenticated")
+                cursor.execute(
+                    "select set_config('request.jwt.claims', %s, true)",
+                    (
+                        json.dumps(
+                            {
+                                "sub": guest_id,
+                                "role": "authenticated",
+                                "is_anonymous": True,
+                            }
+                        ),
+                    ),
+                )
+                cursor.execute(
+                    "select turn_id::text from public.chat_turn_lifecycles"
+                    " order by turn_id"
+                )
+                assert cursor.fetchall() == []
         for table in (
             "conversations",
             "messages",

@@ -759,6 +759,100 @@ def test_real_anonymous_identity_links_in_place_without_moving_product_rows(
                 gateway.delete_auth_user(user_id)
 
 
+def test_disabled_public_email_cannot_link_real_anonymous_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    email = f"disabled-link-{secrets.token_hex(6)}@example.test"
+    password = f"Disabled-{secrets.token_urlsafe(18)}"
+    user_id: str | None = None
+    conversation_id: str | None = None
+    try:
+        gateway.client.table("private_alpha_allowlist").insert(
+            {
+                "email": email,
+                "disabled_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
+        guest = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        auth_user = guest["user"]
+        user_id = str(auth_user["id"])
+        profile = gateway.get_or_create_profile_for_auth_user(auth_user)
+        gateway.create_guest_workspace(
+            user_id=profile.id,
+            created_at=profile.created_at,
+        )
+        conversation = gateway.create_conversation(
+            user_id=user_id,
+            title="Disabled identity proof",
+            title_source="system_default",
+            language="en",
+        )
+        conversation_id = conversation.id
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            client.cookies.set(
+                "sb-auth-token",
+                str(guest["session"]["access_token"]),
+            )
+            client.cookies.set(
+                "sb-refresh-token",
+                str(guest["session"]["refresh_token"]),
+            )
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={"email": email, "password": password},
+                headers={"origin": "http://localhost:3000"},
+            )
+
+        assert response.status_code == 400
+        assert response.json()["code"] == "guest_identity_link_failed"
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select is_anonymous, email from auth.users where id = %s",
+                    (user_id,),
+                )
+                assert cursor.fetchone() == (True, None)
+                cursor.execute(
+                    "select count(*) from auth.users where lower(email) = %s",
+                    (email,),
+                )
+                assert cursor.fetchone()[0] == 0
+                cursor.execute(
+                    "select status, claimed_by, conversation_id::text"
+                    " from public.guest_workspaces where user_id = %s",
+                    (user_id,),
+                )
+                assert cursor.fetchone() == ("active", None, conversation_id)
+                cursor.execute(
+                    "select user_id::text from public.conversations where id = %s",
+                    (conversation_id,),
+                )
+                assert cursor.fetchone()[0] == user_id
+    finally:
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().eq(
+                "email", email
+            ).execute()
+        if user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
+
+
 def test_existing_account_claim_preserves_same_conversation_and_deletes_source_only_after_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -807,21 +901,36 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             language="en",
         )
         conversation_id = conversation.id
+        user_message_id = str(uuid4())
+        assistant_message_id = str(uuid4())
         gateway.client.table("messages").insert(
             [
                 {
+                    "id": user_message_id,
                     "conversation_id": conversation_id,
                     "user_id": source_user_id,
                     "role": "user",
                     "content": "One guest message",
                 },
                 {
+                    "id": assistant_message_id,
                     "conversation_id": conversation_id,
                     "user_id": source_user_id,
                     "role": "assistant",
                     "content": "One durable response",
                 },
             ]
+        ).execute()
+        gateway.client.table("chat_turn_lifecycles").insert(
+            {
+                "turn_id": user_message_id,
+                "user_id": source_user_id,
+                "conversation_id": conversation_id,
+                "assistant_message_id": assistant_message_id,
+                "request_id": f"request-{user_message_id}",
+                "status": "completed",
+                "terminal_at": datetime.now(timezone.utc).isoformat(),
+            }
         ).execute()
         assert gateway.private_alpha_email_allowed(email) is True
 
@@ -909,6 +1018,21 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             "One durable response",
         ]
         assert all(row["user_id"] == destination_user_id for row in messages)
+        lifecycle = (
+            gateway.client.table("chat_turn_lifecycles")
+            .select("turn_id,user_id,conversation_id,assistant_message_id,status")
+            .eq("turn_id", user_message_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert lifecycle == {
+            "turn_id": user_message_id,
+            "user_id": destination_user_id,
+            "conversation_id": conversation_id,
+            "assistant_message_id": assistant_message_id,
+            "status": "completed",
+        }
         source_auth = gateway.client.auth.admin.get_user_by_id(source_user_id)
         assert source_auth.user is not None
         assert source_auth.user.is_anonymous is True
@@ -927,6 +1051,18 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
         assert cleanup.auth_deleted == 1
         with pytest.raises(AuthApiError):
             gateway.client.auth.admin.get_user_by_id(source_user_id)
+        lifecycle_after_cleanup = (
+            gateway.client.table("chat_turn_lifecycles")
+            .select("turn_id,user_id")
+            .eq("turn_id", user_message_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert lifecycle_after_cleanup == {
+            "turn_id": user_message_id,
+            "user_id": destination_user_id,
+        }
     finally:
         if destination_user_id:
             with suppress(Exception):

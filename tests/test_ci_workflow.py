@@ -104,7 +104,9 @@ def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
     assert "ARGUS_LOCAL_SUPABASE_URL" in joined_steps
     assert "ARGUS_LOCAL_SUPABASE_ANON_KEY" in joined_steps
     assert "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY" in joined_steps
+    assert "tests/evals/test_chat_runtime_trajectory_harness.py" in joined_steps
     assert "tests/test_allowance_accounting_postgres.py" in joined_steps
+    assert "tests/test_chat_turn_lifecycle_postgres.py" in joined_steps
     assert "tests/test_guest_cleanup_postgres.py" in joined_steps
     assert "tests/test_guest_handoff_postgres.py" in joined_steps
     assert "tests/test_guest_workspace_postgres.py" in joined_steps
