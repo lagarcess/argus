@@ -114,18 +114,25 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const headerMenu = readFileSync(
+      join(root, "components/chat/ChatHeaderMenu.tsx"),
+      "utf-8",
+    );
 
-    expect(chat).toContain(
+    expect(chat).toContain("<ChatHeaderMenu");
+    expect(headerMenu).toContain(
       'aria-label={t("chat.chat_options", "Chat options")}',
     );
-    expect(chat).toContain("MoreVertical");
-    expect(chat).toContain("chat.rename_chat");
-    expect(chat).toContain("chat.pin_chat");
-    expect(chat).toContain("chat.unpin_chat");
-    expect(chat).not.toContain("chat.copy_conversation_link");
-    expect(chat).not.toContain("handleCopyConversationLink");
-    expect(chat).not.toContain("chat.add_to_collection");
-    expect(chat).not.toContain('aria-label="Archived chats"');
+    expect(headerMenu).toContain("MoreVertical");
+    expect(headerMenu).toContain("chat.rename_chat");
+    expect(headerMenu).toContain("chat.pin_chat");
+    expect(headerMenu).toContain("chat.unpin_chat");
+    for (const source of [chat, headerMenu]) {
+      expect(source).not.toContain("chat.copy_conversation_link");
+      expect(source).not.toContain("handleCopyConversationLink");
+      expect(source).not.toContain("chat.add_to_collection");
+      expect(source).not.toContain('aria-label="Archived chats"');
+    }
   });
 
   test("sidebar logo swap preserves toggle behavior and archives the legacy mark", () => {

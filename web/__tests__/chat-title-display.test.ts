@@ -164,8 +164,13 @@ describe("chat header wiring", () => {
   );
 
   test("header renders the synced conversation title instead of a static label", () => {
+    const titleState = readFileSync(
+      join(root, "lib/chat-header-title-state.ts"),
+      "utf-8",
+    );
     expect(chat).toContain("<ChatHeaderTitle");
-    expect(chat).toContain("conversationDisplayTitle(");
+    expect(chat).toContain("useActiveConversationTitle({");
+    expect(titleState).toContain("conversationDisplayTitle(");
     expect(chat).not.toContain("t('common.conversation', 'Conversation')");
   });
 
