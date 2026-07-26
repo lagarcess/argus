@@ -8,6 +8,7 @@ import {
   retryRequestMessageForAssistant,
 } from "../lib/chat-message-hydration";
 import type { ApiMessage } from "../lib/argus-api";
+import { conversationLoadFailureMessage } from "../lib/chat-conversation-load-state";
 import { latestInputActions } from "../components/chat/ChatInterface";
 import type { Message } from "../components/chat/types";
 
@@ -157,7 +158,7 @@ describe("chat message hydration", () => {
   );
 
   test.each(["accepted", "running"])(
-    "keeps ambiguous transport presentation-only while backend is %s",
+    "returns explicit exhaustion when backend remains %s after the final read",
     async (status) => {
       const durable = apiMessage({
         id: "request-1",
@@ -179,7 +180,7 @@ describe("chat message hydration", () => {
         { followUpDelaysMs: [] },
       );
 
-      expect(resolution).toEqual({ kind: "checking", items: [durable] });
+      expect(resolution).toEqual({ kind: "exhausted", items: [durable] });
     },
   );
 
@@ -353,7 +354,7 @@ describe("chat message hydration", () => {
       },
     );
 
-    expect(resolution).toEqual({ kind: "checking", items: [running] });
+    expect(resolution).toEqual({ kind: "cancelled", items: [running] });
     expect(loads).toBe(1);
   });
 
@@ -570,7 +571,7 @@ describe("chat message hydration", () => {
       items: [apiMessage({ id: "old-1", metadata: {} })],
     },
   ])(
-    "preserves the optimistic transcript while durable correlation is unknown: $name",
+    "offers load recovery while preserving the optimistic user turn: $name",
     async ({ existingMessageIds, items }) => {
       const optimistic: Message[] = [
         {
@@ -586,6 +587,10 @@ describe("chat message hydration", () => {
           content: "",
         },
       ];
+      const fallbackMessage = conversationLoadFailureMessage(
+        "conversation-1",
+        "Could not load.",
+      );
       const view = await resolveOrdinaryTransportAmbiguityView(
         async () => items,
         () => ({
@@ -608,25 +613,24 @@ describe("chat message hydration", () => {
         }),
         {
           assistantId: "optimistic-assistant",
-          message: {
-            id: "load-failure",
-            role: "ai",
-            kind: "text",
-            content: "Could not load.",
-          },
+          message: fallbackMessage,
         },
         existingMessageIds,
         "request-a",
       );
 
-      expect(applyViewMessages(view.messages, optimistic)).toEqual(optimistic);
+      expect(applyViewMessages(view.messages, optimistic)).toEqual([
+        optimistic[0],
+        fallbackMessage,
+      ]);
       expect(view.inputActions).toEqual([]);
-      expect(view.showChecking).toBe(true);
+      expect(fallbackMessage.actions?.[0]?.type).toBe("retry_load_conversation");
+      expect(view.showChecking).toBe(false);
     },
   );
 
   test.each(["accepted", "running"])(
-    "preserves the optimistic transcript while durable state is %s",
+    "offers load recovery when final durable state remains %s",
     async (status) => {
       const optimistic: Message[] = [
         {
@@ -654,6 +658,10 @@ describe("chat message hydration", () => {
           },
         },
       });
+      const fallbackMessage = conversationLoadFailureMessage(
+        "conversation-1",
+        "Could not load.",
+      );
       const view = await resolveOrdinaryTransportAmbiguityView(
         async () => [request],
         () => ({
@@ -669,23 +677,130 @@ describe("chat message hydration", () => {
         }),
         {
           assistantId: "optimistic-assistant",
-          message: {
-            id: "load-failure",
-            role: "ai",
-            kind: "text",
-            content: "Could not load.",
-          },
+          message: fallbackMessage,
         },
         new Set(),
         "request-a",
         { followUpDelaysMs: [] },
       );
 
-      expect(applyViewMessages(view.messages, optimistic)).toEqual(optimistic);
+      expect(applyViewMessages(view.messages, optimistic)).toEqual([
+        optimistic[0],
+        fallbackMessage,
+      ]);
       expect(view.inputActions).toEqual([]);
-      expect(view.showChecking).toBe(true);
+      expect(fallbackMessage.actions?.[0]?.type).toBe("retry_load_conversation");
+      expect(view.showChecking).toBe(false);
     },
   );
+
+  test("final read failure offers load recovery without discarding the user turn", async () => {
+    const optimistic: Message[] = [
+      {
+        id: "optimistic-user",
+        role: "user",
+        kind: "text",
+        content: "Test the new turn",
+      },
+      {
+        id: "optimistic-assistant",
+        role: "ai",
+        kind: "text",
+        content: "",
+      },
+    ];
+    const running = apiMessage({
+      id: "request-new",
+      role: "user",
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-new",
+          request_id: "request-a",
+          status: "running",
+          terminal: false,
+        },
+      },
+    });
+    const fallbackMessage = conversationLoadFailureMessage(
+      "conversation-1",
+      "Could not load.",
+    );
+    let loads = 0;
+    const view = await resolveOrdinaryTransportAmbiguityView(
+      async () => {
+        loads += 1;
+        if (loads === 1) return [running];
+        throw new Error("final owner-scoped read failed");
+      },
+      () => ({ messages: [], inputActions: [] }),
+      { assistantId: "optimistic-assistant", message: fallbackMessage },
+      new Set(),
+      "request-a",
+      { followUpDelayMs: 0, wait: async () => undefined },
+    );
+
+    expect(loads).toBe(2);
+    expect(applyViewMessages(view.messages, optimistic)).toEqual([
+      optimistic[0],
+      fallbackMessage,
+    ]);
+    expect(view.inputActions).toEqual([]);
+    expect(fallbackMessage.actions?.[0]?.type).toBe("retry_load_conversation");
+    expect(view.showChecking).toBe(false);
+  });
+
+  test("cancelled reconciliation does not prepare a fallback update", async () => {
+    const optimistic: Message[] = [
+      {
+        id: "optimistic-user",
+        role: "user",
+        kind: "text",
+        content: "Test the new turn",
+      },
+      {
+        id: "optimistic-assistant",
+        role: "ai",
+        kind: "text",
+        content: "",
+      },
+    ];
+    const running = apiMessage({
+      id: "request-new",
+      role: "user",
+      metadata: {
+        agent_runtime_turn: {
+          turn_id: "request-new",
+          request_id: "request-a",
+          status: "running",
+          terminal: false,
+        },
+      },
+    });
+    const controller = new AbortController();
+    const view = await resolveOrdinaryTransportAmbiguityView(
+      async () => [running],
+      () => ({ messages: [], inputActions: [] }),
+      {
+        assistantId: "optimistic-assistant",
+        message: conversationLoadFailureMessage(
+          "conversation-1",
+          "Could not load.",
+        ),
+      },
+      new Set(),
+      "request-a",
+      {
+        signal: controller.signal,
+        wait: async () => {
+          controller.abort();
+        },
+      },
+    );
+
+    expect(applyViewMessages(view.messages, optimistic)).toEqual(optimistic);
+    expect(view.inputActions).toEqual([]);
+    expect(view.showChecking).toBe(true);
+  });
 
   test("hydrates durable messages and actions only after exact terminal correlation", async () => {
     const request = apiMessage({
@@ -788,7 +903,7 @@ describe("chat message hydration", () => {
     );
 
     expect(view.inputActions).toEqual([]);
-    expect(view.showChecking).toBe(true);
+    expect(view.showChecking).toBe(false);
   });
 
   test("hydrates linked assistant retry from the persisted request message", () => {

@@ -25,6 +25,8 @@ type TextMessageHydrationOptions = {
 export type OrdinaryTransportAmbiguityResolution =
   | { kind: "terminal"; items: ApiMessage[] }
   | { kind: "checking"; items: ApiMessage[] }
+  | { kind: "exhausted"; items: ApiMessage[] }
+  | { kind: "cancelled"; items: ApiMessage[] }
   | { kind: "unknown"; items: ApiMessage[] }
   | { kind: "load_failed"; items: [] };
 
@@ -179,9 +181,13 @@ export async function resolveOrdinaryTransportAmbiguity(
   const wait = options.wait ?? waitForOrdinaryTransportFollowUp;
   let latest = initial;
   for (const delayMs of delays) {
-    if (options.signal?.aborted) return latest;
+    if (options.signal?.aborted) {
+      return { kind: "cancelled", items: latest.items };
+    }
     await wait(delayMs, options.signal);
-    if (options.signal?.aborted) return latest;
+    if (options.signal?.aborted) {
+      return { kind: "cancelled", items: latest.items };
+    }
     try {
       const followUp = classifyOrdinaryTransportAmbiguity(
         await loadMessages(),
@@ -194,7 +200,7 @@ export async function resolveOrdinaryTransportAmbiguity(
       // A later owner-scoped read can still recover durable terminal truth.
     }
   }
-  return latest;
+  return { kind: "exhausted", items: latest.items };
 }
 
 export async function snapshotOrdinaryTransportMessageIds(
@@ -221,7 +227,14 @@ export async function resolveOrdinaryTransportAmbiguityView(
     expectedRequestId,
     options,
   );
-  if (resolution.kind === "load_failed") {
+  if (resolution.kind === "cancelled") {
+    return {
+      messages: (current) => current,
+      inputActions: [],
+      showChecking: true,
+    };
+  }
+  if (resolution.kind !== "terminal") {
     return {
       messages: (current) => [
         ...current.filter((message) => message.id !== fallback.assistantId),
@@ -229,13 +242,6 @@ export async function resolveOrdinaryTransportAmbiguityView(
       ],
       inputActions: [],
       showChecking: false,
-    };
-  }
-  if (resolution.kind !== "terminal") {
-    return {
-      messages: (current) => current,
-      inputActions: [],
-      showChecking: true,
     };
   }
   const hydrated = hydrateMessages(resolution.items);
