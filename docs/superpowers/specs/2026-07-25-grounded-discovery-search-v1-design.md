@@ -221,6 +221,18 @@ only the empirically selected one is activated by config
 5. Founder selects the provider from the recorded evidence. The synthetic
    evaluator's Perplexity-direct hypothesis is input, never the decision.
 
+**Selection record (2026-07-26):** the founder-approved comparison ran at
+$0.112 total spend (ceiling $5.00), 11 probes per provider plus free failure
+probes. Perplexity direct passed every rubric line (11/11 relevant, p50
+810 ms / max 1.4 s, $0.005 fixed per search, source dates on 100% of results,
+clean typed failures). OpenRouter web search (locked model
+`deepseek/deepseek-v4-flash`) failed the latency bar (p50 22.5 s, max 79.8 s,
+one timeout) and carries no source dates by annotation schema. **The founder
+selected `perplexity_direct`** as the activated default; the OpenRouter
+adapter remains in the codebase as the benched alternative. The sanitized
+scorecard lives at `temp/discovery-provider-scorecard.json` (local run
+artifact) and is summarized in the Draft PR.
+
 **Rubric thresholds for the comparison (founder approval = this section):**
 relevance ≥ 4/5 probes produce ≥3 plausible members; p50 latency ≤ 3.0s and
 p95 ≤ 8.0s; cost per search ≤ $0.02 end to end; zero policy-affecting behavior
