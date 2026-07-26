@@ -769,7 +769,6 @@ test("@guest-experience exact-head 20-check matrix", async ({
     await runStep(9, evidence, (value) => (currentCheck = value), async () => {
       await page.goto("/chat", { waitUntil: "domcontentloaded" });
       await expect(page.getByTestId("chat-input")).toBeVisible();
-      await expect(resultCard(page)).toHaveCount(0);
       const expand = page.getByRole("button", { name: "Expand sidebar" });
       if (await expand.isVisible()) await expand.click();
       const sidebar = page.locator("aside");

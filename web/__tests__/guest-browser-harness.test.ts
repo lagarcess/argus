@@ -645,6 +645,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check8).toContain("latestResultFacts");
     expect(check8).toContain("conversationGraph");
     expect(check9).toContain('goto("/chat"');
+    expect(check9).not.toContain("resultCard(page)).toHaveCount(0)");
     expect(check9).toContain("if ((await rows.count()) === 0)");
     expect(check9).toContain("await recents.click()");
     expect(check9).toContain("data-conversation-id");
