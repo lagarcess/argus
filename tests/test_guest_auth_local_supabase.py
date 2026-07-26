@@ -8,16 +8,21 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import patch
+from uuid import uuid4
 
 import psycopg
 import pytest
 from argus.agent_runtime.stages.confirm import _coverage_preflight
 from argus.api import state as api_state
+from argus.api.guest_access import AccountContext, guest_capabilities
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
+from argus.api.schemas import Message
 from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
+from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.usage_limits import message_usage_settlement
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
 
@@ -91,6 +96,138 @@ def test_real_anonymous_identity_survives_reload(
     finally:
         if user_id:
             gateway.delete_auth_user(user_id)
+
+
+def test_real_guest_terminal_message_settles_fixed_lifetime_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    user_id: str | None = None
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            created = client.post(
+                "/api/v1/auth/guest",
+                json={"captcha_token": "local-captcha-proof", "language": "en"},
+                headers={"origin": "http://localhost:3000"},
+            )
+            assert created.status_code == 200
+            user_id = str(created.json()["user"]["id"])
+            workspace = gateway.get_active_guest_workspace(
+                user_id=user_id,
+                at=datetime.now(timezone.utc),
+            )
+            assert workspace is not None
+
+            created_conversation = client.post("/api/v1/conversations", json={})
+            assert created_conversation.status_code == 200
+            conversation_id = created_conversation.json()["conversation"]["id"]
+            turn_id = str(uuid4())
+            request_id = f"request-{turn_id}"
+            accepted = gateway.accept_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                message=Message(
+                    id=turn_id,
+                    conversation_id=conversation_id,
+                    role="user",
+                    content="Test this idea.",
+                    metadata={},
+                    created_at=utcnow(),
+                ),
+            )
+            assistant = Message(
+                id=str(uuid4()),
+                conversation_id=conversation_id,
+                role="assistant",
+                content="Ready to review.",
+                metadata={
+                    "agent_runtime_turn": {
+                        "turn_id": turn_id,
+                        "request_id": request_id,
+                        "status": "completed",
+                        "terminal": True,
+                    }
+                },
+                created_at=utcnow(),
+            )
+            settlement = message_usage_settlement(
+                AccountContext(
+                    kind="guest",
+                    user_id=user_id,
+                    expires_at=workspace.expires_at,
+                    capabilities=guest_capabilities(),
+                )
+            )
+
+            first = gateway.finalize_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                turn_id=accepted.id,
+                request_id=request_id,
+                message=assistant,
+                to_status="completed",
+                failure_code=None,
+                retryable=False,
+                settle_usage=settlement,
+            )
+            replay = gateway.finalize_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                turn_id=accepted.id,
+                request_id=request_id,
+                message=assistant,
+                to_status="completed",
+                failure_code=None,
+                retryable=False,
+                settle_usage=settlement,
+            )
+
+            counters = (
+                gateway.client.table("usage_counters")
+                .select("period,period_start,period_end,used_count,limit_count")
+                .eq("user_id", user_id)
+                .eq("resource", "chat_messages")
+                .execute()
+                .data
+            )
+            lifecycle = (
+                gateway.client.table("chat_turn_lifecycles")
+                .select("status,assistant_message_id")
+                .eq("turn_id", turn_id)
+                .single()
+                .execute()
+                .data
+            )
+
+            assert replay == first
+            assert lifecycle == {
+                "status": "completed",
+                "assistant_message_id": assistant.id,
+            }
+            assert counters == [
+                {
+                    "period": "guest_session",
+                    "period_start": workspace.created_at.isoformat(),
+                    "period_end": workspace.expires_at.isoformat(),
+                    "used_count": 1,
+                    "limit_count": 10,
+                }
+            ]
+    finally:
+        if user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
 
 
 def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(

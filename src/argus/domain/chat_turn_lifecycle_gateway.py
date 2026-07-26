@@ -8,6 +8,7 @@ from uuid import UUID
 from argus.api.chat.previews import accepted_user_message_preview, plain_text_preview
 from argus.api.schemas import Message
 from argus.domain.chat_turn_lifecycle import TransitionResult, TurnStatus
+from argus.domain.supabase_conversation_messages import _serialized_usage_limits
 from supabase import Client
 
 _PROJECTABLE_TURN_MESSAGE_ID_BATCH_SIZE = 25
@@ -171,10 +172,7 @@ class ChatTurnLifecycleGatewayMixin:
                     settle_usage["resource"] if settle_usage is not None else None
                 ),
                 "p_usage_limits": (
-                    [
-                        {"period": period, "limit": limit_count}
-                        for period, limit_count in settle_usage["limits"]
-                    ]
+                    _serialized_usage_limits(settle_usage["limits"])
                     if settle_usage is not None
                     else None
                 ),
