@@ -30,7 +30,7 @@ Before making code changes, agents must review these source-of-truth docs in thi
 # 🎯 Alpha Product Truth
 
 **Argus Alpha Priorities:**
-- Chat-first UX & AI-first onboarding
+- Chat-first UX; activation is the first successful backtest
 - Strategy drafting through conversation
 - Simple, trustworthy backtests
 - Recents/history retrieval
@@ -496,7 +496,6 @@ NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
-NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 ```
 
 ### Frontend Environment (web/.env.local)
