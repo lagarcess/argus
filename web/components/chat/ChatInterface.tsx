@@ -883,6 +883,7 @@ export default function ChatInterface() {
     requestNewChat,
     requestOmnisearch,
     resumeDecisionArtifactId,
+    resumeDecisionMessageId,
     clearResumeDecision,
   } = guestExperience;
 
@@ -2178,7 +2179,11 @@ export default function ChatInterface() {
                           isGuest={isGuest}
                           canSaveDecision={canSaveDecision}
                           onDecisionUnavailable={requestGuestDecision}
-                          resumeDecisionArtifactId={resumeDecisionArtifactId}
+                          resumeDecisionArtifactId={
+                            msg.id === resumeDecisionMessageId
+                              ? resumeDecisionArtifactId
+                              : null
+                          }
                           onDecisionResumeHandled={clearResumeDecision}
                         />
                       );

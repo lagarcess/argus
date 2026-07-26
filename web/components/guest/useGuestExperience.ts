@@ -22,6 +22,7 @@ import {
 import { replaceGuestConversation } from "@/lib/guest-api";
 import type { UserResponse } from "@/lib/guest-account";
 import {
+  latestDecisionResumeMessageId,
   newConversationConversionMode,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
@@ -247,11 +248,16 @@ export function useGuestExperience({
     () => setResumeDecisionArtifactId(null),
     [],
   );
+  const resumeDecisionMessageId = latestDecisionResumeMessageId(
+    messages,
+    resumeDecisionArtifactId,
+  );
 
   return {
     ...shell,
     admitSend,
     resumeDecisionArtifactId,
+    resumeDecisionMessageId,
     clearResumeDecision,
     conversion,
     newConversation: {

@@ -6,6 +6,7 @@ import GuestExperienceSurfaces from "../components/guest/GuestExperienceSurfaces
 import type { GuestExperience } from "../components/guest/useGuestExperience";
 import {
   guestConversionBenefitKey,
+  latestDecisionResumeMessageId,
   newConversationConversionMode,
   pendingGuestActionSummary,
   SingleUseGuestAction,
@@ -109,6 +110,31 @@ describe("guest conversion contract", () => {
 
     expect(latch.take()).toEqual(action);
     expect(latch.take()).toBeNull();
+  });
+
+  test("resumes a decision on only the newest matching result projection", () => {
+    const messages = [
+      {
+        id: "older-result",
+        kind: "strategy_result",
+        result: { evidenceArtifactId: "evidence-1" },
+      },
+      {
+        id: "newest-result",
+        kind: "strategy_result",
+        result: { evidenceArtifactId: "evidence-1" },
+      },
+      {
+        id: "other-result",
+        kind: "strategy_result",
+        result: { evidenceArtifactId: "evidence-2" },
+      },
+    ];
+
+    expect(
+      latestDecisionResumeMessageId(messages, "evidence-1"),
+    ).toBe("newest-result");
+    expect(latestDecisionResumeMessageId(messages, null)).toBeNull();
   });
 
   test("uses one shared validated auth form in landing and centered modal", () => {

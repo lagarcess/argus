@@ -70,6 +70,28 @@ export function pendingGuestActionSummary(
   };
 }
 
+type DecisionResumeMessage = {
+  id: string;
+  kind?: string;
+  result?: {
+    evidenceArtifactId?: string | null;
+  } | null;
+};
+
+export function latestDecisionResumeMessageId(
+  messages: readonly DecisionResumeMessage[],
+  artifactId: string | null,
+): string | null {
+  if (!artifactId) return null;
+  return (
+    messages.findLast(
+      (message) =>
+        message.kind === "strategy_result" &&
+        message.result?.evidenceArtifactId === artifactId,
+    )?.id ?? null
+  );
+}
+
 export class SingleUseGuestAction {
   private action: GuestPendingAction | null;
 
