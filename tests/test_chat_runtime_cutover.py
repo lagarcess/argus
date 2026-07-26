@@ -266,9 +266,9 @@ def test_post_admission_builder_failure_owns_recovery_and_evidence(
     assert response.text.count('"type":"error"') == 1
     assert response.text.count("data: [DONE]") == 1
     assert '"type":"final"' not in response.text
-    messages = client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    ).json()["items"]
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert messages[-1]["content"] == recovery_message(
         "runtime_failure",
@@ -290,7 +290,7 @@ def test_post_admission_builder_failure_owns_recovery_and_evidence(
     [
         ("onboarding_goal", "advanced"),
         ("cancel", "finished"),
-        ("deterministic_recovery", "clarification"),
+        ("deterministic_recovery", "redirected"),
     ],
 )
 def test_early_accepted_routes_persist_one_typed_turn_summary(
@@ -380,7 +380,16 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
             "payload": {"confirmation_id": "confirmation-1"},
         }
 
-    response = client.post("/api/v1/chat/stream", json=request_payload)
+    request_headers = (
+        {"Idempotency-Key": "confirmation-1"}
+        if route == "deterministic_recovery"
+        else None
+    )
+    response = client.post(
+        "/api/v1/chat/stream",
+        json=request_payload,
+        headers=request_headers,
+    )
 
     assert response.status_code == 200
     assert response.text.count("data: [DONE]") == 1
@@ -714,15 +723,9 @@ def test_runtime_confirmation_card_formats_machine_date_tokens(
     assert last_three_months["strategy_type"] == "indicator_threshold"
     assert last_three_months["date_range"]["start"] == "2026-02-03"
     assert last_three_months["date_range"]["end"] == "2026-05-03"
-    assert (
-        last_three_months["date_range"]["display"]
-        == "February 3, 2026 - May 3, 2026"
-    )
+    assert last_three_months["date_range"]["display"] == "February 3, 2026 - May 3, 2026"
     assert last_rows["period"]["labelKey"] == "chat.confirmation.rows.period"
-    assert (
-        last_rows["period"]["value"]
-        == last_three_months["date_range"]["display"]
-    )
+    assert last_rows["period"]["value"] == last_three_months["date_range"]["display"]
     assert ytd["date_range"]["start"] == "2026-01-01"
     assert ytd["date_range"]["end"] == "2026-05-03"
     assert ytd["date_range"]["display"] == "January 1, 2026 - May 3, 2026"
