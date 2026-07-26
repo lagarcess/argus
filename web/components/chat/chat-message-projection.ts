@@ -23,6 +23,7 @@ import {
 import {
   hydrateResultActions,
 } from "@/lib/chat-result-actions";
+import { retainCanonicalResultProjectionOwners } from "@/lib/chat-result-projection-ownership";
 import { visibleComposerResponseActions } from "@/lib/chat-recovery-display";
 import {
   applyConsumedResultActions,
@@ -222,7 +223,7 @@ export function hydrateMessagesFromApi(
     ...hiddenSaveActionMessageIdsFromApi(items),
     ...confirmationActionEffects.hiddenMessageIds,
   ]);
-  const messages: Message[] = items
+  const messages: Message[] = retainCanonicalResultProjectionOwners(items)
     .filter((message) => !hiddenMessageIds.has(message.id))
     .map((message) => {
       const metadata = message.metadata ?? {};

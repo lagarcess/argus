@@ -473,6 +473,142 @@ describe("chat backtest jobs", () => {
     expect(updated.content).not.toContain("as soon as it is ready");
   });
 
+  for (const accountKind of ["guest", "registered"] as const) {
+    test(`${accountKind} reload gives one canonical result message sole card and action ownership`, () => {
+      const resultReadout =
+        "**Quick take**\n\nMSFT returned 12.4% while SPY returned 10.1%.";
+      const resultCard = {
+        ...run().conversation_result_card,
+        evidence_artifact_id: "evidence-1",
+        actions: [
+          {
+            type: "show_breakdown" as const,
+            label: "Explain result",
+            presentation: "result" as const,
+            payload: {},
+          },
+          {
+            type: "refine_strategy" as const,
+            label: "Refine idea",
+            presentation: "result" as const,
+            payload: {},
+          },
+        ],
+      };
+      const completedJob = job({
+        status: "succeeded",
+        result_run_id: "run-1",
+        finished_at: "2026-06-06T12:00:04Z",
+      });
+      const items: ApiMessage[] = [
+        {
+          id: "assistant-job-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: "",
+          created_at: "2026-06-06T12:00:03Z",
+          metadata: {
+            backtest_job_id: "job-1",
+            backtest_job: completedJob,
+            result_card: resultCard,
+            result_run_id: "run-1",
+            latest_run_id: "run-1",
+            result_conversation_id: "conversation-1",
+            result_fact_bank: {
+              run_id: "run-1",
+              symbols: ["MSFT"],
+              benchmark_symbol: "SPY",
+              asset_class: "equity",
+              config_snapshot: { template: "buy_and_hold" },
+            },
+          },
+        },
+        {
+          id: "assistant-result-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: resultReadout,
+          created_at: "2026-06-06T12:00:04Z",
+          metadata: {
+            result_card: resultCard,
+            result_run_id: "run-1",
+            latest_run_id: "run-1",
+            result_conversation_id: "conversation-1",
+            result_fact_bank: {
+              run_id: "run-1",
+              symbols: ["MSFT"],
+              benchmark_symbol: "SPY",
+              asset_class: "equity",
+              config_snapshot: { template: "buy_and_hold" },
+            },
+          },
+        },
+      ];
+
+      const hydrated = hydrateMessagesFromApi(items);
+      const resultMessages = hydrated.messages.filter(
+        (message) => message.kind === "strategy_result",
+      );
+      const quickTakeOwners = resultMessages.filter((message) =>
+        message.content?.includes("**Quick take**"),
+      );
+      const addDecisionEditorOwners = resultMessages.filter(
+        (message) => message.result?.evidenceArtifactId === "evidence-1",
+      );
+      const resultActionOwners = resultMessages.filter(
+        (message) => (message.result?.actions?.length ?? 0) > 0,
+      );
+
+      expect(resultMessages).toHaveLength(1);
+      expect(resultMessages[0]?.id).toBe("assistant-result-1");
+      expect(resultMessages[0]?.result?.runId).toBe("run-1");
+      expect(resultMessages[0]?.result?.evidenceArtifactId).toBe("evidence-1");
+      expect(quickTakeOwners).toHaveLength(1);
+      expect(addDecisionEditorOwners).toHaveLength(1);
+      expect(resultActionOwners).toHaveLength(1);
+    });
+  }
+
+  test("completed job projection remains the result owner when the durable result message is absent", () => {
+    const completedJob = job({
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const [resultMessage] = hydrateMessagesFromApi([
+      {
+        id: "assistant-job-1",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-06-06T12:00:03Z",
+        metadata: {
+          backtest_job_id: "job-1",
+          backtest_job: completedJob,
+          result_card: {
+            ...run().conversation_result_card,
+            evidence_artifact_id: "evidence-1",
+          },
+          result_run_id: "run-1",
+          latest_run_id: "run-1",
+          result_conversation_id: "conversation-1",
+          result_fact_bank: {
+            run_id: "run-1",
+            symbols: ["MSFT"],
+            benchmark_symbol: "SPY",
+            asset_class: "equity",
+            config_snapshot: { template: "buy_and_hold" },
+          },
+        },
+      },
+    ]).messages;
+
+    expect(resultMessage?.id).toBe("assistant-job-1");
+    expect(resultMessage?.kind).toBe("strategy_result");
+    expect(resultMessage?.result?.runId).toBe("run-1");
+    expect(resultMessage?.result?.evidenceArtifactId).toBe("evidence-1");
+  });
+
   test("durable job hydration does not generate backend-owned quick takes in the frontend", () => {
     const source = readFileSync(join(root, "lib/chat-backtest-jobs.ts"), "utf-8");
 
