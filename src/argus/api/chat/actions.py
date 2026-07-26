@@ -183,6 +183,21 @@ def is_cancel_confirmation_action(payload: ChatStreamRequest) -> bool:
     return payload.action is not None and payload.action.type == "cancel_confirmation"
 
 
+def recent_confirmation_messages(
+    *,
+    payload: ChatStreamRequest,
+    user_id: str,
+    conversation_id: str,
+) -> list[Message] | None:
+    if not is_confirmation_action(payload):
+        return None
+    return _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+
+
 def confirmation_cancellation_admission(
     *,
     payload: ChatStreamRequest,

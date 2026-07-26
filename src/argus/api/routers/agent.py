@@ -21,12 +21,12 @@ from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
     confirmation_action_id,
-    confirmation_cancellation_admission,
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
     missing_run_confirmation_action_id_message,
     persisted_chat_action,
+    recent_confirmation_messages,
     recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
@@ -46,6 +46,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.cancellation import prepare_confirmation_cancellation
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
@@ -57,7 +58,6 @@ from argus.api.chat.onboarding import (
 )
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
-    _recent_messages_for_conversation,
     checkpoint_has_pending_confirmation,
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
@@ -430,58 +430,21 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    confirmation_action_messages = (
-        _recent_messages_for_conversation(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            limit=20,
-        )
-        if is_confirmation_action(payload)
-        else None
+    confirmation_action_messages = recent_confirmation_messages(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
     )
     cancellation_admission = None
     if cancel_confirmation_action:
-        cancellation_admission = confirmation_cancellation_admission(
+        cancellation_admission, cancellation_response = prepare_confirmation_cancellation(
             payload=payload,
+            request=request,
             recent_messages=confirmation_action_messages or [],
+            headers=headers,
         )
-        if cancellation_admission is None:
-            raise problem(
-                request,
-                status_code=409,
-                code="confirmation_required",
-                title="Confirmation Required",
-                detail=(
-                    "That confirmation is no longer active. Describe the idea again "
-                    "and I will prepare a fresh confirmation."
-                ),
-            )
-        if cancellation_admission.replay_message is not None:
-            replay_message = cancellation_admission.replay_message
-
-            async def cancellation_replay_events() -> AsyncIterator[str]:
-                yield sse_data(
-                    {
-                        "type": "final",
-                        "payload": {
-                            "stage_outcome": "ready_to_respond",
-                            "assistant_response": "",
-                            "message_id": replay_message.id,
-                            "confirmation_cancelled": {
-                                "confirmation_id": (
-                                    cancellation_admission.confirmation_id
-                                ),
-                            },
-                        },
-                    }
-                )
-                yield sse_done()
-
-            return StreamingResponse(
-                cancellation_replay_events(),
-                media_type="text/event-stream",
-                headers=headers,
-            )
+        if cancellation_response is not None:
+            return cancellation_response
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
