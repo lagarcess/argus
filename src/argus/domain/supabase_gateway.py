@@ -22,7 +22,6 @@ from argus.api.schemas import (
     Language,
     Locale,
     Message,
-    OnboardingState,
     Strategy,
     User,
 )
@@ -285,7 +284,6 @@ class SupabaseGateway(
             "locale": "en-US",
             "theme": "dark",
             "is_admin": True,
-            "onboarding": OnboardingState().model_dump(),
             "updated_at": now,
         }
         self.client.table("profiles").upsert(profile, on_conflict="id").execute()
@@ -1421,7 +1419,9 @@ class SupabaseGateway(
         )
         query_chats = (
             self.client.table("conversations")
-            .select("id,title,last_message_preview,pinned,updated_at,deleted_at,archived")
+            .select(
+                "id,title,title_source,last_message_preview,pinned,updated_at,deleted_at,archived"
+            )
             .eq("user_id", user_id)
             .eq("archived", archived)
         )
@@ -2064,12 +2064,6 @@ class SupabaseGateway(
             "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
             "theme": "dark",
             "is_admin": is_admin,
-            "onboarding": {
-                "completed": False,
-                "stage": "language_selection",
-                "language_confirmed": False,
-                "primary_goal": None,
-            },
             "created_at": now,
             "updated_at": now,
         }

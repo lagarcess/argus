@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from argus.api.chat.onboarding import parse_onboarding_control_message
+from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.retry import durable_retry_last_turn_metadata
 from argus.api.message_store import (
     create_message,
@@ -107,7 +107,7 @@ class ChatTurnLifecycleHooks:
         public_metadata = _public_metadata(metadata)
         if (
             retryable
-            and parse_onboarding_control_message(self.request_message.content) is None
+            and not is_legacy_onboarding_marker(self.request_message.content)
         ):
             public_metadata.update(
                 durable_retry_last_turn_metadata(self.request_message)

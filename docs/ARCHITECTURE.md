@@ -268,7 +268,7 @@ Canonical state store.
 - Users
 - Profiles
 - Preferences
-- Onboarding state
+- Legacy onboarding state (inert compatibility JSON on old profile rows)
 - Conversations
 - Messages
 - Durable chat-turn lifecycle records
@@ -341,7 +341,6 @@ byte-identical, so evidence artifacts stay reproducible across the flag boundary
 **Use for:**
 
 - Chat intelligence
-- Onboarding guidance
 - Strategy extraction
 - Explanations
 
@@ -777,7 +776,7 @@ Never leave user confused.
 - Persistence
 
 ### Layer 3: Intelligence Layer
-- Onboarding prompts
+- Starter prompts
 - Extraction prompts
 - Response streaming
 

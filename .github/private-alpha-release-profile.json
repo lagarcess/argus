@@ -16,7 +16,6 @@
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_MOCK_AUTH": "false",
         "ARGUS_STRATEGIES_ENABLED": "false",
-        "ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED": "false",
         "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "true",
         "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
         "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "true",
@@ -67,7 +66,6 @@
         "NEXT_PUBLIC_STRATEGIES_ENABLED": "false",
         "NEXT_PUBLIC_COLLECTIONS_ENABLED": "false",
         "NEXT_PUBLIC_OMNISEARCH_ENABLED": "true",
-        "NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED": "false",
         "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED": "false"
       },
       "required_present": [
@@ -120,7 +118,6 @@
     "omnisearch": true,
     "strategies": false,
     "collections": false,
-    "private_alpha_onboarding": false,
     "real_workflow_execution": true
   },
   "locales": {

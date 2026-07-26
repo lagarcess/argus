@@ -107,6 +107,10 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const headerMenu = readFileSync(
+      join(root, "components/chat/ChatHeaderMenu.tsx"),
+      "utf-8",
+    );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
     expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
@@ -116,7 +120,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
     expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
     expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
-    expect(chat).toContain("disabled={!conversationId || isDeletingHeaderChat}");
+    expect(chat).toContain('{currentView === "chat" && conversationId && (');
+    expect(chat).toContain("isDeleting={isDeletingHeaderChat}");
+    expect(headerMenu).toContain("disabled={isDeleting}");
   });
 
   test("chat disclaimer appears only after conversation activity and is localized", () => {
@@ -169,7 +175,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
     const catchStart = chat.indexOf("try {\n      await streamToConversation");
-    const catchEnd = chat.indexOf("const handleOnboardingGoalChoice", catchStart);
+    const catchEnd = chat.indexOf("// \u2500\u2500 Action routing", catchStart);
     const sendCatch = chat.slice(catchStart, catchEnd);
 
     expect(catchStart).toBeGreaterThan(-1);
@@ -194,7 +200,7 @@ describe("chat archive/delete lifecycle source contract", () => {
   test("text and structured ordinary turns snapshot ids before paged reconciliation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const sendStart = chat.indexOf("const handleSend = async");
-    const sendEnd = chat.indexOf("const handleOnboardingGoalChoice", sendStart);
+    const sendEnd = chat.indexOf("// \u2500\u2500 Action routing", sendStart);
     const send = chat.slice(sendStart, sendEnd);
 
     expect(send).toContain('action?.type !== "run_backtest"');
@@ -214,35 +220,4 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
   });
 
-  test("onboarding typed stream errors cannot be overwritten by done or profile completion", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const start = chat.indexOf("const handleOnboardingGoalChoice");
-    const end = chat.indexOf("// ── Action routing", start);
-    const onboarding = chat.slice(start, end);
-
-    expect(onboarding).toContain("let onboardingStreamFailed = false");
-    expect(onboarding).toContain("onboardingStreamFailed = true");
-    expect(onboarding).toContain("if (onboardingStreamFailed) return");
-    expect(onboarding).toContain("setShowOnboardingGoalCards(true)");
-    expect(onboarding).not.toMatch(
-      /if \(event\.event === "done"\) \{\s+setStreamStatus/,
-    );
-    expect(onboarding.indexOf("if (onboardingStreamFailed) return")).toBeLessThan(
-      onboarding.indexOf("await patchMe"),
-    );
-  });
-
-  test("pending onboarding choices return when a recoverable conversation reloads", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const initStart = chat.indexOf("// ── Init conversation");
-    const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
-    const init = chat.slice(initStart, initEnd);
-
-    expect(init).toContain(
-      '(stage === "language_selection" || stage === "primary_goal_selection")',
-    );
-    expect(init).not.toContain(
-      'hydrated.messages.length === 0\n              && (stage === "language_selection"',
-    );
-  });
 });

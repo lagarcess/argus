@@ -9,8 +9,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    SerializerFunctionWrapHandler,
     WithJsonSchema,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -69,6 +71,13 @@ StrategyTemplate = Annotated[
 
 
 class OnboardingState(BaseModel):
+    """Legacy/inert compatibility state; no product behavior reads or writes it.
+
+    The explicit onboarding flow is removed. The field survives only because
+    old profile rows carry it and deployed clients may still read the `/me`
+    shape during a rollout.
+    """
+
     completed: bool = False
     stage: Literal[
         "language_selection", "primary_goal_selection", "ready", "completed"
@@ -98,10 +107,6 @@ class User(BaseModel):
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
-
-    @property
-    def is_onboarding_complete(self) -> bool:
-        return self.onboarding.completed
 
 
 class UserResponse(BaseModel):
@@ -147,7 +152,6 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
-    onboarding: dict[str, Any] | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -432,10 +436,22 @@ class HistoryItem(BaseModel):
     type: Literal["chat", "strategy", "collection", "run"]
     id: str
     title: str
+    # Chat items only; lets clients render unnamed chats without title heuristics.
+    title_source: NameSource | None = None
     subtitle: str
     pinned: bool = False
     created_at: datetime
     conversation_id: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_title_source(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> dict[str, Any]:
+        # The contract keeps title_source absent, not null, on non-chat items.
+        data = handler(self)
+        if data.get("title_source") is None:
+            data.pop("title_source", None)
+        return data
 
 
 class PaginatedHistory(BaseModel):

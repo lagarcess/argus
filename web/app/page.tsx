@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeClosed } from "lucide-react";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "react-i18next";
-import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
+import { DevModeBadge } from "@/components/ui/DevModeBadge";
 import {
+  getMe,
   loginWithEmail,
   normalizeApiLanguage,
   signupWithEmail,
@@ -20,6 +21,17 @@ function authModeFromLocation(): AuthMode {
   return mode === "signup" || mode === "login" ? mode : "intro";
 }
 
+function skipAuthenticatedRedirect(): boolean {
+  if (typeof window === "undefined") return true;
+  const params = new URLSearchParams(window.location.search);
+  const authMode = params.get("auth");
+  return (
+    params.get("preview") === "true" ||
+    authMode === "signup" ||
+    authMode === "login"
+  );
+}
+
 export default function LandingPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -31,10 +43,32 @@ export default function LandingPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     setAuthMode(authModeFromLocation());
   }, []);
+
+  useEffect(() => {
+    if (skipAuthenticatedRedirect()) {
+      setIsCheckingSession(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        await getMe();
+        if (cancelled) return;
+        router.replace("/chat");
+      } catch {
+        if (cancelled) return;
+        setIsCheckingSession(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const updateAuthMode = (nextMode: AuthMode) => {
     setAuthMode(nextMode);
@@ -95,8 +129,20 @@ export default function LandingPage() {
   const isSignup = authMode === "signup";
   const isLogin = authMode === "login";
 
+  if (isCheckingSession) {
+    return (
+      <>
+        <DevModeBadge />
+        <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </>
+    );
+  }
+
   return (
-    <OnboardingGate postCompleteHref="/chat">
+    <>
+      <DevModeBadge />
       <main className="relative flex min-h-[100dvh] w-full flex-col justify-between overflow-hidden px-6 py-8 md:px-12">
         <SettingsMenu />
 
@@ -218,6 +264,6 @@ export default function LandingPage() {
           </p>
         </div>
       </main>
-    </OnboardingGate>
+    </>
   );
 }

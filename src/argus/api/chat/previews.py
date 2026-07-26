@@ -27,11 +27,11 @@ def accepted_user_message_preview(
     content: str,
     max_length: int = 180,
 ) -> str | None:
-    """Hide typed onboarding controls from user-facing conversation previews."""
+    """Hide legacy persisted onboarding markers from conversation previews."""
 
-    from argus.api.chat.onboarding import parse_onboarding_control_message
+    from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 
-    if parse_onboarding_control_message(content) is not None:
+    if is_legacy_onboarding_marker(content):
         return None
     return plain_text_preview(content, max_length=max_length)
 

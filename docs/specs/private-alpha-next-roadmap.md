@@ -123,6 +123,16 @@ slice, it must read the relevant memo sections and addenda for that slice.
 
 P0 continuity is complete on the clean reintegration line at `bbd9f10`.
 
+The explicit private-alpha onboarding product was removed as a bounded
+strip-out lane (2026-07): no language/goal gate, no chat goal cards, no hidden
+`__ONBOARDING_*` control protocol, no onboarding flags. Authentication lands
+directly in normal chat with localized generic starter prompts; the first
+successful backtest is the meaningful onboarding milestone. Legacy persisted
+onboarding profile JSON and marker messages remain inert and hidden
+(`docs/API_CONTRACT.md` section 10). Any lane that previously special-cased
+onboarding (for example a guest-mode bypass) must reconcile against this
+checkpoint when it next rebases.
+
 Done behavior:
 
 - `add` / `append` merge new symbols into the active strategy.

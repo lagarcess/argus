@@ -114,18 +114,25 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const headerMenu = readFileSync(
+      join(root, "components/chat/ChatHeaderMenu.tsx"),
+      "utf-8",
+    );
 
-    expect(chat).toContain(
+    expect(chat).toContain("<ChatHeaderMenu");
+    expect(headerMenu).toContain(
       'aria-label={t("chat.chat_options", "Chat options")}',
     );
-    expect(chat).toContain("MoreVertical");
-    expect(chat).toContain("chat.rename_chat");
-    expect(chat).toContain("chat.pin_chat");
-    expect(chat).toContain("chat.unpin_chat");
-    expect(chat).not.toContain("chat.copy_conversation_link");
-    expect(chat).not.toContain("handleCopyConversationLink");
-    expect(chat).not.toContain("chat.add_to_collection");
-    expect(chat).not.toContain('aria-label="Archived chats"');
+    expect(headerMenu).toContain("MoreVertical");
+    expect(headerMenu).toContain("chat.rename_chat");
+    expect(headerMenu).toContain("chat.pin_chat");
+    expect(headerMenu).toContain("chat.unpin_chat");
+    for (const source of [chat, headerMenu]) {
+      expect(source).not.toContain("chat.copy_conversation_link");
+      expect(source).not.toContain("handleCopyConversationLink");
+      expect(source).not.toContain("chat.add_to_collection");
+      expect(source).not.toContain('aria-label="Archived chats"');
+    }
   });
 
   test("sidebar logo swap preserves toggle behavior and archives the legacy mark", () => {
@@ -1272,18 +1279,6 @@ describe("Argus Alpha frontend contract", () => {
     expect(i18n).toContain("ENABLED_LANGUAGE_CODES");
   });
 
-  test("chat includes onboarding goal cards and hidden onboarding protocol", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
-
-    expect(chat).toContain('data-testid="onboarding-goal-cards"');
-    expect(chat).toContain('data-testid="onboarding-skip"');
-    expect(chat).toContain("__ONBOARDING_GOAL__:");
-    expect(chat).toContain("__ONBOARDING_SKIP__");
-  });
-
   test("chat sidebar opens a safe command palette instead of hydrating chat previews", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
@@ -1868,10 +1863,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(usageButton).not.toContain("cursor-not-allowed");
   });
 
-  test("landing onboarding continues into chat after completion", () => {
+  test("landing redirects authenticated sessions straight into chat", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
-    expect(page).toContain('postCompleteHref="/chat"');
+    expect(page).toContain("await getMe()");
+    expect(page).toContain('router.replace("/chat")');
+    expect(page).toContain("skipAuthenticatedRedirect");
     expect(page).toContain("font-display text-6xl");
     expect(page).toContain("font-display flex w-full max-w-sm");
   });
@@ -1931,27 +1928,13 @@ describe("Argus Alpha frontend contract", () => {
       .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
   });
 
-  test("onboarding api error keeps the argus wordmark centered", () => {
-    const gate = readFileSync(
-      join(root, "components/onboarding/OnboardingGate.tsx"),
-      "utf-8",
-    );
+  test("front door auth states stay interactive during auth entry", () => {
+    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
-    expect(gate).toContain("font-display mb-2 text-center");
-    expect(gate).toContain("onboarding.error.title");
-  });
-
-  test("front door auth states remain visible even when mock auth has a user", () => {
-    const gate = readFileSync(
-      join(root, "components/onboarding/OnboardingGate.tsx"),
-      "utf-8",
+    expect(page).toContain(
+      'authMode === "signup" ||\n    authMode === "login"',
     );
-
-    expect(gate).toContain(
-      'const isAuthEntry = authMode === "signup" || authMode === "login"',
-    );
-    expect(gate).toContain("!isPreview && !isAuthEntry");
-    expect(gate).toContain('step === "done" || isPreview || isAuthEntry');
+    expect(page).toContain('params.get("preview") === "true"');
   });
 
   test("settings subscription section is feature-flagged off by default", () => {
