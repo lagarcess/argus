@@ -222,7 +222,7 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
             completed = client.post(
                 "/api/v1/chat/stream",
                 headers={
-                    "Idempotency-Key": f"guest-run-{secrets.token_hex(8)}",
+                    "Idempotency-Key": confirmation_id,
                     "origin": "http://localhost:3000",
                 },
                 json={
