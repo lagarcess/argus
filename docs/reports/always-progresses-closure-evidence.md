@@ -1,13 +1,14 @@
 # Always Progresses Closure Evidence
 
-Status: Task 8 complete; internal review clear; ready for independent review
+Status: **COMPLETE ON INTEGRATION — PR #268 merged as `847c413b`**
 
-Candidate HEAD before this evidence-only update:
-`cadb1759bf82f4f2a84eff17197ac56d805ddf88`
+Reviewed PR head: `5585c6a7a328f65f9a36b2f004e79e1c1d761b55`
 
 Final authorized real-Run HEAD: `e73350f065f9b258d0927b735123f73e21af617e`
 
-Recorded: 2026-07-25
+Integration squash merge: `847c413b3c3fe90d9b17e0aeb79b16c0c1a15b72`
+
+Recorded locally: 2026-07-25
 
 This ledger separates production-parity browser evidence from deterministic
 exact-current-head evidence. The final real backtest was founder-authorized
@@ -148,13 +149,28 @@ build, modularity, diff check, and the deterministic browser harness passed.
 Two delta reviews cleared the terminal path and then the exhaustion boundary
 with no remaining Critical, Important, or Minor finding.
 
-## Pending and external gates
+## Review, publication, and integration disposition
 
-- The one sanctioned paid interpreter eval is intentionally still unrun in this
-  commit. It must run once only after the independent review is clear and the
-  exact candidate HEAD is clean. Its result belongs in the Draft PR and founder
-  handoff so the evaluated HEAD is not changed afterward.
-- The single independent `argus-review-contract` layer is pending.
-- Push, Draft PR, and exact-head CI are pending.
-- Tester exposure, Render canary, Ready-for-review promotion, merge, and
-  deployment remain separate founder-directed gates.
+- The sanctioned interpreter eval passed `27/27` at product head `7750a247`.
+  Later corrections through `5585c6a` were confined to transport,
+  persistence, dispatch metadata, and durable Run-message identity; they did
+  not change interpreter prompts, routing, tiers, or capability behavior.
+- Independent whole-branch review cleared the product candidate. Codex Cloud
+  review then found two reachable P2 defects: post-dispatch metadata failure
+  could terminalize an already-dispatched job, and ambiguous Run replay could
+  persist a second action message. Both were fixed at `5585c6a`, covered by
+  focused backend/frontend, workflow, trajectory, disposable-Postgres, and
+  zero-provider browser checks, and their review threads were resolved.
+- Final GitHub CI at `5585c6a` reached terminal green with 11 successful,
+  zero failing, and zero pending checks.
+- PR #268 merged into `codex/private-alpha-next` as `847c413b` on
+  2026-07-26. The reviewed PR head and squash-merge trees are byte-equivalent.
+
+## Remaining external gates
+
+- This ledger closes the founder-visible **Argus always progresses** product
+  pillar at the integration checkpoint.
+- Render canary, deployed-browser proof, tester exposure, promotion to `main`,
+  and production deployment remain separate founder-directed release gates.
+- Issue-specific acceptance that exceeds this pillar remains open rather than
+  being implied complete by the merge.
