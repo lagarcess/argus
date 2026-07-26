@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 from copy import deepcopy
+from decimal import Decimal
 from typing import Any
 
 from argus.agent_runtime.coverage_recovery import (
@@ -1121,7 +1122,7 @@ def _resolve_execution_realism(
 def _decimal_rate_to_bps(value: float | None) -> float:
     if value is None:
         return 0.0
-    return value * 10000.0
+    return float(Decimal(str(value)) * Decimal("10000"))
 
 
 def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:

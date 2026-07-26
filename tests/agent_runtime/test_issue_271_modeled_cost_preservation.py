@@ -377,6 +377,38 @@ def test_confirmation_launch_card_and_hydration_share_canonical_costs(
     }
 
 
+def test_launch_projection_uses_exact_basis_points_for_decimal_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    strategy = _cost_strategy()
+    strategy.extra_parameters.update(
+        {
+            "fee_rate": 0.0011,
+            "slippage": 0.0006,
+        }
+    )
+    state = RunState.new(
+        current_user_message="Use 11 bps fees and 6 bps slippage.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = strategy
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    payload = result.patch["confirmation_payload"]
+    assert payload["strategy"]["extra_parameters"]["fee_rate"] == 0.0011
+    assert payload["strategy"]["extra_parameters"]["slippage"] == 0.0006
+    assert payload["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 11.0,
+        "slippage_bps": 6.0,
+    }
+
+
 @pytest.mark.parametrize(
     "message",
     [
