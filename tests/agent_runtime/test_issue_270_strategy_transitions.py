@@ -475,3 +475,46 @@ def test_crossover_confirmation_launch_and_reload_share_one_typed_identity(
     assert reloaded_payload["strategy"]["rule_spec"] == RULE_SPEC
     assert reloaded_payload["launch_payload"]["strategy_type"] == "signal_strategy"
     assert reloaded_payload["launch_payload"]["rule_spec"] == RULE_SPEC
+
+
+def test_complete_fresh_crossover_recovers_registry_template_from_typed_rules() -> None:
+    """Executable typed rules must retain their named capability identity."""
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    draft = _crossover_draft().model_copy(update={"requested_strategy_template": None})
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test a complete 50/200 SMA crossover.",
+        candidate_strategy_draft=draft,
+        semantic_turn_act="new_idea",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+    )
+
+    interpretation = interpreter._to_runtime_interpretation(
+        response,
+        request=interpreter_module.InterpretationRequest(
+            current_user_message=draft.raw_user_phrasing or "",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            selected_thread_metadata={},
+            user=UserState(user_id="u-270"),
+        ),
+    )
+
+    assert (
+        interpretation.candidate_strategy_draft.requested_strategy_template
+        == "moving_average_crossover"
+    )
+
+    malformed = interpretation.candidate_strategy_draft.model_copy(
+        update={"exit_rule": dict(ENTRY_RULE)}
+    )
+    assert (
+        interpreter_module.executable_strategy_template_from_typed_rules(malformed)
+        is None
+    )

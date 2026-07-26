@@ -354,6 +354,7 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
+    executable_strategy_template_from_typed_rules,
     executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
     has_partial_explicit_date_range,
@@ -1050,6 +1051,10 @@ class OpenRouterStructuredInterpreter:
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
         strategy = _strategy_from_llm(response.candidate_strategy_draft)
+        if strategy.requested_strategy_template is None:
+            strategy.requested_strategy_template = (
+                executable_strategy_template_from_typed_rules(strategy)
+            )
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(

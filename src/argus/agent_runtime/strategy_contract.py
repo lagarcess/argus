@@ -88,6 +88,43 @@ def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     )
 
 
+def executable_strategy_template_from_typed_rules(
+    strategy: StrategySummary | dict[str, Any],
+) -> str | None:
+    """Recover a named executable template only from its canonical typed shape."""
+
+    payload = _strategy_payload(strategy)
+    entry_rule = payload.get("entry_rule")
+    exit_rule = payload.get("exit_rule")
+    if not (
+        isinstance(entry_rule, dict)
+        and isinstance(exit_rule, dict)
+        and entry_rule.get("type") == "moving_average_crossover"
+        and exit_rule.get("type") == "moving_average_crossover"
+    ):
+        return None
+    try:
+        generated_rule_spec = rule_spec_from_moving_average_crossover_rules(
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+        )
+    except (TypeError, ValueError):
+        return None
+    if generated_rule_spec is None:
+        return None
+    stated_rule_spec = payload.get("rule_spec")
+    if stated_rule_spec is not None and stated_rule_spec != generated_rule_spec:
+        return None
+    template = "moving_average_crossover"
+    capability = STRATEGY_CAPABILITIES[template]
+    if (
+        capability.status != "executable"
+        or capability.execution_strategy_type != executable_strategy_type(payload)
+    ):
+        return None
+    return template
+
+
 def executable_strategy_type_from_extracted_fields(
     fields: Mapping[str, Any],
 ) -> str | None:
