@@ -645,14 +645,50 @@ describe("browser safety evidence", () => {
       rawError: "net::ERR_CONNECTION_REFUSED",
       context: { check: 18, phase: "fault_injection" },
     });
+    const unrelatedPageError = browserSafetyDetail({
+      event: "page_error",
+      rawError: "Hydration failed",
+      context: { check: 18, phase: "fault_injection" },
+    });
+    const unrelatedExternalFailure = browserSafetyDetail({
+      event: "failed_request",
+      rawUrl: "https://example.invalid/api/v1/conversations",
+      method: "GET",
+      rawError: "net::ERR_CONNECTION_REFUSED",
+      context: { check: 18, phase: "fault_injection" },
+    });
+    const correlatedConsole = browserSafetyDetail({
+      event: "console_error",
+      rawError: "net::ERR_CONNECTION_REFUSED",
+      correlatedFault: true,
+      context: { check: 18, phase: "fault_injection" },
+    });
+    const uncorrelatedConsole = browserSafetyDetail({
+      event: "console_error",
+      rawError: "net::ERR_CONNECTION_REFUSED",
+      context: { check: 18, phase: "fault_injection" },
+    });
     const teardown = browserSafetyDetail({
       event: "console_error",
       rawError: "net::ERR_CONNECTION_REFUSED",
       context: { check: 18, phase: "teardown" },
     });
-    const details = [product, controlled, teardown];
+    const details = [
+      product,
+      controlled,
+      unrelatedPageError,
+      unrelatedExternalFailure,
+      correlatedConsole,
+      uncorrelatedConsole,
+      teardown,
+    ];
 
-    expect(productExecutionSafetyDetails(details)).toEqual([product]);
+    expect(productExecutionSafetyDetails(details)).toEqual([
+      product,
+      unrelatedPageError,
+      unrelatedExternalFailure,
+      uncorrelatedConsole,
+    ]);
     expect(details).toContain(controlled);
     expect(controlled).toEqual({
       event: "failed_request",
@@ -663,6 +699,10 @@ describe("browser safety evidence", () => {
       check: 18,
       phase: "fault_injection",
     });
+    expect(correlatedConsole.phase).toBe("fault_injection");
+    expect(unrelatedPageError.phase).toBe("product");
+    expect(unrelatedExternalFailure.phase).toBe("product");
+    expect(uncorrelatedConsole.phase).toBe("product");
   });
 
   test("detects credential-shaped data on a non-loopback request without retaining it", () => {

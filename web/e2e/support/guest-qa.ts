@@ -8,6 +8,7 @@ import {
   type APIRequestContext,
   type BrowserContext,
   type Page,
+  type Request,
 } from "@playwright/test";
 import { guestQaEndpointConfig } from "./guest-qa-endpoints";
 
@@ -2637,9 +2638,46 @@ export function browserSafetyDetail(input: {
   method?: string;
   rawError?: string;
   status?: number | null;
+  correlatedFault?: boolean;
   context: BrowserSafetyContext;
 }): BrowserSafetyDetail {
   const isNetwork = input.event === "failed_request";
+  const category = browserErrorCategory(
+    input.event,
+    input.rawError ?? "",
+    input.status,
+  );
+  const controlledNetworkFailure = (() => {
+    if (
+      input.context.phase !== "fault_injection" ||
+      input.event !== "failed_request" ||
+      category !== "connection_refused" ||
+      !input.rawUrl
+    ) {
+      return false;
+    }
+    try {
+      const url = new URL(input.rawUrl);
+      return (
+        ["localhost", "127.0.0.1", "::1"].includes(url.hostname) &&
+        url.port === String(LOCAL_API_PORT) &&
+        url.pathname.startsWith("/api/v1/")
+      );
+    } catch {
+      return false;
+    }
+  })();
+  const controlledConsoleFailure =
+    input.context.phase === "fault_injection" &&
+    input.event === "console_error" &&
+    category === "connection_refused" &&
+    input.correlatedFault === true;
+  const phase =
+    input.context.phase === "fault_injection" &&
+    !controlledNetworkFailure &&
+    !controlledConsoleFailure
+      ? "product"
+      : input.context.phase;
   return {
     event: input.event,
     component:
@@ -2656,13 +2694,9 @@ export function browserSafetyDetail(input: {
       typeof input.status === "number" && Number.isInteger(input.status)
         ? input.status
         : null,
-    category: browserErrorCategory(
-      input.event,
-      input.rawError ?? "",
-      input.status,
-    ),
+    category,
     check: input.context.check,
-    phase: input.context.phase,
+    phase,
   };
 }
 
@@ -2731,6 +2765,7 @@ export class BrowserSafetyMonitor {
   credentialExposure = 0;
   readonly mutations = new Map<string, number>();
   private readonly details: BrowserSafetyDetail[] = [];
+  private readonly requestContexts = new WeakMap<Request, BrowserSafetyContext>();
 
   constructor(
     private readonly context: () => BrowserSafetyContext = () => ({
@@ -2742,12 +2777,19 @@ export class BrowserSafetyMonitor {
   attach(page: Page): void {
     page.on("console", (message) => {
       if (message.type() === "error") {
+        const context = this.context();
+        const previous = this.details.at(-1);
         this.consoleErrors += 1;
         this.details.push(
           browserSafetyDetail({
             event: "console_error",
             rawError: message.text(),
-            context: this.context(),
+            correlatedFault:
+              context.phase === "fault_injection" &&
+              previous?.event === "failed_request" &&
+              previous.phase === "fault_injection" &&
+              previous.check === context.check,
+            context,
           }),
         );
       }
@@ -2782,7 +2824,7 @@ export class BrowserSafetyMonitor {
           rawUrl: request.url(),
           method: request.method(),
           rawError: request.failure()?.errorText ?? "",
-          context: this.context(),
+          context: this.requestContexts.get(request) ?? this.context(),
         }),
       );
     });
@@ -2795,11 +2837,13 @@ export class BrowserSafetyMonitor {
           rawUrl: response.url(),
           method: response.request().method(),
           status: response.status(),
-          context: this.context(),
+          context:
+            this.requestContexts.get(response.request()) ?? this.context(),
         }),
       );
     });
     page.on("request", (request) => {
+      this.requestContexts.set(request, this.context());
       const url = new URL(request.url());
       const isWrite = !["GET", "HEAD", "OPTIONS"].includes(request.method());
       if (isWrite) {
