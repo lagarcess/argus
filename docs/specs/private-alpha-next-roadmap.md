@@ -18,15 +18,16 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-22
+## Active Post-Promotion Pointer — 2026-07-25
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `bbd1d2b`.
-It contains the founder-accepted graph-range, account-security, Usage, and
-capability-truth vertical slices from PRs #264, #261, #259, and #266. This
-pointer does not claim that the integration checkpoint is deployed or exposed
-to testers.
+`main` at `217ead12`. The current stable integration checkpoint is `b7fd6f08`.
+It contains the founder-accepted graph-range, account-security, Usage,
+capability-truth, and Always Progresses baseline slices from PRs #264, #261,
+#259, #266, and #268, plus the bounded calendar-materiality correction from
+PR #267. This pointer does not claim that the integration checkpoint is
+deployed or exposed to testers.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
@@ -900,6 +901,15 @@ browser journeys, one authorized real Run, reload-stable result truth, and
 independent review. Deployment and tester exposure remain separate release
 gates. The active interim roadmap now has two unfinished founder outcomes:
 **grounded discovery and suggestions** and **full Omnisearch capability**.
+
+Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
+above remains valid, but a longer same-conversation exploration at integration
+SHA `b7fd6f08` exposed untriaged gaps in cost preservation, stale-action
+presentation, fact-preserving recovery, supported strategy transitions, and
+recovery-heading ownership. Quick take voice variance and one provider-timeout
+fallback were recorded separately from confirmed continuity defects. No fix or
+GitHub issue is authorized by this note. See
+`docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
 

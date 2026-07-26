@@ -1,6 +1,21 @@
 # Always Progresses Closure Evidence
 
-Status: **COMPLETE ON INTEGRATION — PR #268 merged as `847c413b`**
+Status: **BASELINE COMPLETE ON INTEGRATION — PR #268 merged as `847c413b`;
+STANDING QUALITY BAR ACTIVE**
+
+Post-merge qualification: this ledger proves the bounded acceptance matrix. A
+later same-conversation stress audit found additional long-chain exploration
+gaps without invalidating the exact journeys recorded here. Those observations,
+attribution limits, and issue-intake groups are recorded in
+[the 2026-07-25 post-merge stress audit](2026-07-25-always-progresses-post-merge-stress-audit.md).
+No fix or GitHub issue is authorized by that report.
+
+A separate guest-lane post-integration check reproduced an ordinary starter
+runtime failure after the guest branch absorbed this integration checkpoint.
+That signal is recorded in
+[the guest runtime regression observation](2026-07-25-guest-post-integration-runtime-regression.md).
+Its cause remains unassigned; this ledger must not be used to blame either the
+integration runtime or guest code before the bounded differential diagnosis.
 
 Reviewed PR head: `5585c6a7a328f65f9a36b2f004e79e1c1d761b55`
 
