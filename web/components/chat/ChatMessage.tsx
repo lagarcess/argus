@@ -189,7 +189,12 @@ export default function ChatMessage({
   };
 
   const actionLabel = (action: ChatActionOption) =>
-    action.labelKey ? t(action.labelKey, action.label) : action.label;
+    action.labelKey
+      ? t(action.labelKey, {
+          defaultValue: action.label,
+          ...((action.payload ?? {}) as Record<string, unknown>),
+        })
+      : action.label;
   const retryAction = message.actions?.find(isRetryAction);
   const userRecoveryText =
     isUser && message.recoveryDisplay

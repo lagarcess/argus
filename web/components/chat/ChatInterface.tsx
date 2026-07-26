@@ -1094,7 +1094,12 @@ export default function ChatInterface() {
 
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
-      action.labelKey ? t(action.labelKey, action.label) : action.label,
+      action.labelKey
+      ? t(action.labelKey, {
+          defaultValue: action.label,
+          ...((action.payload ?? {}) as Record<string, unknown>),
+        })
+      : action.label,
     [t],
   );
 
@@ -1993,7 +1998,12 @@ export default function ChatInterface() {
     ? []
     : visibleComposerResponseActions(inputActions);
   const actionLabel = (action: ChatActionOption) =>
-    action.labelKey ? t(action.labelKey, action.label) : action.label;
+    action.labelKey
+      ? t(action.labelKey, {
+          defaultValue: action.label,
+          ...((action.payload ?? {}) as Record<string, unknown>),
+        })
+      : action.label;
   const latestAssistantContent =
     [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
