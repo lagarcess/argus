@@ -205,12 +205,12 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
     expect(card).toContain("confirmationStatusAllowsActions(displayState.status)");
-    expect(chat).toContain("confirmationStatusAllowsActions(confirmationStatus)");
+    expect(chat).toContain("confirmationStatusAllowsActions(status)");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {
@@ -233,7 +233,7 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
@@ -242,7 +242,9 @@ describe("chat turn artifact UX", () => {
     expect(chat).toContain(
       "visibleComposerResponseActions(latestAi?.actions ?? [])",
     );
-    expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
+    expect(message).toMatch(
+      /import \{\s*actionHasCardScopedOwnership\s*\} from "@\/lib\/chat-action-ownership";/,
+    );
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
     expect(message).toContain("const shouldShowAssistantFooter =");

@@ -15,6 +15,10 @@ import httpx
 from loguru import logger
 
 from argus.agent_runtime.confirmation_artifacts import canonical_launch_identity_payload
+from argus.api.chat.backtest_job_envelopes import (
+    admission_rejection_envelope,
+    async_backtest_job_envelope,
+)
 from argus.domain.backtest_admission import (
     DEFAULT_GLOBAL_QUEUED_LIMIT,
     DEFAULT_GLOBAL_RUNNING_LIMIT,
@@ -392,7 +396,11 @@ def reconcile_terminal_render_task_run(
         expected_status=status,
         expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
-    reconciled = reconciled or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or "")) or job
+    reconciled = (
+        reconciled
+        or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or ""))
+        or job
+    )
     return dict(reconciled)
 
 
@@ -589,7 +597,11 @@ def fail_job_without_task_run(
 
 
 def _stale_seconds_for_status(status: str) -> int:
-    return DEFAULT_STALE_QUEUED_SECONDS if status == "queued" else DEFAULT_STALE_RUNNING_SECONDS
+    return (
+        DEFAULT_STALE_QUEUED_SECONDS
+        if status == "queued"
+        else DEFAULT_STALE_RUNNING_SECONDS
+    )
 
 
 def should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:
@@ -849,10 +861,10 @@ class ShadowBacktestJobTool:
                 ),
             )
             if admission.decision not in ("admitted", "replay"):
-                return None, _admission_rejection_envelope(admission.decision)
+                return None, admission_rejection_envelope(admission.decision)
             job = admission.job
             if job is None:
-                return None, _admission_rejection_envelope("missing_job")
+                return None, admission_rejection_envelope("missing_job")
             context.admission_decision = admission.decision
             job_id = str(job.get("id") or "").strip()
             if job_id:
@@ -923,7 +935,9 @@ class ShadowBacktestJobTool:
         status = str(job.get("status") or "").strip().lower()
         if status in {"succeeded", "failed", "canceled", "expired"}:
             return True
-        return context.admission_decision == "admitted" or context.workflow_dispatch_started
+        return (
+            context.admission_decision == "admitted" or context.workflow_dispatch_started
+        )
 
     def _maybe_dispatch_shadow_job(
         self,
@@ -959,9 +973,14 @@ class ShadowBacktestJobTool:
                 conversation_id=context.conversation_id,
                 job_id=job_id,
             )
-            return fail_job_without_task_run(gateway=gateway, user_id=context.user_id, job=job)
+            return fail_job_without_task_run(
+                gateway=gateway, user_id=context.user_id, job=job
+            )
         task_run_id = str(result.get("id") or "").strip() or None
-        context.workflow_dispatch_started, context.workflow_task_run_id = True, task_run_id
+        context.workflow_dispatch_started, context.workflow_task_run_id = (
+            True,
+            task_run_id,
+        )
         try:
             gateway.merge_backtest_job_execution_metadata(
                 user_id=context.user_id,
@@ -1004,71 +1023,6 @@ class ShadowBacktestJobTool:
         task_run_id = str(workflow_dispatch.get("task_run_id") or "").strip()
         context.workflow_task_run_id = task_run_id or None
         return True
-
-
-def public_backtest_job_payload(job: dict[str, Any]) -> dict[str, Any]:
-    public_keys = (
-        "id",
-        "conversation_id",
-        "request_message_id",
-        "confirmation_message_id",
-        "status",
-        "result_run_id",
-        "failure_code",
-        "failure_detail",
-        "retryable",
-        "queued_at",
-        "started_at",
-        "finished_at",
-        "created_at",
-        "updated_at",
-    )
-    return {key: job.get(key) for key in public_keys if key in job}
-
-
-def async_backtest_job_envelope(job: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "success": True,
-        "payload": {"backtest_job": public_backtest_job_payload(job)},
-        "error_type": None,
-        "error_message": None,
-        "retryable": False,
-        "capability_context": {
-            "execution_status": str(job.get("status") or "queued"),
-        },
-    }
-
-
-def _admission_rejection_envelope(decision: str) -> dict[str, Any]:
-    """Typed rejection: an unadmitted run must fail honestly, never execute
-    for free or charge the allowance."""
-
-    if decision == "conversion_required":
-        error_type = "account_required"
-        failure_code = "account_conversion_required"
-    elif decision == "allowance_exhausted":
-        error_type = "rate_limited"
-        failure_code = "simulation_allowance_exhausted"
-    elif decision in ("per_user_capacity", "global_capacity"):
-        error_type = "service_overloaded"
-        failure_code = "backtest_capacity_exceeded"
-    elif decision == "conflict":
-        error_type = "tool_execution_error"
-        failure_code = "idempotency_conflict"
-    else:
-        error_type = "tool_execution_error"
-        failure_code = "backtest_admission_unavailable"
-    return {
-        "success": False,
-        "payload": None,
-        "error_type": error_type,
-        "error_message": None,
-        "retryable": False,
-        "capability_context": {
-            "execution_status": "rejected",
-            "failure_code": failure_code,
-        },
-    }
 
 
 def link_shadow_backtest_job_result(

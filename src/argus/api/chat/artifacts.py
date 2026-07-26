@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
+from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
 from argus.agent_runtime.state.models import ArtifactReference
 from argus.api.schemas import BacktestRun
 from argus.domain.backtest_message_projection import result_fact_bank
@@ -33,6 +35,29 @@ def result_reference_from_run(run: BacktestRun) -> ArtifactReference:
         artifact_status=run.status,
         metadata=result_fact_bank(run),
     )
+
+
+def confirmation_id_for_runtime_card(
+    runtime_result: dict[str, Any],
+    *,
+    new_id: Callable[[], str],
+) -> str:
+    references = runtime_result.get("artifact_references")
+    fallback = None
+    if isinstance(references, list):
+        for reference in references:
+            if (
+                isinstance(reference, dict)
+                and reference.get("artifact_kind") == "confirmation"
+            ):
+                artifact_id = reference.get("artifact_id")
+                if isinstance(artifact_id, str) and artifact_id.strip():
+                    fallback = artifact_id.strip()
+                    break
+    payload = runtime_result.get("confirmation_payload")
+    if isinstance(payload, dict):
+        return confirmation_id_from_payload(payload, fallback=fallback)
+    return fallback or new_id()
 
 
 def saved_strategy_metadata(run: BacktestRun, strategy_id: str) -> dict[str, Any]:

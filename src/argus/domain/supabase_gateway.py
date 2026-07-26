@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -44,6 +43,7 @@ from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
 from argus.domain.supabase_guest_accounts import GuestAccountPersistenceMixin
+from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
@@ -183,19 +183,8 @@ class SupabaseGateway(
     def _fetch_all_rows(
         self,
         query_factory: Callable[[int, int], Any],
-        *,
-        batch_size: int = 500,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        start = 0
-        while True:
-            response = query_factory(start, start + batch_size - 1).execute()
-            data = response.data or []
-            rows.extend(data)
-            if len(data) < batch_size:
-                break
-            start += batch_size
-        return rows
+        return fetch_all_rows_batched(query_factory)
 
     def reset_dev_data(self) -> None:
         user = self.get_or_create_mock_user()
@@ -2080,9 +2069,11 @@ class SupabaseGateway(
             "updated_at": now,
         }
 
-        created = self.client.table("profiles").upsert(
-            payload, on_conflict="id", ignore_duplicates=True
-        ).execute()
+        created = (
+            self.client.table("profiles")
+            .upsert(payload, on_conflict="id", ignore_duplicates=True)
+            .execute()
+        )
         row = _row_one(created)
         if row is not None:
             return User.model_validate(row)

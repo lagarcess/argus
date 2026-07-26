@@ -719,7 +719,15 @@ describe("chat backtest jobs", () => {
   });
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chatInterface = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
+    const chat = [chatInterface, projection].join("\n");
     const polling = readFileSync(
       join(root, "lib/chat-run-reconciliation.ts"),
       "utf-8",
@@ -727,11 +735,17 @@ describe("chat backtest jobs", () => {
 
     expect(chat).toContain("useBacktestJobPolling");
     expect(polling).toContain("getBacktestJob");
-    expect(chat).toContain("backtestJobMessageFromApi(m)");
-    expect(chat.indexOf("backtestJobMessageFromApi(m)")).toBeLessThan(
-      chat.indexOf('m.role === "user" && chatAction'),
+    expect(projection).toContain("backtestJobMessageFromApi(message)");
+    expect(
+      projection.indexOf(
+        'message.role === "user" ? backtestJobMessageFromApi(message)',
+      ),
+    ).toBeLessThan(
+      projection.indexOf("chatAction &&"),
     );
-    expect(chat).toContain("const finalBacktestJob = backtestJobFromFinalPayload(finalPayload)");
+    expect(chat).toMatch(
+      /const finalBacktestJob = backtestJobFromFinalPayload\(\s*finalPayload,?\s*\)/,
+    );
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
     expect(polling).toContain("pendingBacktestJobKey");

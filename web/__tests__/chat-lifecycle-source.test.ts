@@ -13,7 +13,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const beforeCatch = loadConversation.slice(0, loadConversation.indexOf("} catch (error)"));
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    expect(loadConversation).toContain("setStreamStatus(t('common.loading'))");
+    expect(loadConversation).toContain('setStreamStatus(t("common.loading"))');
     expect(beforeCatch).not.toContain("setMessages([])");
     expect(beforeCatch).not.toContain("setInputActions([])");
   });
@@ -101,22 +101,32 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("persisted result cards are validated before structured hydration", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
-    const hydrateStart = chat.indexOf("function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages");
-    const hydrateEnd = chat.indexOf("function createPendingAssistantMessage", hydrateStart);
-    const hydrateBlock = chat.slice(hydrateStart, hydrateEnd);
+    const hydrateStart = projection.indexOf(
+      "export function hydrateMessagesFromApi(",
+    );
+    const hydrateBlock = projection.slice(hydrateStart);
 
     expect(hydration).toContain("export function isHydratableResultCard(");
-    expect(hydrateBlock).toContain("isHydratableResultCard(resultCard)");
-    expect(hydrateBlock).not.toContain("resultCard &&\n      Array.isArray(resultCard.rows)");
+    expect(hydrateBlock).toContain(
+      "isHydratableResultCard(metadata.result_card)",
+    );
+    expect(hydrateBlock).not.toContain(
+      "metadata.result_card &&\n        Array.isArray(metadata.result_card.rows)",
+    );
   });
 
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
-    expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
+    expect(chat).toMatch(
+      /const \[pendingHeaderDeleteId, setPendingHeaderDeleteId\] = useState<\s*string \| null\s*>\(null\);/,
+    );
     expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
     expect(chat).toContain("if (!conversationId) return;");
     expect(chat).toContain("setPendingHeaderDeleteId(conversationId);");
@@ -200,8 +210,8 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch).toContain("resolveOrdinaryTransportAmbiguityView");
     expect(sendCatch).toContain("loadAllConversationMessagePages");
     expect(sendCatch).toContain("conversationLoadFailureMessage");
-    expect(sendCatch).toContain("t('chat.status.checking')");
-    expect(sendCatch.indexOf("setStreamStatus(t('chat.status.checking'))")).toBeLessThan(
+    expect(sendCatch).toContain('t("chat.status.checking")');
+    expect(sendCatch.indexOf('setStreamStatus(t("chat.status.checking"))')).toBeLessThan(
       sendCatch.indexOf("await resolveOrdinaryTransportAmbiguityView"),
     );
     expect(sendCatch).toContain("signal: reconciliationController.signal");
@@ -267,7 +277,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(init).toContain('stage === "language_selection"');
     expect(init).toContain('stage === "primary_goal_selection"');
     expect(init).toContain("setShowOnboardingGoalCards(");
-    expect(init).toContain("showRegisteredOnboarding,");
+    expect(init).toContain(
+      "setShowOnboardingGoalCards(showRegisteredOnboarding)",
+    );
     expect(init).not.toContain(
       'hydrated.messages.length === 0\n              && (stage === "language_selection"',
     );

@@ -46,6 +46,7 @@ from argus.api.chat.allowance import (
     ordinary_turn_settlement,
 )
 from argus.api.chat.artifacts import (
+    confirmation_id_for_runtime_card,
     result_fact_bank,
     result_followup_metadata_from_run,
     saved_strategy_metadata,
@@ -56,7 +57,10 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.cancellation import prepare_confirmation_cancellation
+from argus.api.chat.cancellation import (
+    complete_confirmation_cancellation,
+    prepare_confirmation_cancellation,
+)
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
@@ -81,8 +85,12 @@ from argus.api.chat.request_admission import (
     prepare_chat_request_admission,
     reject_invalid_non_run_confirmation_action,
 )
+from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.route_receipts import persist_route_receipts
-from argus.api.chat.run_action_identity import require_run_action_identity
+from argus.api.chat.run_action_identity import (
+    require_run_action_identity,
+    validated_optional_idempotency_key,
+)
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
@@ -112,7 +120,6 @@ from argus.api.schemas import (
     StarterPromptsResponse,
     User,
 )
-from argus.domain import backtest_admission
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
@@ -182,52 +189,6 @@ def _strategies_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _validated_optional_idempotency_key(request: Request, raw: str | None) -> str | None:
-    """#229 grammar on the original bytes: a present key must be 1-128
-    visible ASCII with no whitespace and is never normalized."""
-
-    state, key = backtest_admission.validate_idempotency_key(raw)
-    if state == "invalid":
-        raise problem(
-            request,
-            status_code=422,
-            code="validation_error",
-            title="Validation Error",
-            detail=(
-                "Idempotency-Key must be 1-128 visible ASCII characters "
-                "with no whitespace."
-            ),
-        )
-    return key
-
-
-def _confirmation_artifact_id_from_runtime_result(
-    runtime_result: dict[str, Any],
-) -> str | None:
-    references = runtime_result.get("artifact_references")
-    if not isinstance(references, list):
-        return None
-    for reference in references:
-        if not isinstance(reference, dict):
-            continue
-        if reference.get("artifact_kind") != "confirmation":
-            continue
-        artifact_id = reference.get("artifact_id")
-        if isinstance(artifact_id, str) and artifact_id.strip():
-            return artifact_id.strip()
-    return None
-
-
-def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
-    from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
-
-    payload = runtime_result.get("confirmation_payload")
-    fallback = _confirmation_artifact_id_from_runtime_result(runtime_result)
-    if isinstance(payload, dict):
-        return confirmation_id_from_payload(payload, fallback=fallback)
-    return fallback or api_state.store.new_id()
-
-
 async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
     from argus.agent_runtime.result_followups import (
         compose_private_alpha_save_response as _compose_private_alpha_save_response,
@@ -256,17 +217,7 @@ def result_breakdown_message_with_metadata(
     return _result_breakdown_message_with_metadata(run, language=language)
 
 
-def _result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
-    request = runtime_result.get("result_action_request")
-    if not isinstance(request, dict):
-        return None
-    action_type = request.get("type")
-    if action_type in {"show_breakdown", "save_strategy"}:
-        return str(action_type)
-    return None
-
-
-def _missing_result_action_run_message(
+def missing_result_action_run_message(
     *,
     action_type: str,
     language: str | None,
@@ -313,7 +264,10 @@ async def chat_stream(
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
     turn_account = account_context(request)
-    clean_idempotency_key = _validated_optional_idempotency_key(request, idempotency_key)
+    clean_idempotency_key = validated_optional_idempotency_key(
+        request,
+        idempotency_key,
+    )
     headers = {
         "X-Request-Id": request.state.request_id,
         "X-Accel-Buffering": "no",
@@ -371,9 +325,7 @@ async def chat_stream(
             conversation = api_state.store.conversations.get(payload.conversation_id)
     else:
         conversation = api_state.store.conversations.get(payload.conversation_id)
-    memory_owner_id = api_state.store.conversation_owners.get(
-        payload.conversation_id
-    )
+    memory_owner_id = api_state.store.conversation_owners.get(payload.conversation_id)
     if not conversation or (
         api_state.supabase_gateway is None
         and memory_owner_id is not None
@@ -443,7 +395,8 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 recent_messages=confirmation_action_messages,
             )
-            if confirmation_action_messages is not None else None
+            if confirmation_action_messages is not None
+            else None
         ),
         stale_confirmation_message=stale_confirmation_message,
         language=language,
@@ -469,17 +422,14 @@ async def chat_stream(
         request_message = accepted_option_request.content
         display_message = accepted_option_request.content
         onboarding_goal = parse_onboarding_control_message(request_message)
-        if (
-            payload.action is not None
-            and payload.action.payload.get("request_message_id")
+        if payload.action is not None and payload.action.payload.get(
+            "request_message_id"
         ):
             mention_provenance = []
     lifecycle_hooks = (
         None if is_run_backtest_turn else request_admission.lifecycle_hooks()
     )
-    deterministic_control_turn = (
-        onboarding_goal is not None or cancel_confirmation_action
-    )
+    deterministic_control_turn = onboarding_goal is not None or cancel_confirmation_action
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
@@ -887,7 +837,9 @@ async def chat_stream(
             recovery = runtime_fallback.recovery
             recovery_code = recovery.get("code") if isinstance(recovery, dict) else None
             stale_card_redirect = recovery_code == "confirmation_action_stale_card"
-            stage_status = "ready_to_respond" if stale_card_redirect else "await_user_reply"
+            stage_status = (
+                "ready_to_respond" if stale_card_redirect else "await_user_reply"
+            )
             metadata: dict[str, Any] = {
                 "conversation_mode": "confirm",
                 "agent_runtime_stage_outcome": stage_status,
@@ -924,9 +876,7 @@ async def chat_stream(
                         "stage_outcome": stage_status,
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
-                        **(
-                            {"recovery": recovery} if recovery is not None else {}
-                        ),
+                        **({"recovery": recovery} if recovery is not None else {}),
                     },
                 }
             )
@@ -935,38 +885,14 @@ async def chat_stream(
 
         if cancel_confirmation_action and payload.action is not None:
             assert cancellation_admission is not None
-            confirmation_id = cancellation_admission.confirmation_id
-            confirmation_cancelled = {
-                "confirmation_id": confirmation_id,
-            }
-            artifact_event = {
-                "type": "confirmation_cancelled",
-                "confirmation_id": confirmation_id,
-            }
-            metadata: dict[str, Any] = {
-                "conversation_mode": "confirm",
-                "agent_runtime_stage_outcome": "ready_to_respond",
-                "chat_action": persisted_chat_action(payload),
-                "artifact_event": artifact_event,
-            }
-            assistant_message = lifecycle_hooks.complete(
-                content="",
-                metadata=metadata,
-                settle_usage=None,
+            _, final_payload = complete_confirmation_cancellation(
+                payload=payload,
+                admission=cancellation_admission,
+                lifecycle_hooks=lifecycle_hooks,
             )
             record_control_exit("approval", "finished")
             persist_turn_evidence()
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": "",
-                        "message_id": assistant_message.id,
-                        "confirmation_cancelled": confirmation_cancelled,
-                    },
-                }
-            )
+            yield sse_data({"type": "final", "payload": final_payload})
             yield sse_done()
             return
 
@@ -1058,7 +984,10 @@ async def chat_stream(
 
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
-                    confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
+                    confirmation_id=confirmation_id_for_runtime_card(
+                        runtime_result,
+                        new_id=api_state.store.new_id,
+                    ),
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
                 )
@@ -1084,7 +1013,7 @@ async def chat_stream(
                 run = None
                 result_action_run = None
                 saved_strategy_id_for_naming: str | None = None
-                result_action_type = _result_action_request_type(runtime_result)
+                result_action_type = result_action_request_type(runtime_result)
                 if (
                     result_action_type is None
                     and payload.action is not None
@@ -1169,7 +1098,7 @@ async def chat_stream(
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
-                            assistant_text = _missing_result_action_run_message(
+                            assistant_text = missing_result_action_run_message(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
@@ -1470,8 +1399,7 @@ async def chat_stream(
                 "recoverable_failed",
                 (
                     str(runtime_diagnostics.get("code"))
-                    if runtime_diagnostics is not None
-                    and runtime_diagnostics.get("code")
+                    if runtime_diagnostics is not None and runtime_diagnostics.get("code")
                     else failure_code
                 ),
             )
