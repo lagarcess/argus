@@ -229,6 +229,55 @@ def test_measurement_outcome_keeps_requested_effective_and_reason_independent() 
     assert harness.typed_expectation_failures(case=case, outcome=outcome) == []
 
 
+def test_strategy_transition_expectations_assert_typed_rules_not_prose() -> None:
+    rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    case = harness.EvalCase(
+        id="issue-270-typed-rule",
+        category="messy_english",
+        prompt="Use a 50/200 SMA crossover with SPY as benchmark.",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            requested_strategy_template="moving_average_crossover",
+            strategy_type="signal_strategy",
+            entry_rule=rule,
+            benchmark_symbol="SPY",
+        ),
+    )
+    truthful = {
+        "intent": "backtest_execution",
+        "capability_verdict": "executable",
+        "requested_strategy_template": "moving_average_crossover",
+        "strategy_type": "signal_strategy",
+        "entry_rule": rule,
+        "benchmark_symbol": "SPY",
+    }
+
+    assert harness.typed_expectation_failures(case=case, outcome=truthful) == []
+    buy_and_hold = {
+        **truthful,
+        "requested_strategy_template": "buy_and_hold",
+        "strategy_type": "buy_and_hold",
+        "entry_rule": {"type": "start_of_period"},
+    }
+    failures = harness.typed_expectation_failures(
+        case=case,
+        outcome=buy_and_hold,
+    )
+    assert any(item.startswith("requested_strategy_template:") for item in failures)
+    assert any(item.startswith("strategy_type:") for item in failures)
+    assert any(item.startswith("entry_rule:") for item in failures)
+
+
 def test_measurement_comparisons_report_swapped_windows_and_reason_separately() -> None:
     requested = {"start": "2024-01-01", "end": "2024-01-05"}
     effective = {"start": "2024-01-03", "end": "2024-01-05"}

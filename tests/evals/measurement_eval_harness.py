@@ -80,7 +80,11 @@ class TypedExpectations:
     capability_verdict: str
     assets: tuple[str, ...] = ()
     asset_class: str | None = None
+    requested_strategy_template: str | None = None
     strategy_type: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     date_range: dict[str, str] | str | None = None
     requested_date_range: dict[str, str] | str | None = None
     effective_date_range: dict[str, str] | str | None = None
@@ -281,11 +285,20 @@ def typed_expectation_failures(
         _compare("assets", list(expected.assets), outcome.get("assets"), failures)
     _compare("asset_class", expected.asset_class, outcome.get("asset_class"), failures)
     _compare(
+        "requested_strategy_template",
+        expected.requested_strategy_template,
+        outcome.get("requested_strategy_template"),
+        failures,
+    )
+    _compare(
         "strategy_type",
         expected.strategy_type,
         outcome.get("strategy_type"),
         failures,
     )
+    _compare("entry_rule", expected.entry_rule, outcome.get("entry_rule"), failures)
+    _compare("exit_rule", expected.exit_rule, outcome.get("exit_rule"), failures)
+    _compare("rule_spec", expected.rule_spec, outcome.get("rule_spec"), failures)
     if expected.date_range is not None:
         _compare_date_range(
             "date_range",
@@ -617,7 +630,11 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             capability_verdict=str(expected["capability_verdict"]),
             assets=tuple(expected.get("assets") or ()),
             asset_class=expected.get("asset_class"),
+            requested_strategy_template=expected.get("requested_strategy_template"),
             strategy_type=expected.get("strategy_type"),
+            entry_rule=expected.get("entry_rule"),
+            exit_rule=expected.get("exit_rule"),
+            rule_spec=expected.get("rule_spec"),
             date_range=expected.get("date_range"),
             requested_date_range=expected.get("requested_date_range"),
             effective_date_range=expected.get("effective_date_range"),
@@ -825,8 +842,12 @@ def _typed_outcome(
         ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
+        "requested_strategy_template": strategy.get("requested_strategy_template"),
         "strategy_type": launch_payload.get("strategy_type")
         or strategy.get("strategy_type"),
+        "entry_rule": launch_payload.get("entry_rule") or strategy.get("entry_rule"),
+        "exit_rule": launch_payload.get("exit_rule") or strategy.get("exit_rule"),
+        "rule_spec": launch_payload.get("rule_spec") or strategy.get("rule_spec"),
         "date_range": requested_date_range,
         "requested_date_range": requested_date_range,
         "effective_date_range": effective_date_range,

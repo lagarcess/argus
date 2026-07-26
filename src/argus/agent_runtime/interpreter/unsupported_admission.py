@@ -100,6 +100,7 @@ def future_performance_capability_clause() -> str:
         "user and without presenting any historical result as a forecast.\n\n"
     )
 
+
 # Byte-identical to the constraint-present audit framing previously inlined in
 # run_field_audits._supported_strategy_capability_conflict_messages.
 CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT = (
@@ -111,12 +112,16 @@ CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT = (
     "selects a supported Alpha strategy or asks for real unsupported "
     "custom logic. Use semantic meaning, not keyword or phrase matching. "
     "Supported Alpha strategy families include buy_and_hold and "
-    "dca_accumulation when the user is only asking to test holding or "
-    "recurring fixed-dollar buys over a period. A plain performance, "
+    "dca_accumulation for holding or recurring fixed-dollar buys, plus "
+    "registry-backed signal_strategy requests when their typed executable "
+    "signal rules are complete. A plain "
+    "performance, "
     "return, or benchmark comparison between one primary asset and a "
     "reference asset over a stated window is a supported buy_and_hold "
     "comparison with comparison_baseline; it is not unsupported custom "
     "strategy logic unless the user adds a separate unsupported rule. "
+    "Likewise, comparison_baseline on a complete supported signal strategy is "
+    "only its benchmark; it does not request a second buy-and-hold strategy. "
     "Keep the unsupported "
     "constraint when the current message adds an extra unsupported entry "
     "condition, exit condition, fundamental rule, sentiment/news/event "
@@ -507,9 +512,7 @@ def future_performance_admission_result(
     constraint = UnsupportedConstraint(
         category=FUTURE_PERFORMANCE_CATEGORY,
         raw_value=str(
-            horizon.get("evidence")
-            or decision.user_goal_summary
-            or "future performance"
+            horizon.get("evidence") or decision.user_goal_summary or "future performance"
         ),
         explanation=_FUTURE_PERFORMANCE_EXPLANATION,
         simplification_options=contract.get_simplification_options(
@@ -583,10 +586,7 @@ def strategy_route_admission_result(
     if decision.requires_clarification and not has_unsupported_verdict:
         return None
     confirmation_patch = dict(stage_patch)
-    if (
-        assistant_response
-        and "artifact_assumption_edit_planned" in decision.reason_codes
-    ):
+    if assistant_response and "artifact_assumption_edit_planned" in decision.reason_codes:
         confirmation_patch["assistant_response"] = assistant_response
     return admitted_or_blocked_confirmation_result(
         decision=decision,
