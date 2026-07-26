@@ -410,6 +410,46 @@ def strategy_from_failed_launch_payload(payload: dict[str, Any]) -> StrategySumm
     return strategy
 
 
+def strategy_from_failed_action_snapshot(
+    payload: dict[str, Any],
+    snapshot: TaskSnapshot | None,
+) -> StrategySummary:
+    strategy = strategy_from_failed_launch_payload(payload)
+    authoritative = (
+        snapshot.pending_strategy_summary if snapshot is not None else None
+    )
+    if authoritative is None:
+        return strategy
+    authoritative_parameters = dict(authoritative.extra_parameters)
+    modeled_cost_fields = [
+        field_name
+        for field_name in ("fee_rate", "slippage")
+        if field_name in authoritative_parameters
+    ]
+    if not modeled_cost_fields:
+        return strategy
+
+    extra_parameters = dict(strategy.extra_parameters)
+    field_provenance = dict(extra_parameters.get("field_provenance") or {})
+    authoritative_provenance = dict(
+        authoritative_parameters.get("field_provenance") or {}
+    )
+    for field_name in modeled_cost_fields:
+        extra_parameters[field_name] = authoritative_parameters[field_name]
+        if field_name in authoritative_provenance:
+            field_provenance[field_name] = authoritative_provenance[field_name]
+        else:
+            field_provenance.pop(field_name, None)
+    if field_provenance:
+        extra_parameters["field_provenance"] = field_provenance
+    else:
+        extra_parameters.pop("field_provenance", None)
+    return strategy.model_copy(
+        update={"extra_parameters": extra_parameters},
+        deep=True,
+    )
+
+
 def _retry_strategy_thesis(payload: dict[str, Any], symbols: list[str]) -> str:
     strategy_type = str(payload.get("strategy_type") or "strategy").replace("_", " ")
     asset_text = ", ".join(symbols) if symbols else "the selected asset"

@@ -1918,6 +1918,91 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     assert snapshot.latest_failed_action_reference is None
 
 
+@pytest.mark.asyncio
+async def test_workflow_retry_preserves_explicit_zero_costs_from_pending_strategy() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    workflow = build_workflow(
+        structured_interpreter=RetryApprovalInterpreter(),
+        tool=tool,
+        max_retries=1,
+        checkpointer=MemorySaver(),
+    )
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
+    pending_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold MSFT.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2025-05-13", "end": "2026-05-13"},
+        sizing_mode="capital_amount",
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "fee_rate": 0.0,
+            "slippage": 0.0,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-retry-explicit-zero-costs",
+        message="Can you try again?",
+        fallback_latest_task_snapshot={
+            "pending_strategy_summary": pending_strategy.model_dump(mode="python"),
+            "latest_failed_action_reference": {
+                "artifact_kind": "failed_action",
+                "artifact_id": "failed-action-zero-costs",
+                "artifact_status": "failed",
+                "metadata": {
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "upstream_dependency_error",
+                    "error": "market_data_unavailable",
+                    "retryable": True,
+                },
+            },
+        },
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    assert tool.calls == []
+    strategy = result["confirmation_payload"]["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.0
+    assert strategy["extra_parameters"]["slippage"] == 0.0
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert "_execution_realism" not in result["confirmation_payload"]["launch_payload"]
+
+
 def test_execute_stage_translates_provider_window_limit_to_human_recovery() -> None:
     tool = StubBacktestTool(
         responses=[

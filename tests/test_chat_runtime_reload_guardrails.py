@@ -4171,6 +4171,84 @@ def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) 
     assert reference.metadata["launch_payload"] == launch_payload
 
 
+def test_failed_action_reload_keeps_explicit_zero_cost_pending_strategy() -> None:
+    from argus.api.chat.recovery import failed_action_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The run failed, but the idea is still available to retry.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold MSFT.",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2025-05-13",
+                        "end": "2026-05-13",
+                    },
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "comparison_baseline": "SPY",
+                    "extra_parameters": {
+                        "fee_rate": 0.0,
+                        "slippage": 0.0,
+                        "field_provenance": {
+                            "fee_rate": "explicit_user",
+                            "slippage": "explicit_user",
+                        },
+                    },
+                }
+            },
+            "failed_action": {
+                "artifact_id": "failed-zero-cost-run",
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    fallback = failed_action_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.latest_failed_action_reference is not None
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.extra_parameters["fee_rate"] == 0.0
+    assert pending.extra_parameters["slippage"] == 0.0
+    assert pending.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
 def test_structured_retry_action_after_reload_carries_failed_action_reference(
     monkeypatch,
 ) -> None:
