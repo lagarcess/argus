@@ -20,7 +20,6 @@ from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.main import app
 from argus.domain import backtest_admission
 from argus.domain.store import utcnow
-from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 from argus.llm.openrouter import (
     clear_openrouter_route_receipts,
     invoke_openrouter_json_schema,
@@ -71,11 +70,16 @@ class _MemoryBacktestGateway:
     def get_or_create_mock_user(self):
         return api_state.store.get_or_create_dev_user()
 
-    def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
+    def admit_backtest_job(
+        self,
+        *,
+        allowance_limits: list[dict[str, object]] | None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         outcome = backtest_admission.admit_backtest_job_memory(
             api_state.store,
             **kwargs,
-            allowance_limits=list(SIMULATION_ALLOWANCE_LIMITS),
+            allowance_limits=allowance_limits,
         )
         return {
             "decision": outcome.kind,
