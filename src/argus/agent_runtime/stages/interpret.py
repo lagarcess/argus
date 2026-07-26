@@ -25,7 +25,7 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.discovery import discovery_stage_result_if_applicable
+from argus.agent_runtime.discovery import discovery_stage_result_for
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
@@ -105,7 +105,9 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _format_market_mover_symbol,
     _join_context_symbols,
     _LiveContextCuriosityFacts,
+    _compose_unhandled_conversation_answer,
     _llm_composition_unavailable_recovery_answer,
+    _unhandled_response_recovery_if_needed,
     _market_movers_packet_fact_text,
     _market_movers_packet_symbols,
     _mentioned_packet_symbols,
@@ -1078,13 +1080,8 @@ async def _stage_result_from_interpretation(
     )
     if retry_result is not None:
         return retry_result
-    discovery_result = await discovery_stage_result_if_applicable(
-        decision=decision,
-        current_user_message=state.current_user_message,
-        language=(
-            interpretation.detected_user_language or user.language_preference
-        ),
-        discovery_allowance_available=state.discovery_allowance_available,
+    discovery_result = await discovery_stage_result_for(
+        interpretation=interpretation, decision=decision, state=state, user=user
     )
     if discovery_result is not None:
         return discovery_result
@@ -2164,27 +2161,6 @@ async def _educational_answer_recovery_if_needed(
     return _llm_composition_unavailable_recovery_answer(language=language)
 
 
-async def _unhandled_response_recovery_if_needed(
-    *,
-    semantic_turn_act: SemanticTurnAct | None,
-    expects_strategy_route: bool,
-    requires_clarification: bool,
-    assistant_response: str | None,
-    current_user_message: str,
-    language: str,
-) -> str | None:
-    if expects_strategy_route or requires_clarification or assistant_response:
-        return None
-    composed = await _compose_unhandled_conversation_answer(
-        semantic_turn_act=semantic_turn_act,
-        current_user_message=current_user_message,
-        language=language,
-    )
-    if composed:
-        return composed
-    return _llm_composition_unavailable_recovery_answer(language=language)
-
-
 async def _compose_general_educational_answer(
     *,
     current_user_message: str,
@@ -2202,54 +2178,6 @@ async def _compose_general_educational_answer(
                 "concise, avoid report tone, do not name data vendors, do not imply "
                 "live news coverage, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
-            ),
-        },
-        {"role": "user", "content": current_user_message},
-    ]
-    try:
-        response = await invoke_openrouter_chat_completion(
-            task="chat_composer",
-            messages=messages,
-        )
-    except Exception:
-        return None
-    cleaned = str(response or "").strip()
-    return cleaned or None
-
-
-async def _compose_unhandled_conversation_answer(
-    *,
-    semantic_turn_act: SemanticTurnAct | None,
-    current_user_message: str,
-    language: str = "en",
-) -> str | None:
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are Argus, a chat-first investing experimentation assistant. "
-                "The runtime has no executable strategy, no clarification contract, "
-                "and no user-facing answer for this turn. "
-                f"{response_language_instruction(language)} "
-                "Recover by answering in warm, plain language. Do not use report tone. "
-                "Do not name data "
-                "vendors, imply live market-news coverage, invent current facts, "
-                "or give investment advice. Preserve continuity of exploration by "
-                "offering one nearby historical experiment or recoverable next step "
-                "from the supported experiment paths. Do not suggest live screens, "
-                "feeds, rankings, sector screens, filter pipelines, volume-surge "
-                "tests, event-driven execution, or macro data as direct trading "
-                "signals."
-            ),
-        },
-        {
-            "role": "system",
-            "content": f"Semantic turn act: {semantic_turn_act or 'unspecified'}",
-        },
-        {
-            "role": "system",
-            "content": (
-                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},

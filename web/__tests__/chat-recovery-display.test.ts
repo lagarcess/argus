@@ -6,6 +6,7 @@ import {
   coverageRecoveryActionsFromMetadata,
   noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  recoveryDisplayFromRecoveryState,
   recoveryDisplayText,
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
@@ -761,5 +762,30 @@ describe("chat recovery display", () => {
 
       expect(esKeys).toEqual(enKeys);
     }
+  });
+});
+
+describe("recoveryDisplayFromRecoveryState llm_generated prose ownership", () => {
+  test("llm_generated recovery keeps the voiced prose as the display owner", () => {
+    expect(
+      recoveryDisplayFromRecoveryState({
+        code: "discovery_search_failed",
+        retryable: true,
+        prompt_source: "llm_generated",
+      }),
+    ).toBeNull();
+  });
+
+  test("typed fallback recovery still renders from the localized code", () => {
+    expect(
+      recoveryDisplayFromRecoveryState({
+        code: "discovery_search_failed",
+        retryable: true,
+      }),
+    ).toEqual({
+      kind: "recovery_code",
+      code: "discovery_search_failed",
+      values: undefined,
+    });
   });
 });

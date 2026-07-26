@@ -182,6 +182,11 @@ class ChatRequestAdmission:
     def runtime_action_context(self) -> dict[str, Any] | None:
         if self.payload.action is None:
             return None
+        if self.payload.action.type == "select_discovery_candidate":
+            # Discovery selections are provenance-only: the turn text carries
+            # the full meaning and the runtime interprets it as ordinary
+            # language; chat_action metadata persists for transcript chips.
+            return None
         persisted_action = (
             self.request_message_record.metadata.get("chat_action")
             if self.request_message_record is not None

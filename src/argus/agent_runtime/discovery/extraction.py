@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from loguru import logger
+
 from argus.agent_runtime.discovery.contracts import DiscoveryExtraction
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.domain.discovery_search import SearchResultPacket
@@ -48,12 +50,23 @@ async def extract_candidates(
             "content": f"Request: {target}\n\nSources:\n\n{source_blocks}",
         },
     ]
-    return await invoke_openrouter_json_schema(
-        task="discovery_extraction",
-        messages=messages,
-        schema_model=DiscoveryExtraction,
-        schema_name="discovery_extraction",
-    )
+    # A raise here would escape the discovery stage into generic runtime
+    # failure and lose the already-paid Search attempt's usage evidence; the
+    # composer maps None to typed discovery_search_failed recovery instead.
+    try:
+        return await invoke_openrouter_json_schema(
+            task="discovery_extraction",
+            messages=messages,
+            schema_model=DiscoveryExtraction,
+            schema_name="discovery_extraction",
+        )
+    except Exception as exc:
+        logger.warning(
+            "Discovery extraction call failed",
+            error=str(exc),
+            failure_classification="discovery_extraction_unavailable",
+        )
+        return None
 
 
 def _target_description(request: AssetDiscoveryRequest) -> str:

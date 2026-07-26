@@ -1590,7 +1590,7 @@ def test_unhandled_broad_turn_recovers_with_chat_tier_instead_of_blank_response(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        "argus.agent_runtime.stages.interpret_internal.answer_composition.invoke_openrouter_chat_completion",
         _fake_chat_completion,
     )
     response = StructuredInterpretation(

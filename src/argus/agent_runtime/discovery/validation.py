@@ -67,21 +67,29 @@ def validated_candidates(
         canonical = str(canonical_symbol).upper()
         if canonical in seen_symbols:
             continue
+        valid_source_indices = tuple(
+            index
+            for index in candidate.source_indices
+            if isinstance(index, int) and 0 <= index < result_count
+        )
+        # Grounded means source-backed: a resolvable ticker with no surviving
+        # source evidence must not become selectable.
+        if not valid_source_indices:
+            _note_unverified(unverified, display_name or symbol_guess)
+            continue
         seen_symbols.add(canonical)
+        # The resolver owns the actionable identity. The extracted name is
+        # untrusted and could pair a real ticker with the wrong company.
         resolved_name = _bounded_text(
             str(getattr(resolved, "name", "") or ""), MAX_CANDIDATE_NAME_CHARS
         )
         validated.append(
             ValidatedCandidate(
                 symbol=canonical,
-                name=display_name or resolved_name or canonical,
+                name=resolved_name or canonical,
                 asset_class=asset_class,
                 reason_text=_bounded_text(candidate.reason_text, MAX_REASON_CHARS),
-                source_indices=tuple(
-                    index
-                    for index in candidate.source_indices
-                    if isinstance(index, int) and 0 <= index < result_count
-                ),
+                source_indices=valid_source_indices,
             )
         )
         if len(validated) >= max_candidates:

@@ -14,6 +14,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -952,24 +953,8 @@ class OpenRouterStructuredInterpreter:
             "questions, result_followup for questions about the latest completed run, "
             "retry_failed_action when the user asks to try again, retry, rerun the same "
             "one, or otherwise repeat the latest failed run without changing the idea, "
-            "unsupported_request when the user asks for unsupported capabilities, "
-            "and asset_discovery when the user explicitly asks Argus to find, "
-            "discover, list, or suggest which assets exist to test (set intent "
-            "to conversation_followup for these turns) — by category "
-            "('what cybersecurity stocks could I test?'), by peer similarity "
-            "('find companies similar to Nvidia'), or for comparison candidates "
-            "('what else in Costco's category could I compare?'), in any language. "
-            "For asset_discovery turns, always fill the asset_discovery payload: "
-            "relationship (category, peer, or comparison), category_description "
-            "with the plain category phrase when one exists, anchor_symbols with "
-            "known tickers the user is anchoring on, and asset_class_hint when "
-            "clear. Leave candidate_strategy_draft empty on asset_discovery "
-            "turns; the user is asking who exists, not yet configuring a test. "
-            "Ordinary 'what should I try next?' follow-ups stay result_followup "
-            "with next_experiment; questions about what Argus supports stay "
-            "educational_question; a direct request to test a named asset is "
-            "never asset_discovery. "
-            "When semantic_turn_act is result_followup, set result_followup_focus to "
+            + DISCOVERY_ACT_GUIDANCE
+            + "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
             "peak_date, peak_value, result_card_fact, what_tested, "
             "next_experiment, assumptions, or general. Use peak_date when the user "

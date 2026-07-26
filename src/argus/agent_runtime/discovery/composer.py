@@ -31,6 +31,25 @@ from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 
+async def discovery_stage_result_for(
+    *,
+    interpretation: Any,
+    decision: InterpretDecision,
+    state: Any,
+    user: Any,
+) -> StageResult | None:
+    """Stage-facing wrapper: owns turn-language and allowance plumbing."""
+    return await discovery_stage_result_if_applicable(
+        decision=decision,
+        current_user_message=state.current_user_message,
+        language=(
+            getattr(interpretation, "detected_user_language", None)
+            or user.language_preference
+        ),
+        discovery_allowance_available=state.discovery_allowance_available,
+    )
+
+
 async def discovery_stage_result_if_applicable(
     *,
     decision: InterpretDecision,
@@ -224,11 +243,19 @@ async def _recovery_result(
         language=language,
         unverified_names=unverified_names or [],
     )
-    # Voiced recovery is the user-facing prose (llm_generated pattern). Only
-    # the deterministic fallback carries the typed recovery object, which the
-    # frontend then renders from its localized catalogs.
+    # The typed recovery object persists in both branches so codes such as a
+    # retryable discovery_search_failed survive into metadata and analytics.
+    # prompt_source=llm_generated tells clients the voiced prose owns display;
+    # without it (deterministic fallback), clients render localized copy from
+    # the code.
     assistant_response = voiced or recovery_message(code, retryable=retryable)
     stage_patch: dict[str, Any] = {"assistant_response": assistant_response}
+    if voiced:
+        stage_patch["recovery"] = {
+            "code": code,
+            "retryable": retryable,
+            "prompt_source": "llm_generated",
+        }
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(

@@ -116,18 +116,16 @@ class TestDiscoveryRouteFlagOff:
     def test_detected_turn_language_reaches_discovery_composer(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from argus.agent_runtime.stages import interpret as interpret_module
+        from argus.agent_runtime.discovery import composer as composer_module
 
         captured: dict[str, Any] = {}
-        original = interpret_module.discovery_stage_result_if_applicable
+        original = composer_module.discovery_stage_result_if_applicable
 
         async def _spy(**kwargs: Any):
             captured["language"] = kwargs.get("language")
             return await original(**kwargs)
 
-        monkeypatch.setattr(
-            interpret_module, "discovery_stage_result_if_applicable", _spy
-        )
+        monkeypatch.setattr(composer_module, "discovery_stage_result_if_applicable", _spy)
         _run(
             message="¿Qué acciones de ciberseguridad podría probar?",
             response=_discovery_interpretation(language="es-419"),

@@ -314,3 +314,37 @@ class TestFlagOnPipeline:
         result = await _run(_decision(act="result_followup"))
         assert result is None
         assert provider.calls == []
+
+
+class TestVoicedRecoveryMetadata:
+    @pytest.mark.asyncio()
+    async def test_voiced_recovery_keeps_typed_code_with_llm_generated_source(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+
+        async def _voiced_recovery(**kwargs: Any) -> str | None:
+            return "I could not reach current sources just now; ask again soon."
+
+        flag_on.setattr(composer_module, "_voiced_discovery_recovery", _voiced_recovery)
+        result = await _run(_decision())
+        patch = result.patch
+        assert patch["assistant_response"].startswith("I could not reach")
+        assert patch["recovery"] == {
+            "code": "discovery_search_failed",
+            "retryable": True,
+            "prompt_source": "llm_generated",
+        }
+
+    @pytest.mark.asyncio()
+    async def test_fallback_recovery_carries_typed_code_without_llm_source(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision())
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_search_failed"
+        assert patch["recovery"]["retryable"] is True
+        assert patch["recovery"].get("prompt_source") is None

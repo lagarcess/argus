@@ -186,3 +186,38 @@ class TestValidatedCandidates:
         )
         assert [item.symbol for item in validated] == ["CRWD"]
         assert len(unverified) == 1
+
+
+class TestReviewHardening:
+    def test_candidate_name_is_resolver_owned_not_extracted(self) -> None:
+        extraction = DiscoveryExtraction(
+            candidates=[
+                _candidate("AAPL", name="CrowdStrike", sources=[0]),
+            ]
+        )
+        validated, _ = validated_candidates(
+            extraction,
+            packet=_packet(),
+            resolve=_resolver({"AAPL": "equity"}),
+            max_candidates=5,
+        )
+        assert validated[0].symbol == "AAPL"
+        assert validated[0].name == "AAPL Inc"
+        assert "CrowdStrike" not in validated[0].name
+
+    def test_candidate_without_source_evidence_is_not_selectable(self) -> None:
+        extraction = DiscoveryExtraction(
+            candidates=[
+                _candidate("CRWD", sources=[]),
+                _candidate("PANW", sources=[9, -3]),
+                _candidate("CSCO", sources=[1]),
+            ]
+        )
+        validated, unverified = validated_candidates(
+            extraction,
+            packet=_packet(),
+            resolve=_resolver({"CRWD": "equity", "PANW": "equity", "CSCO": "equity"}),
+            max_candidates=5,
+        )
+        assert [item.symbol for item in validated] == ["CSCO"]
+        assert len(unverified) == 2

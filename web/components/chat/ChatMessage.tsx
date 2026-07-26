@@ -335,7 +335,18 @@ export default function ChatMessage({
                     <button
                       key={candidate.symbol}
                       type="button"
-                      onClick={() => onAction?.({ label: sendText, value: sendText })}
+                      onClick={() =>
+                        onAction?.({
+                          type: "select_discovery_candidate",
+                          label: sendText,
+                          labelKey: "chat.discovery_results.test_candidate",
+                          value: sendText,
+                          payload: {
+                            symbol: candidate.symbol,
+                            name: candidate.name,
+                          },
+                        })
+                      }
                       title={candidate.reason_text || candidate.name}
                       aria-label={sendText}
                       className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
