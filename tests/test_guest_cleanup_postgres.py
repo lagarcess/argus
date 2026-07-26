@@ -1304,6 +1304,75 @@ def test_cleanup_removes_orphan_identity_feedback() -> None:
         connection.rollback()
 
 
+def test_poisoned_orphan_does_not_roll_back_healthy_orphan_cleanup() -> None:
+    with _connect(autocommit=False) as connection:
+        poisoned_user_id = str(uuid.uuid4())
+        healthy_user_id = str(uuid.uuid4())
+        source_user_id = str(uuid.uuid4())
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                "insert into auth.users (id,email,is_anonymous,created_at)"
+                " values (%s,null,true,%s)",
+                (
+                    (
+                        poisoned_user_id,
+                        datetime.now(timezone.utc) - timedelta(minutes=30),
+                    ),
+                    (
+                        healthy_user_id,
+                        datetime.now(timezone.utc) - timedelta(minutes=20),
+                    ),
+                    (
+                        source_user_id,
+                        datetime.now(timezone.utc) - timedelta(minutes=10),
+                    ),
+                ),
+            )
+            cursor.executemany(
+                "insert into public.profiles (id,email) values (%s,null)",
+                (
+                    (poisoned_user_id,),
+                    (healthy_user_id,),
+                    (source_user_id,),
+                ),
+            )
+            cursor.execute(
+                "insert into public.guest_workspaces"
+                " (user_id,status,created_at,expires_at,claimed_by,claimed_at)"
+                " values (%s,'claimed',now(),now()+interval '7 days',%s,now())",
+                (source_user_id, poisoned_user_id),
+            )
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select user_id::text,conversation_id::text,auth_deleted,"
+                " cleanup_reason"
+                " from public.claim_expired_guest_workspaces(2,false)",
+            )
+            rows = cursor.fetchall()
+        selected = {
+            row[0]: (row[2], row[3])
+            for row in rows
+            if row[0] in {poisoned_user_id, healthy_user_id}
+        }
+
+        assert selected == {
+            healthy_user_id: (True, "orphan_identity"),
+        }
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (poisoned_user_id,),
+            )
+            assert cursor.fetchone()[0] == 1
+            cursor.execute(
+                "select count(*) from auth.users where id=%s",
+                (healthy_user_id,),
+            )
+            assert cursor.fetchone()[0] == 0
+        connection.rollback()
+
+
 def test_cleanup_orphan_with_foreign_relational_reference_fails_closed() -> None:
     with _connect(autocommit=False) as connection:
         orphan_user_id = str(uuid.uuid4())

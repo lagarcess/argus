@@ -329,6 +329,61 @@ def test_cancel_confirmation_bypasses_quota_and_settles_zero_units(mock_gateway)
     assert assistant_calls[0].kwargs.get("settle_usage") is None
 
 
+@pytest.mark.parametrize("confirmation_id", [None, "different-confirmation"])
+def test_cancel_confirmation_rejects_unverified_identity_without_writing(
+    mock_gateway,
+    confirmation_id,
+):
+    mock_gateway.list_messages.return_value = [
+        Message(
+            id="confirmation-message",
+            conversation_id="conv-1",
+            role="assistant",
+            content="Ready to run.",
+            metadata={
+                "confirmation_payload": {
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "strategy_thesis": "Buy and hold Apple.",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                        "date_range": "past year",
+                    },
+                    "optional_parameters": {},
+                    "launch_payload": {},
+                    "validation": {"status": "ready_to_run", "executable": True},
+                },
+                "confirmation_card": {
+                    "confirmation_id": "active-confirmation",
+                },
+            },
+            created_at=utcnow(),
+        )
+    ]
+    action_payload = (
+        {} if confirmation_id is None else {"confirmation_id": confirmation_id}
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": "conv-1",
+            "action": {
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "presentation": "confirmation",
+                "payload": action_payload,
+            },
+            "language": "en",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "confirmation_required"
+    mock_gateway.create_message.assert_not_called()
+
+
 def test_gateway_owns_an_atomic_admission_operation():
     assert hasattr(SupabaseGateway, "admit_backtest_job"), (
         "Simulation charging must compose with one database-owned admission "
