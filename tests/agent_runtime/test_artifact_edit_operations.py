@@ -92,6 +92,75 @@ def test_rsi_threshold_edits_are_typed_artifact_operations():
     assert resolved.unsupported == []
 
 
+def test_moving_average_family_edit_is_a_typed_artifact_operation():
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    resolved = apply_edit_operations(
+        [
+            EditOperation(
+                op="replace",
+                target="strategy_family",
+                strategy_template="moving_average_crossover",
+                entry_rule=entry_rule,
+            )
+        ]
+    )
+
+    assert resolved.requested_strategy_template == "moving_average_crossover"
+    assert resolved.strategy_type == "signal_strategy"
+    assert resolved.entry_rule == entry_rule
+    assert resolved.exit_rule == {**entry_rule, "direction": "bearish"}
+    assert resolved.rule_spec is not None
+    assert resolved.applied == ["replace.strategy_family"]
+    assert resolved.unsupported == []
+
+
+@pytest.mark.parametrize(
+    "entry_rule",
+    [
+        None,
+        {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 200,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bullish",
+        },
+        {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+            "slow_indicator": "sma",
+            "slow_period": 200,
+            "direction": "sideways",
+        },
+    ],
+)
+def test_invalid_moving_average_family_edit_fails_closed(entry_rule):
+    resolved = apply_edit_operations(
+        [
+            EditOperation(
+                op="replace",
+                target="strategy_family",
+                strategy_template="moving_average_crossover",
+                entry_rule=entry_rule,
+            )
+        ]
+    )
+
+    assert resolved.requested_strategy_template is None
+    assert resolved.strategy_type is None
+    assert resolved.applied == []
+    assert resolved.unsupported == ["replace.strategy_family"]
+
+
 def test_unsupported_operation_is_named_not_dropped():
     resolved = apply_edit_operations(
         [
@@ -167,9 +236,7 @@ def test_unresolvable_slash_pair_still_splits_into_resolved_legs():
     resolved = apply_edit_operations(
         [EditOperation(op="replace", target="asset", symbols=["AAPL/MSFT"])],
         current_asset_universe=["TSLA"],
-        asset_symbol_resolver=lambda raw: (
-            None if "/" in raw else raw.strip().upper()
-        ),
+        asset_symbol_resolver=lambda raw: (None if "/" in raw else raw.strip().upper()),
     )
 
     assert resolved.asset_universe == ["AAPL", "MSFT"]
@@ -220,6 +287,4 @@ async def test_planner_keeps_company_name_asset_remove_for_later_resolution(
     assert [
         (operation.op, operation.target, operation.symbols)
         for operation in plan.operations
-    ] == [
-        ("remove", "asset", ["Microsoft"])
-    ]
+    ] == [("remove", "asset", ["Microsoft"])]

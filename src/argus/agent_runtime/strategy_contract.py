@@ -140,6 +140,21 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
 
 def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     payload = _strategy_payload(strategy)
+    canonical = executable_strategy_type(payload)
+    requested_template = payload.get("requested_strategy_template")
+    requested_capability = (
+        STRATEGY_CAPABILITIES.get(requested_template)
+        if isinstance(requested_template, str)
+        else None
+    )
+    if (
+        requested_template == "moving_average_crossover"
+        and requested_capability is not None
+        and requested_capability.execution_strategy_type == canonical
+    ):
+        return requested_capability.display_name
+    if canonical == "signal_strategy" and _has_structured_moving_average_rule(payload):
+        return STRATEGY_CAPABILITIES["moving_average_crossover"].display_name
     extra_parameters = payload.get("extra_parameters")
     raw_type = (
         extra_parameters.get("raw_strategy_type")
@@ -152,7 +167,6 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
         return "Dip Buying"
     if normalized in {"rsi_threshold", "rsi_mean_reversion"}:
         return "RSI Threshold"
-    canonical = executable_strategy_type(payload)
     thesis_text = " ".join(
         str(value)
         for value in [

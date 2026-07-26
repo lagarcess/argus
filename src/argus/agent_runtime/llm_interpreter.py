@@ -1389,15 +1389,19 @@ def _response_without_ungrounded_symbols(
                 dict.fromkeys([*missing_required_fields, "asset_universe"])
             )
             requires_clarification = True
-    return _response_with_canonical_interpreter_assets(response.model_copy(
-        update={
-            "candidate_strategy_draft": draft,
-            "assistant_response": None,
-            "requires_clarification": requires_clarification,
-            "missing_required_fields": missing_required_fields,
-            "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
-        }
-    ))
+    return _response_with_canonical_interpreter_assets(
+        response.model_copy(
+            update={
+                "candidate_strategy_draft": draft,
+                "assistant_response": None,
+                "requires_clarification": requires_clarification,
+                "missing_required_fields": missing_required_fields,
+                "reason_codes": list(
+                    dict.fromkeys([*response.reason_codes, reason_code])
+                ),
+            }
+        )
+    )
 
 
 def _response_with_mixed_asset_guardrail_from_symbols(
@@ -4094,7 +4098,18 @@ async def _audit_supported_strategy_capability_conflict(
             strategy_type = canonical_strategy_type(
                 response.candidate_strategy_draft.strategy_type
             )
-        if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+        if strategy_type not in {
+            "buy_and_hold",
+            "dca_accumulation",
+            "signal_strategy",
+        }:
+            return None
+        if strategy_type == "signal_strategy" and (
+            executable_strategy_type(
+                response.candidate_strategy_draft.model_dump(mode="python")
+            )
+            != strategy_type
+        ):
             return None
         repaired = _response_with_supported_strategy_capability_conflict_removed(
             response=response,
