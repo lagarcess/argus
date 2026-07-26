@@ -20,6 +20,7 @@ import {
   type ConfirmationFacts,
   type PersistedMessageItem,
 } from "../e2e/support/guest-qa";
+import { guestQaEndpointConfig } from "../e2e/support/guest-qa-endpoints";
 
 const requestedRange = { start: "2025-07-25", end: "2026-07-25" };
 const effectiveRange = { start: "2025-07-25", end: "2026-07-24" };
@@ -71,6 +72,60 @@ const refined = confirmationMessage(
   "confirmation-refined",
   "MSFT",
 );
+
+describe("guest QA isolated endpoint configuration", () => {
+  test("preserves the existing local defaults", () => {
+    expect(guestQaEndpointConfig({})).toEqual({
+      appOrigin: "http://localhost:3000",
+      appPort: 3000,
+      apiOrigin: "http://localhost:8000",
+      apiPort: 8000,
+      apiBase: "http://localhost:8000/api/v1",
+      databaseContainer: "supabase_db_argus-qa",
+    });
+  });
+
+  test("accepts lane-unique loopback ports and database container", () => {
+    expect(
+      guestQaEndpointConfig({
+        ARGUS_GUEST_QA_APP_PORT: "59900",
+        ARGUS_GUEST_QA_API_PORT: "59901",
+        ARGUS_GUEST_QA_DB_CONTAINER:
+          "supabase_db_argus-guest-settlement-proof",
+      }),
+    ).toEqual({
+      appOrigin: "http://localhost:59900",
+      appPort: 59900,
+      apiOrigin: "http://localhost:59901",
+      apiPort: 59901,
+      apiBase: "http://localhost:59901/api/v1",
+      databaseContainer: "supabase_db_argus-guest-settlement-proof",
+    });
+  });
+
+  test("fails closed for malformed ports and unsafe container names", () => {
+    expect(() =>
+      guestQaEndpointConfig({ ARGUS_GUEST_QA_APP_PORT: "0" }),
+    ).toThrow("ARGUS_GUEST_QA_APP_PORT");
+    expect(() =>
+      guestQaEndpointConfig({ ARGUS_GUEST_QA_API_PORT: "8000/path" }),
+    ).toThrow("ARGUS_GUEST_QA_API_PORT");
+    expect(() =>
+      guestQaEndpointConfig({
+        ARGUS_GUEST_QA_APP_PORT: "4100",
+        ARGUS_GUEST_QA_API_PORT: "4100",
+      }),
+    ).toThrow("must be different");
+    expect(() =>
+      guestQaEndpointConfig({ ARGUS_GUEST_QA_API_PORT: "65536" }),
+    ).toThrow("ARGUS_GUEST_QA_API_PORT");
+    expect(() =>
+      guestQaEndpointConfig({
+        ARGUS_GUEST_QA_DB_CONTAINER: "supabase_db_argus-qa; docker rm",
+      }),
+    ).toThrow("ARGUS_GUEST_QA_DB_CONTAINER");
+  });
+});
 
 describe("guest QA strict UTC timestamp comparison", () => {
   test("treats API and Postgres UTC encodings of the same microsecond as equal", () => {
@@ -796,6 +851,10 @@ describe("Checks 6–20 harness guards", () => {
       join(import.meta.dir, "../e2e/guest-experience.global-setup.ts"),
       "utf-8",
     );
+    const preflightSpec = readFileSync(
+      join(import.meta.dir, "../e2e/guest-experience.preflight.spec.ts"),
+      "utf-8",
+    );
     const support = readFileSync(
       join(import.meta.dir, "../e2e/support/guest-qa.ts"),
       "utf-8",
@@ -809,8 +868,13 @@ describe("Checks 6–20 harness guards", () => {
     expect(runner).toContain("list|preflight|entry|authoritative");
     expect(runner).toContain("ARGUS_GUEST_QA_ENTRY=true");
     expect(runner).toContain("NEXT_PUBLIC_MOCK_AUTH=true");
+    expect(runner).toContain("ARGUS_GUEST_QA_SUPABASE_WORKDIR");
+    expect(runner).toContain('supabase status --workdir "$supabase_workdir"');
+    expect(runner).toContain("com.supabase.cli.project");
+    expect(runner).toContain("lsof");
     expect(config).toContain("bun run start");
     expect(config).not.toContain("bun run dev");
+    expect(config).toContain("guestQaEndpointConfig");
     expect(config).toContain(
       'const entry = process.env.ARGUS_GUEST_QA_ENTRY === "true"',
     );
@@ -819,6 +883,8 @@ describe("Checks 6–20 harness guards", () => {
     expect(config).not.toContain(
       '["guest-entry.spec.ts", "guest-experience.spec.ts"]',
     );
+    expect(preflightSpec).not.toContain("http://localhost:3000");
+    expect(preflightSpec).not.toContain("http://localhost:8000");
     expect(globalSetup).toContain(
       'allowMockBrowserAuth: process.env.ARGUS_GUEST_QA_ENTRY === "true"',
     );

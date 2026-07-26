@@ -55,6 +55,22 @@ bash scripts/qa/run-guest-experience-qa.sh preflight
 bash scripts/qa/run-guest-experience-qa.sh entry
 ```
 
+The runner defaults to the repository-local Supabase project and ports
+`3000`/`8000`. When another Argus lane is active, select one lane-owned local
+stack and unused ports without changing those defaults:
+
+```bash
+ARGUS_GUEST_QA_APP_PORT=59900 \
+ARGUS_GUEST_QA_API_PORT=59901 \
+ARGUS_GUEST_QA_SUPABASE_WORKDIR=/absolute/path/to/isolated-worktree \
+ARGUS_GUEST_QA_DB_CONTAINER=supabase_db_isolated-project \
+bash scripts/qa/run-guest-experience-qa.sh preflight
+```
+
+The selected worktree must contain `supabase/config.toml`; its `project_id`
+must match the running database container label. The runner refuses occupied
+ports and never stops an existing listener.
+
 After committing, reset the local Supabase stack and prove zero state before
 the one authorized live run:
 

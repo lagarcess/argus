@@ -13,6 +13,8 @@ import {
   feedbackPrivacy,
   freshGuest,
   guestWorkspaceExpiryIsImmutable,
+  LOCAL_API_BASE,
+  LOCAL_APP_ORIGIN,
   markWorkspaceExpired,
   purgeDisposableQaEvidence,
   seedClaimGraphFromConversation,
@@ -51,9 +53,7 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
     await expect
       .poll(
         async () => {
-          const response = await fetch("http://localhost:3000").catch(
-            () => null,
-          );
+          const response = await fetch(LOCAL_APP_ORIGIN).catch(() => null);
           return response?.status ?? 0;
         },
         { timeout: 5_000, intervals: [100, 250, 500] },
@@ -78,9 +78,7 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
     await expect(
       page.getByText("¿Qué quieres probar?", { exact: true }),
     ).toBeVisible();
-    const response = await fetch(
-      "http://localhost:8000/api/v1/auth/session",
-    );
+    const response = await fetch(`${LOCAL_API_BASE}/auth/session`);
     expect([200, 401]).toContain(response.status);
     expect(monitor.detailSnapshot()).toEqual([]);
     expect(monitor.hostedWrites).toBe(0);
@@ -94,9 +92,9 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
   await expect
     .poll(
       async () => {
-        const response = await fetch(
-          "http://localhost:8000/api/v1/auth/session",
-        ).catch(() => null);
+        const response = await fetch(`${LOCAL_API_BASE}/auth/session`).catch(
+          () => null,
+        );
         return response === null;
       },
       { timeout: 10_000, intervals: [100, 250, 500] },
@@ -407,7 +405,7 @@ test("guest entry without a terminal signal fails within its bounded deadline", 
   test.setTimeout(10_000);
   assertExactLocalCandidate();
   assertZeroState();
-  await page.route("http://localhost:3000/", async (route) => {
+  await page.route(`${LOCAL_APP_ORIGIN}/`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "text/html",

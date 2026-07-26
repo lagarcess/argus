@@ -14,12 +14,16 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { guestQaEndpointConfig } from "./guest-qa-endpoints";
 
 export const REPOSITORY_ROOT = path.resolve(__dirname, "../../..");
-export const LOCAL_APP_ORIGIN = "http://localhost:3000";
-export const LOCAL_API_ORIGIN = "http://localhost:8000";
-export const LOCAL_API_BASE = `${LOCAL_API_ORIGIN}/api/v1`;
-const LOCAL_DB_CONTAINER = "supabase_db_argus-qa";
+const QA_ENDPOINTS = guestQaEndpointConfig();
+export const LOCAL_APP_ORIGIN = QA_ENDPOINTS.appOrigin;
+export const LOCAL_APP_PORT = QA_ENDPOINTS.appPort;
+export const LOCAL_API_ORIGIN = QA_ENDPOINTS.apiOrigin;
+export const LOCAL_API_PORT = QA_ENDPOINTS.apiPort;
+export const LOCAL_API_BASE = QA_ENDPOINTS.apiBase;
+const LOCAL_DB_CONTAINER = QA_ENDPOINTS.databaseContainer;
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
@@ -585,10 +589,10 @@ export function assertExactLocalCandidate(
     "NEXT_PUBLIC_ARGUS_API_URL",
   );
   if (app.origin !== LOCAL_APP_ORIGIN) {
-    throw new Error("Guest QA app origin must be http://localhost:3000");
+    throw new Error(`Guest QA app origin must be ${LOCAL_APP_ORIGIN}`);
   }
   if (`${api.origin}${api.pathname.replace(/\/$/, "")}` !== LOCAL_API_BASE) {
-    throw new Error("Guest QA API must be http://localhost:8000/api/v1");
+    throw new Error(`Guest QA API must be ${LOCAL_API_BASE}`);
   }
   if (options.allowMockBrowserAuth) {
     if (process.env.NEXT_PUBLIC_MOCK_AUTH !== "true") {
@@ -1754,7 +1758,7 @@ export class BackendController {
         "--host",
         "127.0.0.1",
         "--port",
-        "8000",
+        String(LOCAL_API_PORT),
       ],
       {
         cwd: REPOSITORY_ROOT,

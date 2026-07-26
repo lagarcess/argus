@@ -50,12 +50,84 @@ fi
 export ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
 unset ARGUS_QA_APPROVED_SUPABASE_REF || true
 
+app_port="${ARGUS_GUEST_QA_APP_PORT:-3000}"
+api_port="${ARGUS_GUEST_QA_API_PORT:-8000}"
+database_container="${ARGUS_GUEST_QA_DB_CONTAINER:-supabase_db_argus-qa}"
+supabase_workdir="${ARGUS_GUEST_QA_SUPABASE_WORKDIR:-$ROOT_DIR}"
+for port_name in app_port api_port; do
+  port_value="${!port_name}"
+  case "$port_value" in
+    ''|*[!0-9]*)
+      echo "guest QA refused: $port_name must be an integer port" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$port_value" -lt 1 ] || [ "$port_value" -gt 65535 ]; then
+    echo "guest QA refused: $port_name must be between 1 and 65535" >&2
+    exit 1
+  fi
+done
+[ "$app_port" != "$api_port" ] || {
+  echo "guest QA refused: app and API ports must be different" >&2
+  exit 1
+}
+case "$database_container" in
+  supabase_db_[A-Za-z0-9]*)
+    case "$database_container" in *[!A-Za-z0-9_-]*)
+      echo "guest QA refused: unsafe database container name" >&2
+      exit 1
+    esac
+    ;;
+  *)
+    echo "guest QA refused: unsafe database container name" >&2
+    exit 1
+    ;;
+esac
+[ -d "$supabase_workdir" ] || {
+  echo "guest QA refused: Supabase workdir does not exist" >&2
+  exit 1
+}
+[ -f "$supabase_workdir/supabase/config.toml" ] || {
+  echo "guest QA refused: Supabase workdir has no supabase/config.toml" >&2
+  exit 1
+}
+supabase_project_id="$(
+  sed -n 's/^project_id = "\([^"]*\)"/\1/p' \
+    "$supabase_workdir/supabase/config.toml" |
+    head -1
+)"
+[ -n "$supabase_project_id" ] || {
+  echo "guest QA refused: Supabase project_id is missing" >&2
+  exit 1
+}
+[ "$database_container" = "supabase_db_$supabase_project_id" ] || {
+  echo "guest QA refused: database container does not match Supabase workdir" >&2
+  exit 1
+}
+container_identity="$(
+  docker inspect \
+    -f '{{ index .Config.Labels "com.supabase.cli.project" }}|{{.State.Running}}' \
+    "$database_container" 2>/dev/null || true
+)"
+[ "$container_identity" = "$supabase_project_id|true" ] || {
+  echo "guest QA refused: selected Supabase database is not the running workdir project" >&2
+  exit 1
+}
+export ARGUS_GUEST_QA_APP_PORT="$app_port"
+export ARGUS_GUEST_QA_API_PORT="$api_port"
+export ARGUS_GUEST_QA_DB_CONTAINER="$database_container"
+export ARGUS_GUEST_QA_SUPABASE_WORKDIR="$supabase_workdir"
+
 # Load live provider/model credentials, then replace every database/Auth target
 # with the disposable local Supabase stack before a service or browser starts.
 # shellcheck disable=SC1091
 source .github/argus-env.sh
 argus_load_root_env
-eval "$(supabase status -o env)"
+export ARGUS_GUEST_QA_APP_PORT="$app_port"
+export ARGUS_GUEST_QA_API_PORT="$api_port"
+export ARGUS_GUEST_QA_DB_CONTAINER="$database_container"
+export ARGUS_GUEST_QA_SUPABASE_WORKDIR="$supabase_workdir"
+eval "$(supabase status --workdir "$supabase_workdir" -o env)"
 
 for required in API_URL ANON_KEY SERVICE_ROLE_KEY DB_URL JWT_SECRET; do
   value="${!required:-}"
@@ -101,14 +173,14 @@ export ARGUS_MOCK_AUTH=false
 export ARGUS_GUEST_ACCESS_ENABLED=true
 export ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
 export ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
-export ARGUS_CORS_ALLOW_ORIGINS=http://localhost:3000
+export ARGUS_CORS_ALLOW_ORIGINS="http://localhost:$app_port"
 export ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false
 export ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false
 export ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false
 
-export ARGUS_APP_ORIGIN=http://localhost:3000
-export PLAYWRIGHT_BASE_URL=http://localhost:3000
-export NEXT_PUBLIC_ARGUS_API_URL=http://localhost:8000/api/v1
+export ARGUS_APP_ORIGIN="http://localhost:$app_port"
+export PLAYWRIGHT_BASE_URL="http://localhost:$app_port"
+export NEXT_PUBLIC_ARGUS_API_URL="http://localhost:$api_port/api/v1"
 export NEXT_PUBLIC_MOCK_AUTH=false
 export NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
 export NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN=argus-local-browser-qa
@@ -122,6 +194,19 @@ export NEXT_PUBLIC_POSTHOG_KEY=
 unset NEXT_PUBLIC_POSTHOG_HOST || true
 unset POSTHOG_PROJECT_TOKEN POSTHOG_REGION POSTHOG_HOST \
   ARGUS_POSTHOG_TIMEOUT_SECONDS || true
+
+if [ "$mode" != "list" ]; then
+  command -v lsof >/dev/null || {
+    echo "guest QA refused: lsof is required to prove ports are unused" >&2
+    exit 1
+  }
+  for port_value in "$app_port" "$api_port"; do
+    if lsof -nP -iTCP:"$port_value" -sTCP:LISTEN -t | grep -q .; then
+      echo "guest QA refused: selected local port $port_value is already listening" >&2
+      exit 1
+    fi
+  done
+fi
 
 build_frontend() {
   (cd web && bun run build)

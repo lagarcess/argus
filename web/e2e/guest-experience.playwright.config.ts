@@ -1,10 +1,12 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { guestQaEndpointConfig } from "./support/guest-qa-endpoints";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const preflight = process.env.ARGUS_GUEST_QA_PREFLIGHT === "true";
 const entry = process.env.ARGUS_GUEST_QA_ENTRY === "true";
 const runId = `${Date.now()}-${process.pid}`;
+const { appOrigin, appPort } = guestQaEndpointConfig();
 
 export default defineConfig({
   testDir: path.join(repositoryRoot, "web/e2e"),
@@ -31,7 +33,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: appOrigin,
     headless: false,
     trace: "off",
     video: "off",
@@ -39,9 +41,9 @@ export default defineConfig({
     serviceWorkers: "block",
   },
   webServer: {
-    command: "bun run start --hostname 127.0.0.1 --port 3000",
+    command: `bun run start --hostname 127.0.0.1 --port ${appPort}`,
     cwd: path.join(repositoryRoot, "web"),
-    url: "http://localhost:3000",
+    url: appOrigin,
     reuseExistingServer: false,
     timeout: 120_000,
     stdout: "ignore",
