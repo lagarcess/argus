@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
 SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
-AGENT_RUNTIME_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
+AGENT_RUNTIME_WORKFLOW_PATH = (
+    ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
+)
 
 
 def _workflow() -> dict:
@@ -86,6 +88,35 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert "bun run build" in frontend_steps
 
 
+def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
+    jobs = _workflow()["jobs"]
+    guest_job = jobs["guest-release-gates"]
+    joined_steps = "\n".join(str(step.get("run", "")) for step in guest_job["steps"])
+    uses_steps = {
+        str(step.get("uses", "")): step for step in guest_job["steps"] if step.get("uses")
+    }
+
+    assert "supabase/setup-cli@v1" in uses_steps
+    assert uses_steps["supabase/setup-cli@v1"]["with"]["version"] == "2.109.0"
+    assert "supabase start" in joined_steps
+    assert "supabase db reset" in joined_steps
+    assert "ARGUS_DISPOSABLE_DATABASE_URL" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_URL" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_ANON_KEY" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY" in joined_steps
+    assert "tests/test_allowance_accounting_postgres.py" in joined_steps
+    assert "tests/test_guest_cleanup_postgres.py" in joined_steps
+    assert "tests/test_guest_handoff_postgres.py" in joined_steps
+    assert "tests/test_guest_workspace_postgres.py" in joined_steps
+    assert "tests/test_guest_auth_local_supabase.py" in joined_steps
+    assert "scripts/qa/assert_pytest_gate.py" in joined_steps
+    assert guest_job["env"]["OPENROUTER_API_KEY"] == ""
+    assert guest_job["env"]["ALPACA_API_KEY"] == ""
+    assert guest_job["env"]["ALPACA_SECRET_KEY"] == ""
+    assert guest_job["env"]["ARGUS_MARKET_DATA_PROVIDER_MODE"] == "synthetic_unit_fixture"
+    assert "live_provider" not in joined_steps
+
+
 def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
@@ -93,6 +124,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "ownership-gate",
         "backend-checks",
         "frontend-checks",
+        "guest-release-gates",
     ]
 
 
@@ -148,8 +180,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     assert set(job["env"]) == {"ARGUS_WARMUP_EXPECT_MODE"}
 
     secret_steps = {
-        step["name"]: set((step.get("env") or {}).keys()) & secret_names
-        for step in steps
+        step["name"]: set((step.get("env") or {}).keys()) & secret_names for step in steps
     }
     assert secret_steps["Check required secrets"] == secret_names
     assert secret_steps["Warm Render product path"] == {
@@ -193,9 +224,7 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert ": > temp/canary-evidence/es-419-capture.json" in joined_steps
     assert "rm -f temp/canary-evidence/es-419-capture.json" in joined_steps
     assert (
-        steps_by_name["Run authoritative Spanish release canary"][
-            "continue-on-error"
-        ]
+        steps_by_name["Run authoritative Spanish release canary"]["continue-on-error"]
         is True
     )
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
@@ -212,8 +241,7 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert "private-alpha-canary-evidence" in workflow_source
     assert "temp/canary-evidence/*" not in workflow_source
     assert steps_by_name["Upload human-safe canary evidence"]["with"]["path"] == (
-        "temp/canary-evidence/es-419.json\n"
-        "temp/canary-evidence/es-419.exit\n"
+        "temp/canary-evidence/es-419.json\n" "temp/canary-evidence/es-419.exit\n"
     )
     assert steps_by_name["Upload failed canary capture"]["if"] == "failure()"
     assert steps_by_name["Upload failed canary capture"]["with"]["path"] == (
@@ -253,7 +281,7 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
     assert "cd web && bun install --frozen-lockfile" in joined_steps
-    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert '.github/local-smoke.sh --expected-sha "$GITHUB_SHA"' in joined_steps
     assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
@@ -269,9 +297,7 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
     }
     assert workflow["on"]["schedule"] == [{"cron": "15 9 * * *"}]
     assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
-    assert workflow["on"]["pull_request"]["branches"] == [
-        "codex/private-alpha-next"
-    ]
+    assert workflow["on"]["pull_request"]["branches"] == ["codex/private-alpha-next"]
     assert "src/argus/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
     assert "tests/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
     assert "tests/test_spine_guardrails.py" in workflow["on"]["pull_request"]["paths"]
@@ -307,7 +333,10 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
 
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev --no-interaction" in joined_steps
-    assert "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov" in joined_steps
+    assert (
+        "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov"
+        in joined_steps
+    )
     sweep_step = next(
         step
         for step in job["steps"]

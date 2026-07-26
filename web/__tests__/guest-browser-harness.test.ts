@@ -5,6 +5,7 @@ import {
   BrowserSafetyMonitor,
   CONFIRMATION_CONTINUITY_ASSERTION_MESSAGES,
   assertSafeEvidence,
+  benignLoopbackNavigationAbort,
   binaryEvidenceDiffers,
   browserSafetyDetail,
   confirmationContinuityChecks,
@@ -239,6 +240,33 @@ describe("guest Check 4 continuity assertions", () => {
 });
 
 describe("browser safety evidence", () => {
+  test("ignores only the superseded loopback chat navigation fetch", () => {
+    expect(
+      benignLoopbackNavigationAbort({
+        rawUrl: "http://localhost:3000/chat",
+        method: "GET",
+        rawError: "net::ERR_ABORTED",
+        isNavigationRequest: false,
+      }),
+    ).toBe(true);
+    expect(
+      benignLoopbackNavigationAbort({
+        rawUrl: "http://localhost:8000/api/v1/chat/stream",
+        method: "POST",
+        rawError: "net::ERR_ABORTED",
+        isNavigationRequest: false,
+      }),
+    ).toBe(false);
+    expect(
+      benignLoopbackNavigationAbort({
+        rawUrl: "https://argus.example/chat",
+        method: "GET",
+        rawError: "net::ERR_ABORTED",
+        isNavigationRequest: true,
+      }),
+    ).toBe(false);
+  });
+
   test("allows only the expected sanitized analytics write at a conversion gate", () => {
     const before = {
       "POST /api/v1/analytics/guest-events": 2,
@@ -344,6 +372,7 @@ describe("browser safety evidence", () => {
         "http://127.0.0.1:8000/api/v1/conversations/4f8c3dea-c926-4e33-9d50-959bd43d4868/messages?token=secret",
       method: () => "POST",
       failure: () => ({ errorText: "net::ERR_ABORTED bearer secret" }),
+      isNavigationRequest: () => false,
     });
 
     expect(monitor.detailSnapshot()).toEqual([
@@ -598,6 +627,14 @@ describe("Checks 6–20 harness guards", () => {
     expect(check7).toContain("latestResultFacts");
     expect(check7).toContain("guest_session");
     expect(check7).toContain("graph.runs");
+    expect(check7).toContain("uiMessageUnits");
+    expect(check7).toContain("uiSimulationUnits");
+    expect(check7).toContain(
+      "expect(uiMessageUnits).toBe(messageWindow.used)",
+    );
+    expect(check7).toContain(
+      "expect(uiSimulationUnits).toBe(simulationWindow.used)",
+    );
     expect(check8).toContain("messagesResponse");
     expect(check8).toContain("latestResultFacts");
     expect(check8).toContain("conversationGraph");
@@ -723,17 +760,39 @@ describe("Checks 6–20 harness guards", () => {
     expect(check17).toContain("seededMessagesResponse");
   });
 
-  test("hydrates a durable retry and never fabricates recovery with request aborts", () => {
+  test("executes a real failed turn and proves its durable zero-charge recovery", () => {
     const check18 = checkSource(18);
 
-    expect(check18).toContain("seedDurableRetryableFailure");
-    expect(check18).toContain("messagesResponse");
-    expect(check18).toContain("recoveryFixture.failedAssistantId");
+    expect(check18).not.toContain("seedDurableRetryableFailure");
+    expect(check18).toContain('openRouterApiKey: ""');
+    expect(check18).toContain('getByTestId("chat-input")');
+    expect(check18).toContain("POST /api/v1/chat/stream");
+    expect(check18).toContain("durableMessages");
     expect(check18).toContain('recoveryMetadata.code === "runtime_failure"');
     expect(check18).toContain("retryable === true");
+    expect(check18).toContain("durableUsage.chat_units - before.chat_units");
     expect(check18).not.toContain("await retry.click()");
     expect(check18).not.toContain('route.abort("connectionreset")');
     expect(check18).not.toContain("unroute");
+  });
+
+  test("serves the authoritative matrix from one compiled production build", () => {
+    const runner = readFileSync(
+      join(import.meta.dir, "../../scripts/qa/run-guest-experience-qa.sh"),
+      "utf-8",
+    );
+    const config = readFileSync(
+      join(import.meta.dir, "../e2e/guest-experience.playwright.config.ts"),
+      "utf-8",
+    );
+
+    expect(runner.match(/bun run build/g)?.length).toBe(1);
+    expect(config).toContain("bun run start");
+    expect(config).not.toContain("bun run dev");
+    expect(config).toContain('"guest-experience.spec.ts"');
+    expect(config).toContain('"guest-entry.spec.ts"');
+    expect(config).toContain("workers: 1");
+    expect(config).toContain("retries: 0");
   });
 
   test("uses the bounded cleanup predicate and proves complete cleanup retention", () => {

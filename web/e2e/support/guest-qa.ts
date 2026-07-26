@@ -293,6 +293,8 @@ export type ZeroStateSnapshot = {
 
 export type SafeEvidence = {
   candidate_sha: string;
+  served_sha: string;
+  frontend_mode: "production";
   status: "passed" | "failed";
   completed_checks: number[];
   failure_check: number | null;
@@ -1731,7 +1733,10 @@ export class BackendController {
   private process: ChildProcess | null = null;
   private publicAccountsEnabled = false;
 
-  async start(publicAccountsEnabled: boolean): Promise<void> {
+  async start(
+    publicAccountsEnabled: boolean,
+    options: { openRouterApiKey?: string } = {},
+  ): Promise<void> {
     await this.stop();
     this.publicAccountsEnabled = publicAccountsEnabled;
     this.process = spawn(
@@ -1753,6 +1758,9 @@ export class BackendController {
           ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED: String(publicAccountsEnabled),
           ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED: "false",
           ARGUS_MOCK_AUTH: "false",
+          ...(options.openRouterApiKey !== undefined
+            ? { OPENROUTER_API_KEY: options.openRouterApiKey }
+            : {}),
         },
         stdio: "ignore",
       },
@@ -2044,6 +2052,29 @@ export function productFailedRequestsForCheck(
   );
 }
 
+export function benignLoopbackNavigationAbort(input: {
+  rawUrl: string;
+  method: string;
+  rawError: string;
+  isNavigationRequest: boolean;
+}): boolean {
+  if (
+    input.method !== "GET" ||
+    !input.rawError.toLowerCase().includes("err_aborted")
+  ) {
+    return false;
+  }
+  try {
+    const url = new URL(input.rawUrl);
+    return (
+      ["localhost", "127.0.0.1", "::1"].includes(url.hostname) &&
+      url.pathname === "/chat"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function expectedMutationDeltasOnly(
   before: Record<string, number>,
   after: Record<string, number>,
@@ -2102,6 +2133,16 @@ export class BrowserSafetyMonitor {
       this.scan(error.message);
     });
     page.on("requestfailed", (request) => {
+      if (
+        benignLoopbackNavigationAbort({
+          rawUrl: request.url(),
+          method: request.method(),
+          rawError: request.failure()?.errorText ?? "",
+          isNavigationRequest: request.isNavigationRequest(),
+        })
+      ) {
+        return;
+      }
       this.failedRequests += 1;
       this.details.push(
         browserSafetyDetail({
@@ -2420,6 +2461,8 @@ export function purgeDisposableQaEvidence(): void {
 export function emptyEvidence(): SafeEvidence {
   return {
     candidate_sha: requireCandidateSha(),
+    served_sha: requireCandidateSha(),
+    frontend_mode: "production",
     status: "failed",
     completed_checks: [],
     failure_check: null,

@@ -48,7 +48,6 @@ import {
   safeScreenshot,
   sameGraphIds,
   seedClaimGraphFromConversation,
-  seedDurableRetryableFailure,
   strictUtcTimestampsEqual,
   waitForMe,
   workspaceFacts,
@@ -703,6 +702,10 @@ test("@guest-experience exact-head 20-check matrix", async ({
           primaryResultFacts.evidenceId === graph.evidence[0],
       ).toBe(true);
       const card = resultCard(page);
+      const uiMessageUnits = await confirmationCards(page).count();
+      const uiSimulationUnits = await card.count();
+      expect(uiMessageUnits).toBe(messageWindow.used);
+      expect(uiSimulationUnits).toBe(simulationWindow.used);
       await expect(card).toHaveCount(1);
       await expect(card.getByTestId("result-equity-chart")).toBeVisible();
       await expect(card.getByText("MSFT", { exact: true })).toBeVisible();
@@ -1633,29 +1636,27 @@ test("@guest-experience exact-head 20-check matrix", async ({
       const before = ownerSnapshot(feedbackGuestOwner);
       const mutationsBefore = mergeMutationCounts(monitors);
       const recoveryConversation = requireConversationId(feedbackPage);
-      const recoveryFixture = seedDurableRetryableFailure({
-        userId: feedbackGuestOwner,
-        conversationId: recoveryConversation,
-      });
-      expect(recoveryFixture.inserted).toBe(true);
-      const seeded = ownerSnapshot(feedbackGuestOwner);
-      expect(seeded.messages).toBe(before.messages + 2);
-      expect(seeded.user_messages).toBe(before.user_messages + 1);
-      expect(seeded.assistant_messages).toBe(before.assistant_messages + 1);
-      expect(seeded.chat_units).toBe(before.chat_units);
-      expect(seeded.simulation_units).toBe(before.simulation_units);
-      evidence.interrupted_usage_delta = seeded.chat_units - before.chat_units;
-
-      const messagesResponse = feedbackPage.waitForResponse(
-        (response) =>
-          response.request().method() === "GET" &&
-          new URL(response.url()).pathname.endsWith(
-            `/api/v1/conversations/${recoveryConversation}/messages`,
-          ) &&
-          response.status() === 200,
-      );
-      await feedbackPage.reload({ waitUntil: "domcontentloaded" });
-      await messagesResponse;
+      const recoveryInput = "Test a provider-failure recovery path for QQQ";
+      let chatStreamStatus = 0;
+      try {
+        await backend.start(false, { openRouterApiKey: "" });
+        const streamResponse = feedbackPage.waitForResponse(
+          (response) =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
+        );
+        await feedbackPage.getByTestId("chat-input").fill(recoveryInput);
+        await feedbackPage.getByTestId("chat-input").press("Enter");
+        chatStreamStatus = (await streamResponse).status();
+        await expect
+          .poll(() => ownerSnapshot(feedbackGuestOwner).messages, {
+            message: "the real failed turn should persist its recovery pair",
+          })
+          .toBe(before.messages + 2);
+      } finally {
+        await backend.start(false);
+      }
+      expect(chatStreamStatus).toBe(200);
       await expect(
         feedbackPage.getByText(
           "Something went wrong. Your conversation is saved. Please try again.",
@@ -1673,7 +1674,13 @@ test("@guest-experience exact-head 20-check matrix", async ({
         `/conversations/${recoveryConversation}/messages?limit=100`,
       );
       const durableAssistant = durableMessages.body.items.find(
-        (item) => item.id === recoveryFixture.failedAssistantId,
+        (item) =>
+          item.role === "assistant" &&
+          recordOrEmpty(recordOrEmpty(item.metadata).recovery).code ===
+            "runtime_failure",
+      );
+      const durableUser = durableMessages.body.items.find(
+        (item) => item.role === "user" && item.content === recoveryInput,
       );
       const durableMetadata = recordOrEmpty(durableAssistant?.metadata);
       const recoveryMetadata = recordOrEmpty(durableMetadata.recovery);
@@ -1685,17 +1692,24 @@ test("@guest-experience exact-head 20-check matrix", async ({
             "Something went wrong. Your conversation is saved. Please try again." &&
           recoveryMetadata.code === "runtime_failure" &&
           recoveryMetadata.retryable === true &&
-          typeof retryMetadata.message === "string" &&
-          retryMetadata.message.length > 0,
+          retryMetadata.message === recoveryInput &&
+          durableUser?.content === recoveryInput,
       ).toBe(true);
       const durableUsage = ownerSnapshot(feedbackGuestOwner);
       expect(durableUsage.chat_units).toBe(before.chat_units);
       expect(durableUsage.simulation_units).toBe(before.simulation_units);
+      expect(durableUsage.messages).toBe(before.messages + 2);
+      expect(durableUsage.user_messages).toBe(before.user_messages + 1);
+      expect(durableUsage.assistant_messages).toBe(
+        before.assistant_messages + 1,
+      );
+      evidence.interrupted_usage_delta =
+        durableUsage.chat_units - before.chat_units;
       const mutationsAfter = mergeMutationCounts(monitors);
       expect(
         (mutationsAfter["POST /api/v1/chat/stream"] ?? 0) -
           (mutationsBefore["POST /api/v1/chat/stream"] ?? 0),
-      ).toBe(0);
+      ).toBe(1);
     });
 
     await runStep(19, evidence, (value) => (currentCheck = value), async () => {
@@ -1882,6 +1896,8 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(hostedWrites).toBe(0);
       expect(credentialExposure).toBe(0);
       expect(evidence.cross_owner_result_count).toBe(0);
+      expect(evidence.served_sha).toBe(process.env.ARGUS_CANDIDATE_SHA);
+      expect(evidence.frontend_mode).toBe("production");
       expect(backend.flagsRestoredFalse).toBe(true);
       expect(
         [

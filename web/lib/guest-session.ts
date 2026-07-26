@@ -59,11 +59,34 @@ export function createGuestSessionBootstrapper<
   };
 }
 
-function guestCaptchaToken(): string | null {
-  if (process.env.NODE_ENV === "production") {
+export function guestCaptchaTokenForEnvironment(input: {
+  nodeEnv: string | undefined;
+  apiUrl: string | undefined;
+  localQaToken: string | undefined;
+}): string | null {
+  if (input.nodeEnv !== "production") {
+    return "argus-local-browser-qa";
+  }
+  const token = input.localQaToken?.trim() ?? "";
+  if (!token) return null;
+  try {
+    const hostname = new URL(input.apiUrl ?? "").hostname;
+    return hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+      ? token
+      : null;
+  } catch {
     return null;
   }
-  return "argus-local-browser-qa";
+}
+
+function guestCaptchaToken(): string | null {
+  return guestCaptchaTokenForEnvironment({
+    nodeEnv: process.env.NODE_ENV,
+    apiUrl: process.env.NEXT_PUBLIC_ARGUS_API_URL,
+    localQaToken: process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN,
+  });
 }
 
 const browserGuestBootstrapper = createGuestSessionBootstrapper<

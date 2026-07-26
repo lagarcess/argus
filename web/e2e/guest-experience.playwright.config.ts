@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: path.join(repositoryRoot, "web/e2e"),
   testMatch: preflight
     ? "guest-experience.preflight.spec.ts"
-    : "guest-experience.spec.ts",
+    : ["guest-entry.spec.ts", "guest-experience.spec.ts"],
   globalSetup: path.join(
     repositoryRoot,
     "web/e2e/guest-experience.global-setup.ts",
@@ -36,7 +36,7 @@ export default defineConfig({
     serviceWorkers: "block",
   },
   webServer: {
-    command: "bun run dev --hostname 127.0.0.1 --port 3000",
+    command: "bun run start --hostname 127.0.0.1 --port 3000",
     cwd: path.join(repositoryRoot, "web"),
     url: "http://localhost:3000",
     reuseExistingServer: false,

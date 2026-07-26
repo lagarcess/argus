@@ -35,7 +35,7 @@ if [ -n "$status" ]; then
   invalid_path="$(
     git status --porcelain |
       sed -E 's/^.. //' |
-      grep -Ev '^(web/e2e/|web/__tests__/guest-browser-harness\.test\.ts$|scripts/qa/README\.md$|scripts/qa/run-guest-experience-qa\.sh$)' |
+      grep -Ev '^(\.github/workflows/ci\.yml$|tests/test_ci_workflow\.py$|scripts/qa/assert_pytest_gate\.py$|scripts/qa/README\.md$|scripts/qa/run-guest-experience-qa\.sh$|web/e2e/|web/lib/guest-session\.ts$|web/__tests__/guest-browser-harness\.test\.ts$|web/__tests__/guest-session\.test\.ts$)' |
       head -1 || true
   )"
   [ -z "$invalid_path" ] || {
@@ -111,6 +111,7 @@ export PLAYWRIGHT_BASE_URL=http://localhost:3000
 export NEXT_PUBLIC_ARGUS_API_URL=http://localhost:8000/api/v1
 export NEXT_PUBLIC_MOCK_AUTH=false
 export NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
+export NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN=argus-local-browser-qa
 export NEXT_PUBLIC_ENABLE_SPANISH=true
 export NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 export NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
@@ -122,14 +123,19 @@ unset NEXT_PUBLIC_POSTHOG_HOST || true
 unset POSTHOG_PROJECT_TOKEN POSTHOG_REGION POSTHOG_HOST \
   ARGUS_POSTHOG_TIMEOUT_SECONDS || true
 
+build_frontend() {
+  (cd web && bun run build)
+}
+
 if [ "$mode" = "authoritative" ]; then
   argus_require_qa_env
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=true
   unset ARGUS_GUEST_QA_PREFLIGHT || true
-  (cd web && bun run build)
+  build_frontend
 elif [ "$mode" = "preflight" ]; then
   export ARGUS_GUEST_QA_PREFLIGHT=true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false
+  build_frontend
 else
   unset ARGUS_GUEST_QA_PREFLIGHT || true
   export ARGUS_GUEST_QA_REQUIRE_ZERO_STATE=false

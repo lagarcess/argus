@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createGuestSessionBootstrapper } from "../lib/guest-session";
+import {
+  createGuestSessionBootstrapper,
+  guestCaptchaTokenForEnvironment,
+} from "../lib/guest-session";
 
 const root = join(import.meta.dir, "..");
 
@@ -52,6 +55,40 @@ describe("guest session entry contract", () => {
     await expect(bootstrapper.run("fail")).rejects.toThrow("failed");
     expect(await bootstrapper.run("recovered")).toBe("recovered");
     expect(calls).toBe(3);
+  });
+
+  test("allows an explicit production-QA CAPTCHA token only for loopback", () => {
+    expect(
+      guestCaptchaTokenForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "http://localhost:8000/api/v1",
+        localQaToken: "local-qa-proof",
+      }),
+    ).toBe("local-qa-proof");
+    expect(
+      guestCaptchaTokenForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "https://api.argus.example/api/v1",
+        localQaToken: "local-qa-proof",
+      }),
+    ).toBeNull();
+  });
+
+  test("keeps ordinary production closed and development deterministic", () => {
+    expect(
+      guestCaptchaTokenForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "http://localhost:8000/api/v1",
+        localQaToken: "",
+      }),
+    ).toBeNull();
+    expect(
+      guestCaptchaTokenForEnvironment({
+        nodeEnv: "development",
+        apiUrl: "http://localhost:8000/api/v1",
+        localQaToken: "",
+      }),
+    ).toBe("argus-local-browser-qa");
   });
 
   test("uses the existing server guest endpoint and persists the provider session", () => {
