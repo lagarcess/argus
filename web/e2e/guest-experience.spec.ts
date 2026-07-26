@@ -178,7 +178,7 @@ function resultCard(page: Page) {
 }
 
 function confirmationCards(page: Page) {
-  return page.locator("section:has([data-confirmation-status])");
+  return page.locator("section.argus-confirmation-reveal");
 }
 
 function searchSurface(page: Page) {
@@ -448,9 +448,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       evidence.check4_initial_confirmation = safeConfirmationEvidence(
         initialConfirmationFacts,
       );
-      initialConfirmationCardCount = await page
-        .locator("section:has([data-confirmation-status])")
-        .count();
+      initialConfirmationCardCount = await confirmationCards(page).count();
       expect(initialConfirmationCardCount).toBeGreaterThan(0);
     });
 

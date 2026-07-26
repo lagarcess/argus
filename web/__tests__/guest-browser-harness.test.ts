@@ -629,6 +629,12 @@ describe("Checks 6–20 harness guards", () => {
     expect(check7).toContain("graph.runs");
     expect(check7).toContain("uiMessageUnits");
     expect(check7).toContain("uiSimulationUnits");
+    expect(source).toContain(
+      'page.locator("section.argus-confirmation-reveal")',
+    );
+    expect(source).not.toContain(
+      'section:has([data-confirmation-status])',
+    );
     expect(check7).toContain(
       "expect(uiMessageUnits).toBe(messageWindow.used)",
     );
