@@ -19,6 +19,7 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
+from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
@@ -79,6 +80,8 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.get_conversation.return_value = _conversation()
     gateway.list_messages.return_value = []
+    gateway.reconcile_stale_chat_turns.return_value = []
+    gateway.list_projectable_chat_turns.return_value = []
     gateway.count_completed_runs.return_value = 1
     gateway.get_latest_completed_run_for_conversation.return_value = None
     gateway.create_message.side_effect = lambda **kwargs: Message(
@@ -89,6 +92,11 @@ def mock_gateway():
         created_at=utcnow(),
         metadata=kwargs.get("metadata"),
     )
+    gateway.accept_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
+    gateway.transition_chat_turn.return_value = TransitionResult(
+        outcome="applied",
+    )
+    gateway.finalize_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
     gateway.get_backtest_job_reservation.return_value = None
     gateway.admit_backtest_job.return_value = {
         "decision": "admitted",
@@ -139,6 +147,10 @@ def _assistant_settlements(gateway: MagicMock) -> list[dict[str, Any]]:
     for call in gateway.create_message.call_args_list:
         if call.kwargs.get("role") != "assistant":
             continue
+        settle = call.kwargs.get("settle_usage")
+        if settle is not None:
+            settlements.append(dict(settle))
+    for call in gateway.finalize_chat_turn.call_args_list:
         settle = call.kwargs.get("settle_usage")
         if settle is not None:
             settlements.append(dict(settle))
@@ -331,13 +343,13 @@ def test_cancel_confirmation_bypasses_quota_and_settles_zero_units(mock_gateway)
     assert response.status_code == 200, response.text
     assert "confirmation_cancelled" in response.text
     mock_gateway.check_usage_limits.assert_not_called()
-    assistant_calls = [
+    terminal_calls = [
         call
-        for call in mock_gateway.create_message.call_args_list
-        if call.kwargs.get("role") == "assistant"
+        for call in mock_gateway.finalize_chat_turn.call_args_list
+        if call.kwargs.get("to_status") == "completed"
     ]
-    assert len(assistant_calls) == 1
-    assert assistant_calls[0].kwargs.get("settle_usage") is None
+    assert len(terminal_calls) == 1
+    assert terminal_calls[0].kwargs.get("settle_usage") is None
 
 
 @pytest.mark.parametrize("confirmation_id", [None, "different-confirmation"])
@@ -439,17 +451,10 @@ def test_cancel_confirmation_replay_returns_the_existing_tombstone(mock_gateway)
     )
     assert first.status_code == 200
     first_final = _stream_events(first.text, "final")[0]
-    tombstone_call = mock_gateway.create_message.call_args_list[-1]
-    tombstone = Message(
-        id=first_final["message_id"],
-        conversation_id="conv-1",
-        role="assistant",
-        content="",
-        metadata=tombstone_call.kwargs["metadata"],
-        created_at=utcnow(),
-    )
+    terminal_call = mock_gateway.finalize_chat_turn.call_args_list[-1]
+    tombstone = terminal_call.kwargs["message"]
     mock_gateway.list_messages.return_value = [confirmation, tombstone]
-    mock_gateway.create_message.reset_mock()
+    mock_gateway.finalize_chat_turn.reset_mock()
 
     replay = client.post(
         "/api/v1/chat/stream",
@@ -459,7 +464,7 @@ def test_cancel_confirmation_replay_returns_the_existing_tombstone(mock_gateway)
 
     assert replay.status_code == 200
     assert _stream_events(replay.text, "final")[0] == first_final
-    mock_gateway.create_message.assert_not_called()
+    mock_gateway.finalize_chat_turn.assert_not_called()
 
 
 def test_gateway_owns_an_atomic_admission_operation():

@@ -626,9 +626,14 @@ def test_shadow_backtest_job_tool_does_not_redispatch_existing_job(
     with backtest_job_shadow_context(context):
         result = tool.run(_payload())
 
-    assert result == {"success": True, "payload": {"result": "ok"}}
-    assert events == ["job", "delegate"]
+    assert result["success"] is True
+    assert result["payload"]["backtest_job"] == {
+        "id": "job-1",
+        "status": "queued",
+    }
+    assert events == ["job"]
     assert dispatcher.calls == []
+    assert delegate.calls == []
     assert context.created_job_id == "job-1"
     assert context.workflow_dispatch_started is True
     assert context.workflow_task_run_id == "task-run-existing"

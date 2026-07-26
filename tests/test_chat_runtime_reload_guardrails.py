@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier, Event
+from copy import deepcopy
+from threading import Event
 from types import SimpleNamespace
 from typing import Any
 
@@ -17,6 +18,10 @@ from argus.api.message_store import (
 )
 from argus.api.schemas import BacktestRun
 from argus.domain.store import utcnow
+from argus.llm.openrouter import (
+    clear_openrouter_route_receipts,
+    get_openrouter_route_receipts,
+)
 from fastapi.testclient import TestClient
 
 
@@ -282,6 +287,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -348,6 +354,7 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -445,6 +452,7 @@ def test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1016,13 +1024,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -1069,13 +1078,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_spanish_reco
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Ejecutar backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "es-419",
         },
@@ -1137,6 +1147,7 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1160,6 +1171,128 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     }
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
+
+
+def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
+    monkeypatch,
+) -> None:
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+    persisted_turn_evidence: list[dict[str, Any]] = []
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    def _capture_turn_evidence(
+        *,
+        metadata: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> None:
+        persisted_turn_evidence.append(
+            dict((metadata or {}).get("turn_execution") or {})
+        )
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "persist_route_receipts",
+        _capture_turn_evidence,
+    )
+    client = _client()
+    clear_openrouter_route_receipts()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = deepcopy(_confirmation_metadata())
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["title"] = "NVDA buy and hold"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as NVDA using a buy and hold approach.",
+        metadata=new_metadata,
+    )
+    usage_before = deepcopy(api_state.store.usage_counters)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    raw_frames = [
+        part.removeprefix("data: ").strip()
+        for part in response.text.split("\n\n")
+        if part.startswith("data: ")
+    ]
+    assert [
+        "[DONE]" if raw == "[DONE]" else json.loads(raw)["type"]
+        for raw in raw_frames
+    ] == ["stage_start", "stage_outcome", "final", "[DONE]"]
+    [final] = _stream_payloads(response.text, "final")
+    assert final["stage_outcome"] == "ready_to_respond"
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_assistant = persisted[-1]
+    assert persisted_assistant["role"] == "assistant"
+    assert persisted_assistant["metadata"]["agent_runtime_stage_outcome"] == (
+        "ready_to_respond"
+    )
+    assert persisted_assistant["metadata"]["recovery"] == final["recovery"]
+    assert persisted_assistant["metadata"]["chat_action"]["payload"] == {
+        "confirmation_id": "confirm-old"
+    }
+    assert api_state.store.chat_turn_lifecycles == {}
+    assert api_state.store.usage_counters == usage_before
+    assert get_openrouter_route_receipts() == []
+    assert api_state.store.backtest_jobs == {}
+    assert len(persisted_turn_evidence) == 1
+    assert persisted_turn_evidence[0]["progress_outcome"] == "redirected"
+    assert persisted_turn_evidence[0]["terminal"] == "redirected"
+    assert (
+        latest_active_confirmation_id(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        == "confirm-new"
+    )
 
 
 def test_response_option_action_rejects_an_older_recovery_message_identity(
@@ -1230,7 +1363,7 @@ def test_response_option_action_rejects_an_older_recovery_message_identity(
     assert len(persisted_messages) == message_count_before
 
 
-def test_response_option_action_rejects_source_superseded_during_checkpoint_read(
+def test_response_option_action_uses_atomic_source_snapshot_before_checkpoint_read(
     monkeypatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
@@ -1289,16 +1422,265 @@ def test_response_option_action_rejects_source_superseded_during_checkpoint_read
         },
     )
 
-    assert response.status_code == 409
-    assert response.json()["code"] == "artifact_action_invalid_state"
-    assert runtime_calls == 0
+    assert response.status_code == 200
+    assert runtime_calls == 1
     persisted_messages = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
     ).json()["items"]
-    assert [message["content"] for message in persisted_messages] == [
-        "AAPL needs a supported timeframe.",
-        "NVDA needs a supported timeframe.",
+    accepted_request = next(
+        message
+        for message in persisted_messages
+        if message["role"] == "user"
+    )
+    assert accepted_request["metadata"]["chat_action"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+
+
+def test_failed_response_option_retry_uses_canonical_server_owned_input(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _failing_runtime(**_: Any):
+        raise RuntimeError("forced response-option failure")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _failing_runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    first = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": source.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+    assert first.status_code == 200
+    assert _stream_payloads(first.text, "error")
+    first_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    original_request = next(
+        message
+        for message in first_messages
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "select_response_option"
+    )
+
+    async def _successful_runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The canonical option was retried.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _successful_runtime,
+    )
+    retried = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "tampered replay label",
+                "payload": {
+                    "request_message_id": original_request["id"],
+                    "source_assistant_id": "tampered-source",
+                    "option_id": "tampered-option",
+                    "replacement_values": {"timeframe": "5m"},
+                },
+            },
+            "mentions": [
+                {
+                    "id": "asset:equity:MSFT",
+                    "type": "asset",
+                    "label": "Microsoft",
+                    "symbol": "MSFT",
+                    "asset_class": "equity",
+                    "insert_text": "MSFT",
+                    "provider": "alpaca",
+                }
+            ],
+            "language": "en",
+        },
+    )
+
+    assert retried.status_code == 200
+    assert captured["message"] == "Retry with daily bars"
+    assert captured["action_context"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+        "source_assistant_id": source.id,
+        "validated_source_assistant_id": source.id,
+    }
+    assert captured["context_hints"] == []
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    retry_requests = [
+        message
+        for message in persisted
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "select_response_option"
     ]
+    assert len(retry_requests) == 2
+    assert retry_requests[-1]["content"] == "Retry with daily bars"
+    assert retry_requests[-1]["metadata"]["chat_action"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    assert "mentions" not in retry_requests[-1]["metadata"]
+    assert "request_message_id" not in (
+        retry_requests[-1]["metadata"]["chat_action"]["payload"]
+    )
+    assert "source_assistant_id" not in (
+        retry_requests[-1]["metadata"]["chat_action"]["payload"]
+    )
+
+
+@pytest.mark.parametrize(
+    "rejection_case",
+    [
+        "foreign_owner",
+        "foreign_conversation",
+        "completed",
+        "nonretryable",
+        "superseded",
+    ],
+)
+def test_rejected_response_option_retry_never_reaches_runtime_or_mutates(
+    monkeypatch,
+    rejection_case: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _failing_runtime(**_: Any):
+        raise RuntimeError("forced response-option failure")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _failing_runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    first = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": source.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+    assert first.status_code == 200
+    original_request = next(
+        message
+        for message in api_state.store.messages[conversation["id"]]
+        if message.role == "user"
+        and message.metadata.get("chat_action", {}).get("type")
+        == "select_response_option"
+    )
+    lifecycle = api_state.store.chat_turn_lifecycles[original_request.id]
+    if rejection_case == "completed":
+        lifecycle.update(status="completed", failure_code=None, retryable=False)
+    elif rejection_case == "nonretryable":
+        lifecycle.update(status="recoverable_failed", retryable=False)
+    elif rejection_case == "foreign_owner":
+        lifecycle["user_id"] = "00000000-0000-0000-0000-000000000099"
+    elif rejection_case == "superseded":
+        api_state.store.messages[conversation["id"]].append(
+            prepare_message(
+                conversation_id=conversation["id"],
+                role="user",
+                content="Later work",
+            )
+        )
+    retry_conversation = conversation
+    if rejection_case == "foreign_conversation":
+        retry_conversation = _conversation(client)
+
+    runtime_calls = 0
+
+    async def _runtime_must_not_run(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        raise AssertionError("rejected retry reached runtime")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _runtime_must_not_run,
+    )
+    messages_before = deepcopy(api_state.store.messages)
+    lifecycles_before = deepcopy(api_state.store.chat_turn_lifecycles)
+    usage_before = deepcopy(api_state.store.usage_counters)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": retry_conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "tampered replay",
+                "payload": {
+                    "request_message_id": original_request.id,
+                    "source_assistant_id": "tampered-source",
+                    "option_id": "tampered-option",
+                    "replacement_values": {"timeframe": "5m"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert runtime_calls == 0
+    assert api_state.store.messages == messages_before
+    assert api_state.store.chat_turn_lifecycles == lifecycles_before
+    assert api_state.store.usage_counters == usage_before
 
 
 def test_concurrent_response_option_clicks_admit_exactly_one_request(
@@ -1306,11 +1688,9 @@ def test_concurrent_response_option_clicks_admit_exactly_one_request(
 ) -> None:
     from argus.api.routers import agent as agent_router
 
-    checkpoint_barrier = Barrier(2)
     runtime_calls: list[str] = []
 
     async def _checkpoint_race(**_: Any) -> dict[str, Any]:
-        checkpoint_barrier.wait(timeout=5)
         return {}
 
     async def _runtime(**kwargs: Any):
@@ -1806,6 +2186,7 @@ def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> N
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1855,6 +2236,7 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1867,18 +2249,9 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    text = final["assistant_response"]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    lowered = text.lower()
-    assert "confirmation action" in lowered
-    assert "latest card action" in lowered
 
 
 def test_run_confirmation_action_without_confirmation_id_returns_spanish_recovery(
@@ -1907,6 +2280,7 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1919,15 +2293,9 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    assert "confirmation action" in final["assistant_response"].lower()
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
@@ -1970,13 +2338,14 @@ def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -2020,17 +2389,33 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assert all(
-        not (
-            message["role"] == "user"
-            and message["metadata"]
-            and message["metadata"].get("chat_action", {}).get("type")
-            == "cancel_confirmation"
-        )
+    cancel_messages = [
+        message
         for message in messages
-    )
+        if message["role"] == "user"
+        and message["metadata"]
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "cancel_confirmation"
+    ]
+    assert len(cancel_messages) == 1
+    cancel_message = cancel_messages[0]
+    assert cancel_message["metadata"]["agent_runtime_turn"]["status"] == "started"
+    assert "terminal" not in cancel_message["metadata"]["agent_runtime_turn"]
+    lifecycle = api_state.store.chat_turn_lifecycles[cancel_message["id"]]
+    assert lifecycle["user_id"] == user_id
+    assert lifecycle["conversation_id"] == conversation["id"]
+    assert lifecycle["status"] == "completed"
     assert messages[-1]["role"] == "assistant"
     assert messages[-1]["content"] == ""
+    assert messages[-1]["metadata"]["agent_runtime_turn"] == {
+        "turn_id": cancel_message["id"],
+        "request_id": cancel_message["metadata"]["agent_runtime_turn"]["request_id"],
+        "status": "completed",
+        "terminal": True,
+        "reconciled_outcome": None,
+        "failure_code": None,
+        "retryable": False,
+    }
     assert messages[-1]["metadata"]["chat_action"]["type"] == "cancel_confirmation"
     assert messages[-1]["metadata"]["artifact_event"] == {
         "type": "confirmation_cancelled",
@@ -2093,6 +2478,7 @@ def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -
 
     stale_run_response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -4446,13 +4832,14 @@ def test_terminal_runtime_failure_reconciles_hidden_pending_checkpoint_before_ac
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },

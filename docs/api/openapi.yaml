@@ -370,6 +370,29 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/backtest-jobs/by-action/{confirmation_id}:
+    get:
+      parameters:
+        - name: confirmation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Owner-scoped durable job state for one chat Run action.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestJobResponse"
+        "404":
+          description: No owner-scoped reservation exists for this action identity.
+        "409":
+          description: The action identity is linked to different immutable inputs.
+        "500":
+          description: Durable job or confirmation-artifact state is inconsistent.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/backtest-jobs/{id}:
     get:
       responses:

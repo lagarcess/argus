@@ -31,6 +31,7 @@ from argus.agent_runtime.strategy_contract import (
     resolve_executable_date_range,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.results import (
     is_user_safe_failure_code,
     user_safe_failure_message,
@@ -814,7 +815,8 @@ def _is_launch_request_payload(payload: dict[str, Any]) -> bool:
 
 
 def _normalize_launch_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(payload)
+    LaunchBacktestRequest.model_validate(payload)
+    normalized = deepcopy(payload)
     parameters = normalized.get("parameters")
     if isinstance(parameters, dict):
         normalized["parameters"] = _strategy_parameters_from_launch_payload(parameters)

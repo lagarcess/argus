@@ -889,8 +889,17 @@ draft, restored localized Quick take, and passed founder-visible browser QA.
 It landed on `codex/private-alpha-next` as `bbd1d2b`. The completed design is
 archived at
 `docs/archive/2026-07-22-capability-truth-executable-boundary-design.md`;
-existing links continue through a pointer at the former spec path. The active
-interim roadmap now selects **Argus always progresses** for specification.
+existing links continue through a pointer at the former spec path.
+
+Interim founder-outcome closure (2026-07-25): PR #268 completed **Argus always
+progresses** at reviewed head `5585c6a`, which landed on
+`codex/private-alpha-next` as `847c413b`. The slice proved bounded semantic
+progress, durable ordinary-turn recovery, exact-once Run reconciliation,
+fact-preserving continuation, concrete trajectory adapters, production-parity
+browser journeys, one authorized real Run, reload-stable result truth, and
+independent review. Deployment and tester exposure remain separate release
+gates. The active interim roadmap now has two unfinished founder outcomes:
+**grounded discovery and suggestions** and **full Omnisearch capability**.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
 

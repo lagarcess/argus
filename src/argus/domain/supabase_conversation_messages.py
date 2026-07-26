@@ -106,9 +106,10 @@ class ConversationMessagePersistenceMixin:
         content: str,
         metadata: dict[str, Any] | None = None,
         settle_usage: dict[str, Any] | None = None,
+        message_id: str | None = None,
     ) -> Message:
         message = Message(
-            id=str(uuid4()),
+            id=message_id or str(uuid4()),
             conversation_id=conversation_id,
             role=cast(MessageRole, role),
             content=content,

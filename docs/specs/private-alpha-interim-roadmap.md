@@ -66,14 +66,14 @@ deterministic test result by itself.
 
 | Founder outcome | State | Completion evidence |
 | --- | --- | --- |
-| 1. Argus always progresses | Not yet accepted complete | No founder-accepted slice yet proves representative conversational journeys against the current integration checkpoint. |
+| 1. Argus always progresses | **Complete** | PR #268 delivered bounded semantic progress, durable ordinary-turn recovery, exact-once Run reconciliation, stale-authority rejection, fact-preserving refinement, concrete trajectory adapters, EN/ES browser proof, one authorized real Run, and reload-stable result truth. Reviewed head `5585c6a` landed on integration as `847c413b`. |
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
 | 5. Discovery is grounded and Argus can suggest | Not yet accepted complete | No founder-accepted slice yet proves grounded suggestions end to end on the current checkpoint. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
-Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
+Outcomes 1, 2, 3, and 4 must not be redispatched unless a new regression is
 reproduced. Their evidence remains useful as a regression baseline for later
 slices.
 
@@ -81,7 +81,7 @@ slices.
 
 ```mermaid
 flowchart LR
-    LIVE["Argus always progresses"]
+    LIVE["Argus always progresses — complete"]
     ACCESS["Security and usage unlocked — complete"]
     RANGE["Graph range switching — complete"]
     TRUTH["Capability truth — complete"]
@@ -186,7 +186,6 @@ implementation queue.
 
 | Outcome | Product proof still required |
 | --- | --- |
-| Argus always progresses | Representative messy-language journeys make progress, recover, and reload without loops or deterministic cul-de-sacs. |
 | Grounded discovery and suggestions | Search-backed suggestions carry source and provider truth and lead only to supported next actions. |
 | Full Omnisearch | Owner-scoped conversations, results, decisions, and evidence are retrievable with truthful previews and useful navigation. |
 
@@ -236,11 +235,11 @@ Completion evidence:
 - the founder approved merge, PR #266 landed as `bbd1d2b`, and issue #241
   closed as completed.
 
-### Next selected pillar: Argus always progresses
+### Completed slice: Argus always progresses
 
-Status: **SPEC LOCKED — implementation handoff authorized**
+Status: **COMPLETE — PR #268 merged as `847c413b`**
 
-This pillar is next because it protects every later conversational surface.
+This pillar protects every later conversational surface.
 The founder-approved end-to-end contract is
 [`2026-07-23-always-progresses-continuity-design.md`](../superpowers/specs/2026-07-23-always-progresses-continuity-design.md).
 The serialized execution plan is
@@ -249,12 +248,30 @@ Together they require every accepted operation to advance typed state or reach
 a clear, actionable stopping point across clarification, confirmation, Run,
 result, retry, and reload.
 
-This is not permission for a generic loop engine, broad runtime refactor, new
-intent taxonomy, phrase-based routing, or a sweep of historical issue debt.
-Related issues and the audit donor remain evidence only. The implementation
-worker must execute the locked plan from a fresh worktree based on the current
-integration branch, prove gaps at exact head before editing, and stop at the
-plan's founder review boundaries.
+Completion evidence:
+
+- one turn-wide deadline, model-call allowance, semantic progress assessment,
+  and first-wins internal terminal;
+- durable accepted-turn lifecycle with owner-scoped reconciliation, adjacent
+  Retry, supersession, and reload projection;
+- server-owned response-option Retry and Run-action identity with exact replay,
+  collision rejection, and no duplicate job, Run, action bubble, usage charge,
+  or result;
+- founder-visible production-parity journeys for clarification, edited
+  confirmation, one real Run, ambiguous transport, ordinary failure and Retry,
+  stale authority, no-progress recovery, result refinement, Spanish recovery,
+  and reload;
+- disposable-Postgres lifecycle/RLS/accounting proof, concrete runtime
+  trajectory adapters, the zero-provider browser harness, the sanctioned
+  interpreter scorecard, independent review, and exact-head CI; and
+- reviewed PR head `5585c6a` merged into `codex/private-alpha-next` as
+  `847c413b`, with byte-equivalent trees.
+
+This completion does not claim deployment or tester exposure. #228, #233, and
+#237 retain those release-owned gates. Narrow issue-specific follow-ups also
+remain open where their own acceptance exceeds this founder outcome, including
+#239's dedicated trajectory cleanup, #243's combined release gate, and #251's
+remaining period-truth work.
 
 ## Retained Product Decisions
 

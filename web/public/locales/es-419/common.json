@@ -267,6 +267,7 @@
       "context_market_movers_seed_recovery": "Una foto momentánea de movimientos puede ayudar a elegir semillas para un experimento: {{seeds}}. Trátalas como símbolos por validar, no como recomendaciones ni como un ranking en vivo. Elige uno y puedo plantear una prueba histórica compatible.",
       "capability_answer_unavailable": "No pude formular esa respuesta de capacidades con claridad en este momento. Dime el activo, periodo o regla compatible que quieres probar, o intenta de nuevo en un momento.",
       "runtime_failure": "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.",
+      "turn_abandoned": "Ese turno se detuvo antes de terminar. Tu mensaje está guardado, así que puedes reintentarlo.",
       "artifact_action_invalid_state": "Esa acción ya no está conectada al estado actual de la conversación. Usa la acción visible más reciente o dime qué quieres hacer ahora.",
       "artifact_action_retry_stale": "Ese reintento pertenece a una ejecución fallida anterior. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
       "artifact_action_retry_missing_artifact_id": "A ese reintento le falta la referencia de la ejecución fallida. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
@@ -292,6 +293,11 @@
       "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
       "refinement": "¿Qué quieres ajustar de esta idea?",
       "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
+      "no_progress_actions": {
+        "supply_missing_value": "Proporcionar el dato faltante",
+        "keep_unchanged": "Mantener la idea sin cambios",
+        "cancel": "Cancelar"
+      },
       "unsupported_recovery": "Argus todavía no puede ejecutar esa regla directamente. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_for_asset": "Argus todavía no puede ejecutar esa regla directamente para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_with_raw_value": "Argus todavía no puede ejecutar {{rawValue}} directamente. ¿Qué camino quieres usar: {{options}}?",
@@ -579,6 +585,7 @@
       "running_backtest": "Ejecutando simulación",
       "calculating_metrics": "Calculando métricas",
       "running": "Ejecutando simulación",
+      "checking": "Comprobando lo que se guardó...",
       "preparing": "Preparando resultados",
       "intent_run_backtest": "Diseñando tu estrategia...",
       "intent_onboarding_prompt": "Personalizando tu experiencia...",

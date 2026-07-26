@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pytest
+from argus.api import state as api_state
 from argus.api.main import app
+from argus.api.message_store import prepare_message
 from fastapi.testclient import TestClient
 
 
@@ -129,6 +133,335 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
         "user",
         "assistant",
     ]
+
+
+@pytest.mark.parametrize("threaded", [False, True])
+def test_inline_and_threaded_streams_use_one_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    threaded: bool,
+) -> None:
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    observed_contexts: list[object | None] = []
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        observed_contexts.append(active_turn_execution())
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "_turn_progress": {
+                "output_fingerprint": "a" * 64,
+                "progress_outcome": "clarification",
+                "terminal": "clarification",
+                "terminal_reason": "runtime_final",
+            },
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "What date range should I use for AAPL?",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                    },
+                    "requested_field": "date_range",
+                    "missing_required_fields": ["date_range"],
+                },
+                "response_intent": {
+                    "kind": "clarification",
+                    "requested_fields": ["date_range"],
+                    "semantic_needs": ["period"],
+                },
+            },
+        }
+
+    @asynccontextmanager
+    async def _isolated_workflow():
+        yield "isolated-workflow"
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: threaded)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "isolated_agent_runtime_workflow",
+        _isolated_workflow,
+    )
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Test buy and hold AAPL.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(observed_contexts) == 1
+    assert observed_contexts[0] is not None
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == "clarification"
+    assert summary["progress_outcome"] == "clarification"
+    assert summary["output_fingerprint"] == "a" * 64
+    assert "_turn_progress" not in response.text
+
+
+@pytest.mark.parametrize("threaded", [False, True])
+def test_post_admission_builder_failure_owns_recovery_and_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    threaded: bool,
+) -> None:
+    from argus.agent_runtime.recovery_messages import recovery_message
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    def _broken_workflow_input(**_: Any) -> dict[str, Any]:
+        raise ValueError("builder-secret-must-not-escape")
+
+    async def _provider_must_not_run(**_: Any):
+        raise AssertionError("provider runtime must not start after builder failure")
+        yield
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: threaded)
+    monkeypatch.setattr(agent_router, "build_workflow_input", _broken_workflow_input)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _provider_must_not_run,
+    )
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Prueba una idea secreta.",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count('"type":"error"') == 1
+    assert response.text.count("data: [DONE]") == 1
+    assert '"type":"final"' not in response.text
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["role"] for message in messages] == ["user", "assistant"]
+    assert messages[-1]["content"] == recovery_message(
+        "runtime_failure",
+        language="es-419",
+    )
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == "recoverable_failed"
+    assert summary["progress_outcome"] == "recoverable_failed"
+    assert summary["calls_reserved"] == 0
+    assert summary["provider_receipt_count"] == 0
+    assert "builder-secret-must-not-escape" not in json.dumps(summary)
+    assert "Prueba una idea secreta" not in json.dumps(summary)
+    assert active_turn_execution() is None
+
+
+@pytest.mark.parametrize(
+    ("route", "expected_terminal"),
+    [
+        ("onboarding_goal", "advanced"),
+        ("cancel", "finished"),
+        ("deterministic_recovery", "clarification"),
+    ],
+)
+def test_early_accepted_routes_persist_one_typed_turn_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    route: str,
+    expected_terminal: str,
+) -> None:
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    async def _provider_must_not_run(**_: Any):
+        raise AssertionError("early accepted routes must not call the provider")
+        yield
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _provider_must_not_run,
+    )
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    request_payload: dict[str, Any] = {
+        "conversation_id": conversation["id"],
+        "language": "en",
+    }
+    if route == "onboarding_goal":
+        client.patch(
+            "/api/v1/me",
+            json={
+                "onboarding": {
+                    "stage": "primary_goal_selection",
+                    "language_confirmed": True,
+                    "primary_goal": None,
+                    "completed": False,
+                }
+            },
+        )
+        request_payload["message"] = "__ONBOARDING_GOAL__:test_stock_idea"
+    elif route == "cancel":
+        _set_onboarding_ready(client, primary_goal="test_stock_idea")
+        api_state.store.messages[conversation["id"]].append(
+            prepare_message(
+                conversation_id=conversation["id"],
+                role="assistant",
+                content="Review this draft.",
+                metadata={
+                    "confirmation_card": {
+                        "confirmation_id": "confirmation-1",
+                    }
+                },
+            )
+        )
+        monkeypatch.setattr(
+            agent_router,
+            "checkpoint_has_pending_confirmation",
+            lambda _values: True,
+        )
+        monkeypatch.setattr(
+            agent_router,
+            "confirmation_metadata_fallback_context",
+            lambda **_: None,
+        )
+        request_payload["action"] = {
+            "type": "cancel_confirmation",
+            "label": "Cancel",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-1"},
+        }
+    else:
+        _set_onboarding_ready(client, primary_goal="test_stock_idea")
+        monkeypatch.setattr(
+            agent_router,
+            "stale_confirmation_action_message",
+            lambda **_: "That draft is no longer active.",
+        )
+        request_payload["action"] = {
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-1"},
+        }
+
+    response = client.post("/api/v1/chat/stream", json=request_payload)
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == expected_terminal
+    assert summary["progress_outcome"] == expected_terminal
+    assert summary["calls_reserved"] == 0
+    assert summary["provider_receipt_count"] == 0
+    summary_json = json.dumps(summary)
+    assert "__ONBOARDING_GOAL__" not in summary_json
+    assert "That draft is no longer active." not in summary_json
+    assert active_turn_execution() is None
+
+
+def test_normal_onboarding_language_enters_runtime_and_persists_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    async def _runtime_events(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "_turn_progress": {
+                "output_fingerprint": "b" * 64,
+                "progress_outcome": "advanced",
+                "terminal": "advanced",
+                "terminal_reason": "runtime_final",
+            },
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "I can help test Apple.",
+            },
+        }
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_events)
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    client.patch(
+        "/api/v1/me",
+        json={
+            "onboarding": {
+                "stage": "primary_goal_selection",
+                "language_confirmed": True,
+                "primary_goal": None,
+                "completed": False,
+            }
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "I want to test Apple.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 1
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == "advanced"
+    assert summary["progress_outcome"] == "advanced"
+    assert summary["calls_reserved"] == 0
+    assert summary["provider_receipt_count"] == 0
+    assert "_turn_progress" not in response.text
+    assert active_turn_execution() is None
 
 
 def test_chat_stream_production_path_uses_astream_events_not_invoke() -> None:

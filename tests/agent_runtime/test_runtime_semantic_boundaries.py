@@ -11,6 +11,7 @@ RUNTIME_INTENT_FILES = [
     "src/argus/agent_runtime/stages/execute.py",
     "src/argus/agent_runtime/rule_specs.py",
     "src/argus/agent_runtime/signal_rule_repair.py",
+    "src/argus/agent_runtime/turn_progress.py",
     "src/argus/agent_runtime/turn_execution_evidence.py",
 ]
 

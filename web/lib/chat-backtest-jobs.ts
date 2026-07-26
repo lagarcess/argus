@@ -33,9 +33,6 @@ const JOB_SETTLEABLE_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>
 ]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
-  if (message.role === "user") {
-    return null;
-  }
   const job = backtestJobFromMetadata(message.metadata ?? {});
   if (!job) {
     return null;
@@ -99,6 +96,15 @@ export function applyBacktestJobUpdate(
     return message;
   });
   return settleConfirmationLabelsForJob(updatedMessages, response.job);
+}
+
+export function applyHydratedBacktestJobTruth(messages: Message[]): Message[] {
+  return messages.reduce((projected, message) => {
+    if (message.kind !== "backtest_job" || !message.backtestJob) {
+      return projected;
+    }
+    return settleConfirmationLabelsForJob(projected, message.backtestJob);
+  }, messages);
 }
 
 function resultMessageFromRun(

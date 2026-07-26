@@ -5,6 +5,7 @@ import os
 
 from loguru import logger
 
+from argus.agent_runtime.turn_execution import detach_turn_execution
 from argus.api.artifact_naming import (
     maybe_generate_conversation_title,
     maybe_generate_saved_strategy_name,
@@ -141,6 +142,7 @@ def schedule_artifact_naming_after_stream(
         return
 
     async def _run() -> None:
+        detach_turn_execution()
         await asyncio.to_thread(
             finalize_conversation_title_after_turn,
             user_id=user_id,

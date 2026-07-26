@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+import pytest
+from argus.api import state as api_state
 
 from tests.evals.chat_runtime_eval_harness import (
     ALPHA_TRAJECTORY_PATH,
@@ -15,9 +19,19 @@ from tests.evals.chat_runtime_eval_harness import (
     trajectory_scorecard_for_results,
     write_trajectory_scorecard,
 )
+from tests.evals.chat_runtime_trajectory_adapters import ConcreteTrajectoryRuntime
 
 EXPECTED_ALPHA_LABELS = {f"alpha_session_{index:02d}" for index in range(1, 8)}
-EXPECTED_OWNING_ISSUES = {"#230", "#238", "#239", "#240", "#241", "#242", "#251"}
+ISSUE_LABELS = {
+    "#238": "alpha_session_01",
+    "#239": "alpha_session_02",
+    "#241": "alpha_session_03",
+    "#251": "alpha_session_04",
+    "#242": "alpha_session_05",
+    "#230": "alpha_session_06",
+    "#240": "alpha_session_07",
+}
+EXPECTED_UNRESOLVED_ISSUES = {"#239", "#241", "#251"}
 EXPECTED_OPERATIONS = {
     "stream",
     "action",
@@ -26,6 +40,534 @@ EXPECTED_OPERATIONS = {
     "retry",
     "persistence",
 }
+
+
+def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        results = {
+            trajectory.label: run_alpha_trajectory(
+                trajectory=trajectory,
+                adapters=runtime.adapters,
+            )
+            for trajectory in load_alpha_trajectories()
+        }
+
+    assert {label: result.status for label, result in results.items()} == {
+        "alpha_session_01": "passed",
+        "alpha_session_02": "expected_failed",
+        "alpha_session_03": "expected_failed",
+        "alpha_session_04": "expected_failed",
+        "alpha_session_05": "passed",
+        "alpha_session_06": "passed",
+        "alpha_session_07": "passed",
+    }
+    assert all(
+        result.failed_checks
+        for label, result in results.items()
+        if label in {"alpha_session_02", "alpha_session_03", "alpha_session_04"}
+    )
+
+
+def test_concrete_reload_cannot_pass_from_cached_alias_when_persistence_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#239")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        api_state.store.messages[state.conversation_id] = []
+
+        observation = runtime.reload(
+            trajectory=trajectory,
+            step=trajectory.steps[3],
+            history=(),
+        )
+
+    assert observation.artifact_identity is None
+    assert observation.reload_state is None
+
+
+def test_concrete_stream_fails_closed_when_route_fingerprint_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    trajectory = _trajectory_for_issue("#239")
+    monkeypatch.setattr(
+        agent_router,
+        "turn_execution_summary",
+        lambda _receipts: {
+            "input_fingerprint": None,
+            "output_fingerprint": None,
+        },
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        with pytest.raises(
+            AssertionError,
+            match="persisted route execution fingerprint",
+        ):
+            runtime.stream(
+                trajectory=trajectory,
+                step=trajectory.steps[0],
+                history=(),
+            )
+
+
+def test_run_disconnect_submits_once_through_the_real_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        before_count = len(api_state.store.messages[state.conversation_id])
+
+        observation = runtime.disconnect(
+            trajectory=trajectory,
+            step=trajectory.steps[1],
+            history=(),
+        )
+
+        submitted_actions = [
+            message
+            for message in api_state.store.messages[state.conversation_id][before_count:]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        jobs = [
+            job
+            for job in api_state.store.backtest_jobs.values()
+            if job.get("conversation_id") == state.conversation_id
+        ]
+
+    assert observation.typed_terminal is False
+    assert len(submitted_actions) == 1
+    assert len(jobs) == 1
+
+
+def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat.request_admission import ChatRequestAdmission
+
+    from tests.evals.chat_runtime_trajectory_adapters import _TransportCut
+
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        raw_confirmation_id = state.raw_artifact_ids[
+            "alpha_session_05:confirmation:1"
+        ]
+        action = deepcopy(
+            trajectory.steps[1].request["submission"]["request"]["action"]
+        )
+        action.update(
+            label="Run backtest",
+            presentation="confirmation",
+            payload={"confirmation_id": raw_confirmation_id},
+        )
+        request = {
+            "conversation_id": state.conversation_id,
+            "language": trajectory.locale,
+            "action": action,
+        }
+        headers = {"Idempotency-Key": raw_confirmation_id}
+        original_persist = ChatRequestAdmission.persist
+
+        def persist_then_disconnect(admission: ChatRequestAdmission):
+            message = original_persist(admission)
+            if admission.owner == "message_only":
+                raise _TransportCut("after_action_message_persistence")
+            return message
+
+        with monkeypatch.context() as cut:
+            cut.setattr(ChatRequestAdmission, "persist", persist_then_disconnect)
+            try:
+                runtime._http.post(
+                    "/api/v1/chat/stream",
+                    headers=headers,
+                    json=request,
+                )
+            except BaseException as exc:
+                assert runtime._contains_transport_cut(exc)
+            else:
+                raise AssertionError("action transport cut did not fire")
+
+        run_actions_before = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        assert len(run_actions_before) == 1
+        assert api_state.store.backtest_jobs == {}
+        assert api_state.store.backtest_job_reservations == {}
+        assert all(
+            key[1] != "backtest_runs"
+            for key in api_state.store.usage_counters
+        )
+
+        with monkeypatch.context() as lookup_patch:
+            lookup_patch.setattr(
+                api_state,
+                "supabase_gateway",
+                runtime._backtest_gateway,
+            )
+            lookup = runtime._http.get(
+                f"/api/v1/backtest-jobs/by-action/{raw_confirmation_id}"
+            )
+        assert lookup.status_code == 404
+
+        admission_calls: list[dict[str, Any]] = []
+        original_admit = runtime._backtest_gateway.admit_backtest_job
+
+        def counted_admit(**kwargs: Any) -> dict[str, Any]:
+            admission_calls.append(kwargs)
+            return original_admit(**kwargs)
+
+        monkeypatch.setattr(
+            runtime._backtest_gateway,
+            "admit_backtest_job",
+            counted_admit,
+        )
+        replay = runtime._http.post(
+            "/api/v1/chat/stream",
+            headers=headers,
+            json=request,
+        )
+        replay.raise_for_status()
+        reload_response = runtime._http.get(
+            f"/api/v1/conversations/{state.conversation_id}/messages"
+        )
+        reload_response.raise_for_status()
+
+        run_actions_after = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.metadata.get("chat_action", {}).get("type") == "run_backtest"
+        ]
+        reloaded_run_actions = [
+            message
+            for message in reload_response.json()["items"]
+            if message["role"] == "user"
+            and message["metadata"].get("chat_action", {}).get("type")
+            == "run_backtest"
+        ]
+        jobs = [
+            job
+            for job in api_state.store.backtest_jobs.values()
+            if job.get("conversation_id") == state.conversation_id
+        ]
+
+    assert [message.id for message in run_actions_after] == [
+        run_actions_before[0].id
+    ]
+    assert [message["id"] for message in reloaded_run_actions] == [
+        run_actions_before[0].id
+    ]
+    assert len(admission_calls) == 1
+    assert len(jobs) == 1
+    assert len(api_state.store.backtest_job_reservations) == 1
+    assert {
+        int(row.get("used_count", 0))
+        for key, row in api_state.store.usage_counters.items()
+        if key[1] == "backtest_runs"
+    } == {1}
+    assert api_state.store.backtest_runs == {}
+    assert api_state.store.backtest_finalizations == {}
+
+
+def test_direct_job_bypass_cannot_satisfy_persisted_trajectory_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#242")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        confirmation_alias = "alpha_session_05:confirmation:1"
+        raw_confirmation_id = state.raw_artifact_ids[confirmation_alias]
+        confirmation_message = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "assistant"
+            and message.metadata.get("confirmation_card", {}).get("confirmation_id")
+            == raw_confirmation_id
+        )
+        raw_job_id = "direct-bypass-job"
+        job_alias = "alpha_session_05:job:1"
+        api_state.store.backtest_jobs[raw_job_id] = {
+            "id": raw_job_id,
+            "conversation_id": state.conversation_id,
+            "idempotency_key": raw_confirmation_id,
+            "confirmation_message_id": confirmation_message.id,
+            "created_at": "9999-12-31T00:00:00+00:00",
+        }
+        state.artifact_aliases[raw_job_id] = job_alias
+        state.raw_artifact_ids[job_alias] = raw_job_id
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[-1],
+            history=(),
+        )
+
+    assert observation.artifact_identity == confirmation_alias
+    assert observation.artifact_identity != job_alias
+
+
+def test_concrete_expected_fail_masks_exactly_match_observed_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        results = {
+            trajectory.label: (
+                trajectory,
+                run_alpha_trajectory(
+                    trajectory=trajectory,
+                    adapters=runtime.adapters,
+                ),
+            )
+            for trajectory in load_alpha_trajectories()
+            if trajectory.expected_fail is not None
+        }
+
+    for trajectory, result in results.values():
+        assert trajectory.expected_fail is not None
+        configured = {
+            (allowed.step_id, allowed.prefix)
+            for allowed in trajectory.expected_fail.allowed_failures
+        }
+        observed = {
+            (step_result.step_id, f"{failure.split(':', 1)[0]}:")
+            for step_result in result.step_results
+            for failure in step_result.failed_checks
+        }
+        assert configured == observed, trajectory.label
+
+
+def test_concrete_persistence_counts_injected_stale_job_owner_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = next(
+        item
+        for item in load_alpha_trajectories()
+        if item.label == "alpha_session_01"
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:3]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        old_confirmation = state.raw_artifact_ids[
+            "alpha_session_01:confirmation:1"
+        ]
+        api_state.store.backtest_jobs["injected-stale-job"] = {
+            "id": "injected-stale-job",
+            "conversation_id": state.conversation_id,
+            "idempotency_key": old_confirmation,
+        }
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[3],
+            history=(),
+        )
+
+    assert observation.checkpoints["stale_action.persisted_execution_count"] == 1
+
+
+def test_concrete_persistence_counts_repeated_terminal_fingerprint_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#239")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:2]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        evidence = runtime._persisted_route_evidence[state.conversation_id]
+        evidence.append(deepcopy(evidence[-1]))
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.checkpoints["terminal.repeated_fingerprint_count"] == 1
+
+
+def test_concrete_persistence_counts_duplicate_lifecycle_identity_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        runtime.disconnect(
+            trajectory=trajectory,
+            step=trajectory.steps[1],
+            history=(),
+        )
+        state = runtime._state(trajectory)
+        assert state.disconnected_turn_id is not None
+        original = api_state.store.chat_turn_lifecycles[state.disconnected_turn_id]
+        original_message = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.id == state.disconnected_turn_id
+        )
+        duplicate_turn_id = "injected-duplicate-turn"
+        api_state.store.messages[state.conversation_id].append(
+            original_message.model_copy(update={"id": duplicate_turn_id})
+        )
+        api_state.store.chat_turn_lifecycles[duplicate_turn_id] = {
+            **original,
+            "turn_id": duplicate_turn_id,
+        }
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.checkpoints["persistence.durable_identity_count"] == 2
+
+
+def test_abandoned_retry_uses_projected_authority_and_creates_one_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        before_lifecycles = len(
+            [
+                row
+                for row in api_state.store.chat_turn_lifecycles.values()
+                if row["conversation_id"] == state.conversation_id
+            ]
+        )
+        observation = runtime.retry(
+            trajectory=trajectory,
+            step=trajectory.steps[4],
+            history=(),
+        )
+        after_rows = [
+            row
+            for row in api_state.store.chat_turn_lifecycles.values()
+            if row["conversation_id"] == state.conversation_id
+        ]
+        persisted_requests = [
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "user"
+            and message.content == "Change the active test to the last six months."
+        ]
+
+    assert len(after_rows) == before_lifecycles + 1
+    assert len(persisted_requests) == 2
+    assert observation.checkpoints == {
+        "retry_last_turn.request_message_id": "alpha_session_07:turn:1",
+        "orphan_turn.duplicate_turn_count": 0,
+        "terminal.artifact_identity": "alpha_session_07:confirmation:2",
+    }
+
+
+def test_abandoned_retry_reports_injected_duplicate_attempt_owner_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        submit_stream = runtime._submit_stream
+
+        def _submit_with_duplicate_owner(**kwargs: Any):
+            result = submit_stream(**kwargs)
+            retry_rows = [
+                row
+                for row in runtime._matching_lifecycle_rows(state=state)
+                if row["turn_id"] != state.disconnected_turn_id
+            ]
+            assert len(retry_rows) == 1
+            retry_row = retry_rows[0]
+            retry_message = next(
+                message
+                for message in api_state.store.messages[state.conversation_id]
+                if message.id == retry_row["turn_id"]
+            )
+            duplicate_turn_id = "injected-duplicate-retry"
+            api_state.store.messages[state.conversation_id].append(
+                retry_message.model_copy(update={"id": duplicate_turn_id})
+            )
+            api_state.store.chat_turn_lifecycles[duplicate_turn_id] = {
+                **retry_row,
+                "turn_id": duplicate_turn_id,
+                "request_id": "injected-duplicate-request",
+            }
+            return result
+
+        monkeypatch.setattr(runtime, "_submit_stream", _submit_with_duplicate_owner)
+        observation = runtime.retry(
+            trajectory=trajectory,
+            step=trajectory.steps[4],
+            history=(),
+        )
+
+    assert observation.checkpoints["orphan_turn.duplicate_turn_count"] == 1
+
+
+def test_abandoned_retry_rejects_a_fixture_identity_without_projected_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#240")
+    retry_step = replace(
+        trajectory.steps[4],
+        request={
+            "action": {
+                "type": "retry_last_turn",
+                "payload": {"request_message_id": "alpha_session_07:turn:other"},
+            }
+        },
+    )
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:4]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+
+        with pytest.raises(
+            AssertionError,
+            match="projected retry authority",
+        ):
+            runtime.retry(
+                trajectory=trajectory,
+                step=retry_step,
+                history=(),
+            )
 
 
 def _matching_observation(step: Any) -> StepObservation:
@@ -95,7 +637,7 @@ def _trajectory_for_issue(issue: str) -> Any:
     return next(
         trajectory
         for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue == issue
+        if trajectory.label == ISSUE_LABELS[issue]
     )
 
 
@@ -125,9 +667,11 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
 
     assert {trajectory.label for trajectory in trajectories} == EXPECTED_ALPHA_LABELS
     assert {trajectory.locale for trajectory in trajectories} == {"en", "es-419"}
-    assert {trajectory.expected_fail.issue for trajectory in trajectories} == (
-        EXPECTED_OWNING_ISSUES
-    )
+    assert {
+        trajectory.expected_fail.issue
+        for trajectory in trajectories
+        if trajectory.expected_fail is not None
+    } == EXPECTED_UNRESOLVED_ISSUES
     assert {
         step.operation for trajectory in trajectories for step in trajectory.steps
     } == EXPECTED_OPERATIONS
@@ -156,14 +700,15 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
     for trajectory in trajectories:
         assert trajectory.purpose
         assert len(trajectory.steps) >= 3
-        assert trajectory.expected_fail.reason
-        assert trajectory.expected_fail.allowed_failures
-        assert re.fullmatch(r"#\d+", trajectory.expected_fail.issue)
-        assert all(
-            allowed_failure.step_id.startswith(f"{trajectory.label}:step:")
-            and allowed_failure.prefix.endswith(":")
-            for allowed_failure in trajectory.expected_fail.allowed_failures
-        )
+        if trajectory.expected_fail is not None:
+            assert trajectory.expected_fail.reason
+            assert trajectory.expected_fail.allowed_failures
+            assert re.fullmatch(r"#\d+", trajectory.expected_fail.issue)
+            assert all(
+                allowed_failure.step_id.startswith(f"{trajectory.label}:step:")
+                and allowed_failure.prefix.endswith(":")
+                for allowed_failure in trajectory.expected_fail.allowed_failures
+            )
         assert [step.index for step in trajectory.steps] == list(
             range(1, len(trajectory.steps) + 1)
         )
@@ -172,22 +717,14 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
             for step in trajectory.steps
         )
 
-    data_window = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#251"
-    )
+    data_window = _trajectory_for_issue("#251")
     assert "retail" in data_window.tags
     assert any(
         allowed_failure.prefix == "effective_window:"
         for allowed_failure in data_window.expected_fail.allowed_failures
     )
 
-    orphan_reconciliation = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#240"
-    )
+    orphan_reconciliation = _trajectory_for_issue("#240")
     assert orphan_reconciliation.steps[0].request == {
         "message": "Backtest holding MSFT for the past year."
     }
@@ -272,37 +809,26 @@ def test_run_actions_use_confirmation_id_as_the_exact_idempotency_identity() -> 
             assert step.request["submission"]["identity"] == confirmation_id
 
 
-def test_ambiguous_run_uses_by_action_lookup_before_one_exact_replay() -> None:
+def test_ambiguous_run_reconciles_by_action_without_replay() -> None:
     trajectory = _trajectory_for_issue("#242")
     confirmation_id = "alpha_session_05:confirmation:1"
     lookup_path = f"/api/v1/backtest-jobs/by-action/{confirmation_id}"
     lookup_step = trajectory.steps[2]
-    replay_step = trajectory.steps[3]
 
     assert lookup_step.operation == "reload"
     assert lookup_step.request == {
         "method": "GET",
         "path": lookup_path,
     }
-    assert lookup_step.expectation.reload_state == "not_found"
+    assert lookup_step.expectation.reload_state == "found"
+    assert lookup_step.expectation.artifact_identity == "alpha_session_05:job:1"
     assert lookup_step.expectation.action_identity == confirmation_id
     assert lookup_step.expectation.checkpoints == {
-        "by_action.lookup_status": 404,
-        "by_action.replay_allowed": True,
+        "by_action.lookup_status": 200,
+        "by_action.replay_allowed": False,
+        "admission.execution_count": 1,
     }
-
-    assert replay_step.operation == "retry"
-    replay_envelopes = _run_action_envelopes(replay_step.request)
-    assert len(replay_envelopes) == 1
-    assert replay_envelopes[0] == trajectory.steps[1].request["submission"]["request"]
-    assert replay_envelopes[0] == {
-        "action": {
-            "type": "run_backtest",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        "headers": {"Idempotency-Key": confirmation_id},
-    }
-    assert replay_step.expectation.checkpoints["by_action.replay_count"] == 1
+    assert all(step.operation != "retry" for step in trajectory.steps)
 
 
 def test_abandoned_turn_projects_terminal_recovery_and_keyed_retry() -> None:
@@ -357,12 +883,7 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert "runtime_budget_exhausted" not in raw
     assert "asset_discovery_unavailable" not in raw
 
-    contract_neutral_issues = {"#239", "#241"}
-    trajectories = [
-        trajectory
-        for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue in contract_neutral_issues
-    ]
+    trajectories = [_trajectory_for_issue(issue) for issue in ("#239", "#241")]
     for trajectory in trajectories:
         for step in trajectory.steps:
             assert step.expectation.recovery_code is None
@@ -370,19 +891,11 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
                 assert step.expectation.persistence_state is None
                 assert step.expectation.reload_state is None
 
-    budget_retry = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#239"
-    ).steps[1]
+    budget_retry = _trajectory_for_issue("#239").steps[1]
     assert budget_retry.expectation.visible_response_category == "typed_recovery"
     assert budget_retry.expectation.stage_outcome == "ready_to_respond"
 
-    discovery_recovery = next(
-        trajectory
-        for trajectory in trajectories
-        if trajectory.expected_fail.issue == "#241"
-    ).steps[0]
+    discovery_recovery = _trajectory_for_issue("#241").steps[0]
     assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
     assert discovery_recovery.expectation.stage_outcome == "needs_clarification"
 
@@ -405,6 +918,8 @@ def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None
     }
 
     for trajectory in load_alpha_trajectories():
+        if trajectory.expected_fail is None:
+            continue
         supported_by_step: dict[str, set[str]] = {}
         for step in trajectory.steps:
             supported = {"stale_action:", "orphan_turn:", "fingerprint:"}
@@ -455,14 +970,14 @@ def test_trajectory_runner_dispatches_every_step_through_typed_adapters() -> Non
         len(result.step_results) == len(trajectory.steps)
         for result, trajectory in zip(results, trajectories, strict=True)
     )
-    assert {result.status for result in results} == {"unexpected_pass"}
+    assert {result.status for result in results} == {"passed", "unexpected_pass"}
+    assert sum(result.status == "passed" for result in results) == 4
+    assert sum(result.status == "unexpected_pass" for result in results) == 3
     assert all(result.failed_checks == () for result in results)
 
 
 def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     first_step = trajectory.steps[0]
     matching = _matching_observation(first_step)
     allowed_failure = replace(
@@ -496,9 +1011,7 @@ def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
 
 
 def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     first_step = trajectory.steps[0]
     other_step = trajectory.steps[2]
     assert any(
@@ -535,9 +1048,7 @@ def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
 
 
 def test_runner_rejects_disconnect_after_terminal_for_same_submission() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#242"
-    )
+    trajectory = _trajectory_for_issue("#242")
     terminal_step = replace(
         trajectory.steps[0],
         request={
@@ -593,16 +1104,12 @@ def test_orphan_recovery_terminal_must_keep_the_same_durable_identity() -> None:
         ),
     )
 
-    assert result.status == "expected_failed"
+    assert result.status == "failed"
     assert any(check.startswith("agent_runtime_turn:") for check in result.failed_checks)
 
 
 def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
-    trajectories = load_alpha_trajectories()
-
-    budget_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#239"
-    )
+    budget_trajectory = _trajectory_for_issue("#239")
     budget_step = budget_trajectory.steps[0]
     budget_observation = replace(
         _matching_observation(budget_step),
@@ -612,17 +1119,15 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
         ),
     )
     budget_result = run_alpha_trajectory(
-        trajectory=budget_trajectory,
+        trajectory=replace(budget_trajectory, expected_fail=None),
         adapters=_recording_adapters(
             [], overrides={budget_step.step_id: budget_observation}
         ),
     )
-    assert budget_result.status == "expected_failed"
+    assert budget_result.status == "failed"
     assert any(check.startswith("budget.calls:") for check in budget_result.failed_checks)
 
-    stale_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#238"
-    )
+    stale_trajectory = _trajectory_for_issue("#238")
     stale_step = stale_trajectory.steps[2]
     stale_observation = replace(
         _matching_observation(stale_step),
@@ -634,12 +1139,10 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
             [], overrides={stale_step.step_id: stale_observation}
         ),
     )
-    assert stale_result.status == "expected_failed"
+    assert stale_result.status == "failed"
     assert any(check.startswith("stale_action:") for check in stale_result.failed_checks)
 
-    orphan_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#240"
-    )
+    orphan_trajectory = _trajectory_for_issue("#240")
     orphan_step = orphan_trajectory.steps[3]
     orphan_observation = replace(
         _matching_observation(orphan_step),
@@ -651,12 +1154,10 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
             [], overrides={orphan_step.step_id: orphan_observation}
         ),
     )
-    assert orphan_result.status == "expected_failed"
+    assert orphan_result.status == "failed"
     assert any(check.startswith("orphan_turn:") for check in orphan_result.failed_checks)
 
-    sse_trajectory = next(
-        item for item in trajectories if item.expected_fail.issue == "#251"
-    )
+    sse_trajectory = _trajectory_for_issue("#251")
     sse_step = sse_trajectory.steps[0]
     invalid_sse = replace(
         _matching_observation(sse_step),
@@ -671,9 +1172,7 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
 
 
 def test_canonical_sse_requires_framed_stage_sequence() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     matching = _matching_observation(step)
 
@@ -777,9 +1276,7 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
 
 def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     matching = _matching_observation(step)
     invalid_events = (
@@ -836,9 +1333,7 @@ def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None
 
 
 def test_route_budget_rejects_missing_or_invalid_measurements() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
-    )
+    trajectory = _trajectory_for_issue("#251")
     step = trajectory.steps[0]
     malformed = replace(
         _matching_observation(step),
@@ -895,10 +1390,10 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
 
     assert stored == scorecard | {"generated_at": stored["generated_at"]}
     assert stored["totals"] == {
-        "passed": 0,
+        "passed": 4,
         "failed": 0,
         "expected_failed": 0,
-        "unexpected_pass": 7,
+        "unexpected_pass": 3,
     }
     assert {result["label"] for result in stored["results"]} == EXPECTED_ALPHA_LABELS
     assert all(

@@ -33,6 +33,9 @@ from argus.domain.backtest_finalization import (
 from argus.domain.backtest_message_projection import (
     hydrate_completed_backtest_job_messages,
 )
+from argus.domain.chat_turn_lifecycle_gateway import (
+    ChatTurnLifecycleGatewayMixin,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -143,6 +146,7 @@ def _supabase_client_options() -> ClientOptions:
 @dataclass
 class SupabaseGateway(
     GuestAccountPersistenceMixin,
+    ChatTurnLifecycleGatewayMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
 ):
@@ -199,6 +203,7 @@ class SupabaseGateway(
         for table in (
             "feedback",
             "usage_counters",
+            "chat_turn_lifecycles",
             "collection_strategies",
             "decision_notes",
             "evidence_artifacts",
@@ -956,23 +961,24 @@ class SupabaseGateway(
         return dict(_row_one(created) or {})
 
     def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
+        return jobs.admit_backtest_job(self.client, **kwargs)
 
     def get_backtest_job_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.get_backtest_job_reservation(
-            self.client, **kwargs
-        )
+        return jobs.get_backtest_job_reservation(self.client, **kwargs)
+
+    def list_backtest_job_reservations(self, **kwargs: Any) -> list[dict[str, Any]]:
+        from argus.domain import backtest_admission_gateway as jobs
+
+        return jobs.list_backtest_job_reservations(self.client, **kwargs)
 
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
+        from argus.domain import backtest_admission_gateway as jobs
 
-        return backtest_admission_gateway.finalize_direct_backtest_job(
-            self.client, **kwargs
-        )
+        return jobs.finalize_direct_backtest_job(self.client, **kwargs)
 
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
@@ -987,11 +993,7 @@ class SupabaseGateway(
         return dict(row) if row is not None else None
 
     def count_backtest_jobs(
-        self,
-        *,
-        status: str,
-        user_id: str | None = None,
-        limit: int = 100,
+        self, *, status: str, user_id: str | None = None, limit: int = 100
     ) -> int:
         query = self.client.table("backtest_jobs").select("id").eq("status", status)
         if user_id is not None:
@@ -1138,11 +1140,12 @@ class SupabaseGateway(
         retryable: bool,
         execution_metadata: dict[str, Any] | None = None,
         finished_at: str | None = None,
+        expected_status: str | None = None,
+        expected_updated_at: str | None = None,
     ) -> dict[str, Any]:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
             raise ValueError("Backtest job not found or not owned by user.")
-
         metadata = dict(existing.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
         payload = {
@@ -1155,13 +1158,17 @@ class SupabaseGateway(
             "execution_metadata": metadata,
             "updated_at": _now_iso(),
         }
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
         )
+        if expected_status is not None:
+            update_query = update_query.eq("status", expected_status)
+        if expected_updated_at is not None:
+            update_query = update_query.eq("updated_at", expected_updated_at)
+        updated = update_query.execute()
         return dict(_row_one(updated) or {})
 
     def create_context_packet(
@@ -2038,7 +2045,6 @@ class SupabaseGateway(
             None if is_anonymous else self.private_alpha_role_for_email(email or "")
         )
         is_admin = allowlist_role in {"admin", "developer"}
-        # Try to get existing profile
         existing = self.get_user(user_id=user_id)
         if existing is not None:
             if not is_anonymous and existing.email is None:
@@ -2047,10 +2053,7 @@ class SupabaseGateway(
                     updates={"id": user_id, "email": email, "is_admin": is_admin},
                 )
             if is_admin and not existing.is_admin:
-                return self.update_user(
-                    user_id=user_id,
-                    updates={"id": user_id, "is_admin": True},
-                )
+                return self.update_user(user_id, {"id": user_id, "is_admin": True})
             return existing
 
         now = _now_iso()
@@ -2058,7 +2061,6 @@ class SupabaseGateway(
         user_metadata = raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
         metadata_language = user_metadata.get("language")
         language: Language = "es-419" if metadata_language == "es-419" else "en"
-        # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": email,
@@ -2078,11 +2080,18 @@ class SupabaseGateway(
             "updated_at": now,
         }
 
-        created = self.client.table("profiles").insert(payload).execute()
+        created = self.client.table("profiles").upsert(
+            payload, on_conflict="id", ignore_duplicates=True
+        ).execute()
         row = _row_one(created)
-        if row is None:
+        if row is not None:
+            return User.model_validate(row)
+        existing = self.get_user(user_id=user_id)
+        if existing is None:
             raise RuntimeError("Failed to create user profile.")
-        return User.model_validate(row)
+        if is_admin and not existing.is_admin:
+            return self.update_user(user_id, {"id": user_id, "is_admin": True})
+        return existing
 
     @staticmethod
     def parse_iso(value: str) -> datetime:

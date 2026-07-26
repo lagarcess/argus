@@ -78,6 +78,60 @@ def test_launch_payload_preserves_state_draft_without_confirmation_payload() -> 
     assert payload["benchmark_symbol"] == "SPY"
 
 
+def test_launch_payload_preserves_confirmation_measurement_for_execution() -> None:
+    raw_launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+        "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+        "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+            "effective_date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+            "adjustment_reason": "calendar_alignment",
+            "preflight_id": "coverage-fixture",
+            "observations_by_symbol": {"AAPL": 3, "SPY": 3},
+        },
+        "entry_rule": None,
+        "exit_rule": None,
+        "rule_spec": None,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10_000.0,
+        "position_size": None,
+        "cadence": None,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+        "_execution_realism": None,
+        "language": "en",
+    }
+    state = RunState.new(
+        current_user_message="Run the confirmed Apple backtest.",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = {"launch_payload": raw_launch_payload}
+
+    payload = _launch_payload(state)
+
+    assert payload["coverage_preflight"] == {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "requested_date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+        "effective_date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+        "adjustment_reason": "calendar_alignment",
+        "preflight_id": "coverage-fixture",
+        "observations_by_symbol": {"AAPL": 3, "SPY": 3},
+    }
+    assert (
+        raw_launch_payload["coverage_preflight"]["adjustment_reason"]
+        == "calendar_alignment"
+    )
+
+
 def test_launch_payload_maps_decimal_execution_realism_to_bps_when_flag_on(
     monkeypatch,
 ) -> None:
