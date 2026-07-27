@@ -375,7 +375,11 @@ def test_current_read_predicates_select_each_forward_index(
     idea_id = bounded_index_rows["owner_spine"]["idea_id"]
     with psycopg.connect(DSN) as connection:
         with connection.cursor() as cursor:
+            # Keep this tiny capability fixture deterministic; scale tests use
+            # the normal planner against 12,000-row owners.
             cursor.execute("set local enable_seqscan = off")
+            cursor.execute("set local enable_sort = off")
+            cursor.execute("set local enable_incremental_sort = off")
             queries = {
                 "idx_conversations_active_page": (
                     """
