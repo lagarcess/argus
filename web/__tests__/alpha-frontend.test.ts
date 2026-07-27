@@ -637,16 +637,23 @@ describe("Argus Alpha frontend contract", () => {
     expect(activeArtifactHelper).not.toContain("latestAi");
 
     // The floating composer strip is gone. Its gating survives on the row list:
-    // no next moves mid-stream, mid-hydration, or while a card owns actions.
+    // no next moves mid-turn or while a card owns actions. The in-flight lock
+    // is shared with the composer so persistent rows cannot bypass it.
+    const inFlight = chat.slice(
+      chat.indexOf("const turnInFlight ="),
+      chat.indexOf("const nextMovesEnabled ="),
+    );
+    expect(inFlight).toContain("streamStatus");
+    expect(inFlight).toContain("isStreamingResponse");
+    expect(inFlight).toContain("isHydratingConversation");
     const gate = chat.slice(
       chat.indexOf("const nextMovesEnabled ="),
       chat.indexOf("const latestAssistantContent"),
     );
-    expect(gate).toContain("!streamStatus");
-    expect(gate).toContain("!isStreamingResponse");
-    expect(gate).toContain("!isHydratingConversation");
+    expect(gate).toContain("!turnInFlight");
     expect(gate).toContain("!hasActiveArtifactActionSet(messages)");
     expect(chat).toContain("nextMovesEnabled={nextMovesEnabled}");
+    expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(chat).not.toContain("const composerActions =");
   });
 

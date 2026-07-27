@@ -86,6 +86,19 @@ describe("next moves answer the newest question only", () => {
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
   });
 
+  test("persistent discovery rows obey the same in-flight lock as the composer", () => {
+    // Discovery rows deliberately survive on older messages, so the per-message
+    // streaming flag does not cover them. Without the shared lock they would be
+    // a way to fire turns while one is already running.
+    expect(chat).toContain("const turnInFlight =");
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(message).toContain("disabled={turnInFlight}");
+    expect(row).toContain("disabled={disabled}");
+    // Disabled rows stay readable: they are evidence, not just an affordance.
+    expect(row).toContain("disabled:opacity-55");
+    expect(row).not.toContain("disabled:hidden");
+  });
+
   test("the floating composer strip is gone and its gating survives", () => {
     expect(chat).not.toContain("const composerActions =");
     expect(chat).toContain("const nextMovesEnabled =");

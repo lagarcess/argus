@@ -37,6 +37,7 @@ type ChatMessageProps = {
   isStreaming?: boolean;
   conversationId?: string | null;
   nextMovesEnabled?: boolean;
+  turnInFlight?: boolean;
 };
 
 export default function ChatMessage({
@@ -48,6 +49,7 @@ export default function ChatMessage({
   isStreaming,
   conversationId,
   nextMovesEnabled = true,
+  turnInFlight = false,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
@@ -355,6 +357,7 @@ export default function ChatMessage({
                     <NextMoveRow
                       key={candidate.symbol}
                       ariaLabel={sendText}
+                      disabled={turnInFlight}
                       onClick={() =>
                         onAction?.({
                           type: "select_discovery_candidate",

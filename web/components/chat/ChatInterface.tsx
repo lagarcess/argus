@@ -1994,15 +1994,17 @@ export default function ChatInterface() {
     }
   };
 
+  // One in-flight lock for every way to start a turn. The composer already
+  // disables itself while a turn runs; persistent discovery rows have to obey
+  // the same lock or they become a way to spam turns around it.
+  const turnInFlight =
+    Boolean(streamStatus) || isStreamingResponse || isHydratingConversation;
   // Next-move rows render under their owning message instead of a floating
   // strip above the composer, but they keep every gate the strip applied:
-  // nothing offers a next move mid-stream, mid-hydration, or while an active
-  // card already owns the conversation's actions.
+  // nothing offers a next move mid-turn, or while an active card already owns
+  // the conversation's actions.
   const nextMovesEnabled =
-    !streamStatus &&
-    !isStreamingResponse &&
-    !isHydratingConversation &&
-    !hasActiveArtifactActionSet(messages);
+    !turnInFlight && !hasActiveArtifactActionSet(messages);
   const latestAssistantContent =
     [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
@@ -2263,6 +2265,7 @@ export default function ChatInterface() {
                           onToast={showToast}
                           isLatest={isLatestAi}
                           nextMovesEnabled={nextMovesEnabled}
+                          turnInFlight={turnInFlight}
                           isStreaming={isWorkingMessage}
                           conversationId={conversationId}
                         />

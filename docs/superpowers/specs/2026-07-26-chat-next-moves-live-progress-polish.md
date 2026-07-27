@@ -115,6 +115,24 @@ Discovery candidate rows opt out of this rule by construction: they are owned
 by their message's `metadata.discovery` sidecar, not by the latest-AI-message
 gate, and therefore persist.
 
+**Locked dispositions (founder decision 2026-07-27).** These were argued and
+settled; do not reopen without new evidence.
+
+| Option | Disposition | Reason |
+| --- | --- | --- |
+| Remove candidate rows once one is tapped | **Rejected** | Costs more, not less. The user then asks "what were those railroads again?", which is a fresh metered search to re-tell them something already told. Measured: three turns in a live session produced exactly one search; re-taps consume no search and no discovery quota. |
+| Freeze a row after one tap | **Rejected** | No requirement owner, no observed failure, and it contradicts grounded discovery design §8. It eliminates one case (double-tap) out of seven; every hard case is about switching *between* candidates and survives untouched. It also forbids the reasonable act of re-running the same asset over different dates. |
+| Discovery-specific machinery for mid-setup switches | **Rejected as framed** | A tap is an ordinary user turn (design §8). "Tap UNP while answering a CSX date question" is the same event as typing it, and that path already exists and is tested. The observed failure was a parse defect (`"Backtest UNP"` read as a strategy name), not a state defect. |
+| Keep rows live, mark what was chosen, handle switches honestly | **Accepted** | Preserves paid-for evidence, keeps re-testing one tap away, and makes the decision legible. |
+| Chosen-state marker | **Deferred to Slice D** | Needs backend truth about the selection to survive reload; guessing from transcript text is the fragility being removed. The user's own echo bubble already shows the choice today. |
+| Carry assumptions forward on a mid-setup switch | **Deferred, not this lane** | A general interpreter improvement owed to typed input too, not a discovery debt. |
+
+**In-flight lock (in this slice).** The composer disables itself while a turn
+runs. Persistent discovery rows must obey the same lock or they become a way to
+fire turns around it — the per-message streaming flag does not cover a row on an
+older message. One shared `turnInFlight` signal drives both. Disabled rows stay
+visible and readable, because they are evidence, and simply stop accepting taps.
+
 **One current behavior is deliberately removed.** Assistant footer actions today
 do not disappear on older messages — they fade to `opacity-0` and return on
 hover (`ChatMessage.tsx`, `footerVisibilityClass`). Hover does not exist on
