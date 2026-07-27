@@ -40,12 +40,27 @@ def _packet() -> SearchResultPacket:
     )
 
 
-def _resolver(known: dict[str, str]):
+# A real provider returns the company's actual name ("CrowdStrike Holdings"),
+# which is what lets validation check that a resolved asset is about the entity
+# the sources named. A stub returning "CRWD Inc" cannot corroborate anything.
+_CATALOG_NAMES = {
+    "CRWD": "CrowdStrike Holdings",
+    "PANW": "Palo Alto Networks",
+    "CSCO": "Cisco Systems",
+    "AAPL": "Apple Inc",
+}
+
+
+def _resolver(known: dict[str, str], *, names: dict[str, str] | None = None):
+    catalog = {**_CATALOG_NAMES, **(names or {})}
+
     def resolve(symbol: str, **_: Any) -> _Asset:
         cleaned = symbol.strip().upper()
         if cleaned not in known:
             raise ValueError(f"unknown symbol {symbol}")
-        return _Asset(cleaned, known[cleaned], name=f"{cleaned} Inc")
+        return _Asset(
+            cleaned, known[cleaned], name=catalog.get(cleaned, f"{cleaned} Inc")
+        )
 
     return resolve
 
@@ -88,7 +103,7 @@ class TestValidatedCandidates:
         extraction = DiscoveryExtraction(
             candidates=[
                 _candidate("AAA"),
-                _candidate("aaa", name="dupe"),
+                _candidate("aaa"),
                 _candidate("BBB"),
                 _candidate("CCC"),
                 _candidate("DDD"),
@@ -117,7 +132,7 @@ class TestValidatedCandidates:
             candidates=[
                 _candidate(
                     "CRWD",
-                    name="Crowd\x00Strike" + "x" * 300,
+                    name="CrowdStrike",
                     reason="r\x1b" * 300,
                 ),
             ]
@@ -192,18 +207,89 @@ class TestReviewHardening:
     def test_candidate_name_is_resolver_owned_not_extracted(self) -> None:
         extraction = DiscoveryExtraction(
             candidates=[
-                _candidate("AAPL", name="CrowdStrike", sources=[0]),
+                _candidate("CRWD", name="CrowdStrike", sources=[0]),
             ]
         )
         validated, _ = validated_candidates(
             extraction,
             packet=_packet(),
+            resolve=_resolver({"CRWD": "equity"}),
+            max_candidates=5,
+        )
+        assert validated[0].symbol == "CRWD"
+        # The resolver owns the displayed identity even when it corroborates.
+        assert validated[0].name == "CrowdStrike Holdings"
+
+    def test_ticker_collision_with_an_unrelated_company_is_dropped(self) -> None:
+        """A real ticker paired with a different company must not be selectable.
+
+        This is the TRX case: sources named Tron, the symbol resolved to a gold
+        miner that merely shares the ticker. Previously the resolver's name
+        silently replaced the extracted one and the wrong asset stayed
+        actionable.
+        """
+        extraction = DiscoveryExtraction(
+            candidates=[
+                _candidate("AAPL", name="CrowdStrike", sources=[0]),
+            ]
+        )
+        validated, unverified = validated_candidates(
+            extraction,
+            packet=_packet(),
             resolve=_resolver({"AAPL": "equity"}),
             max_candidates=5,
         )
-        assert validated[0].symbol == "AAPL"
-        assert validated[0].name == "AAPL Inc"
-        assert "CrowdStrike" not in validated[0].name
+        assert validated == []
+        assert unverified == ["CrowdStrike"]
+
+    def test_exposure_vehicle_is_currently_dropped_known_limitation(self) -> None:
+        """KNOWN LIMITATION: a crypto-exposure ETF does not survive today.
+
+        Corroboration requires a single named token to lead the resolved name
+        and the name to be short, which is what stops "Apple" from matching
+        "Apple Hospitality REIT". "Grayscale Bitcoin Mini Trust ETF" fails both,
+        so a legitimate exposure vehicle is dropped to unverified prose rather
+        than offered as selectable.
+
+        That is the safe direction — honest and non-actionable, versus a wrong
+        asset the user can run. Surfacing exposure vehicles deliberately needs
+        its own design; loosening this rule would reopen the collision class.
+        """
+        extraction = DiscoveryExtraction(
+            candidates=[
+                _candidate("BTCM", name="Bitcoin", sources=[0]),
+            ]
+        )
+        validated, unverified = validated_candidates(
+            extraction,
+            packet=_packet(),
+            resolve=_resolver(
+                {"BTCM": "equity"},
+                names={"BTCM": "Grayscale Bitcoin Mini Trust ETF"},
+            ),
+            max_candidates=5,
+            asset_class_hint="crypto",
+        )
+        assert validated == []
+        assert unverified == ["Bitcoin"]
+
+    def test_bare_ticker_without_an_entity_name_falls_back_to_the_class_hint(
+        self,
+    ) -> None:
+        """With no named entity there is nothing to corroborate against."""
+        extraction = DiscoveryExtraction(
+            candidates=[
+                _candidate("TRX", sources=[0]),
+            ]
+        )
+        validated, _ = validated_candidates(
+            extraction,
+            packet=_packet(),
+            resolve=_resolver({"TRX": "equity"}),
+            max_candidates=5,
+            asset_class_hint="crypto",
+        )
+        assert validated == []
 
     def test_candidate_without_source_evidence_is_not_selectable(self) -> None:
         extraction = DiscoveryExtraction(

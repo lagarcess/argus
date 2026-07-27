@@ -4,6 +4,9 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from argus.agent_runtime.asset_text_grounding import (
+    text_corroborates_resolved_asset,
+)
 from argus.agent_runtime.discovery.contracts import (
     MAX_CANDIDATE_NAME_CHARS,
     MAX_REASON_CHARS,
@@ -20,12 +23,38 @@ def _bounded_text(value: str, limit: int) -> str:
     return cleaned.strip()[:limit]
 
 
+def _resolution_matches_request(
+    *,
+    display_name: str,
+    symbol_guess: str,
+    resolved: Any,
+    asset_class: str,
+    asset_class_hint: str | None,
+) -> bool:
+    """Is the resolved asset about the entity the sources actually named?
+
+    A ticker can exist in more than one asset class, so resolving the symbol
+    alone can return an unrelated company that merely shares it. Corroboration
+    is what separates a crypto-exposure equity (a Bitcoin trust answering a
+    Bitcoin question) from a collision (a gold miner answering a Tron
+    question).
+    """
+
+    if display_name and display_name.strip().upper() != symbol_guess:
+        return text_corroborates_resolved_asset(display_name, resolved)
+    # The extraction named no entity beyond the ticker, so there is nothing to
+    # corroborate against. The request's own class hint is the only remaining
+    # signal; without one, the symbol stands on its own.
+    return asset_class_hint is None or asset_class == asset_class_hint
+
+
 def validated_candidates(
     extraction: DiscoveryExtraction,
     *,
     packet: SearchResultPacket,
     resolve: Callable[..., Any],
     max_candidates: int,
+    asset_class_hint: str | None = None,
 ) -> tuple[list[ValidatedCandidate], list[str]]:
     """Independently verify every extracted candidate before it can act.
 
@@ -62,6 +91,23 @@ def validated_candidates(
             or not canonical_symbol
             or asset_class not in {"equity", "crypto", "currency_pair"}
         ):
+            _note_unverified(unverified, display_name or symbol_guess)
+            continue
+        if not _resolution_matches_request(
+            display_name=display_name,
+            symbol_guess=symbol_guess,
+            resolved=resolved,
+            asset_class=str(asset_class),
+            asset_class_hint=asset_class_hint,
+        ):
+            logger.info(
+                "Discovery candidate dropped: resolution does not match the named entity",
+                symbol_guess=symbol_guess,
+                extracted_name=display_name,
+                resolved_name=str(getattr(resolved, "name", "") or ""),
+                resolved_class=str(asset_class),
+                asset_class_hint=asset_class_hint,
+            )
             _note_unverified(unverified, display_name or symbol_guess)
             continue
         canonical = str(canonical_symbol).upper()
