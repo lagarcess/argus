@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { formattedSourceDate } from "../components/chat/DiscoverySourcesPanel";
+import { markComposerActionsInactive } from "../components/chat/chat-message-projection";
 
 const root = join(import.meta.dir, "..");
 
@@ -116,6 +117,59 @@ describe("next moves answer the newest question only", () => {
     expect(rowBlock).toContain("<NextMoveRow");
     expect(rowBlock).not.toContain("footerVisibilityClass");
     expect(rowBlock).not.toContain("group-hover:opacity-100");
+  });
+});
+
+describe("who retires an action", () => {
+  // Card actions die with their artifact, retry dies with its turn, and
+  // conversational next moves are retired by the row renderer. One field holds
+  // all three, so supersession must not retire what it does not own.
+  test("supersession migrates card actions and clears retry, but keeps conversational options", () => {
+    const superseded = markComposerActionsInactive([
+      {
+        id: "a",
+        role: "ai",
+        kind: "text",
+        actions: [
+          {
+            id: "unsupported-strategy-rsi-threshold",
+            label: "Use a supported RSI threshold rule",
+            type: "select_response_option",
+          },
+          { id: "retry-1", label: "Retry", type: "retry_last_turn" },
+        ],
+      },
+      {
+        id: "b",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: { actions: undefined },
+        actions: [{ type: "run_backtest", label: "Run backtest" }],
+      },
+    ] as never);
+
+    // Conversational option survives; retry does not.
+    expect(superseded[0].actions?.map((a) => a.id)).toEqual([
+      "unsupported-strategy-rsi-threshold",
+    ]);
+    // Card action migrates onto the artifact that owns it.
+    expect(superseded[1].actions).toBeUndefined();
+    expect(
+      (superseded[1] as { confirmation: { actions: Array<{ type: string }> } })
+        .confirmation.actions.map((a) => a.type),
+    ).toEqual(["run_backtest"]);
+  });
+
+  test("a message with only retry loses its actions entirely", () => {
+    const superseded = markComposerActionsInactive([
+      {
+        id: "a",
+        role: "ai",
+        kind: "text",
+        actions: [{ id: "retry-1", label: "Retry", type: "retry_last_turn" }],
+      },
+    ] as never);
+    expect(superseded[0].actions).toBeUndefined();
   });
 });
 
