@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { formattedSourceDate } from "../components/chat/DiscoverySourcesPanel";
 import { markComposerActionsInactive } from "../components/chat/chat-message-projection";
+import { discoveryCandidateMention } from "../lib/chat-discovery-sidecar";
 
 const root = join(import.meta.dir, "..");
 
@@ -117,6 +118,59 @@ describe("next moves answer the newest question only", () => {
     expect(rowBlock).toContain("<NextMoveRow");
     expect(rowBlock).not.toContain("footerVisibilityClass");
     expect(rowBlock).not.toContain("group-hover:opacity-100");
+  });
+});
+
+describe("discovery selection carries resolved identity", () => {
+  const tap = (payload: Record<string, unknown>) =>
+    discoveryCandidateMention({
+      type: "select_discovery_candidate",
+      label: "Backtest AKAM",
+      payload,
+    } as never);
+
+  test("a tapped candidate becomes an asset mention, not bare text", () => {
+    expect(
+      tap({ symbol: "AKAM", name: "Akamai Technologies", asset_class: "equity" }),
+    ).toEqual({
+      id: "discovery-candidate-AKAM",
+      type: "asset",
+      label: "Akamai Technologies",
+      symbol: "AKAM",
+      asset_class: "equity",
+      insert_text: "AKAM",
+    });
+  });
+
+  test("the resolver-owned asset class survives the tap", () => {
+    expect(tap({ symbol: "SOL", name: "Solana", asset_class: "crypto" })?.asset_class).toBe(
+      "crypto",
+    );
+    // An unrecognised class is dropped rather than passed through as truth.
+    expect(tap({ symbol: "SOL", asset_class: "wildcat" })?.asset_class).toBeNull();
+  });
+
+  test("identity is only claimed when there is a symbol to claim", () => {
+    expect(tap({ name: "No symbol here" })).toBeNull();
+    expect(tap({ symbol: "   " })).toBeNull();
+  });
+
+  test("no other action type produces a mention", () => {
+    expect(
+      discoveryCandidateMention({
+        type: "select_response_option",
+        label: "Compare with buy and hold",
+        payload: { symbol: "AKAM" },
+      } as never),
+    ).toBeNull();
+  });
+
+  test("the tap sends the mention alongside the turn, and stays an ordinary turn", () => {
+    // Identity travels; a prepared action does not. The turn still re-enters
+    // interpretation and still requires confirmation before anything runs.
+    expect(chat).toContain("const discoveryMention = discoveryCandidateMention(action)");
+    expect(chat).toContain("handleSend(action.label || value, [discoveryMention], action)");
+    expect(message).toContain("asset_class: candidate.asset_class");
   });
 });
 

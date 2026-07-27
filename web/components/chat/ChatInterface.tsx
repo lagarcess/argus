@@ -77,7 +77,10 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
-import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import {
+  discoveryCandidateMention,
+  discoverySidecarFromMetadata,
+} from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
@@ -1747,6 +1750,11 @@ export default function ChatInterface() {
     }
     if (isFailedActionRetry(action)) {
       void handleSend(action.label || value, action);
+      return;
+    }
+    const discoveryMention = discoveryCandidateMention(action);
+    if (discoveryMention) {
+      void handleSend(action.label || value, [discoveryMention], action);
       return;
     }
     void handleSend(action.label || value, action.type ? action : undefined);
