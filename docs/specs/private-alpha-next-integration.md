@@ -311,6 +311,13 @@ Do not reopen these as debt unless a new bug is reproduced:
   history. RLS and service-role-only append/read privileges were verified; no
   application commit, deploy, or PR was required. See
   `docs/reports/issue-246-cost-ledger-closure-evidence.md`.
+- Structural OpenAPI compatibility is complete and issue #234 is closed. PR
+  #289 landed as `8a66f0ba`: generated FastAPI structure remains authoritative,
+  the checked artifact is reproducibly generated, and CI enforces normalized
+  public path/method, parameter, request/response schema, required-field, enum,
+  exclusion, and server-prefix compatibility. Both PR and post-merge CI passed.
+  Issue #235 is now unblocked and must branch from the current remote
+  integration head.
 
 ## P0 Reintegration Checkpoint
 
@@ -352,7 +359,13 @@ Codex should own or closely supervise this:
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
-3. **Evidence-aware idea loop source thesis**
+3. **Advance the unblocked API-boundary lane**
+   - #234 landed through PR #289 at `8a66f0ba` and is closed.
+   - #235 may now implement the already-approved request-size and correlated
+     RFC 9457 failure boundary. Start from the current remote integration head;
+     do not reopen OpenAPI authority or expand its allowlist.
+
+4. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring remain design/reference material until the
      active roadmap starts a bounded slice.

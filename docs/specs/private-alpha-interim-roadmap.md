@@ -58,6 +58,13 @@ checked-in `20260702000001_add_cost_ledger_entries` migration was applied to
 the hosted Argus Supabase project and its append-only service-role contract was
 verified.
 
+PR #289 then landed the structural OpenAPI compatibility gate as `8a66f0ba`.
+Generated FastAPI structure remains the machine-readable authority; the checked
+artifact is regenerated from that authority and CI compares normalized paths,
+methods, parameters, request/response schemas, required fields, and enums with
+only the three approved internal/dev exclusions. Issue #234 is closed. Issue
+#235 is now unblocked and must start from the current remote integration head.
+
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
 comparison only, not as an active donor or implementation base for the remaining
@@ -524,6 +531,21 @@ the completed user-visible Usage slice.
 - No repository change, application deploy, or PR was required. Issue #246 is
   closed; the durable evidence is recorded in
   [`issue-246-cost-ledger-closure-evidence.md`](../reports/issue-246-cost-ledger-closure-evidence.md).
+
+### OpenAPI compatibility (#234 — complete)
+
+- PR #289 landed as `8a66f0ba` and closes issue #234.
+- FastAPI `app.openapi()` remains the canonical machine-readable authority.
+  `docs/api/openapi.yaml` is generated from the corrected document and checked
+  as a compatibility artifact, not maintained as a competing contract.
+- CI now fails on unallowlisted path/method drift, server-prefix duplication,
+  parameter and required-field drift, request/response schema drift, relevant
+  enum drift, and overly broad exclusions.
+- The only excluded operations are the named health, readiness, and local-dev
+  reset surfaces; the SSE response-body normalization remains narrowly scoped.
+- Both PR CI and post-merge integration CI passed. Issue #235's request-bound
+  and correlated-failure lane is now unblocked and starts from the current
+  remote integration head.
 
 ## Historical Planning Archive
 
