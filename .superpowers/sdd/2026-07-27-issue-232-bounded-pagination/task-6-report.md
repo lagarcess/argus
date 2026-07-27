@@ -13,11 +13,11 @@ The migration does not add or change a function, view, RPC, generated column,
 grant, RLS policy, API field, cursor, rank, group, or endpoint response.
 
 The isolated Message endpoint passes its required uncached performance gate:
-20/20 HTTP 200 samples, p95 total **32.084 ms** against the **250 ms** target.
+20/20 HTTP 200 samples, p95 total **31.085 ms** against the **250 ms** target.
 
 Search remains unresolved and is not hidden by this commit. Its normalized
 source scans still exceed the production-like two-second statement timeout:
-20/20 samples returned HTTP 500, with p95 database time **2,008.266 ms**. The
+20/20 samples returned HTTP 500, with p95 database time **2,008.348 ms**. The
 remaining owner is the current normalized seven-source candidate query, not an
 index missing from this bounded migration.
 
@@ -35,6 +35,42 @@ index missing from this bounded migration.
 - The measured routes are read-only database routes. Instrumentation observed
   only PostgREST and private Postgres channels; no interpreter or market-data
   provider path was invoked.
+
+## Review correction
+
+A post-commit review reproduced the deployed large Conversation deep-page plan
+with the exact PostgREST OR cursor:
+
+```text
+Index Scan using idx_conversations_active_page
+root rows: 21
+physical rows: 4,022
+rows removed by filter: 4,001
+shared buffers: 139
+execution: 0.311 ms
+```
+
+The original harness used an equivalent row-value comparison. That comparison
+let PostgreSQL turn the cursor into a tighter index bound and incorrectly
+reported 21 physical rows. The committed PostgREST builder emits an explicit OR
+tree, so the original deep-page scan claim was not valid.
+
+The correction also found that the Message context witness used the wrong page
+boundary. The real first page includes one earlier History message and ends at
+page-message 50, while a large deep page after position 8,000 ends at 8,051.
+The original harness used positions 51 and 8,000.
+
+The corrected harness now:
+
+- uses the exact committed Conversation and Message OR disjunctions;
+- uses the actual end-of-page boundary for reload and lifecycle witnesses;
+- captures the Conversation pivot query separately;
+- drops all three kept indexes only inside the pre-index measurement
+  transaction, then rolls back; and
+- replaces decoded-payload re-serialization with timing around the actual
+  `starlette.responses.JSONResponse.render` boundary.
+
+No migration, runtime query, index, RLS, cursor, or response contract changed.
 
 ## Deterministic fixture
 
@@ -71,22 +107,30 @@ EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
 
 It records node type, selected index, actual rows, loops, rows removed, shared
 buffers, sort method, planning time, execution time, and a derived physical-row
-count. UUID-shaped values are replaced in raw plans before they are written.
+count. Conversation and Message use the exact committed PostgREST OR
+disjunctions. History and Search import their exact committed private SQL.
+UUID-shaped values are replaced in raw plans before they are written.
+
+For corrected pre-index plans, the harness drops the three kept indexes inside
+one database transaction, captures all plans, and rolls the transaction back.
+The immediate catalog read returned all three indexes, proving no catalog
+drift.
 
 The important first-page baseline is:
 
 | Query | Returned rows, small/large | Max physical rows, small/large | Shared buffers, small/large | Execution ms, small/large |
 | --- | ---: | ---: | ---: | ---: |
-| Conversation | 21 / 21 | 64 / 12,000 | 21 / 629 | 0.180 / 1.827 |
-| Message candidate | 51 / 51 | 52 / 52 | 107 / 106 | 0.176 / 0.041 |
-| History candidates | 84 / 84 | 24,128 / 24,128 | 2,792 / 63,782 | 14.204 / 69.190 |
-| Search candidates | 147 / 147 | 772,096 / 144,768,000 | 38,592 / 6,174,218 | 58.190 / 7,282.413 |
-| Search ledger | 4 / 4 | 12,064 / 12,064 | 1,242 / 1,239 | 2.712 / 171.489 |
+| Conversation | 21 / 21 | 64 / 12,000 | 17 / 322 | 0.103 / 1.568 |
+| Message candidate | 51 / 51 | 52 / 52 | 8 / 7 | 0.052 / 0.037 |
+| History candidates | 84 / 84 | 12,064 / 12,064 | 3,596 / 39,401 | 8.791 / 63.616 |
+| Search candidates | 147 / 147 | 772,096 / 144,768,000 | 22,142 / 3,113,832 | 49.869 / 6,551.450 |
+| Search ledger | 4 / 4 | 12,064 / 12,064 | 741 / 738 | 3.140 / 174.925 |
 
 Returned rows and statement counts are bounded, but the Conversation and
 Search physical work grew with fixture volume. History and ledger work also
 remain volume-sensitive even though the database returns a fixed candidate
-budget. A `Limit` was therefore not treated as proof of bounded physical work.
+budget. Deep Conversation and Message pages remain cursor-depth sensitive. A
+`Limit` was therefore not treated as proof of bounded physical work.
 
 ## One-index-at-a-time decisions
 
@@ -97,13 +141,13 @@ and either kept or dropped before the next candidate.
 
 | Index | Exact large plan evidence | Decision |
 | --- | --- | --- |
-| `idx_conversations_active_page` on `(user_id, pinned desc, updated_at desc, id desc) where deleted_at is null` | Deep page: 12,064 physical rows, 464 buffers, top-N sort, 3.443 ms became 21 rows, 3 buffers, no sort, 0.054 ms. Final reset proof: 21 rows, 5 buffers, 0.028 ms. | Keep. It exactly serves the active Conversation order and removes volume-growing scan/sort work. |
-| `idx_messages_reload_artifact_page` on `(user_id, conversation_id, created_at, id)` with the assistant/artifact superset predicate | Reload first page: 11,950 physical rows, 393 buffers, 3.411 ms became an index lookup with 0 fixture matches, 2 buffers, 0.015 ms. Final seeded proof with a real artifact: 1 physical row, 2 buffers, 0.018 ms. Lifecycle first page also changed from 11,950 rows and 3.032 ms to 1 row and 0.012 ms. | Keep. One partial superset index serves both exact reload and lifecycle predicates while their stricter value checks stay query-owned. |
-| `idx_decision_notes_idea_latest` on `(user_id, idea_id, updated_at desc, id desc)` | Search first page: 144,768,000 max physical rows, 6,174,218 buffers, 7,282.413 ms became 24,000 max rows, 42,106 buffers, 3,541.862 ms. Final reset proof was 12,064 max rows, 41,831 buffers, 3,535.503 ms. Deep page changed from 96,499,936 max rows and 6,240.361 ms to 12,064 rows and 3,750.340 ms. | Keep. It removes the 12,000-by-12,000 latest-Decision scan and also makes the deep cursor pivot use the exact latest-Decision order. |
+| `idx_conversations_active_page` on `(user_id, pinned desc, updated_at desc, id desc) where deleted_at is null` | First page: 12,000 physical rows, 322 buffers, 1.568 ms became 21 rows, 4 buffers, 0.017 ms. Exact deep OR page: 11,992 physical rows, 320 buffers, 1.428 ms became 4,022 rows, 139 buffers, 0.311 ms. | Keep. It exactly serves the active order and materially reduces first and deep work. It does not make deep work constant: 4,001 newer rows are still filtered because of the committed OR cursor shape. |
+| `idx_messages_reload_artifact_page` on `(user_id, conversation_id, created_at, id)` with the assistant/artifact superset predicate | Exact deep reload: 12,001 physical rows, 399 buffers, 1.708 ms became 50 partial-index rows, 5 buffers, 0.018 ms. Exact deep lifecycle: 12,001 rows, 399 buffers, 1.202 ms became 50 rows, 5 buffers, 0.011 ms. First-page improvement is smaller: 55 to 26 physical rows. | Keep. One partial superset index sharply bounds deep artifact witness scans while exact value checks remain query-owned. The separate Message candidate page remains cursor-depth sensitive. |
+| `idx_decision_notes_idea_latest` on `(user_id, idea_id, updated_at desc, id desc)` | Search first page: 144,768,000 max physical rows, 3,113,832 buffers, 6,551.450 ms became 12,064 rows, 41,832 buffers, 3,597.019 ms. Deep page changed from 96,499,936 max rows and 5,709.939 ms to 12,064 rows and 3,762.459 ms. | Keep. It removes the 12,000-by-12,000 latest-Decision scan. The deep pivot selects the index and removes its sort, but still examines up to 12,064 rows. |
 
 The Decision index is independently useful, but it does not make Search
 acceptable. The remaining seven source normalizers still scan 12,064 rows per
-source. Search candidate execution remains about 3.5 seconds without a
+source. Search candidate execution remains about 3.6 seconds without a
 statement timeout and reliably trips the two-second endpoint timeout.
 
 ### Dropped
@@ -117,8 +161,10 @@ statement timeout and reliably trips the two-second endpoint timeout.
 | Backtest-run History order | Same 84 / 24,128 / 39,121 shape, 64.423 ms; candidate not selected. | No plan improvement. |
 | Chat/History composite order | Same 84 / 24,128 / 39,121 shape, 64.870 ms; candidate not selected. | Did not remove parent, message, or merged-source work. |
 
-Every rejected index was dropped. The post-reset catalog contains only the
-three kept Task 6 indexes.
+Those rejected measurements are first-page runs and do not depend on the
+corrected cursor expression. Every rejected index was dropped. Static migration
+tests allow exactly three `CREATE INDEX` statements, and the post-correction
+catalog contains only the three kept Task 6 indexes.
 
 ## Final plan state
 
@@ -127,18 +173,31 @@ plans were recaptured from that exact head:
 
 | Query | Returned rows, small/large | Max physical rows, small/large | Shared buffers, small/large | Execution ms, small/large |
 | --- | ---: | ---: | ---: | ---: |
-| Conversation | 21 / 21 | 21 / 21 | 5 / 4 | 0.080 / 0.017 |
-| Message candidate | 51 / 51 | 52 / 52 | 14 / 7 | 0.155 / 0.030 |
-| Message reload artifact | 1 / 1 | 1 / 1 | 2 / 2 | 0.081 / 0.018 |
-| History candidates | 84 / 84 | 12,064 / 12,064 | 3,573 / 39,378 | 8.601 / 64.479 |
-| Search candidates | 147 / 147 | 12,064 / 12,064 | 5,757 / 41,831 | 32.749 / 3,535.503 |
-| Search ledger | 4 / 4 | 12,064 / 12,064 | 739 / 736 | 3.369 / 175.462 |
+| Conversation | 21 / 21 | 21 / 21 | 5 / 4 | 0.117 / 0.017 |
+| Message candidate | 51 / 51 | 52 / 52 | 14 / 7 | 0.123 / 0.032 |
+| Message reload artifact | 1 / 1 | 26 / 26 | 3 / 3 | 0.077 / 0.025 |
+| History candidates | 84 / 84 | 12,064 / 12,064 | 3,596 / 39,401 | 10.081 / 64.082 |
+| Search candidates | 147 / 147 | 12,064 / 12,064 | 5,758 / 41,832 | 31.550 / 3,597.019 |
+| Search ledger | 4 / 4 | 12,064 / 12,064 | 741 / 738 | 3.302 / 174.586 |
 
-The plan harness issues exactly one statement for each candidate or ledger
-measurement. First and deep cursor-page proofs are captured for Conversation,
-Message, History, and Search; the Search and History deep pivots are captured
-separately. Existing real-Postgres suites cover first, middle, final,
-equal-timestamp, deletion/lifecycle, invalid pivot, and cross-owner cases.
+Exact large deep-page comparison:
+
+| Query | Pre-index physical rows / buffers / ms | Post-index physical rows / buffers / ms | Remaining sensitivity |
+| --- | ---: | ---: | --- |
+| Conversation candidate | 11,992 / 320 / 1.428 | 4,022 / 139 / 0.311 | The OR cursor filters 4,001 newer rows. |
+| Conversation pivot | 1 / 3 / 0.009 | 1 / 3 / 0.007 | Constant primary-key lookup; unrelated to the new index. |
+| Message candidate | 8,053 / 268 / 0.770 | 8,053 / 268 / 0.709 | Unchanged and cursor-depth sensitive. |
+| Message reload artifact | 12,001 / 399 / 1.708 | 50 / 5 / 0.018 | Bounded by matching artifact rows, not page depth. |
+| Message lifecycle artifact | 12,001 / 399 / 1.202 | 50 / 5 / 0.011 | Bounded by matching artifact rows, not page depth. |
+| History candidates | 12,064 / 27,374 / 46.378 | 12,064 / 27,374 / 45.807 | Unchanged merged-source volume sensitivity. |
+| Search candidates | 96,499,936 / 2,077,573 / 5,709.939 | 12,064 / 41,832 / 3,762.459 | Normalized source scans remain volume-sensitive. |
+
+The plan harness issues exactly one statement for each candidate, pivot, or
+ledger measurement. First and deep cursor-page proofs are captured for
+Conversation, Message, History, and Search; Conversation, Search, and History
+deep pivots are captured separately. Existing real-Postgres suites cover first,
+middle, final, equal-timestamp, deletion/lifecycle, invalid pivot, and
+cross-owner cases.
 
 History has no Task 6 index claim: its final runtime is acceptable for the
 seeded endpoint sample, but its remaining volume-sensitive merged-source work
@@ -148,19 +207,28 @@ is visible above. Search is the explicit unresolved owner.
 
 The application cache was disabled. Each route was sampled 20 times against
 the large owner fixture. Database time includes only instrumented PostgREST or
-private Postgres execution/fetch time; projection is residual route/artifact
-work; serialization is measured separately using the decoded response.
+private Postgres execution/fetch time. Serialization is timed inside the actual
+`starlette.responses.JSONResponse.render` call. Route/response residual is
+`total - database - JSONResponse.render`; it is an upper bound that includes
+route logic, artifact projection, response-model conversion, TestClient
+transport, and scheduler overhead. It is not presented as isolated artifact
+projection time.
 
-| Endpoint | HTTP status | Queries / DB rows | DB p50 / p95 ms | Projection p50 / p95 ms | Serialization p50 / p95 ms | Total p50 / p95 ms |
+| Endpoint | HTTP status | Queries / DB rows | DB p50 / p95 ms | Route/response residual p50 / p95 ms | JSON render p50 / p95 ms | Total p50 / p95 ms |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Conversation | 20 × 200 | 1 / 21 | 1.679 / 2.127 | 1.447 / 1.888 | 0.005 / 0.006 | 3.204 / 3.549 |
-| Message | 20 × 200 | 11 / 80 | 24.620 / 28.377 | 3.155 / 5.037 | 0.011 / 0.020 | 28.233 / **32.084** |
-| History | 20 × 200 | 1 / 84 | 62.599 / 63.985 | 5.211 / 5.958 | 0.012 / 0.018 | 67.870 / 69.112 |
-| Search | 20 × 500 | 1 / 0 | 2,006.797 / **2,008.266** | 4.413 / 7.363 | 0 / 0 | 2,011.548 / **2,012.626** |
+| Conversation | 20 × 200 | 1 / 21 | 2.070 / 3.184 | 1.488 / 1.639 | 0.034 / 0.045 | 3.575 / 5.109 |
+| Message | 20 × 200 | 11 / 80 | 23.372 / 26.093 | 2.712 / 3.788 | 0.074 / 0.167 | 26.167 / **31.085** |
+| History | 20 × 200 | 1 / 84 | 59.749 / 64.526 | 5.050 / 5.478 | 0.108 / 0.132 | 64.633 / 68.664 |
+| Search | 20 × 500 | 1 / 0 | 2,007.338 / **2,008.348** | 4.575 / 7.691 | 0 / 0 | 2,011.843 / **2,017.274** |
 
-Message passes the 250 ms p95 gate by 217.916 ms. Its 11 queries are the
+Message passes the 250 ms p95 gate by 218.915 ms. Its 11 queries are the
 current bounded page/context/hydration contract and its 80 database rows are
 constant for the measured limit and completed-job context.
+
+The successful endpoints recorded exactly one `JSONResponse.render` call per
+sample. Search recorded none because the unhandled database timeout is turned
+into TestClient's plain 500 response outside that JSON rendering boundary;
+therefore its JSON render value is correctly zero, not an estimate.
 
 Search failure is preserved exactly: the shared private pool used
 `statement_timeout=2000`, and every Search sample timed out before returning
@@ -193,7 +261,9 @@ The real-RLS test:
 5. rolls back the temporary grants; and
 6. deletes both Auth users and dependent rows in cleanup.
 
-The final catalog test reconfirms that persistent grants are still false.
+The final catalog test reconfirms that persistent grants are still false. A
+second catalog read immediately after the transactional pre-index capture
+returned all three Task 6 indexes, proving the temporary drops rolled back.
 
 ## TDD evidence
 
@@ -221,6 +291,31 @@ Final result: **6 passed**. These tests cover the exact migration surface,
 catalog, unchanged RLS/grants, two-owner authenticated isolation, and current
 query-predicate selection of all three indexes.
 
+### Review RED and correction
+
+The review reproduction was the evidence-level RED:
+
+```text
+reported deep Conversation physical rows: 21
+exact committed OR cursor physical rows: 4,022
+```
+
+Inspection traced the mismatch to `row(pinned, updated_at, id) < row(...)` in
+the ignored harness. The committed gateway instead creates a nested PostgREST
+OR filter. Replacing the row comparison with that exact OR, and correcting the
+Message context boundary, reproduced the reviewer result. The corrected
+pre/post captures then proved:
+
+```text
+Conversation deep: 11,992 -> 4,022 physical rows
+Message reload deep: 12,001 -> 50 physical rows
+Message lifecycle deep: 12,001 -> 50 physical rows
+Search first: 144,768,000 -> 12,064 max physical rows
+```
+
+All three keep decisions remain supported, but no report claim now says deep
+Conversation or Message candidate work is constant.
+
 ## Verification
 
 Zero reset and reseed:
@@ -235,17 +330,28 @@ docker exec -i supabase_db_argus-issue-232-4e4b \
 Result: complete chain applied; seed committed with two owners, 12,064
 Conversations, 24,128 Messages, and 82 completed jobs.
 
-Plan recapture:
+Exact pre-index plan recapture with transactional rollback:
 
 ```bash
 eval "$(supabase --workdir temp/issue-232/local-project status -o env 2>/dev/null)" &&
 ARGUS_DISPOSABLE_DATABASE_URL="$DB_URL" \
 poetry run python temp/issue-232/task6_measure_plans.py \
-  --output temp/issue-232/task6-post-reset-index-plans.json
+  --without-kept-indexes \
+  --output temp/issue-232/task6-exact-pre-index-plans.json
 ```
 
-Result: passed; the summary and UUID-sanitized raw plan evidence were written
-under the ignored Task 6 directory.
+Exact reset-head post-index plan recapture:
+
+```bash
+eval "$(supabase --workdir temp/issue-232/local-project status -o env 2>/dev/null)" &&
+ARGUS_DISPOSABLE_DATABASE_URL="$DB_URL" \
+poetry run python temp/issue-232/task6_measure_plans.py \
+  --output temp/issue-232/task6-exact-post-index-plans.json
+```
+
+Result: both passed; summaries and UUID-sanitized raw plans were written under
+the ignored Task 6 directory. The catalog immediately afterward still contained
+all three kept indexes.
 
 Endpoint benchmark:
 
@@ -254,11 +360,12 @@ eval "$(supabase --workdir temp/issue-232/local-project status -o env 2>/dev/nul
 ISSUE232_SUPABASE_URL="$API_URL" \
 ISSUE232_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
 ARGUS_DISPOSABLE_DATABASE_URL="$DB_URL" \
-ISSUE232_REPORT_PATH="temp/issue-232/task6-endpoint-benchmark.json" \
+ISSUE232_REPORT_PATH="temp/issue-232/task6-endpoint-benchmark-render-boundary.json" \
 poetry run python temp/issue-232/measure_baseline.py
 ```
 
-Result: 20 samples per endpoint; detailed results are in the endpoint table
+Result: 20 samples per endpoint with sequential instrumentation of the actual
+`JSONResponse.render` boundary; detailed results are in the endpoint table
 above.
 
 Focused migration/RLS:
@@ -315,14 +422,19 @@ Static gates:
 ```bash
 poetry run ruff check \
   tests/test_bounded_read_indexes.py \
-  tests/test_bounded_read_indexes_postgres.py
+  tests/test_bounded_read_indexes_postgres.py \
+  temp/issue-232/task6_measure_plans.py \
+  temp/issue-232/measure_baseline.py
 poetry run ruff format --check \
   tests/test_bounded_read_indexes.py \
-  tests/test_bounded_read_indexes_postgres.py
+  tests/test_bounded_read_indexes_postgres.py \
+  temp/issue-232/task6_measure_plans.py \
+  temp/issue-232/measure_baseline.py
 git diff --check
 ```
 
-Result: Ruff passed, both files are formatted, and `git diff --check` passed.
+Result: Ruff passed, all four files are formatted, and `git diff --check`
+passed.
 
 Modularity:
 
@@ -356,13 +468,18 @@ drop index if exists public.idx_conversations_active_page;
   timeout. Solving its normalized-source scan requires a separate runtime query
   design/review slice; it must not be smuggled into this index commit.
 - History remains physically volume-sensitive, although its 20-sample endpoint
-  p95 is 69.112 ms. None of the isolated History candidates earned a migration.
+  p95 is 68.664 ms. None of the isolated History candidates earned a migration.
+- Conversation deep pages still filter rows proportional to cursor depth under
+  the committed OR predicate; the index reduces but does not eliminate that
+  work.
+- Message candidate deep pages remain cursor-depth sensitive. The partial
+  artifact index bounds reload/lifecycle witness scans, not the candidate page.
 - The modularity script remains red only on the inherited
   `supabase_gateway.py` budget.
 - One inherited database-lint warning remains in an unchanged function.
 - The disposable stack is seeded and running. Its fixture can be fully removed
   with the exact local reset command above.
 
-Subject to review of the preserved Search follow-up, the three-index
-migration, tests, and this report form one coherent, independently revertible
-commit.
+The original three-index migration/tests commit remains independently
+revertible. This follow-up changes only durable evidence; the ignored harness
+and raw measurement files stay local to the isolated acceptance stack.
