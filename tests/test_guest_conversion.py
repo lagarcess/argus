@@ -127,8 +127,10 @@ def test_guest_identity_link_contract_requires_a_real_email_and_strong_password(
     request = GuestIdentityLinkRequest(
         email="new-member@example.com",
         password="strong-password",
+        refresh_token="current-refresh-token",
     )
     assert request.email == "new-member@example.com"
+    assert "current-refresh-token" not in repr(request)
 
     with pytest.raises(ValueError):
         GuestIdentityLinkRequest(email="not-an-email", password="strong-password")
@@ -507,6 +509,44 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
     assert failed.json()["code"] == "guest_identity_link_failed"
     gateway.link_anonymous_identity.assert_called_once()
     gateway.mark_guest_identity_linked.assert_not_called()
+
+
+def test_identity_link_uses_current_request_refresh_token_over_stale_bootstrap_cookie(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_disabled.return_value = False
+    gateway.link_anonymous_identity.side_effect = RuntimeError("provider rejected")
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _guest_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app) as client,
+        ):
+            client.cookies.set("sb-refresh-token", "stale-bootstrap-refresh-token")
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={
+                    "email": "new-member@example.com",
+                    "password": "strong-password",
+                    "refresh_token": "current-browser-refresh-token",
+                },
+                headers={"Authorization": "Bearer current-browser-access-token"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    gateway.link_anonymous_identity.assert_called_once_with(
+        access_token="current-browser-access-token",
+        refresh_token="current-browser-refresh-token",
+        email="new-member@example.com",
+        password="strong-password",
+    )
 
 
 def test_public_account_link_rejects_explicitly_disabled_email_before_auth_mutation(

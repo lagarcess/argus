@@ -16,6 +16,10 @@ import {
   signupWithEmail,
 } from "@/lib/argus-api";
 import { guestAccessEnabled } from "@/lib/private-alpha-flags";
+import {
+  resolveLandingEntrySurface,
+} from "@/lib/landing-entry";
+import { guestCaptchaConfigured } from "@/lib/guest-session";
 
 type AuthMode = "intro" | "signup" | "login";
 
@@ -44,14 +48,8 @@ export default function LandingPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    setAuthMode(authModeFromLocation());
-  }, []);
-
-  useEffect(() => {
-    if (guestAccessEnabled) {
-      setIsCheckingSession(false);
-      return;
-    }
+    const nextAuthMode = authModeFromLocation();
+    setAuthMode(nextAuthMode);
     if (skipAuthenticatedRedirect()) {
       setIsCheckingSession(false);
       return;
@@ -116,12 +114,13 @@ export default function LandingPage() {
   };
 
   const isSignup = authMode === "signup";
+  const entrySurface = resolveLandingEntrySurface({
+    authMode,
+    guestEntryAvailable: guestAccessEnabled && guestCaptchaConfigured,
+    isCheckingSession,
+  });
 
-  if (guestAccessEnabled) {
-    return <GuestEntry />;
-  }
-
-  if (isCheckingSession) {
+  if (entrySurface === "loading") {
     return (
       <>
         <DevModeBadge />
@@ -130,6 +129,10 @@ export default function LandingPage() {
         </div>
       </>
     );
+  }
+
+  if (entrySurface === "guest") {
+    return <GuestEntry />;
   }
 
   return (

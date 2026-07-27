@@ -3,9 +3,17 @@ import {
   persistBrowserSession,
   unauthenticatedApiFetch,
 } from "./argus-api";
+import { acquireGuestCaptchaToken } from "./guest-captcha";
+
+export {
+  guestCaptchaConfigured,
+  guestCaptchaPlanForEnvironment,
+  guestCaptchaTokenForEnvironment,
+} from "./guest-captcha";
 
 type GuestSessionInput = {
   language: string | null | undefined;
+  captchaToken?: string | null;
 };
 
 export type GuestBootstrapResponse = {
@@ -59,57 +67,28 @@ export function createGuestSessionBootstrapper<
   };
 }
 
-export function guestCaptchaTokenForEnvironment(input: {
-  nodeEnv: string | undefined;
-  apiUrl: string | undefined;
-  localQaToken: string | undefined;
-}): string | null {
-  if (input.nodeEnv !== "production") {
-    return "argus-local-browser-qa";
-  }
-  const token = input.localQaToken?.trim() ?? "";
-  if (!token) return null;
-  try {
-    const hostname = new URL(input.apiUrl ?? "").hostname;
-    return hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1"
-      ? token
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function guestCaptchaToken(): string | null {
-  return guestCaptchaTokenForEnvironment({
-    nodeEnv: process.env.NODE_ENV,
-    apiUrl: process.env.NEXT_PUBLIC_ARGUS_API_URL,
-    localQaToken: process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN,
-  });
-}
-
 const browserGuestBootstrapper = createGuestSessionBootstrapper<
   GuestSessionInput,
   GuestBootstrapResponse
->(async ({ language }) => {
-  const captchaToken = guestCaptchaToken();
-  if (!captchaToken) {
-    throw new Error(
-      "Guest access requires a configured browser CAPTCHA before production exposure.",
-    );
-  }
+>(async ({ language, captchaToken: browserCaptchaToken }) => {
+  const captchaToken = await acquireGuestCaptchaToken(browserCaptchaToken);
   return bootstrapGuest({
     captcha_token: captchaToken,
     language: normalizeApiLanguage(language),
   });
 });
 
-export function startGuestSession(language?: string | null) {
-  return browserGuestBootstrapper.run({ language });
+export function startGuestSession(
+  language?: string | null,
+  captchaToken?: string | null,
+) {
+  return browserGuestBootstrapper.run({ language, captchaToken });
 }
 
-export function retryGuestSession(language?: string | null) {
+export function retryGuestSession(
+  language?: string | null,
+  captchaToken?: string | null,
+) {
   browserGuestBootstrapper.reset();
-  return startGuestSession(language);
+  return startGuestSession(language, captchaToken);
 }

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   createGuestSessionBootstrapper,
+  guestCaptchaPlanForEnvironment,
   guestCaptchaTokenForEnvironment,
 } from "../lib/guest-session";
 import { guestAccessEnabledFromEnv } from "../lib/private-alpha-flags";
@@ -35,9 +36,15 @@ describe("guest session entry contract", () => {
     if (!existsSync(sessionPath)) return;
 
     const session = readFileSync(sessionPath, "utf-8");
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
     expect(session).toContain("createGuestSessionBootstrapper");
-    expect(session).toContain("production");
-    expect(session).toContain("captcha");
+    expect(captcha).toContain("production");
+    expect(captcha).toContain("CAPTCHA");
+    expect(captcha).toContain(
+      "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
+    );
+    expect(captcha).toContain("turnstile.render");
+    expect(captcha).toContain('"error-callback"');
     expect(session).not.toContain("signInAnonymously");
     expect(session).not.toContain("service_role");
   });
@@ -98,6 +105,36 @@ describe("guest session entry contract", () => {
     ).toBe("argus-local-browser-qa");
   });
 
+  test("acquires a production Turnstile challenge instead of failing guest entry", () => {
+    expect(
+      guestCaptchaPlanForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "https://api.argus.example/api/v1",
+        localQaToken: "",
+        turnstileSiteKey: "public-site-key",
+      }),
+    ).toEqual({
+      kind: "turnstile",
+      siteKey: "public-site-key",
+    });
+    expect(
+      guestCaptchaPlanForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "https://api.argus.example/api/v1",
+        localQaToken: "",
+        turnstileSiteKey: "",
+      }),
+    ).toEqual({ kind: "unavailable" });
+    expect(
+      guestCaptchaTokenForEnvironment({
+        nodeEnv: "production",
+        apiUrl: "https://api.argus.example/api/v1",
+        localQaToken: "",
+        browserCaptchaToken: "verified-turnstile-token",
+      }),
+    ).toBe("verified-turnstile-token");
+  });
+
   test("uses the existing server guest endpoint and persists the provider session", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const session = readFileSync(join(root, "lib/guest-session.ts"), "utf-8");
@@ -112,6 +149,15 @@ describe("guest session entry contract", () => {
     expect(api).toContain("if (error)");
     expect(entry).toContain('router.replace("/chat")');
     expect(entry).not.toContain("router.refresh()");
+  });
+
+  test("links with the current browser refresh token instead of the bootstrap cookie", () => {
+    const guestApi = readFileSync(join(root, "lib/guest-api.ts"), "utf-8");
+
+    expect(guestApi).toContain("getSupabaseClient");
+    expect(guestApi).toContain("session.refresh_token");
+    expect(guestApi).toContain("refresh_token:");
+    expect(guestApi).toContain("Authorization");
   });
 
 });

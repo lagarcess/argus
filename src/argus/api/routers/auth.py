@@ -585,7 +585,9 @@ def link_guest_identity(
             ),
         )
     access_token = _request_access_token(request)
-    refresh_token = request.cookies.get("sb-refresh-token", "").strip()
+    refresh_token = (body.refresh_token or "").strip() or request.cookies.get(
+        "sb-refresh-token", ""
+    ).strip()
     if not access_token or not refresh_token:
         raise problem(
             request,

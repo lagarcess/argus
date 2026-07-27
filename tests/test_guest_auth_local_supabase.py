@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
+import httpx
 import psycopg
 import pytest
 from argus.agent_runtime.stages.confirm import _coverage_preflight
@@ -663,6 +664,18 @@ def test_real_anonymous_identity_links_in_place_without_moving_product_rows(
             captcha_token="local-captcha-proof",
             language="en",
         )
+        original_refresh_token = str(guest["session"]["refresh_token"])
+        rotated = httpx.post(
+            f"{LOCAL_URL.rstrip('/')}/auth/v1/token?grant_type=refresh_token",
+            headers={
+                "apikey": LOCAL_ANON_KEY,
+                "Content-Type": "application/json",
+            },
+            json={"refresh_token": original_refresh_token},
+            timeout=15,
+        )
+        assert rotated.is_success
+        rotated_session = rotated.json()
         auth_user = guest["user"]
         user_id = str(auth_user["id"])
         profile = gateway.get_or_create_profile_for_auth_user(auth_user)
@@ -692,15 +705,19 @@ def test_real_anonymous_identity_links_in_place_without_moving_product_rows(
         ):
             client.cookies.set(
                 "sb-auth-token",
-                str(guest["session"]["access_token"]),
+                str(rotated_session["access_token"]),
             )
             client.cookies.set(
                 "sb-refresh-token",
-                str(guest["session"]["refresh_token"]),
+                original_refresh_token,
             )
             linked = client.post(
                 "/api/v1/auth/guest/link",
-                json={"email": email, "password": password},
+                json={
+                    "email": email,
+                    "password": password,
+                    "refresh_token": str(rotated_session["refresh_token"]),
+                },
                 headers={"origin": "http://localhost:3000"},
             )
 

@@ -1512,7 +1512,10 @@ defaults to `true` and controls presentation only. The independent
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
-  checked before Auth creation. It uses the existing secure cookie rules.
+  checked before Auth creation. Non-loopback production entry acquires a
+  Cloudflare Turnstile token through the public site key before calling this
+  endpoint; missing CAPTCHA configuration falls back to the preserved auth
+  landing. It uses the existing secure cookie rules.
   The response always includes `renewed_after_expiry` and the server-owned
   `public_account_access_enabled` presentation permission. An expired verified
   anonymous session is replaced with a fresh guest identity and returns
@@ -1521,8 +1524,10 @@ defaults to `true` and controls presentation only. The independent
   guests remain usable until conversion, fixed expiry, or cleanup.
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
   update to add verified email/password credentials to the current anonymous
-  identity. It is available only when the server enables public account access
-  and preserves the Auth UUID.
+  identity. The browser supplies its current rotated session refresh token;
+  the original bootstrap cookie is only a backward-compatible fallback. It is
+  available only when the server enables public account access and preserves
+  the Auth UUID.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action to a ten-minute handoff without resolving whether that account

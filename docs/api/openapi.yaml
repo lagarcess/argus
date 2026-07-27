@@ -789,6 +789,12 @@ components:
           format: password
           minLength: 8
           maxLength: 128
+        refresh_token:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 4096
+          description: Current browser session refresh token, used to survive provider token rotation.
     GuestFunnelClientEventRequest:
       type: object
       additionalProperties: false

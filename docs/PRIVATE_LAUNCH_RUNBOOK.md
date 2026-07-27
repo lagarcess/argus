@@ -320,9 +320,12 @@ account promise is shown.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
-provider anonymous-sign-in limits, Argus origin enforcement and per-IP attempt
-limits, and no direct anonymous-role access to product tables. Do not mutate
-hosted Auth configuration as part of a code promotion.
+`NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY` present in the web build, provider
+anonymous-sign-in limits, Argus origin enforcement and per-IP attempt limits,
+and no direct anonymous-role access to product tables. Without the public site
+key, non-loopback production preserves the auth landing rather than beginning
+an unusable Guest bootstrap. Do not mutate hosted Auth configuration as part
+of a code promotion.
 
 Run guest cleanup first as a dry run:
 
