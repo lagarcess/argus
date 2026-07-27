@@ -482,7 +482,7 @@ def test_zero_provider_routes_have_one_durable_terminal_and_no_public_internals(
     elif route == "deterministic_recovery":
         monkeypatch.setattr(
             agent_router,
-            "failed_action_metadata_fallback_context",
+            "ordinary_turn_metadata_fallback_context",
             lambda **_: agent_router.RuntimeFallbackContext(
                 recovery_message="That failed action is still saved.",
                 recovery={

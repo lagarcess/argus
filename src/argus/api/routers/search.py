@@ -20,6 +20,10 @@ from argus.api.search_assembly import (
     scored_supabase_search_items,
 )
 from argus.api.search_utils import search_rank_key
+from argus.domain.postgres_search_reader import (
+    SearchCursorError,
+    SearchReadResult,
+)
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
@@ -48,27 +52,59 @@ def search(
     # ledger, e.g. "show my promising ideas"); otherwise it returns nothing.
     if not query and decision_state is None and not include_ledger_groups:
         return PaginatedSearch(items=[], next_cursor=None)
-    scored_items: list[tuple[int, SearchItem]] = []
-    if api_state.supabase_gateway is not None:
-        raw = api_state.supabase_gateway.search_rows(
+
+    cursor_dt: datetime | None = None
+    cursor_id: str | None = None
+    if cursor:
+        cursor_updated_at, cursor_id = decode_cursor(cursor, request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+        if cursor_dt.tzinfo is None or cursor_dt.utcoffset() is None:
+            raise invalid_cursor_problem(request)
+
+    workspace_conversation_id: str | None = None
+    if context.kind == "guest" and api_state.supabase_gateway is not None:
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
             user_id=user.id,
-            query=query,
-            limit=None,
+            at=datetime.now(timezone.utc),
         )
+        workspace_conversation_id = (
+            workspace.conversation_id if workspace is not None else None
+        )
+
+    scored_items: list[tuple[int, SearchItem]] = []
+    search_read: SearchReadResult | None = None
+    if api_state.supabase_gateway is not None:
+        try:
+            read_result = api_state.supabase_gateway.search_rows(
+                user_id=user.id,
+                query=query,
+                source_limit=limit + 1,
+                cursor_updated_at=cursor_dt,
+                cursor_id=cursor_id,
+                decision_state=decision_state,
+                include_ledger_groups=include_ledger_groups,
+                guest_scope=context.kind == "guest",
+                guest_conversation_id=workspace_conversation_id,
+            )
+        except SearchCursorError:
+            raise invalid_cursor_problem(request) from None
+        if isinstance(read_result, SearchReadResult):
+            search_read = read_result
+            raw = read_result.rows
+        else:
+            # Keep injected test gateways compatible while the production
+            # Supabase gateway always returns the typed reader result.
+            raw = read_result
         scored_items.extend(scored_supabase_search_items(raw=raw, query=query))
     else:
         scored_items.extend(scored_memory_search_items(user=user, query=query))
 
     if context.kind == "guest":
-        workspace_conversation_id: str | None = None
-        if api_state.supabase_gateway is not None:
-            workspace = api_state.supabase_gateway.get_active_guest_workspace(
-                user_id=user.id,
-                at=datetime.now(timezone.utc),
-            )
-            workspace_conversation_id = (
-                workspace.conversation_id if workspace is not None else None
-            )
+        # Defense in depth: the persistent reader applies this scope before
+        # each source limit; this keeps non-production injected gateways safe.
         scored_items = [
             pair
             for pair in scored_items
@@ -93,6 +129,8 @@ def search(
     ledger_groups = (
         []
         if context.kind == "guest" and include_ledger_groups
+        else _ledger_groups_from_counts(search_read.ledger_counts)
+        if include_ledger_groups and search_read is not None
         else _ledger_groups_from_items(scored_items)
         if include_ledger_groups
         else None
@@ -111,12 +149,9 @@ def search(
             if pair[1].type == "idea" and pair[1].decision_state is not None
         ]
     filtered = scored_items
-    if cursor:
-        cursor_updated_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            cursor_dt = datetime.fromisoformat(cursor_updated_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
+    if cursor and search_read is None:
+        assert cursor_dt is not None
+        assert cursor_id is not None
         cursor_pair = next(
             (
                 pair
@@ -183,6 +218,16 @@ def _ledger_groups_from_items(
         counts[item.decision_state] += 1
     return [
         SearchLedgerGroup(decision_state=state, count=counts[state])
+        for state in LEDGER_DECISION_STATE_ORDER
+    ]
+
+
+def _ledger_groups_from_counts(
+    counts: dict[str, int] | None,
+) -> list[SearchLedgerGroup]:
+    values = counts or {}
+    return [
+        SearchLedgerGroup(decision_state=state, count=int(values.get(state, 0)))
         for state in LEDGER_DECISION_STATE_ORDER
     ]
 

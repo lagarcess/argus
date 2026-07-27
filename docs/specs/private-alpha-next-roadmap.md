@@ -22,7 +22,9 @@ that Argus remembers, compares, and stays honest about staleness.
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `75e87206`.
+`main` at `217ead12`. The current integrated product checkpoint contains PR
+#288 at `9f3453a3`; new work must branch from the current remote
+`codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
 #259, #266, and #268, plus the bounded calendar-materiality correction from
@@ -32,7 +34,17 @@ explicit onboarding removal from PR #275, and stale Run settlement from PR
 Grounded Discovery and Guest baselines from PRs #276 and #279, modeled-cost
 preservation from PR #280, and chat next-move presentation from PR #281.
 Provider-free test isolation landed through PR #282, and PR #286 replaced the
-partial backend test list with the complete `tests/` directory gate. This
+partial backend test list with the complete `tests/` directory gate. PR #287
+then delivered resolver-owned discovery selection identity and
+candidate/entity corroboration. PR #285 then pushed Conversations, Messages,
+History, and Omnisearch/Idea Ledger pagination and search bounds into Postgres
+without changing public cursors, ranking, ownership, or canonical artifact
+identity. Its accepted private-alpha boundary permits sparse/deep/final History
+Run pages to inspect more ordered rows; a maintained History read model remains
+deferred scale architecture rather than unfinished #232 work. PR #288 then
+completed fact-preserving recovery: stale or failed actions restore the latest
+usable canonical artifact anchor instead of rebuilding an empty idea, while
+genuinely absent facts still receive one targeted clarification. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -930,10 +942,13 @@ canary evidence are still required before tester exposure. PR #281 then landed
 the frontend presentation slice as `8fde4ac1`: conversational next moves and
 discovery candidates render as stacked rows under their owning message,
 candidate reasons remain visible, and the persisted discovery evidence opens
-in a sources panel without re-querying. The remaining chat-polish work is
-explicitly separate: resolved-identity carry-forward (Slice D), honest live
-progress (Slice B), and guest discovery allowance. Full Omnisearch is the
-remaining unbuilt founder outcome.
+in a sources panel without re-querying. PR #287 then landed Slice D as
+`ea2b3f35`: discovery selection carries the resolver-owned identity through the
+normal mention channel, durable Retry preserves it, and candidate validation
+rejects unrelated ticker collisions. The chosen-state marker was cut, and
+broader assumption carry-forward remains general interpreter work rather than
+discovery debt. Honest live progress (Slice B) and guest discovery allowance
+remain. Full Omnisearch is the remaining unbuilt founder outcome.
 
 Integration-verification checkpoint (2026-07-27): PR #282 landed as
 `059f8e82` and made the ordinary backend test environment provider-free by
@@ -942,6 +957,15 @@ default while adding both alpha API suites to CI. PR #286 then landed as
 made `backend-checks` run the complete `tests/` directory instead of a curated
 file list. These are test/CI truth improvements, not product behavior changes,
 provider-backed evidence, deployment, or tester exposure.
+
+Discovery-selection checkpoint (2026-07-27): PR #287 landed as `ea2b3f35` and
+closed Slice D of the chat next-moves lane. The selected asset's resolved symbol
+and class now survive initial submission and durable Retry as a normal mention;
+interpretation, guardrails, and confirmation remain mandatory. The same PR
+added candidate/entity corroboration to prevent unrelated cross-class ticker
+collisions. It intentionally filters crypto-exposure vehicles along with true
+collisions; #244 remains open for that product decision, comparison-phrase
+reliability, hosted configuration, and exact-SHA canary evidence.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration
@@ -955,12 +979,18 @@ classified as a Guest-only settlement defect, landed with Guest PR #279 at
 `53e812e9`, and is closed.
 Supported strategy-transition preservation (#270) is complete through PR #278
 at `b80d95a2`; modeled-cost preservation (#271) landed through PR #280 at
-`d16f7496` and remains open only for its focused integrated closure journey.
-#272 is now the next protected interpreter/edit-spine issue. #249 may now start
-from `8fde4ac1` or later because the overlapping Guest and chat-next-move shell
-owners have landed; it must preserve PR #281's stacked rows, source panel, and
-shared in-flight lock while changing only Quick take, Explain, Try next, and
-recovery ownership. See
+`d16f7496` and is complete based on PR #280's bounded same-chat integration
+journey.
+#272 is complete through PR #288 at `9f3453a3`: recovery restores the current
+canonical artifact anchor, preserves already-owned facts, asks only for
+genuinely missing fields, keeps prior results immutable, and creates no
+duplicate compute. No further protected-spine implementation lane is queued;
+#270–#272 are closed, and representative repetition belongs to later promotion
+qualification. #249 may start from the current remote integration head because
+the overlapping Guest,
+chat-next-move, and recovery-state owners have landed; it must preserve PR
+#281's stacked rows, source panel, and shared in-flight lock while changing only
+Quick take, Explain, Try next, and recovery presentation ownership. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)

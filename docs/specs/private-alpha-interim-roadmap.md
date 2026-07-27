@@ -6,8 +6,10 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-27
 
-Current stable integration checkpoint: `codex/private-alpha-next` at
-`75e87206574cca41a715d357b366bda569beb8bd`.
+Latest integrated product checkpoint: PR #288 at `9f3453a3`. Later commits may
+reconcile roadmap and issue state without changing product behavior. New work
+must branch from the current remote integration head rather than pinning this
+product SHA.
 
 That checkpoint contains the founder-accepted outcome baselines delivered
 through independently revertible vertical slices:
@@ -33,8 +35,35 @@ Guest experience from PR #279 at `53e812e9` and chat next-move presentation
 from PR #281 at `8fde4ac1`. PR #282 then made ordinary backend tests
 provider-free and added the alpha API suites to CI at `059f8e82`; PR #286 made
 the complete backend `tests/` directory the required CI gate at `75e87206`.
-Those two CI landings improve verification truth without changing product
-behavior.
+PR #287 then delivered resolver-owned discovery selection identity and
+candidate/entity corroboration at `ea2b3f35`. The two CI landings improve
+verification truth without changing product behavior; PR #287 changes the
+discovery selection and validation path. PR #285 then landed bounded Postgres
+pagination and search at `7b7920bb` for Conversations, Messages, History, and
+Omnisearch/Idea Ledger without changing public cursor, ranking, ownership, or
+artifact contracts. Issue #232 is complete. Its accepted sparse/deep/final
+History Run scan exception remains an explicit private-alpha boundary; #252
+continues to own client hydration, caching, and rendering. PR #288 then landed
+canonical fact-preserving recovery at `9f3453a3`: stale or failed actions
+restore the latest usable artifact anchor, already-owned facts are not
+re-requested, genuinely absent facts receive one targeted clarification, and
+prior results remain immutable without duplicate compute.
+
+Two issue closures after that product checkpoint required no new application
+commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
+requested/effective period truth, calendar-materiality classification, and
+durable recovery. Promotion evidence remains with #233 and trajectory-ledger
+bookkeeping remains with #243. Issue #246 is also closed after the exact
+checked-in `20260702000001_add_cost_ledger_entries` migration was applied to
+the hosted Argus Supabase project and its append-only service-role contract was
+verified.
+
+PR #289 then landed the structural OpenAPI compatibility gate as `8a66f0ba`.
+Generated FastAPI structure remains the machine-readable authority; the checked
+artifact is regenerated from that authority and CI compares normalized paths,
+methods, parameters, request/response schemas, required fields, and enums with
+only the three approved internal/dev exclusions. Issue #234 is closed. Issue
+#235 is now unblocked and must start from the current remote integration head.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -90,7 +119,7 @@ deterministic test result by itself.
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
-| 5. Discovery is grounded and Argus can suggest | **Baseline landed default-on; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. #244 remains open: comparison phrasing reliability plus Render configuration and exact-SHA canary evidence are required before tester exposure. |
+| 5. Discovery is grounded and Argus can suggest | **Baseline landed default-on; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 then landed the presentation (`8fde4ac1`) and PR #287 the selection identity plus a ticker-collision correction (`ea2b3f35`). #244 remains open: comparison phrasing reliability, the recorded exposure-vehicle limitation, plus Render configuration and exact-SHA canary evidence are required before tester exposure. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
 Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
@@ -142,16 +171,20 @@ Execute serially:
    is **complete**. PR #278 landed as `b80d95a2`; its eight acceptance criteria
    were reconciled and #270 is closed.
 2. [#271 — Preserve modeled costs across asset edits](https://github.com/lagarcess/argus/issues/271).
-   PR #280 landed as `d16f7496` after proving cost preservation, evidence-owned
-   natural-language and card edits, explicit zero, date/asset edits, launch
-   agreement, and reload. The issue stays open only for its named integrated
-   preservation repetition.
+   This is **complete**. PR #280 landed as `d16f7496` after proving cost
+   preservation, evidence-owned natural-language and card edits, explicit
+   zero, date/asset edits, launch agreement, and reload in its bounded
+   same-chat integration journey.
 3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
-   This is now the next protected interpreter/edit-spine issue and must start
-   from `75e87206` or a later clean integration checkpoint.
+   This is **complete**. PR #288 landed as `9f3453a3`; canonical recovery
+   restores the latest usable anchor, preserves its owned facts through reload
+   and later edits, asks only for genuinely missing fields, keeps the prior
+   result immutable, and creates no duplicate compute.
 
-Only one agent owns the interpreter/edit spine at a time. Do not combine these
-issues into another open-ended continuity rewrite.
+The protected interpreter/edit-spine queue is complete and #270–#272 are
+closed. Any repetition of these journeys belongs to a later promotion
+qualification checkpoint, not another issue-level implementation gate. Do not
+combine these issues into another open-ended continuity rewrite.
 
 #### Artifact lifecycle and presentation
 
@@ -161,8 +194,9 @@ Execute serially:
    is **complete**. PR #277 landed as `2d5a2b52`; all eight acceptance criteria
    were reconciled and #273 is closed.
 2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249)
-   is now ready to start from `75e87206` or later. Guest has landed, so the
-   overlapping chat-shell and recovery-presentation owner is stable.
+   is now ready to start from the current remote `codex/private-alpha-next`
+   head. Guest has landed, so the overlapping chat-shell and
+   recovery-presentation owner is stable.
 
 Issue #249 was updated instead of duplicating presentation ownership. It
 records:
@@ -186,16 +220,17 @@ This is the current dispatch gate, not another speculative backlog:
 | Ownership lane | Current owner | Next handoff |
 | --- | --- | --- |
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
-| Protected interpreter/edit spine | #271 implementation landed through PR #280 at `d16f7496` | Run its focused integrated closure journey, then close #271. #272 must use `75e87206` or later. |
-| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from `75e87206` or later. |
-| Grounded discovery | PR #276 landed as `c212107a`; chat next-moves polish PR #281 landed as `8fde4ac1`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, configure Render, and prove the exact deployed SHA/canary. |
-| Chat next-move presentation | PR #281 landed as `8fde4ac1`: clarify options, follow-ups, and discovery candidates render as stacked rows under their owning message; sources panel with outbound links; shared in-flight lock. Frontend only | Two specified follow-ups remain in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md`: Slice D (discovery selection carries resolved identity, plus chosen-state and switch continuity) and Slice B (live progress lines, blocked on three backend prerequisites). New work must start from `75e87206` or later. |
+| Protected interpreter/edit spine | #270–#272 are closed; #271 landed through PR #280 at `d16f7496` | No additional spine implementation lane is queued. Repeat representative journeys only at promotion qualification. |
+| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from the current remote integration head. |
+| Grounded discovery | PR #276 landed as `c212107a`; chat next-moves polish PR #281 landed as `8fde4ac1`; selection identity and candidate/entity corroboration landed through PR #287 at `ea2b3f35`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, decide the exposure-vehicle product path, configure Render, and prove the exact deployed SHA/canary. |
+| Chat next-move presentation | PR #281 landed as `8fde4ac1` (stacked rows, sources panel, shared in-flight lock); PR #287 landed as `ea2b3f35` (Slice D: discovery selection carries the resolver's identity, plus a resolution-corroboration fix) | Slice D is closed — the chosen-state marker was cut deliberately, and carry-forward on switch was deferred out of the lane as general interpreter work. Only Slice B remains in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md` (live progress lines, blocked on three backend prerequisites). New work must start from the current remote integration head. |
+| Discovery candidate resolution | PR #287 corrected a ticker-collision defect: a resolved candidate must now corroborate the entity the sources named, so a gold miner is no longer offered for a Tron question | Known limitation accepted and recorded in `docs/superpowers/specs/2026-07-25-grounded-discovery-search-v1-design.md` §5.1: crypto-exposure ETFs are dropped alongside true collisions because the two are structurally indistinguishable to a token check. Surfacing exposure vehicles deliberately is real product value and needs its own design. Owned by #244. |
 | Guest grounded discovery | Specified, not started — `docs/superpowers/specs/2026-07-27-guest-grounded-discovery-quota.md` | Meter the guest ask per session; do not gate the candidate tap. Supersedes the "registered users only" line in the grounded discovery design. Allowance number is founder-owned. |
-| Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto `75e87206` or later; do not invent discovery truth or activate Search implicitly. |
+| Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto the current remote integration head; do not invent discovery truth or activate Search implicitly. |
 
-The next bounded continuity lanes are #272 and #249. They have different owners
-and may proceed in parallel, but work inside each ownership queue remains
-serialized.
+The next bounded continuity implementation lane is #249. The protected
+interpreter/edit-spine queue is closed; do not reopen it without a new
+reproduction.
 
 ### Guest Main-Promotion And Public-Exposure Register
 
@@ -421,8 +456,9 @@ Completion evidence:
 This completion does not claim deployment or tester exposure. #228, #233, and
 #237 retain those release-owned gates. Narrow issue-specific follow-ups also
 remain open where their own acceptance exceeds this founder outcome, including
-#239's dedicated trajectory cleanup, #243's combined release gate, and #251's
-remaining period-truth work.
+#239's dedicated trajectory cleanup and #243's trajectory-ledger reconciliation.
+#251 is closed; promotion and evaluation bookkeeping must not reopen its
+completed product scope.
 
 ## Retained Product Decisions
 
@@ -453,13 +489,15 @@ The pre-existing stale direct-job GET reconciliation gap remains tracked by
 #231; #230 owns any atomic database primitive it requires. It is not part of
 the completed user-visible Usage slice.
 
-### Incomplete data windows (#251)
+### Requested/effective data-window truth (#251 — complete)
 
-- Implementation checkpoint (2026-07-25): coverage preflight now persists a
-  code-owned `adjustment_reason`, distinguishes exchange-calendar alignment
-  from provider-driven truncation, and emits the existing period-adjustment
-  sidecar only for provider-driven changes. The reason is measurement-visible
-  without changing normalized confirmation action identity.
+- PR #262 established one requested/effective coverage contract across
+  confirmation, execution, result, persistence, evidence, and reload.
+- PR #267 added the code-owned `adjustment_reason`, distinguishes ordinary
+  exchange-calendar alignment from provider-driven truncation, and emits the
+  period-adjustment sidecar only for material provider-driven changes.
+- PR #268 preserves the resulting artifact and recovery ownership through
+  continued conversation and reload.
 - Fit to provider-supported data only when a viable common window remains; a
   material fit must not be silent.
 - Ordinary weekend or holiday session normalization inside available coverage
@@ -473,9 +511,41 @@ the completed user-visible Usage slice.
 - If no viable common window exists, return typed recovery and no runnable card.
 - The approved effective window remains identical across result facts, chart,
   prose, evidence, reload, replay, and Omnisearch.
-- Remaining follow-ups: preserve normal LLM-authored adjustment voice through
-  stream and reload, and decide whether historical cards without the typed
-  reason need notice backfill. Neither follow-up is implemented by this slice.
+- Founder-visible QA confirmed the product behavior in real conversation turns,
+  and issue #251 is closed. Exact-SHA promotion/canary evidence remains #233
+  work. Seven-session expected-failure bookkeeping remains #243 work.
+
+### Cost-ledger visibility (#246 — complete)
+
+- The hosted Argus Supabase project had skipped the existing
+  `20260702000001_add_cost_ledger_entries` migration; the table had never been
+  intentionally removed.
+- On 2026-07-27, the exact checked-in migration and matching history
+  version/name were applied without replaying unrelated pending migrations.
+- Direct SQL and PostgREST now observe the table with RLS enabled.
+  `service_role` has only `INSERT` and `SELECT`; `anon` and `authenticated`
+  have no table privileges, and service-role `UPDATE`/`DELETE` remain denied.
+- One privacy-safe append-only reconciliation row proves the hosted write/read
+  path. Focused failure injection still proves chat and backtests continue when
+  ledger persistence is unavailable.
+- No repository change, application deploy, or PR was required. Issue #246 is
+  closed; the durable evidence is recorded in
+  [`issue-246-cost-ledger-closure-evidence.md`](../reports/issue-246-cost-ledger-closure-evidence.md).
+
+### OpenAPI compatibility (#234 — complete)
+
+- PR #289 landed as `8a66f0ba` and closes issue #234.
+- FastAPI `app.openapi()` remains the canonical machine-readable authority.
+  `docs/api/openapi.yaml` is generated from the corrected document and checked
+  as a compatibility artifact, not maintained as a competing contract.
+- CI now fails on unallowlisted path/method drift, server-prefix duplication,
+  parameter and required-field drift, request/response schema drift, relevant
+  enum drift, and overly broad exclusions.
+- The only excluded operations are the named health, readiness, and local-dev
+  reset surfaces; the SSE response-body normalization remains narrowly scoped.
+- Both PR CI and post-merge integration CI passed. Issue #235's request-bound
+  and correlated-failure lane is now unblocked and starts from the current
+  remote integration head.
 
 ## Historical Planning Archive
 

@@ -7,7 +7,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 
@@ -21,7 +21,6 @@ from argus.api.schemas import (
     IdeaVersion,
     Language,
     Locale,
-    Message,
     Strategy,
     User,
 )
@@ -29,20 +28,37 @@ from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
 )
-from argus.domain.backtest_message_projection import (
-    hydrate_completed_backtest_job_messages,
-)
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
-from argus.domain.search_text import normalize_search_text, search_text_matches_query
+from argus.domain.postgres_history_reader import (
+    PostgresHistoryReader,
+    history_reader_for_database_url,
+)
+from argus.domain.postgres_keyset_reader import (
+    ConversationKeysetCursorError,
+    PostgresKeysetReader,
+)
+from argus.domain.postgres_search_reader import (
+    PostgresSearchReader,
+    SearchReadResult,
+)
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
 from argus.domain.supabase_guest_accounts import GuestAccountPersistenceMixin
+from argus.domain.supabase_message_reads import (
+    _COMPLETED_RESULT_BATCH_SIZE,
+    SupabaseMessageReadMixin,
+    _distinct_chunks,
+    _unique_owned_rows_by_id,
+)
+from argus.domain.supabase_message_reads import (
+    MessageCursorError as MessageCursorError,
+)
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
@@ -60,6 +76,10 @@ from supabase import Client, ClientOptions, create_client
 
 class DecisionCaptureIntegrityError(RuntimeError):
     """Raised when the decision RPC does not return the committed object spine."""
+
+
+class ConversationCursorError(ValueError):
+    """Raised when a conversation cursor pivot cannot be resolved exactly."""
 
 
 _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
@@ -81,57 +101,6 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return data
 
 
-def _filter_history_runs_by_conversation_state(
-    runs: list[dict[str, Any]],
-    conversations: list[dict[str, Any]],
-    *,
-    archived: bool,
-    deleted: bool,
-) -> list[dict[str, Any]]:
-    conversations_by_id = {
-        str(row["id"]): row for row in conversations if row.get("id") is not None
-    }
-    include_orphan_runs = not archived and not deleted
-    filtered: list[dict[str, Any]] = []
-
-    for run in runs:
-        conversation_id = run.get("conversation_id")
-        if conversation_id is None:
-            if include_orphan_runs:
-                filtered.append(run)
-            continue
-        conversation = conversations_by_id.get(str(conversation_id))
-        if conversation is None:
-            if include_orphan_runs:
-                filtered.append(run)
-            continue
-        deleted_matches = (
-            conversation.get("deleted_at") is not None
-            if deleted
-            else conversation.get("deleted_at") is None
-        )
-        if deleted_matches and bool(conversation.get("archived", False)) == archived:
-            filtered.append(run)
-
-    return filtered
-
-
-def _filter_history_conversations_by_message_state(
-    conversations: list[dict[str, Any]],
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    conversation_ids_with_messages = {
-        str(row["conversation_id"])
-        for row in messages
-        if row.get("conversation_id") is not None
-    }
-    return [
-        row
-        for row in conversations
-        if row.get("id") is not None and str(row["id"]) in conversation_ids_with_messages
-    ]
-
-
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -147,11 +116,15 @@ def _supabase_client_options() -> ClientOptions:
 class SupabaseGateway(
     GuestAccountPersistenceMixin,
     ChatTurnLifecycleGatewayMixin,
+    SupabaseMessageReadMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
 ):
     client: Client
     auth_client: Client | None = None
+    history_reader: PostgresHistoryReader | None = None
+    search_reader: PostgresSearchReader | None = None
+    keyset_reader: PostgresKeysetReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -161,13 +134,16 @@ class SupabaseGateway(
     def from_env(cls) -> SupabaseGateway:
         url = os.getenv("SUPABASE_URL") or os.getenv("SUPABASE_PROJECT_URL")
         key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if not url or not key:
+        database_url = os.getenv("DATABASE_URL", "").strip()
+        if not url or not key or not database_url:
             raise RuntimeError(
-                "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+                "Supabase mode requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, "
+                "and DATABASE_URL."
             )
         auth_key = (
             os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_PUBLIC_KEY") or key
         )
+        history_reader = history_reader_for_database_url(database_url)
         return cls(
             client=create_client(url, key, options=_supabase_client_options()),
             auth_client=create_client(
@@ -175,6 +151,9 @@ class SupabaseGateway(
                 auth_key,
                 options=_supabase_client_options(),
             ),
+            history_reader=history_reader,
+            keyset_reader=PostgresKeysetReader(history_reader.pool),
+            search_reader=PostgresSearchReader(history_reader.pool),
         )
 
     def new_id(self) -> str:
@@ -383,7 +362,60 @@ class SupabaseGateway(
         limit: int | None,
         archived: bool | None = None,
         deleted: bool = False,
+        cursor_updated_at: datetime | None = None,
+        cursor_id: str | None = None,
     ) -> list[Conversation]:
+        if (cursor_updated_at is None) != (cursor_id is None):
+            raise ConversationCursorError("invalid conversation cursor pivot")
+
+        if cursor_id is not None:
+            try:
+                normalized_cursor_id = str(UUID(cursor_id))
+            except (AttributeError, TypeError, ValueError):
+                raise ConversationCursorError(
+                    "invalid conversation cursor pivot"
+                ) from None
+            if normalized_cursor_id != cursor_id:
+                raise ConversationCursorError("invalid conversation cursor pivot")
+
+        if limit is not None and self.keyset_reader is not None:
+            try:
+                keyset_rows = self.keyset_reader.list_conversation_rows(
+                    user_id=user_id,
+                    limit=limit,
+                    archived=archived,
+                    deleted=deleted,
+                    cursor_updated_at=cursor_updated_at,
+                    cursor_id=cursor_id,
+                )
+            except ConversationKeysetCursorError as exc:
+                raise ConversationCursorError(
+                    "invalid conversation cursor pivot"
+                ) from exc
+            return [Conversation.model_validate(row) for row in keyset_rows]
+
+        cursor_pinned: bool | None = None
+        canonical_cursor_id: str | None = None
+        if cursor_updated_at is not None and cursor_id is not None:
+            pivot_rows = (
+                self.client.table("conversations")
+                .select("id,pinned")
+                .eq("user_id", user_id)
+                .eq("id", cursor_id)
+                .limit(2)
+                .execute()
+                .data
+                or []
+            )
+            if len(pivot_rows) != 1:
+                raise ConversationCursorError("invalid conversation cursor pivot")
+            pivot = pivot_rows[0]
+            canonical_cursor_id = str(pivot.get("id") or "")
+            pinned = pivot.get("pinned")
+            if canonical_cursor_id != cursor_id or not isinstance(pinned, bool):
+                raise ConversationCursorError("invalid conversation cursor pivot")
+            cursor_pinned = pinned
+
         query = self.client.table("conversations").select("*").eq("user_id", user_id)
         if deleted:
             query = query.not_.is_("deleted_at", "null")
@@ -393,11 +425,33 @@ class SupabaseGateway(
         if archived is not None:
             query = query.eq("archived", archived)
 
-        ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
+        if (
+            cursor_updated_at is not None
+            and canonical_cursor_id is not None
+            and cursor_pinned is not None
+        ):
+            timestamp = cursor_updated_at.isoformat()
+            within_tier = (
+                f"or(updated_at.lt.{timestamp},"
+                f"and(updated_at.eq.{timestamp},id.lt.{canonical_cursor_id}))"
+            )
+            if cursor_pinned:
+                keyset_filter = (
+                    f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
+                )
+            else:
+                keyset_filter = f"and(pinned.eq.false,{within_tier})"
+            query = query.or_(keyset_filter)
+
+        ordered = (
+            query.order("pinned", desc=True)
+            .order("updated_at", desc=True)
+            .order("id", desc=True)
+        )
         if limit is None:
             rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
         else:
-            rows_data = ordered.limit(limit).execute().data or []
+            rows_data = ordered.limit(limit + 1).execute().data or []
         return [Conversation.model_validate(row) for row in rows_data]
 
     def get_conversation(
@@ -444,33 +498,6 @@ class SupabaseGateway(
             .execute()
         )
         return len(result.data or [])
-
-    def list_messages(
-        self, *, user_id: str, conversation_id: str, limit: int | None
-    ) -> list[Message]:
-        query = (
-            self.client.table("messages")
-            .select("id,conversation_id,role,content,metadata,created_at")
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-            .order("created_at", desc=False)
-        )
-        if limit is None:
-            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
-        else:
-            rows_data = query.limit(limit).execute().data or []
-        messages = [Message.model_validate(row) for row in rows_data]
-        return hydrate_completed_backtest_job_messages(
-            messages,
-            load_job=lambda job_id: self.get_backtest_job(
-                user_id=user_id,
-                job_id=job_id,
-            ),
-            load_run=lambda run_id: self.get_backtest_run(
-                user_id=user_id,
-                run_id=run_id,
-            ),
-        )
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:
         self._require_owned_conversation(
@@ -552,10 +579,12 @@ class SupabaseGateway(
         )
         if not run.conversation_id:
             return
-        for message in self.list_messages(
+        for message in self._decision_result_messages(
             user_id=user_id,
             conversation_id=run.conversation_id,
-            limit=None,
+            run=run,
+            evidence_artifact_id=evidence_artifact_id,
+            enriched_card=enriched_card,
         ):
             metadata = dict(message.metadata or {})
             result_card = metadata.get("result_card")
@@ -980,6 +1009,43 @@ class SupabaseGateway(
         row = _row_one(result)
         return dict(row) if row is not None else None
 
+    def get_backtest_jobs_by_ids(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        job_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        if not job_ids:
+            return {}
+        jobs_by_id: dict[str, dict[str, Any]] = {}
+        for requested in _distinct_chunks(
+            job_ids,
+            size=_COMPLETED_RESULT_BATCH_SIZE,
+        ):
+            rows = (
+                self.client.table("backtest_jobs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .in_("id", requested)
+                .limit(len(requested) + 1)
+                .execute()
+                .data
+                or []
+            )
+            if len(rows) > len(requested):
+                continue
+            jobs_by_id.update(
+                _unique_owned_rows_by_id(
+                    rows,
+                    requested_ids=set(requested),
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                )
+            )
+        return jobs_by_id
+
     def count_backtest_jobs(
         self, *, status: str, user_id: str | None = None, limit: int = 100
     ) -> int:
@@ -1352,6 +1418,47 @@ class SupabaseGateway(
         row = _row_one(rows)
         return BacktestRun.model_validate(row) if row else None
 
+    def get_backtest_runs_by_ids(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        run_ids: list[str],
+    ) -> dict[str, BacktestRun]:
+        if not run_ids:
+            return {}
+        runs_by_id: dict[str, BacktestRun] = {}
+        for requested in _distinct_chunks(
+            run_ids,
+            size=_COMPLETED_RESULT_BATCH_SIZE,
+        ):
+            rows = (
+                self.client.table("backtest_runs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .in_("id", requested)
+                .limit(len(requested) + 1)
+                .execute()
+                .data
+                or []
+            )
+            if len(rows) > len(requested):
+                continue
+            owned_rows = _unique_owned_rows_by_id(
+                rows,
+                requested_ids=set(requested),
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+            runs_by_id.update(
+                {
+                    run_id: BacktestRun.model_validate(row)
+                    for run_id, row in owned_rows.items()
+                }
+            )
+        return runs_by_id
+
     def get_latest_completed_run_for_conversation(
         self, *, user_id: str, conversation_id: str
     ) -> BacktestRun | None:
@@ -1400,339 +1507,53 @@ class SupabaseGateway(
         self,
         *,
         user_id: str,
-        limit: int | None,
+        limit: int,
         archived: bool = False,
         deleted: bool = False,
+        cursor_activity_at: datetime | None = None,
+        cursor_id: str | None = None,
+        cursor_pinned: bool | None = None,
+        cursor_type_rank: int | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        query_runs = (
-            self.client.table("backtest_runs")
-            .select("id,conversation_id,conversation_result_card,created_at")
-            .eq("user_id", user_id)
-        )
-        query_chats = (
-            self.client.table("conversations")
-            .select(
-                "id,title,title_source,last_message_preview,pinned,updated_at,deleted_at,archived"
-            )
-            .eq("user_id", user_id)
-            .eq("archived", archived)
-        )
-        query_strategies = (
-            self.client.table("strategies")
-            .select("id,name,symbols,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-        )
-        query_collections = (
-            self.client.table("collections")
-            .select("id,name,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-        )
-
-        if deleted:
-            # We don't soft-delete backtest_runs usually, but if we did:
-            # query_runs = query_runs.not_.is_("deleted_at", "null")
-            query_chats = query_chats.not_.is_("deleted_at", "null")
-            query_strategies = query_strategies.not_.is_("deleted_at", "null")
-            query_collections = query_collections.not_.is_("deleted_at", "null")
-        else:
-            query_chats = query_chats.is_("deleted_at", "null")
-            query_strategies = query_strategies.is_("deleted_at", "null")
-            query_collections = query_collections.is_("deleted_at", "null")
-
-        ordered_runs = query_runs.order("created_at", desc=True)
-        ordered_chats = query_chats.order("updated_at", desc=True)
-        ordered_strategies = query_strategies.order("updated_at", desc=True)
-        ordered_collections = query_collections.order("updated_at", desc=True)
-
-        if limit is None:
-            runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
-            chats = self._fetch_all_rows(
-                lambda start, end: ordered_chats.range(start, end)
-            )
-            strategies = self._fetch_all_rows(
-                lambda start, end: ordered_strategies.range(start, end)
-            )
-            collections = self._fetch_all_rows(
-                lambda start, end: ordered_collections.range(start, end)
-            )
-        else:
-            runs = ordered_runs.limit(limit).execute().data or []
-            chats = ordered_chats.limit(limit).execute().data or []
-            strategies = ordered_strategies.limit(limit).execute().data or []
-            collections = ordered_collections.limit(limit).execute().data or []
-        run_parent_conversations = self._fetch_history_run_conversation_states(
+        if self.history_reader is None:
+            raise RuntimeError("Persistent History requires its Postgres reader.")
+        return self.history_reader.list_rows(
             user_id=user_id,
-            runs=runs,
-        )
-        chat_message_states = self._fetch_history_conversation_message_states(
-            user_id=user_id,
-            conversations=chats,
-        )
-        runs = _filter_history_runs_by_conversation_state(
-            runs,
-            run_parent_conversations,
+            limit=limit,
             archived=archived,
             deleted=deleted,
+            cursor_activity_at=cursor_activity_at,
+            cursor_id=cursor_id,
+            cursor_pinned=cursor_pinned,
+            cursor_type_rank=cursor_type_rank,
         )
-        chats = _filter_history_conversations_by_message_state(
-            chats,
-            chat_message_states,
-        )
-
-        return {
-            "runs": runs,
-            "conversations": chats,
-            "strategies": strategies,
-            "collections": collections,
-        }
-
-    def _fetch_history_run_conversation_states(
-        self,
-        *,
-        user_id: str,
-        runs: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        conversation_ids = sorted(
-            {
-                str(run["conversation_id"])
-                for run in runs
-                if run.get("conversation_id") is not None
-            }
-        )
-        if not conversation_ids:
-            return []
-        return (
-            self.client.table("conversations")
-            .select("id,archived,deleted_at")
-            .eq("user_id", user_id)
-            .in_("id", conversation_ids)
-            .execute()
-            .data
-            or []
-        )
-
-    def _fetch_history_conversation_message_states(
-        self,
-        *,
-        user_id: str,
-        conversations: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        conversation_ids = sorted(
-            {
-                str(conversation["id"])
-                for conversation in conversations
-                if conversation.get("id") is not None
-            }
-        )
-        if not conversation_ids:
-            return []
-        query = (
-            self.client.table("messages")
-            .select("conversation_id")
-            .eq("user_id", user_id)
-            .in_("conversation_id", conversation_ids)
-        )
-        return self._fetch_all_rows(lambda start, end: query.range(start, end))
 
     def search_rows(
-        self, *, user_id: str, query: str, limit: int | None
-    ) -> dict[str, list[dict[str, Any]]]:
-        normalized_query = normalize_search_text(query)
-        conversations_query = (
-            self.client.table("conversations")
-            .select("id,title,last_message_preview,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
+        self,
+        *,
+        user_id: str,
+        query: str,
+        source_limit: int,
+        cursor_updated_at: datetime | None = None,
+        cursor_id: str | None = None,
+        decision_state: str | None = None,
+        include_ledger_groups: bool = False,
+        guest_scope: bool = False,
+        guest_conversation_id: str | None = None,
+    ) -> SearchReadResult:
+        if self.search_reader is None:
+            raise RuntimeError("Persistent Search requires its Postgres reader.")
+        return self.search_reader.search_rows(
+            user_id=user_id,
+            query=query,
+            source_limit=source_limit,
+            cursor_updated_at=cursor_updated_at,
+            cursor_id=cursor_id,
+            decision_state=decision_state,
+            include_ledger_groups=include_ledger_groups,
+            guest_scope=guest_scope,
+            guest_conversation_id=guest_conversation_id,
         )
-        strategies_query = (
-            self.client.table("strategies")
-            .select("id,name,symbols,template,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-        )
-        collections_query = (
-            self.client.table("collections")
-            .select("id,name,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-        )
-        runs_query = (
-            self.client.table("backtest_runs")
-            .select(
-                "id,conversation_id,conversation_result_card,created_at,status,"
-                "asset_class,benchmark_symbol"
-            )
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .order("created_at", desc=True)
-        )
-        ideas_query = (
-            self.client.table("ideas")
-            .select(
-                "id,title,summary,lifecycle,active_version_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-        evidence_query = (
-            self.client.table("evidence_artifacts")
-            .select(
-                "id,title,digest,lifecycle,artifact_type,payload,source_run_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-        decisions_query = (
-            self.client.table("decision_notes")
-            .select(
-                "id,idea_id,decision_state,note,evidence_artifact_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-
-        if limit is None:
-            conversations_raw = self._fetch_all_rows(
-                lambda start, end: conversations_query.range(start, end)
-            )
-            strategies_raw = self._fetch_all_rows(
-                lambda start, end: strategies_query.range(start, end)
-            )
-            collections_raw = self._fetch_all_rows(
-                lambda start, end: collections_query.range(start, end)
-            )
-            runs_raw = self._fetch_all_rows(
-                lambda start, end: runs_query.range(start, end)
-            )
-            ideas_raw = self._fetch_all_rows(
-                lambda start, end: ideas_query.range(start, end)
-            )
-            evidence_raw = self._fetch_all_rows(
-                lambda start, end: evidence_query.range(start, end)
-            )
-            decisions_raw = self._fetch_all_rows(
-                lambda start, end: decisions_query.range(start, end)
-            )
-        else:
-            conversations_raw = conversations_query.limit(limit).execute().data or []
-            strategies_raw = strategies_query.limit(limit).execute().data or []
-            collections_raw = collections_query.limit(limit).execute().data or []
-            runs_raw = runs_query.limit(limit).execute().data or []
-            ideas_raw = ideas_query.limit(limit).execute().data or []
-            evidence_raw = evidence_query.limit(limit).execute().data or []
-            decisions_raw = decisions_query.limit(limit).execute().data or []
-
-        conversations = [
-            row
-            for row in conversations_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=f"{row.get('title', '')} {row.get('last_message_preview') or ''}",
-            )
-        ]
-        strategies = [
-            row
-            for row in strategies_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{row.get('name', '')} {' '.join(row.get('symbols') or [])} "
-                    f"{row.get('template') or ''}"
-                ),
-            )
-        ]
-        collections = [
-            row
-            for row in collections_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=row.get("name", ""),
-            )
-        ]
-        runs = [
-            row
-            for row in runs_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{(row.get('conversation_result_card') or {}).get('title', '')} "
-                    f"{' '.join((row.get('conversation_result_card') or {}).get('symbols') or [])} "
-                    f"{(row.get('conversation_result_card') or {}).get('strategy_label', '')} "
-                    f"{row.get('benchmark_symbol') or ''}"
-                ),
-            )
-        ]
-        # Idea Ledger: roll up each idea's CURRENT (latest) decision_state from the
-        # UNFILTERED decisions, so the status survives a search that matched the idea
-        # by title/summary but not its decision text, and so an empty-query status
-        # browse (q="" + a decision_state filter, which the /search router permits)
-        # still returns ideas. raw["decisions"] below is query-filtered and must NOT
-        # be used for this rollup.
-        idea_decision_state: dict[str, Any] = {}
-        idea_decision_ts: dict[str, Any] = {}
-        for drow in decisions_raw:
-            idea_key = str(drow.get("idea_id") or "")
-            state = drow.get("decision_state")
-            if not idea_key or not state:
-                continue
-            ts = drow.get("updated_at")
-            prior_ts = idea_decision_ts.get(idea_key)
-            if idea_key not in idea_decision_state or (
-                ts is not None and (prior_ts is None or ts >= prior_ts)
-            ):
-                idea_decision_ts[idea_key] = ts
-                idea_decision_state[idea_key] = state
-        ideas = [
-            {**row, "decision_state": idea_decision_state.get(str(row.get("id")))}
-            for row in ideas_raw
-            if not normalized_query
-            or search_text_matches_query(
-                query=normalized_query,
-                text=f"{row.get('title', '')} {row.get('summary') or ''}",
-            )
-        ]
-        evidence = [
-            row
-            for row in evidence_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{row.get('title', '')} {row.get('digest') or ''} "
-                    f"{' '.join(((row.get('payload') or {}).get('result_card') or {}).get('symbols') or [])}"
-                ),
-            )
-        ]
-        evidence_by_id = {str(row.get("id")): row for row in evidence_raw}
-        decisions = []
-        for row in decisions_raw:
-            artifact = evidence_by_id.get(str(row.get("evidence_artifact_id"))) or {}
-            haystack = (
-                f"{row.get('decision_state', '')} {row.get('note') or ''} "
-                f"{artifact.get('title', '')} {artifact.get('digest', '')}"
-            )
-            if search_text_matches_query(query=normalized_query, text=haystack):
-                decisions.append(
-                    {
-                        **row,
-                        "artifact_title": artifact.get("title"),
-                        "artifact_digest": artifact.get("digest"),
-                    }
-                )
-        return {
-            "conversations": conversations,
-            "strategies": strategies,
-            "collections": collections,
-            "runs": runs,
-            "ideas": ideas,
-            "evidence": evidence,
-            "decisions": decisions,
-        }
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
         self._require_owned_conversation(

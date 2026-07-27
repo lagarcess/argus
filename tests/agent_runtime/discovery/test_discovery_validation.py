@@ -220,6 +220,7 @@ class TestReviewHardening:
         # The resolver owns the displayed identity even when it corroborates.
         assert validated[0].name == "CrowdStrike Holdings"
 
+
     def test_ticker_collision_with_an_unrelated_company_is_dropped(self) -> None:
         """A real ticker paired with a different company must not be selectable.
 

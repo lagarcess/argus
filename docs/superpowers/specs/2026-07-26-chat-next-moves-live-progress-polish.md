@@ -355,8 +355,11 @@ Also required: `web/lib/argus-api.ts` types the event as `{ stage: string }`;
 
 ## 5. Slice D — Discovery selection carries resolved identity (runtime + frontend)
 
-**Ships separately, after Slice A/C.** Founder-approved 2026-07-27; not in the
-UI PR. Recorded here so the lane is not re-derived later.
+**Delivered by PR #287 at `ea2b3f35`.** The approved contract below is retained
+as implementation history. Delivered scope is resolver-owned identity on the
+selection turn and durable Retry. The chosen-state marker was cut; broader
+assumption carry-forward on a mid-setup switch was explicitly deferred as
+general interpreter work rather than Slice D acceptance.
 
 ### The problem
 
@@ -393,11 +396,10 @@ Argus had already answered for itself.
 - **Standalone selection** (no active draft or result): Argus knows the asset,
   and asks once for what it genuinely lacks — strategy and dates. It must not
   ask which asset was meant.
-- **Post-result / post-draft selection:** the existing artifact-continuity
-  contract resolves the anchor (structured action payload → active confirmation
-  → latest completed result) and patches only the asset; capital, dates,
-  timeframe, benchmark, cadence, and strategy carry forward, landing directly on
-  a corrected confirmation card.
+- **Post-result / post-draft selection:** the selected asset keeps the
+  resolver-owned identity. Any broader carry-forward of capital, dates,
+  timeframe, benchmark, cadence, or strategy follows the general
+  artifact-continuity contract and is not promised by Slice D.
 - Strategy-parameter defaults are already applied on option selection
   (`normalize_indicator_parameters` in `interpreter/pending_option.py`) and need
   no change: selecting an RSI or crossover option fills period and thresholds
@@ -425,25 +427,22 @@ endpoint that rejects or supersedes a second concurrent turn, consistent with
 existing quota and supersession semantics. No UI change follows from it — the
 frontend already renders backend truth.
 
-### Why this needs proving, not assuming
+### What was proven
 
-The post-result path is the weakest-evidenced acceptance point in the whole
-Grounded Discovery lane. No test asserts the carry-forward, and the recorded
-live QA shows the clarify-heavy standalone shape. Design §8 originally
-specified two chip texts ("Test CRWD with this setup" post-result vs "Backtest
-CRWD" standalone); the two-variant idea was dropped during live QA when "Test"
-was parsed as a strategy name, and only the verb was fixed. Whether continuity
-carries today is unknown.
+The live failure was identity loss: the selected asset was re-derived from chip
+text and misread as a strategy. PR #287 proved the same selection now reaches a
+targeted missing-field question with the resolver-owned asset intact, and its
+review correction proved durable Retry rebuilds the same mention instead of
+replaying bare chip text. Broader post-result assumption carry-forward remains
+outside this slice.
 
 ### Tests
 
-- Selection with an active result patches only the asset; capital, dates,
-  benchmark, timeframe, and strategy are unchanged and the turn reaches a
-  confirmation card without a clarify round.
 - Standalone selection never asks which asset was meant.
+- Durable Retry retains the same resolver-owned asset identity.
 - Interpretation and confirmation still run on every selection turn; no path
   reaches execution without the card.
-- Live eval: one discovery-selection case per continuity shape.
+- Live browser QA proves the original identity-loss case on the real stack.
 
 ## 6. Documentation tasks in the lane
 
@@ -479,9 +478,8 @@ carries today is unknown.
 **PR 2 — Slice D (selection identity):**
 
 8. A discovery selection never asks which asset was meant.
-9. Selection with an active result or draft patches only the asset and reaches a
-   confirmation card with capital, dates, timeframe, benchmark, and strategy
-   intact.
+9. Durable Retry preserves the same resolver-owned asset identity; broader
+   assumption carry-forward remains deferred as general interpreter work.
 10. Interpretation, guardrails, and the confirmation card still run on every
     selection turn.
 

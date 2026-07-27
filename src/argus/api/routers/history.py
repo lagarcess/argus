@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from typing import cast
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -18,8 +19,43 @@ from argus.api.schemas import (
     User,
 )
 from argus.api.search_utils import search_type_rank
+from argus.domain.postgres_history_reader import HistoryCursorError
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
+
+_HISTORY_CURSOR_VERSION = "h1"
+
+
+def _decode_history_cursor(
+    cursor: str,
+    request: Request,
+) -> tuple[str, str, bool | None, int | None]:
+    timestamp: str
+    encoded_id: str
+    timestamp, encoded_id = decode_cursor(cursor, request)
+    prefix = f"{_HISTORY_CURSOR_VERSION}:"
+    if not encoded_id.startswith(prefix):
+        return timestamp, encoded_id, None, None
+
+    parts = encoded_id.split(":", 3)
+    if len(parts) != 4:
+        raise invalid_cursor_problem(request)
+    _, pinned_text, type_rank_text, item_id = parts
+    if pinned_text not in {"0", "1"} or not item_id:
+        raise invalid_cursor_problem(request)
+    try:
+        type_rank = int(type_rank_text)
+    except ValueError:
+        raise invalid_cursor_problem(request) from None
+    if type_rank not in {1, 2, 3, 4}:
+        raise invalid_cursor_problem(request)
+    return timestamp, item_id, pinned_text == "1", type_rank
+
+
+def _encode_history_cursor(item: HistoryItem) -> str:
+    type_rank = search_type_rank(item.type)
+    ranked_id = f"{_HISTORY_CURSOR_VERSION}:{int(item.pinned)}:{type_rank}:{item.id}"
+    return cast(str, encode_cursor(item.created_at.isoformat(), ranked_id))
 
 
 @router.get("/history", response_model=PaginatedHistory)
@@ -68,13 +104,38 @@ def history(
             ],
             next_cursor=None,
         )
-    if api_state.supabase_gateway is not None:
-        raw = api_state.supabase_gateway.list_history_rows(
-            user_id=user.id,
-            limit=None,
-            archived=archived,
-            deleted=deleted,
-        )
+    cursor_dt: datetime | None = None
+    cursor_id: str | None = None
+    cursor_pinned: bool | None = None
+    cursor_type_rank: int | None = None
+    if cursor:
+        (
+            cursor_created_at,
+            cursor_id,
+            cursor_pinned,
+            cursor_type_rank,
+        ) = _decode_history_cursor(cursor, request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_created_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+
+    gateway = api_state.supabase_gateway
+    persistent_history = gateway is not None
+    if gateway is not None:
+        try:
+            raw = gateway.list_history_rows(
+                user_id=user.id,
+                limit=limit + 1,
+                cursor_activity_at=cursor_dt,
+                cursor_id=cursor_id,
+                archived=archived,
+                deleted=deleted,
+                cursor_pinned=cursor_pinned,
+                cursor_type_rank=cursor_type_rank,
+            )
+        except HistoryCursorError:
+            raise invalid_cursor_problem(request) from None
         items: list[HistoryItem] = []
         for run in raw["runs"]:
             items.append(
@@ -87,38 +148,39 @@ def history(
                     conversation_id=run.get("conversation_id"),
                 )
             )
-        for conversation in raw["conversations"]:
+        for conversation_row in raw["conversations"]:
             items.append(
                 HistoryItem(
                     type="chat",
-                    id=conversation["id"],
-                    title=conversation["title"],
-                    title_source=conversation["title_source"],
-                    subtitle=conversation["last_message_preview"] or "No messages yet",
-                    pinned=conversation["pinned"],
-                    created_at=conversation["updated_at"],
+                    id=conversation_row["id"],
+                    title=conversation_row["title"],
+                    title_source=conversation_row["title_source"],
+                    subtitle=conversation_row["last_message_preview"]
+                    or "No messages yet",
+                    pinned=conversation_row["pinned"],
+                    created_at=conversation_row["updated_at"],
                 )
             )
-        for strategy in raw["strategies"]:
+        for strategy_row in raw["strategies"]:
             items.append(
                 HistoryItem(
                     type="strategy",
-                    id=strategy["id"],
-                    title=strategy["name"],
-                    subtitle=", ".join(strategy["symbols"]),
-                    pinned=strategy["pinned"],
-                    created_at=strategy["updated_at"],
+                    id=strategy_row["id"],
+                    title=strategy_row["name"],
+                    subtitle=", ".join(strategy_row["symbols"]),
+                    pinned=strategy_row["pinned"],
+                    created_at=strategy_row["updated_at"],
                 )
             )
-        for collection in raw["collections"]:
+        for collection_row in raw["collections"]:
             items.append(
                 HistoryItem(
                     type="collection",
-                    id=collection["id"],
-                    title=collection["name"],
-                    subtitle=f"{collection.get('strategy_count', 0)} strategies",
-                    pinned=collection["pinned"],
-                    created_at=collection["updated_at"],
+                    id=collection_row["id"],
+                    title=collection_row["name"],
+                    subtitle=(f"{collection_row.get('strategy_count', 0)} strategies"),
+                    pinned=collection_row["pinned"],
+                    created_at=collection_row["updated_at"],
                 )
             )
     else:
@@ -146,71 +208,72 @@ def history(
                         conversation_id=run.conversation_id,
                     )
                 )
-        for conversation in api_state.store.conversations.values():
+        for stored_conversation in api_state.store.conversations.values():
             if not memory_object_visible(
                 owner_map=api_state.store.conversation_owners,
-                object_id=conversation.id,
+                object_id=stored_conversation.id,
                 user_id=user.id,
             ):
                 continue
             if (
-                conversation.deleted_at is not None
+                stored_conversation.deleted_at is not None
                 if deleted
-                else conversation.deleted_at is None
-            ) and conversation.archived is archived:
+                else stored_conversation.deleted_at is None
+            ) and stored_conversation.archived is archived:
                 items.append(
                     HistoryItem(
                         type="chat",
-                        id=conversation.id,
-                        title=conversation.title,
-                        title_source=conversation.title_source,
-                        subtitle=conversation.last_message_preview or "No messages yet",
-                        pinned=conversation.pinned,
-                        created_at=conversation.updated_at,
+                        id=stored_conversation.id,
+                        title=stored_conversation.title,
+                        title_source=stored_conversation.title_source,
+                        subtitle=stored_conversation.last_message_preview
+                        or "No messages yet",
+                        pinned=stored_conversation.pinned,
+                        created_at=stored_conversation.updated_at,
                     )
                 )
-        for strategy in api_state.store.strategies.values():
+        for stored_strategy in api_state.store.strategies.values():
             if not memory_object_visible(
                 owner_map=api_state.store.strategy_owners,
-                object_id=strategy.id,
+                object_id=stored_strategy.id,
                 user_id=user.id,
             ):
                 continue
             if (
-                strategy.deleted_at is not None
+                stored_strategy.deleted_at is not None
                 if deleted
-                else strategy.deleted_at is None
+                else stored_strategy.deleted_at is None
             ):
                 items.append(
                     HistoryItem(
                         type="strategy",
-                        id=strategy.id,
-                        title=strategy.name,
-                        subtitle=", ".join(strategy.symbols),
-                        pinned=strategy.pinned,
-                        created_at=strategy.updated_at,
+                        id=stored_strategy.id,
+                        title=stored_strategy.name,
+                        subtitle=", ".join(stored_strategy.symbols),
+                        pinned=stored_strategy.pinned,
+                        created_at=stored_strategy.updated_at,
                     )
                 )
-        for collection in api_state.store.collections.values():
+        for stored_collection in api_state.store.collections.values():
             if not memory_object_visible(
                 owner_map=api_state.store.collection_owners,
-                object_id=collection.id,
+                object_id=stored_collection.id,
                 user_id=user.id,
             ):
                 continue
             if (
-                collection.deleted_at is not None
+                stored_collection.deleted_at is not None
                 if deleted
-                else collection.deleted_at is None
+                else stored_collection.deleted_at is None
             ):
                 items.append(
                     HistoryItem(
                         type="collection",
-                        id=collection.id,
-                        title=collection.name,
-                        subtitle=f"{collection.strategy_count} strategies",
-                        pinned=collection.pinned,
-                        created_at=collection.updated_at,
+                        id=stored_collection.id,
+                        title=stored_collection.name,
+                        subtitle=f"{stored_collection.strategy_count} strategies",
+                        pinned=stored_collection.pinned,
+                        created_at=stored_collection.updated_at,
                     )
                 )
 
@@ -224,12 +287,9 @@ def history(
         reverse=True,
     )
     filtered = items
-    if cursor:
-        cursor_created_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            cursor_dt = datetime.fromisoformat(cursor_created_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
+    if cursor and not persistent_history:
+        assert cursor_dt is not None
+        assert cursor_id is not None
         cursor_item = next(
             (
                 item
@@ -263,7 +323,7 @@ def history(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
+        next_cursor = _encode_history_cursor(last)
     return PaginatedHistory(items=page_items, next_cursor=next_cursor)
 
 

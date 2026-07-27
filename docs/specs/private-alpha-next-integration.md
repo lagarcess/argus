@@ -6,7 +6,10 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `75e87206`. The accepted post-promotion
+Latest product checkpoint: PR #288 at `9f3453a3`. Later commits may reconcile
+documentation and issue state without changing product behavior. New work must
+branch from the current remote `codex/private-alpha-next` head rather than
+pinning this product SHA. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -17,8 +20,13 @@ preservation (PR #278), plus the default-on grounded-discovery baseline
 (PR #276), modeled-cost preservation (PR #280), and the Guest experience
 (PR #279), followed by chat next-move presentation (PR #281). Provider-free
 backend test isolation landed through PR #282, and PR #286 made the complete
-`tests/` directory the backend CI gate. This is an integration checkpoint, not
-a deployed or tester-exposed SHA.
+`tests/` directory the backend CI gate. PR #287 then delivered resolver-owned
+discovery selection identity and candidate/entity corroboration. PR #285 then
+bounded Conversations, Messages, History, and Omnisearch/Idea Ledger reads at
+the Postgres boundary while preserving cursor, ranking, ownership, and artifact
+contracts. This is an integration checkpoint, not a deployed or
+tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
+after stale or failed actions without changing public artifact contracts.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -233,8 +241,9 @@ Do not reopen these as debt unless a new bug is reproduced:
   date, capital, and strategy edits preserve explicitly owned fee/slippage
   assumptions; card and natural-language edits share the canonical evidence
   boundary; explicit zero clears costs; and confirmation, launch, and reload
-  agree. Issue #271 remains open only for its named focused integrated closure
-  journey.
+  agree. Issue #271 is complete; PR #280's bounded same-chat integration
+  journey is the closure evidence. Any later repetition belongs to promotion
+  qualification, not issue acceptance.
 - Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
   Explicit peer/category discovery has one typed route, bounded source-backed
   Search, resolver-validated candidates for equity, crypto, and currency-pair
@@ -244,14 +253,22 @@ Do not reopen these as debt unless a new bug is reproduced:
   open because one comparison phrasing missed the typed route in the sanctioned
   eval; that gap, Render configuration, and an exact-SHA canary are required
   before tester exposure.
-- Chat next-move presentation is integrated from PR #281 at `8fde4ac1`.
+- Chat next-move presentation is integrated from PR #281 at `8fde4ac1`, with
+  resolver-owned discovery selection identity added by PR #287 at `ea2b3f35`.
   Clarify options, supported follow-ups, and discovery candidates render as
   stacked rows under their owning message; verified candidate reasons remain
   visible; and persisted discovery evidence opens in a source-safe panel
   without another provider call. The shared in-flight lock protects the
-  composer and rows in one tab. This is a frontend checkpoint, not completion
-  of resolved-identity carry-forward, backend concurrent-turn admission, live
-  progress lines, or guest discovery allowance.
+  composer and rows in one tab. A selected candidate now carries the identity
+  the resolver already verified as a normal asset mention, including across
+  durable Retry, without becoming a prepared execution action. Remaining work
+  is backend concurrent-turn admission, honest live progress, guest discovery
+  allowance, and any general assumption carry-forward beyond selected identity.
+- Candidate/entity corroboration is integrated from PR #287. A source-named
+  entity must agree with the resolved candidate, preventing unrelated
+  cross-class ticker collisions such as a gold miner for a Tron request.
+  Crypto-exposure vehicles are currently filtered with true collisions; #244
+  owns the deliberate product design needed to surface them safely.
 - Guest access is integrated from PR #279 at `53e812e9`: verified anonymous
   identity, one temporary owner-scoped workspace, fixed lifetime allowances,
   exact-once settlement, one simulation, conversion/claim, cleanup, Guest
@@ -267,6 +284,40 @@ Do not reopen these as debt unless a new bug is reproduced:
   guard test prevents the workflow from returning to a curated file list.
   Issues #283 and #284 are closed. This changes verification coverage, not
   runtime behavior.
+- Bounded database pagination and search are complete at PR #285 / issue #232:
+  Conversations and Messages use stable keyset reads, completed-result
+  projection uses bounded batches, and History and Omnisearch/Idea Ledger
+  bound their source candidates while preserving public cursor compatibility,
+  ordering, ownership, ranking, exact ledger groups, and canonical artifacts.
+  It landed as `7b7920bb`. The founder-accepted sparse/deep/final History Run
+  scan exception remains documented: returned candidates and normal measured
+  distributions are bounded, while a maintained History read model is deferred
+  scale architecture. Client hydration, caching, and rendering remain #252.
+- Fact-preserving recovery is complete at PR #288 / issue #272: stale or
+  failed actions restore the latest usable canonical confirmation or result
+  anchor, preserve assets, capital, requested/effective dates, daily timeframe,
+  benchmark, rules, and modeled costs, and ask only for genuinely missing
+  fields. Prior results remain immutable, later explicit edits supersede
+  recovery state, and recovery creates no duplicate job, Run, or usage.
+- Requested/effective period truth is complete and issue #251 is closed. PR
+  #262 established the shared coverage contract, PR #267 classified quiet
+  calendar alignment versus material provider truncation, and PR #268
+  preserved the resulting artifact through continued conversation and reload.
+  Promotion evidence belongs to #233; trajectory-ledger reconciliation belongs
+  to #243.
+- Hosted cost-ledger visibility is repaired and issue #246 is closed. The
+  existing `20260702000001_add_cost_ledger_entries` migration was applied
+  directly to the hosted Argus Supabase project with matching migration
+  history. RLS and service-role-only append/read privileges were verified; no
+  application commit, deploy, or PR was required. See
+  `docs/reports/issue-246-cost-ledger-closure-evidence.md`.
+- Structural OpenAPI compatibility is complete and issue #234 is closed. PR
+  #289 landed as `8a66f0ba`: generated FastAPI structure remains authoritative,
+  the checked artifact is reproducibly generated, and CI enforces normalized
+  public path/method, parameter, request/response schema, required-field, enum,
+  exclusion, and server-prefix compatibility. Both PR and post-merge CI passed.
+  Issue #235 is now unblocked and must branch from the current remote
+  integration head.
 
 ## P0 Reintegration Checkpoint
 
@@ -297,17 +348,24 @@ Codex should own or closely supervise this:
 2. **Advance bounded continuity follow-ups by owner**
    - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
      a second runtime lane.
-   - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
-     closure journey. New #272 work must start from `75e87206` or later.
+   - #271 landed through PR #280 at `d16f7496` and is closed. #272 landed
+     through PR #288 at `9f3453a3` and is closed; do not open another modeled
+     cost or canonical recovery lane without a new reproduction.
    - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
-     released the shared shell owner, so new #249 work must start from
-     `75e87206` or later. Preserve PR #281's stacked rows, source panel, and
-     in-flight lock;
+     released the shared shell owner, so new #249 work must start from the
+     current remote integration head. Preserve PR #281's stacked rows, source panel, and
+     in-flight lock plus PR #287's resolver-owned selection identity;
      #249 owns the remaining Quick take, Explain, Try next, and recovery roles.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
-3. **Evidence-aware idea loop source thesis**
+3. **Advance the unblocked API-boundary lane**
+   - #234 landed through PR #289 at `8a66f0ba` and is closed.
+   - #235 may now implement the already-approved request-size and correlated
+     RFC 9457 failure boundary. Start from the current remote integration head;
+     do not reopen OpenAPI authority or expand its allowlist.
+
+4. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring remain design/reference material until the
      active roadmap starts a bounded slice.

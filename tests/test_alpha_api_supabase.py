@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -9,6 +9,7 @@ import pytest
 import yaml
 from argus.api import state as api_state
 from argus.api.main import app
+from argus.api.pagination import encode_cursor
 from argus.api.schemas import (
     AccountCapabilities,
     BacktestRun,
@@ -25,8 +26,17 @@ from argus.api.schemas import (
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.postgres_history_reader import (
+    HistoryCursorError,
+    PostgresHistoryReader,
+)
+from argus.domain.postgres_search_reader import SearchReadResult
 from argus.domain.store import AlphaStore, utcnow
-from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.domain.supabase_gateway import (
+    ConversationCursorError,
+    QuotaExceededError,
+    SupabaseGateway,
+)
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -449,6 +459,7 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.list_message_page_context.return_value = ([], set())
     gateway.reconcile_stale_chat_turns.return_value = []
     gateway.list_projectable_chat_turns.return_value = []
     gateway.get_latest_completed_run_for_conversation.return_value = None
@@ -2384,6 +2395,103 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     )
 
 
+def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    pivot_id = "00000000-0000-0000-0000-000000000091"
+    mock_gateway.search_rows.return_value = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts={
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+    )
+    cursor = encode_cursor(now.isoformat(), pivot_id)
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "Needle",
+            "limit": 2,
+            "cursor": cursor,
+            "decision_state": "promising",
+            "include_ledger_groups": "true",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="needle",
+        source_limit=3,
+        cursor_updated_at=now,
+        cursor_id=pivot_id,
+        decision_state="promising",
+        include_ledger_groups=True,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+
+def test_search_reader_cursor_failure_maps_to_invalid_cursor_problem(
+    mock_gateway,
+):
+    try:
+        from argus.domain.postgres_search_reader import SearchCursorError
+    except ModuleNotFoundError:
+        pytest.fail("bounded Postgres Search reader is not implemented")
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.side_effect = SearchCursorError("missing pivot")
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "needle",
+            "cursor": encode_cursor(
+                now.isoformat(),
+                "00000000-0000-0000-0000-000000000091",
+            ),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
+
+
+def test_search_supabase_rejects_naive_cursor_before_database_read(
+    mock_gateway,
+):
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "needle",
+            "cursor": encode_cursor(
+                "2026-07-27T12:00:00",
+                "00000000-0000-0000-0000-000000000091",
+            ),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
+    mock_gateway.search_rows.assert_not_called()
+
+
 def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {
@@ -2734,7 +2842,11 @@ def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
     assert response.status_code == 200
     mock_gateway.list_history_rows.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
-        limit=None,
+        limit=21,
+        cursor_activity_at=None,
+        cursor_id=None,
+        cursor_pinned=None,
+        cursor_type_rank=None,
         deleted=False,
         archived=False,
     )
@@ -2798,51 +2910,217 @@ def test_history_supabase_can_request_archived_rows(mock_gateway):
     assert response.status_code == 200
     mock_gateway.list_history_rows.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
-        limit=None,
+        limit=21,
+        cursor_activity_at=None,
+        cursor_id=None,
+        cursor_pinned=None,
+        cursor_type_rank=None,
         deleted=False,
         archived=True,
     )
 
 
-def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
-    now = utcnow()
-    mock_gateway.list_conversations.return_value = [
+def test_history_supabase_middle_page_uses_cursor_pivot_outside_candidates(
+    mock_gateway,
+):
+    pivot_at = datetime(2026, 7, 2, tzinfo=timezone.utc)
+    candidate_at = pivot_at - timedelta(minutes=1)
+    pivot_id = "22222222-2222-2222-2222-222222222222"
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "name": "Next strategy",
+                "symbols": ["AAPL"],
+                "pinned": False,
+                "updated_at": candidate_at.isoformat(),
+            }
+        ],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "limit": 2,
+            "cursor": encode_cursor(pivot_at.isoformat(), pivot_id),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [
+        "11111111-1111-1111-1111-111111111111"
+    ]
+    mock_gateway.list_history_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=3,
+        cursor_activity_at=pivot_at,
+        cursor_id=pivot_id,
+        cursor_pinned=None,
+        cursor_type_rank=None,
+        deleted=False,
+        archived=False,
+    )
+
+
+def test_history_supabase_cursor_retains_original_pivot_rank(mock_gateway):
+    newest_at = datetime(2026, 7, 2, 12, 2, tzinfo=timezone.utc)
+    pivot_at = newest_at - timedelta(minutes=1)
+    sentinel_at = pivot_at - timedelta(minutes=1)
+    pivot_id = "22222222-2222-2222-2222-222222222222"
+    mock_gateway.list_history_rows.side_effect = [
+        {
+            "runs": [],
+            "conversations": [],
+            "strategies": [
+                {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "name": "Newest pinned strategy",
+                    "symbols": ["AAPL"],
+                    "pinned": True,
+                    "updated_at": newest_at.isoformat(),
+                },
+                {
+                    "id": pivot_id,
+                    "name": "Pinned page pivot",
+                    "symbols": ["MSFT"],
+                    "pinned": True,
+                    "updated_at": pivot_at.isoformat(),
+                },
+                {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "name": "Unpinned sentinel",
+                    "symbols": ["NVDA"],
+                    "pinned": False,
+                    "updated_at": sentinel_at.isoformat(),
+                },
+            ],
+            "collections": [],
+        },
+        {
+            "runs": [],
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+        },
+    ]
+
+    first_page = client.get(
+        "/api/v1/history?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    cursor = first_page.json()["next_cursor"]
+    assert cursor is not None
+
+    second_page = client.get(
+        "/api/v1/history",
+        params={"limit": 2, "cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert second_page.status_code == 200
+    assert mock_gateway.list_history_rows.call_args_list[1].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "limit": 3,
+        "cursor_activity_at": pivot_at,
+        "cursor_id": pivot_id,
+        "cursor_pinned": True,
+        "cursor_type_rank": 3,
+        "deleted": False,
+        "archived": False,
+    }
+
+
+def test_history_supabase_missing_or_ambiguous_pivot_uses_invalid_cursor_problem(
+    mock_gateway,
+):
+    pivot_at = datetime(2026, 7, 2, tzinfo=timezone.utc)
+    mock_gateway.list_history_rows.side_effect = HistoryCursorError
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "cursor": encode_cursor(
+                pivot_at.isoformat(),
+                "22222222-2222-2222-2222-222222222222",
+            )
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
+
+
+@pytest.mark.parametrize(
+    ("cursor_timestamp", "cursor_id"),
+    [
+        ("2026-07-27T12:00:00", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        (
+            "2026-07-27T12:00:00+00:00",
+            "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        ),
+        (
+            "2026-07-27T12:00:00+00:00",
+            "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+        ),
+    ],
+)
+def test_history_supabase_malformed_cursor_uses_invalid_cursor_problem_before_pool(
+    mock_gateway,
+    cursor_timestamp: str,
+    cursor_id: str,
+):
+    pool = MagicMock()
+    connection = pool.connection.return_value.__enter__.return_value
+    database_cursor = connection.cursor.return_value.__enter__.return_value
+    database_cursor.fetchall.side_effect = [
+        [{"source_type": "strategy", "pinned": False, "type_rank": 3}],
+        [],
+    ]
+    mock_gateway.list_history_rows.side_effect = PostgresHistoryReader(pool).list_rows
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "cursor": encode_cursor(cursor_timestamp, cursor_id),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
+    pool.connection.assert_not_called()
+
+
+def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
+    updated_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversations = [
         Conversation(
-            id="conv-1",
-            title="Idea 1",
+            id=f"conv-{idx}",
+            title=f"Idea {idx}",
             title_source="system_default",
             language="en",
-            pinned=True,
+            pinned=idx < 2,
             archived=False,
-            last_message_preview="A",
+            last_message_preview=f"Preview {idx}",
             deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
-        Conversation(
-            id="conv-2",
-            title="Idea 2",
-            title_source="system_default",
-            language="en",
-            pinned=False,
-            archived=False,
-            last_message_preview="B",
-            deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
-        Conversation(
-            id="conv-3",
-            title="Idea 3",
-            title_source="system_default",
-            language="en",
-            pinned=False,
-            archived=False,
-            last_message_preview="C",
-            deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
+            created_at=updated_at,
+            updated_at=updated_at,
+        )
+        for idx in range(5)
+    ]
+    mock_gateway.list_conversations.side_effect = [
+        conversations[:3],
+        conversations[2:5],
+        conversations[4:],
+        [],
     ]
 
     first_page = client.get(
@@ -2860,16 +3138,66 @@ def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
     )
     assert second_page.status_code == 200
     second_payload = second_page.json()
-    first_ids = {item["id"] for item in payload["items"]}
-    second_ids = {item["id"] for item in second_payload["items"]}
-    assert first_ids.isdisjoint(second_ids)
+    assert [item["id"] for item in second_payload["items"]] == ["conv-2", "conv-3"]
+    assert second_payload["next_cursor"] is not None
+
+    final_page = client.get(
+        f"/api/v1/conversations?limit=2&cursor={second_payload['next_cursor']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert final_page.status_code == 200
+    assert final_page.json() == {
+        "items": [conversations[4].model_dump(mode="json")],
+        "next_cursor": None,
+    }
+
+    empty_page = client.get(
+        "/api/v1/conversations?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert empty_page.status_code == 200
+    assert empty_page.json() == {"items": [], "next_cursor": None}
+
+    calls = mock_gateway.list_conversations.call_args_list
+    assert calls[0].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "limit": 2,
+        "archived": None,
+        "deleted": False,
+        "cursor_updated_at": None,
+        "cursor_id": None,
+    }
+    assert calls[1].kwargs["cursor_updated_at"] == updated_at
+    assert calls[1].kwargs["cursor_id"] == "conv-1"
+    assert calls[2].kwargs["cursor_updated_at"] == updated_at
+    assert calls[2].kwargs["cursor_id"] == "conv-3"
+    assert calls[3].kwargs["cursor_updated_at"] is None
+    assert calls[3].kwargs["cursor_id"] is None
+
+
+def test_conversation_missing_pivot_uses_existing_invalid_cursor_problem(mock_gateway):
+    cursor = encode_cursor(
+        datetime(2026, 7, 1, tzinfo=timezone.utc).isoformat(),
+        "missing-conversation",
+    )
+    mock_gateway.list_conversations.side_effect = ConversationCursorError(
+        "invalid conversation cursor pivot"
+    )
+
+    response = client.get(
+        f"/api/v1/conversations?limit=2&cursor={cursor}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
 
 
 def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gateway):
-    now = utcnow()
-    mock_gateway.list_conversations.return_value = [
+    now = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversations = [
         Conversation(
-            id=f"conv-{idx}",
+            id=f"conv-{idx:03d}",
             title=f"Idea {idx}",
             title_source="system_default",
             language="en",
@@ -2877,10 +3205,15 @@ def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gatew
             archived=False,
             last_message_preview=f"Preview {idx}",
             deleted_at=None,
-            created_at=now,
-            updated_at=now,
+            created_at=now - timedelta(seconds=idx),
+            updated_at=now - timedelta(seconds=idx),
         )
         for idx in range(130)
+    ]
+    mock_gateway.list_conversations.side_effect = [
+        conversations[:51],
+        conversations[50:101],
+        conversations[100:],
     ]
 
     first_page = client.get(
@@ -2909,3 +3242,397 @@ def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gatew
     third_payload = third_page.json()
     assert len(third_payload["items"]) == 30
     assert third_payload["next_cursor"] is None
+
+    all_ids = [
+        item["id"]
+        for payload in (first_payload, second_payload, third_payload)
+        for item in payload["items"]
+    ]
+    assert len(all_ids) == len(set(all_ids)) == 130
+
+
+def test_message_first_middle_final_and_empty_pages(mock_gateway):
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000001",
+        title="Paged messages",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    messages = [
+        Message(
+            id=f"30000000-0000-0000-0000-{idx:012d}",
+            conversation_id=conversation.id,
+            role="user",
+            content=f"Message {idx}",
+            created_at=created_at,
+            metadata={},
+        )
+        for idx in range(5)
+    ]
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_messages.side_effect = [
+        messages[:3],
+        messages[2:5],
+        messages[4:],
+        [],
+    ]
+
+    first_page = client.get(
+        f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    payload = first_page.json()
+    assert [item["id"] for item in payload["items"]] == [
+        messages[0].id,
+        messages[1].id,
+    ]
+    assert payload["next_cursor"] is not None
+
+    second_page = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={payload['next_cursor']}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert [item["id"] for item in second_payload["items"]] == [
+        messages[2].id,
+        messages[3].id,
+    ]
+    assert second_payload["next_cursor"] is not None
+
+    final_page = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={second_payload['next_cursor']}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert final_page.status_code == 200
+    assert final_page.json() == {
+        "items": [messages[4].model_dump(mode="json")],
+        "next_cursor": None,
+    }
+
+    empty_page = client.get(
+        f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert empty_page.status_code == 200
+    assert empty_page.json() == {"items": [], "next_cursor": None}
+
+    calls = mock_gateway.list_messages.call_args_list
+    assert calls[0].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "conversation_id": conversation.id,
+        "limit": 2,
+        "cursor_created_at": None,
+        "cursor_id": None,
+        "page": True,
+    }
+    assert calls[1].kwargs["cursor_created_at"] == created_at
+    assert calls[1].kwargs["cursor_id"] == messages[1].id
+    assert calls[2].kwargs["cursor_created_at"] == created_at
+    assert calls[2].kwargs["cursor_id"] == messages[3].id
+    assert calls[3].kwargs["cursor_created_at"] is None
+    assert calls[3].kwargs["cursor_id"] is None
+
+
+def test_message_malformed_pivot_uses_existing_invalid_cursor_problem(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000002",
+        title="Malformed message cursor",
+        title_source="system_default",
+        language="en",
+        created_at=now,
+        updated_at=now,
+    )
+    cursor = encode_cursor(
+        datetime(2026, 7, 1, tzinfo=timezone.utc).isoformat(),
+        "missing-message",
+    )
+    mock_gateway.get_conversation.return_value = conversation
+
+    response = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={cursor}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
+    mock_gateway.list_messages.assert_not_called()
+
+
+class _MessagePageContextGateway:
+    def __init__(
+        self,
+        delegate: Any,
+        *,
+        page_messages: list[Message],
+        later_work: list[Message],
+        represented_request_ids: set[str] | None = None,
+    ) -> None:
+        self._delegate = delegate
+        self._page_messages = page_messages
+        self._later_work = later_work
+        self._represented_request_ids = represented_request_ids or set()
+        self.context_calls: list[dict[str, Any]] = []
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
+
+    def list_messages(self, **_: Any) -> list[Message]:
+        return list(self._page_messages)
+
+    def list_message_page_context(
+        self,
+        **kwargs: Any,
+    ) -> tuple[list[Message], set[str]]:
+        self.context_calls.append(kwargs)
+        return list(self._later_work), set(self._represented_request_ids)
+
+
+def test_message_page_later_artifact_preserves_retry_supersession(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000003",
+        title="Retry reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    user_message = Message(
+        id="30000000-0000-0000-0000-000000000010",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test AAPL.",
+        created_at=created_at,
+        metadata={},
+    )
+    failed_message = Message(
+        id="30000000-0000-0000-0000-000000000011",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Something went wrong.",
+        created_at=created_at + timedelta(microseconds=1),
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": {"code": "runtime_failure", "retryable": True},
+            "retry_last_turn": {"message": user_message.content},
+        },
+    )
+    lookahead = Message(
+        id="30000000-0000-0000-0000-000000000012",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Still working.",
+        created_at=created_at + timedelta(microseconds=2),
+        metadata={},
+    )
+    later_artifact = Message(
+        id="30000000-0000-0000-0000-000000000013",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Ready to run.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={"confirmation_card": {"status": "ready_to_run"}},
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=[user_message, failed_message, lookahead],
+        later_work=[later_artifact],
+    )
+    mock_gateway.get_conversation.return_value = conversation
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    failed = response.json()["items"][1]
+    assert failed["id"] == failed_message.id
+    assert "retry_last_turn" not in failed["metadata"]
+    assert failed["metadata"]["recovery"]["retryable"] is False
+    assert len(gateway.context_calls) == 1
+
+
+def test_message_page_later_user_preserves_abandoned_retry_suppression(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000004",
+        title="Abandoned reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    abandoned_user = Message(
+        id="30000000-0000-0000-0000-000000000020",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test AAPL.",
+        created_at=created_at,
+        metadata={},
+    )
+    page_messages = [
+        abandoned_user,
+        Message(
+            id="30000000-0000-0000-0000-000000000021",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Waiting.",
+            created_at=created_at + timedelta(microseconds=1),
+            metadata={},
+        ),
+        Message(
+            id="30000000-0000-0000-0000-000000000022",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Still waiting.",
+            created_at=created_at + timedelta(microseconds=2),
+            metadata={},
+        ),
+    ]
+    later_user = Message(
+        id="30000000-0000-0000-0000-000000000023",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test MSFT instead.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={},
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=page_messages,
+        later_work=[later_user],
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_projectable_chat_turns.return_value = [
+        {
+            "turn_id": abandoned_user.id,
+            "request_id": "abandoned-request",
+            "assistant_message_id": None,
+            "status": "abandoned",
+            "reconciled_outcome": None,
+            "failure_code": "turn_abandoned",
+            "retryable": True,
+        }
+    ]
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    abandoned = response.json()["items"][0]
+    assert abandoned["id"] == abandoned_user.id
+    assert abandoned["metadata"]["agent_runtime_turn"]["status"] == "abandoned"
+    assert "retry_last_turn" not in abandoned["metadata"]
+    assert len(gateway.context_calls) == 1
+
+
+def test_message_page_transcript_representation_prevents_duplicate_job_projection(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000005",
+        title="Run action reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    action_message = Message(
+        id="30000000-0000-0000-0000-000000000030",
+        conversation_id=conversation.id,
+        role="user",
+        content="Run backtest",
+        created_at=created_at,
+        metadata={
+            "chat_action": {
+                "type": "run_backtest",
+                "payload": {"confirmation_id": "confirmation-1"},
+            }
+        },
+    )
+    page_messages = [
+        action_message,
+        Message(
+            id="30000000-0000-0000-0000-000000000031",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Waiting.",
+            created_at=created_at + timedelta(microseconds=1),
+            metadata={},
+        ),
+        Message(
+            id="30000000-0000-0000-0000-000000000032",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Still waiting.",
+            created_at=created_at + timedelta(microseconds=2),
+            metadata={},
+        ),
+    ]
+    represented_message = Message(
+        id="30000000-0000-0000-0000-000000000033",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Run queued.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={
+            "backtest_job": {
+                "id": "job-1",
+                "request_message_id": action_message.id,
+            }
+        },
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=page_messages,
+        later_work=[represented_message],
+        represented_request_ids={action_message.id},
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_backtest_job_reservations.return_value = [
+        {
+            "id": "job-1",
+            "idempotency_key": "confirmation-1",
+            "conversation_id": conversation.id,
+            "request_message_id": action_message.id,
+            "status": "queued",
+        }
+    ]
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    action = response.json()["items"][0]
+    assert action["id"] == action_message.id
+    assert "backtest_job" not in action["metadata"]
+    assert len(gateway.context_calls) == 1
