@@ -5828,6 +5828,115 @@ def test_issue_272_failure_pending_does_not_displace_completed_result() -> None:
     )
 
 
+def test_issue_272_current_clarification_keeps_pending_primary() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    failed_action_id = "issue-272-retained-aapl-failed-action"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="How much would you like to invest in NVDA?",
+        metadata={
+            "conversation_mode": "drafting",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold NVDA.",
+                    "asset_universe": ["NVDA"],
+                    "asset_class": "equity",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "comparison_baseline": "SPY",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["sizing_amount"],
+                    "requested_fields": ["capital_amount"],
+                },
+                "source_result": {
+                    "run_id": run_id,
+                    "strategy_id": None,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "source_result_run_id": run_id,
+            "failed_action": {
+                "artifact_id": failed_action_id,
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-02",
+                        "end": "2024-12-31",
+                    },
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.asset_universe == ["NVDA"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert snapshot.latest_failed_action_reference.artifact_id == failed_action_id
+    assert recovered.selected_thread_metadata is not None
+    assert recovered.selected_thread_metadata["last_stage_outcome"] == "await_user_reply"
+    assert (
+        recovered.selected_thread_metadata["fallback_source"]
+        == "pending_strategy_metadata"
+    )
+    assert recovered.selected_thread_metadata["requested_field"] == "capital_amount"
+
+
 def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:
     from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
 

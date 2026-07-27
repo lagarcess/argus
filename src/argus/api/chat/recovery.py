@@ -761,6 +761,11 @@ def _pending_fallback_belongs_to_failed_action(
     pending_fallback: RuntimeFallbackContext | None,
     failed_fallback: RuntimeFallbackContext | None,
 ) -> bool:
+    pending_metadata = (
+        pending_fallback.selected_thread_metadata
+        if pending_fallback is not None
+        else None
+    )
     pending_snapshot = (
         pending_fallback.latest_task_snapshot if pending_fallback is not None else None
     )
@@ -776,7 +781,10 @@ def _pending_fallback_belongs_to_failed_action(
         failed_snapshot.pending_strategy_summary if failed_snapshot is not None else None
     )
     return bool(
-        pending_strategy is not None
+        isinstance(pending_metadata, dict)
+        and pending_metadata.get("fallback_source") == "pending_strategy_metadata"
+        and pending_metadata.get("last_stage_outcome") == "execution_failed_recoverably"
+        and pending_strategy is not None
         and failed_pending_strategy is not None
         and failed_snapshot.latest_failed_action_reference is not None
         and pending_strategy == failed_pending_strategy
