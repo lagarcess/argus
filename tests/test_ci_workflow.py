@@ -65,6 +65,8 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert "poetry run ruff check src tests workflows scripts" in backend_steps
     assert "tests/test_environment_scripts.py" in backend_steps
     assert "tests/test_api_import_boundary.py" in backend_steps
+    assert "tests/test_alpha_api.py" in backend_steps
+    assert "tests/test_alpha_api_supabase.py" in backend_steps
     assert "tests/test_render_canary_script.py" in backend_steps
     assert "tests/test_legacy_orchestrator_retirement.py" in backend_steps
     assert "tests/test_chat_backtest_state_machine.py" in backend_steps
