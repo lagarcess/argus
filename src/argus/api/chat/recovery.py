@@ -701,11 +701,13 @@ def ordinary_turn_metadata_fallback_context(
             user_id=user_id,
             conversation_id=conversation_id,
         )
-        result_fallback = latest_result_fallback_context(
-            user_id=user_id,
-            conversation_id=conversation_id,
-        )
-        primary_fallback = pending_fallback or result_fallback
+        primary_fallback = pending_fallback
+        if primary_fallback is None:
+            result_fallback = latest_result_fallback_context(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+            primary_fallback = result_fallback
 
     failed_fallback = failed_action_metadata_fallback_context(
         user_id=user_id,
@@ -715,6 +717,11 @@ def ordinary_turn_metadata_fallback_context(
         pending_fallback=pending_fallback,
         failed_fallback=failed_fallback,
     ):
+        if result_fallback is None:
+            result_fallback = latest_result_fallback_context(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
         primary_fallback = result_fallback or pending_fallback
     if primary_fallback is None:
         return failed_fallback

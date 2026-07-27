@@ -5828,9 +5828,11 @@ def test_issue_272_failure_pending_does_not_displace_completed_result() -> None:
     )
 
 
-def test_issue_272_current_clarification_keeps_pending_primary() -> None:
+def test_issue_272_current_clarification_keeps_pending_primary_without_result_read(
+    monkeypatch,
+) -> None:
     from argus.api import state as api_state
-    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+    from argus.api.chat import recovery as recovery_module
 
     client = _client()
     conversation = _conversation(client)
@@ -5912,7 +5914,18 @@ def test_issue_272_current_clarification_keeps_pending_primary() -> None:
         },
     )
 
-    recovered = ordinary_turn_metadata_fallback_context(
+    def _unexpected_result_lookup(**_kwargs: Any) -> None:
+        raise AssertionError(
+            "a current pending clarification must not query the result fallback"
+        )
+
+    monkeypatch.setattr(
+        recovery_module,
+        "latest_result_fallback_context",
+        _unexpected_result_lookup,
+    )
+
+    recovered = recovery_module.ordinary_turn_metadata_fallback_context(
         user_id=user_id,
         conversation_id=conversation["id"],
         language="en",
