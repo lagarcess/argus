@@ -730,3 +730,529 @@ cases:
         slippage_bps: 5.0
       stage_outcomes:
         ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en
+    prompt: "Change the active NVDA setup to $30,000 and keep every other owned fact unchanged."
+    user_language: en
+    ui_language: en
+    snapshot:
+      latest_task_type: backtest_execution
+      completed: false
+      pending_strategy:
+        requested_strategy_template: moving_average_crossover
+        strategy_type: signal_strategy
+        strategy_thesis: "Trade NVDA with a 50/200 SMA crossover."
+        asset_universe: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        comparison_baseline: SPY
+        entry_logic: "50-day SMA crosses above 200-day SMA"
+        exit_logic: "50-day SMA crosses below 200-day SMA"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+      latest_backtest_result_reference:
+        artifact_kind: backtest_result
+        artifact_id: "eval-run-msft-272-en"
+        artifact_status: completed
+        metadata:
+          result_run_id: "eval-run-msft-272-en"
+          asset_class: equity
+          symbols: ["MSFT"]
+          benchmark_symbol: SPY
+      latest_failed_action_reference:
+        artifact_kind: failed_action
+        artifact_id: "eval-failed-action-272-en"
+        artifact_status: retryable
+        metadata:
+          action_type: run_backtest
+          retryable: true
+          launch_payload:
+            strategy_type: buy_and_hold
+            symbols: ["AAPL"]
+            timeframe: 1D
+            date_range:
+              start: "2024-01-02"
+              end: "2024-12-31"
+            capital_amount: 1000
+            benchmark_symbol: SPY
+      artifact_references:
+        - artifact_kind: backtest_result
+          artifact_id: "eval-run-msft-272-en"
+          artifact_status: completed
+          metadata:
+            result_run_id: "eval-run-msft-272-en"
+            asset_class: equity
+            symbols: ["MSFT"]
+            benchmark_symbol: SPY
+        - artifact_kind: failed_action
+          artifact_id: "eval-failed-action-272-en"
+          artifact_status: retryable
+          metadata:
+            action_type: run_backtest
+            retryable: true
+    confirmation_payload:
+      confirmation_id: "eval-confirm-nvda-272-en"
+      artifact_id: "eval-confirm-nvda-272-en"
+      strategy:
+        requested_strategy_template: moving_average_crossover
+        strategy_type: signal_strategy
+        strategy_thesis: "Trade NVDA with a 50/200 SMA crossover."
+        asset_universe: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        comparison_baseline: SPY
+        entry_logic: "50-day SMA crosses above 200-day SMA"
+        exit_logic: "50-day SMA crosses below 200-day SMA"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+      optional_parameters:
+        fees: {value: 0.001, source: user}
+        slippage: {value: 0.0005, source: user}
+      launch_payload:
+        strategy_type: signal_strategy
+        symbol: NVDA
+        symbols: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        requested_date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        date_range:
+          start: "2023-01-03"
+          end: "2024-12-31"
+        coverage_preflight:
+          schema_version: market_data_coverage_v1
+          outcome: adjusted_coverage
+          adjustment_reason: calendar_alignment
+          requested_date_range:
+            start: "2023-01-01"
+            end: "2024-12-31"
+          effective_date_range:
+            start: "2023-01-03"
+            end: "2024-12-31"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+        _execution_realism:
+          enabled: true
+          fee_bps: 10.0
+          slippage_bps: 5.0
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: [strategy_drafting, backtest_execution]
+      capability_verdict: executable
+      assets: ["NVDA"]
+      asset_class: equity
+      requested_strategy_template: moving_average_crossover
+      strategy_type: signal_strategy
+      entry_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bullish
+      exit_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bearish
+      rule_spec:
+        entry:
+          conditions:
+            - left: {kind: indicator, key: sma, period: 50}
+              operator: cross_above
+              right: {kind: indicator, key: sma, period: 200}
+        exit:
+          conditions:
+            - left: {kind: indicator, key: sma, period: 50}
+              operator: cross_below
+              right: {kind: indicator, key: sma, period: 200}
+      date_range:
+        start: "2023-01-01"
+        end: "2024-12-31"
+      requested_date_range:
+        start: "2023-01-01"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
+      benchmark_symbol: SPY
+      capital_amount: 30000
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+      launch_execution_realism:
+        enabled: true
+        fee_bps: 10.0
+        slippage_bps: 5.0
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es
+    prompt: "Cambia el capital de la configuracion activa de NVDA a $30,000 y conserva los demas datos."
+    user_language: es-419
+    ui_language: es-419
+    snapshot:
+      latest_task_type: backtest_execution
+      completed: false
+      pending_strategy:
+        requested_strategy_template: moving_average_crossover
+        strategy_type: signal_strategy
+        strategy_thesis: "Opera NVDA con un cruce de SMA 50/200."
+        asset_universe: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        comparison_baseline: SPY
+        entry_logic: "SMA de 50 dias cruza por encima de SMA de 200 dias"
+        exit_logic: "SMA de 50 dias cruza por debajo de SMA de 200 dias"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+      latest_backtest_result_reference:
+        artifact_kind: backtest_result
+        artifact_id: "eval-run-msft-272-es"
+        artifact_status: completed
+        metadata:
+          result_run_id: "eval-run-msft-272-es"
+          asset_class: equity
+          symbols: ["MSFT"]
+          benchmark_symbol: SPY
+      latest_failed_action_reference:
+        artifact_kind: failed_action
+        artifact_id: "eval-failed-action-272-es"
+        artifact_status: retryable
+        metadata:
+          action_type: run_backtest
+          retryable: true
+          launch_payload:
+            strategy_type: buy_and_hold
+            symbols: ["AAPL"]
+            timeframe: 1D
+            date_range:
+              start: "2024-01-02"
+              end: "2024-12-31"
+            capital_amount: 1000
+            benchmark_symbol: SPY
+      artifact_references:
+        - artifact_kind: backtest_result
+          artifact_id: "eval-run-msft-272-es"
+          artifact_status: completed
+          metadata:
+            result_run_id: "eval-run-msft-272-es"
+            asset_class: equity
+            symbols: ["MSFT"]
+            benchmark_symbol: SPY
+        - artifact_kind: failed_action
+          artifact_id: "eval-failed-action-272-es"
+          artifact_status: retryable
+          metadata:
+            action_type: run_backtest
+            retryable: true
+    confirmation_payload:
+      confirmation_id: "eval-confirm-nvda-272-es"
+      artifact_id: "eval-confirm-nvda-272-es"
+      strategy:
+        requested_strategy_template: moving_average_crossover
+        strategy_type: signal_strategy
+        strategy_thesis: "Opera NVDA con un cruce de SMA 50/200."
+        asset_universe: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        comparison_baseline: SPY
+        entry_logic: "SMA de 50 dias cruza por encima de SMA de 200 dias"
+        exit_logic: "SMA de 50 dias cruza por debajo de SMA de 200 dias"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+      optional_parameters:
+        fees: {value: 0.001, source: user}
+        slippage: {value: 0.0005, source: user}
+      launch_payload:
+        strategy_type: signal_strategy
+        symbol: NVDA
+        symbols: ["NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        requested_date_range:
+          start: "2023-01-01"
+          end: "2024-12-31"
+        date_range:
+          start: "2023-01-03"
+          end: "2024-12-31"
+        coverage_preflight:
+          schema_version: market_data_coverage_v1
+          outcome: adjusted_coverage
+          adjustment_reason: calendar_alignment
+          requested_date_range:
+            start: "2023-01-01"
+            end: "2024-12-31"
+          effective_date_range:
+            start: "2023-01-03"
+            end: "2024-12-31"
+        entry_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bullish
+        exit_rule:
+          type: moving_average_crossover
+          fast_indicator: sma
+          fast_period: 50
+          slow_indicator: sma
+          slow_period: 200
+          direction: bearish
+        rule_spec:
+          entry:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_above
+                right: {kind: indicator, key: sma, period: 200}
+          exit:
+            conditions:
+              - left: {kind: indicator, key: sma, period: 50}
+                operator: cross_below
+                right: {kind: indicator, key: sma, period: 200}
+        sizing_mode: capital_amount
+        capital_amount: 25000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: es-419
+        _execution_realism:
+          enabled: true
+          fee_bps: 10.0
+          slippage_bps: 5.0
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: [strategy_drafting, backtest_execution]
+      capability_verdict: executable
+      assets: ["NVDA"]
+      asset_class: equity
+      requested_strategy_template: moving_average_crossover
+      strategy_type: signal_strategy
+      entry_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bullish
+      exit_rule:
+        type: moving_average_crossover
+        fast_indicator: sma
+        fast_period: 50
+        slow_indicator: sma
+        slow_period: 200
+        direction: bearish
+      rule_spec:
+        entry:
+          conditions:
+            - left: {kind: indicator, key: sma, period: 50}
+              operator: cross_above
+              right: {kind: indicator, key: sma, period: 200}
+        exit:
+          conditions:
+            - left: {kind: indicator, key: sma, period: 50}
+              operator: cross_below
+              right: {kind: indicator, key: sma, period: 200}
+      date_range:
+        start: "2023-01-01"
+        end: "2024-12-31"
+      requested_date_range:
+        start: "2023-01-01"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      adjustment_reason: calendar_alignment
+      benchmark_symbol: SPY
+      capital_amount: 30000
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+      launch_execution_realism:
+        enabled: true
+        fee_bps: 10.0
+        slippage_bps: 5.0
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]

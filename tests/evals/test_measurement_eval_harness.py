@@ -528,6 +528,105 @@ def test_issue_271_cases_are_on_the_live_measurement_surface() -> None:
         }
 
 
+def test_issue_272_cases_are_on_the_mocked_and_live_measurement_surface() -> None:
+    cases = {case.id: case for case in load_eval_cases()}
+    issue_272_cases = [
+        cases["ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en"],
+        cases["ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es"],
+    ]
+
+    for case in issue_272_cases:
+        assert case.snapshot is not None
+        pending = case.snapshot.pending_strategy_summary
+        assert pending is not None
+        assert pending.asset_universe == ["NVDA"]
+        assert pending.capital_amount == 25000
+        assert pending.timeframe == "1D"
+        assert pending.comparison_baseline == "SPY"
+        assert pending.requested_strategy_template == "moving_average_crossover"
+        assert pending.strategy_type == "signal_strategy"
+        assert pending.entry_rule == case.expected.entry_rule
+        assert pending.exit_rule == case.expected.exit_rule
+        assert pending.rule_spec == case.expected.rule_spec
+        assert pending.extra_parameters == {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        }
+        assert case.snapshot.active_confirmation_reference is not None
+        assert case.snapshot.latest_backtest_result_reference is not None
+        assert (
+            case.snapshot.latest_backtest_result_reference.artifact_id
+            == f"eval-run-msft-272-{case.user_language.split('-')[0]}"
+        )
+        assert case.snapshot.latest_failed_action_reference is not None
+        assert (
+            case.snapshot.latest_failed_action_reference.artifact_id
+            == f"eval-failed-action-272-{case.user_language.split('-')[0]}"
+        )
+        assert case.confirmation_payload is not None
+        launch_payload = case.confirmation_payload["launch_payload"]
+        assert launch_payload["requested_date_range"] == {
+            "start": "2023-01-01",
+            "end": "2024-12-31",
+        }
+        assert launch_payload["date_range"] == {
+            "start": "2023-01-03",
+            "end": "2024-12-31",
+        }
+        assert launch_payload["_execution_realism"] == {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        }
+
+        truthful_outcome = {
+            "intent": "backtest_execution",
+            "capability_verdict": "executable",
+            "assets": ["NVDA"],
+            "asset_class": "equity",
+            "requested_strategy_template": "moving_average_crossover",
+            "strategy_type": "signal_strategy",
+            "entry_rule": case.expected.entry_rule,
+            "exit_rule": case.expected.exit_rule,
+            "rule_spec": case.expected.rule_spec,
+            "date_range": {"start": "2023-01-01", "end": "2024-12-31"},
+            "requested_date_range": {
+                "start": "2023-01-01",
+                "end": "2024-12-31",
+            },
+            "effective_date_range": {
+                "start": "2023-01-03",
+                "end": "2024-12-31",
+            },
+            "adjustment_reason": "calendar_alignment",
+            "benchmark_symbol": "SPY",
+            "capital_amount": 30000,
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "cost_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+            "launch_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+            "stage_outcomes": list(case.expected.stage_outcomes),
+        }
+        assert (
+            harness.typed_expectation_failures(
+                case=case,
+                outcome=truthful_outcome,
+            )
+            == []
+        )
+
+
 def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> None:
     case = {
         case.id: case for case in load_eval_cases()
