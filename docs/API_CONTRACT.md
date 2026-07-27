@@ -762,8 +762,8 @@ messages may store `pending_strategy`, `confirmation_card`,
 `result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
-`failed_action`, `retry_last_turn`, `recovery`, `clarification`, and
-`result_fact_bank`. User messages created by action chips may store
+`failed_action`, `retry_last_turn`, `recovery`, `clarification`,
+`result_fact_bank`, and `discovery`. User messages created by action chips may store
 `chat_action` so the transcript can hydrate the selected chip as an action item
 after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so
@@ -2005,6 +2005,71 @@ actions and to ordinary user text.
 - Generic guidance responses such as "try next" are valid only for open-ended
   result questions. They must not replace a patch response when the user is
   modifying, rerunning, or retrying a known setup.
+
+### Grounded Discovery Responses
+
+An explicit peer/category asset-discovery turn (typed
+`asset_discovery` interpretation) returns an ordinary assistant response whose
+final payload and persisted assistant-message metadata may include an additive
+`discovery` sidecar. The runtime Search path is gated by
+`ARGUS_GROUNDED_DISCOVERY_ENABLED` (default off); with the flag off, discovery
+turns return typed honest recovery and make zero Search-provider calls.
+
+```json
+{
+  "discovery": {
+    "schema_version": "argus_discovery/v1",
+    "kind": "asset_discovery",
+    "relationship": "category",
+    "query_summary": "cybersecurity stocks",
+    "retrieved_at": "2026-07-26T15:04:05Z",
+    "sources": [
+      {
+        "title": "…",
+        "domain": "example.com",
+        "url": "https://example.com/article",
+        "source_date": "2026-07-20"
+      }
+    ],
+    "candidates": [
+      {
+        "symbol": "CRWD",
+        "name": "CrowdStrike",
+        "asset_class": "equity",
+        "reason_text": "Named as a leading cybersecurity vendor.",
+        "source_indices": [0]
+      }
+    ],
+    "unverified_names": ["ExamplePrivateCo"]
+  }
+}
+```
+
+Contract rules:
+
+- Every entry in `candidates` has passed provider-backed asset resolution and
+  carries a supported `asset_class`; only these may render as selectable
+  actions. `unverified_names` are prose-only context and must never be
+  actionable.
+- Bounds: at most 5 sources, 5 candidates, and 3 unverified names; all strings
+  are backend-sanitized and length-capped; source URLs are https-only.
+- Search-provider identity is intentionally absent from this sidecar and from
+  user-facing prose; route receipts and the cost ledger own provider
+  provenance.
+- Selecting a candidate sends a normal user turn (with optional `chat_action`
+  metadata) through the ordinary interpretation, clarification, and
+  confirmation lifecycle. Discovery never auto-runs a backtest.
+- Clients render source `domain` plus locale-formatted dates from the ISO
+  fields; `url` is stored provenance and is not rendered as an outbound link
+  in private alpha.
+- Discovery turns never mutate pending drafts, active confirmations, or the
+  latest result; reload hydrates the response and this sidecar from persisted
+  message metadata without re-querying any provider.
+- Typed discovery recovery uses the standard `recovery` object with codes
+  `discovery_unavailable`, `discovery_search_failed` (retryable),
+  `discovery_no_verified_candidates`, `discovery_limit_reached`, and
+  `discovery_target_missing`. Direct backtests and ordinary follow-ups make
+  zero Search calls.
 
 **Retry semantics:**
 - `retry_last_turn` replays a specific failed user message and may include

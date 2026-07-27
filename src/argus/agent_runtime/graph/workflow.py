@@ -89,6 +89,8 @@ class WorkflowState(TypedDict, total=False):
     result_action_request: dict[str, Any]
     clarification: dict[str, Any]
     recovery: dict[str, Any]
+    discovery: dict[str, Any]
+    discovery_usage: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -111,6 +113,8 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "result_action_request",
         "clarification",
         "recovery",
+        "discovery",
+        "discovery_usage",
     }
 )
 

@@ -91,6 +91,10 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if payload.action is None:
         return payload.message or ""
     action_type = payload.action.type
+    if action_type == "select_discovery_candidate":
+        # The chip label is the exact natural-language turn the user saw and
+        # tapped; the runtime interprets it as ordinary text.
+        return payload.action.label or payload.message or ""
     if action_type == "select_response_option":
         if payload.action.label_key:
             localized = _localized_action_label(

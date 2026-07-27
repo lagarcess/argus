@@ -21,6 +21,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "capability_honesty",
     "backtest_metric_correctness",
     "graceful_recovery",
+    "asset_discovery_routing",
 }
 
 PHRASE_ASSERTION_KEYS = {
@@ -121,6 +122,181 @@ def test_expected_fail_only_masks_allowed_failure_prefixes() -> None:
         == "failed"
     )
     assert harness._result_status([], expected_fail=expected_fail) == "unexpected_pass"
+
+
+def _asset_discovery_case(
+    expected_asset_discovery: dict[str, Any] | None,
+    *,
+    semantic_turn_act: str | None = "asset_discovery",
+) -> harness.EvalCase:
+    return harness.EvalCase(
+        id="asset-discovery-routing-check",
+        category="asset_discovery_routing",
+        prompt="what cybersecurity stocks could I test?",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="conversation_followup",
+            capability_verdict="answer_only",
+            semantic_turn_act=semantic_turn_act,
+            asset_discovery=expected_asset_discovery,
+        ),
+    )
+
+
+def _asset_discovery_outcome(
+    *,
+    semantic_turn_act: str | None,
+    asset_discovery: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "intent": "conversation_followup",
+        "capability_verdict": "answer_only",
+        "semantic_turn_act": semantic_turn_act,
+        "asset_discovery": asset_discovery,
+    }
+
+
+def test_asset_discovery_expectations_pass_on_correct_route() -> None:
+    case = _asset_discovery_case(
+        {
+            "relationship": "category",
+            "anchor_symbols": [],
+            "category_description_includes_any": ["cybersecurity"],
+        }
+    )
+
+    failures = harness.typed_expectation_failures(
+        case=case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "category",
+                "category_description": "cybersecurity stocks",
+                "anchor_symbols": [],
+                "asset_class_hint": None,
+            },
+        ),
+    )
+
+    assert failures == []
+
+
+def test_asset_discovery_expectations_flag_misroutes() -> None:
+    category_case = _asset_discovery_case(
+        {
+            "relationship": "category",
+            "anchor_symbols": [],
+            "category_description_includes_any": ["cybersecurity"],
+        }
+    )
+
+    act_misroute = harness.typed_expectation_failures(
+        case=category_case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="new_idea",
+            asset_discovery=None,
+        ),
+    )
+    assert any(failure.startswith("semantic_turn_act:") for failure in act_misroute)
+    assert any(failure.startswith("asset_discovery:") for failure in act_misroute)
+
+    wrong_relationship = harness.typed_expectation_failures(
+        case=category_case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "peer",
+                "category_description": "cybersecurity stocks",
+                "anchor_symbols": [],
+                "asset_class_hint": None,
+            },
+        ),
+    )
+    assert any(
+        failure.startswith("asset_discovery.relationship:")
+        for failure in wrong_relationship
+    )
+
+    missing_terms = harness.typed_expectation_failures(
+        case=category_case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "category",
+                "category_description": "electric vehicle makers",
+                "anchor_symbols": [],
+                "asset_class_hint": None,
+            },
+        ),
+    )
+    assert any(
+        failure.startswith("asset_discovery.category_description:")
+        for failure in missing_terms
+    )
+
+    anchor_case = _asset_discovery_case(
+        {"relationship": "peer", "anchor_symbols": ["NVDA"]}
+    )
+    wrong_anchor = harness.typed_expectation_failures(
+        case=anchor_case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "peer",
+                "category_description": None,
+                "anchor_symbols": ["amd"],
+                "asset_class_hint": "equity",
+            },
+        ),
+    )
+    assert any(
+        failure.startswith("asset_discovery.anchor_symbols:") for failure in wrong_anchor
+    )
+
+    negative_case = _asset_discovery_case(None, semantic_turn_act="result_followup")
+    discovery_leak = harness.typed_expectation_failures(
+        case=negative_case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "category",
+                "category_description": "anything",
+                "anchor_symbols": [],
+                "asset_class_hint": None,
+            },
+        ),
+    )
+    assert any(failure.startswith("semantic_turn_act:") for failure in discovery_leak)
+
+
+def test_typed_outcome_extracts_discovery_route_fields() -> None:
+    case = _asset_discovery_case({"relationship": "peer", "anchor_symbols": ["NVDA"]})
+    interpret_result = SimpleNamespace(
+        outcome="ready_to_respond",
+        patch={
+            "intent": "conversation_followup",
+            "semantic_turn_act": "asset_discovery",
+            "asset_discovery": {
+                "relationship": "peer",
+                "category_description": None,
+                "anchor_symbols": ["NVDA"],
+                "asset_class_hint": "equity",
+            },
+        },
+    )
+
+    outcome = harness._typed_outcome(
+        case=case,
+        interpret_result=interpret_result,
+        confirm_result=None,
+        clarify_result=None,
+    )
+
+    assert outcome["semantic_turn_act"] == "asset_discovery"
+    assert outcome["asset_discovery"]["anchor_symbols"] == ["NVDA"]
+    assert outcome["capability_verdict"] == "answer_only"
+    assert harness.typed_expectation_failures(case=case, outcome=outcome) == []
 
 
 def test_date_range_expectations_compare_iso_interval_and_dict_equivalently() -> None:
