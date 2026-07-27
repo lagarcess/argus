@@ -66,6 +66,29 @@ Psycopg 3, pytest, Ruff, Bun/React hydration tests, Playwright.
   feature activation, collection-count changes, semantic search, cache,
   materialized view, denormalization, provider/runtime work, or frontend polish.
 
+## Accepted private-alpha History Run boundary
+
+Founder decision on 2026-07-27 accepts one measured physical-work limitation
+for this lane:
+
+- every History source returns at most its bounded candidate limit before the
+  Python merge;
+- the measured normal 64-row and 12,000-row distributions remain bounded and
+  performant;
+- sparse, deep, or final Run pages may inspect more ordered Run rows because
+  mutable Conversation archive/delete eligibility and Run ordering live in
+  separate tables;
+- ordering, archive/delete semantics, owner scope, and complete pages must not
+  be weakened to reduce that work;
+- the private reader's statement timeout remains the operational backstop; and
+- issue #232 must not claim universal constant physical work for this
+  cross-table Run path.
+
+Maintaining Conversation state on Run rows or adding a maintained History read
+model is a deferred scale-architecture option, not unfinished issue #232 work.
+This lane must not add denormalized Run state, synchronization triggers, or a
+maintained read model.
+
 ---
 
 ### Task 0: Baseline, feasibility, and execution ledger
@@ -77,8 +100,8 @@ Psycopg 3, pytest, Ruff, Bun/React hydration tests, Playwright.
 - [x] Read canon, issue #232/comments, issue #252, tests, and migrations.
 - [x] Capture realistic isolated-Postgres baseline metrics and plans.
 - [x] Prove an exact indexable private SQL search normalizer.
-- [ ] Initialize the subagent-driven-development execution ledger.
-- [ ] Commit this active plan as
+- [x] Initialize the subagent-driven-development execution ledger.
+- [x] Commit this active plan as
   `docs(history): add issue 232 bounded query execution plan`.
 
 **Rollback:** revert the documentation commit; no runtime behavior changes.
@@ -107,12 +130,12 @@ conversation_foreign_or_missing_pivot_fails_closed
 conversation_owner_scope_is_present_in_every_query
 ```
 
-- [ ] Add the regressions and record the focused red output.
-- [ ] Add an owner-scoped pivot lookup for legacy cursors and push the complete
+- [x] Add the regressions and record the focused red output.
+- [x] Add an owner-scoped pivot lookup for legacy cursors and push the complete
   keyset predicate plus `limit + 1` to Postgres.
-- [ ] Keep the memory-store path behaviorally unchanged.
-- [ ] Prove focused unit/API/real-Postgres tests green.
-- [ ] Commit
+- [x] Keep the memory-store path behaviorally unchanged.
+- [x] Prove focused unit/API/real-Postgres tests green.
+- [x] Commit
   `perf(conversations): push keyset pagination into Postgres`.
 
 **Stop:** any requirement to replace `updated_at`, enrich/version the public
@@ -142,15 +165,15 @@ message_equal_timestamps_and_deleted_pivot_are_stable
 message_owner_and_conversation_scope_are_present
 ```
 
-- [ ] Add regressions and capture the exact red.
-- [ ] Query the raw page with `(created_at,id)` keyset ordering and
+- [x] Add regressions and capture the exact red.
+- [x] Query the raw page with `(created_at,id)` keyset ordering and
   `limit + 1`.
-- [ ] Preserve transcript-wide lifecycle truth with bounded existence/batch
+- [x] Preserve transcript-wide lifecycle truth with bounded existence/batch
   reads where the page boundary otherwise depends on later work; never infer
   artifacts from prose.
-- [ ] Prove focused API, Guest, lifecycle, and real-Postgres pagination tests
+- [x] Prove focused API, Guest, lifecycle, and real-Postgres pagination tests
   green.
-- [ ] Commit `perf(messages): push keyset pagination into Postgres`.
+- [x] Commit `perf(messages): push keyset pagination into Postgres`.
 
 **Stop:** any need to hydrate each frontend page independently or change the
 public message/result metadata contract.
@@ -181,14 +204,14 @@ guest_and_registered_reload_projection_match_prior_behavior
 later_work_and_represented_request_checks_remain_transcript_correct
 ```
 
-- [ ] Add regressions and capture the exact red.
-- [ ] Replace per-identity job/run loaders with owner/conversation-scoped batch
+- [x] Add regressions and capture the exact red.
+- [x] Replace per-identity job/run loaders with owner/conversation-scoped batch
   reads while keeping the current completed-job eligibility checks.
-- [ ] Preserve message, action, job, Run, result, EvidenceArtifact, and
+- [x] Preserve message, action, job, Run, result, EvidenceArtifact, and
   DecisionNote identity; never infer artifacts from prose.
-- [ ] Prove focused projection, API, Guest, stale-card, and result-owner tests
+- [x] Prove focused projection, API, Guest, stale-card, and result-owner tests
   green.
-- [ ] Commit `perf(messages): batch completed result hydration`.
+- [x] Commit `perf(messages): batch completed result hydration`.
 
 **Stop:** any change to public message/result metadata, Guest settlement,
 stale-card meaning, or one-result-owner behavior.
@@ -223,14 +246,14 @@ history_guest_single_workspace_behavior_is_unchanged
 history_query_and_row_budget_are_constant_as_volume_grows
 ```
 
-- [ ] Add regressions and capture the exact red.
-- [ ] Resolve legacy cursor pivots owner-scoped across the eligible source
+- [x] Add regressions and capture the exact red.
+- [x] Resolve legacy cursor pivots owner-scoped across the eligible source
   types; fail closed when absent or ambiguous.
-- [ ] Fetch no more than `limit + 1` ranking-compatible candidates per source,
+- [x] Fetch no more than `limit + 1` ranking-compatible candidates per source,
   applying parent state/message existence before each source limit.
-- [ ] Merge only bounded candidates in Python with the existing sort key.
-- [ ] Prove focused API/real-Postgres/scale tests green.
-- [ ] Commit `perf(history): bound merged source queries in Postgres`.
+- [x] Merge only bounded candidates in Python with the existing sort key.
+- [x] Prove focused API/real-Postgres/scale tests green.
+- [x] Commit `perf(history): bound merged source queries in Postgres`.
 
 **Stop:** any need to change cursor meaning, History grouping/order, or add a
 public view/RPC.
@@ -266,17 +289,17 @@ ledger_groups_are_exact_and_not_candidate_or_decision_filter_relative
 search_query_and_row_budget_are_constant_as_volume_grows
 ```
 
-- [ ] Add parity, scale, cursor, ranking, identity, and ledger regressions; record
+- [x] Add parity, scale, cursor, ranking, identity, and ledger regressions; record
   the exact red.
-- [ ] Use parameterized private SQL with explicit owner/workspace predicates.
+- [x] Use parameterized private SQL with explicit owner/workspace predicates.
   Build a top `limit + 1` candidate set per source using the exact existing
   matcher/rank dimensions.
-- [ ] Fetch Decision-linked Evidence in one bounded batch.
-- [ ] Keep exact ledger counts on a separate aggregate path computed before the
+- [x] Fetch Decision-linked Evidence in one bounded batch.
+- [x] Keep exact ledger counts on a separate aggregate path computed before the
   optional decision-state result filter.
-- [ ] Continue projecting typed response models in Python.
-- [ ] Prove focused unit/API/real-Postgres/scale tests green.
-- [ ] Commit
+- [x] Continue projecting typed response models in Python.
+- [x] Prove focused unit/API/real-Postgres/scale tests green.
+- [x] Commit
   `perf(search): bound ranked candidates and preserve ledger counts`.
 
 **Stop:** any mismatch in search completeness/ranking/group counts, or need for
@@ -297,18 +320,18 @@ meaning.
 - Add/update privacy-safe benchmark tooling under `scripts/qa/` only if it is
   generally reusable; otherwise keep evidence ignored under `temp/issue-232/`.
 
-- [ ] Capture post-implementation `EXPLAIN (ANALYZE, BUFFERS)` before adding
+- [x] Capture post-implementation `EXPLAIN (ANALYZE, BUFFERS)` before adding
   indexes.
-- [ ] Add only the minimum composite/expression indexes proven necessary.
-- [ ] Capture plan improvement after each index.
-- [ ] Reset the isolated Supabase project from zero and verify the full
+- [x] Add only the minimum composite/expression indexes proven necessary.
+- [x] Capture plan improvement after each index.
+- [x] Reset the isolated Supabase project from zero and verify the full
   migration chain/catalog/RLS.
-- [ ] Compare small and large fixtures: query count and returned rows remain
+- [x] Compare small and large fixtures: query count and returned rows remain
   bounded.
 - [ ] Record database, artifact projection, serialization, and endpoint p50/p95
   separately. The seeded uncached message endpoint must be at or below 250 ms
   p95.
-- [ ] Commit
+- [x] Commit
   `perf(postgres): add proven indexes for bounded history reads`.
 
 **Stop:** any schema/RLS redesign beyond forward indexes, or a p95 miss without
@@ -340,18 +363,18 @@ search_expression_indexes_are_selected_and_owner_scope_is_preserved
 search_zero_reset_catalog_and_rls_remain_valid
 ```
 
-- [ ] Record the exact timeout and source-scan plans as RED.
-- [ ] Replace row-by-row regexp token splitting with parameterized, exact
+- [x] Record the exact timeout and source-scan plans as RED.
+- [x] Replace row-by-row regexp token splitting with parameterized, exact
   per-token predicates and an exact final recheck.
-- [ ] Add only plan-proven normalized-expression trigram indexes. The
+- [x] Add only plan-proven normalized-expression trigram indexes. The
   index-enabling extension is private database machinery; it must not add a
   public RPC/view, generated search column, or API dependency.
-- [ ] Preserve arbitrary substring completeness, including one- and two-
+- [x] Preserve arbitrary substring completeness, including one- and two-
   character tokens, the complete rank tuple, exact ledger groups, Guest scope,
   and artifact identity.
-- [ ] Prove the focused parity, cursor, scale, RLS, reset, plan, and endpoint
+- [x] Prove the focused parity, cursor, scale, RLS, reset, plan, and endpoint
   tests green.
-- [ ] Commit independently as
+- [x] Commit independently as
   `perf(search): index exact bounded candidates`.
 
 **Stop:** any need to change Search completeness, rank/group semantics, the
@@ -383,16 +406,16 @@ history_equal_timestamps_deletion_and_owner_scope_remain_exact
 history_small_and_large_plan_rows_are_page_bounded_per_source
 ```
 
-- [ ] Record the exact PostgREST OR and generic History plans as RED.
-- [ ] Move persistent Conversation and Message candidate pages to private,
+- [x] Record the exact PostgREST OR and generic History plans as RED.
+- [x] Move persistent Conversation and Message candidate pages to private,
   owner-scoped parameterized tuple-keyset SQL while keeping their opaque
   cursor meaning and response projection unchanged.
-- [ ] Specialize History source SQL for first/deep and archive/delete shapes
+- [x] Specialize History source SQL for first/deep and archive/delete shapes
   so existing order indexes can stop at `limit + 1`.
-- [ ] Add only source-order indexes selected by exact before/after plans.
-- [ ] Prove cursor compatibility, deletion stability, equal-timestamp ordering,
+- [x] Add only source-order indexes selected by exact before/after plans.
+- [x] Prove cursor compatibility, deletion stability, equal-timestamp ordering,
   owner isolation, artifact hydration, scale, RLS, reset, and endpoint timing.
-- [ ] Commit Conversation/Message and History corrections as independently
+- [x] Commit Conversation/Message and History corrections as independently
   revertible commits.
 
 **Stop:** any public cursor change, public RPC/view, schema/RLS redesign, or
@@ -404,12 +427,12 @@ History ordering/grouping/collection-count change.
 
 ### Task 9: Fresh review and proportional corrections
 
-- [ ] Request fresh database/query correctness review.
-- [ ] Request fresh API/cursor compatibility review.
-- [ ] Request fresh RLS/security review.
-- [ ] Request fresh artifact identity/hydration review.
-- [ ] Request fresh QA/performance methodology review.
-- [ ] Reproduce every actionable finding at candidate HEAD.
+- [x] Request fresh database/query correctness review.
+- [x] Request fresh API/cursor compatibility review.
+- [x] Request fresh RLS/security review.
+- [x] Request fresh artifact identity/hydration review.
+- [x] Request fresh QA/performance methodology review.
+- [x] Reproduce every actionable finding at candidate HEAD.
 - [ ] Apply only the smallest correction for confirmed reachable findings.
 - [ ] Re-review only the bounded delta.
 
