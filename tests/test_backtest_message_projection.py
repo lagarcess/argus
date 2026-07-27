@@ -142,9 +142,7 @@ class _ProjectionBatchQuery:
                 row
                 for row in rows
                 if all(row.get(key) == value for key, value in self.equal_filters)
-                and all(
-                    row.get(key) in values for key, values in self.in_filters
-                )
+                and all(row.get(key) in values for key, values in self.in_filters)
             ]
         if self.limit_count is not None:
             rows = rows[: self.limit_count]
@@ -189,9 +187,7 @@ def _projection_gateway_fixture(
                 "status": "succeeded",
                 "result_run_id": run_id,
                 "execution_metadata": {
-                    "workflow_backtest": {
-                        "result_readout": f"Completed readout {index}"
-                    }
+                    "workflow_backtest": {"result_readout": f"Completed readout {index}"}
                 },
             }
         )
@@ -240,9 +236,9 @@ def test_completed_job_and_run_query_count_does_not_grow_with_message_count() ->
                 len(client.executed_queries("backtest_runs")),
             )
         )
-        assert {
-            message.metadata["result_run_id"] for message in messages
-        } == {f"run-{index}" for index in range(candidate_count)}
+        assert {message.metadata["result_run_id"] for message in messages} == {
+            f"run-{index}" for index in range(candidate_count)
+        }
         observed_clients.append((candidate_count, client))
 
     assert observed_counts == [(1, 1), (1, 1)]
@@ -275,17 +271,14 @@ def test_unbounded_message_projection_chunks_job_and_run_identity_reads() -> Non
     )
 
     assert len(messages) == 101
-    assert {
-        message.metadata["result_run_id"] for message in messages
-    } == {f"run-{index}" for index in range(101)}
+    assert {message.metadata["result_run_id"] for message in messages} == {
+        f"run-{index}" for index in range(101)
+    }
     for table_name in ("backtest_jobs", "backtest_runs"):
         queries = client.executed_queries(table_name)
         assert len(queries) == 2
         assert all(query.limit_count is not None for query in queries)
-        assert all(
-            len(query.in_filters[0][1]) <= 100
-            for query in queries
-        )
+        assert all(len(query.in_filters[0][1]) <= 100 for query in queries)
 
 
 def test_job_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
@@ -386,14 +379,12 @@ def test_job_batch_map_uses_a_sentinel_row_to_reject_one_requested_duplicate() -
 
 def test_run_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
     requested = [f"run-{index}" for index in range(6)]
-    valid_run = (
-        _completed_run().model_copy(update={"id": "run-0"}).model_dump(mode="json")
-        | {"user_id": "user-1"}
-    )
-    duplicate_run = (
-        _completed_run().model_copy(update={"id": "run-3"}).model_dump(mode="json")
-        | {"user_id": "user-1"}
-    )
+    valid_run = _completed_run().model_copy(update={"id": "run-0"}).model_dump(
+        mode="json"
+    ) | {"user_id": "user-1"}
+    duplicate_run = _completed_run().model_copy(update={"id": "run-3"}).model_dump(
+        mode="json"
+    ) | {"user_id": "user-1"}
     client = _ProjectionBatchClient(
         {
             "backtest_runs": [
@@ -442,10 +433,9 @@ def test_run_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
 
 
 def test_run_batch_map_uses_a_sentinel_row_to_reject_one_requested_duplicate() -> None:
-    first = (
-        _completed_run().model_copy(update={"id": "run-1"}).model_dump(mode="json")
-        | {"user_id": "user-1"}
-    )
+    first = _completed_run().model_copy(update={"id": "run-1"}).model_dump(
+        mode="json"
+    ) | {"user_id": "user-1"}
     client = _ProjectionBatchClient(
         {
             "backtest_runs": [
@@ -583,9 +573,7 @@ def test_invalid_completed_records_never_project() -> None:
         "status": "succeeded",
         "result_run_id": "run-1",
     }
-    cases: list[
-        tuple[str, dict[str, dict[str, Any]], dict[str, BacktestRun]]
-    ] = [
+    cases: list[tuple[str, dict[str, dict[str, Any]], dict[str, BacktestRun]]] = [
         ("missing-job", {}, {}),
         (
             "foreign-job-conversation",

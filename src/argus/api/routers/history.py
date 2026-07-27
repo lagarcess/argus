@@ -134,9 +134,7 @@ def history(
                     type="collection",
                     id=collection_row["id"],
                     title=collection_row["name"],
-                    subtitle=(
-                        f"{collection_row.get('strategy_count', 0)} strategies"
-                    ),
+                    subtitle=(f"{collection_row.get('strategy_count', 0)} strategies"),
                     pinned=collection_row["pinned"],
                     created_at=collection_row["updated_at"],
                 )
