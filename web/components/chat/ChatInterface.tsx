@@ -1732,11 +1732,17 @@ export default function ChatInterface() {
       const failedAssistantId =
         retryLastTurnFailedAssistantIdFromAction(action);
       const requestMessageId = retryLastTurnRequestMessageIdFromAction(action);
+      // A replayed discovery selection has to carry its identity too, or the
+      // retry sends bare chip text and reintroduces the asset re-derivation
+      // this lane fixes. The persisted chat_action still holds the payload.
+      const retryMention = retryChatAction
+        ? discoveryCandidateMention(retryChatAction)
+        : null;
       if (retryText) {
         void handleSend(
           retryText,
-          retryChatAction ?? [],
-          undefined,
+          retryMention ? [retryMention] : (retryChatAction ?? []),
+          retryMention ? (retryChatAction ?? undefined) : undefined,
           requestMessageId
             ? { renderUserMessage: true }
             : {

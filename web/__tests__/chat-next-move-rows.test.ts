@@ -173,6 +173,18 @@ describe("discovery selection carries resolved identity", () => {
     ).toBeNull();
   });
 
+  test("a durable retry replays the identity instead of bare chip text", () => {
+    // The retry payload keeps the chat_action but carried no mentions, so
+    // pressing Retry on a failed selection reintroduced the re-derivation this
+    // slice fixes. The mention is rebuilt from the persisted action.
+    const retry = chat.slice(
+      chat.indexOf('if (action.type === "retry_last_turn")'),
+      chat.indexOf('if (action.type === "retry_load_conversation")'),
+    );
+    expect(retry).toContain("discoveryCandidateMention(retryChatAction)");
+    expect(retry).toContain("retryMention ? [retryMention]");
+  });
+
   test("the tap sends the mention alongside the turn, and stays an ordinary turn", () => {
     // Identity travels; a prepared action does not. The turn still re-enters
     // interpretation and still requires confirmation before anything runs.

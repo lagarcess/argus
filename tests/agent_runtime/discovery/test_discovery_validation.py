@@ -273,6 +273,29 @@ class TestReviewHardening:
         assert validated == []
         assert unverified == ["Bitcoin"]
 
+    def test_decorated_ticker_names_do_not_bypass_the_class_hint(self) -> None:
+        """A decorated ticker still names no entity.
+
+        "$TRX" / "(TRX)" / "TRX." differ from the raw symbol as strings, so a
+        naive equality check sent them down the corroboration branch — where a
+        bare ticker trivially matches the resolved asset's own symbol and the
+        collision survived. Every spelling must take the class-hint branch.
+        """
+        for spelling in ("$TRX", "(TRX)", "TRX.", " trx "):
+            extraction = DiscoveryExtraction(
+                candidates=[_candidate("TRX", name=spelling, sources=[0])]
+            )
+            validated, _ = validated_candidates(
+                extraction,
+                packet=_packet(),
+                resolve=_resolver(
+                    {"TRX": "equity"}, names={"TRX": "TRX Gold Corporation"}
+                ),
+                max_candidates=5,
+                asset_class_hint="crypto",
+            )
+            assert validated == [], f"{spelling!r} bypassed the class hint"
+
     def test_bare_ticker_without_an_entity_name_falls_back_to_the_class_hint(
         self,
     ) -> None:

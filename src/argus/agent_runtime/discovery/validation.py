@@ -40,7 +40,12 @@ def _resolution_matches_request(
     question).
     """
 
-    if display_name and display_name.strip().upper() != symbol_guess:
+    # A decorated ticker ("$TRX", "(TRX)", "TRX.") still names no entity, and
+    # corroborating it would only match the symbol back to itself. Compare on
+    # alphanumerics so every spelling of a bare ticker takes the same branch.
+    named_entity = "".join(char for char in display_name if char.isalnum()).upper()
+    bare_symbol = "".join(char for char in symbol_guess if char.isalnum()).upper()
+    if named_entity and named_entity != bare_symbol:
         return text_corroborates_resolved_asset(display_name, resolved)
     # The extraction named no entity beyond the ticker, so there is nothing to
     # corroborate against. The request's own class hint is the only remaining
