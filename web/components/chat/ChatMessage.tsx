@@ -414,7 +414,7 @@ export default function ChatMessage({
                     <button
                       type="button"
                       onClick={() => setShowSources(true)}
-                      className="shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
+                      className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
                     >
                       {t("chat.discovery_results.sources_panel_open", {
                         count: message.discovery.sources.length,

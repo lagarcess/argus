@@ -141,6 +141,28 @@ describe("sources panel", () => {
     expect(link.indexOf("{source.domain}")).toBeGreaterThan(0);
   });
 
+  test("both panel controls carry a 44px tap target despite compact visuals", () => {
+    // The trigger is a 12px text line and the close button is a 16px icon.
+    // Neither may rely on its visual box for touch: the trigger extends its hit
+    // area with a pseudo-element so the baseline-aligned sources row is
+    // unchanged, and the close button gets a real 44px box pulled into its
+    // padding so the header layout is unchanged.
+    const trigger = message.slice(
+      message.indexOf("sources_panel_open") - 600,
+      message.indexOf("sources_panel_open"),
+    );
+    expect(trigger).toContain("after:h-11");
+    expect(trigger).toContain("after:min-w-11");
+    expect(trigger).toContain("relative");
+
+    const close = panel.slice(
+      panel.indexOf("sources_panel_close") - 400,
+      panel.indexOf("sources_panel_close") + 400,
+    );
+    expect(close).toContain("min-h-11");
+    expect(close).toContain("min-w-11");
+  });
+
   test("is a dismissible modal with restored focus", () => {
     expect(panel).toContain('role="dialog"');
     expect(panel).toContain('aria-modal="true"');

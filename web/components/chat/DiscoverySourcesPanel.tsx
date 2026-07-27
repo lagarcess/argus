@@ -115,7 +115,7 @@ export default function DiscoverySourcesPanel({
             aria-label={t("chat.discovery_results.sources_panel_close", {
               defaultValue: "Close sources",
             })}
-            className="shrink-0 rounded-full p-1.5 text-black/60 transition-colors hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+            className="-me-2 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-black/60 transition-colors hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
