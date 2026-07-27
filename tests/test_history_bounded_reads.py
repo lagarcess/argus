@@ -240,10 +240,19 @@ def test_supabase_persistence_requires_and_injects_history_database_reader(
         "PostgresSearchReader",
         search_reader_factory,
     )
+    keyset_reader = MagicMock()
+    keyset_reader_factory = MagicMock(return_value=keyset_reader)
+    monkeypatch.setattr(
+        supabase_gateway,
+        "PostgresKeysetReader",
+        keyset_reader_factory,
+    )
 
     gateway = supabase_gateway.SupabaseGateway.from_env()
 
     assert gateway.history_reader is reader
     assert gateway.search_reader is search_reader
+    assert gateway.keyset_reader is keyset_reader
     reader_factory.assert_called_once_with("postgresql://history-pool/argus")
     search_reader_factory.assert_called_once_with(reader.pool)
+    keyset_reader_factory.assert_called_once_with(reader.pool)

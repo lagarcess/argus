@@ -175,6 +175,40 @@ def test_conversation_page_fetches_only_limit_plus_one() -> None:
     assert "range" not in _operation_names(client.queries[0])
 
 
+def test_conversation_page_delegates_to_injected_postgres_keyset_reader() -> None:
+    reader = MagicMock()
+    reader.list_conversation_rows.return_value = [
+        _conversation_row(0),
+        _conversation_row(1),
+        _conversation_row(2),
+    ]
+    client = MagicMock()
+    client.table.side_effect = AssertionError("PostgREST must not read page candidates")
+    gateway = SupabaseGateway(client=client, keyset_reader=reader)
+
+    rows = gateway.list_conversations(
+        user_id="30000000-0000-0000-0000-000000000001",
+        limit=2,
+        archived=False,
+        deleted=False,
+    )
+
+    assert [row.id for row in rows] == [
+        _conversation_id(0),
+        _conversation_id(1),
+        _conversation_id(2),
+    ]
+    reader.list_conversation_rows.assert_called_once_with(
+        user_id="30000000-0000-0000-0000-000000000001",
+        limit=2,
+        archived=False,
+        deleted=False,
+        cursor_updated_at=None,
+        cursor_id=None,
+    )
+    client.table.assert_not_called()
+
+
 def test_conversation_page_uses_pinned_updated_at_id_desc() -> None:
     client = _RecordingClient([])
     gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
@@ -323,6 +357,51 @@ def test_message_page_fetches_only_limit_plus_one() -> None:
     assert client.table_names == ["messages"]
     assert ("limit", (3,)) in client.queries[0].operations
     assert "range" not in _operation_names(client.queries[0])
+
+
+def test_message_page_delegates_then_preserves_batched_hydration() -> None:
+    reader = MagicMock()
+    reader.list_message_rows.return_value = [
+        _message_row(0),
+        _message_row(1),
+        _message_row(2),
+    ]
+    client = MagicMock()
+    client.table.side_effect = AssertionError("PostgREST must not read page candidates")
+    gateway = SupabaseGateway(client=client, keyset_reader=reader)
+    gateway.get_backtest_jobs_by_ids = MagicMock(return_value={})  # type: ignore[method-assign]
+    gateway.get_backtest_runs_by_ids = MagicMock(return_value={})  # type: ignore[method-assign]
+
+    rows = gateway.list_messages(
+        user_id="30000000-0000-0000-0000-000000000001",
+        conversation_id=_conversation_id(1),
+        limit=2,
+        page=True,
+    )
+
+    assert [row.id for row in rows] == [
+        _message_id(0),
+        _message_id(1),
+        _message_id(2),
+    ]
+    reader.list_message_rows.assert_called_once_with(
+        user_id="30000000-0000-0000-0000-000000000001",
+        conversation_id=_conversation_id(1),
+        limit=2,
+        cursor_created_at=None,
+        cursor_id=None,
+    )
+    gateway.get_backtest_jobs_by_ids.assert_called_once_with(
+        user_id="30000000-0000-0000-0000-000000000001",
+        conversation_id=_conversation_id(1),
+        job_ids=[],
+    )
+    gateway.get_backtest_runs_by_ids.assert_called_once_with(
+        user_id="30000000-0000-0000-0000-000000000001",
+        conversation_id=_conversation_id(1),
+        run_ids=[],
+    )
+    client.table.assert_not_called()
 
 
 def test_message_page_uses_created_at_id_asc_after_cursor() -> None:

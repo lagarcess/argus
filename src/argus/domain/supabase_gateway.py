@@ -46,6 +46,10 @@ from argus.domain.postgres_history_reader import (
     PostgresHistoryReader,
     history_reader_for_database_url,
 )
+from argus.domain.postgres_keyset_reader import (
+    ConversationKeysetCursorError,
+    PostgresKeysetReader,
+)
 from argus.domain.postgres_search_reader import (
     PostgresSearchReader,
     SearchReadResult,
@@ -219,6 +223,7 @@ class SupabaseGateway(
     auth_client: Client | None = None
     history_reader: PostgresHistoryReader | None = None
     search_reader: PostgresSearchReader | None = None
+    keyset_reader: PostgresKeysetReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -246,6 +251,7 @@ class SupabaseGateway(
                 options=_supabase_client_options(),
             ),
             history_reader=history_reader,
+            keyset_reader=PostgresKeysetReader(history_reader.pool),
             search_reader=PostgresSearchReader(history_reader.pool),
         )
 
@@ -471,6 +477,22 @@ class SupabaseGateway(
             if normalized_cursor_id != cursor_id:
                 raise ConversationCursorError("invalid conversation cursor pivot")
 
+        if limit is not None and self.keyset_reader is not None:
+            try:
+                keyset_rows = self.keyset_reader.list_conversation_rows(
+                    user_id=user_id,
+                    limit=limit,
+                    archived=archived,
+                    deleted=deleted,
+                    cursor_updated_at=cursor_updated_at,
+                    cursor_id=cursor_id,
+                )
+            except ConversationKeysetCursorError as exc:
+                raise ConversationCursorError(
+                    "invalid conversation cursor pivot"
+                ) from exc
+            return [Conversation.model_validate(row) for row in keyset_rows]
+
         cursor_pinned: bool | None = None
         canonical_cursor_id: str | None = None
         if cursor_updated_at is not None and cursor_id is not None:
@@ -617,33 +639,46 @@ class SupabaseGateway(
         if not page and cursor_created_at is not None:
             raise ValueError("Message cursors are only valid for page reads.")
 
-        query = (
-            self.client.table("messages")
-            .select(_MESSAGE_SELECT)
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-        )
-        if page:
-            query = query.or_(
-                r"role.neq.user,"
-                f"and(content.neq.{_LEGACY_SKIP_MARKER},"
-                f"content.not.like.{_LEGACY_ONBOARDING_GOAL_LIKE})"
-            )
-            if cursor_created_at is not None and cursor_id is not None:
-                timestamp = cursor_created_at.isoformat()
-                query = query.or_(
-                    f"created_at.gt.{timestamp},"
-                    f"and(created_at.eq.{timestamp},id.gt.{cursor_id})"
-                )
-        ordered = query.order("created_at", desc=False).order("id", desc=False)
-        if page:
+        if page and self.keyset_reader is not None:
             assert limit is not None
-            rows_data = ordered.limit(limit + 1).execute().data or []
-        elif limit is None:
-            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
+            keyset_rows = self.keyset_reader.list_message_rows(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                limit=limit,
+                cursor_created_at=cursor_created_at,
+                cursor_id=cursor_id,
+            )
+            messages = [Message.model_validate(row) for row in keyset_rows]
         else:
-            rows_data = ordered.limit(limit).execute().data or []
-        messages = [Message.model_validate(row) for row in rows_data]
+            query = (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+            )
+            if page:
+                query = query.or_(
+                    r"role.neq.user,"
+                    f"and(content.neq.{_LEGACY_SKIP_MARKER},"
+                    f"content.not.like.{_LEGACY_ONBOARDING_GOAL_LIKE})"
+                )
+                if cursor_created_at is not None and cursor_id is not None:
+                    timestamp = cursor_created_at.isoformat()
+                    query = query.or_(
+                        f"created_at.gt.{timestamp},"
+                        f"and(created_at.eq.{timestamp},id.gt.{cursor_id})"
+                    )
+            ordered = query.order("created_at", desc=False).order("id", desc=False)
+            if page:
+                assert limit is not None
+                rows_data = ordered.limit(limit + 1).execute().data or []
+            elif limit is None:
+                rows_data = self._fetch_all_rows(
+                    lambda start, end: ordered.range(start, end)
+                )
+            else:
+                rows_data = ordered.limit(limit).execute().data or []
+            messages = [Message.model_validate(row) for row in rows_data]
         jobs_by_id = self.get_backtest_jobs_by_ids(
             user_id=user_id,
             conversation_id=conversation_id,
