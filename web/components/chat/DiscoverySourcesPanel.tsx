@@ -10,14 +10,24 @@ type DiscoverySourcesPanelProps = {
   sidecar: DiscoverySidecar;
 };
 
-function formattedSourceDate(
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A provider `source_date` is a calendar date, not an instant. Rendering it in
+ * the viewer's zone would shift "2026-07-20" back a day west of UTC, so a
+ * date-only value is formatted in UTC and stays the date the publisher stated.
+ */
+export function formattedSourceDate(
   value: string | null | undefined,
   locale: string,
 ): string {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(parsed);
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    ...(DATE_ONLY.test(value) ? { timeZone: "UTC" } : {}),
+  }).format(parsed);
 }
 
 /**

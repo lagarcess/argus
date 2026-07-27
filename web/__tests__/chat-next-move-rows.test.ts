@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { formattedSourceDate } from "../components/chat/DiscoverySourcesPanel";
+
 const root = join(import.meta.dir, "..");
 
 const row = readFileSync(join(root, "components/chat/NextMoveRow.tsx"), "utf-8");
@@ -132,6 +134,19 @@ describe("sources panel", () => {
     expect(panel).toContain('event.key === "Escape"');
     expect(panel).toContain("restoreFocusRef.current?.focus?.()");
     expect(panel).toContain("onClick={onClose}");
+  });
+
+  test("a publisher's calendar date is never shifted by the viewer's timezone", () => {
+    // A bare source_date is a calendar date, not an instant. Parsed as UTC
+    // midnight and formatted locally, it would read a day early west of UTC.
+    expect(formattedSourceDate("2026-07-20", "en-US")).toBe("Jul 20, 2026");
+    expect(formattedSourceDate("2026-01-01", "en-US")).toBe("Jan 1, 2026");
+  });
+
+  test("absent or unparseable source dates render as nothing, never as an error", () => {
+    expect(formattedSourceDate(null, "en-US")).toBe("");
+    expect(formattedSourceDate(undefined, "en-US")).toBe("");
+    expect(formattedSourceDate("not-a-date", "en-US")).toBe("");
   });
 
   test("framing is descriptive rather than endorsing", () => {
