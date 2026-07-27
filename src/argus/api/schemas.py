@@ -97,7 +97,7 @@ class OnboardingState(BaseModel):
 
 class User(BaseModel):
     id: str
-    email: str
+    email: str | None
     username: str | None = None
     display_name: str | None = None
     language: Language = "en"
@@ -109,8 +109,35 @@ class User(BaseModel):
     updated_at: datetime
 
 
+class GuestAccountSummary(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    expires_at: datetime
+    conversation_limit: int = Field(ge=1, le=2_147_483_647)
+    message_limit: int = Field(ge=1, le=2_147_483_647)
+    simulation_limit: int = Field(ge=1, le=2_147_483_647)
+    feedback_limit: int = Field(ge=1, le=2_147_483_647)
+
+
+class AccountCapabilities(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    can_create_additional_conversation: bool
+    can_manage_conversation: bool
+    can_save_decision: bool
+    can_manage_account: bool
+    can_use_omnisearch: bool
+    can_search_current_workspace: bool
+    can_use_grounded_discovery: bool
+    can_submit_feedback: bool
+
+
 class UserResponse(BaseModel):
     user: User
+    account_kind: Literal["guest", "registered"]
+    guest: GuestAccountSummary | None
+    capabilities: AccountCapabilities
+    public_account_access_enabled: bool
 
 
 class UsageWindow(BaseModel):
@@ -123,15 +150,15 @@ class UsageWindow(BaseModel):
 
 
 class UsageAllowance(BaseModel):
-    """Backend-derived allowance truth for one resource: both active UTC
-    windows plus availability and the most restrictive window."""
+    """Backend-derived allowance truth for the account's active windows."""
 
     model_config = ConfigDict(frozen=True)
 
-    hour: UsageWindow
-    day: UsageWindow
+    hour: UsageWindow | None
+    day: UsageWindow | None
+    guest_session: UsageWindow | None
     available_now: bool
-    limiting_window: Literal["hour", "day"]
+    limiting_window: Literal["hour", "day", "guest_session"]
 
 
 class UsageAllowances(BaseModel):
@@ -442,6 +469,7 @@ class HistoryItem(BaseModel):
     pinned: bool = False
     created_at: datetime
     conversation_id: str | None = None
+    expires_at: datetime | None = None
 
     @model_serializer(mode="wrap")
     def _omit_absent_title_source(
@@ -601,6 +629,135 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class GuestBootstrapRequest(BaseModel):
+    captcha_token: str = Field(min_length=1, max_length=4096)
+    language: Language = "en"
+
+
+GuestConversionReason = Literal[
+    "second_simulation",
+    "message_limit",
+    "save_decision",
+    "new_conversation",
+    "keep_history",
+]
+
+
+class GuestPendingAction(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: GuestConversionReason
+    conversation_id: str = Field(min_length=1, max_length=128)
+    action_id: str = Field(min_length=1, max_length=128)
+    artifact_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def require_reason_specific_identity(self) -> "GuestPendingAction":
+        if self.reason == "save_decision" and self.artifact_id is None:
+            raise ValueError("save_decision_requires_artifact_id")
+        if self.reason != "save_decision" and self.artifact_id is not None:
+            raise ValueError("artifact_id_is_only_valid_for_save_decision")
+        return self
+
+
+class GuestHandoffCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    destination_email: str = Field(min_length=3, max_length=320)
+    source_conversation_id: str = Field(min_length=1, max_length=128)
+    pending_action: GuestPendingAction | None = None
+
+    @field_validator("destination_email")
+    @classmethod
+    def normalize_destination_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+    @model_validator(mode="after")
+    def bind_action_to_source_conversation(self) -> "GuestHandoffCreateRequest":
+        if (
+            self.pending_action is not None
+            and self.pending_action.conversation_id != self.source_conversation_id
+        ):
+            raise ValueError("pending_action_conversation_mismatch")
+        return self
+
+
+class GuestHandoffCreateResponse(BaseModel):
+    handoff_id: str
+    expires_at: datetime
+
+
+class GuestHandoffClaimResponse(BaseModel):
+    conversation_id: str
+    pending_action: GuestPendingAction | None = None
+
+
+class GuestIdentityLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=128)
+    refresh_token: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=4096,
+        repr=False,
+    )
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+
+class GuestFunnelClientEventRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event: Literal["starter_action_selected", "conversion_prompt_shown"]
+    language: Language
+    surface: Literal["starter_actions", "conversion_modal"]
+    strategy_category: (
+        Literal["buy_and_hold", "dca_accumulation"] | None
+    ) = None
+    conversion_reason: GuestConversionReason | None = None
+    terminal_outcome: Literal["selected", "shown"]
+
+    @model_validator(mode="after")
+    def require_event_specific_properties(self) -> "GuestFunnelClientEventRequest":
+        if self.event == "starter_action_selected":
+            if (
+                self.surface != "starter_actions"
+                or self.strategy_category is None
+                or self.conversion_reason is not None
+                or self.terminal_outcome != "selected"
+            ):
+                raise ValueError("invalid_starter_action_event")
+        elif (
+            self.surface != "conversion_modal"
+            or self.conversion_reason is None
+            or self.strategy_category is not None
+            or self.terminal_outcome != "shown"
+        ):
+            raise ValueError("invalid_conversion_prompt_event")
+        return self
 
 
 class SuccessResponse(BaseModel):

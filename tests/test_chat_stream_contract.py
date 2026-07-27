@@ -8,6 +8,7 @@ from threading import Event
 from typing import Any
 
 import pytest
+from argus.api.guest_access import registered_account_context
 from argus.api.main import app
 from fastapi.testclient import TestClient
 
@@ -1392,6 +1393,7 @@ async def test_stream_close_persists_provider_receipt_with_request_identity(
         }
     )
     request.state.request_id = "request-disconnect"
+    request.state.account_context = registered_account_context(user.id)
     response = await agent_router.chat_stream(
         ChatStreamRequest(
             conversation_id=conversation["id"],

@@ -285,6 +285,57 @@ Codex should own or closely supervise this:
      branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
 
+## Guest Experience PR Candidate
+
+`codex/guest-experience` is the focused PR #279 candidate. Preserve its
+history with normal integration merges; do not rebase or force-push it.
+
+Migration order is fixed:
+
+1. `20260724101324_add_guest_workspaces.sql`
+2. `20260724102309_add_guest_session_allowances.sql`
+3. `20260724102645_guest_conversation_and_cleanup.sql`
+4. `20260724110000_restore_settle_only_usage.sql`
+5. `20260724110100_serialize_guest_feedback.sql`
+6. `20260724110200_align_guest_cleanup_candidates.sql`
+7. `20260724211312_guest_workspace_handoffs.sql`
+8. `20260724223000_replace_guest_conversation.sql`
+9. `20260724230000_harden_guest_public_boundaries.sql`
+10. `20260725220148_fix_expired_guest_complete_graph_cleanup.sql`
+11. `20260726001954_isolate_guest_cleanup_candidates.sql`
+12. `20260726001955_enforce_guest_terminal_message_limit.sql`
+13. `20260726002158_respect_permanent_conversation_ownership.sql`
+14. `20260726014754_isolate_poisoned_guest_orphans.sql`
+15. `20260726185021_harden_guest_lifecycle_ownership.sql`
+
+The earlier message-settlement and atomic-backtest-admission migrations remain
+prerequisites and must retain their existing order. Integration must reset a
+fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
+promotion.
+
+The conversion contract has two owners:
+
+- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- an existing registered account claims the complete guest graph through the
+  short-lived, email-hash-bound, single-use server handoff. Login completes
+  the claim before returning its session and can reconcile one ambiguous
+  same-destination response without repeating transfer.
+
+Neither path copies visible prose in the browser or merges guest lifetime
+counters into registered hour/day counters. Guest server/bootstrap and
+presentation flags default on as emergency kill switches. Rollback is flags
+first: explicitly disable the frontend guest presentation, then server guest
+bootstrap; keep public-account access false. Do not roll back by deleting guest
+rows or reverting already-applied migrations.
+The server guest flag is the creation gate: disabling it stops new anonymous
+sessions while existing verified guests drain to conversion, fixed expiry, or
+transactional cleanup.
+
+Always Progresses and Grounded Discovery are reconciled into this candidate.
+Remaining external gates are the branch-deployed exact-SHA canary, hosted
+anonymous Auth and CAPTCHA/rate-limit configuration, scheduled cleanup
+ownership, and founder traffic/cost approval.
+
 ## Historical Evidence Retention
 
 Completed specs, plans, and browser reports remain in place when GitHub issues,

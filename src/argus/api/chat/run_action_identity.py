@@ -5,6 +5,28 @@ from fastapi import Request
 from argus.api.chat.actions import confirmation_action_id
 from argus.api.dependencies import problem
 from argus.api.schemas import ChatStreamRequest
+from argus.domain import backtest_admission
+
+
+def validated_optional_idempotency_key(
+    request: Request,
+    raw: str | None,
+) -> str | None:
+    """Validate #229 grammar on the original, unnormalized header bytes."""
+
+    state, key = backtest_admission.validate_idempotency_key(raw)
+    if state == "invalid":
+        raise problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail=(
+                "Idempotency-Key must be 1-128 visible ASCII characters "
+                "with no whitespace."
+            ),
+        )
+    return key
 
 
 def require_run_action_identity(

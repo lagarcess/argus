@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from argus.api.guest_access import AccountContext, guest_capabilities
 from argus.api.schemas import Message
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
 from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.usage_limits import message_usage_settlement
 
 
 def _id() -> str:
@@ -262,6 +264,54 @@ def test_terminal_finalization_uses_service_only_atomic_rpc() -> None:
     assert params["p_usage_limits"] == [
         {"period": "hour", "limit": 20},
         {"period": "day", "limit": 100},
+    ]
+
+
+def test_terminal_finalization_serializes_guest_lifetime_window() -> None:
+    user_id = _id()
+    conversation_id = _id()
+    turn_id = _id()
+    expires_at = datetime(2026, 8, 1, 8, 3, 9, 708198, tzinfo=timezone.utc)
+    assistant = _assistant_message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id="request-guest-final",
+    )
+    client = MagicMock()
+    client.rpc.return_value.execute.return_value = SimpleNamespace(
+        data=[{"message": assistant.model_dump(mode="json")}]
+    )
+    gateway = SupabaseGateway(client=client)
+    settlement = message_usage_settlement(
+        AccountContext(
+            kind="guest",
+            user_id=user_id,
+            expires_at=expires_at,
+            capabilities=guest_capabilities(),
+        )
+    )
+
+    persisted = gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id="request-guest-final",
+        message=assistant,
+        to_status="completed",
+        failure_code=None,
+        retryable=False,
+        settle_usage=settlement,
+    )
+
+    assert persisted == assistant
+    assert client.rpc.call_args.args[1]["p_usage_limits"] == [
+        {
+            "period": "guest_session",
+            "limit": 10,
+            "period_start": (expires_at - timedelta(days=7)).isoformat(),
+            "period_end": expires_at.isoformat(),
+        }
     ]
 
 

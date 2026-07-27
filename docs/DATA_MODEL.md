@@ -123,7 +123,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 
 ### Fields
 - `id`: `uuid` (Primary Key, references `auth.users.id`)
-- `email`: `text`
+- `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
 - `language`: `text` (Default: `'en'`)
@@ -158,8 +158,92 @@ product behavior reads it, and no API path writes it.
   authentication this row is authoritative and no frontend repair update is
   required.
 - `display_name` is used for personalization.
-- `email` is for authentication, not primary UX identity.
+- `profiles.email` is null only for a verified anonymous Auth user. Permanent
+  profiles require the verified provider email. Fake or placeholder guest
+  addresses are forbidden.
 - `username` is optional for Alpha.
+---
+
+## 5.1 guest_workspaces
+
+Server-owned policy record for one temporary anonymous identity.
+
+### Fields
+- `user_id`: `uuid` (Primary Key, references `profiles.id`)
+- `conversation_id`: `uuid` (Unique, nullable, references `conversations.id`)
+- `status`: `active`, `claiming`, `claimed`, or `expired`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz`
+- `claimed_by`: `uuid` (Nullable, references `profiles.id`)
+- `claimed_at`: `timestamptz` (Nullable)
+- `updated_at`: `timestamptz`
+
+### Invariants
+- The owner must be a verified anonymous Supabase Auth user when the workspace
+  is created.
+- Exactly one workspace exists per anonymous owner and at most one
+  conversation may bind to it.
+- Expiry uses a fixed seven-day window after creation. Message, simulation, feedback, and
+  conversation activity cannot extend it.
+- Browser roles may read only their own active workspace and cannot mutate
+  expiry, claim, or cleanup state.
+- Cleanup locks `auth.users` and the workspace, re-verifies anonymous identity
+  truth, removes the eligible graph, and deletes the Auth row in the same
+  database transaction. A converted or permanent account is never eligible.
+- Cleanup deletes conversation messages/jobs, guest feedback text, and the
+  checkpoint rows whose `thread_id` matches the guest conversation before the
+  transactional Auth deletion removes the remaining owner-scoped product rows.
+  It also removes safely transferred source identities after a fifteen-minute
+  reconciliation grace and abandoned bootstrap identities after five minutes.
+  Privacy-safe append-only cost and route/security evidence may retain nullable
+  attribution; transcript-bearing state may not.
+- Guest Start over is one service-owned transaction. It locks the workspace,
+  validates the complete conversation-owned graph, removes that graph and its
+  checkpoint thread, and binds one new empty conversation to the same
+  workspace. It does not replace the Auth identity, move `expires_at`, or reset
+  any lifetime allowance or feedback counter. Append-only cost, route, security,
+  and audit evidence is not rewritten.
+
+---
+
+## 5.2 guest_workspace_handoffs
+
+Server-owned, short-lived claim record for moving one anonymous workspace into
+one existing permanent account.
+
+### Fields
+- `id`: `uuid` (Primary Key)
+- `secret_hash`: `text` (SHA-256 hex digest; the opaque secret is never stored)
+- `source_user_id`: `uuid` (References the anonymous `profiles.id`)
+- `destination_email_hash`: `text` (SHA-256 of the normalized destination
+  email; required)
+- `destination_user_id`: `uuid` (Nullable until verified login resolves the
+  permanent `profiles.id`; cleared if that account is deleted)
+- `source_conversation_id`: `uuid` (References the one guest conversation)
+- `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
+  decision artifact id when applicable)
+- `status`: `pending`, `consumed`, or `revoked`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz` (Exactly ten minutes after creation)
+- `consumed_at`: `timestamptz` (Nullable)
+
+### Invariants
+- Browser roles cannot read or execute against this table. Only the service
+  role may create or claim a handoff.
+- A pending source workspace has at most one handoff.
+- Claim locks the handoff and complete source product graph, resolves the
+  destination only from verified Auth email truth, verifies every foreign
+  owner, and transfers all mutable product rows in one transaction.
+- Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
+  decision, and context ids do not change. Checkpoint rows keep
+  `thread_id == conversation_id`.
+- Guest counters and feedback are not merged into registered allowances.
+  Immutable cost, provider, security, and audit evidence is not rewritten.
+- Source anonymous Auth deletion occurs in bounded cleanup only after a
+  fifteen-minute claim-reconciliation grace, and in the same transaction that
+  re-verifies the source owns no transferred product row. Any claim or cleanup
+  failure changes zero owners.
+
 ---
 
 # 6. private_alpha_allowlist
@@ -952,7 +1036,7 @@ Tracks resource consumption for quotas and limits.
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
 - `resource`: `text` (e.g., `backtest_runs`, `backtest_jobs`, `chat_messages`)
-- `period`: `text` (e.g., `hour`, `day`)
+- `period`: `text` (e.g., `hour`, `day`, `guest_session`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
 - `used_count`: `integer` (Default: `0`)
@@ -968,7 +1052,7 @@ Tracks resource consumption for quotas and limits.
 ### Alpha Enums
 - **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`,
   `discovery_searches`
-- **Period**: `hour`, `day`
+- **Period**: `hour`, `day`, `guest_session`
 
 ### Discovery Search Accounting
 - `discovery_searches` counts grounded-discovery Search attempts (10/hour,
@@ -981,6 +1065,11 @@ Tracks resource consumption for quotas and limits.
 
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
+- For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
+  `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
+  assistant terminals, one unique simulation admission, and five feedback
+  submissions over the identity lifetime.
+- Registered users continue to use the existing UTC hour/day accounting.
 
 ---
 
@@ -1067,7 +1156,14 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
-  `usage_counters`.
+  `usage_counters`, `guest_workspaces`.
+
+### Guest ownership
+- Supabase anonymous identities use the `authenticated` role, so every guest
+  policy keeps `(select auth.uid()) = user_id`; role membership alone is never
+  authorization.
+- Expired guest identities cannot read or write product rows.
+- Another guest and a permanent user see zero guest workspace rows.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.

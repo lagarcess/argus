@@ -10,14 +10,17 @@ import yaml
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import (
+    AccountCapabilities,
     BacktestRun,
     Conversation,
     EvidenceArtifact,
+    GuestAccountSummary,
     Idea,
     IdeaVersion,
     Message,
     OnboardingState,
     User,
+    UserResponse,
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
@@ -147,6 +150,39 @@ def _fake_fetch_price_series(
         end_date=end_date,
         timeframe=timeframe,
     )["close"]
+
+
+def test_guest_account_response_contract_is_typed_and_exact() -> None:
+    now = utcnow()
+    response = UserResponse(
+        user=_mock_profile(),
+        account_kind="guest",
+        guest=GuestAccountSummary(
+            expires_at=now + timedelta(days=7),
+            conversation_limit=1,
+            message_limit=10,
+            simulation_limit=1,
+            feedback_limit=5,
+        ),
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=False,
+            can_manage_conversation=False,
+            can_save_decision=False,
+            can_manage_account=False,
+            can_use_omnisearch=True,
+            can_search_current_workspace=True,
+            can_use_grounded_discovery=False,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+
+    assert response.guest is not None
+    assert response.guest.conversation_limit == 1
+    assert response.guest.message_limit == 10
+    assert response.guest.simulation_limit == 1
+    assert response.guest.feedback_limit == 5
+    assert response.model_dump()["account_kind"] == "guest"
 
 
 def test_gateway_auth_flows_use_separate_auth_client():
@@ -788,6 +824,7 @@ def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
         assert set(schema["properties"]) == {
             "hour",
             "day",
+            "guest_session",
             "available_now",
             "limiting_window",
         }
@@ -2089,11 +2126,12 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
 
 
 def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
+    from argus.api import rate_limits
     from argus.api.routers import auth as auth_router
 
     auth_router.reset_auth_attempt_limiter_for_tests()
-    monkeypatch.setattr(auth_router, "_AUTH_ATTEMPT_COMPACT_THRESHOLD", 1)
-    monkeypatch.setattr(auth_router, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(auth_router._AUTH_ATTEMPT_LIMITER, "_compact_threshold", 1)
+    monkeypatch.setattr(rate_limits, "monotonic", lambda: 0.0)
 
     assert (
         auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
@@ -2105,7 +2143,7 @@ def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
     )
 
     monkeypatch.setattr(
-        auth_router,
+        rate_limits,
         "monotonic",
         lambda: float(auth_router._AUTH_ATTEMPT_WINDOW_SECONDS + 1),
     )

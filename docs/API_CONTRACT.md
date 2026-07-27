@@ -1501,7 +1501,91 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 **Potential later modes:**
 - username + password mapped to email-backed identity
 - OAuth
-- anonymous/guest sessions
+
+## Guest identity and policy endpoints
+
+Guest access is additive and server-authoritative.
+`ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
+emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
+defaults to `true` and controls presentation only. The independent
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
+
+- `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
+  session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
+  checked before Auth creation. Non-loopback production entry acquires a
+  Cloudflare Turnstile token through the public site key before calling this
+  endpoint; missing CAPTCHA configuration falls back to the preserved auth
+  landing. It uses the existing secure cookie rules.
+  The response always includes `renewed_after_expiry` and the server-owned
+  `public_account_access_enabled` presentation permission. An expired verified
+  anonymous session is replaced with a fresh guest identity and returns
+  `renewed_after_expiry=true`; the expired workspace is never revived.
+  Disabling the flag stops new anonymous identities while already-verified
+  guests remain usable until conversion, fixed expiry, or cleanup.
+- `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
+  update to add verified email/password credentials to the current anonymous
+  identity. The browser supplies its current rotated session refresh token;
+  the original bootstrap cookie is only a backward-compatible fallback. It is
+  available only when the server enables public account access and preserves
+  the Auth UUID.
+- `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
+  normalized destination-email hash, source conversation, and optional typed
+  pending action to a ten-minute handoff without resolving whether that account
+  exists. The response exposes only the handoff id and expiry; the id and opaque
+  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+- `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
+  the permanent session. Its optional `guest_claim` contains the original
+  conversation id and verified typed pending action. Retrying the same login
+  after an ambiguous response returns the same claim result without repeating
+  transfer; the explicit claim endpoint remains strict single-use.
+- `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
+  the signed-in destination, then atomically transfers the complete mutable
+  product graph. It is single-use and returns the original conversation id plus
+  the verified typed pending action.
+- `POST /api/v1/conversations/guest/replace` is the only guest Start over
+  mutation. It locks the active workspace, removes the current temporary
+  conversation graph, creates one replacement conversation, and preserves the
+  anonymous identity, fixed expiry, and lifetime usage counters.
+- Conversation create/manage and evidence-decision routes enforce the same
+  server capabilities returned by `GET /api/v1/me`. Direct guest requests for
+  gated durable mutations fail with `403 account_conversion_required`;
+  owner-scoped reads and the guest Start over route remain available.
+- `GET /api/v1/me` returns the verified account kind, guest expiry and limits,
+  and server capabilities with the ordinary profile.
+
+The response includes `user`, `account_kind`, a nullable `guest` summary with
+expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+server-authoritative `public_account_access_enabled` presentation permission.
+Public account creation is absent unless that last value is true.
+Guest capability truth distinguishes owner-scoped current-workspace search
+(`can_search_current_workspace`) from broader Grounded Discovery
+(`can_use_grounded_discovery`). `can_use_omnisearch` may remain true for the
+former while the latter is false.
+
+All guest mutation failures use the existing Problem Details, request-ID,
+same-origin, secure-cookie, and idempotency conventions.
+The authenticated browser-event relay is additionally capped per verified
+guest; server-owned funnel events never depend on that convenience endpoint.
+
+`usage_counters.period = guest_session` adds the `guest_session` period. Its `period_start` is the
+guest workspace creation time and its `period_end` is the fixed seven-day
+expiry. The existing message settlement and backtest admission transactions
+own completed-turn and unique-simulation charges; feedback insert and charge
+are one transaction. Replays, failures, and interruptions add no unit.
+
+New-account linking preserves the owner UUID. An existing-account claim must
+move the complete conversation-owned product graph atomically.
+`cost_ledger_entries`, security evidence, and route evidence are deliberately
+excluded from owner rewriting: they retain anonymous attribution or become
+null through their existing foreign-key behavior.
+
+While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
+remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
+authenticate without role elevation; explicitly disabled rows remain blocked.
+Before that flag may be enabled, founder-approved production-parity evidence
+must prove that every enabled permanent Auth provider supplies a verified email
+compatible with profile and allowlist-role rules. Phone, OAuth, or other
+emailless permanent identities require a separate schema and Auth slice.
 
 ## `POST /auth/signup`
 
@@ -1671,6 +1755,7 @@ create or increment a counter.
         "remaining": 188,
         "period_end": "2026-07-22T00:00:00Z"
       },
+      "guest_session": null,
       "available_now": true,
       "limiting_window": "hour"
     },
@@ -1687,6 +1772,7 @@ create or increment a counter.
         "remaining": 46,
         "period_end": "2026-07-22T00:00:00Z"
       },
+      "guest_session": null,
       "available_now": true,
       "limiting_window": "hour"
     }
@@ -1694,21 +1780,30 @@ create or increment a counter.
 }
 ```
 
+Guests receive the same typed resource keys with `hour` and `day` set to
+`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
+expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
+simulation counter reports `available_now: false`. Guest responses never
+fabricate registered hour/day windows.
+
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
-- Both active UTC calendar windows are returned per resource with exact
-  backend-owned `period_end` reset timestamps. Clients may localize their
-  display, but must not infer or replace them with a countdown, local timer,
-  or `Retry-After` value.
+- Registered accounts receive both active UTC calendar windows. Guests receive
+  only the fixed `guest_session` window. Every populated window carries the
+  exact backend-owned `period_end`; clients may localize its display, but must
+  not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
-- `available_now` is backend-derived: true exactly when both windows have
-  remaining capacity.
-- `limiting_window` is backend-derived: the window with the smaller remaining
-  capacity (`day` on ties). The frontend must not compute, estimate, or
-  hardcode quota truth; it renders these derived fields.
+- `available_now` is backend-derived: for registered accounts it is true when
+  both calendar windows have capacity; for guests it follows the one fixed
+  session window.
+- `limiting_window` is backend-derived: registered accounts use the calendar
+  window with the smaller remaining capacity (`day` on ties), while guests use
+  `guest_session`. The frontend must not compute, estimate, or hardcode quota
+  truth; it renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 
@@ -1782,7 +1877,9 @@ Argus supports English and Spanish (Latin America) in Alpha.
 
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
-- **Logged-out Users**: Frontend may store preferences in `localStorage`. API does not persist these unless guest sessions are implemented.
+- **Logged-out Users**: Frontend may store pre-session hints in `localStorage`.
+  For a guest, the resolved language is persisted on the real anonymous
+  profile and becomes authoritative after bootstrap.
 - Successful signup writes both profile values from the validated signup
   language before the authenticated application renders. Login, session
   hydration, and reload replace browser/local hints with the stored profile;
@@ -2892,7 +2989,9 @@ Mixed recent activity feed.
       "title_source": "ai_generated",
       "subtitle": "Last message or metric preview",
       "pinned": false,
-      "created_at": "timestamp"
+      "created_at": "timestamp",
+      "conversation_id": "uuid",
+      "expires_at": "timestamp or null"
     }
   ],
   "next_cursor": null
@@ -2904,6 +3003,12 @@ Mixed recent activity feed.
 `system_default`, clients should render a localized "New chat" placeholder
 instead of the stored default title.
 
+A verified guest receives at most its one workspace-bound conversation.
+`expires_at` is the exact fixed workspace expiry. Clients may localize its
+visible presentation but must not infer or extend it. Guest Recents exposes no
+rename, archive, delete, Strategy, or Collection controls and presents the
+sign-in path for keeping history.
+
 ---
 
 # 17. Search
@@ -2911,6 +3016,14 @@ instead of the stored default title.
 ## `GET /search`
 
 Global omni-search across conversations and typed recall objects.
+
+For guests, this endpoint is current-workspace search, not Grounded Discovery:
+results are restricted to the one owned temporary conversation and its
+conversation-linked chat, run/backtest, Idea, EvidenceArtifact, and Decision
+records. Strategy and Collection destinations, ledger groups, other owners,
+and provider/model/runtime metadata are excluded. The client uses
+`can_use_grounded_discovery=false` to render one honest unavailable state for
+the broader pillar while keeping current-workspace search functional.
 
 **Query Params:**
 - `q`
@@ -3066,12 +3179,20 @@ Privacy posture:
 - Default mode is `metadata_only`.
 - The sanitizer removes raw prompts, transcripts, context packets, route
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
-  account balances, exact holdings, payment identifiers, and similar sensitive
-  payloads before capture.
+  account balances, exact holdings, exact dates/capital, email, display name,
+  private titles/previews, URLs, cookies, headers, IP addresses, payment
+  identifiers, and similar sensitive payloads before capture.
 - PostHog receives only the sanitized projection. Raw identifiers are hashed
   before emission.
-- Capture is server-side only. Frontend PostHog, autocapture, session replay,
-  and product behavior reads from analytics remain out of scope.
+- PostHog capture remains server-side only. Two browser-owned facts
+  (`starter_action_selected` and `conversion_prompt_shown`) cross the
+  authenticated `POST /analytics/guest-events` contract; the browser never
+  receives a PostHog key or sends prompts, prose, Auth material, provider/model
+  data, or other arbitrary properties. The remaining guest funnel facts emit
+  from their authoritative server settlement, admission, Auth, feedback, and
+  cleanup owners.
+- Frontend PostHog, autocapture, session replay, and product behavior reads
+  from analytics remain out of scope.
 - Person profiles are disabled per event with `$process_person_profile = false`.
 - Current PostHog region is US Cloud, selected deliberately for the private
   alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
@@ -3087,6 +3208,26 @@ Approved product events:
 Each approved product event sets `attributes.product_event` to the registered
 name above while preserving the envelope `event_type` taxonomy and
 `event_action` state model from memo 15.5.
+
+Approved guest funnel events use `feature_area = "guest_acquisition"`:
+- `guest_session_started`
+- `starter_action_selected`
+- `first_useful_assistant_response_completed`
+- `confirmation_reached`
+- `first_simulation_admitted`
+- `first_result_completed`
+- `conversion_prompt_shown`
+- `account_creation_completed`
+- `existing_account_sign_in_completed`
+- `temporary_workspace_claimed`
+- `guest_limit_reached`
+- `guest_feedback_submitted`
+- `guest_session_expired`
+
+Their optional properties are limited to hashed/correlated identity, language,
+surface, approved typed strategy/capability category, conversion reason, and
+terminal outcome. Provider cost and latency stay in the existing server-owned
+evidence ledger and correlate through privacy-safe identifiers.
 
 Implemented operational surface:
 - The append-only first-party `cost_ledger_entries` table is the server-owned
@@ -3136,6 +3277,10 @@ metadata. Raw browser URLs are not persisted; when a URL or legacy
 `metadata.path` is provided, the backend stores only a queryless `page_path`
 with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
 tokens, and arbitrary browser metadata are dropped.
+
+Guest feedback does not require an email and does not consume chat or simulation
+allowance. Conversation and artifact identifiers are attached only after the
+user explicitly opts in; raw transcript content is never attached by default.
 
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account

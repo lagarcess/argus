@@ -13,6 +13,10 @@ from typing import Any
 
 from loguru import logger
 
+from argus.api.guest_observability import (
+    emit_verified_guest_funnel_event,
+    guest_session_allowance_present,
+)
 from argus.domain.backtest_admission import CHAT_RUN_SCOPE, validate_idempotency_key
 
 BACKPRESSURE_RECONCILE_SCAN_LIMIT = 16
@@ -65,10 +69,27 @@ def admit_durable_chat_job(
             request_message_id=context.request_message_id,
             confirmation_message_id=context.confirmation_message_id,
             execution_metadata=execution_metadata,
+            allowance_limits=context.allowance_limits,
         )
         decision = str(outcome.get("decision") or "")
         if decision in ("admitted", "replay"):
             job = outcome.get("job")
+            if decision == "admitted" and guest_session_allowance_present(
+                context.allowance_limits
+            ):
+                emit_verified_guest_funnel_event(
+                    "first_simulation_admitted",
+                    user_id=context.user_id,
+                    conversation_id=context.conversation_id,
+                    job_id=(
+                        str(job.get("id"))
+                        if isinstance(job, dict) and job.get("id")
+                        else None
+                    ),
+                    surface="backtest",
+                    capability_category="simulation",
+                    terminal_outcome="admitted",
+                )
             return ChatAdmissionResult(
                 decision=decision,
                 job=dict(job) if isinstance(job, dict) else None,
@@ -89,7 +110,19 @@ def admit_durable_chat_job(
                 conversation_id=context.conversation_id,
             )
             return ChatAdmissionResult(decision=decision)
-        if decision in ("conflict", "allowance_exhausted"):
+        if decision in ("conflict", "allowance_exhausted", "conversion_required"):
+            if decision == "conversion_required" and guest_session_allowance_present(
+                context.allowance_limits
+            ):
+                emit_verified_guest_funnel_event(
+                    "guest_limit_reached",
+                    user_id=context.user_id,
+                    conversation_id=context.conversation_id,
+                    surface="backtest",
+                    capability_category="simulation",
+                    conversion_reason="second_simulation",
+                    terminal_outcome="limit_reached",
+                )
             logger.warning(
                 "Chat backtest admission rejected",
                 reason=decision,

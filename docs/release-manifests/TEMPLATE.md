@@ -53,6 +53,22 @@ evidence.
   - active workflow task verified:
   - real workflow task verified:
 - Feature flags:
+- Guest staged mode:
+  - `ARGUS_GUEST_ACCESS_ENABLED`:
+  - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`:
+  - `NEXT_PUBLIC_GUEST_ACCESS_ENABLED`:
+  - permanent account allowlist verified:
+- Anonymous Auth / abuse controls:
+  - anonymous Auth enabled:
+  - CAPTCHA posture:
+  - provider anonymous-user rate limit:
+  - Argus per-IP guest-attempt limit:
+- Guest cleanup:
+  - command and schedule:
+  - owner / alert destination:
+  - dry-run selected:
+  - real selected/deleted/preserved/failed:
+  - cleanup lag:
 - Render config audit command:
 - Secret rotation / least-privilege owner:
 
@@ -69,7 +85,24 @@ evidence.
   - Finalized evidence/result labels:
   - Decision-note label and reload hydration:
   - Omnisearch source identity:
-  - Browser signup/login proof:
+- Browser signup/login proof:
+- Guest exact-head browser evidence:
+  - local candidate SHA:
+  - 20-check matrix result:
+  - same-UUID new-account conversion:
+  - atomic existing-account claim:
+  - zero cross-owner results:
+  - usage/API/database agreement:
+  - chart-interaction zero-write ledger:
+  - console status:
+- Guest load calibration:
+  - synthetic p50/p95 and sample size:
+  - error rate:
+  - queue/backpressure result:
+  - anonymous-session creation volume:
+  - cleanup lag:
+  - provider-reported cost per completed result:
+  - unsupported production projections:
   - Failed-capture replay, if failed:
   - Exit status:
 
@@ -79,6 +112,7 @@ evidence.
 - Known caveats:
 - Rollback trigger:
 - Rollback command or owner:
+- Guest rollback order verified:
 - Follow-up owner:
 
 ## Privacy Notes
@@ -90,3 +124,6 @@ evidence.
 - Failed-capture artifacts are sanitized replay inputs, not raw transcripts.
 - Service-role credentials, cookies, prompts, and route receipt payloads are not
   copied into this manifest.
+- Guest evidence contains no Auth UUID, raw conversation/artifact/job/run ids,
+  email, tokens, cookies, headers, screenshots of credentials, or transcript
+  dumps. Store only privacy-safe hashes and aggregate/count facts.

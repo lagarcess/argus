@@ -1002,6 +1002,35 @@ shell to land. See
   those product lanes land; instrumentation must not pretend an unbuilt surface
   exists.
 
+##### Guest experience — Blocks 1–4 local candidate (LOCAL EVIDENCE GATE)
+
+- Status: Blocks 1–3 implement verified anonymous identity, fixed temporary
+  workspace policy, lifetime allowances, cleanup, guest shell, conversion, and
+  owner-scoped capability gates on `codex/guest-experience`. Block 4 adds the
+  approved privacy-safe funnel through the existing observability envelope.
+  This is a local candidate only, not a public-ready or integrated release.
+- Guest is now an accepted part of the normal product shape:
+  `ARGUS_GUEST_ACCESS_ENABLED=true` and
+  `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill
+  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false` remains the independent
+  permanent-account gate.
+- Public exposure still requires the exact-head local browser matrix, clean
+  reconciliation with the moving integration branch, a branch-deployed
+  exact-SHA canary, hosted anonymous-Auth abuse controls, cleanup scheduling,
+  cost/latency calibration, and founder go/no-go.
+- Grounded Discovery and Always Progresses are integrated dependencies. Guest
+  Omnisearch remains owner-scoped, while the ordinary chat runtime preserves
+  the integrated provider-backed discovery contract.
+- Authentication now lands both guest and registered identities directly in
+  ordinary chat. There is no guest onboarding bypass or registered
+  onboarding/`primary_goal` branch; guest behavior differs only through
+  verified identity, persistence, allowances, and conversion policy.
+- Founder decisions still open: first traffic size, CAPTCHA/provider posture,
+  acceptable cost and latency bands, cleanup cadence/owner, public-account
+  enablement timing, and canary approval. Public-account access must not be
+  enabled before its account-method and abuse-control gate is explicitly
+  approved.
+
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
 Status: BUILT + LANDED on `codex/private-alpha-next` (6 commits). Typed `EditOperation`

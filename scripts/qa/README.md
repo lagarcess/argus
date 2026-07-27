@@ -4,6 +4,92 @@ End-to-end account-recovery and session-control QA against real Supabase Auth.
 Everything here targets the worktree-local Supabase stack (or one approved QA
 branch) and is blocked from production by `assert-nonprod-target.sh`.
 
+## Guest exact-head evidence
+
+Guest Block 4 QA uses the same non-production guard and local Supabase stack.
+After a zero-state `supabase db reset --local`, run the guest browser matrix
+only against the exact committed candidate SHA with mock Auth disabled. Guest
+access defaults on; explicit false remains the emergency kill switch. Public-
+account access stays false for staged-mode checks and is enabled only for the
+isolated new-account conversion case, then restored false.
+
+Store sanitized evidence under:
+
+```text
+temp/qa-evidence-guest/<candidate-sha>/
+```
+
+The evidence set may include screenshots, sanitized `/me` and usage shapes,
+hashed owner labels, counts, expiry facts, zero-cross-owner results,
+chart-interaction network method/path counts, and console status. It must not
+include passwords, email addresses, Auth UUIDs, raw conversation/artifact/job/
+run ids, cookies, bearer tokens, headers, handoff secrets, query strings, or raw
+transcript dumps.
+
+The exact-head matrix is one visible pass with Playwright retries disabled.
+Use deterministic database setup for quota, expiry, cleanup, and concurrency;
+use only one bounded real interpreter/provider journey. Stop on the first
+product failure and preserve the sanitized evidence without silently retrying.
+Passing local evidence does not authorize integration, deployment, public
+flags, or tester exposure.
+
+### Block 4 guest browser harness
+
+The Block 4 matrix has a dedicated local-only runner. It selects only the
+guest harness, rejects hosted targets, disables Playwright retries/traces/
+video, launches one headful Chromium worker, and keeps public-account access
+off except for the in-process isolated conversion step.
+
+The runner builds once per mode and serves the compiled frontend with
+`bun run start`. The provider-free guest-entry fixtures use a dedicated
+mock-auth production build because browser API interception cannot satisfy the
+server-rendered `/chat` Supabase session guard. The authoritative matrix uses a
+separate real-Auth production build from the same exact SHA.
+
+Before committing a harness correction, validate setup and teardown without a
+runtime turn:
+
+```bash
+bash scripts/qa/run-guest-experience-qa.sh list --list
+bash scripts/qa/run-guest-experience-qa.sh preflight
+bash scripts/qa/run-guest-experience-qa.sh entry
+```
+
+The runner defaults to the repository-local Supabase project and ports
+`3000`/`8000`. When another Argus lane is active, select one lane-owned local
+stack and unused ports without changing those defaults:
+
+```bash
+ARGUS_GUEST_QA_APP_PORT=59900 \
+ARGUS_GUEST_QA_API_PORT=59901 \
+ARGUS_GUEST_QA_SUPABASE_WORKDIR=/absolute/path/to/isolated-worktree \
+ARGUS_GUEST_QA_DB_CONTAINER=supabase_db_isolated-project \
+bash scripts/qa/run-guest-experience-qa.sh preflight
+```
+
+The selected worktree must contain `supabase/config.toml`; its `project_id`
+must match the running database container label. The runner refuses occupied
+ports and never stops an existing listener.
+
+After committing, reset the local Supabase stack and prove zero state before
+the one authorized live run:
+
+```bash
+supabase db reset --local
+bash scripts/qa/run-guest-experience-qa.sh authoritative
+```
+
+Do not run the authoritative command against an existing server or a hosted
+Supabase project. The runner requires a clean worktree and starts fresh local
+services itself. It is branch-agnostic so the same committed gate can verify a
+merged or reintegrated candidate. Pin the expected commit when handing the run
+between release captains:
+
+```bash
+ARGUS_EXPECTED_CANDIDATE_SHA="$(git rev-parse HEAD)" \
+bash scripts/qa/run-guest-experience-qa.sh authoritative
+```
+
 ## One-shot run
 
 ```bash

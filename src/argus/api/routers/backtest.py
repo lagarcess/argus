@@ -10,6 +10,8 @@ from argus.api.chat.backtest_jobs import (
     should_fail_stale_job_without_task_run,
 )
 from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
+from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
@@ -25,7 +27,11 @@ from argus.domain.backtest_finalization import (
     stable_backtest_run_id,
 )
 from argus.domain.supabase_gateway import QuotaExceededError
-from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
+from argus.domain.usage_limits import (
+    SIMULATION_ALLOWANCE_LIMITS,
+    SIMULATION_USAGE_RESOURCE,
+    allowance_windows,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
 
@@ -141,12 +147,20 @@ def run_backtest(
             return _replay_direct_job(request, user=user, job=job or {})
 
     if api_state.supabase_gateway is not None:
+        account = account_context(request)
         try:
-            api_state.supabase_gateway.check_usage_limits(
-                user_id=user.id,
-                resource="backtest_runs",
-                limits=SIMULATION_ALLOWANCE_LIMITS,
-            )
+            if account.kind == "guest":
+                api_state.supabase_gateway.check_allowance_windows(
+                    user_id=user.id,
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    windows=allowance_windows(account, SIMULATION_USAGE_RESOURCE),
+                )
+            else:
+                api_state.supabase_gateway.check_usage_limits(
+                    user_id=user.id,
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    limits=SIMULATION_ALLOWANCE_LIMITS,
+                )
         except QuotaExceededError as exc:
             # A duplicate racing the admission that filled the window must
             # still resolve replay/collision first.
@@ -164,6 +178,24 @@ def run_backtest(
                 )
                 if decision == "replay":
                     return _replay_direct_job(request, user=user, job=job or {})
+            if account.kind == "guest":
+                emit_guest_funnel_event(
+                    account=account,
+                    kind="guest_limit_reached",
+                    user_id=user.id,
+                    conversation_id=payload.conversation_id,
+                    surface="backtest",
+                    capability_category="simulation",
+                    conversion_reason="second_simulation",
+                    terminal_outcome="limit_reached",
+                )
+                raise problem(
+                    request,
+                    status_code=403,
+                    code="account_conversion_required",
+                    title="Account Required",
+                    detail="Sign in before running another simulation.",
+                ) from exc
             raise problem(
                 request,
                 status_code=429,
@@ -264,6 +296,17 @@ def run_backtest(
             ),
             context={"backtest_job_id": job_id, "retryable": True},
         )
+    emit_guest_funnel_event(
+        account=account_context(request),
+        kind="first_result_completed",
+        user_id=user.id,
+        conversation_id=finalized.run.conversation_id,
+        job_id=job_id,
+        backtest_run_id=finalized.run.id,
+        surface="backtest",
+        capability_category="simulation",
+        terminal_outcome="completed",
+    )
     return BacktestRunResponse(run=finalized.run)
 
 
@@ -359,6 +402,7 @@ def _admit_direct_run(
     conversation_id: str | None,
 ) -> tuple[str, dict[str, Any] | None]:
     gateway = api_state.supabase_gateway
+    account = account_context(request)
     if gateway is not None:
         outcome = gateway.admit_backtest_job(
             user_id=user.id,
@@ -370,6 +414,10 @@ def _admit_direct_run(
             initial_status="running",
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
+            allowance_limits=allowance_windows(
+                account,
+                SIMULATION_USAGE_RESOURCE,
+            ),
         )
         decision = str(outcome.get("decision") or "")
         job = outcome.get("job") if isinstance(outcome.get("job"), dict) else None
@@ -385,12 +433,26 @@ def _admit_direct_run(
             initial_status="running",
             conversation_id=conversation_id,
             execution_metadata={"source": "api_direct"},
-            allowance_limits=SIMULATION_ALLOWANCE_LIMITS,
+            allowance_limits=allowance_windows(
+                account,
+                SIMULATION_USAGE_RESOURCE,
+            ),
         )
         decision = memory_outcome.kind
         job = memory_outcome.job
 
     if decision in ("admitted", "replay"):
+        if decision == "admitted":
+            emit_guest_funnel_event(
+                account=account,
+                kind="first_simulation_admitted",
+                user_id=user.id,
+                conversation_id=conversation_id,
+                job_id=str((job or {}).get("id") or "") or None,
+                surface="backtest",
+                capability_category="simulation",
+                terminal_outcome="admitted",
+            )
         return decision, job
     if decision == "conflict":
         raise problem(
@@ -411,6 +473,24 @@ def _admit_direct_run(
             title="Quota Exceeded",
             detail="Simulation allowance exhausted for the current window.",
             headers={"Retry-After": "60"},
+        )
+    if decision == "conversion_required":
+        emit_guest_funnel_event(
+            account=account,
+            kind="guest_limit_reached",
+            user_id=user.id,
+            conversation_id=conversation_id,
+            surface="backtest",
+            capability_category="simulation",
+            conversion_reason="second_simulation",
+            terminal_outcome="limit_reached",
+        )
+        raise problem(
+            request,
+            status_code=403,
+            code="account_conversion_required",
+            title="Account Required",
+            detail="Sign in before running another simulation.",
         )
     if decision == "per_user_capacity":
         raise problem(

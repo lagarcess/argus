@@ -743,6 +743,46 @@ The release manifest records the profile hash, environment fingerprints,
 deployed service SHAs, and full real-user Spanish signup-to-evidence-to-decision-
 to-recall canary evidence for that same candidate.
 
+## Guest Identity and Policy Boundary
+
+Supabase Auth owns both permanent and anonymous identities. Anonymous users
+receive the ordinary `authenticated` Postgres role; verified Auth truth
+(`is_anonymous`) plus an active `guest_workspaces` row determines guest status.
+Editable profile metadata, browser state, and the frontend flag never determine
+authorization.
+
+One request-scoped typed account context is the server policy owner for guest
+capabilities, fixed expiry, and lifetime allowances. The existing conversation,
+LangGraph, message settlement, and backtest-admission paths remain the only
+runtime and accounting owners.
+
+Two server flags own separate policy boundaries:
+
+- `ARGUS_GUEST_ACCESS_ENABLED` defaults on; explicit `false` is the emergency
+  bootstrap kill switch.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` defaults off and separately controls
+  ordinary permanent-account access.
+
+`NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also defaults on and selects presentation
+only; explicit `false` restores the preserved auth-first landing. An explicit
+client/server disagreement fails closed. With public permanent accounts
+disabled, the current private-alpha allowlist continues to own signup/login and
+role elevation.
+Turning the server guest flag off stops bootstrap only: active verified guests
+drain through their fixed expiry or conversion instead of being abruptly
+deauthorized.
+
+Cleanup is a bounded privileged database operation. It locks the Auth identity
+and workspace, removes an eligible conversation graph, guest feedback text,
+and matching LangGraph checkpoint thread, then deletes the anonymous Auth row
+inside that same transaction. Claimed source identities receive a
+reconciliation grace and are deleted only after the transferred graph has zero
+remaining source owners. This closes the cross-system check/delete race and
+cannot delete a converted or permanent account.
+Append-only cost and route/security evidence may remain only with privacy-safe
+nullable attribution. No hosted Supabase setting is changed by the feature
+branch.
+
 # 19. Failure Handling Standards
 
 ## AI Failure

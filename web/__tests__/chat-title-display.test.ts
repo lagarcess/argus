@@ -174,8 +174,11 @@ describe("chat header wiring", () => {
     expect(chat).not.toContain("t('common.conversation', 'Conversation')");
   });
 
-  test("owner menu renders only when a conversation exists", () => {
-    expect(chat).toContain('{currentView === "chat" && conversationId && (');
+  test("owner menu renders only for a manageable conversation", () => {
+    expect(chat).toContain(') : currentView === "chat" &&');
+    expect(chat).toContain("conversationId &&");
+    expect(chat).toContain("canManageConversation ? (");
+    expect(chat).toContain("<ChatHeaderMenu");
   });
 
   test("header delete dialog names the active chat", () => {

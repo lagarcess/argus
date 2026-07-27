@@ -38,6 +38,22 @@ def _message_preview(
     return plain_text_preview(content, max_length=max_length)
 
 
+def _serialized_usage_limits(limits: list[Any]) -> list[dict[str, Any]]:
+    serialized: list[dict[str, Any]] = []
+    for window in limits:
+        if isinstance(window, dict):
+            item = dict(window)
+            for key in ("period_start", "period_end"):
+                value = item.get(key)
+                if hasattr(value, "isoformat"):
+                    item[key] = value.isoformat()
+            serialized.append(item)
+            continue
+        period, limit_count = window
+        serialized.append({"period": period, "limit": limit_count})
+    return serialized
+
+
 class ConversationMessagePersistenceMixin:
     """Owner-scoped message queries and serialized RPC-backed appends."""
 
@@ -169,10 +185,7 @@ class ConversationMessagePersistenceMixin:
                     "p_created_at": message.created_at.isoformat(),
                     "p_preview": preview,
                     "p_usage_resource": settle_usage["resource"],
-                    "p_usage_limits": [
-                        {"period": period, "limit": limit_count}
-                        for period, limit_count in settle_usage["limits"]
-                    ],
+                    "p_usage_limits": _serialized_usage_limits(settle_usage["limits"]),
                 },
             ).execute()
             row = _row_one(result)

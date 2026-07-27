@@ -13,7 +13,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const beforeCatch = loadConversation.slice(0, loadConversation.indexOf("} catch (error)"));
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    expect(loadConversation).toContain("setStreamStatus(t('common.loading'))");
+    expect(loadConversation).toContain('setStreamStatus(t("common.loading"))');
     expect(beforeCatch).not.toContain("setMessages([])");
     expect(beforeCatch).not.toContain("setInputActions([])");
   });
@@ -40,12 +40,19 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("stale or deleted active chats reset to a lazy empty chat instead of creating a new stored conversation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const lifecycle = readFileSync(
+      join(root, "components/chat/useChatSurfaceLifecycle.ts"),
+      "utf-8",
+    );
     const initStart = chat.indexOf("// ── Init conversation");
     const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
     const initBlock = chat.slice(initStart, initEnd);
-    const removedStart = chat.indexOf("const handleConversationRemoved");
-    const removedEnd = chat.indexOf("const handleTriggerPrompt", removedStart);
-    const removedBlock = chat.slice(removedStart, removedEnd);
+    const removedStart = lifecycle.indexOf("const handleConversationRemoved");
+    const removedEnd = lifecycle.indexOf(
+      "const handleAllConversationsDeleted",
+      removedStart,
+    );
+    const removedBlock = lifecycle.slice(removedStart, removedEnd);
 
     expect(chat).toContain("resetToEmptyChatSurface");
     expect(initBlock).not.toContain("await createConversation(resolvedLanguage)");
@@ -94,15 +101,23 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("persisted result cards are validated before structured hydration", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
-    const hydrateStart = chat.indexOf("function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages");
-    const hydrateEnd = chat.indexOf("function createPendingAssistantMessage", hydrateStart);
-    const hydrateBlock = chat.slice(hydrateStart, hydrateEnd);
+    const hydrateStart = projection.indexOf(
+      "export function hydrateMessagesFromApi(",
+    );
+    const hydrateBlock = projection.slice(hydrateStart);
 
     expect(hydration).toContain("export function isHydratableResultCard(");
-    expect(hydrateBlock).toContain("isHydratableResultCard(resultCard)");
-    expect(hydrateBlock).not.toContain("resultCard &&\n      Array.isArray(resultCard.rows)");
+    expect(hydrateBlock).toContain(
+      "isHydratableResultCard(metadata.result_card)",
+    );
+    expect(hydrateBlock).not.toContain(
+      "metadata.result_card &&\n        Array.isArray(metadata.result_card.rows)",
+    );
   });
 
   test("header delete requires a selected chat and confirmation", () => {
@@ -113,20 +128,25 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
-    expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
+    expect(chat).toMatch(
+      /const \[pendingHeaderDeleteId, setPendingHeaderDeleteId\] = useState<\s*string \| null\s*>\(null\);/,
+    );
     expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
     expect(chat).toContain("if (!conversationId) return;");
     expect(chat).toContain("setPendingHeaderDeleteId(conversationId);");
     expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
     expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
     expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
-    expect(chat).toContain('{currentView === "chat" && conversationId && (');
+    expect(chat).toContain(') : currentView === "chat" &&');
+    expect(chat).toContain("conversationId &&");
+    expect(chat).toContain("canManageConversation ? (");
     expect(chat).toContain("isDeleting={isDeletingHeaderChat}");
     expect(headerMenu).toContain("disabled={isDeleting}");
   });
 
   test("chat disclaimer appears only after conversation activity and is localized", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const legal = readFileSync(join(root, "components/chat/ChatLegalNotice.tsx"), "utf-8");
     const en = JSON.parse(readFileSync(join(root, "public/locales/en/common.json"), "utf-8"));
     const es = JSON.parse(readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"));
     const coldStartBranchStart = chat.indexOf("{messages.length === 0 ? (");
@@ -138,14 +158,30 @@ describe("chat archive/delete lifecycle source contract", () => {
 
     expect(chat).toContain("const showConversationDisclaimer = shouldShowConversationDisclaimer(");
     expect(coldStartBranch).not.toContain("chat.disclaimer");
-    expect(conversationComposer).toContain("showConversationDisclaimer &&");
-    expect(conversationComposer).toContain('data-testid="chat-disclaimer"');
-    expect(conversationComposer).toContain('t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")');
-    expect(conversationComposer).toContain("text-[13px]");
-    expect(conversationComposer).toContain("font-normal");
-    expect(conversationComposer).toContain("text-black/40 dark:text-white/40");
+    expect(conversationComposer).toContain(
+      "showRegisteredDisclaimer={showConversationDisclaimer}",
+    );
+    expect(legal).toContain('data-testid="chat-disclaimer"');
+    expect(legal).toContain('"chat.disclaimer"');
+    expect(legal).toContain("text-[13px]");
+    expect(legal).toContain("font-normal");
+    expect(legal).toContain("text-black/40 dark:text-white/40");
     expect(en.chat.disclaimer).toBe("Argus can make mistakes. For education only. Not financial advice.");
     expect(es.chat.disclaimer).toBe("Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.");
+  });
+
+  test("guest expiry stays composer-owned across empty and active chat layouts", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const legal = readFileSync(join(root, "components/chat/ChatLegalNotice.tsx"), "utf-8");
+    const footer = readFileSync(join(root, "components/guest/GuestLegalFooter.tsx"), "utf-8");
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+
+    expect(chat.match(/<ChatLegalNotice/g)?.length).toBe(2);
+    expect(chat).not.toContain("temporaryExpiresAt=");
+    expect(legal).toContain("<GuestLegalFooter");
+    expect(footer.match(/data-testid="guest-temporary-notice"/g)?.length).toBe(1);
+    expect(sidebar).not.toContain("guest-sidebar-expiry");
+    expect(sidebar).not.toContain("temporaryExpiresAt");
   });
 
   test("durable retry renders beside its owning row and creates a visible new attempt", () => {
@@ -168,13 +204,36 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(retryStart).toBeGreaterThan(-1);
     expect(retryEnd).toBeGreaterThan(retryStart);
     expect(retryButton).toContain("min-h-11");
+    expect(retryButton).toContain("min-w-11");
     expect(retryButton).not.toContain("min-h-9");
+  });
+
+  test("durable retry matches the assistant footer icon treatment without losing its label", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const assistantRetryStart = message.indexOf(
+      "<Tooltip content={actionLabel(retryAction)}",
+    );
+    const assistantRetryEnd = message.indexOf("</button>", assistantRetryStart);
+    const assistantRetryButton = message.slice(
+      assistantRetryStart,
+      assistantRetryEnd,
+    );
+    const userRetryStart = message.indexOf('data-testid="user-turn-retry"');
+    const userRetryEnd = message.indexOf("</button>", userRetryStart);
+    const userRetryButton = message.slice(userRetryStart, userRetryEnd);
+
+    expect(message).toContain("const retryIconButtonClass");
+    expect(assistantRetryButton).toContain("retryIconButtonClass");
+    expect(userRetryButton).toContain("retryIconButtonClass");
+    expect(userRetryButton).toContain("aria-label={retryLabel}");
+    expect(message).toContain("<Tooltip content={retryLabel}");
+    expect(userRetryButton).not.toContain("\n          {retryLabel}\n");
   });
 
   test("ordinary transport ambiguity follows durable pages and never builds composer retry", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
-    const catchStart = chat.indexOf("try {\n      await streamToConversation");
+    const catchStart = chat.indexOf("try {\n        await streamToConversation");
     const catchEnd = chat.indexOf("// \u2500\u2500 Action routing", catchStart);
     const sendCatch = chat.slice(catchStart, catchEnd);
 
@@ -182,8 +241,8 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch).toContain("resolveOrdinaryTransportAmbiguityView");
     expect(sendCatch).toContain("loadAllConversationMessagePages");
     expect(sendCatch).toContain("conversationLoadFailureMessage");
-    expect(sendCatch).toContain("t('chat.status.checking')");
-    expect(sendCatch.indexOf("setStreamStatus(t('chat.status.checking'))")).toBeLessThan(
+    expect(sendCatch).toContain('t("chat.status.checking")');
+    expect(sendCatch.indexOf('setStreamStatus(t("chat.status.checking"))')).toBeLessThan(
       sendCatch.indexOf("await resolveOrdinaryTransportAmbiguityView"),
     );
     expect(sendCatch).toContain("signal: reconciliationController.signal");

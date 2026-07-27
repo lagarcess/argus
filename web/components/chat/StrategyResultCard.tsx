@@ -35,6 +35,10 @@ type StrategyResultCardProps = {
   result: StrategyResultPayload;
   onAction?: (action: ChatActionOption) => void;
   appearance?: "light" | "dark";
+  canSaveDecision?: boolean;
+  onDecisionUnavailable?: (artifactId: string) => void;
+  resumeDecisionArtifactId?: string | null;
+  onDecisionResumeHandled?: () => void;
 };
 
 const actionClassName =
@@ -49,6 +53,10 @@ const decisionOptions: DecisionState[] = [
 
 export default function StrategyResultCard({
   appearance,
+  canSaveDecision = true,
+  onDecisionUnavailable,
+  resumeDecisionArtifactId,
+  onDecisionResumeHandled,
   onAction,
   result,
 }: StrategyResultCardProps) {
@@ -97,6 +105,25 @@ export default function StrategyResultCard({
     savedDecisionState ?? result.decisionState ?? null;
   const canAddDecision =
     Boolean(result.evidenceArtifactId) && !visibleDecisionState;
+  useEffect(() => {
+    if (
+      !canSaveDecision ||
+      !canAddDecision ||
+      !result.evidenceArtifactId ||
+      resumeDecisionArtifactId !== result.evidenceArtifactId
+    ) {
+      return;
+    }
+    setDecisionSaveFailed(false);
+    setIsDecisionOpen(true);
+    onDecisionResumeHandled?.();
+  }, [
+    canAddDecision,
+    canSaveDecision,
+    onDecisionResumeHandled,
+    result.evidenceArtifactId,
+    resumeDecisionArtifactId,
+  ]);
   const showActionRail =
     renderedActions.length > 0 ||
     Boolean(showSavedState) ||
@@ -226,6 +253,10 @@ export default function StrategyResultCard({
             <button
               type="button"
               onClick={() => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.(result.evidenceArtifactId!);
+                  return;
+                }
                 setDecisionSaveFailed(false);
                 setIsDecisionOpen((current) => !current);
               }}
@@ -291,6 +322,10 @@ export default function StrategyResultCard({
               type="button"
               disabled={isSavingDecision}
               onClick={async () => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.(result.evidenceArtifactId!);
+                  return;
+                }
                 if (!result.evidenceArtifactId || isSavingDecision) return;
                 setIsSavingDecision(true);
                 setDecisionSaveFailed(false);

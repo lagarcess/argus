@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -11,7 +11,13 @@ from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
 )
-from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.dependencies import (
+    current_user,
+    dev_memory_fallback_enabled,
+    problem,
+    require_account_capability,
+)
+from argus.api.guest_access import account_context
 from argus.api.message_store import (
     memory_conversation,
     reconcile_reload_message_metadata,
@@ -105,12 +111,49 @@ def _project_backtest_job_actions(
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(
     payload: ConversationCreate,
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
     title = payload.title or "New idea"
     title_source = "user_renamed" if payload.title else "system_default"
     language = payload.language or user.language
     if api_state.supabase_gateway is not None:
+        context = account_context(request)
+        if context.kind == "guest":
+            workspace = api_state.supabase_gateway.get_active_guest_workspace(
+                user_id=user.id,
+                at=datetime.now(timezone.utc),
+            )
+            if workspace is None:
+                raise problem(
+                    request,
+                    status_code=403,
+                    code="guest_session_expired",
+                    title="Guest Session Expired",
+                    detail="This temporary guest session is no longer available.",
+                )
+            if workspace.conversation_id is not None:
+                existing = api_state.supabase_gateway.get_conversation(
+                    user_id=user.id,
+                    conversation_id=workspace.conversation_id,
+                )
+                if existing is not None:
+                    messages = api_state.supabase_gateway.list_messages(
+                        user_id=user.id,
+                        conversation_id=workspace.conversation_id,
+                        limit=None,
+                    )
+                    if not any(message.role == "user" for message in messages):
+                        return ConversationResponse(conversation=existing)
+                    require_account_capability(
+                        request,
+                        "can_create_additional_conversation",
+                        detail=(
+                            "Sign in to keep this temporary conversation "
+                            "and start another."
+                        ),
+                        reason="new_conversation",
+                    )
         try:
             conversation = api_state.supabase_gateway.create_conversation(
                 user_id=user.id,
@@ -138,6 +181,42 @@ def create_conversation(
             language=language,
             user_id=user.id,
         )
+    return ConversationResponse(conversation=conversation)
+
+
+@router.post(
+    "/conversations/guest/replace",
+    response_model=ConversationResponse,
+)
+def replace_guest_conversation(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConversationResponse:
+    context = account_context(request)
+    if context.kind != "guest" or api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=403,
+            code="guest_account_required",
+            title="Guest Account Required",
+            detail="Only an active guest workspace can be replaced.",
+        )
+    try:
+        conversation = api_state.supabase_gateway.replace_guest_conversation(
+            user_id=user.id,
+            title="New idea",
+            title_source="system_default",
+            language=user.language,
+        )
+    except Exception as exc:
+        logger.warning("Guest conversation replacement failed", error=type(exc).__name__)
+        raise problem(
+            request,
+            status_code=409,
+            code="guest_start_over_failed",
+            title="Could Not Start Over",
+            detail="The temporary conversation was left unchanged.",
+        ) from exc
     return ConversationResponse(conversation=conversation)
 
 
@@ -209,8 +288,15 @@ def list_conversations(
 
 @router.delete("/conversations", response_model=BulkConversationDeleteResponse)
 def delete_all_conversations(
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> BulkConversationDeleteResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     if api_state.supabase_gateway is not None:
         deleted_count = api_state.supabase_gateway.soft_delete_all_conversations(
             user_id=user.id,
@@ -241,6 +327,12 @@ def patch_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
@@ -293,6 +385,12 @@ def delete_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> SuccessResponse:
+    require_account_capability(
+        request,
+        "can_manage_conversation",
+        detail="Sign in to manage saved conversations.",
+        reason="keep_history",
+    )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
