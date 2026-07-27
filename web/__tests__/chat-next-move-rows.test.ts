@@ -133,7 +133,7 @@ describe("discovery selection carries resolved identity", () => {
     expect(
       tap({ symbol: "AKAM", name: "Akamai Technologies", asset_class: "equity" }),
     ).toEqual({
-      id: "discovery-candidate-AKAM",
+      id: "asset:equity:AKAM",
       type: "asset",
       label: "Akamai Technologies",
       symbol: "AKAM",
@@ -153,6 +153,14 @@ describe("discovery selection carries resolved identity", () => {
   test("identity is only claimed when there is a symbol to claim", () => {
     expect(tap({ name: "No symbol here" })).toBeNull();
     expect(tap({ symbol: "   " })).toBeNull();
+  });
+
+  test("the mention id follows the documented asset:{class}:{symbol} shape", () => {
+    // API_CONTRACT.md ties this shape to preserving a chosen identity for
+    // ambiguous symbols, which is the whole point of carrying it.
+    expect(tap({ symbol: "SOL", asset_class: "crypto" })?.id).toBe(
+      "asset:crypto:SOL",
+    );
   });
 
   test("no other action type produces a mention", () => {

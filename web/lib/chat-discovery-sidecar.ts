@@ -113,7 +113,9 @@ export function discoveryCandidateMention(
       : null;
   const name = typeof payload.name === "string" ? payload.name.trim() : "";
   return {
-    id: `discovery-candidate-${symbol}`,
+    // API_CONTRACT.md requires asset:{asset_class}:{symbol} so an ambiguous
+    // symbol keeps the identity that was actually chosen.
+    id: assetClass ? `asset:${assetClass}:${symbol}` : `asset:${symbol}`,
     type: "asset",
     label: name || symbol,
     symbol,

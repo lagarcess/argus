@@ -4,7 +4,7 @@ import { streamChatMessage } from "../lib/argus-api";
 import type { ChatMention } from "../components/chat/types";
 
 const identity: ChatMention = {
-  id: "discovery-candidate-UNP",
+  id: "asset:equity:UNP",
   type: "asset",
   label: "Union Pacific Corp.",
   symbol: "UNP",

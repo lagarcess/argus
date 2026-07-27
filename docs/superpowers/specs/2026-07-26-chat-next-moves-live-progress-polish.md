@@ -1,12 +1,12 @@
 # Chat Polish: Stacked Next-Move Rows + Honest Live Progress
 
-**Status:** FOUNDER-DIRECTED FOLLOW-UP — direction approved 2026-07-26; row anatomy, resolved-group rule, and sources-drawer promotion approved 2026-07-27; implementation not started.
+**Status:** FOUNDER-DIRECTED FOLLOW-UP — direction approved 2026-07-26; row anatomy, resolved-group rule, and sources-drawer promotion approved 2026-07-27. Slices A, C, and D delivered; Slice B remains.
 **Shape:** three PRs, in order.
 
 | PR | Scope | State |
 | --- | --- | --- |
 | **PR 1** — Slices A + C | Every UI change, zero runtime change | ✅ **Merged** — [#281](https://github.com/lagarcess/argus/pull/281), reconciled with integration (guest #279, costs #280) before merge |
-| **PR 2** — Slice D | Discovery selection carries resolved identity | Not started |
+| **PR 2** — Slice D | Discovery selection carries resolved identity | ✅ **Complete** — identity delivered and live-proven; chosen-state marker cut |
 | **PR 3** — Slice B | Live progress lines | Not started; blocked on three backend prerequisites in §4 |
 
 **Delivered in PR 1 beyond the original slice definition,** found during implementation and browser QA:
@@ -24,9 +24,17 @@
   indiscriminate wipe; the non-card branch was the last unconverted remnant.
 - Dead `inputActions` state removed with the composer strip it fed.
 
-**Deferred out of PR 1 by founder decision:** the chosen-state marker and
-carry-forward on switch (both Slice D), and the guest grounded-discovery
-allowance (its own slice, `2026-07-27-guest-grounded-discovery-quota.md`).
+**Slice D is complete and closed.** Its one behavior — a tapped candidate keeps
+the identity the resolver already verified — is delivered and proven against the
+real stack: tapping UNP after a railroad discovery used to answer "Argus can't
+run Backtest UNP directly yet for UNP", the chip text read as a strategy name,
+and now answers "What date window should I use for UNP?". The chosen-state
+marker was cut (§2 table) and carry-forward on switch was deferred out of the
+lane as general interpreter work owed to typed input too.
+
+**Still open in the lane:** Slice B only. Plus the guest grounded-discovery
+allowance, which is its own spec
+(`2026-07-27-guest-grounded-discovery-quota.md`).
 **Owner:** Follow-up lane after PR #276 merges (branch from `codex/private-alpha-next`; if #276's merge is held, stack a child branch on `claude/grounded-discovery-release-9cc859` and review against it as parent).
 **Parent context:** Grounded Discovery Search v1 (issue #244, PR #276), founder UI-taste review of 2026-07-26.
 **Scope class:** Small full-slice polish lane. Frontend presentation + one additive runtime event surface. No API-contract breaks, no new tables, no new flags, no new provider calls. One recorded product contract does change: outbound source links (Slice C).
@@ -149,7 +157,7 @@ settled; do not reopen without new evidence.
 | Freeze a row after one tap | **Rejected** | No requirement owner, no observed failure, and it contradicts grounded discovery design §8. It eliminates one case (double-tap) out of seven; every hard case is about switching *between* candidates and survives untouched. It also forbids the reasonable act of re-running the same asset over different dates. |
 | Discovery-specific machinery for mid-setup switches | **Rejected as framed** | A tap is an ordinary user turn (design §8). "Tap UNP while answering a CSX date question" is the same event as typing it, and that path already exists and is tested. The observed failure was a parse defect (`"Backtest UNP"` read as a strategy name), not a state defect. |
 | Keep rows live, mark what was chosen, handle switches honestly | **Accepted** | Preserves paid-for evidence, keeps re-testing one tap away, and makes the decision legible. |
-| Chosen-state marker | **Deferred to Slice D** | Needs backend truth about the selection to survive reload; guessing from transcript text is the fragility being removed. The user's own echo bubble already shows the choice today. |
+| Chosen-state marker | **Cut** (founder decision 2026-07-27) | Prevents no observed failure — the user's own echo bubble already shows the choice. The cheap version also fights a decision locked in this same lane: graying a row reads as *disabled* everywhere else in this UI (the in-flight lock uses exactly that), but these rows stay deliberately tappable so an asset can be re-run over different dates. Graying one that still works would be the interface lying. If a tester ever reports losing track across a long transcript, build it as a "done" affordance — a check or muted tag at full text strength — never as a gray-out. |
 | Carry assumptions forward on a mid-setup switch | **Deferred, not this lane** | A general interpreter improvement owed to typed input too, not a discovery debt. |
 
 **In-flight lock (in this slice).** The composer disables itself while a turn
