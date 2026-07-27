@@ -2201,9 +2201,15 @@ Contract rules:
 }
 ```
 
-`mentions` is optional composer provenance. It records user-selected asset or
-indicator hints from the input affordance, but it does not rewrite `message`,
-bypass LLM interpretation, or create hidden execution state. Asset mentions
+`mentions` is optional selection provenance. It records user-selected asset or
+indicator hints, but it does not rewrite `message`, bypass LLM interpretation,
+or create hidden execution state. It accompanies a `message` from the composer
+affordance, and may also accompany an `action` when the action is itself an
+asset selection — today only `select_discovery_candidate`, whose candidate
+already passed provider-backed resolution before it was renderable. Carrying
+that identity keeps the interpreter from re-deriving an asset the resolver
+already verified; it is identity, never a prepared action, so the selection
+turn still re-enters interpretation and still requires confirmation. Asset mentions
 should include durable `asset_class` (`equity`, `crypto`, or `currency_pair`)
 and IDs shaped as `asset:{asset_class}:{symbol}` so selected ambiguous symbols
 preserve the user's chosen asset identity. Backend resolution still validates

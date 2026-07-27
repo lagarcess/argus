@@ -382,6 +382,7 @@ export default function ChatMessage({
                           payload: {
                             symbol: candidate.symbol,
                             name: candidate.name,
+                            asset_class: candidate.asset_class,
                           },
                         })
                       }

@@ -171,7 +171,12 @@ def _wire(
         cleaned = symbol.strip().upper()
         if cleaned not in assets:
             raise ValueError(f"unknown symbol {cleaned}")
-        return _Asset(cleaned, assets[cleaned], name=f"{cleaned} Inc")
+        # Mirror a real provider: the catalog name identifies the company, so
+        # validation can confirm the resolved asset is the one the sources named.
+        catalog = {"CRWD": "CrowdStrike Holdings", "PANW": "Palo Alto Networks"}
+        return _Asset(
+            cleaned, assets[cleaned], name=catalog.get(cleaned, f"{cleaned} Inc")
+        )
 
     monkeypatch.setattr(composer_module, "resolve_asset", _resolve)
 

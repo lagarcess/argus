@@ -1,4 +1,6 @@
 import type {
+  ChatActionOption,
+  ChatMention,
   DiscoveryCandidate,
   DiscoverySidecar,
   DiscoverySource,
@@ -82,6 +84,43 @@ export function discoverySidecarFromMetadata(
     )
       .filter((name): name is string => typeof name === "string" && name.trim() !== "")
       .slice(0, MAX_UNVERIFIED),
+  };
+}
+
+/**
+ * The asset identity for a tapped discovery candidate, as a mention.
+ *
+ * The candidate already passed `resolve_asset()` before it was allowed to
+ * render, so re-deriving it from the four words of chip text throws away work
+ * Argus already did — and gets it wrong, since "Backtest UNP" can read as a
+ * strategy name. A mention is the channel `@ticker` already uses to say which
+ * asset is meant, so identity travels without inventing a contract.
+ *
+ * This carries identity, never a prepared action: the turn still re-enters
+ * interpretation and still requires confirmation before anything runs.
+ */
+export function discoveryCandidateMention(
+  action: ChatActionOption,
+): ChatMention | null {
+  if (action.type !== "select_discovery_candidate") return null;
+  const payload = action.payload ?? {};
+  const symbol = typeof payload.symbol === "string" ? payload.symbol.trim() : "";
+  if (!symbol) return null;
+  const assetClass =
+    typeof payload.asset_class === "string" &&
+    ASSET_CLASSES.has(payload.asset_class)
+      ? (payload.asset_class as DiscoveryCandidate["asset_class"])
+      : null;
+  const name = typeof payload.name === "string" ? payload.name.trim() : "";
+  return {
+    // API_CONTRACT.md requires asset:{asset_class}:{symbol} so an ambiguous
+    // symbol keeps the identity that was actually chosen.
+    id: assetClass ? `asset:${assetClass}:${symbol}` : `asset:${symbol}`,
+    type: "asset",
+    label: name || symbol,
+    symbol,
+    asset_class: assetClass,
+    insert_text: symbol,
   };
 }
 

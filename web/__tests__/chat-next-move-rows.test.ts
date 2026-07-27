@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { formattedSourceDate } from "../components/chat/DiscoverySourcesPanel";
 import { markComposerActionsInactive } from "../components/chat/chat-message-projection";
+import { discoveryCandidateMention } from "../lib/chat-discovery-sidecar";
 
 const root = join(import.meta.dir, "..");
 
@@ -117,6 +118,79 @@ describe("next moves answer the newest question only", () => {
     expect(rowBlock).toContain("<NextMoveRow");
     expect(rowBlock).not.toContain("footerVisibilityClass");
     expect(rowBlock).not.toContain("group-hover:opacity-100");
+  });
+});
+
+describe("discovery selection carries resolved identity", () => {
+  const tap = (payload: Record<string, unknown>) =>
+    discoveryCandidateMention({
+      type: "select_discovery_candidate",
+      label: "Backtest AKAM",
+      payload,
+    } as never);
+
+  test("a tapped candidate becomes an asset mention, not bare text", () => {
+    expect(
+      tap({ symbol: "AKAM", name: "Akamai Technologies", asset_class: "equity" }),
+    ).toEqual({
+      id: "asset:equity:AKAM",
+      type: "asset",
+      label: "Akamai Technologies",
+      symbol: "AKAM",
+      asset_class: "equity",
+      insert_text: "AKAM",
+    });
+  });
+
+  test("the resolver-owned asset class survives the tap", () => {
+    expect(tap({ symbol: "SOL", name: "Solana", asset_class: "crypto" })?.asset_class).toBe(
+      "crypto",
+    );
+    // An unrecognised class is dropped rather than passed through as truth.
+    expect(tap({ symbol: "SOL", asset_class: "wildcat" })?.asset_class).toBeNull();
+  });
+
+  test("identity is only claimed when there is a symbol to claim", () => {
+    expect(tap({ name: "No symbol here" })).toBeNull();
+    expect(tap({ symbol: "   " })).toBeNull();
+  });
+
+  test("the mention id follows the documented asset:{class}:{symbol} shape", () => {
+    // API_CONTRACT.md ties this shape to preserving a chosen identity for
+    // ambiguous symbols, which is the whole point of carrying it.
+    expect(tap({ symbol: "SOL", asset_class: "crypto" })?.id).toBe(
+      "asset:crypto:SOL",
+    );
+  });
+
+  test("no other action type produces a mention", () => {
+    expect(
+      discoveryCandidateMention({
+        type: "select_response_option",
+        label: "Compare with buy and hold",
+        payload: { symbol: "AKAM" },
+      } as never),
+    ).toBeNull();
+  });
+
+  test("a durable retry replays the identity instead of bare chip text", () => {
+    // The retry payload keeps the chat_action but carried no mentions, so
+    // pressing Retry on a failed selection reintroduced the re-derivation this
+    // slice fixes. The mention is rebuilt from the persisted action.
+    const retry = chat.slice(
+      chat.indexOf('if (action.type === "retry_last_turn")'),
+      chat.indexOf('if (action.type === "retry_load_conversation")'),
+    );
+    expect(retry).toContain("discoveryCandidateMention(retryChatAction)");
+    expect(retry).toContain("retryMention ? [retryMention]");
+  });
+
+  test("the tap sends the mention alongside the turn, and stays an ordinary turn", () => {
+    // Identity travels; a prepared action does not. The turn still re-enters
+    // interpretation and still requires confirmation before anything runs.
+    expect(chat).toContain("const discoveryMention = discoveryCandidateMention(action)");
+    expect(chat).toContain("handleSend(action.label || value, [discoveryMention], action)");
+    expect(message).toContain("asset_class: candidate.asset_class");
   });
 });
 
