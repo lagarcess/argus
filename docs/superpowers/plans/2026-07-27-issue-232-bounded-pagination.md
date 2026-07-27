@@ -1,0 +1,326 @@
+# Issue #232 Bounded Postgres Pagination Implementation Plan
+
+Status: **ACTIVE**
+
+> **For agentic workers:** every behavioral slice starts with a focused failing
+> regression, records the exact red, implements the smallest correction, proves
+> the focused test green, and ends as an independently revertible conventional
+> commit. The release captain owns sequencing, integration, publication, and
+> every stop gate.
+
+**Goal:** Stop Conversations, Messages, History, and Omnisearch / Idea Ledger
+from loading every owned row before returning one page, while preserving owner
+scope, existing opaque cursors, visible ordering, search completeness/ranking,
+ledger counts, grouping, and canonical artifact identity.
+
+**Starting integration SHA:** `94296ab8fccb9cdf7334bd2ef3e58dc3ec5543db`
+from the exact then-current `origin/codex/private-alpha-next`.
+
+**Architecture:** Keep the public routes and cursor encoding unchanged. Add
+cohesive bounded read helpers at the Supabase/Postgres adapter boundary:
+PostgREST keyset reads where its query language preserves the full ordering,
+and private parameterized Psycopg SQL for the cross-source History/Search read
+models. Every query repeats explicit owner/workspace predicates. Candidate
+pages use `limit + 1`; exact Idea Ledger counts use a separate aggregate query.
+Python continues to own response-model projection and artifact assembly.
+
+**Tech stack:** Python 3.10, FastAPI, Supabase/PostgREST, PostgreSQL 17,
+Psycopg 3, pytest, Ruff, Bun/React hydration tests, Playwright.
+
+## Proven baseline
+
+- Conversations: five product queries; 2,000 owned rows returned to produce a
+  20-row page; p95 45.376 ms.
+- Messages: 418 product queries; 5,302 rows returned to produce a 50-row page;
+  p95 793.525 ms. The query fan-out included 100 jobs, 100 runs, 205 lifecycle
+  records, and 11 message ranges.
+- History: 14 queries; 5,000 rows returned before merge. The scale fixture
+  triggered an oversized PostgREST request while joining 1,000 conversation
+  ids, proving the current projection is not merely slow but operationally
+  unbounded.
+- Search: 23 queries; 8,000 rows returned to produce a 20-row page; p95
+  386.730 ms.
+- Plans showed full-owner sequential scans for the baseline fixture. Evidence
+  is privacy-safe under `temp/issue-232/`.
+- The private SQL normalizer was exhaustively checked across all Unicode scalar
+  values plus random strings: zero mismatches against
+  `normalize_search_text()`. PostgreSQL used the expression trigram index. This
+  avoids a public RPC/view, generated column, or new cursor meaning.
+
+## Non-negotiable contracts
+
+- Conversations retain `(pinned, updated_at, id) DESC`. `updated_at` is the
+  existing cursor timestamp and Recents activity clock; `created_at` would be a
+  user-visible reorder.
+- Messages retain `(created_at, id) ASC`.
+- History retains
+  `(pinned, activity_at, search_type_rank(type), id) DESC`.
+- Search retains
+  `(pinned, exact_title, exact_symbol, type_rank, updated_at,
+  text_relevance, id) DESC`.
+- Existing `base64(timestamp|id)` cursors remain accepted and emitted.
+- Guest scope, PR #277 stale-card settlement, one canonical result owner,
+  completed-only Run identity, and durable Idea/Evidence/Decision identity
+  remain unchanged.
+- No client caching/prefetch/cancellation, Recents disclosure UI, hidden
+  feature activation, collection-count changes, semantic search, cache,
+  materialized view, denormalization, provider/runtime work, or frontend polish.
+
+---
+
+### Task 0: Baseline, feasibility, and execution ledger
+
+**Files:** privacy-safe ignored evidence under `temp/issue-232/`; this plan.
+
+- [x] Verify the clean, non-nested exact-integration worktree and canonical
+  environment links.
+- [x] Read canon, issue #232/comments, issue #252, tests, and migrations.
+- [x] Capture realistic isolated-Postgres baseline metrics and plans.
+- [x] Prove an exact indexable private SQL search normalizer.
+- [ ] Initialize the subagent-driven-development execution ledger.
+- [ ] Commit this active plan as
+  `docs(history): add issue 232 bounded query execution plan`.
+
+**Rollback:** revert the documentation commit; no runtime behavior changes.
+
+---
+
+### Task 1: Conversation keyset pagination
+
+**Owned files:**
+
+- Modify `src/argus/domain/supabase_gateway.py`, or extract one cohesive bounded
+  read helper if that keeps the gateway smaller.
+- Modify `src/argus/api/routers/conversations.py`.
+- Modify `tests/test_supabase_gateway_pagination.py`.
+- Modify/add focused API/Postgres pagination tests only as needed.
+
+**Red matrix:**
+
+```text
+conversation_page_fetches_only_limit_plus_one
+conversation_page_uses_pinned_updated_at_id_desc
+conversation_first_middle_final_and_empty_pages
+conversation_equal_timestamps_are_stable
+conversation_soft_deleted_pivot_does_not_skip_or_duplicate
+conversation_foreign_or_missing_pivot_fails_closed
+conversation_owner_scope_is_present_in_every_query
+```
+
+- [ ] Add the regressions and record the focused red output.
+- [ ] Add an owner-scoped pivot lookup for legacy cursors and push the complete
+  keyset predicate plus `limit + 1` to Postgres.
+- [ ] Keep the memory-store path behaviorally unchanged.
+- [ ] Prove focused unit/API/real-Postgres tests green.
+- [ ] Commit
+  `perf(conversations): push keyset pagination into Postgres`.
+
+**Stop:** any requirement to replace `updated_at`, enrich/version the public
+cursor, or make hard-deleted pivots silently guess their pinned tier.
+
+**Rollback:** revert this commit; the former route-local slicing returns.
+
+---
+
+### Task 2: Message keyset pagination and bounded result hydration
+
+**Owned files:**
+
+- Modify `src/argus/domain/supabase_gateway.py` and/or one cohesive message read
+  helper.
+- Modify `src/argus/domain/backtest_message_projection.py`.
+- Modify `src/argus/api/routers/conversations.py`.
+- Modify `tests/test_supabase_gateway_pagination.py`.
+- Modify `tests/test_backtest_message_projection.py`.
+- Add focused reload/lifecycle projection regressions where required.
+
+**Red matrix:**
+
+```text
+message_page_fetches_only_limit_plus_one
+message_page_uses_created_at_id_asc_after_cursor
+message_first_middle_final_and_empty_pages
+message_equal_timestamps_and_deleted_pivot_are_stable
+message_owner_and_conversation_scope_are_present
+completed_job_and_run_hydration_is_two_bounded_batch_reads
+query_count_does_not_grow_with_completed_message_count
+durable_result_owner_beats_projected_alias
+stale_confirmation_settles_only_its_exact_owner
+guest_and_registered_reload_projection_match_prior_behavior
+later_work_and_represented_request_checks_remain_transcript_correct
+```
+
+- [ ] Add regressions and capture the exact red.
+- [ ] Query the raw page with `(created_at,id)` keyset ordering and
+  `limit + 1`.
+- [ ] Replace per-identity job/run loaders with owner/conversation-scoped batch
+  reads while keeping the current completed-job eligibility checks.
+- [ ] Preserve transcript-wide lifecycle truth with bounded existence/batch
+  reads; never infer artifacts from prose.
+- [ ] Prove focused API, projection, Guest, stale-card, and real-Postgres tests
+  green.
+- [ ] Commit
+  `perf(messages): bound keyset reads and batch result hydration`.
+
+**Stop:** any need to hydrate each frontend page independently or change the
+public message/result metadata contract.
+
+**Rollback:** revert this commit; the previous full-transcript adapter path
+returns.
+
+---
+
+### Task 3: Bounded merged History
+
+**Owned files:**
+
+- Create/modify a cohesive private bounded-read module under
+  `src/argus/domain/`.
+- Modify `src/argus/domain/supabase_gateway.py`.
+- Modify `src/argus/api/routers/history.py`.
+- Add focused History API/query-budget/Postgres tests.
+
+**Red matrix:**
+
+```text
+history_each_source_returns_at_most_limit_plus_one
+history_first_middle_final_and_empty_pages
+history_equal_timestamps_use_type_rank_then_id
+history_soft_deleted_pivot_preserves_legacy_cursor_boundary
+history_pages_have_no_skip_or_duplicate_after_deletion
+history_chat_requires_message_exists_before_limit
+history_run_parent_archive_delete_filter_applies_before_limit
+history_owner_scope_is_present_in_every_source
+history_guest_single_workspace_behavior_is_unchanged
+history_query_and_row_budget_are_constant_as_volume_grows
+```
+
+- [ ] Add regressions and capture the exact red.
+- [ ] Resolve legacy cursor pivots owner-scoped across the eligible source
+  types; fail closed when absent or ambiguous.
+- [ ] Fetch no more than `limit + 1` ranking-compatible candidates per source,
+  applying parent state/message existence before each source limit.
+- [ ] Merge only bounded candidates in Python with the existing sort key.
+- [ ] Prove focused API/real-Postgres/scale tests green.
+- [ ] Commit `perf(history): bound merged source queries in Postgres`.
+
+**Stop:** any need to change cursor meaning, History grouping/order, or add a
+public view/RPC.
+
+**Rollback:** revert the commit; no durable writes or schema dependencies.
+
+---
+
+### Task 4: Bounded Omnisearch and exact Idea Ledger
+
+**Owned files:**
+
+- Create/modify the private bounded-read module and a generated/checked-in
+  search SQL expression helper if needed.
+- Modify `src/argus/domain/supabase_gateway.py`.
+- Modify `src/argus/api/routers/search.py`.
+- Modify focused search assembly/text tests and add real-Postgres scale tests.
+
+**Red matrix:**
+
+```text
+sql_normalizer_matches_python_for_unicode_and_random_text
+search_each_source_returns_at_most_limit_plus_one_candidates
+search_preserves_all_token_matching_and_rank_buckets
+old_pinned_exact_title_and_exact_symbol_beat_newer_plain_matches
+search_first_middle_final_equal_timestamp_and_empty_pages
+search_cursor_pivot_preserves_existing_query_specific_behavior
+search_guest_scope_is_applied_before_candidate_limit
+completed_runs_and_all_artifact_identities_are_preserved
+decision_evidence_batch_is_bounded_and_owner_scoped
+latest_decision_equal_timestamp_tie_uses_id_deterministically
+ledger_groups_are_exact_and_not_candidate_or_decision_filter_relative
+search_query_and_row_budget_are_constant_as_volume_grows
+```
+
+- [ ] Add parity, scale, cursor, ranking, identity, and ledger regressions; record
+  the exact red.
+- [ ] Use parameterized private SQL with explicit owner/workspace predicates.
+  Build a top `limit + 1` candidate set per source using the exact existing
+  matcher/rank dimensions.
+- [ ] Fetch Decision-linked Evidence in one bounded batch.
+- [ ] Keep exact ledger counts on a separate aggregate path computed before the
+  optional decision-state result filter.
+- [ ] Continue projecting typed response models in Python.
+- [ ] Prove focused unit/API/real-Postgres/scale tests green.
+- [ ] Commit
+  `perf(search): bound ranked candidates and preserve ledger counts`.
+
+**Stop:** any mismatch in search completeness/ranking/group counts, or need for
+a public RPC/view, generated search column, new product semantic, or new cursor
+meaning.
+
+**Rollback:** revert the commit; the prior Python all-row assembly returns.
+
+---
+
+### Task 5: Query-plan-justified indexes and measurement proof
+
+**Owned files:**
+
+- Add one forward migration under `supabase/migrations/` only for indexes whose
+  before/after plans prove they are required.
+- Add migration catalog/reset and query-budget tests.
+- Add/update privacy-safe benchmark tooling under `scripts/qa/` only if it is
+  generally reusable; otherwise keep evidence ignored under `temp/issue-232/`.
+
+- [ ] Capture post-implementation `EXPLAIN (ANALYZE, BUFFERS)` before adding
+  indexes.
+- [ ] Add only the minimum composite/expression indexes proven necessary.
+- [ ] Capture plan improvement after each index.
+- [ ] Reset the isolated Supabase project from zero and verify the full
+  migration chain/catalog/RLS.
+- [ ] Compare small and large fixtures: query count and returned rows remain
+  bounded.
+- [ ] Record database, artifact projection, serialization, and endpoint p50/p95
+  separately. The seeded uncached message endpoint must be at or below 250 ms
+  p95.
+- [ ] Commit
+  `perf(postgres): add proven indexes for bounded history reads`.
+
+**Stop:** any schema/RLS redesign beyond forward indexes, or a p95 miss without
+an identified measured owner.
+
+**Rollback:** each index migration contains explicit `DROP INDEX` guidance in
+its comments/PR notes; runtime commits remain independently revertible.
+
+---
+
+### Task 6: Fresh review and proportional corrections
+
+- [ ] Request fresh database/query correctness review.
+- [ ] Request fresh API/cursor compatibility review.
+- [ ] Request fresh RLS/security review.
+- [ ] Request fresh artifact identity/hydration review.
+- [ ] Request fresh QA/performance methodology review.
+- [ ] Reproduce every actionable finding at candidate HEAD.
+- [ ] Apply only the smallest correction for confirmed reachable findings.
+- [ ] Re-review only the bounded delta.
+
+Use both `superpowers:requesting-code-review` and `argus-review-contract`.
+
+---
+
+### Task 7: Final integration, acceptance, and publication
+
+- [ ] Fetch `origin/codex/private-alpha-next` and merge it normally exactly
+  once; never rebase.
+- [ ] Rerun affected focused tests, real Postgres/RLS, migration reset, scale
+  benchmarks, Ruff/format/modularity, `git diff --check`, frontend hydration
+  tests, and production build when types/hydration are affected.
+- [ ] Run production-parity authenticated browser/API QA with controlled
+  fixtures and no provider-backed interpreter turns.
+- [ ] Record exact candidate SHA and privacy-safe evidence.
+- [ ] Push `codex/issue-232-bounded-pagination`.
+- [ ] Open a Draft PR targeting `codex/private-alpha-next`.
+- [ ] Wait for terminal CI.
+- [ ] Update issue #232 criterion by criterion; check only direct proof and
+  leave the issue open.
+
+**Never:** merge, deploy, promote to `main`, close the issue, mutate hosted
+Supabase, or change unrelated flags.
