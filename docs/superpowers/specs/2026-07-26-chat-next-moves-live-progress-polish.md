@@ -370,6 +370,28 @@ Argus had already answered for itself.
   no change: selecting an RSI or crossover option fills period and thresholds
   from the indicator spec's declared defaults rather than asking.
 
+### Carried into this slice: concurrent turns are not a UI concern
+
+Slice A adds a shared `turnInFlight` lock so the composer, clarify rows, and
+persistent discovery rows all stop accepting input while a turn runs. That lock
+is **per-tab UI state**. It closes the accidental double-tap and the impatient
+re-click, which is what it was built for. It does not close:
+
+- two browser tabs open on the same conversation, each firing a turn;
+- a replayed or scripted request that never renders the UI at all;
+- a turn started in one tab while another tab is mid-stream.
+
+None of that is discovery-specific — it is general chat-runtime concurrency, and
+discovery rows only made it visible by being the first affordance that survives
+outside the newest turn. Recorded here because Slice D is the backend-touching
+slice in this lane, not because Slice D owns the problem: if the fix grows past
+a conversation-scoped guard, it deserves its own issue rather than riding along.
+
+Smallest credible shape: a conversation-scoped in-flight guard on the chat
+endpoint that rejects or supersedes a second concurrent turn, consistent with
+existing quota and supersession semantics. No UI change follows from it — the
+frontend already renders backend truth.
+
 ### Why this needs proving, not assuming
 
 The post-result path is the weakest-evidenced acceptance point in the whole
