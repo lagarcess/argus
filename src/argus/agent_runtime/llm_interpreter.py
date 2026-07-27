@@ -1050,7 +1050,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
-        strategy = _strategy_from_llm(response.candidate_strategy_draft)
+        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(

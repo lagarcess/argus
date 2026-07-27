@@ -56,7 +56,10 @@ from argus.domain.indicators import (
 from argus.nlp.natural_time import resolve_date_range_intent
 
 
-def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
+def _strategy_from_llm(
+    draft: LLMStrategyDraft,
+    current_user_message: str | None = None,
+) -> StrategySummary:
     payload = draft.model_dump(mode="python")
     field_provenance = payload.pop("field_provenance", {}) or {}
     language = _clean_optional_text(payload.pop("language", None))
@@ -65,6 +68,13 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.pop("date_range_intent", None)
     )
     evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
+    if current_user_message is not None:
+        evidence_spans = _ground_execution_cost_evidence_spans(
+            evidence_spans,
+            current_user_message=current_user_message,
+        )
+        for field_name in ("fee_rate", "slippage"):
+            field_provenance.pop(field_name, None)
     asset_universe_operation = normalized_asset_universe_operation(
         payload.pop("asset_universe_operation", None)
     )
@@ -270,6 +280,20 @@ def _clean_evidence_spans(value: Any) -> dict[str, str]:
         if normalized_key and normalized_span:
             cleaned[normalized_key] = normalized_span
     return cleaned
+
+
+def _ground_execution_cost_evidence_spans(
+    evidence_spans: dict[str, str],
+    *,
+    current_user_message: str,
+) -> dict[str, str]:
+    grounded = dict(evidence_spans)
+    source_text = str(current_user_message)
+    for field_name in ("fee_rate", "slippage"):
+        span = grounded.get(field_name)
+        if not span or span not in source_text:
+            grounded.pop(field_name, None)
+    return grounded
 
 
 def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:

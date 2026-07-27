@@ -188,7 +188,10 @@ class LLMStrategyDraft(BaseModel):
         description=(
             "Short user-message spans that justify extracted canonical fields, keyed "
             "by field name such as strategy_type, asset_universe, date_range, "
-            "capital_amount, cadence, or comparison_baseline."
+            "capital_amount, cadence, comparison_baseline, fee_rate, or slippage. "
+            "For populated fee_rate or slippage, copy the exact bounded phrase from "
+            "the current user message into the corresponding evidence key; canonical "
+            "explicit-user provenance is derived from that evidence."
         ),
     )
     extra_parameters: dict[str, Any] = Field(default_factory=dict)

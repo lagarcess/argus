@@ -150,8 +150,12 @@ def test_unprovenanced_llm_costs_stay_idealized_at_canonical_boundary() -> None:
 
 
 def test_evidence_backed_llm_costs_gain_explicit_provenance() -> None:
+    message = (
+        "Build a daily MSFT test and model a 10 bps fee and 5 bps slippage."
+    )
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
+            raw_user_phrasing="Model-normalized strategy summary.",
             strategy_type="buy_and_hold",
             asset_universe=["MSFT"],
             date_range={"start": "2023-01-03", "end": "2024-12-31"},
@@ -164,18 +168,23 @@ def test_evidence_backed_llm_costs_gain_explicit_provenance() -> None:
                 "fee_rate": 0.001,
                 "slippage": 0.0005,
             },
-        )
+        ),
+        current_user_message=message,
     )
 
     assert strategy.extra_parameters["fee_rate"] == 0.001
     assert strategy.extra_parameters["slippage"] == 0.0005
+    assert strategy.extra_parameters["evidence_spans"] == {
+        "fee_rate": "10 bps fee",
+        "slippage": "5 bps slippage",
+    }
     assert strategy.extra_parameters["field_provenance"] == {
         "fee_rate": "explicit_user",
         "slippage": "explicit_user",
     }
 
 
-def test_explicit_llm_cost_provenance_preserves_canonical_values() -> None:
+def test_model_declared_cost_provenance_without_spans_is_rejected() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
             strategy_type="buy_and_hold",
@@ -190,11 +199,67 @@ def test_explicit_llm_cost_provenance_preserves_canonical_values() -> None:
                 "fee_rate": 0.001,
                 "slippage": 0.0005,
             },
-        )
+        ),
+        current_user_message=(
+            "Build a daily MSFT test with a 10 bps fee and 5 bps slippage."
+        ),
     )
 
-    assert strategy.extra_parameters["fee_rate"] == 0.001
-    assert strategy.extra_parameters["slippage"] == 0.0005
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "field_provenance" not in strategy.extra_parameters
+
+
+def test_invented_cost_evidence_spans_are_rejected() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            evidence_spans={
+                "fee_rate": "20 bps fee",
+                "slippage": "2 bps slippage",
+            },
+            field_provenance={
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+            },
+        ),
+        current_user_message=(
+            "Build a daily MSFT test with a 10 bps fee and 5 bps slippage."
+        ),
+    )
+
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "field_provenance" not in strategy.extra_parameters
+    assert "evidence_spans" not in strategy.extra_parameters
+
+
+def test_bounded_zero_cost_spans_preserve_intentional_clears() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            evidence_spans={
+                "fee_rate": "0 bps fee",
+                "slippage": "0 bps slippage",
+            },
+            extra_parameters={
+                "fee_rate": 0.0,
+                "slippage": 0.0,
+            },
+        ),
+        current_user_message="Set a 0 bps fee and 0 bps slippage.",
+    )
+
+    assert strategy.extra_parameters["fee_rate"] == 0.0
+    assert strategy.extra_parameters["slippage"] == 0.0
     assert strategy.extra_parameters["field_provenance"] == {
         "fee_rate": "explicit_user",
         "slippage": "explicit_user",

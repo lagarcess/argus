@@ -21,8 +21,9 @@ def execution_cost_capability_clause() -> str:
         "record decimal fractions in extra_parameters.fee_rate and "
         "extra_parameters.slippage (0.1% fees means 0.001; one basis point "
         "is 0.0001, so 10 bps fees means 0.001 and 5 bps slippage means "
-        "0.0005) and set "
-        "field_provenance.fee_rate / field_provenance.slippage to "
-        "'explicit_user'. Never invent costs; both default to zero when "
-        "the user does not state them.\n\n"
+        "0.0005). Copy the exact bounded current-user phrase supporting each "
+        "populated value into evidence_spans.fee_rate and "
+        "evidence_spans.slippage. Canonical explicit-user provenance is derived "
+        "from those spans; never invent costs or evidence. Both costs default "
+        "to zero when the user does not state them.\n\n"
     )
