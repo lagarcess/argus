@@ -345,21 +345,22 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
     }
     assert user_response["properties"]["user"] == {"$ref": "#/components/schemas/User"}
     assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {
-        "type": ["string", "null"]
+        "anyOf": [{"type": "string"}, {"type": "null"}]
     }
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 
-    text = openapi.read_text(encoding="utf-8")
-    start = text.index("  /api/v1/backtests/run:")
-    end = text.index("  /api/v1/backtest-jobs/{id}:")
-    backtest_run_contract = text[start:end]
-
-    assert "name: Idempotency-Key" in backtest_run_contract
-    assert "in: header" in backtest_run_contract
-    assert "required: true" in backtest_run_contract
+    document = yaml.safe_load(openapi.read_text(encoding="utf-8"))
+    operation = document["paths"]["/api/v1/backtests/run"]["post"]
+    parameters = {
+        parameter["name"]: parameter for parameter in operation.get("parameters", [])
+    }
+    idempotency = parameters["Idempotency-Key"]
+    assert idempotency["in"] == "header"
+    assert idempotency["required"] is True
+    assert idempotency["schema"] == {"type": "string"}
 
 
 def test_by_action_backtest_job_lookup_is_declared_in_openapi() -> None:
@@ -387,13 +388,10 @@ def test_by_action_backtest_job_lookup_is_declared_in_openapi() -> None:
 def test_logout_openapi_declares_browser_origin_rejection() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 
-    text = openapi.read_text(encoding="utf-8")
-    start = text.index("  /api/v1/auth/logout:")
-    end = text.index("  /api/v1/auth/session:")
-    logout_contract = text[start:end]
+    document = yaml.safe_load(openapi.read_text(encoding="utf-8"))
+    responses = document["paths"]["/api/v1/auth/logout"]["post"]["responses"]
 
-    assert '"403":' in logout_contract
-    assert "untrusted browser origin" in logout_contract.lower()
+    assert "untrusted browser origin" in responses["403"]["description"].lower()
 
 
 def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
@@ -442,14 +440,14 @@ def test_api_contract_documents_recovery_transport_rejections() -> None:
 
 
 def test_chat_stream_openapi_declares_stale_action_problem_response() -> None:
-    text = (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
-    start = text.index("  /api/v1/chat/stream:")
-    end = text.index("  /api/v1/strategies:", start)
-    chat_stream_contract = text[start:end]
+    document = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
 
-    assert '"409":' in chat_stream_contract
-    assert "application/json:" in chat_stream_contract
-    assert "#/components/schemas/Error" in chat_stream_contract
+    responses = document["paths"]["/api/v1/chat/stream"]["post"]["responses"]
+    stale = responses["409"]["content"]["application/json"]
+    assert stale["schema"] == {"$ref": "#/components/schemas/Error"}
+    assert list(responses["200"]["content"]) == ["text/event-stream"]
 
 
 def test_supabase_migration_matches_alpha_data_model() -> None:

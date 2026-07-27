@@ -137,7 +137,9 @@ class UserResponse(BaseModel):
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
-    public_account_access_enabled: bool
+    public_account_access_enabled: bool = Field(
+        description="Server-authoritative permission to expose ordinary account creation."
+    )
 
 
 class UsageWindow(BaseModel):
