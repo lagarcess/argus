@@ -235,6 +235,45 @@ def test_search_naive_cursor_fails_before_database_read() -> None:
     assert pool.cursor.executions == []
 
 
+@pytest.mark.parametrize(
+    "cursor_id",
+    [
+        "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+        "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+    ],
+)
+def test_search_noncanonical_cursor_uuid_fails_before_database_read(
+    cursor_id: str,
+) -> None:
+    reader_type, cursor_error = _reader_types()
+    pool = _RecordingPool(
+        [
+            [
+                {
+                    "source_type": "chat",
+                    "pinned_rank": 0,
+                    "exact_rank": 0,
+                    "symbol_rank": 0,
+                    "type_rank": 4,
+                    "text_rank": 0,
+                }
+            ],
+            *([[]] * 7),
+        ]
+    )
+
+    with pytest.raises(cursor_error):
+        reader_type(pool).search_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            query="search",
+            source_limit=4,
+            cursor_updated_at=datetime(2026, 7, 27, tzinfo=timezone.utc),
+            cursor_id=cursor_id,
+        )
+
+    assert pool.cursor.executions == []
+
+
 def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[] for _ in range(7)])
@@ -250,7 +289,7 @@ def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> Non
     assert params["symbol_query"] is None
 
 
-def test_search_uses_parameterized_token_likes_without_row_token_splitting() -> None:
+def test_search_uses_bound_token_array_without_row_token_splitting() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[] for _ in range(7)])
 
@@ -264,14 +303,37 @@ def test_search_uses_parameterized_token_likes_without_row_token_splitting() -> 
     rendered = query.as_string()
 
     assert "regexp_split_to_table" not in rendered
-    assert params["token_0_pattern"] == "%alpha%"
-    assert params["token_1_pattern"] == "%x%"
-    assert params["token_2_pattern"] == "%beta%"
-    assert "token_0_pattern" in rendered
-    assert "token_1_pattern" in rendered
-    assert "token_2_pattern" in rendered
+    assert params["token_patterns"] == ["%alpha%", "%x%", "%beta%"]
+    assert params["anchor_pattern"] == "%alpha%"
+    assert "unnest(%(token_patterns)s::text[])" in rendered
+    assert "%(anchor_pattern)s" in rendered
+    assert "token_0_pattern" not in rendered
     assert "alpha" not in rendered
     assert "beta" not in rendered
+
+
+def test_search_sql_shape_is_constant_as_token_count_grows() -> None:
+    reader_type, _ = _reader_types()
+
+    def rendered_sql_shape(query: str) -> tuple[int, int]:
+        pool = _RecordingPool([[] for _ in range(7)])
+        reader_type(pool).search_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            query=query,
+            source_limit=4,
+        )
+        rendered = [statement.as_string() for statement, _ in pool.cursor.executions]
+        return (
+            sum(len(statement) for statement in rendered),
+            sum(statement.count('collate "und-x-icu"') for statement in rendered),
+        )
+
+    one_token_shape = rendered_sql_shape("needle000")
+    many_token_shape = rendered_sql_shape(
+        " ".join(f"needle{index:03d}" for index in range(400))
+    )
+
+    assert many_token_shape == one_token_shape
 
 
 def test_search_exact_index_predicate_keeps_mixed_short_token_recheck() -> None:
@@ -282,11 +344,11 @@ def test_search_exact_index_predicate_keeps_mixed_short_token_recheck() -> None:
 
     rendered = _source_token_predicate(
         _LATE_CHAT,
-        normalized_tokens=("alpha", "x"),
+        has_anchor=True,
     ).as_string()
 
-    assert "token_0_pattern" in rendered
-    assert "token_1_pattern" in rendered
+    assert rendered.count("%(anchor_pattern)s") == 1
+    assert rendered.count("unnest(%(token_patterns)s::text[])") == 1
 
 
 def test_search_executes_one_bounded_candidate_query_per_source() -> None:
@@ -369,7 +431,8 @@ def test_search_hydrates_returned_idea_decisions_in_one_bounded_batch() -> None:
     assert result.rows["ideas"][0]["decision_state"] == "watching"
     assert len(pool.cursor.executions) == 8
     assert all(
-        "join lateral" not in query.as_string() for query, _ in pool.cursor.executions[:7]
+        "left join lateral" not in query.as_string()
+        for query, _ in pool.cursor.executions[:7]
     )
     query, params = pool.cursor.executions[7]
     assert "distinct on (idea_id)" in query

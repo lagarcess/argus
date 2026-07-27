@@ -12,7 +12,6 @@ from argus.domain.search_sql_text import normalizer_expression
 from argus.domain.search_text import normalize_search_text
 
 _SEARCH_ACQUIRE_TIMEOUT_SECONDS = 2.0
-_TOKEN_PREDICATE_MARKER = "/* argus_search_token_predicates */ true"
 _DECISION_STATES = ("promising", "watching", "rejected", "revisit_later")
 _ROW_GROUP_BY_SOURCE = {
     "chat": "conversations",
@@ -39,34 +38,38 @@ def _normalized(expression: str) -> sql.Composed:
     return normalizer_expression(sql.SQL(expression))
 
 
-def _token_predicates(
+def _all_token_recheck(
     normalized_haystack: sql.Composable,
-    *,
-    token_count: int,
-) -> sql.Composable:
-    if token_count < 1:
-        return sql.SQL("true")
-    return sql.SQL(" and ").join(
-        sql.SQL("{} like {}").format(
-            normalized_haystack,
-            sql.Placeholder(f"token_{index}_pattern"),
+) -> sql.Composed:
+    return sql.SQL(
+        """
+        not exists (
+            select 1
+            from unnest(%(token_patterns)s::text[]) as required(pattern)
+            where not coalesce(
+                {normalized_haystack} like required.pattern,
+                false
+            )
         )
-        for index in range(token_count)
-    )
+        """
+    ).format(normalized_haystack=normalized_haystack)
 
 
-def _bind_token_predicates(
-    query: sql.Composable,
+def _token_match_predicate(
     *,
     normalized_haystack: sql.Composable,
-    token_count: int,
-) -> sql.SQL:
-    rendered = query.as_string()
-    replacement = _token_predicates(
-        normalized_haystack,
-        token_count=token_count,
-    ).as_string()
-    return sql.SQL(rendered.replace(_TOKEN_PREDICATE_MARKER, replacement))
+    normalized_index_haystack: sql.Composable | None,
+    has_anchor: bool,
+) -> sql.Composed:
+    predicates: list[sql.Composable] = []
+    if has_anchor and normalized_index_haystack is not None:
+        predicates.append(
+            sql.SQL("{} like %(anchor_pattern)s").format(
+                normalized_index_haystack,
+            )
+        )
+    predicates.append(_all_token_recheck(normalized_haystack))
+    return sql.SQL(" and ").join(predicates)
 
 
 _INPUT_CTE = sql.SQL(
@@ -532,49 +535,30 @@ _LATE_SOURCES = (
 def _source_token_predicate(
     source: _LateSource,
     *,
-    normalized_tokens: tuple[str, ...],
+    has_anchor: bool,
 ) -> sql.Composable:
-    predicates: list[sql.Composable] = []
-    candidate_is_exact = source.candidate_haystack_expression is not None and " ".join(
-        source.candidate_haystack_expression.split()
-    ) == " ".join(source.haystack_expression.split())
-    if source.candidate_haystack_expression is not None:
-        normalized_candidate = _normalized(source.candidate_haystack_expression)
-        predicates.extend(
-            sql.SQL("{} like {}").format(
-                normalized_candidate,
-                sql.Placeholder(f"token_{index}_pattern"),
-            )
-            for index, token in enumerate(normalized_tokens)
-            if len(token) >= 3
-        )
-    exact_indexes = (
-        tuple(index for index, token in enumerate(normalized_tokens) if len(token) < 3)
-        if candidate_is_exact
-        else tuple(range(len(normalized_tokens)))
+    normalized_index_haystack = (
+        _normalized(source.candidate_haystack_expression)
+        if source.candidate_haystack_expression is not None
+        else None
     )
-    if exact_indexes:
-        normalized_haystack = _normalized(source.haystack_expression)
-        predicates.extend(
-            sql.SQL("{} like {}").format(
-                normalized_haystack,
-                sql.Placeholder(f"token_{index}_pattern"),
-            )
-            for index in exact_indexes
-        )
-    return sql.SQL(" and ").join(predicates) if predicates else sql.SQL("true")
+    return _token_match_predicate(
+        normalized_haystack=sql.SQL("search_text.normalized_haystack"),
+        normalized_index_haystack=normalized_index_haystack,
+        has_anchor=has_anchor,
+    )
 
 
 def _late_source_ctes(
     source: _LateSource,
     *,
-    normalized_tokens: tuple[str, ...],
+    has_anchor: bool,
     has_cursor: bool,
 ) -> tuple[sql.Composed, sql.Composed, sql.Composed, sql.Composed]:
     match_predicate = sql.SQL("(input.normalized_query <> '' and ({}))").format(
         _source_token_predicate(
             source,
-            normalized_tokens=normalized_tokens,
+            has_anchor=has_anchor,
         )
     )
     keys_name = sql.Identifier(f"{source.name}_late_keys")
@@ -598,6 +582,9 @@ def _late_source_ctes(
                 {matched_expression} as matched_text
             from input
             {joins}
+            cross join lateral (
+                select {normalized_haystack} as normalized_haystack
+            ) as search_text
             where ({filters})
               and ({match_predicate})
         )
@@ -613,6 +600,7 @@ def _late_source_ctes(
         type_rank_expression=sql.SQL(source.type_rank_expression),
         matched_expression=sql.SQL(source.matched_expression),
         joins=sql.SQL(source.joins),
+        normalized_haystack=_normalized(source.haystack_expression),
         filters=sql.SQL(source.filters),
         match_predicate=match_predicate,
     )
@@ -739,14 +727,14 @@ def _late_source_ctes(
 def _late_source_sql(
     source: _LateSource,
     *,
-    normalized_tokens: tuple[str, ...],
+    has_anchor: bool,
     has_cursor: bool,
 ) -> sql.Composed:
     ctes: list[sql.Composable] = [
         _INPUT_CTE,
         *_late_source_ctes(
             source,
-            normalized_tokens=normalized_tokens,
+            has_anchor=has_anchor,
             has_cursor=has_cursor,
         ),
     ]
@@ -773,12 +761,9 @@ def _late_source_sql(
 
 def _direct_pivot_branch(
     source: _LateSource,
-    *,
-    normalized_tokens: tuple[str, ...],
 ) -> sql.Composed:
-    match_predicate = _token_predicates(
-        _normalized(source.haystack_expression),
-        token_count=len(normalized_tokens),
+    match_predicate = _all_token_recheck(
+        sql.SQL("search_text.normalized_haystack"),
     )
     return sql.SQL(
         """
@@ -813,6 +798,9 @@ def _direct_pivot_branch(
             )::integer as text_rank
         from input
         {joins}
+        cross join lateral (
+            select {normalized_haystack} as normalized_haystack
+        ) as search_text
         where ({filters})
           and {id_expression} = %(cursor_id)s::uuid
           and {activity_expression} = %(cursor_updated_at)s::timestamptz
@@ -827,6 +815,7 @@ def _direct_pivot_branch(
         type_rank_expression=sql.SQL(source.type_rank_expression),
         normalized_matched=_normalized(source.matched_expression),
         joins=sql.SQL(source.joins),
+        normalized_haystack=_normalized(source.haystack_expression),
         filters=sql.SQL(source.filters),
         id_expression=sql.SQL(source.id_expression),
         activity_expression=sql.SQL(source.activity_expression),
@@ -834,33 +823,26 @@ def _direct_pivot_branch(
     )
 
 
-def _direct_pivot_sql(
-    *,
-    normalized_tokens: tuple[str, ...],
-) -> sql.Composed:
+def _direct_pivot_sql() -> sql.Composed:
     return sql.SQL("with {input_cte} {branches}").format(
         input_cte=_INPUT_CTE,
         branches=sql.SQL(" union all ").join(
-            _direct_pivot_branch(
-                source,
-                normalized_tokens=normalized_tokens,
-            )
-            for source in _LATE_SOURCES
+            _direct_pivot_branch(source) for source in _LATE_SOURCES
         ),
     )
 
 
 def _idea_browse_from(
     *,
-    normalized_tokens: tuple[str, ...],
+    has_anchor: bool,
     pivot_only: bool,
 ) -> sql.Composed:
-    query_predicate: sql.Composable = sql.SQL("true")
-    if normalized_tokens:
-        query_predicate = _token_predicates(
-            _normalized("idea.title || ' ' || coalesce(idea.summary, '')"),
-            token_count=len(normalized_tokens),
-        )
+    normalized_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
+    query_predicate = _token_match_predicate(
+        normalized_haystack=sql.SQL("search_text.normalized_haystack"),
+        normalized_index_haystack=normalized_haystack,
+        has_anchor=has_anchor,
+    )
     pivot_predicate = (
         sql.SQL(
             """
@@ -889,6 +871,9 @@ def _idea_browse_from(
             limit 1
         ) as latest_decision
           on true
+        cross join lateral (
+            select {normalized_haystack} as normalized_haystack
+        ) as search_text
         where (
             input.decision_state is null
             or latest_decision.decision_state = input.decision_state
@@ -901,6 +886,7 @@ def _idea_browse_from(
           {pivot_predicate}
         """
     ).format(
+        normalized_haystack=normalized_haystack,
         query_predicate=query_predicate,
         pivot_predicate=pivot_predicate,
     )
@@ -930,10 +916,7 @@ _IDEA_BROWSE_INPUT_CTE = sql.SQL(
 )
 
 
-def _idea_browse_pivot_sql(
-    *,
-    normalized_tokens: tuple[str, ...],
-) -> sql.Composed:
+def _idea_browse_pivot_sql() -> sql.Composed:
     normalized_title = _normalized("idea.title")
     normalized_matched = _normalized("coalesce(nullif(idea.summary, ''), idea.title)")
     return sql.SQL(
@@ -975,7 +958,7 @@ def _idea_browse_pivot_sql(
         normalized_title=normalized_title,
         normalized_matched=normalized_matched,
         browse_from=_idea_browse_from(
-            normalized_tokens=normalized_tokens,
+            has_anchor=False,
             pivot_only=True,
         ),
     )
@@ -983,7 +966,7 @@ def _idea_browse_pivot_sql(
 
 def _idea_browse_sql(
     *,
-    normalized_tokens: tuple[str, ...],
+    has_anchor: bool,
 ) -> sql.Composed:
     normalized_title = _normalized("idea.title")
     normalized_matched = _normalized("coalesce(nullif(idea.summary, ''), idea.title)")
@@ -1065,7 +1048,7 @@ def _idea_browse_sql(
         normalized_title=normalized_title,
         normalized_matched=normalized_matched,
         browse_from=_idea_browse_from(
-            normalized_tokens=normalized_tokens,
+            has_anchor=has_anchor,
             pivot_only=False,
         ),
     )
@@ -1088,56 +1071,56 @@ where user_id = %(user_id)s::uuid
 order by idea_id, updated_at desc, id desc
 """
 
-_LEDGER_SQL = sql.SQL(
-    """
-    with input as (
-        select
-            %(user_id)s::uuid as user_id,
-            %(normalized_query)s::text as normalized_query
-    ),
-    matching_ideas as (
-        select idea.id
-        from input
-        join public.ideas as idea
-          on idea.user_id = input.user_id
-        cross join lateral (
-            select
-                {normalized_haystack} as normalized_haystack
-        ) as search_text
-        where (
-            input.normalized_query = ''
-            or ({token_predicates})
-        )
-    ),
-    latest_decisions as (
-        select distinct on (decision.idea_id)
-            decision.idea_id,
-            decision.decision_state
-        from input
-        join public.decision_notes as decision
-          on decision.user_id = input.user_id
-        join matching_ideas
-          on matching_ideas.id = decision.idea_id
-        order by
-            decision.idea_id,
-            decision.updated_at desc,
-            decision.id desc
-    )
-    select decision_state, count(*)::integer as count
-    from latest_decisions
-    group by decision_state
-    """
-).format(
-    normalized_haystack=_normalized("idea.title || ' ' || coalesce(idea.summary, '')"),
-    token_predicates=sql.SQL(_TOKEN_PREDICATE_MARKER),
-)
 
-
-def _ledger_sql(*, token_count: int) -> sql.SQL:
-    return _bind_token_predicates(
-        _LEDGER_SQL,
+def _ledger_sql(*, has_anchor: bool) -> sql.Composed:
+    normalized_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
+    token_predicate = _token_match_predicate(
         normalized_haystack=sql.SQL("search_text.normalized_haystack"),
-        token_count=token_count,
+        normalized_index_haystack=normalized_haystack,
+        has_anchor=has_anchor,
+    )
+    return sql.SQL(
+        """
+        with input as (
+            select
+                %(user_id)s::uuid as user_id,
+                %(normalized_query)s::text as normalized_query
+        ),
+        matching_ideas as (
+            select idea.id
+            from input
+            join public.ideas as idea
+              on idea.user_id = input.user_id
+            cross join lateral (
+                select
+                    {normalized_haystack} as normalized_haystack
+            ) as search_text
+            where (
+                input.normalized_query = ''
+                or ({token_predicate})
+            )
+        ),
+        latest_decisions as (
+            select distinct on (decision.idea_id)
+                decision.idea_id,
+                decision.decision_state
+            from input
+            join public.decision_notes as decision
+              on decision.user_id = input.user_id
+            join matching_ideas
+              on matching_ideas.id = decision.idea_id
+            order by
+                decision.idea_id,
+                decision.updated_at desc,
+                decision.id desc
+        )
+        select decision_state, count(*)::integer as count
+        from latest_decisions
+        group by decision_state
+        """
+    ).format(
+        normalized_haystack=normalized_haystack,
+        token_predicate=token_predicate,
     )
 
 
@@ -1176,6 +1159,8 @@ class PostgresSearchReader:
             pivot_id = UUID(cursor_id) if cursor_id is not None else None
         except (TypeError, ValueError) as exc:
             raise SearchCursorError("Search cursor id is invalid.") from exc
+        if cursor_id is not None and str(pivot_id) != cursor_id:
+            raise SearchCursorError("Search cursor id is not canonical.")
         try:
             workspace_id = (
                 UUID(guest_conversation_id) if guest_conversation_id is not None else None
@@ -1185,6 +1170,11 @@ class PostgresSearchReader:
 
         normalized_query = normalize_search_text(query)
         normalized_tokens = tuple(dict.fromkeys(normalized_query.split()))
+        anchor_token = max(
+            (token for token in normalized_tokens if len(token) >= 3),
+            key=len,
+            default=None,
+        )
         ideas_only = decision_state is not None or (
             include_ledger_groups and not normalized_query
         )
@@ -1210,24 +1200,16 @@ class PostgresSearchReader:
             "ideas_only": ideas_only,
             "guest_scope": guest_scope,
             "guest_conversation_id": workspace_id,
+            "token_patterns": [f"%{token}%" for token in normalized_tokens],
+            "anchor_pattern": (f"%{anchor_token}%" if anchor_token is not None else None),
         }
-        params.update(
-            {
-                f"token_{index}_pattern": f"%{token}%"
-                for index, token in enumerate(normalized_tokens)
-            }
-        )
         with self.pool.connection(timeout=_SEARCH_ACQUIRE_TIMEOUT_SECONDS) as connection:
             with connection.cursor(row_factory=dict_row) as cursor:
                 if has_cursor:
                     if ordinary_search:
-                        pivot_query = _direct_pivot_sql(
-                            normalized_tokens=normalized_tokens,
-                        )
+                        pivot_query = _direct_pivot_sql()
                     else:
-                        pivot_query = _idea_browse_pivot_sql(
-                            normalized_tokens=normalized_tokens,
-                        )
+                        pivot_query = _idea_browse_pivot_sql()
                     cursor.execute(pivot_query, params)
                     pivots = cursor.fetchall()
                     if len(pivots) != 1:
@@ -1249,7 +1231,7 @@ class PostgresSearchReader:
                         cursor.execute(
                             _late_source_sql(
                                 source,
-                                normalized_tokens=normalized_tokens,
+                                has_anchor=anchor_token is not None,
                                 has_cursor=has_cursor,
                             ),
                             params,
@@ -1258,7 +1240,7 @@ class PostgresSearchReader:
                 else:
                     cursor.execute(
                         _idea_browse_sql(
-                            normalized_tokens=normalized_tokens,
+                            has_anchor=anchor_token is not None,
                         ),
                         params,
                     )
@@ -1281,14 +1263,16 @@ class PostgresSearchReader:
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
                     cursor.execute(
-                        _ledger_sql(token_count=len(normalized_tokens)),
+                        _ledger_sql(has_anchor=anchor_token is not None),
                         {
                             "user_id": owner_id,
                             "normalized_query": normalized_query,
-                            **{
-                                f"token_{index}_pattern": f"%{token}%"
-                                for index, token in enumerate(normalized_tokens)
-                            },
+                            "token_patterns": [
+                                f"%{token}%" for token in normalized_tokens
+                            ],
+                            "anchor_pattern": (
+                                f"%{anchor_token}%" if anchor_token is not None else None
+                            ),
                         },
                     )
                     ledger_counts = {state: 0 for state in _DECISION_STATES}

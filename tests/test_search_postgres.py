@@ -1221,7 +1221,8 @@ def test_search_candidate_plan_keeps_a_limit_inside_each_source(
             "user_id": owner_id,
             "normalized_query": "needle",
             "symbol_query": "needle",
-            "token_0_pattern": "%needle%",
+            "token_patterns": ["%needle%"],
+            "anchor_pattern": "%needle%",
             "source_limit": 6,
             "has_cursor": False,
             "cursor_pinned_rank": 0,
@@ -1245,7 +1246,7 @@ def test_search_candidate_plan_keeps_a_limit_inside_each_source(
                 sql.SQL("explain (analyze, buffers, format json) {}").format(
                     _late_source_sql(
                         source,
-                        normalized_tokens=("needle",),
+                        has_anchor=True,
                         has_cursor=False,
                     )
                 ),
