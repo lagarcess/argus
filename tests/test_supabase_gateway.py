@@ -58,39 +58,43 @@ def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
     gateway._fetch_all_rows = MagicMock(  # type: ignore[method-assign]
         return_value=[queued.model_dump(mode="json")]
     )
-    gateway.get_backtest_job = MagicMock(  # type: ignore[method-assign]
+    gateway.get_backtest_jobs_by_ids = MagicMock(  # type: ignore[method-assign]
         return_value={
-            "id": "job-1",
-            "conversation_id": "conversation-1",
-            "status": "succeeded",
-            "result_run_id": "run-1",
-            "execution_metadata": {
-                "workflow_backtest": {"result_readout": "Completed readout"}
-            },
+            "job-1": {
+                "id": "job-1",
+                "conversation_id": "conversation-1",
+                "status": "succeeded",
+                "result_run_id": "run-1",
+                "execution_metadata": {
+                    "workflow_backtest": {"result_readout": "Completed readout"}
+                },
+            }
         }
     )
-    gateway.get_backtest_run = MagicMock(  # type: ignore[method-assign]
-        return_value=BacktestRun(
-            id="run-1",
-            conversation_id="conversation-1",
-            strategy_id=None,
-            status="completed",
-            asset_class="equity",
-            symbols=["AAPL"],
-            allocation_method="equal_weight",
-            benchmark_symbol="SPY",
-            metrics={},
-            config_snapshot={"template": "buy_and_hold"},
-            conversation_result_card={
-                "title": "AAPL result",
-                "evidence_artifact_id": "evidence-1",
-                "decision_note_id": "decision-1",
-                "decision_state": "promising",
-            },
-            created_at=utcnow(),
-            chart=None,
-            trades=[],
-        )
+    gateway.get_backtest_runs_by_ids = MagicMock(  # type: ignore[method-assign]
+        return_value={
+            "run-1": BacktestRun(
+                id="run-1",
+                conversation_id="conversation-1",
+                strategy_id=None,
+                status="completed",
+                asset_class="equity",
+                symbols=["AAPL"],
+                allocation_method="equal_weight",
+                benchmark_symbol="SPY",
+                metrics={},
+                config_snapshot={"template": "buy_and_hold"},
+                conversation_result_card={
+                    "title": "AAPL result",
+                    "evidence_artifact_id": "evidence-1",
+                    "decision_note_id": "decision-1",
+                    "decision_state": "promising",
+                },
+                created_at=utcnow(),
+                chart=None,
+                trades=[],
+            )
+        }
     )
 
     messages = gateway.list_messages(
@@ -101,8 +105,16 @@ def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
 
     assert messages[0].content == "Completed readout"
     assert messages[0].metadata["result_card"]["decision_note_id"] == "decision-1"
-    gateway.get_backtest_job.assert_called_once_with(user_id="user-1", job_id="job-1")
-    gateway.get_backtest_run.assert_called_once_with(user_id="user-1", run_id="run-1")
+    gateway.get_backtest_jobs_by_ids.assert_called_once_with(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        job_ids=["job-1"],
+    )
+    gateway.get_backtest_runs_by_ids.assert_called_once_with(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        run_ids=["run-1"],
+    )
 
 
 def _message_query_mock(*, row: dict[str, Any]) -> tuple[MagicMock, MagicMock]:

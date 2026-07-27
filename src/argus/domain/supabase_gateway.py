@@ -34,6 +34,8 @@ from argus.domain.backtest_finalization import (
     PreparedBacktestFinalization,
 )
 from argus.domain.backtest_message_projection import (
+    completed_backtest_job_ids,
+    completed_backtest_run_ids,
     hydrate_completed_backtest_job_messages,
 )
 from argus.domain.chat_turn_lifecycle_gateway import (
@@ -632,16 +634,23 @@ class SupabaseGateway(
         else:
             rows_data = ordered.limit(limit).execute().data or []
         messages = [Message.model_validate(row) for row in rows_data]
+        jobs_by_id = self.get_backtest_jobs_by_ids(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            job_ids=completed_backtest_job_ids(messages),
+        )
+        runs_by_id = self.get_backtest_runs_by_ids(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            run_ids=completed_backtest_run_ids(
+                messages,
+                jobs_by_id=jobs_by_id,
+            ),
+        )
         return hydrate_completed_backtest_job_messages(
             messages,
-            load_job=lambda job_id: self.get_backtest_job(
-                user_id=user_id,
-                job_id=job_id,
-            ),
-            load_run=lambda run_id: self.get_backtest_run(
-                user_id=user_id,
-                run_id=run_id,
-            ),
+            jobs_by_id=jobs_by_id,
+            runs_by_id=runs_by_id,
         )
 
     def list_message_page_context(
@@ -1261,6 +1270,33 @@ class SupabaseGateway(
         row = _row_one(result)
         return dict(row) if row is not None else None
 
+    def get_backtest_jobs_by_ids(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        job_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        if not job_ids:
+            return {}
+        rows = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .in_("id", job_ids)
+            .limit(len(job_ids))
+            .execute()
+            .data
+            or []
+        )
+        requested_ids = set(job_ids)
+        return {
+            str(row["id"]): dict(row)
+            for row in rows
+            if row.get("id") is not None and str(row["id"]) in requested_ids
+        }
+
     def count_backtest_jobs(
         self, *, status: str, user_id: str | None = None, limit: int = 100
     ) -> int:
@@ -1632,6 +1668,34 @@ class SupabaseGateway(
         )
         row = _row_one(rows)
         return BacktestRun.model_validate(row) if row else None
+
+    def get_backtest_runs_by_ids(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        run_ids: list[str],
+    ) -> dict[str, BacktestRun]:
+        if not run_ids:
+            return {}
+        rows = (
+            self.client.table("backtest_runs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .in_("id", run_ids)
+            .limit(len(run_ids))
+            .execute()
+            .data
+            or []
+        )
+        requested_ids = set(run_ids)
+        runs = [
+            BacktestRun.model_validate(row)
+            for row in rows
+            if row.get("id") is not None and str(row["id"]) in requested_ids
+        ]
+        return {run.id: run for run in runs}
 
     def get_latest_completed_run_for_conversation(
         self, *, user_id: str, conversation_id: str
