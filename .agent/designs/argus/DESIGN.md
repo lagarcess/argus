@@ -218,6 +218,48 @@ _Design targets below are intentional for this system; if implementation keeps T
   private-alpha defaults, examples are "Explain result", "Refine idea", and
   "Add decision". "Save Strategy" and "Add to Collection" must not appear while
   their product flags are disabled.
+- **Pills are buttons; rows are next moves.** A pill is a true button — result
+  and confirmation card CTAs, starter prompts, and the user's own echoed action
+  bubble. Anything conversational the assistant offers — clarify options,
+  follow-ups, discovery candidates — renders as a stacked next-move row under
+  the message that offered it, so a question and its answers stay together.
+  Sentence-length choices do not belong in pills; they wrap badly and they hide
+  the detail that makes the choice meaningful.
+
+### Next-move rows
+
+- **Anatomy**: borderless at rest, with a muted leading `↳` glyph carrying the
+  affordance — touch devices never hover, so the rest state must read as
+  tappable on its own. On hover or press, a hairline border plus wash appears,
+  **sized to the text**: a short label gets a short box.
+- **Hit area is not the visible box.** The tappable region spans the full
+  message column and stays at least 44px tall regardless of how narrow the
+  hover box is. Never make someone aim at the text.
+- **Detail is visible, never a tooltip.** A discovery row shows the
+  resolver-owned name and its reason inline. Tooltips hide the very thing that
+  makes one candidate different from another, and they do not exist on touch.
+- **Text is sized by rules, not by locale.** Never truncate identity; clamp only
+  secondary detail. Use logical properties so RTL mirrors (the `↳` included),
+  keep separators as their own nodes so locales can restyle them, allow wrapping
+  in scripts without spaces, and let content grow the row rather than fixing its
+  height.
+
+### When next moves are live
+
+- **Exclusive vs menu.** Clarify options answer one question, so the group stops
+  rendering once answered — the reply is already in the transcript. Discovery
+  candidates are a menu, not a question: choosing one does not retire the
+  others, so they persist and stay tappable. Discarding them would force the
+  user to ask again, which re-runs a metered search to re-tell them something
+  Argus already said.
+- **One in-flight lock.** The composer and every next-move row share a single
+  "a turn is running" signal. Persistent rows outlive the newest turn, so
+  without the shared lock they become a way to fire turns around a disabled
+  composer. Locked rows stay visible and readable — they are evidence — and
+  simply stop accepting taps. This is per-tab UI state, not a substitute for a
+  backend concurrency guard.
+- **Cards win.** While an active card owns the conversation's actions, no
+  conversational next moves are offered alongside it.
 
 ## 12. Result Card Design
 

@@ -338,7 +338,12 @@
     "discovery_results": {
       "test_candidate": "Backtest {{symbol}}",
       "sources_line": "Sources: {{domains}} · as of {{date}}",
-      "sources_line_undated": "Sources: {{domains}}"
+      "sources_line_undated": "Sources: {{domains}}",
+      "sources_panel_open_one": "{{count}} source ›",
+      "sources_panel_open_other": "{{count}} sources ›",
+      "sources_panel_title": "Sources Argus read",
+      "sources_panel_note": "Argus read these while answering. Not recommended reading.",
+      "sources_panel_close": "Close sources"
     },
     "result_breakdown": {
       "aria_label": "Result breakdown",
