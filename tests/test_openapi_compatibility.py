@@ -114,7 +114,9 @@ def test_method_drift_fails_with_named_operation(generated: dict, checked: dict)
     broken["paths"]["/api/v1/discovery/assets"]["put"] = operation
 
     failures = openapi_compat.structural_failures(generated, broken)
-    assert "missing operation in checked artifact: GET /api/v1/discovery/assets" in failures
+    assert (
+        "missing operation in checked artifact: GET /api/v1/discovery/assets" in failures
+    )
     assert (
         "unexpected operation in checked artifact: PUT /api/v1/discovery/assets"
         in failures
@@ -161,8 +163,7 @@ def test_required_field_drift_on_a_component_schema_fails_with_named_difference(
 
     failures = openapi_compat.structural_failures(generated, broken)
     assert any(
-        "required" in failure and "can_submit_feedback" in failure
-        for failure in failures
+        "required" in failure and "can_submit_feedback" in failure for failure in failures
     ), failures
 
 
@@ -214,6 +215,16 @@ def test_streaming_normalization_is_narrow(generated: dict, checked: dict) -> No
     assert "409" in stream["responses"]
     assert "422" in stream["responses"]
     assert "503" in stream["responses"]
+
+
+def test_chat_stream_declares_the_approved_request_boundary_failures(
+    generated: dict,
+) -> None:
+    responses = generated["paths"]["/api/v1/chat/stream"]["post"]["responses"]
+    for status in ("413", "500"):
+        assert responses[status]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/Error"
+        }
 
 
 def test_regeneration_script_matches_checked_artifact() -> None:

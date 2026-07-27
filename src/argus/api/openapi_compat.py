@@ -147,7 +147,10 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             "400", {"description": "Missing required Idempotency-Key header."}
         )
         responses.setdefault(
-            "409", {"description": "The data window changed after approval and must be reviewed again."}
+            "409",
+            {
+                "description": "The data window changed after approval and must be reviewed again."
+            },
         )
         responses["503"] = {
             "description": (
@@ -156,9 +159,7 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
                 "or market data is temporarily unavailable "
                 "(`market_data_unavailable`).\n"
             ),
-            "content": {
-                "application/json": {"schema": copy.deepcopy(_ERROR_REF)}
-            },
+            "content": {"application/json": {"schema": copy.deepcopy(_ERROR_REF)}},
         }
 
     stream_method, stream_path = STREAMING_OPERATION
@@ -175,6 +176,9 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             "The selected response option is missing, mismatched, foreign to the "
             "owner or conversation, or no longer attached to the latest active "
             "assistant message."
+        )
+        responses["413"] = _error_response(
+            "The chat request body exceeded the 65,536-byte ingress limit."
         )
 
     logout_op = spec.get("paths", {}).get("/api/v1/auth/logout", {}).get("post")
@@ -226,10 +230,13 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             if method not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
             if (method, path) == ("post", f"{API_PREFIX}/backtests/run"):
+                operation.setdefault("responses", {})["500"] = _error_response(
+                    "An unexpected server error occurred."
+                )
                 continue
-            operation.setdefault("responses", {})["503"] = copy.deepcopy(
-                _AUTH_SESSION_UNAVAILABLE_RESPONSE_REF
-            )
+            responses = operation.setdefault("responses", {})
+            responses["503"] = copy.deepcopy(_AUTH_SESSION_UNAVAILABLE_RESPONSE_REF)
+            responses["500"] = _error_response("An unexpected server error occurred.")
 
     return spec
 

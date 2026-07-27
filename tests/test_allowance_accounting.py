@@ -1257,21 +1257,33 @@ def test_unexpected_direct_failure_still_settles_the_job_terminally(
 
     monkeypatch.setattr(backtest_service, "create_run_from_payload", _explode)
 
-    with pytest.raises(RuntimeError, match="engine crashed mid-run"):
-        client.post(
-            "/api/v1/backtests/run",
-            json={
-                "template": "buy_and_hold",
-                "asset_class": "equity",
-                "symbols": ["AAPL"],
-                "start_date": "2024-01-02",
-                "end_date": "2024-01-05",
-            },
-            headers={
-                "Authorization": "Bearer test-token",
-                "Idempotency-Key": "unexpected-crash",
-            },
-        )
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "unexpected-crash",
+            "X-Request-Id": "direct-unexpected-crash",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "type": "https://api.argus.app/problems/internal-error",
+        "title": "Internal Error",
+        "status": 500,
+        "detail": "An unexpected error occurred. Please try again.",
+        "code": "internal_error",
+        "request_id": "direct-unexpected-crash",
+    }
+    assert response.headers["X-Request-Id"] == "direct-unexpected-crash"
+    assert "engine crashed mid-run" not in response.text
 
     mock_gateway.finalize_direct_backtest_job.assert_called_once()
     settled = mock_gateway.finalize_direct_backtest_job.call_args.kwargs

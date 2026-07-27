@@ -45,6 +45,23 @@ DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 
+CHAT_STREAM_MAX_BODY_BYTES = 65_536
+CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
+CHAT_STREAM_MAX_MESSAGE_LENGTH = 16_000
+CHAT_STREAM_MAX_MENTIONS = 10
+CHAT_STREAM_MAX_MENTION_ID_LENGTH = 128
+CHAT_STREAM_MAX_MENTION_LABEL_LENGTH = 120
+CHAT_STREAM_MAX_MENTION_SYMBOL_LENGTH = 32
+CHAT_STREAM_MAX_MENTION_DESCRIPTION_LENGTH = 256
+CHAT_STREAM_MAX_MENTION_INSERT_TEXT_LENGTH = 64
+CHAT_STREAM_MAX_MENTION_PROVIDER_LENGTH = 64
+CHAT_STREAM_MAX_ACTION_LABEL_LENGTH = 120
+CHAT_STREAM_MAX_ACTION_LABEL_KEY_LENGTH = 160
+CHAT_STREAM_MAX_ACTION_PAYLOAD_BYTES = 16_384
+CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH = 6
+CHAT_STREAM_MAX_ACTION_PAYLOAD_CONTAINER_ITEMS = 50
+CHAT_STREAM_MAX_ACTION_PAYLOAD_STRING_LENGTH = 4_096
+
 
 # Single source of truth: executable templates live only in the capability registry
 # (derived from each StrategyCapability's status). StrategyTemplate validates against that
@@ -540,29 +557,61 @@ class ChatActionPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
     type: ChatActionType
-    label: str | None = None
-    label_key: str | None = Field(default=None, alias="labelKey")
+    label: str | None = Field(
+        default=None, max_length=CHAT_STREAM_MAX_ACTION_LABEL_LENGTH
+    )
+    label_key: str | None = Field(
+        default=None,
+        alias="labelKey",
+        max_length=CHAT_STREAM_MAX_ACTION_LABEL_KEY_LENGTH,
+    )
     payload: dict[str, Any] = Field(default_factory=dict)
     presentation: Literal["confirmation", "result"] | None = None
 
+    @field_validator("payload")
+    @classmethod
+    def validate_payload_bounds(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        serialized = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        if len(serialized) > CHAT_STREAM_MAX_ACTION_PAYLOAD_BYTES:
+            raise ValueError("action_payload_serialized_size_exceeded")
+        _validate_chat_action_payload_value(payload, depth=1)
+        return payload
+
 
 class ChatMentionPayload(BaseModel):
-    id: str
+    id: str = Field(max_length=CHAT_STREAM_MAX_MENTION_ID_LENGTH)
     type: Literal["asset", "indicator"]
-    label: str
-    symbol: str | None = None
+    label: str = Field(max_length=CHAT_STREAM_MAX_MENTION_LABEL_LENGTH)
+    symbol: str | None = Field(
+        default=None,
+        max_length=CHAT_STREAM_MAX_MENTION_SYMBOL_LENGTH,
+    )
     asset_class: AssetClass | None = None
-    description: str | None = None
-    insert_text: str
-    provider: str | None = None
+    description: str | None = Field(
+        default=None,
+        max_length=CHAT_STREAM_MAX_MENTION_DESCRIPTION_LENGTH,
+    )
+    insert_text: str = Field(max_length=CHAT_STREAM_MAX_MENTION_INSERT_TEXT_LENGTH)
+    provider: str | None = Field(
+        default=None,
+        max_length=CHAT_STREAM_MAX_MENTION_PROVIDER_LENGTH,
+    )
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
 
 
 class ChatStreamRequest(BaseModel):
-    conversation_id: str
-    message: str | None = None
+    conversation_id: str = Field(max_length=CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH)
+    message: str | None = Field(default=None, max_length=CHAT_STREAM_MAX_MESSAGE_LENGTH)
     action: ChatActionPayload | None = None
-    mentions: list[ChatMentionPayload] = Field(default_factory=list)
+    mentions: list[ChatMentionPayload] = Field(
+        default_factory=list,
+        max_length=CHAT_STREAM_MAX_MENTIONS,
+    )
     language: Language | None = None
 
     @model_validator(mode="after")
@@ -572,6 +621,30 @@ class ChatStreamRequest(BaseModel):
         if self.message is not None and self.message.strip():
             return self
         raise ValueError("message_or_action_required")
+
+
+def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:
+    if isinstance(value, dict):
+        if depth > CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH:
+            raise ValueError("action_payload_depth_exceeded")
+        if len(value) > CHAT_STREAM_MAX_ACTION_PAYLOAD_CONTAINER_ITEMS:
+            raise ValueError("action_payload_object_keys_exceeded")
+        for nested in value.values():
+            _validate_chat_action_payload_value(nested, depth=depth + 1)
+        return
+    if isinstance(value, list):
+        if depth > CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH:
+            raise ValueError("action_payload_depth_exceeded")
+        if len(value) > CHAT_STREAM_MAX_ACTION_PAYLOAD_CONTAINER_ITEMS:
+            raise ValueError("action_payload_array_items_exceeded")
+        for nested in value:
+            _validate_chat_action_payload_value(nested, depth=depth + 1)
+        return
+    if (
+        isinstance(value, str)
+        and len(value) > CHAT_STREAM_MAX_ACTION_PAYLOAD_STRING_LENGTH
+    ):
+        raise ValueError("action_payload_string_length_exceeded")
 
 
 class DiscoveryItem(BaseModel):
@@ -736,9 +809,7 @@ class GuestFunnelClientEventRequest(BaseModel):
     event: Literal["starter_action_selected", "conversion_prompt_shown"]
     language: Language
     surface: Literal["starter_actions", "conversion_modal"]
-    strategy_category: (
-        Literal["buy_and_hold", "dca_accumulation"] | None
-    ) = None
+    strategy_category: Literal["buy_and_hold", "dca_accumulation"] | None = None
     conversion_reason: GuestConversionReason | None = None
     terminal_outcome: Literal["selected", "shown"]
 
