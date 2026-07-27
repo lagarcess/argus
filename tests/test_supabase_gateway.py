@@ -13,6 +13,7 @@ from argus.domain.backtest_finalization import (
     finalize_backtest_completion,
 )
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
+from argus.domain.postgres_search_reader import SearchReadResult
 from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_conversation_messages import (
@@ -58,39 +59,43 @@ def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
     gateway._fetch_all_rows = MagicMock(  # type: ignore[method-assign]
         return_value=[queued.model_dump(mode="json")]
     )
-    gateway.get_backtest_job = MagicMock(  # type: ignore[method-assign]
+    gateway.get_backtest_jobs_by_ids = MagicMock(  # type: ignore[method-assign]
         return_value={
-            "id": "job-1",
-            "conversation_id": "conversation-1",
-            "status": "succeeded",
-            "result_run_id": "run-1",
-            "execution_metadata": {
-                "workflow_backtest": {"result_readout": "Completed readout"}
-            },
+            "job-1": {
+                "id": "job-1",
+                "conversation_id": "conversation-1",
+                "status": "succeeded",
+                "result_run_id": "run-1",
+                "execution_metadata": {
+                    "workflow_backtest": {"result_readout": "Completed readout"}
+                },
+            }
         }
     )
-    gateway.get_backtest_run = MagicMock(  # type: ignore[method-assign]
-        return_value=BacktestRun(
-            id="run-1",
-            conversation_id="conversation-1",
-            strategy_id=None,
-            status="completed",
-            asset_class="equity",
-            symbols=["AAPL"],
-            allocation_method="equal_weight",
-            benchmark_symbol="SPY",
-            metrics={},
-            config_snapshot={"template": "buy_and_hold"},
-            conversation_result_card={
-                "title": "AAPL result",
-                "evidence_artifact_id": "evidence-1",
-                "decision_note_id": "decision-1",
-                "decision_state": "promising",
-            },
-            created_at=utcnow(),
-            chart=None,
-            trades=[],
-        )
+    gateway.get_backtest_runs_by_ids = MagicMock(  # type: ignore[method-assign]
+        return_value={
+            "run-1": BacktestRun(
+                id="run-1",
+                conversation_id="conversation-1",
+                strategy_id=None,
+                status="completed",
+                asset_class="equity",
+                symbols=["AAPL"],
+                allocation_method="equal_weight",
+                benchmark_symbol="SPY",
+                metrics={},
+                config_snapshot={"template": "buy_and_hold"},
+                conversation_result_card={
+                    "title": "AAPL result",
+                    "evidence_artifact_id": "evidence-1",
+                    "decision_note_id": "decision-1",
+                    "decision_state": "promising",
+                },
+                created_at=utcnow(),
+                chart=None,
+                trades=[],
+            )
+        }
     )
 
     messages = gateway.list_messages(
@@ -101,8 +106,16 @@ def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
 
     assert messages[0].content == "Completed readout"
     assert messages[0].metadata["result_card"]["decision_note_id"] == "decision-1"
-    gateway.get_backtest_job.assert_called_once_with(user_id="user-1", job_id="job-1")
-    gateway.get_backtest_run.assert_called_once_with(user_id="user-1", run_id="run-1")
+    gateway.get_backtest_jobs_by_ids.assert_called_once_with(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        job_ids=["job-1"],
+    )
+    gateway.get_backtest_runs_by_ids.assert_called_once_with(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        run_ids=["run-1"],
+    )
 
 
 def _message_query_mock(*, row: dict[str, Any]) -> tuple[MagicMock, MagicMock]:
@@ -175,6 +188,273 @@ def test_latest_message_uses_owner_scope_and_descending_bounded_query() -> None:
         (("id",), {"desc": True}),
     ]
     query.limit.assert_called_once_with(1)
+
+
+def test_conversation_has_user_message_uses_owned_role_scoped_existence_query() -> None:
+    client, query = _message_query_mock(
+        row={
+            "id": "user-message-1",
+            "conversation_id": "conversation-1",
+            "role": "user",
+            "content": "Test Apple.",
+            "metadata": {},
+            "created_at": "2026-07-17T10:00:00+00:00",
+        }
+    )
+    gateway = SupabaseGateway(client=client)
+
+    exists = gateway.conversation_has_user_message(
+        user_id="user-1",
+        conversation_id="conversation-1",
+    )
+
+    assert exists is True
+    assert query.eq.call_args_list == [
+        (("user_id", "user-1"),),
+        (("conversation_id", "conversation-1"),),
+        (("role", "user"),),
+    ]
+    query.limit.assert_called_once_with(1)
+
+
+def _json_filter_value(row: dict[str, Any], key: str) -> object:
+    value: object = row
+    for part in key.replace("->>", "->").split("->"):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+class _DecisionResultClient:
+    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+        self.rows_by_table = rows_by_table
+        self.queries: list[_DecisionResultQuery] = []
+
+    def table(self, table_name: str) -> "_DecisionResultQuery":
+        query = _DecisionResultQuery(self, table_name)
+        self.queries.append(query)
+        return query
+
+
+class _DecisionResultQuery:
+    def __init__(self, client: _DecisionResultClient, table_name: str) -> None:
+        self.client = client
+        self.table_name = table_name
+        self.operation = "select"
+        self.payload: dict[str, Any] | None = None
+        self.equal_filters: list[tuple[str, object]] = []
+        self.in_filters: list[tuple[str, tuple[object, ...]]] = []
+        self.range_window: tuple[int, int] | None = None
+        self.executed = False
+
+    def select(self, _columns: str) -> "_DecisionResultQuery":
+        self.operation = "select"
+        return self
+
+    def update(self, payload: dict[str, Any]) -> "_DecisionResultQuery":
+        self.operation = "update"
+        self.payload = payload
+        return self
+
+    def eq(self, key: str, value: object) -> "_DecisionResultQuery":
+        self.equal_filters.append((key, value))
+        return self
+
+    def in_(self, key: str, values: list[object]) -> "_DecisionResultQuery":
+        self.in_filters.append((key, tuple(values)))
+        return self
+
+    def order(
+        self,
+        _column: str,
+        *,
+        desc: bool = False,
+    ) -> "_DecisionResultQuery":
+        return self
+
+    def range(self, start: int, end: int) -> "_DecisionResultQuery":
+        self.range_window = (start, end)
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        self.executed = True
+        rows = [
+            row
+            for row in self.client.rows_by_table[self.table_name]
+            if all(
+                _json_filter_value(row, key) == value
+                for key, value in self.equal_filters
+            )
+            and all(
+                _json_filter_value(row, key) in values
+                for key, values in self.in_filters
+            )
+        ]
+        if self.operation == "update":
+            assert self.payload is not None
+            for row in rows:
+                row.update(self.payload)
+            return SimpleNamespace(data=rows)
+        if self.range_window is not None:
+            start, end = self.range_window
+            rows = rows[start : end + 1]
+        return SimpleNamespace(data=rows)
+
+
+def test_decision_enrichment_targets_every_direct_and_projected_result_identity() -> (
+    None
+):
+    now = utcnow()
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "buy_and_hold"},
+        conversation_result_card={
+            "title": "AAPL result",
+            "evidence_artifact_id": "evidence-1",
+        },
+        created_at=now,
+        chart=None,
+        trades=[],
+    )
+    messages = [
+        {
+            "id": "direct-run",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Completed.",
+            "metadata": {
+                "result_run_id": "run-1",
+                "result_card": {
+                    "title": "Direct result",
+                    "evidence_artifact_id": "evidence-1",
+                },
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "direct-artifact",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Saved result.",
+            "metadata": {
+                "result_card": {
+                    "title": "Artifact result",
+                    "evidence_artifact_id": "evidence-1",
+                }
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "projected-root-alias",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Queued.",
+            "metadata": {
+                "backtest_job_id": "job-1",
+                "backtest_job": {"id": "job-1", "status": "queued"},
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "projected-nested-alias",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Queued.",
+            "metadata": {
+                "backtest_job": {"id": "job-1", "status": "queued"},
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "unrelated-result",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Other result.",
+            "metadata": {
+                "result_run_id": "run-2",
+                "result_card": {
+                    "title": "Other",
+                    "evidence_artifact_id": "evidence-2",
+                },
+            },
+            "created_at": now.isoformat(),
+        },
+    ]
+    client = _DecisionResultClient(
+        {
+            "messages": messages,
+            "backtest_jobs": [
+                {
+                    "id": "job-1",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                    "result_run_id": "run-1",
+                    "execution_metadata": {
+                        "workflow_backtest": {"result_readout": "Completed."}
+                    },
+                }
+            ],
+        }
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+    gateway.get_backtest_run = MagicMock(return_value=run)  # type: ignore[method-assign]
+    gateway.update_backtest_run_result_card = MagicMock(  # type: ignore[method-assign]
+        return_value=run
+    )
+    gateway.list_messages = MagicMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("decision enrichment must not scan the transcript")
+    )
+
+    gateway.mark_result_card_decision_for_run(
+        user_id="user-1",
+        run_id="run-1",
+        evidence_artifact_id="evidence-1",
+        decision_id="decision-1",
+        decision_state="promising",
+    )
+
+    by_id = {row["id"]: row for row in messages}
+    for message_id in (
+        "direct-run",
+        "direct-artifact",
+        "projected-root-alias",
+        "projected-nested-alias",
+    ):
+        metadata = by_id[message_id]["metadata"]
+        assert metadata["result_card"]["decision_note_id"] == "decision-1"
+        assert metadata["result_card"]["decision_state"] == "promising"
+        assert metadata["decision_note_id"] == "decision-1"
+        assert metadata["decision_state"] == "promising"
+    assert "decision_note_id" not in by_id["unrelated-result"]["metadata"]
+    gateway.list_messages.assert_not_called()
+
+    select_queries = [
+        query
+        for query in client.queries
+        if query.operation == "select" and query.executed
+    ]
+    assert select_queries
+    assert all(query.range_window is not None for query in select_queries)
+    assert all(
+        ("user_id", "user-1") in query.equal_filters
+        and ("conversation_id", "conversation-1") in query.equal_filters
+        for query in select_queries
+    )
 
 
 def test_conversation_message_append_migration_is_one_locked_service_role_boundary() -> (
@@ -2236,236 +2516,48 @@ def test_p1_decision_gateway_upsert_keeps_one_current_decision() -> None:
     assert len(client.rows_by_table["decision_notes"]) == 1
 
 
-class _HistoryClient:
-    def __init__(self) -> None:
-        self.selected_columns: dict[str, list[str]] = {}
-        self.rows_by_table: dict[str, list[dict[str, Any]]] = {
-            "conversations": [
-                {
-                    "id": "conv-other",
-                    "user_id": "user-1",
-                    "title": "Other active idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-active",
-                    "user_id": "user-1",
-                    "title": "Active idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-archived",
-                    "user_id": "user-1",
-                    "title": "Archived idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": True,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-deleted",
-                    "user_id": "user-1",
-                    "title": "Deleted idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": "2026-05-31T01:00:00+00:00",
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-            ],
-            "messages": [
-                {
-                    "id": "msg-active",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-active",
-                },
-                {
-                    "id": "msg-archived",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-archived",
-                },
-                {
-                    "id": "msg-deleted",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-deleted",
-                },
-                {
-                    "id": "msg-other-user",
-                    "user_id": "user-2",
-                    "conversation_id": "conv-other",
-                },
-            ],
-            "backtest_runs": [
-                {
-                    "id": "run-active",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-active",
-                    "conversation_result_card": {"title": "AAPL run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-archived",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-archived",
-                    "conversation_result_card": {"title": "TSLA run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-deleted",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-deleted",
-                    "conversation_result_card": {"title": "MSFT run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-orphan",
-                    "user_id": "user-1",
-                    "conversation_id": None,
-                    "conversation_result_card": {"title": "Direct run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-            ],
-            "strategies": [],
-            "collections": [],
-        }
-
-    def table(self, table_name: str):
-        return _HistoryTable(self.rows_by_table[table_name], table_name, self)
-
-
-class _HistoryTable:
-    def __init__(
-        self,
-        rows: list[dict[str, Any]],
-        table_name: str | None = None,
-        client: _HistoryClient | None = None,
-    ) -> None:
-        self.rows = list(rows)
-        self.table_name = table_name
-        self.client = client
-
-    def select(self, *args: object, **_kwargs: object):
-        if self.client is not None and self.table_name is not None and args:
-            self.client.selected_columns.setdefault(self.table_name, []).append(
-                str(args[0])
-            )
-        return self
-
-    def eq(self, key: str, value: object):
-        self.rows = [row for row in self.rows if row.get(key) == value]
-        return self
-
-    def in_(self, key: str, values: list[object]):
-        expected = {str(value) for value in values}
-        self.rows = [
-            row
-            for row in self.rows
-            if row.get(key) is not None and str(row[key]) in expected
-        ]
-        return self
-
-    def is_(self, key: str, value: object):
-        if value == "null":
-            self.rows = [row for row in self.rows if row.get(key) is None]
-        return self
-
-    @property
-    def not_(self):
-        return _HistoryNotFilter(self)
-
-    def order(self, *_args: object, **_kwargs: object):
-        return self
-
-    def limit(self, count: int):
-        self.rows = self.rows[:count]
-        return self
-
-    def range(self, start: int, end: int):
-        self.rows = self.rows[start : end + 1]
-        return self
-
-    def execute(self):
-        return SimpleNamespace(data=list(self.rows))
-
-
-class _HistoryNotFilter:
-    def __init__(self, query: _HistoryTable) -> None:
-        self.query = query
-
-    def is_(self, key: str, value: object):
-        if value == "null":
-            self.query.rows = [row for row in self.query.rows if row.get(key) is not None]
-        return self.query
-
-
-def test_gateway_history_selects_conversation_title_source() -> None:
-    client = _HistoryClient()
-    gateway = SupabaseGateway(client=client)
-
-    gateway.list_history_rows(user_id="user-1", limit=100)
-
-    title_selects = [
-        columns
-        for columns in client.selected_columns["conversations"]
-        if "title" in columns.split(",")
-    ]
-    assert title_selects
-    assert all("title_source" in columns.split(",") for columns in title_selects)
-
-
-def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
-    gateway = SupabaseGateway(client=_HistoryClient())
-
-    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
-    archived_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
-        archived=True,
-    )
-    deleted_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
-        deleted=True,
-    )
-
-    assert {row["id"] for row in default_rows["runs"]} == {
-        "run-active",
-        "run-orphan",
+def test_gateway_history_delegates_to_bounded_postgres_reader() -> None:
+    reader = MagicMock()
+    reader.list_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
     }
-    assert {
-        row["id"] for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
-    } == {"run-active"}
-    assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
-    assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}
+    gateway = SupabaseGateway(client=MagicMock(), history_reader=reader)
 
-
-def test_gateway_history_filters_chats_without_visible_messages() -> None:
-    gateway = SupabaseGateway(client=_HistoryClient())
-
-    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
-    archived_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
+    result = gateway.list_history_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=21,
         archived=True,
-    )
-    deleted_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
         deleted=True,
+        cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        cursor_id="11111111-1111-1111-1111-111111111111",
+        cursor_pinned=True,
+        cursor_type_rank=3,
     )
 
-    assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
-    assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
-    assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}
+    assert result == reader.list_rows.return_value
+    reader.list_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=21,
+        archived=True,
+        deleted=True,
+        cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        cursor_id="11111111-1111-1111-1111-111111111111",
+        cursor_pinned=True,
+        cursor_type_rank=3,
+    )
+
+
+def test_gateway_history_fails_closed_without_postgres_reader() -> None:
+    gateway = SupabaseGateway(client=MagicMock())
+
+    with pytest.raises(RuntimeError, match="Postgres reader"):
+        gateway.list_history_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=21,
+        )
 
 
 class _SearchRowsTable:
@@ -2543,20 +2635,61 @@ def _idea_ledger_search_client() -> _SearchRowsClient:
     )
 
 
-def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
+def test_search_rows_delegates_to_private_postgres_reader():
+    search_reader = MagicMock()
+    expected = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts=None,
+    )
+    search_reader.search_rows.return_value = expected
+    gateway = SupabaseGateway(
+        client=_idea_ledger_search_client(),
+        search_reader=search_reader,
+    )
+
+    result = gateway.search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="momentum",
+        source_limit=21,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=False,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+    assert result is expected
+    search_reader.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="momentum",
+        source_limit=21,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=False,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+
+def test_search_rows_requires_private_postgres_reader():
     gateway = SupabaseGateway(client=_idea_ledger_search_client())
 
-    raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
-
-    assert len(raw["ideas"]) == 1
-    assert raw["ideas"][0]["decision_state"] == "promising"
-    assert raw["decisions"] == []
-
-
-def test_search_rows_empty_query_status_browse_returns_ideas():
-    gateway = SupabaseGateway(client=_idea_ledger_search_client())
-
-    raw = gateway.search_rows(user_id="user-1", query="", limit=None)
-
-    assert len(raw["ideas"]) == 1
-    assert raw["ideas"][0]["decision_state"] == "promising"
+    with pytest.raises(
+        RuntimeError,
+        match="Persistent Search requires its Postgres reader",
+    ):
+        gateway.search_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            query="",
+            source_limit=21,
+        )
