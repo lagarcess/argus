@@ -8,10 +8,10 @@ branch) and is blocked from production by `assert-nonprod-target.sh`.
 
 Guest Block 4 QA uses the same non-production guard and local Supabase stack.
 After a zero-state `supabase db reset --local`, run the guest browser matrix
-only against the exact committed candidate SHA with mock Auth disabled. Enable
-guest access only in the backend/frontend process environment; keep checked-in
-defaults false. Public-account access stays false for staged-mode checks and is
-enabled only for the isolated new-account conversion case, then restored false.
+only against the exact committed candidate SHA with mock Auth disabled. Guest
+access defaults on; explicit false remains the emergency kill switch. Public-
+account access stays false for staged-mode checks and is enabled only for the
+isolated new-account conversion case, then restored false.
 
 Store sanitized evidence under:
 

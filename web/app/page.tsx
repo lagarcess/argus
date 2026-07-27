@@ -70,7 +70,7 @@ export default function LandingPage() {
     return () => {
       cancelled = true;
     };
-  }, [guestAccessEnabled, router]);
+  }, [router]);
 
   const updateAuthMode = (nextMode: AuthMode) => {
     setAuthMode(nextMode);
