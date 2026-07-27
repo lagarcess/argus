@@ -242,6 +242,14 @@ Do not reopen these as debt unless a new bug is reproduced:
   open because one comparison phrasing missed the typed route in the sanctioned
   eval; that gap, Render configuration, and an exact-SHA canary are required
   before tester exposure.
+- Chat next-move presentation is integrated from PR #281 at `8fde4ac1`.
+  Clarify options, supported follow-ups, and discovery candidates render as
+  stacked rows under their owning message; verified candidate reasons remain
+  visible; and persisted discovery evidence opens in a source-safe panel
+  without another provider call. The shared in-flight lock protects the
+  composer and rows in one tab. This is a frontend checkpoint, not completion
+  of resolved-identity carry-forward, backend concurrent-turn admission, live
+  progress lines, or guest discovery allowance.
 - Guest access is integrated from PR #279 at `53e812e9`: verified anonymous
   identity, one temporary owner-scoped workspace, fixed lifetime allowances,
   exact-once settlement, one simulation, conversion/claim, cleanup, Guest
@@ -280,8 +288,10 @@ Codex should own or closely supervise this:
      a second runtime lane.
    - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
      closure journey. #272 may now start from `53e812e9` or later.
-   - #273 is closed at `2d5a2b52`. Guest has released the shared shell owner, so
-     #249 may now start from `53e812e9` or later.
+   - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
+     released the shared shell owner, so #249 may now start from `8fde4ac1` or
+     later. Preserve PR #281's stacked rows, source panel, and in-flight lock;
+     #249 owns the remaining Quick take, Explain, Try next, and recovery roles.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
