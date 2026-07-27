@@ -22,8 +22,12 @@ Locked in the 2026-07-26 founder session:
 - **No news or event research in v1.** Discovery answers name assets with short
   source-backed reasons only. The broader research product is split into a
   named follow-up arc (section 14).
-- **Registered users only.** Guest discovery requires a separate founder
-  decision.
+- ~~**Registered users only.** Guest discovery requires a separate founder
+  decision.~~ **Superseded 2026-07-27:** the guest surface (#279) landed and the
+  acquisition strategy changed — Argus is for everyone, with guest gates at
+  points of high value. Guests get discovery, metered per session, with no gate
+  on candidate selection. See
+  `docs/superpowers/specs/2026-07-27-guest-grounded-discovery-quota.md`.
 
 The approved behavior contract:
 

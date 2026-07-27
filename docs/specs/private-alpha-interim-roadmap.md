@@ -183,7 +183,9 @@ This is the current dispatch gate, not another speculative backlog:
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
 | Protected interpreter/edit spine | #271 implementation landed through PR #280 at `d16f7496` | Run its focused integrated closure journey, then close #271. #272 may now start from `53e812e9` or later. |
 | Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from `53e812e9` or later. |
-| Grounded discovery | PR #276 landed as `c212107a`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, configure Render, and prove the exact deployed SHA/canary. |
+| Grounded discovery | PR #276 landed as `c212107a`; chat next-moves polish PR #281 landed as `8fde4ac1`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, configure Render, and prove the exact deployed SHA/canary. |
+| Chat next-move presentation | PR #281 landed as `8fde4ac1`: clarify options, follow-ups, and discovery candidates render as stacked rows under their owning message; sources panel with outbound links; shared in-flight lock. Frontend only | Two specified follow-ups remain in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md`: Slice D (discovery selection carries resolved identity, plus chosen-state and switch continuity) and Slice B (live progress lines, blocked on three backend prerequisites). Start either from `8fde4ac1` or later. |
+| Guest grounded discovery | Specified, not started — `docs/superpowers/specs/2026-07-27-guest-grounded-discovery-quota.md` | Meter the guest ask per session; do not gate the candidate tap. Supersedes the "registered users only" line in the grounded discovery design. Allowance number is founder-owned. |
 | Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto `53e812e9` or later; do not invent discovery truth or activate Search implicitly. |
 
 The next bounded continuity lanes are #272 and #249. They have different owners
@@ -329,7 +331,7 @@ implementation queue.
 
 | Outcome | Product proof still required |
 | --- | --- |
-| Grounded discovery and suggestions | The default-on baseline is merged. Before tester exposure, prove reliable comparison phrasing, configure Render, and pass the exact-SHA canary; keep #244 open until then. |
+| Grounded discovery and suggestions | The default-on baseline is merged, and its presentation landed with PR #281 — candidates read as stacked rows carrying their verified reason, with a sources panel. Before tester exposure, prove reliable comparison phrasing, decide the guest allowance, configure Render, and pass the exact-SHA canary; keep #244 open until then. |
 | Full Omnisearch | Owner-scoped conversations, results, decisions, and evidence are retrievable with truthful previews and useful navigation. |
 
 Do not select the next slice from the archived issue dependency graph. Select

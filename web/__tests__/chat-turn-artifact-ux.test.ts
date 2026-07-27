@@ -351,7 +351,7 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("handleCopy(message.id)");
   });
 
-  test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
+  test("stream error handling settles confirmation artifacts and offers no stale next moves", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -362,7 +362,9 @@ describe("chat turn artifact UX", () => {
 
     expect(errorStart).toBeGreaterThan(-1);
     expect(errorBlock).toContain("retryLastTurnActionFromMetadata(errorPayload");
-    expect(errorBlock).toContain("setInputActions([])");
+    // Stale options no longer need clearing on error: next-move rows render
+    // only on the newest assistant message, and the error message replaces it.
+    expect(chat).not.toContain("setInputActions");
     expect(errorBlock).toContain("settleOpenConfirmationsAfterStreamError(");
     expect(errorBlock).not.toContain("settleOpenConfirmationsAfterTextFinal(");
   });
