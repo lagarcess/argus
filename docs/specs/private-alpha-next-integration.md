@@ -6,7 +6,7 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current integrated product checkpoint: PR #285 at `7b7920bb`. New work must
+Current integrated product checkpoint: PR #288 at `9f3453a3`. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA; later docs-only reconciliation commits do not change
 product behavior. The accepted post-promotion
@@ -25,7 +25,8 @@ discovery selection identity and candidate/entity corroboration. PR #285 then
 bounded Conversations, Messages, History, and Omnisearch/Idea Ledger reads at
 the Postgres boundary while preserving cursor, ranking, ownership, and artifact
 contracts. This is an integration checkpoint, not a deployed or
-tester-exposed SHA.
+tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
+after stale or failed actions without changing public artifact contracts.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -291,6 +292,12 @@ Do not reopen these as debt unless a new bug is reproduced:
   scan exception remains documented: returned candidates and normal measured
   distributions are bounded, while a maintained History read model is deferred
   scale architecture. Client hydration, caching, and rendering remain #252.
+- Fact-preserving recovery is complete at PR #288 / issue #272: stale or
+  failed actions restore the latest usable canonical confirmation or result
+  anchor, preserve assets, capital, requested/effective dates, daily timeframe,
+  benchmark, rules, and modeled costs, and ask only for genuinely missing
+  fields. Prior results remain immutable, later explicit edits supersede
+  recovery state, and recovery creates no duplicate job, Run, or usage.
 
 ## P0 Reintegration Checkpoint
 
@@ -322,8 +329,8 @@ Codex should own or closely supervise this:
    - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
      a second runtime lane.
    - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
-     closure journey. The active #272 branch must reconcile onto the current
-     remote integration head before publication.
+     closure journey. #272 landed through PR #288 at `9f3453a3` and is closed;
+     do not open another canonical recovery lane without a new reproduction.
    - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
      released the shared shell owner, so new #249 work must start from the
      current remote integration head. Preserve PR #281's stacked rows, source panel, and

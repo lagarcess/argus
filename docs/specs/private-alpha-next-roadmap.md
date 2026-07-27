@@ -23,7 +23,7 @@ that Argus remembers, compares, and stays honest about staleness.
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#285 at `7b7920bb`; new work must branch from the current remote
+#288 at `9f3453a3`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -41,7 +41,10 @@ History, and Omnisearch/Idea Ledger pagination and search bounds into Postgres
 without changing public cursors, ranking, ownership, or canonical artifact
 identity. Its accepted private-alpha boundary permits sparse/deep/final History
 Run pages to inspect more ordered rows; a maintained History read model remains
-deferred scale architecture rather than unfinished #232 work. This
+deferred scale architecture rather than unfinished #232 work. PR #288 then
+completed fact-preserving recovery: stale or failed actions restore the latest
+usable canonical artifact anchor instead of rebuilding an empty idea, while
+genuinely absent facts still receive one targeted clarification. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -977,11 +980,15 @@ classified as a Guest-only settlement defect, landed with Guest PR #279 at
 Supported strategy-transition preservation (#270) is complete through PR #278
 at `b80d95a2`; modeled-cost preservation (#271) landed through PR #280 at
 `d16f7496` and remains open only for its focused integrated closure journey.
-#272 is now the next protected interpreter/edit-spine issue. #249 may now start
-from `8fde4ac1` or later because the overlapping Guest and chat-next-move shell
-owners have landed; it must preserve PR #281's stacked rows, source panel, and
-shared in-flight lock while changing only Quick take, Explain, Try next, and
-recovery ownership. See
+#272 is complete through PR #288 at `9f3453a3`: recovery restores the current
+canonical artifact anchor, preserves already-owned facts, asks only for
+genuinely missing fields, keeps prior results immutable, and creates no
+duplicate compute. No further protected-spine implementation lane is queued;
+#271 only retains its named integrated closure check. #249 may start from the
+current remote integration head because the overlapping Guest,
+chat-next-move, and recovery-state owners have landed; it must preserve PR
+#281's stacked rows, source panel, and shared in-flight lock while changing only
+Quick take, Explain, Try next, and recovery presentation ownership. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)

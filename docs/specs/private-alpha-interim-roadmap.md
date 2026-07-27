@@ -7,7 +7,7 @@ Original roadmap date: 2026-07-16
 Last reconciled: 2026-07-27
 
 Current integrated product checkpoint: `codex/private-alpha-next` containing
-PR #285 at `7b7920bb`. New work must branch from the current remote integration
+PR #288 at `9f3453a3`. New work must branch from the current remote integration
 head rather than pinning this product SHA; later docs-only reconciliation
 commits do not change product behavior.
 
@@ -43,7 +43,11 @@ pagination and search at `7b7920bb` for Conversations, Messages, History, and
 Omnisearch/Idea Ledger without changing public cursor, ranking, ownership, or
 artifact contracts. Issue #232 is complete. Its accepted sparse/deep/final
 History Run scan exception remains an explicit private-alpha boundary; #252
-continues to own client hydration, caching, and rendering.
+continues to own client hydration, caching, and rendering. PR #288 then landed
+canonical fact-preserving recovery at `9f3453a3`: stale or failed actions
+restore the latest usable artifact anchor, already-owned facts are not
+re-requested, genuinely absent facts receive one targeted clarification, and
+prior results remain immutable without duplicate compute.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -156,11 +160,13 @@ Execute serially:
    agreement, and reload. The issue stays open only for its named integrated
    preservation repetition.
 3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
-   This is the active protected interpreter/edit-spine issue. Its existing
-   branch must reconcile onto the current remote `codex/private-alpha-next`
-   head before publication.
+   This is **complete**. PR #288 landed as `9f3453a3`; canonical recovery
+   restores the latest usable anchor, preserves its owned facts through reload
+   and later edits, asks only for genuinely missing fields, keeps the prior
+   result immutable, and creates no duplicate compute.
 
-Only one agent owns the interpreter/edit spine at a time. Do not combine these
+The protected interpreter/edit-spine implementation queue is complete. Issue
+#271 retains only its named integrated closure repetition. Do not combine these
 issues into another open-ended continuity rewrite.
 
 #### Artifact lifecycle and presentation
@@ -197,7 +203,7 @@ This is the current dispatch gate, not another speculative backlog:
 | Ownership lane | Current owner | Next handoff |
 | --- | --- | --- |
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
-| Protected interpreter/edit spine | #271 implementation landed through PR #280 at `d16f7496` | Run its focused integrated closure journey, then close #271. The active #272 branch must reconcile onto the current remote integration head before publication. |
+| Protected interpreter/edit spine | #270 and #272 are closed; #271 implementation landed through PR #280 at `d16f7496` | Run #271's focused integrated closure journey, then close it. No additional spine implementation lane is queued. |
 | Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from the current remote integration head. |
 | Grounded discovery | PR #276 landed as `c212107a`; chat next-moves polish PR #281 landed as `8fde4ac1`; selection identity and candidate/entity corroboration landed through PR #287 at `ea2b3f35`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, decide the exposure-vehicle product path, configure Render, and prove the exact deployed SHA/canary. |
 | Chat next-move presentation | PR #281 landed as `8fde4ac1` (stacked rows, sources panel, shared in-flight lock); PR #287 landed as `ea2b3f35` (Slice D: discovery selection carries the resolver's identity, plus a resolution-corroboration fix) | Slice D is closed — the chosen-state marker was cut deliberately, and carry-forward on switch was deferred out of the lane as general interpreter work. Only Slice B remains in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md` (live progress lines, blocked on three backend prerequisites). New work must start from the current remote integration head. |
@@ -205,9 +211,9 @@ This is the current dispatch gate, not another speculative backlog:
 | Guest grounded discovery | Specified, not started — `docs/superpowers/specs/2026-07-27-guest-grounded-discovery-quota.md` | Meter the guest ask per session; do not gate the candidate tap. Supersedes the "registered users only" line in the grounded discovery design. Allowance number is founder-owned. |
 | Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto the current remote integration head; do not invent discovery truth or activate Search implicitly. |
 
-The next bounded continuity lanes are #272 and #249. They have different owners
-and may proceed in parallel, but work inside each ownership queue remains
-serialized.
+The next bounded continuity implementation lane is #249. Issue #271 has only
+its focused integrated closure journey remaining; it is not another broad
+spine implementation lane.
 
 ### Guest Main-Promotion And Public-Exposure Register
 
