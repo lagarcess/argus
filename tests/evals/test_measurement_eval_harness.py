@@ -352,6 +352,131 @@ def test_issue_271_cases_are_on_the_live_measurement_surface() -> None:
         }
 
 
+def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> None:
+    case = {
+        case.id: case for case in load_eval_cases()
+    }["natural_language_establishes_modeled_costs_issue_271"]
+    truthful = {
+        "intent": "strategy_drafting",
+        "capability_verdict": "executable",
+        "assets": ["MSFT"],
+        "asset_class": "equity",
+        "strategy_type": "buy_and_hold",
+        "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "effective_date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "benchmark_symbol": "SPY",
+        "capital_amount": 12000,
+        "fee_rate": 0.001,
+        "slippage": 0.0005,
+        "cost_provenance": {
+            "fee_rate": "explicit_user",
+            "slippage": "explicit_user",
+        },
+        "launch_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+        "stage_outcomes": ["ready_for_confirmation", "await_approval"],
+    }
+
+    assert harness.typed_expectation_failures(case=case, outcome=truthful) == []
+
+
+def test_issue_271_tolerant_intent_keeps_executable_contract_strict() -> None:
+    case = {
+        case.id: case for case in load_eval_cases()
+    }["natural_language_establishes_modeled_costs_issue_271"]
+    truthful = {
+        "intent": "strategy_drafting",
+        "capability_verdict": "executable",
+        "assets": ["MSFT"],
+        "asset_class": "equity",
+        "strategy_type": "buy_and_hold",
+        "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "effective_date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "benchmark_symbol": "SPY",
+        "capital_amount": 12000,
+        "fee_rate": 0.001,
+        "slippage": 0.0005,
+        "cost_provenance": {
+            "fee_rate": "explicit_user",
+            "slippage": "explicit_user",
+        },
+        "launch_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+        "stage_outcomes": ["ready_for_confirmation", "await_approval"],
+    }
+    mutations = {
+        "missing costs": (
+            {"fee_rate": None, "slippage": None},
+            ("fee_rate:", "slippage:"),
+        ),
+        "missing provenance": (
+            {"cost_provenance": {}},
+            ("cost_provenance.fee_rate:", "cost_provenance.slippage:"),
+        ),
+        "missing launch realism": (
+            {"launch_execution_realism": None},
+            ("launch_execution_realism",),
+        ),
+        "wrong facts": (
+            {
+                "assets": ["AAPL"],
+                "asset_class": "crypto",
+                "strategy_type": "signal_strategy",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "effective_date_range": {
+                    "start": "2024-01-01",
+                    "end": "2024-12-31",
+                },
+                "benchmark_symbol": "QQQ",
+                "capital_amount": 5000,
+            },
+            (
+                "assets:",
+                "asset_class:",
+                "strategy_type:",
+                "date_range:",
+                "effective_date_range:",
+                "benchmark_symbol:",
+                "capital_amount:",
+            ),
+        ),
+        "clarification": (
+            {
+                "capability_verdict": "needs_clarification",
+                "stage_outcomes": ["needs_clarification", "await_user_reply"],
+                "clarification": {"kind": "clarification"},
+            },
+            ("capability_verdict:", "stage_outcomes:"),
+        ),
+        "unsupported verdict": (
+            {"capability_verdict": "unsupported"},
+            ("capability_verdict:",),
+        ),
+        "non-confirmation outcome": (
+            {"stage_outcomes": ["ready_to_respond"]},
+            ("stage_outcomes:",),
+        ),
+    }
+
+    for label, (patch, expected_prefixes) in mutations.items():
+        failures = harness.typed_expectation_failures(
+            case=case,
+            outcome={**truthful, **patch},
+        )
+        for prefix in expected_prefixes:
+            assert any(item.startswith(prefix) for item in failures), (
+                label,
+                prefix,
+                failures,
+            )
+
+
 def test_typed_outcome_projects_modeled_costs_from_confirmation() -> None:
     case = harness.EvalCase(
         id="issue-271-outcome-projection",

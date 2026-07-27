@@ -598,7 +598,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: backtest_execution
+      intent: [strategy_drafting, backtest_execution]
       capability_verdict: executable
       assets: ["MSFT"]
       asset_class: equity
