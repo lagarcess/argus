@@ -27,6 +27,25 @@ GUEST_MESSAGE_ALLOWANCE = 10
 GUEST_SIMULATION_ALLOWANCE = 1
 GUEST_FEEDBACK_ALLOWANCE = 5
 GUEST_CONVERSATION_ALLOWANCE = 1
+# Enough for a category ask, a peer ask, and a follow-up after seeing a result,
+# which is where discovery does its funnel work. Below the registered hourly
+# allowance so an account always buys more than rotating guest sessions.
+GUEST_DISCOVERY_ALLOWANCE = 3
+
+# Deliberately a plain day window, not the guest_session window the other guest
+# allowances use. guest_session anchors to the workspace expiry, which moves
+# every time a workspace renews -- it would reset the allowance this limit
+# exists to hold. Paired with a visitor-scoped counter subject, a day window
+# survives renewal.
+GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_DISCOVERY_ALLOWANCE)
+]
+
+# Circuit breaker, not a budget: the only bound that holds when someone rotates
+# identity faster than any per-visitor limit can see. Sized so no honest day
+# reaches it; raise on measured volume.
+GLOBAL_DISCOVERY_DAILY_CEILING = 500
+GLOBAL_DISCOVERY_CEILING_SUBJECT = "__global__"
 
 _REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
     MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,

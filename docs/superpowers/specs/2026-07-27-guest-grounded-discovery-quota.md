@@ -9,6 +9,13 @@
 
 ## 1. Why this exists
 
+**Argus is free.** There is no paid tier. The only distinction is guest (a
+rotating anonymous session) and registered (a durable account). Allowances
+differ between them because identity durability differs, not because anyone
+pays: a registered user is someone we can hold accountable and who has already
+committed, while a guest identity costs nothing to mint. Conversion means
+creating an account, and that is the only conversion this product has.
+
 Guest mode is the acquisition funnel. Discovery is the most persuasive thing
 Argus does for a stranger: five real, resolver-verified, source-backed names in
 seconds. Withhold it and guest mode demonstrates a chat box.
@@ -78,8 +85,8 @@ Every allowance keys on `user_id`. For a registered user that is sound — a
 Guest creation is CAPTCHA-gated and IP-limited to 5 per 10 minutes
 (`AUTH_GUEST_ATTEMPT_LIMIT`), so the ceiling today is roughly five fresh
 allowances per ten minutes per IP. At one search per workspace that is **30
-searches an hour — three times the registered limit of 10.** The guest
-allowance would be weaker than the paid one.
+searches an hour — three times the registered limit of 10.** A guest would
+out-consume someone who committed to an account.
 
 The failure is not the number. It is that the allowance was keyed to a
 **session artifact that renews on a timer** rather than to the visitor.
@@ -101,8 +108,8 @@ at two different people:
 
 The first is the realistic case and the one that matters most. The second
 cannot be prevented, only bounded — which is exactly what provider-level spend
-caps exist for, and the standard practice for protecting a free tier backed by
-a paid API.
+caps exist for, and the standard practice for protecting an open surface
+backed by a metered API.
 
 ## 4. The design
 
@@ -180,8 +187,8 @@ number someone else picks.
 single search is a poor sample of a product whose whole promise is *asking
 Argus things*. Three lets a guest try a category, a peer question, and a
 second idea after seeing a result — which is when discovery does its funnel
-work. It remains well under the registered allowance of 10/hour, so it never
-inverts the incentive.
+work. It stays well under the registered allowance of 10/hour, so committing to
+an account always buys more than rotating guest sessions does.
 
 **Global ceiling:** a daily attempted-search cap set from measured normal
 volume once the surface has real traffic. Until then, a deliberately
