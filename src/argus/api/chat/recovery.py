@@ -654,10 +654,22 @@ def failed_action_metadata_fallback_context(
         )
         if reference is None:
             continue
+        pending_fallback = pending_strategy_metadata_fallback_context_from_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            source_message=message,
+        )
+        pending_strategy = (
+            pending_fallback.latest_task_snapshot.pending_strategy_summary
+            if pending_fallback is not None
+            and pending_fallback.latest_task_snapshot is not None
+            else None
+        )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
                 latest_task_type="backtest_execution",
                 completed=False,
+                pending_strategy_summary=pending_strategy,
                 latest_failed_action_reference=reference,
                 artifact_references=[reference],
             ),
@@ -672,12 +684,17 @@ def failed_action_metadata_fallback_context(
 
 
 def _metadata_supersedes_failed_action(metadata: dict[str, Any]) -> bool:
+    pending_without_failed_action = bool(
+        metadata.get("pending_strategy")
+        and not metadata.get("failed_action")
+        and not metadata.get("latest_failed_action_reference")
+    )
     return bool(
         metadata.get("result_card")
         or metadata.get("result_run_id")
         or metadata.get("latest_run_id")
         or metadata.get("confirmation_card")
-        or metadata.get("pending_strategy")
+        or pending_without_failed_action
     )
 
 

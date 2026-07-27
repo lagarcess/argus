@@ -45,7 +45,7 @@ from argus.agent_runtime.stages.artifact_context import (
     prior_stage_was_await_approval,
     semantic_need_for_action,
     stale_confirmation_action_response,
-    strategy_from_failed_launch_payload,
+    strategy_from_failed_action_snapshot,
     strategy_from_result_action_snapshot,
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
@@ -942,7 +942,7 @@ def _retry_failed_action_stage_result(
                 )
             },
         )
-    strategy = strategy_from_failed_launch_payload(launch_payload)
+    strategy = strategy_from_failed_action_snapshot(launch_payload, snapshot)
     return StageResult(
         outcome="ready_for_confirmation",
         decision=decision.model_copy(
@@ -964,8 +964,6 @@ def _retry_failed_action_stage_result(
             ),
         },
     )
-
-
 def _retry_failed_action_response_intent(
     *,
     status: ArtifactActionRecoveryStatus,

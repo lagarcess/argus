@@ -13,6 +13,10 @@ from argus.agent_runtime.artifact_edit_planner import (
     apply_edit_operations,
 )
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    ground_planned_execution_costs,
+    supported_cost_rate_value,
+)
 from argus.agent_runtime.interpreter.shared import (
     _date_window_intent_bound_to_latest_result,
     _field_path_base,
@@ -313,11 +317,15 @@ def _apply_legacy_flat_edit_fields(
         draft.timeframe = plan.timeframe
         field_provenance["timeframe"] = "explicit_user"
     if plan.fee_rate is not None:
-        extra_parameters["fee_rate"] = plan.fee_rate
-        field_provenance["fee_rate"] = "explicit_user"
+        fee_rate = supported_cost_rate_value(plan.fee_rate, field_name="fee_rate")
+        if fee_rate is not None:
+            extra_parameters["fee_rate"] = fee_rate
+            field_provenance["fee_rate"] = "explicit_user"
     if plan.slippage is not None:
-        extra_parameters["slippage"] = plan.slippage
-        field_provenance["slippage"] = "explicit_user"
+        slippage = supported_cost_rate_value(plan.slippage, field_name="slippage")
+        if slippage is not None:
+            extra_parameters["slippage"] = slippage
+            field_provenance["slippage"] = "explicit_user"
 
 
 def _edit_plan_reshapes_non_recurring_strategy(
@@ -368,6 +376,7 @@ def _response_from_artifact_assumption_edit_plan(
     plan: ArtifactAssumptionEditPlan,
     request: InterpretationRequest,
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     artifact_target = (
@@ -411,6 +420,13 @@ def _response_from_artifact_assumption_edit_plan(
         draft.extra_parameters.update(extra_parameters)
     if field_provenance:
         draft.field_provenance = field_provenance
+    ground_planned_execution_costs(
+        draft,
+        current_message=request.current_user_message,
+        primary_draft=primary_draft,
+        extra_parameters=extra_parameters,
+        field_provenance=field_provenance,
+    )
 
     if plan.outcome == "ready_to_confirm":
         if plan.operations and not field_provenance and not extra_parameters:

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 from copy import deepcopy
+from decimal import Decimal
 from typing import Any
 
 from argus.agent_runtime.coverage_recovery import (
@@ -1092,8 +1093,15 @@ def _resolve_execution_realism(
     extra_parameters = strategy.get("extra_parameters")
     if not isinstance(extra_parameters, dict):
         extra_parameters = {}
-    fee_rate = _as_optional_float(extra_parameters.get("fee_rate"))
-    slippage = _as_optional_float(extra_parameters.get("slippage"))
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    fee_rate, slippage = (
+        _as_optional_float(extra_parameters.get(field_name))
+        if field_provenance.get(field_name) == "explicit_user"
+        else None
+        for field_name in ("fee_rate", "slippage")
+    )
     if isinstance(optional_parameters, dict):
         if fee_rate is None:
             fee_rate = _as_optional_float(
@@ -1121,7 +1129,7 @@ def _resolve_execution_realism(
 def _decimal_rate_to_bps(value: float | None) -> float:
     if value is None:
         return 0.0
-    return value * 10000.0
+    return float(Decimal(str(value)) * Decimal("10000"))
 
 
 def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:

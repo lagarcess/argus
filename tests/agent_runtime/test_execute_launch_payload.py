@@ -148,10 +148,14 @@ def test_launch_payload_maps_decimal_execution_realism_to_bps_when_flag_on(
             "asset_class": "equity",
             "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
             "capital_amount": 10000,
-            "extra_parameters": {
-                "fee_rate": 0.001,
-                "slippage": 0.0005,
-            },
+                "extra_parameters": {
+                    "fee_rate": 0.001,
+                    "slippage": 0.0005,
+                    "field_provenance": {
+                        "fee_rate": "explicit_user",
+                        "slippage": "explicit_user",
+                    },
+                },
         },
         "optional_parameters": {},
     }
@@ -238,10 +242,14 @@ def test_launch_payload_ignores_negative_execution_cost_values(monkeypatch) -> N
             "asset_class": "equity",
             "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
             "capital_amount": 10000,
-            "extra_parameters": {
-                "fee_rate": -0.001,
-                "slippage": 0.0005,
-            },
+                "extra_parameters": {
+                    "fee_rate": -0.001,
+                    "slippage": 0.0005,
+                    "field_provenance": {
+                        "fee_rate": "explicit_user",
+                        "slippage": "explicit_user",
+                    },
+                },
         },
         "optional_parameters": {},
     }

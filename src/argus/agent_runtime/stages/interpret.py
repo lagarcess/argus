@@ -1106,6 +1106,7 @@ async def _stage_result_from_interpretation(
             snapshot=snapshot,
             capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata,
+            corroborating_strategy=decision.candidate_strategy_draft,
         )
         if declined_edit_result is not None:
             return declined_edit_result
@@ -2508,12 +2509,14 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
     current_user_message: str,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     interpretation = await _planned_active_confirmation_edit_interpretation(
         snapshot=snapshot,
         current_user_message=current_user_message,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None:
         return None
@@ -2536,6 +2539,7 @@ async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
     requested_field: str,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     interpretation = await _planned_pending_confirmation_edit_interpretation(
         snapshot=snapshot,
@@ -2543,6 +2547,7 @@ async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
         requested_field=requested_field,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None:
         return None
@@ -2595,6 +2600,7 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
             capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata,
             requested_field=pending_confirmation_requested_field,
+            corroborating_strategy=interpretation.candidate_strategy_draft,
         )
     if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
         return None
@@ -2605,6 +2611,7 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_thread_metadata,
+        corroborating_strategy=interpretation.candidate_strategy_draft,
     )
 
 
@@ -2615,6 +2622,7 @@ async def _planned_edit_after_fact_composer_decline(
     snapshot: TaskSnapshot | None,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     """Composer refusal on a resolved fact key re-enters the typed edit contract.
 
@@ -2627,6 +2635,7 @@ async def _planned_edit_after_fact_composer_decline(
         selected_thread_metadata=selected_thread_metadata,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None and snapshot is not None:
         interpretation = await _planned_active_confirmation_edit_interpretation(
@@ -2634,6 +2643,7 @@ async def _planned_edit_after_fact_composer_decline(
             current_user_message=state.current_user_message,
             resolve_asset_candidate=_resolve_asset_candidate_safely,
             plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+            corroborating_strategy=corroborating_strategy,
         )
     if interpretation is None:
         interpretation = await _planned_latest_result_edit_interpretation(
@@ -2641,6 +2651,7 @@ async def _planned_edit_after_fact_composer_decline(
             current_user_message=state.current_user_message,
             resolve_asset_candidate=_resolve_asset_candidate_safely,
             plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+            corroborating_strategy=corroborating_strategy,
         )
     if interpretation is None:
         return None

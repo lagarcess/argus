@@ -148,6 +148,7 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_cost_capability_clause,
+    has_execution_cost_candidate,
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
     future_performance_capability_clause,
@@ -1049,7 +1050,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
-        strategy = _strategy_from_llm(response.candidate_strategy_draft)
+        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(
@@ -2582,6 +2583,7 @@ async def _response_ready_for_runtime(
         planned_response = await _plan_artifact_edit_response(
             preferred_model=preferred_model,
             request=request,
+            primary_draft=response.candidate_strategy_draft,
         )
         if planned_response is not None:
             return planned_response
@@ -2631,6 +2633,7 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
         rejected_response=response,
+        primary_draft=response.candidate_strategy_draft,
     )
     if planned_response is not None:
         return planned_response
@@ -2702,14 +2705,18 @@ async def _ready_active_artifact_edit_planned_response(
         draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
     ):
         return None
+    async def _planned_with_primary() -> LLMInterpretationResponse | None:
+        return await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+            primary_draft=response.candidate_strategy_draft,
+        )
+
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
         request=request,
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
+        planned = await _planned_with_primary()
         if planned is not None:
             return planned
         return _asset_universe_operation_clarification_response(
@@ -2719,17 +2726,8 @@ async def _ready_active_artifact_edit_planned_response(
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(
         response.candidate_strategy_draft
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
-        if planned is not None:
-            return planned
-        return None
-    planned = await _plan_pending_artifact_assumption_edit(
-        request=request,
-        preferred_model=preferred_model,
-    )
+        return await _planned_with_primary()
+    planned = await _planned_with_primary()
     if planned is None or planned.requires_clarification:
         return None
     return planned
@@ -2831,6 +2829,8 @@ def _optional_runtime_readiness_audit_blocker(
         draft
     ) and not _draft_has_supported_default_benchmark(draft):
         return "unprovenanced_benchmark"
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return "stated_run_field_fidelity"
     if _response_needs_stated_timeframe_fidelity_audit(response):
         return "stated_run_field_fidelity"
     if _response_has_current_message_date_range_reconciliation(
@@ -2957,6 +2957,7 @@ async def _plan_artifact_edit_response(
     preferred_model: str,
     request: InterpretationRequest,
     rejected_response: LLMInterpretationResponse | None = None,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     planned_response = None
     if rejected_response is None or not _refinement_reply_needs_full_interpretation(
@@ -2966,6 +2967,7 @@ async def _plan_artifact_edit_response(
         planned_response = await _plan_pending_artifact_assumption_edit(
             request=request,
             preferred_model=preferred_model,
+            primary_draft=primary_draft,
         )
     if planned_response is None:
         planned_response = await _plan_focused_artifact_edit(
@@ -3387,6 +3389,7 @@ async def _plan_pending_artifact_assumption_edit(
     request: InterpretationRequest,
     preferred_model: str,
     require_failure_edit_evidence: bool = False,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
@@ -3431,7 +3434,10 @@ async def _plan_pending_artifact_assumption_edit(
             return None
     resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     return _response_from_artifact_assumption_edit_plan(
-        plan=plan, request=request, asset_symbol_resolver=resolver
+        plan=plan,
+        request=request,
+        asset_symbol_resolver=resolver,
+        primary_draft=primary_draft,
     )
 
 
@@ -4026,6 +4032,7 @@ async def _audit_stated_run_field_fidelity(
         response=response,
         request=request,
     )
+    audit_response = response
     try:
         audit = await invoke_openrouter_json_schema(
             task="field_fidelity",
@@ -4034,25 +4041,15 @@ async def _audit_stated_run_field_fidelity(
             schema_name="StatedRunFieldFidelityAudit",
         )
     except Exception:
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = None
     if not isinstance(audit, StatedRunFieldFidelityAudit):
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = StatedRunFieldFidelityAudit()
+        audit_response = deterministic_repair or response
     repaired = _response_from_stated_run_field_fidelity_audit(
-        response=response,
+        response=audit_response,
         audit=audit,
         current_message=request.current_user_message,
+        prior_strategy=_current_artifact_strategy(request),
     )
     candidate_response = repaired or deterministic_repair or response
     capital_recheck = await _audit_stated_starting_capital_fidelity(
@@ -4139,6 +4136,10 @@ def _response_needs_stated_run_field_fidelity_audit(
         request=request,
     ):
         return True
+    draft = response.candidate_strategy_draft
+    current_message = request.current_user_message if request is not None else ""
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return True
     if (
         request is not None
         and _response_replays_prior_strategy_without_current_turn_update(
@@ -4147,8 +4148,6 @@ def _response_needs_stated_run_field_fidelity_audit(
         )
     ):
         return False
-    draft = response.candidate_strategy_draft
-    current_message = request.current_user_message if request is not None else ""
     requested_field = ""
     if request is not None:
         requested_field = _field_path_base(

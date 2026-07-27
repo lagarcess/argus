@@ -1849,6 +1849,11 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
         "capital_amount": 1000,
         "benchmark_symbol": "SPY",
         "language": "en",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
     }
 
     result = await run_agent_turn(
@@ -1878,6 +1883,18 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     launch = confirmation_payload["launch_payload"]
     assert launch["symbol"] == "MSFT"
     assert launch["date_range"] == {"start": "2025-05-13", "end": "2026-05-13"}
+    strategy = confirmation_payload["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.001
+    assert strategy["extra_parameters"]["slippage"] == 0.0005
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert result["confirmation_payload"]["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     state_snapshot = await workflow.aget_state(
         {"configurable": {"thread_id": "thread-retry-failed-action"}}
     )
@@ -1885,7 +1902,105 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     active_confirmation = snapshot.active_confirmation_reference
     assert active_confirmation is not None
     assert active_confirmation.artifact_kind == "confirmation"
+    persisted_confirmation = active_confirmation.metadata["confirmation_payload"]
+    persisted_costs = persisted_confirmation["strategy"]["extra_parameters"]
+    assert persisted_costs["fee_rate"] == 0.001
+    assert persisted_costs["slippage"] == 0.0005
+    assert persisted_costs["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert persisted_confirmation["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     assert snapshot.latest_failed_action_reference is None
+
+
+@pytest.mark.asyncio
+async def test_workflow_retry_preserves_explicit_zero_costs_from_pending_strategy() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    workflow = build_workflow(
+        structured_interpreter=RetryApprovalInterpreter(),
+        tool=tool,
+        max_retries=1,
+        checkpointer=MemorySaver(),
+    )
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
+    pending_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold MSFT.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2025-05-13", "end": "2026-05-13"},
+        sizing_mode="capital_amount",
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "fee_rate": 0.0,
+            "slippage": 0.0,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-retry-explicit-zero-costs",
+        message="Can you try again?",
+        fallback_latest_task_snapshot={
+            "pending_strategy_summary": pending_strategy.model_dump(mode="python"),
+            "latest_failed_action_reference": {
+                "artifact_kind": "failed_action",
+                "artifact_id": "failed-action-zero-costs",
+                "artifact_status": "failed",
+                "metadata": {
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "upstream_dependency_error",
+                    "error": "market_data_unavailable",
+                    "retryable": True,
+                },
+            },
+        },
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    assert tool.calls == []
+    strategy = result["confirmation_payload"]["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.0
+    assert strategy["extra_parameters"]["slippage"] == 0.0
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert "_execution_realism" not in result["confirmation_payload"]["launch_payload"]
 
 
 def test_execute_stage_translates_provider_window_limit_to_human_recovery() -> None:

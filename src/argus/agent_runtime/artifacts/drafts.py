@@ -18,6 +18,13 @@ def draft_from_result_metadata(metadata: dict[str, Any]) -> StrategySummary:
     resolved_strategy = _strategy_values(config.get("resolved_strategy"))
     resolved_parameters = _dict(config.get("resolved_parameters"))
     values = dict(resolved_strategy)
+    _preserve_execution_realism(
+        values,
+        _execution_realism_from_result_config(
+            config=config,
+            resolved_parameters=resolved_parameters,
+        ),
+    )
 
     _fill_if_blank(values, "strategy_type", config.get("template"))
     _fill_if_blank(values, "asset_class", metadata.get("asset_class"))
@@ -59,7 +66,9 @@ def draft_from_result_metadata(metadata: dict[str, Any]) -> StrategySummary:
 
 
 def draft_from_failed_launch_payload(payload: dict[str, Any]) -> StrategySummary:
-    return _strategy_from_values(_launch_payload_values(payload))
+    values = _launch_payload_values(payload)
+    _preserve_execution_realism(values, payload.get("_execution_realism"))
+    return _strategy_from_values(values)
 
 
 def _strategy_values(value: Any) -> dict[str, Any]:
@@ -111,6 +120,56 @@ def _preserving_merge(
     for key, value in defaults.items():
         _fill_if_blank(merged, key, value)
     return merged
+
+
+def _execution_realism_from_result_config(
+    *,
+    config: dict[str, Any],
+    resolved_parameters: dict[str, Any],
+) -> Any:
+    for candidate in (
+        config.get("_execution_realism"),
+        resolved_parameters.get("_execution_realism"),
+        _dict(config.get("engine_config")).get("_execution_realism"),
+        _dict(resolved_parameters.get("engine_config")).get("_execution_realism"),
+    ):
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+
+def _preserve_execution_realism(
+    values: dict[str, Any],
+    raw_realism: Any,
+) -> None:
+    realism = _dict(raw_realism)
+    if realism.get("enabled") is not True:
+        return
+    extra_parameters = _dict(values.get("extra_parameters"))
+    field_provenance = _dict(extra_parameters.get("field_provenance"))
+    for bps_key, rate_key in (
+        ("fee_bps", "fee_rate"),
+        ("slippage_bps", "slippage"),
+    ):
+        bps = _nonnegative_float(realism.get(bps_key))
+        if bps is None or bps == 0.0:
+            continue
+        extra_parameters.setdefault(rate_key, bps / 10000.0)
+        field_provenance.setdefault(rate_key, "explicit_user")
+    if not field_provenance:
+        return
+    extra_parameters["field_provenance"] = field_provenance
+    values["extra_parameters"] = extra_parameters
+
+
+def _nonnegative_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if numeric >= 0.0 else None
 
 
 def _strategy_from_values(values: dict[str, Any]) -> StrategySummary:
