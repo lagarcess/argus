@@ -79,20 +79,40 @@ _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "es-419": "es-419",
 }
 _MESSAGE_SELECT = "id,conversation_id,role,content,metadata,created_at"
-_MESSAGE_ARTIFACT_FILTER = ",".join(
+
+
+def _truthy_metadata_filter(field: str) -> str:
+    return (
+        f"and(metadata->>{field}.neq.,"
+        f"metadata->{field}.neq.{{}},"
+        f"metadata->{field}.neq.[],"
+        f"metadata->{field}.neq.false,"
+        f"metadata->{field}.neq.0)"
+    )
+
+
+_RELOAD_ARTIFACT_FILTER = ",".join(
     (
-        "metadata->active_confirmation_reference.not.is.null",
-        "metadata->backtest_job.not.is.null",
-        "metadata->backtest_job_id.not.is.null",
-        "metadata->confirmation_card.not.is.null",
-        "metadata->confirmation_payload.not.is.null",
-        "metadata->latest_run_id.not.is.null",
-        "metadata->result_card.not.is.null",
-        "metadata->result_run_id.not.is.null",
+        _truthy_metadata_filter("active_confirmation_reference"),
+        _truthy_metadata_filter("backtest_job"),
+        _truthy_metadata_filter("backtest_job_id"),
+        _truthy_metadata_filter("confirmation_card"),
+        _truthy_metadata_filter("confirmation_payload"),
+        _truthy_metadata_filter("latest_run_id"),
+        _truthy_metadata_filter("result_card"),
+        _truthy_metadata_filter("result_run_id"),
         'metadata->artifact_references.cs.[{"artifact_kind":"confirmation"}]',
         'metadata->artifact_references.cs.[{"artifact_kind":"result"}]',
         'metadata->artifact_references.cs.[{"artifact_kind":"backtest_result"}]',
         'metadata->artifact_references.cs.[{"artifact_kind":"backtest_job"}]',
+    )
+)
+_LIFECYCLE_ARTIFACT_FILTER = ",".join(
+    (
+        _truthy_metadata_filter("backtest_job"),
+        _truthy_metadata_filter("confirmation_card"),
+        _truthy_metadata_filter("latest_run_id"),
+        _truthy_metadata_filter("result_card"),
     )
 )
 _LEGACY_ONBOARDING_GOAL_LIKE = (
@@ -672,11 +692,17 @@ class SupabaseGateway(
         if later_user is not None:
             witnesses[later_user.id] = later_user
 
-        later_artifact = first_later(
-            base_query().eq("role", "assistant").or_(_MESSAGE_ARTIFACT_FILTER)
+        reload_artifact = first_later(
+            base_query().eq("role", "assistant").or_(_RELOAD_ARTIFACT_FILTER)
         )
-        if later_artifact is not None:
-            witnesses[later_artifact.id] = later_artifact
+        if reload_artifact is not None:
+            witnesses[reload_artifact.id] = reload_artifact
+
+        lifecycle_artifact = first_later(
+            base_query().eq("role", "assistant").or_(_LIFECYCLE_ARTIFACT_FILTER)
+        )
+        if lifecycle_artifact is not None:
+            witnesses[lifecycle_artifact.id] = lifecycle_artifact
 
         request_ids = {
             request_id
@@ -691,7 +717,7 @@ class SupabaseGateway(
                     "metadata->agent_runtime_turn->>request_id",
                     request_id,
                 )
-                .or_(_MESSAGE_ARTIFACT_FILTER)
+                .or_(_RELOAD_ARTIFACT_FILTER)
             )
             if matching_artifact is not None:
                 witnesses[matching_artifact.id] = matching_artifact

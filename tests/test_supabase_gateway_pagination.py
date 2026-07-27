@@ -492,6 +492,7 @@ def test_message_page_context_uses_bounded_owner_scoped_witness_queries() -> Non
         [later_user],
         [later_artifact],
         [later_artifact],
+        [later_artifact],
         [represented],
     )
     gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
@@ -508,7 +509,7 @@ def test_message_page_context_uses_bounded_owner_scoped_witness_queries() -> Non
         _message_id(5),
     ]
     assert represented_request_ids == {_message_id(1)}
-    assert len(client.queries) == 4
+    assert len(client.queries) == 5
     for query in client.queries:
         assert ("eq", ("user_id", "user-1")) in query.operations
         assert (
@@ -536,7 +537,7 @@ def test_message_page_context_skips_keyed_queries_for_non_failure_messages() -> 
             },
         }
     )
-    client = _RecordingClient([], [])
+    client = _RecordingClient([], [], [])
     gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
 
     assert gateway.list_message_page_context(
@@ -544,7 +545,89 @@ def test_message_page_context_skips_keyed_queries_for_non_failure_messages() -> 
         conversation_id=_conversation_id(1),
         page_messages=[message],
     ) == ([], set())
-    assert len(client.queries) == 2
+    assert len(client.queries) == 3
+
+
+def test_message_page_context_keeps_distinct_reload_and_lifecycle_artifacts() -> None:
+    timestamp = datetime(2026, 4, 27, tzinfo=timezone.utc)
+    page_message = Message.model_validate(
+        _message_row(1, created_at=timestamp.isoformat())
+    )
+    broader_reload_artifact = {
+        **_message_row(
+            2,
+            created_at=timestamp.replace(microsecond=1).isoformat(),
+            role="assistant",
+        ),
+        "metadata": {"confirmation_payload": {"strategy": {"symbols": ["AAPL"]}}},
+    }
+    lifecycle_artifact = {
+        **_message_row(
+            3,
+            created_at=timestamp.replace(microsecond=2).isoformat(),
+            role="assistant",
+        ),
+        "metadata": {"result_card": {"run_id": "run-1"}},
+    }
+    client = _RecordingClient(
+        [],
+        [broader_reload_artifact],
+        [lifecycle_artifact],
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    later_work, represented_request_ids = gateway.list_message_page_context(
+        user_id="user-1",
+        conversation_id=_conversation_id(1),
+        page_messages=[page_message],
+    )
+
+    assert [message.id for message in later_work] == [
+        _message_id(2),
+        _message_id(3),
+    ]
+    assert represented_request_ids == set()
+    assert len(client.queries) == 3
+
+
+def test_message_page_context_artifact_filters_exclude_empty_values() -> None:
+    timestamp = datetime(2026, 4, 27, tzinfo=timezone.utc)
+    page_message = Message.model_validate(
+        _message_row(1, created_at=timestamp.isoformat())
+    )
+    real_artifact = {
+        **_message_row(
+            3,
+            created_at=timestamp.replace(microsecond=2).isoformat(),
+            role="assistant",
+        ),
+        "metadata": {"result_card": {"run_id": "run-1"}},
+    }
+    client = _RecordingClient([], [real_artifact], [real_artifact])
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    later_work, _ = gateway.list_message_page_context(
+        user_id="user-1",
+        conversation_id=_conversation_id(1),
+        page_messages=[page_message],
+    )
+
+    assert [message.id for message in later_work] == [_message_id(3)]
+    reload_filter = next(
+        args[0]
+        for name, args in client.queries[1].operations
+        if name == "or_"
+    )
+    lifecycle_filter = next(
+        args[0]
+        for name, args in client.queries[2].operations
+        if name == "or_"
+    )
+    assert "metadata->>confirmation_payload.neq." in reload_filter
+    assert "metadata->confirmation_payload.neq.{}" in reload_filter
+    assert "confirmation_payload" not in lifecycle_filter
+    assert "metadata->>result_card.neq." in lifecycle_filter
+    assert "metadata->result_card.neq.{}" in lifecycle_filter
 
 
 @pytest.mark.skipif(
@@ -740,6 +823,84 @@ def test_message_page_is_stable_and_filters_markers_in_real_postgres() -> None:
         assert {message.id for message in first_candidates[:2]}.isdisjoint(
             message.id for message in second_candidates
         )
+
+        context_rows = [
+            {
+                "id": _message_id(101),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": "Context page A",
+                "metadata": {},
+                "created_at": timestamp.replace(microsecond=1).isoformat(),
+            },
+            {
+                "id": _message_id(102),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": "Broader reload artifact",
+                "metadata": {
+                    "confirmation_payload": {"strategy": {"symbols": ["AAPL"]}}
+                },
+                "created_at": timestamp.replace(microsecond=2).isoformat(),
+            },
+            {
+                "id": _message_id(103),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": "Lifecycle artifact",
+                "metadata": {"result_card": {"run_id": "run-1"}},
+                "created_at": timestamp.replace(microsecond=3).isoformat(),
+            },
+            {
+                "id": _message_id(104),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": "Context page B",
+                "metadata": {},
+                "created_at": timestamp.replace(microsecond=4).isoformat(),
+            },
+            {
+                "id": _message_id(105),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": "Empty artifact",
+                "metadata": {"confirmation_card": {}},
+                "created_at": timestamp.replace(microsecond=5).isoformat(),
+            },
+            {
+                "id": _message_id(106),
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": "Real artifact",
+                "metadata": {"result_card": {"run_id": "run-2"}},
+                "created_at": timestamp.replace(microsecond=6).isoformat(),
+            },
+        ]
+        client.table("messages").insert(context_rows).execute()
+
+        first_context, _ = gateway.list_message_page_context(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            page_messages=[Message.model_validate(context_rows[0])],
+        )
+        assert [message.id for message in first_context] == [
+            _message_id(102),
+            _message_id(103),
+            _message_id(104),
+        ]
+
+        empty_context, _ = gateway.list_message_page_context(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            page_messages=[Message.model_validate(context_rows[3])],
+        )
+        assert [message.id for message in empty_context] == [_message_id(106)]
     finally:
         with suppress(Exception):
             gateway.delete_auth_user(user_id)
