@@ -6,10 +6,10 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current integrated product checkpoint: PR #288 at `9f3453a3`. New work must
+Latest product checkpoint: PR #288 at `9f3453a3`. Later commits may reconcile
+documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
-pinning this product SHA; later docs-only reconciliation commits do not change
-product behavior. The accepted post-promotion
+pinning this product SHA. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -299,6 +299,18 @@ Do not reopen these as debt unless a new bug is reproduced:
   benchmark, rules, and modeled costs, and ask only for genuinely missing
   fields. Prior results remain immutable, later explicit edits supersede
   recovery state, and recovery creates no duplicate job, Run, or usage.
+- Requested/effective period truth is complete and issue #251 is closed. PR
+  #262 established the shared coverage contract, PR #267 classified quiet
+  calendar alignment versus material provider truncation, and PR #268
+  preserved the resulting artifact through continued conversation and reload.
+  Promotion evidence belongs to #233; trajectory-ledger reconciliation belongs
+  to #243.
+- Hosted cost-ledger visibility is repaired and issue #246 is closed. The
+  existing `20260702000001_add_cost_ledger_entries` migration was applied
+  directly to the hosted Argus Supabase project with matching migration
+  history. RLS and service-role-only append/read privileges were verified; no
+  application commit, deploy, or PR was required. See
+  `docs/reports/issue-246-cost-ledger-closure-evidence.md`.
 
 ## P0 Reintegration Checkpoint
 

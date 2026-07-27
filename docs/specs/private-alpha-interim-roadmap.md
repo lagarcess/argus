@@ -6,10 +6,10 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-27
 
-Current integrated product checkpoint: `codex/private-alpha-next` containing
-PR #288 at `9f3453a3`. New work must branch from the current remote integration
-head rather than pinning this product SHA; later docs-only reconciliation
-commits do not change product behavior.
+Latest integrated product checkpoint: PR #288 at `9f3453a3`. Later commits may
+reconcile roadmap and issue state without changing product behavior. New work
+must branch from the current remote integration head rather than pinning this
+product SHA.
 
 That checkpoint contains the founder-accepted outcome baselines delivered
 through independently revertible vertical slices:
@@ -48,6 +48,15 @@ canonical fact-preserving recovery at `9f3453a3`: stale or failed actions
 restore the latest usable artifact anchor, already-owned facts are not
 re-requested, genuinely absent facts receive one targeted clarification, and
 prior results remain immutable without duplicate compute.
+
+Two issue closures after that product checkpoint required no new application
+commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
+requested/effective period truth, calendar-materiality classification, and
+durable recovery. Promotion evidence remains with #233 and trajectory-ledger
+bookkeeping remains with #243. Issue #246 is also closed after the exact
+checked-in `20260702000001_add_cost_ledger_entries` migration was applied to
+the hosted Argus Supabase project and its append-only service-role contract was
+verified.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -440,8 +449,9 @@ Completion evidence:
 This completion does not claim deployment or tester exposure. #228, #233, and
 #237 retain those release-owned gates. Narrow issue-specific follow-ups also
 remain open where their own acceptance exceeds this founder outcome, including
-#239's dedicated trajectory cleanup, #243's combined release gate, and #251's
-remaining period-truth work.
+#239's dedicated trajectory cleanup and #243's trajectory-ledger reconciliation.
+#251 is closed; promotion and evaluation bookkeeping must not reopen its
+completed product scope.
 
 ## Retained Product Decisions
 
@@ -472,13 +482,15 @@ The pre-existing stale direct-job GET reconciliation gap remains tracked by
 #231; #230 owns any atomic database primitive it requires. It is not part of
 the completed user-visible Usage slice.
 
-### Incomplete data windows (#251)
+### Requested/effective data-window truth (#251 — complete)
 
-- Implementation checkpoint (2026-07-25): coverage preflight now persists a
-  code-owned `adjustment_reason`, distinguishes exchange-calendar alignment
-  from provider-driven truncation, and emits the existing period-adjustment
-  sidecar only for provider-driven changes. The reason is measurement-visible
-  without changing normalized confirmation action identity.
+- PR #262 established one requested/effective coverage contract across
+  confirmation, execution, result, persistence, evidence, and reload.
+- PR #267 added the code-owned `adjustment_reason`, distinguishes ordinary
+  exchange-calendar alignment from provider-driven truncation, and emits the
+  period-adjustment sidecar only for material provider-driven changes.
+- PR #268 preserves the resulting artifact and recovery ownership through
+  continued conversation and reload.
 - Fit to provider-supported data only when a viable common window remains; a
   material fit must not be silent.
 - Ordinary weekend or holiday session normalization inside available coverage
@@ -492,9 +504,26 @@ the completed user-visible Usage slice.
 - If no viable common window exists, return typed recovery and no runnable card.
 - The approved effective window remains identical across result facts, chart,
   prose, evidence, reload, replay, and Omnisearch.
-- Remaining follow-ups: preserve normal LLM-authored adjustment voice through
-  stream and reload, and decide whether historical cards without the typed
-  reason need notice backfill. Neither follow-up is implemented by this slice.
+- Founder-visible QA confirmed the product behavior in real conversation turns,
+  and issue #251 is closed. Exact-SHA promotion/canary evidence remains #233
+  work. Seven-session expected-failure bookkeeping remains #243 work.
+
+### Cost-ledger visibility (#246 — complete)
+
+- The hosted Argus Supabase project had skipped the existing
+  `20260702000001_add_cost_ledger_entries` migration; the table had never been
+  intentionally removed.
+- On 2026-07-27, the exact checked-in migration and matching history
+  version/name were applied without replaying unrelated pending migrations.
+- Direct SQL and PostgREST now observe the table with RLS enabled.
+  `service_role` has only `INSERT` and `SELECT`; `anon` and `authenticated`
+  have no table privileges, and service-role `UPDATE`/`DELETE` remain denied.
+- One privacy-safe append-only reconciliation row proves the hosted write/read
+  path. Focused failure injection still proves chat and backtests continue when
+  ledger persistence is unavailable.
+- No repository change, application deploy, or PR was required. Issue #246 is
+  closed; the durable evidence is recorded in
+  [`issue-246-cost-ledger-closure-evidence.md`](../reports/issue-246-cost-ledger-closure-evidence.md).
 
 ## Historical Planning Archive
 
