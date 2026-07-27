@@ -418,7 +418,7 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
                 response = operation["responses"]["503"]
                 assert "auth_session_verification_unavailable" in response["description"]
                 assert "market_data_unavailable" in response["description"]
-                assert response["content"]["application/problem+json"]["schema"] == {
+                assert response["content"]["application/json"]["schema"] == {
                     "$ref": "#/components/schemas/Error"
                 }
                 continue

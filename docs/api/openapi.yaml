@@ -55,6 +55,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '403':
+          description: Guest access is disabled, or the browser origin is untrusted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: This browser already has a permanent account session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many guest session attempts. Please wait before trying again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Supabase persistence is required for guest authentication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Argus could not start a guest session. Please try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/guest/handoffs:
     post:
       tags:
@@ -295,7 +325,7 @@ paths:
 
             '
           content:
-            application/problem+json:
+            application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /api/v1/backtests/{run_id}:
@@ -2706,7 +2736,7 @@ components:
       description: Bounded Supabase session verification is temporarily unavailable; retry
         without redirecting to login.
       content:
-        application/problem+json:
+        application/json:
           schema:
             $ref: '#/components/schemas/Error'
           example:

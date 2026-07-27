@@ -63,7 +63,7 @@ _AUTH_SESSION_UNAVAILABLE_COMPONENT = {
         "retry without redirecting to login."
     ),
     "content": {
-        "application/problem+json": {
+        "application/json": {
             "schema": {"$ref": "#/components/schemas/Error"},
             "example": {
                 "type": (
@@ -157,7 +157,7 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
                 "(`market_data_unavailable`).\n"
             ),
             "content": {
-                "application/problem+json": {"schema": copy.deepcopy(_ERROR_REF)}
+                "application/json": {"schema": copy.deepcopy(_ERROR_REF)}
             },
         }
 
@@ -199,6 +199,25 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
         responses["500"] = {
             "description": "Durable job or confirmation-artifact state is inconsistent."
         }
+
+    guest_bootstrap_op = spec.get("paths", {}).get("/api/v1/auth/guest", {}).get("post")
+    if guest_bootstrap_op is not None:
+        responses = guest_bootstrap_op.setdefault("responses", {})
+        responses["403"] = _error_response(
+            "Guest access is disabled, or the browser origin is untrusted."
+        )
+        responses["409"] = _error_response(
+            "This browser already has a permanent account session."
+        )
+        responses["429"] = _error_response(
+            "Too many guest session attempts. Please wait before trying again."
+        )
+        responses["500"] = _error_response(
+            "Supabase persistence is required for guest authentication."
+        )
+        responses["503"] = _error_response(
+            "Argus could not start a guest session. Please try again."
+        )
 
     for path, path_item in spec.get("paths", {}).items():
         if not isinstance(path_item, dict) or path in _UNAUTHENTICATED_PATHS:
