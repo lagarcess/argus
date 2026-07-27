@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from argus.agent_runtime.stages.confirm import confirmation_artifact_reference
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -167,6 +168,56 @@ def test_text_approval_uses_llm_turn_act_but_defers_to_card_action(
         current_user_message="yes run it",
         recent_thread_history=[],
     )
+    confirmation_payload = _validated_confirmation_payload(pending)
+    state.confirmation_payload = confirmation_payload
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=pending,
+            # The pure-approval guard keys off the visible card, not the payload.
+            active_confirmation_reference=confirmation_artifact_reference(
+                confirmation_id="conf-1",
+                confirmation_payload=confirmation_payload,
+            ),
+        ),
+        structured_interpreter=_interpret_with(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User approved the pending strategy.",
+                semantic_turn_act="approval",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    response = result.patch["assistant_response"].lower()
+    assert "visible" in response
+    assert "confirmation" in response
+    assert "start the simulation" in result.patch["assistant_response"]
+
+
+def test_text_approval_without_visible_card_reconfirms_instead_of_executing(
+    monkeypatch,
+) -> None:
+    _patch_resolve_asset(monkeypatch)
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="last year",
+    )
+    state = RunState.new(
+        current_user_message="yes run it",
+        recent_thread_history=[],
+    )
     state.confirmation_payload = _validated_confirmation_payload(pending)
 
     result = interpret_stage(
@@ -188,8 +239,5 @@ def test_text_approval_uses_llm_turn_act_but_defers_to_card_action(
         ),
     )
 
-    assert result.outcome == "ready_to_respond"
-    response = result.patch["assistant_response"].lower()
-    assert "visible" in response
-    assert "confirmation" in response
-    assert "start the simulation" in result.patch["assistant_response"]
+    # Text never launches a run; the card action is the only execution path.
+    assert result.outcome == "ready_for_confirmation"
