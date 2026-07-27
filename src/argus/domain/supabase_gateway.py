@@ -1446,11 +1446,13 @@ class SupabaseGateway(
                 .eq("user_id", user_id)
                 .eq("conversation_id", conversation_id)
                 .in_("id", requested)
-                .limit(len(requested))
+                .limit(len(requested) + 1)
                 .execute()
                 .data
                 or []
             )
+            if len(rows) > len(requested):
+                continue
             jobs_by_id.update(
                 _unique_owned_rows_by_id(
                     rows,
@@ -1853,11 +1855,13 @@ class SupabaseGateway(
                 .eq("user_id", user_id)
                 .eq("conversation_id", conversation_id)
                 .in_("id", requested)
-                .limit(len(requested))
+                .limit(len(requested) + 1)
                 .execute()
                 .data
                 or []
             )
+            if len(rows) > len(requested):
+                continue
             owned_rows = _unique_owned_rows_by_id(
                 rows,
                 requested_ids=set(requested),

@@ -351,6 +351,39 @@ def test_job_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
     }
 
 
+def test_job_batch_map_uses_a_sentinel_row_to_reject_one_requested_duplicate() -> None:
+    client = _ProjectionBatchClient(
+        {
+            "backtest_jobs": [
+                {
+                    "id": "job-1",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "running",
+                },
+                {
+                    "id": "job-1",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                },
+            ]
+        },
+        ignore_filters=True,
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    jobs = gateway.get_backtest_jobs_by_ids(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        job_ids=["job-1"],
+    )
+
+    assert jobs == {}
+    [query] = client.executed_queries("backtest_jobs")
+    assert query.limit_count == 2
+
+
 def test_run_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
     requested = [f"run-{index}" for index in range(6)]
     valid_run = (
@@ -406,6 +439,36 @@ def test_run_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
     )
 
     assert runs == {"run-0": BacktestRun.model_validate(valid_run)}
+
+
+def test_run_batch_map_uses_a_sentinel_row_to_reject_one_requested_duplicate() -> None:
+    first = (
+        _completed_run().model_copy(update={"id": "run-1"}).model_dump(mode="json")
+        | {"user_id": "user-1"}
+    )
+    client = _ProjectionBatchClient(
+        {
+            "backtest_runs": [
+                first,
+                {
+                    **first,
+                    "metrics": {"conflicting": True},
+                },
+            ]
+        },
+        ignore_filters=True,
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    runs = gateway.get_backtest_runs_by_ids(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        run_ids=["run-1"],
+    )
+
+    assert runs == {}
+    [query] = client.executed_queries("backtest_runs")
+    assert query.limit_count == 2
 
 
 def test_run_batch_ids_include_only_eligible_succeeded_jobs() -> None:
