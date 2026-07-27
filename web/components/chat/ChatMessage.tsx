@@ -8,6 +8,8 @@ import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
+import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import NextMoveRow, { NextMoveDetail, NextMoveSeparator } from "./NextMoveRow";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -34,6 +36,8 @@ type ChatMessageProps = {
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
+  nextMovesEnabled?: boolean;
+  turnInFlight?: boolean;
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
@@ -52,6 +56,8 @@ export default function ChatMessage({
   isLatest,
   isStreaming,
   conversationId,
+  nextMovesEnabled = true,
+  turnInFlight = false,
   isGuest = false,
   canSaveDecision = true,
   onDecisionUnavailable,
@@ -62,6 +68,7 @@ export default function ChatMessage({
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
   const optionsRef = useRef<HTMLDivElement>(null);
   const selectedFeedbackClass =
@@ -210,6 +217,14 @@ export default function ChatMessage({
     (action) => !isRetryAction(action) && !actionHasCardScopedOwnership(action),
   );
   const shouldShowAssistantFooter = !isUser && !isStreaming;
+  // Next moves answer the newest question only. Older groups are settled by the
+  // reply that followed them, so they stop rendering rather than staying
+  // tappable — the guard the floating composer strip used to provide.
+  const showNextMoveRows =
+    shouldShowAssistantFooter &&
+    Boolean(isLatest) &&
+    nextMovesEnabled &&
+    footerMessageActions.length > 0;
   const footerVisibilityClass =
     isLatest || rating || showOptions || Boolean(retryAction)
       ? "opacity-100"
@@ -345,16 +360,19 @@ export default function ChatMessage({
 
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col">
                 {message.discovery.candidates.map((candidate) => {
                   const sendText = t("chat.discovery_results.test_candidate", {
                     symbol: candidate.symbol,
                     defaultValue: "Backtest {{symbol}}",
                   });
+                  const hasName =
+                    Boolean(candidate.name) && candidate.name !== candidate.symbol;
                   return (
-                    <button
+                    <NextMoveRow
                       key={candidate.symbol}
-                      type="button"
+                      ariaLabel={sendText}
+                      disabled={turnInFlight}
                       onClick={() =>
                         onAction?.({
                           type: "select_discovery_candidate",
@@ -367,45 +385,71 @@ export default function ChatMessage({
                           },
                         })
                       }
-                      title={candidate.reason_text || candidate.name}
-                      aria-label={sendText}
-                      className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
                     >
-                      <span className="font-semibold">{candidate.symbol}</span>
-                      {candidate.name && candidate.name !== candidate.symbol ? (
-                        <span className="opacity-70"> · {candidate.name}</span>
+                      <span className="font-medium text-black dark:text-white">
+                        {sendText}
+                      </span>
+                      {hasName ? (
+                        <>
+                          <NextMoveSeparator>·</NextMoveSeparator>
+                          <NextMoveDetail>{candidate.name}</NextMoveDetail>
+                        </>
                       ) : null}
-                    </button>
+                      {candidate.reason_text ? (
+                        <>
+                          <NextMoveSeparator>—</NextMoveSeparator>
+                          <NextMoveDetail>{candidate.reason_text}</NextMoveDetail>
+                        </>
+                      ) : null}
+                    </NextMoveRow>
                   );
                 })}
               </div>
               {discoverySourcesLineText ? (
-                <p className="text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 dark:text-white/50">
-                  {discoverySourcesLineText}
-                </p>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
+                  <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
+                    {discoverySourcesLineText}
+                  </p>
+                  {message.discovery.sources.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowSources(true)}
+                      className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
+                    >
+                      {t("chat.discovery_results.sources_panel_open", {
+                        count: message.discovery.sources.length,
+                        defaultValue: "{{count}} sources ›",
+                        defaultValue_one: "{{count}} source ›",
+                      })}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           )}
 
-          {shouldShowAssistantFooter && (
-            <div className="flex items-start justify-between gap-4 mt-2">
-              {footerMessageActions.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {footerMessageActions.map((action) => (
-                    <button
-                      key={action.id ?? action.type ?? action.label}
-                      type="button"
-                      onClick={() => onAction?.(action)}
-                      className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
-                    >
-                      {actionLabel(action)}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div />
-              )}
+          {message.discovery && showSources ? (
+            <DiscoverySourcesPanel
+              onClose={() => setShowSources(false)}
+              sidecar={message.discovery}
+            />
+          ) : null}
 
+          {showNextMoveRows && (
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col">
+              {footerMessageActions.map((action) => (
+                <NextMoveRow
+                  key={action.id ?? action.type ?? action.label}
+                  onClick={() => onAction?.(action)}
+                >
+                  {actionLabel(action)}
+                </NextMoveRow>
+              ))}
+            </div>
+          )}
+
+          {shouldShowAssistantFooter && (
+            <div className="flex items-start justify-end gap-4 mt-2">
               <div
                 className={`relative flex shrink-0 items-center gap-1.5 transition-opacity ${footerVisibilityClass}`}
                 ref={optionsRef}

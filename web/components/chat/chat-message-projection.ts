@@ -127,16 +127,6 @@ export function isFailedActionRetry(
   );
 }
 
-export function consumeInputAction(
-  action: ChatActionOption,
-  actions: ChatActionOption[],
-): ChatActionOption[] {
-  if (action.type === "show_breakdown") {
-    return actions.filter((candidate) => candidate.type !== "show_breakdown");
-  }
-  return [];
-}
-
 export function consumeConfirmationActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
@@ -211,7 +201,21 @@ export function markComposerActionsInactive(messages: Message[]): Message[] {
         confirmation: { ...message.confirmation, actions },
       };
     }
-    return message.actions ? { ...message, actions: undefined } : message;
+    // Retry belongs to the turn that failed, so a newer send supersedes it the
+    // same way a newer card supersedes an older one. Conversational next moves
+    // belong to the conversation, not to an artifact: whether a clarify option
+    // is still answerable is decided by the row renderer, which is also the only
+    // owner that survives reload -- hydration rebuilds actions for every
+    // historical message, not just the newest.
+    if (!message.actions) return message;
+    const conversational = message.actions.filter(
+      (action) => action.type === "select_response_option",
+    );
+    if (conversational.length === message.actions.length) return message;
+    return {
+      ...message,
+      actions: conversational.length > 0 ? conversational : undefined,
+    };
   });
 }
 

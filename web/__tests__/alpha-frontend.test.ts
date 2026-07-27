@@ -362,8 +362,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(sendState).toContain("message.id !== assistantId");
     expect(retry).not.toContain("content.includes");
     expect(retry).not.toContain(".match(");
-    expect(chat).toContain("const actionLabel = (action: ChatActionOption) =>");
-    expect(chat).toContain("{actionLabel(action)}");
+    // Action labels localize where the actions now render: next-move rows own
+    // labelKey interpolation since the floating composer strip was removed.
+    expect(message).toContain("const actionLabel = (action: ChatActionOption) =>");
+    expect(message).toContain("{actionLabel(action)}");
     expect(chat).toContain("const actionDisplayLabel = useCallback");
     expect(chat).toContain(
       "content: action?.type ? actionDisplayLabel(action) : trimmed",
@@ -580,12 +582,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(ownership).toContain("isCardScopedAction");
     expect(chat).toContain('from "@/lib/chat-action-ownership"');
     expect(chat).toContain("hasActiveArtifactActionSet(messages)");
-    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
+    // Card-scoped actions never become conversational next-move rows; the row
+    // list is filtered per message and suppressed while a card owns actions.
+    expect(message).toContain("!actionHasCardScopedOwnership(action)");
+    expect(chat).toContain("!hasActiveArtifactActionSet(messages)");
     expect(chat).not.toContain("setInputActions(confirmation.actions ?? [])");
     expect(chat).not.toContain("visibleInputActions(inputActions).map");
     expect(chat).not.toContain('event.event === "confirmation"');
     expect(chat).not.toContain('event.event === "result"');
-    expect(chat).toContain("slide-in-from-bottom-2");
+    // The entrance motion belongs to the message that carries the actions now
+    // that the floating composer strip is gone.
+    expect(message).toContain("slide-in-from-bottom-2");
     expect(message).toContain(
       "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
     );
@@ -616,12 +623,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(css).toContain("animation: none;");
   });
 
-  test("composer hides artifact actions whenever any active card owns them", () => {
+  test("next moves hide whenever any active card owns the conversation's actions", () => {
     const chat = readChatImplementationSource();
 
     const activeArtifactHelper = chat.slice(
       chat.indexOf("function hasActiveArtifactActionSet"),
-      chat.indexOf("function consumeInputAction"),
+      chat.indexOf("function consumeConfirmationActionOnMessages"),
     );
 
     expect(activeArtifactHelper).toContain("messages.some");
@@ -630,10 +637,26 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(activeArtifactHelper).toContain("actionHasCardScopedOwnership");
     expect(activeArtifactHelper).not.toContain("latestAi");
-    expect(chat).toContain(
-      "const composerActions = hasActiveArtifactActionSet(messages)",
+
+    // The floating composer strip is gone. Its gating survives on the row list:
+    // no next moves mid-turn or while a card owns actions. The in-flight lock
+    // is shared with the composer so persistent rows cannot bypass it.
+    const inFlight = chat.slice(
+      chat.indexOf("const turnInFlight ="),
+      chat.indexOf("const nextMovesEnabled ="),
     );
-    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
+    expect(inFlight).toContain("streamStatus");
+    expect(inFlight).toContain("isStreamingResponse");
+    expect(inFlight).toContain("isHydratingConversation");
+    const gate = chat.slice(
+      chat.indexOf("const nextMovesEnabled ="),
+      chat.indexOf("const latestAssistantContent"),
+    );
+    expect(gate).toContain("!turnInFlight");
+    expect(gate).toContain("!hasActiveArtifactActionSet(messages)");
+    expect(chat).toContain("nextMovesEnabled={nextMovesEnabled}");
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(chat).not.toContain("const composerActions =");
   });
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
@@ -1196,17 +1219,15 @@ describe("Argus Alpha frontend contract", () => {
   test("chat consumes result action chips after breakdown is requested", () => {
     const chat = readChatImplementationSource();
 
-    expect(chat).toContain("consumeInputAction");
+    // Result-card chip consumption is message-scoped and still live. The
+    // composer-strip half of this mechanism went away with the strip itself.
     expect(chat).toContain("consumeResultActionOnMessages");
     expect(chat).toContain("consumedResultActionsFromApi");
     expect(chat).toContain("applyConsumedResultActions");
-    expect(chat).toContain('action.type === "show_breakdown"');
-    expect(chat).toContain('type !== "show_breakdown"');
-    expect(chat).toContain(
-      "setInputActions(consumeInputAction(action, inputActions))",
-    );
+    expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('latestAi?.kind === "strategy_result"');
-    expect(chat).toContain("setInputActions([])");
+    expect(chat).not.toContain("consumeInputAction");
+    expect(chat).not.toContain("setInputActions");
   });
 
   test("chat resumes explicit conversation routes instead of creating a fresh one on reload", () => {

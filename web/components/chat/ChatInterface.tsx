@@ -81,7 +81,6 @@ import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
-  visibleComposerResponseActions,
 } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
@@ -137,7 +136,6 @@ import {
   chatActionRequestFromAction,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
-  consumeInputAction,
   hasActiveArtifactActionSet,
   hydrateMessagesFromApi,
   isFailedActionRetry,
@@ -281,7 +279,6 @@ export default function ChatInterface() {
     return nextAccount;
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [attentionConversationIds, setAttentionConversationIds] = useState<
     Set<string>
@@ -440,7 +437,6 @@ export default function ChatInterface() {
       currentViewRef.current = "chat";
       setConversationId(nextConversationId);
       setMessages([]);
-      setInputActions([]);
       setStreamStatus(null);
       setIsHydratingConversation(false);
       setIsStreamingResponse(false);
@@ -670,7 +666,6 @@ export default function ChatInterface() {
             rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
-            setInputActions(hydrated.inputActions);
             setIsHydratingConversation(false);
             return;
           } catch (error) {
@@ -696,7 +691,6 @@ export default function ChatInterface() {
                 t("chat.error_load"),
               ),
             ]);
-            setInputActions([]);
             setIsHydratingConversation(false);
             return;
           }
@@ -769,7 +763,6 @@ export default function ChatInterface() {
         return;
       }
       setMessages(hydrated.messages);
-      setInputActions(hydrated.inputActions);
     } catch (error) {
       if (isMissingConversationLoadError(error)) {
         setHistoryItems((prev) =>
@@ -784,7 +777,6 @@ export default function ChatInterface() {
       setMessages([
         conversationLoadFailureMessage(convId, t("chat.error_load")),
       ]);
-      setInputActions([]);
       showToast(t("chat.error_load"));
     } finally {
       setStreamStatus(null);
@@ -1041,7 +1033,6 @@ export default function ChatInterface() {
         renderUserMessage,
       });
     });
-    setInputActions([]);
     setStreamStatus(null);
     activeStreamConversationIdRef.current = targetConversationId;
     setIsStreamingResponse(true);
@@ -1110,7 +1101,6 @@ export default function ChatInterface() {
                 assistantMessageId: persistedErrorMessageId,
               })
             : retryLastTurnAction);
-        setInputActions([]);
         clearActiveStreamState();
         setMessages((prev) =>
           normalizeDurableRetryActionHistory(
@@ -1195,7 +1185,6 @@ export default function ChatInterface() {
           const confirmation = event.data
             .confirmation as StrategyConfirmationPayload;
           const finalAssistantId = finalMessageId ?? assistantId;
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1223,7 +1212,6 @@ export default function ChatInterface() {
             savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
             actions: resultActions,
           };
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1241,7 +1229,6 @@ export default function ChatInterface() {
           );
         } else if (finalBacktestJob) {
           const finalAssistantId = finalMessageId ?? assistantId;
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1265,7 +1252,6 @@ export default function ChatInterface() {
         } else if (finalText) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
-          setInputActions(visibleComposerResponseActions(finalResponseActions));
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1414,7 +1400,6 @@ export default function ChatInterface() {
               canApplyOwnedStreamUpdate()
             ) {
               setMessages(view.messages);
-              setInputActions(view.inputActions);
               if (!view.showChecking) {
                 clearActiveStreamState();
               }
@@ -1437,7 +1422,6 @@ export default function ChatInterface() {
           if (
             canApplyConversationOwnedUpdate(activeStreamTargetConversationId)
           ) {
-            setInputActions([]);
             setStreamStatus(t("chat.status.checking"));
             setMessages((prev) =>
               settleConfirmationAfterActionTransportError(prev, action, {
@@ -1499,7 +1483,6 @@ export default function ChatInterface() {
           activeStreamTargetConversationId,
         );
         if (canApplyOwnedUpdate) {
-          setInputActions([]);
           clearActiveStreamState();
         }
         const status = (err as { status?: number }).status;
@@ -1678,7 +1661,6 @@ export default function ChatInterface() {
       presentation: action.presentation,
     };
 
-    setInputActions([]);
     setStreamStatus(null);
     setIsStreamingResponse(true);
     try {
@@ -1767,7 +1749,6 @@ export default function ChatInterface() {
       void handleSend(action.label || value, action);
       return;
     }
-    setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 
@@ -1866,16 +1847,17 @@ export default function ChatInterface() {
     }
   };
 
-  const composerActions = hasActiveArtifactActionSet(messages)
-    ? []
-    : visibleComposerResponseActions(inputActions);
-  const actionLabel = (action: ChatActionOption) =>
-    action.labelKey
-      ? t(action.labelKey, {
-          defaultValue: action.label,
-          ...((action.payload ?? {}) as Record<string, unknown>),
-        })
-      : action.label;
+  // One in-flight lock for every way to start a turn. The composer already
+  // disables itself while a turn runs; persistent discovery rows have to obey
+  // the same lock or they become a way to spam turns around it.
+  const turnInFlight =
+    Boolean(streamStatus) || isStreamingResponse || isHydratingConversation;
+  // Next-move rows render under their owning message instead of a floating
+  // strip above the composer, but they keep every gate the strip applied:
+  // nothing offers a next move mid-turn, or while an active card already owns
+  // the conversation's actions.
+  const nextMovesEnabled =
+    !turnInFlight && !hasActiveArtifactActionSet(messages);
   const latestAssistantContent =
     [...messages]
       .reverse()
@@ -2190,6 +2172,8 @@ export default function ChatInterface() {
                           isLatest={isLatestAi}
                           isStreaming={isWorkingMessage}
                           conversationId={conversationId}
+                          nextMovesEnabled={nextMovesEnabled}
+                          turnInFlight={turnInFlight}
                           isGuest={isGuest}
                           canSaveDecision={canSaveDecision}
                           onDecisionUnavailable={requestGuestDecision}
@@ -2229,23 +2213,6 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {composerActions.length > 0 &&
-                      !streamStatus &&
-                      !isStreamingResponse &&
-                      !isHydratingConversation && (
-                        <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                          {composerActions.map((action) => (
-                            <button
-                              key={action.id ?? action.type ?? action.label}
-                              type="button"
-                              onClick={() => handleAction(action)}
-                              className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
-                            >
-                              {actionLabel(action)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     <ChatInput
                       onSend={handleSend}
                       disabled={isStreamingResponse || isHydratingConversation}

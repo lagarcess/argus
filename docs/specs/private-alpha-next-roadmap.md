@@ -922,8 +922,14 @@ provider-resolved candidates for equity, crypto, and currency-pair assets,
 persisted EN/ES rendering, honest kill-switch recovery, and operational cost
 evidence. Issue #244 remains open: one comparison phrasing missed the typed
 route in the sanctioned live eval, and Render configuration plus exact-SHA
-canary evidence are still required before tester exposure. Full Omnisearch is
-the remaining unbuilt founder outcome.
+canary evidence are still required before tester exposure. PR #281 then landed
+the frontend presentation slice as `8fde4ac1`: conversational next moves and
+discovery candidates render as stacked rows under their owning message,
+candidate reasons remain visible, and the persisted discovery evidence opens
+in a sources panel without re-querying. The remaining chat-polish work is
+explicitly separate: resolved-identity carry-forward (Slice D), honest live
+progress (Slice B), and guest discovery allowance. Full Omnisearch is the
+remaining unbuilt founder outcome.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration
@@ -938,8 +944,11 @@ classified as a Guest-only settlement defect, landed with Guest PR #279 at
 Supported strategy-transition preservation (#270) is complete through PR #278
 at `b80d95a2`; modeled-cost preservation (#271) landed through PR #280 at
 `d16f7496` and remains open only for its focused integrated closure journey.
-#272 is now the next protected interpreter/edit-spine issue, and #249 may now
-start because the overlapping Guest shell has landed. See
+#272 is now the next protected interpreter/edit-spine issue. #249 may now start
+from `8fde4ac1` or later because the overlapping Guest and chat-next-move shell
+owners have landed; it must preserve PR #281's stacked rows, source panel, and
+shared in-flight lock while changing only Quick take, Explain, Try next, and
+recovery ownership. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
