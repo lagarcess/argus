@@ -2583,6 +2583,7 @@ async def _response_ready_for_runtime(
         planned_response = await _plan_artifact_edit_response(
             preferred_model=preferred_model,
             request=request,
+            primary_draft=response.candidate_strategy_draft,
         )
         if planned_response is not None:
             return planned_response
@@ -2632,6 +2633,7 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
         rejected_response=response,
+        primary_draft=response.candidate_strategy_draft,
     )
     if planned_response is not None:
         return planned_response
@@ -2703,14 +2705,18 @@ async def _ready_active_artifact_edit_planned_response(
         draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
     ):
         return None
+    async def _planned_with_primary() -> LLMInterpretationResponse | None:
+        return await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+            primary_draft=response.candidate_strategy_draft,
+        )
+
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
         request=request,
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
+        planned = await _planned_with_primary()
         if planned is not None:
             return planned
         return _asset_universe_operation_clarification_response(
@@ -2720,17 +2726,8 @@ async def _ready_active_artifact_edit_planned_response(
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(
         response.candidate_strategy_draft
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
-        if planned is not None:
-            return planned
-        return None
-    planned = await _plan_pending_artifact_assumption_edit(
-        request=request,
-        preferred_model=preferred_model,
-    )
+        return await _planned_with_primary()
+    planned = await _planned_with_primary()
     if planned is None or planned.requires_clarification:
         return None
     return planned
@@ -2960,6 +2957,7 @@ async def _plan_artifact_edit_response(
     preferred_model: str,
     request: InterpretationRequest,
     rejected_response: LLMInterpretationResponse | None = None,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     planned_response = None
     if rejected_response is None or not _refinement_reply_needs_full_interpretation(
@@ -2969,6 +2967,7 @@ async def _plan_artifact_edit_response(
         planned_response = await _plan_pending_artifact_assumption_edit(
             request=request,
             preferred_model=preferred_model,
+            primary_draft=primary_draft,
         )
     if planned_response is None:
         planned_response = await _plan_focused_artifact_edit(
@@ -3390,6 +3389,7 @@ async def _plan_pending_artifact_assumption_edit(
     request: InterpretationRequest,
     preferred_model: str,
     require_failure_edit_evidence: bool = False,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
@@ -3434,7 +3434,10 @@ async def _plan_pending_artifact_assumption_edit(
             return None
     resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     return _response_from_artifact_assumption_edit_plan(
-        plan=plan, request=request, asset_symbol_resolver=resolver
+        plan=plan,
+        request=request,
+        asset_symbol_resolver=resolver,
+        primary_draft=primary_draft,
     )
 
 

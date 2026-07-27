@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
+from decimal import Decimal, InvalidOperation
 
 from argus.agent_runtime.interpreter.audits import (
     StatedExecutionCost,
@@ -14,6 +16,10 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
 )
 from argus.agent_runtime.state.models import StrategySummary
+
+# A user states costs as a decimal rate, a percentage, or basis points; the
+# same three readings ground both corroboration and numeric anchoring.
+_COST_UNIT_DIVISORS = (Decimal(1), Decimal(100), Decimal(10000))
 
 EXECUTION_COST_FIDELITY_INSTRUCTIONS = (
     "For a fee or slippage stated in the current message, return the matching "
@@ -138,15 +144,124 @@ def supported_cost_rate_value(rate: float, *, field_name: str) -> float | None:
     return rate
 
 
-def record_typed_plan_cost_evidence(
+def ground_planned_execution_costs(
     draft: LLMStrategyDraft,
     *,
-    field_name: str,
-    rate: float,
-) -> None:
-    """Typed edit-plan resolution is validated cost evidence with no quote span."""
+    current_message: str,
+    primary_draft: LLMStrategyDraft | None,
+    extra_parameters: dict[str, object],
+    field_provenance: dict[str, str],
+) -> list[str]:
+    """A planned cost may become owned only when the same turn's primary
+    interpretation corroborates the value and the current message anchors it
+    (verbatim primary span, or a message number under a supported cost unit).
+    Ungrounded planned costs are removed instead of gaining provenance."""
 
-    draft._validated_execution_cost_evidence[field_name] = (rate, None)
+    dropped: list[str] = []
+    for field_name in ("fee_rate", "slippage"):
+        if field_name not in extra_parameters:
+            continue
+        rate = extra_parameters[field_name]
+        grounded, span = planned_cost_change_is_grounded(
+            rate,
+            field_name=field_name,
+            current_message=current_message,
+            corroborating_values=(
+                primary_draft.extra_parameters if primary_draft is not None else None
+            ),
+            corroborating_spans=(
+                primary_draft.evidence_spans if primary_draft is not None else None
+            ),
+        )
+        if grounded:
+            if span is not None:
+                draft.evidence_spans[field_name] = span
+            draft._validated_execution_cost_evidence[field_name] = (
+                float(rate),  # type: ignore[arg-type]
+                span,
+            )
+            continue
+        dropped.append(field_name)
+        extra_parameters.pop(field_name, None)
+        field_provenance.pop(field_name, None)
+        draft.extra_parameters.pop(field_name, None)
+        draft.field_provenance.pop(field_name, None)
+        draft.evidence_spans.pop(field_name, None)
+        draft._validated_execution_cost_evidence.pop(field_name, None)
+    return dropped
+
+
+def planned_cost_change_is_grounded(
+    rate: object,
+    *,
+    field_name: str,
+    current_message: str,
+    corroborating_values: Mapping[str, object] | None,
+    corroborating_spans: Mapping[str, object] | None,
+) -> tuple[bool, str | None]:
+    """Grounding rule for a planned cost value. When the turn has an
+    independent interpretation, it must corroborate the value (any supported
+    cost unit) and the current message must anchor it — a verbatim
+    corroborating span, or a message number that reads as the value under a
+    supported unit. When no interpretation exists (interpreter-unavailable
+    continuity), the message number is the only available evidence and is
+    required on its own."""
+
+    if corroborating_values is None:
+        return numeric_cost_anchor_in_message(rate, current_message), None
+    if not _unit_equivalent_cost(corroborating_values.get(field_name), rate):
+        return False, None
+    span = str((corroborating_spans or {}).get(field_name) or "").strip()
+    if span and span in str(current_message):
+        return True, span
+    if numeric_cost_anchor_in_message(rate, current_message):
+        return True, None
+    return False, None
+
+
+def numeric_cost_anchor_in_message(rate: object, message: str) -> bool:
+    target = _decimal_or_none(rate)
+    if target is None:
+        return False
+    for number in _numeric_message_tokens(str(message or "")):
+        if any(number / divisor == target for divisor in _COST_UNIT_DIVISORS):
+            return True
+    return False
+
+
+def _numeric_message_tokens(message: str) -> list[Decimal]:
+    numbers: list[Decimal] = []
+    for raw_token in message.split():
+        token = raw_token.strip("%$€£:;,!?()[]{}\"'").replace(",", "")
+        while token.endswith("."):
+            token = token[:-1]
+        number = _decimal_or_none(token)
+        if number is not None:
+            numbers.append(number)
+    return numbers
+
+
+def _unit_equivalent_cost(candidate: object, rate: object) -> bool:
+    stated = _decimal_or_none(candidate)
+    target = _decimal_or_none(rate)
+    if stated is None or target is None:
+        return False
+    return any(stated / divisor == target for divisor in _COST_UNIT_DIVISORS)
+
+
+
+def _decimal_or_none(value: object) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    if not isinstance(value, (int, float, str)):
+        return None
+    try:
+        parsed = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    if not parsed.is_finite():
+        return None
+    return parsed
 
 
 def _candidate_agrees_with_cost(candidate: object, rate: float) -> bool:

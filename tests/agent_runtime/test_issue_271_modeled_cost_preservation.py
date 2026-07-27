@@ -832,11 +832,35 @@ def test_pending_option_selection_preserves_modeled_costs() -> None:
     assert "backtest_job" not in result.patch
 
 
+def _cost_edit_primary_draft(
+    *,
+    message: str,
+    fee_rate: float | None = None,
+    slippage: float | None = None,
+    evidence_spans: dict[str, str] | None = None,
+) -> LLMStrategyDraft:
+    """Primary-interpretation shape for a cost-edit turn: the extracted values
+    are what route the turn to the planner in production."""
+
+    extra_parameters: dict[str, Any] = {}
+    if fee_rate is not None:
+        extra_parameters["fee_rate"] = fee_rate
+    if slippage is not None:
+        extra_parameters["slippage"] = slippage
+    return LLMStrategyDraft(
+        raw_user_phrasing=message,
+        strategy_type="buy_and_hold",
+        extra_parameters=extra_parameters,
+        evidence_spans=dict(evidence_spans or {}),
+    )
+
+
 def _planned_cost_edit_interpretation(
     *,
     message: str,
     snapshot: TaskSnapshot,
     operations: list[EditOperation],
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> StructuredInterpretation:
     """Run the real planner-response route: typed plan -> planned response ->
     canonical conversion. This is the production path for active-confirmation
@@ -856,6 +880,7 @@ def _planned_cost_edit_interpretation(
             user_goal_summary="Change the modeled execution costs.",
         ),
         request=request,
+        primary_draft=primary_draft,
     )
     return OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -872,6 +897,11 @@ def test_planned_explicit_zero_cost_edit_clears_owned_costs() -> None:
             EditOperation(op="set", target="fees", number=0.0),
             EditOperation(op="set", target="slippage", number=0.0),
         ],
+        primary_draft=_cost_edit_primary_draft(
+            message=message,
+            fee_rate=0.0,
+            slippage=0.0,
+        ),
     )
     result = interpret_stage(
         state=RunState.new(
@@ -919,6 +949,11 @@ def test_planned_nonzero_cost_edit_updates_owned_costs() -> None:
             EditOperation(op="set", target="fees", number=0.002),
             EditOperation(op="set", target="slippage", number=0.0007),
         ],
+        primary_draft=_cost_edit_primary_draft(
+            message=message,
+            fee_rate=0.002,
+            slippage=0.0007,
+        ),
     )
     result = interpret_stage(
         state=RunState.new(
@@ -959,6 +994,11 @@ def test_legacy_flat_plan_cost_edit_updates_owned_costs() -> None:
             user_goal_summary="Change the modeled execution costs.",
         ),
         request=request,
+        primary_draft=_cost_edit_primary_draft(
+            message=message,
+            fee_rate=0.002,
+            slippage=0.0007,
+        ),
     )
     interpretation = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -986,4 +1026,260 @@ def test_planned_cost_edit_rejects_unsupported_rates() -> None:
     strategy = interpretation.candidate_strategy_draft
     assert "fee_rate" not in strategy.extra_parameters
     assert "slippage" not in strategy.extra_parameters
+    assert interpretation.requires_clarification is True
+
+
+def _date_only_primary_draft() -> LLMStrategyDraft:
+    """Realistic primary extraction for a date-only edit: no cost fields."""
+
+    return LLMStrategyDraft(
+        raw_user_phrasing=(
+            "Change the dates to February 1, 2023 through November 30, 2024."
+        ),
+        strategy_type="buy_and_hold",
+        date_range={"start": "2023-02-01", "end": "2024-11-30"},
+        field_provenance={"date_range": "explicit_user"},
+    )
+
+
+def test_planner_costs_without_current_message_support_are_not_owned() -> None:
+    message = "Change the dates to February 1, 2023 through November 30, 2024."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=snapshot,
+        user=UserState(user_id="u-271"),
+    )
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window={
+                        "kind": "explicit_range",
+                        "start": "2023-02-01",
+                        "end": "2024-11-30",
+                    },
+                ),
+                EditOperation(op="set", target="fees", number=0.002),
+            ],
+            user_goal_summary="Change the dates.",
+        ),
+        request=request,
+    )
+    interpretation = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(response, request=request)
+
+    draft = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in draft.extra_parameters
+    provenance = draft.extra_parameters.get("field_provenance") or {}
+    assert "fee_rate" not in provenance
+    assert draft.date_range == {"start": "2023-02-01", "end": "2024-11-30"}
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u-271"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=_RecordingInterpreter(interpretation),
+    )
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.001
+    assert strategy.extra_parameters["slippage"] == 0.0005
+
+
+def test_flat_plan_costs_without_current_message_support_are_not_owned() -> None:
+    message = "Change the dates to February 1, 2023 through November 30, 2024."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=snapshot,
+        user=UserState(user_id="u-271"),
+    )
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            fee_rate=0.002,
+            slippage=0.0007,
+            user_goal_summary="Change the dates.",
+        ),
+        request=request,
+    )
+    interpretation = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(response, request=request)
+
+    draft = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in draft.extra_parameters
+    assert "slippage" not in draft.extra_parameters
+
+
+def test_cost_only_plan_without_primary_support_asks_instead_of_owning() -> None:
+    message = "Please update the setup."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=snapshot,
+        user=UserState(user_id="u-271"),
+    )
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="set", target="fees", number=0.002)],
+            user_goal_summary="Change the fees.",
+            assistant_response=None,
+        ),
+        request=request,
+    )
+    interpretation = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(response, request=request)
+
+    draft = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in draft.extra_parameters
+    assert interpretation.requires_clarification is True
+
+
+async def _offline_planned_cost_edit(message: str) -> Any:
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        planned_latest_result_edit_interpretation,
+    )
+
+    source = _completed_result_reference(["MSFT"])
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=True,
+        latest_backtest_result_reference=source,
+        artifact_references=[source],
+    )
+
+    async def fake_planner(**kwargs: Any) -> ArtifactAssumptionEditPlan:
+        del kwargs
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="set", target="fees", number=0.002),
+                EditOperation(op="set", target="slippage", number=0.0007),
+            ],
+            user_goal_summary="Change the modeled costs.",
+        )
+
+    return await planned_latest_result_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=message,
+        resolve_asset_candidate=lambda *args, **kwargs: None,
+        plan_artifact_assumption_edit_fn=fake_planner,
+    )
+
+
+@pytest.mark.asyncio
+async def test_offline_planned_cost_edit_grounds_in_message_numbers() -> None:
+    interpretation = await _offline_planned_cost_edit(
+        "Make it 20 bps fees and 7 bps slippage."
+    )
+
+    assert interpretation is not None
+    draft = interpretation.candidate_strategy_draft
+    assert draft.extra_parameters["fee_rate"] == 0.002
+    assert draft.extra_parameters["slippage"] == 0.0007
+    assert draft.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
+
+
+@pytest.mark.asyncio
+async def test_offline_planned_cost_edit_without_message_support_declines() -> None:
+    interpretation = await _offline_planned_cost_edit(
+        "Change the dates to February 1, 2023 through November 30, 2024."
+    )
+
+    assert interpretation is None
+
+
+def test_uncorroborated_plan_cost_colliding_with_message_numbers_is_dropped() -> None:
+    message = "Change the dates to February 1, 2023 through November 30, 2024."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[EditOperation(op="set", target="fees", number=0.003)],
+        primary_draft=_date_only_primary_draft(),
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in strategy.extra_parameters
+    provenance = strategy.extra_parameters.get("field_provenance") or {}
+    assert "fee_rate" not in provenance
+
+
+def test_worded_zero_clear_grounds_through_primary_evidence_span() -> None:
+    message = "Remove the fees and slippage from this test entirely."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[
+            EditOperation(op="set", target="fees", number=0.0),
+            EditOperation(op="set", target="slippage", number=0.0),
+        ],
+        primary_draft=_cost_edit_primary_draft(
+            message=message,
+            fee_rate=0.0,
+            slippage=0.0,
+            evidence_spans={
+                "fee_rate": "Remove the fees",
+                "slippage": "and slippage",
+            },
+        ),
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.0
+    assert strategy.extra_parameters["slippage"] == 0.0
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
+    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+
+
+def test_bps_normalized_primary_value_corroborates_planned_decimal_rate() -> None:
+    message = "Make it 20 bps fees and 7 bps slippage."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[
+            EditOperation(op="set", target="fees", number=0.002),
+            EditOperation(op="set", target="slippage", number=0.0007),
+        ],
+        primary_draft=_cost_edit_primary_draft(
+            message=message,
+            fee_rate=20,
+            slippage=7,
+        ),
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.002
+    assert strategy.extra_parameters["slippage"] == 0.0007
+
+
+def test_disagreeing_primary_and_plan_costs_ask_instead_of_owning() -> None:
+    message = "Make the fees 20 bps."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[EditOperation(op="set", target="fees", number=0.003)],
+        primary_draft=_cost_edit_primary_draft(message=message, fee_rate=0.002),
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in strategy.extra_parameters
     assert interpretation.requires_clarification is True
