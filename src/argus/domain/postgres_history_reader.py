@@ -58,22 +58,164 @@ from (
 """
 
 
-_CANDIDATES_SQL = """
-with input as (
+_SOURCE_RANKS = {
+    "run": 1,
+    "collection": 2,
+    "strategy": 3,
+    "chat": 4,
+}
+
+
+def _cursor_predicate(
+    *,
+    activity_column: str,
+    id_column: str,
+    source_rank: int,
+    pivot_type_rank: int,
+) -> str:
+    if source_rank < pivot_type_rank:
+        return f"{activity_column} <= %(cursor_activity_at)s"
+    if source_rank > pivot_type_rank:
+        return f"{activity_column} < %(cursor_activity_at)s"
+    return (
+        f"row({activity_column}, {id_column}) "
+        "< row(%(cursor_activity_at)s, %(cursor_id)s)"
+    )
+
+
+def _bounded_leaf(
+    *,
+    select_sql: str,
+    from_sql: str,
+    filters: tuple[str, ...],
+    order_sql: str,
+) -> str:
+    where_sql = "\n      and ".join(filters)
+    return f"""
     select
-        %s::uuid as user_id,
-        %s::boolean as archived,
-        %s::boolean as deleted,
-        %s::boolean as has_cursor,
-        %s::boolean as cursor_pinned,
-        %s::timestamptz as cursor_activity_at,
-        %s::integer as cursor_type_rank,
-        %s::uuid as cursor_id,
-        %s::integer as source_limit
-),
-run_candidates as (
-    select
-        'run'::text as source_type,
+{select_sql}
+    from {from_sql}
+    where {where_sql}
+    order by {order_sql}
+    limit %(source_limit)s
+"""
+
+
+def _variable_source_sql(
+    *,
+    select_sql: str,
+    from_sql: str,
+    base_filters: tuple[str, ...],
+    order_sql: str,
+    outer_order_sql: str,
+    source_alias: str,
+    activity_column: str,
+    id_column: str,
+    source_rank: int,
+    has_cursor: bool,
+    pivot_pinned: bool,
+    pivot_type_rank: int,
+) -> str:
+    if not has_cursor:
+        pinned_leaf = _bounded_leaf(
+            select_sql=select_sql,
+            from_sql=from_sql,
+            filters=(*base_filters, f"{source_alias}.pinned is true"),
+            order_sql=order_sql,
+        )
+        unpinned_leaf = _bounded_leaf(
+            select_sql=select_sql,
+            from_sql=from_sql,
+            filters=(*base_filters, f"{source_alias}.pinned is false"),
+            order_sql=order_sql,
+        )
+        return f"""
+    select *
+    from (
+        ({pinned_leaf})
+        union all
+        ({unpinned_leaf})
+    ) as {source_alias}_tiers
+    order by {outer_order_sql}
+    limit %(source_limit)s
+"""
+
+    cursor_predicate = _cursor_predicate(
+        activity_column=activity_column,
+        id_column=id_column,
+        source_rank=source_rank,
+        pivot_type_rank=pivot_type_rank,
+    )
+    if not pivot_pinned:
+        return _bounded_leaf(
+            select_sql=select_sql,
+            from_sql=from_sql,
+            filters=(*base_filters, f"{source_alias}.pinned is false", cursor_predicate),
+            order_sql=order_sql,
+        )
+
+    pinned_leaf = _bounded_leaf(
+        select_sql=select_sql,
+        from_sql=from_sql,
+        filters=(*base_filters, f"{source_alias}.pinned is true", cursor_predicate),
+        order_sql=order_sql,
+    )
+    unpinned_leaf = _bounded_leaf(
+        select_sql=select_sql,
+        from_sql=from_sql,
+        filters=(*base_filters, f"{source_alias}.pinned is false"),
+        order_sql=order_sql,
+    )
+    return f"""
+    select *
+    from (
+        ({pinned_leaf})
+        union all
+        ({unpinned_leaf})
+    ) as {source_alias}_tiers
+    order by {outer_order_sql}
+    limit %(source_limit)s
+"""
+
+
+@lru_cache(maxsize=40)
+def _candidate_sql(
+    *,
+    archived: bool,
+    deleted: bool,
+    has_cursor: bool,
+    pivot_pinned: bool,
+    pivot_type_rank: int,
+) -> str:
+    if has_cursor and pivot_type_rank not in _SOURCE_RANKS.values():
+        raise HistoryCursorError("History cursor pivot rank is invalid.")
+
+    archive_state = "true" if archived else "false"
+    deleted_state = "is not null" if deleted else "is null"
+
+    run_parent_filter = (
+        "(parent.id is not null "
+        f"and parent.archived is {archive_state} "
+        f"and parent.deleted_at {deleted_state})"
+    )
+    if not archived and not deleted:
+        run_parent_filter = f"(parent.id is null or {run_parent_filter})"
+    run_filters: tuple[str, ...] = (
+        "run.user_id = %(user_id)s",
+        run_parent_filter,
+    )
+    if has_cursor and not pivot_pinned:
+        run_filters = (
+            *run_filters,
+            _cursor_predicate(
+                activity_column="run.created_at",
+                id_column="run.id",
+                source_rank=_SOURCE_RANKS["run"],
+                pivot_type_rank=pivot_type_rank,
+            ),
+        )
+    run_sql = _bounded_leaf(
+        select_sql="""        'run'::text as source_type,
         false as pinned,
         run.created_at as activity_at,
         1 as type_rank,
@@ -83,44 +225,17 @@ run_candidates as (
             'conversation_id', run.conversation_id,
             'conversation_result_card', run.conversation_result_card,
             'created_at', run.created_at
-        ) as payload
-    from input
-    join public.backtest_runs as run
-      on run.user_id = input.user_id
+        ) as payload""",
+        from_sql="""public.backtest_runs as run
     left join public.conversations as parent
       on parent.id = run.conversation_id
-     and parent.user_id = input.user_id
-    where (
-        (
-            parent.id is null
-            and not input.archived
-            and not input.deleted
-        )
-        or (
-            parent.id is not null
-            and parent.archived = input.archived
-            and (
-                (input.deleted and parent.deleted_at is not null)
-                or (not input.deleted and parent.deleted_at is null)
-            )
-        )
+     and parent.user_id = %(user_id)s""",
+        filters=run_filters,
+        order_sql="run.created_at desc, run.id desc",
     )
-      and (
-          not input.has_cursor
-          or row(false, run.created_at, 1, run.id)
-             < row(
-                 input.cursor_pinned,
-                 input.cursor_activity_at,
-                 input.cursor_type_rank,
-                 input.cursor_id
-             )
-      )
-    order by run.created_at desc, run.id desc
-    limit (select source_limit from input)
-),
-chat_candidates as (
-    select
-        'chat'::text as source_type,
+
+    chat_sql = _variable_source_sql(
+        select_sql="""        'chat'::text as source_type,
         chat.pinned,
         chat.updated_at as activity_at,
         4 as type_rank,
@@ -134,37 +249,32 @@ chat_candidates as (
             'updated_at', chat.updated_at,
             'deleted_at', chat.deleted_at,
             'archived', chat.archived
-        ) as payload
-    from input
-    join public.conversations as chat
-      on chat.user_id = input.user_id
-    where chat.archived = input.archived
-      and (
-          (input.deleted and chat.deleted_at is not null)
-          or (not input.deleted and chat.deleted_at is null)
-      )
-      and exists (
+        ) as payload""",
+        from_sql="public.conversations as chat",
+        base_filters=(
+            "chat.user_id = %(user_id)s",
+            f"chat.archived is {archive_state}",
+            f"chat.deleted_at {deleted_state}",
+            """exists (
           select 1
           from public.messages as message
-          where message.user_id = input.user_id
+          where message.user_id = %(user_id)s
             and message.conversation_id = chat.id
-      )
-      and (
-          not input.has_cursor
-          or row(chat.pinned, chat.updated_at, 4, chat.id)
-             < row(
-                 input.cursor_pinned,
-                 input.cursor_activity_at,
-                 input.cursor_type_rank,
-                 input.cursor_id
-             )
-      )
-    order by chat.pinned desc, chat.updated_at desc, chat.id desc
-    limit (select source_limit from input)
-),
-strategy_candidates as (
-    select
-        'strategy'::text as source_type,
+      )""",
+        ),
+        order_sql="chat.pinned desc, chat.updated_at desc, chat.id desc",
+        outer_order_sql="pinned desc, activity_at desc, id desc",
+        source_alias="chat",
+        activity_column="chat.updated_at",
+        id_column="chat.id",
+        source_rank=_SOURCE_RANKS["chat"],
+        has_cursor=has_cursor,
+        pivot_pinned=pivot_pinned,
+        pivot_type_rank=pivot_type_rank,
+    )
+
+    strategy_sql = _variable_source_sql(
+        select_sql="""        'strategy'::text as source_type,
         strategy.pinned,
         strategy.updated_at as activity_at,
         3 as type_rank,
@@ -176,54 +286,60 @@ strategy_candidates as (
             'pinned', strategy.pinned,
             'updated_at', strategy.updated_at,
             'deleted_at', strategy.deleted_at
-        ) as payload
-    from input
-    join public.strategies as strategy
-      on strategy.user_id = input.user_id
-    where (
-        (input.deleted and strategy.deleted_at is not null)
-        or (not input.deleted and strategy.deleted_at is null)
+        ) as payload""",
+        from_sql="public.strategies as strategy",
+        base_filters=(
+            "strategy.user_id = %(user_id)s",
+            f"strategy.deleted_at {deleted_state}",
+        ),
+        order_sql=("strategy.pinned desc, strategy.updated_at desc, strategy.id desc"),
+        outer_order_sql="pinned desc, activity_at desc, id desc",
+        source_alias="strategy",
+        activity_column="strategy.updated_at",
+        id_column="strategy.id",
+        source_rank=_SOURCE_RANKS["strategy"],
+        has_cursor=has_cursor,
+        pivot_pinned=pivot_pinned,
+        pivot_type_rank=pivot_type_rank,
     )
-      and (
-          not input.has_cursor
-          or row(strategy.pinned, strategy.updated_at, 3, strategy.id)
-             < row(
-                 input.cursor_pinned,
-                 input.cursor_activity_at,
-                 input.cursor_type_rank,
-                 input.cursor_id
-             )
-      )
-    order by strategy.pinned desc, strategy.updated_at desc, strategy.id desc
-    limit (select source_limit from input)
-),
-collection_candidates as (
-    select
-        collection.user_id,
+
+    collection_sql = _variable_source_sql(
+        select_sql="""        collection.user_id,
         collection.id,
         collection.name,
         collection.pinned,
         collection.deleted_at,
-        collection.updated_at
-    from input
-    join public.collections as collection
-      on collection.user_id = input.user_id
-    where (
-        (input.deleted and collection.deleted_at is not null)
-        or (not input.deleted and collection.deleted_at is null)
+        collection.updated_at""",
+        from_sql="public.collections as collection",
+        base_filters=(
+            "collection.user_id = %(user_id)s",
+            f"collection.deleted_at {deleted_state}",
+        ),
+        order_sql=(
+            "collection.pinned desc, collection.updated_at desc, collection.id desc"
+        ),
+        outer_order_sql="pinned desc, updated_at desc, id desc",
+        source_alias="collection",
+        activity_column="collection.updated_at",
+        id_column="collection.id",
+        source_rank=_SOURCE_RANKS["collection"],
+        has_cursor=has_cursor,
+        pivot_pinned=pivot_pinned,
+        pivot_type_rank=pivot_type_rank,
     )
-      and (
-          not input.has_cursor
-          or row(collection.pinned, collection.updated_at, 2, collection.id)
-             < row(
-                 input.cursor_pinned,
-                 input.cursor_activity_at,
-                 input.cursor_type_rank,
-                 input.cursor_id
-             )
-      )
-    order by collection.pinned desc, collection.updated_at desc, collection.id desc
-    limit (select source_limit from input)
+
+    return f"""
+with run_candidates as (
+{run_sql}
+),
+chat_candidates as (
+{chat_sql}
+),
+strategy_candidates as (
+{strategy_sql}
+),
+collection_candidates as (
+{collection_sql}
 ),
 collection_rows as (
     select
@@ -316,19 +432,21 @@ class PostgresHistoryReader:
                     pivot_pinned = bool(pivots[0]["pinned"])
                     pivot_type_rank = int(pivots[0]["type_rank"])
 
+                candidate_params = {
+                    "user_id": owner_id,
+                    "cursor_activity_at": cursor_activity_at,
+                    "cursor_id": pivot_id,
+                    "source_limit": limit,
+                }
                 cursor.execute(
-                    _CANDIDATES_SQL,
-                    (
-                        owner_id,
-                        archived,
-                        deleted,
-                        has_cursor,
-                        pivot_pinned,
-                        cursor_activity_at,
-                        pivot_type_rank,
-                        pivot_id,
-                        limit,
+                    _candidate_sql(
+                        archived=archived,
+                        deleted=deleted,
+                        has_cursor=has_cursor,
+                        pivot_pinned=pivot_pinned,
+                        pivot_type_rank=pivot_type_rank,
                     ),
+                    candidate_params,
                 )
                 candidates = cursor.fetchall()
 

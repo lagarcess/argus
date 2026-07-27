@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 
@@ -147,9 +148,169 @@ def test_history_cursor_uses_one_pivot_query_and_one_candidate_query() -> None:
     }
     assert len(pool.cursor.executions) == 2
     candidate_params = pool.cursor.executions[1][1]
-    assert cursor_at in candidate_params
-    assert True in candidate_params
-    assert 3 in candidate_params
+    assert candidate_params == {
+        "user_id": UUID("00000000-0000-0000-0000-000000000001"),
+        "cursor_activity_at": cursor_at,
+        "cursor_id": UUID("11111111-1111-1111-1111-111111111111"),
+        "source_limit": 4,
+    }
+
+
+def _source_sql(sql: str, source: str, next_source: str) -> str:
+    start = sql.index(f"{source}_candidates as (")
+    end = sql.index(f"{next_source}_candidates as (", start)
+    return sql[start:end]
+
+
+def test_history_candidate_sql_uses_cached_specialized_variants() -> None:
+    from argus.domain.postgres_history_reader import _candidate_sql
+
+    _candidate_sql.cache_clear()
+    sql = _candidate_sql(
+        archived=False,
+        deleted=False,
+        has_cursor=False,
+        pivot_pinned=False,
+        pivot_type_rank=0,
+    )
+    repeated = _candidate_sql(
+        archived=False,
+        deleted=False,
+        has_cursor=False,
+        pivot_pinned=False,
+        pivot_type_rank=0,
+    )
+
+    assert sql == repeated
+    assert _candidate_sql.cache_info().hits == 1
+    assert "with input as" not in sql.lower()
+    assert "input." not in sql
+    assert "not has_cursor" not in sql
+    assert "chat.archived is false" in sql
+    assert "chat.deleted_at is null" in sql
+    assert "strategy.deleted_at is null" in sql
+    assert "collection.deleted_at is null" in sql
+    assert "%(user_id)s" in sql
+    assert "%(source_limit)s" in sql
+
+
+def test_history_first_page_splits_pin_tiers_before_each_source_limit() -> None:
+    from argus.domain.postgres_history_reader import _candidate_sql
+
+    sql = _candidate_sql(
+        archived=False,
+        deleted=True,
+        has_cursor=False,
+        pivot_pinned=False,
+        pivot_type_rank=0,
+    )
+    chat_sql = _source_sql(sql, "chat", "strategy")
+    strategy_sql = _source_sql(sql, "strategy", "collection")
+    collection_sql = sql[sql.index("collection_candidates as (") :]
+
+    for source_sql in (chat_sql, strategy_sql, collection_sql):
+        assert ".pinned is true" in source_sql
+        assert ".pinned is false" in source_sql
+        assert "union all" in source_sql.lower()
+
+
+@pytest.mark.parametrize(
+    (
+        "pivot_type_rank",
+        "run_predicate",
+        "chat_predicate",
+        "strategy_predicate",
+        "collection_predicate",
+    ),
+    [
+        (
+            1,
+            "row(run.created_at, run.id) < row(%(cursor_activity_at)s, %(cursor_id)s)",
+            "chat.updated_at < %(cursor_activity_at)s",
+            "strategy.updated_at < %(cursor_activity_at)s",
+            "collection.updated_at < %(cursor_activity_at)s",
+        ),
+        (
+            2,
+            "run.created_at <= %(cursor_activity_at)s",
+            "chat.updated_at < %(cursor_activity_at)s",
+            "strategy.updated_at < %(cursor_activity_at)s",
+            "row(collection.updated_at, collection.id) < row(%(cursor_activity_at)s, %(cursor_id)s)",
+        ),
+        (
+            3,
+            "run.created_at <= %(cursor_activity_at)s",
+            "chat.updated_at < %(cursor_activity_at)s",
+            "row(strategy.updated_at, strategy.id) < row(%(cursor_activity_at)s, %(cursor_id)s)",
+            "collection.updated_at <= %(cursor_activity_at)s",
+        ),
+        (
+            4,
+            "run.created_at <= %(cursor_activity_at)s",
+            "row(chat.updated_at, chat.id) < row(%(cursor_activity_at)s, %(cursor_id)s)",
+            "strategy.updated_at <= %(cursor_activity_at)s",
+            "collection.updated_at <= %(cursor_activity_at)s",
+        ),
+    ],
+)
+def test_history_unpinned_cursor_specializes_each_source_rank(
+    pivot_type_rank: int,
+    run_predicate: str,
+    chat_predicate: str,
+    strategy_predicate: str,
+    collection_predicate: str,
+) -> None:
+    from argus.domain.postgres_history_reader import _candidate_sql
+
+    sql = _candidate_sql(
+        archived=False,
+        deleted=False,
+        has_cursor=True,
+        pivot_pinned=False,
+        pivot_type_rank=pivot_type_rank,
+    )
+    run_sql = _source_sql(sql, "run", "chat")
+    chat_sql = _source_sql(sql, "chat", "strategy")
+    strategy_sql = _source_sql(sql, "strategy", "collection")
+    collection_sql = sql[sql.index("collection_candidates as (") :]
+
+    assert run_predicate in run_sql
+    assert chat_predicate in chat_sql
+    assert strategy_predicate in strategy_sql
+    assert collection_predicate in collection_sql
+    for source_sql in (chat_sql, strategy_sql, collection_sql):
+        assert ".pinned is false" in source_sql
+        assert ".pinned is true" not in source_sql
+
+
+@pytest.mark.parametrize("pivot_type_rank", [1, 2, 3, 4])
+def test_history_pinned_cursor_splits_same_and_lower_pin_tiers(
+    pivot_type_rank: int,
+) -> None:
+    from argus.domain.postgres_history_reader import _candidate_sql
+
+    sql = _candidate_sql(
+        archived=True,
+        deleted=True,
+        has_cursor=True,
+        pivot_pinned=True,
+        pivot_type_rank=pivot_type_rank,
+    )
+    run_sql = _source_sql(sql, "run", "chat")
+    chat_sql = _source_sql(sql, "chat", "strategy")
+    strategy_sql = _source_sql(sql, "strategy", "collection")
+    collection_sql = sql[sql.index("collection_candidates as (") :]
+
+    assert "run.created_at < %(cursor_activity_at)s" not in run_sql
+    assert "run.created_at <= %(cursor_activity_at)s" not in run_sql
+    assert "row(run.created_at, run.id)" not in run_sql
+    assert "parent.archived is true" in run_sql
+    assert "parent.deleted_at is not null" in run_sql
+    assert "chat.archived is true" in chat_sql
+    for source_sql in (chat_sql, strategy_sql, collection_sql):
+        assert ".pinned is true" in source_sql
+        assert ".pinned is false" in source_sql
+        assert "union all" in source_sql.lower()
 
 
 @pytest.mark.parametrize(

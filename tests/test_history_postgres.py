@@ -11,9 +11,9 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 from argus.domain.postgres_history_reader import (
-    _CANDIDATES_SQL,
     HistoryCursorError,
     PostgresHistoryReader,
+    _candidate_sql,
 )
 from psycopg.types.json import Jsonb
 
@@ -96,6 +96,129 @@ def history_identities():
                 )
 
 
+@pytest.fixture(scope="module")
+def history_plan_scale_rows():
+    small_owner_id = uuid4()
+    large_owner_id = uuid4()
+    base = datetime(2026, 7, 27, tzinfo=timezone.utc)
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        with connection.cursor() as cursor:
+            for owner_id, label, row_count in (
+                (small_owner_id, "small", 64),
+                (large_owner_id, "large", 12_000),
+            ):
+                email = f"history-plan-{label}-{owner_id}@argus.local"
+                cursor.execute(
+                    "insert into auth.users (id, email, is_anonymous)"
+                    " values (%s, %s, false)",
+                    (owner_id, email),
+                )
+                cursor.execute(
+                    "insert into public.profiles (id, email) values (%s, %s)",
+                    (owner_id, email),
+                )
+                cursor.execute(
+                    """
+                    insert into public.conversations (
+                        id, user_id, title, title_source, language, pinned,
+                        archived, last_message_preview, created_at, updated_at
+                    )
+                    select
+                        md5(%s || value::text)::uuid,
+                        %s,
+                        'History plan conversation ' || value::text,
+                        'system_default',
+                        'en',
+                        value <= 8,
+                        false,
+                        'Fixture preview',
+                        %s::timestamptz + value * interval '1 millisecond',
+                        %s::timestamptz + value * interval '1 millisecond'
+                    from generate_series(1, %s) as value
+                    """,
+                    (
+                        f"history-plan-{label}-conversation-",
+                        owner_id,
+                        base,
+                        base,
+                        row_count,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    insert into public.messages (
+                        id, conversation_id, user_id, role, content, metadata,
+                        created_at
+                    )
+                    select
+                        md5(%s || value::text)::uuid,
+                        md5(%s || value::text)::uuid,
+                        %s,
+                        'user',
+                        'History plan message',
+                        '{}'::jsonb,
+                        %s::timestamptz + value * interval '1 millisecond'
+                    from generate_series(1, %s) as value
+                    """,
+                    (
+                        f"history-plan-{label}-message-",
+                        f"history-plan-{label}-conversation-",
+                        owner_id,
+                        base,
+                        row_count,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    insert into public.backtest_runs (
+                        id, user_id, conversation_id, status, asset_class,
+                        symbols, allocation_method, benchmark_symbol,
+                        config_snapshot, metrics, conversation_result_card,
+                        created_at, updated_at
+                    )
+                    select
+                        md5(%s || value::text)::uuid,
+                        %s,
+                        md5(%s || value::text)::uuid,
+                        'completed',
+                        'equity',
+                        array['AAPL'],
+                        'equal_weight',
+                        'SPY',
+                        '{}'::jsonb,
+                        '{}'::jsonb,
+                        '{}'::jsonb,
+                        %s::timestamptz + value * interval '1 millisecond',
+                        %s::timestamptz + value * interval '1 millisecond'
+                    from generate_series(1, %s) as value
+                    """,
+                    (
+                        f"history-plan-{label}-run-",
+                        owner_id,
+                        f"history-plan-{label}-conversation-",
+                        base,
+                        base,
+                        row_count,
+                    ),
+                )
+            cursor.execute("analyze public.conversations")
+            cursor.execute("analyze public.messages")
+            cursor.execute("analyze public.backtest_runs")
+    try:
+        yield {
+            "small_owner_id": small_owner_id,
+            "large_owner_id": large_owner_id,
+            "base": base,
+        }
+    finally:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from auth.users where id = any(%s::uuid[])",
+                    ([small_owner_id, large_owner_id],),
+                )
+
+
 def _connect():
     return psycopg.connect(DSN, autocommit=True)
 
@@ -103,6 +226,22 @@ def _connect():
 def _reader() -> tuple[PostgresHistoryReader, _TrackingPool]:
     pool = _TrackingPool()
     return PostgresHistoryReader(pool), pool
+
+
+def _walk_plan(plan: dict[str, Any]):
+    yield plan
+    for child in plan.get("Plans", []):
+        yield from _walk_plan(child)
+
+
+def _physical_rows(node: dict[str, Any]) -> int:
+    loops = max(1, int(node.get("Actual Loops", 1)))
+    return (
+        int(node.get("Actual Rows", 0))
+        + int(node.get("Rows Removed by Filter", 0))
+        + int(node.get("Rows Removed by Join Filter", 0))
+        + int(node.get("Rows Removed by Index Recheck", 0))
+    ) * loops
 
 
 def _insert_conversation(
@@ -436,6 +575,82 @@ def test_history_equal_timestamps_use_type_rank_then_id(history_identities) -> N
         str(row["id"]) for source_type, row in ordered if source_type == "strategy"
     ]
     assert strategy_ids == [str(higher_strategy_id), str(lower_strategy_id)]
+
+
+def test_history_pinned_cursor_executes_split_pin_tiers(history_identities) -> None:
+    timestamp = datetime(2026, 7, 3, 12, tzinfo=timezone.utc)
+    owner_id = history_identities["owner"]
+    with _connect() as connection, connection.cursor() as cursor:
+        pivot_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp,
+            pinned=True,
+        )
+        collection_id = _insert_collection(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp,
+            pinned=True,
+        )
+        unpinned_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=1),
+            pinned=False,
+        )
+
+    reader, _ = _reader()
+    rows = _read(
+        reader,
+        owner_id=owner_id,
+        source_limit=4,
+        cursor_item=(
+            "strategy",
+            {"id": pivot_id, "updated_at": timestamp, "pinned": True},
+        ),
+    )
+    visible_ids = {str(row["id"]) for _, row in _flatten(rows)}
+
+    assert str(collection_id) in visible_ids
+    assert str(unpinned_id) in visible_ids
+    assert str(pivot_id) not in visible_ids
+
+
+def test_history_all_specialized_sql_variants_prepare(history_identities) -> None:
+    owner_id = history_identities["owner"]
+    timestamp = datetime(2026, 7, 3, 15, tzinfo=timezone.utc)
+    executed = 0
+    with _connect() as connection, connection.cursor() as cursor:
+        for archived in (False, True):
+            for deleted in (False, True):
+                variants = [(False, False, 0)]
+                variants.extend(
+                    (True, pivot_pinned, pivot_type_rank)
+                    for pivot_pinned in (False, True)
+                    for pivot_type_rank in (1, 2, 3, 4)
+                )
+                for has_cursor, pivot_pinned, pivot_type_rank in variants:
+                    cursor.execute(
+                        "explain "
+                        + _candidate_sql(
+                            archived=archived,
+                            deleted=deleted,
+                            has_cursor=has_cursor,
+                            pivot_pinned=pivot_pinned,
+                            pivot_type_rank=pivot_type_rank,
+                        ),
+                        {
+                            "user_id": owner_id,
+                            "cursor_activity_at": (timestamp if has_cursor else None),
+                            "cursor_id": uuid4() if has_cursor else None,
+                            "source_limit": 4,
+                        },
+                    )
+                    assert cursor.fetchall()
+                    executed += 1
+
+    assert executed == 36
 
 
 def test_history_soft_deleted_pivot_preserves_legacy_cursor_boundary(
@@ -808,6 +1023,64 @@ def test_history_query_and_row_budget_are_constant_as_volume_grows(
     assert larger_pool.tracker == {"query_count": 1, "row_counts": [6]}
 
 
+def test_history_run_and_chat_plans_are_page_bounded_at_64_and_12k(
+    history_plan_scale_rows: dict[str, Any],
+) -> None:
+    plans: list[dict[str, Any]] = []
+    with _connect() as connection, connection.cursor() as cursor:
+        for owner_key, position in (
+            ("small_owner_id", 32),
+            ("large_owner_id", 8_000),
+        ):
+            for has_cursor in (False, True):
+                cursor.execute(
+                    "explain (analyze, buffers, format json) "
+                    + _candidate_sql(
+                        archived=False,
+                        deleted=False,
+                        has_cursor=has_cursor,
+                        pivot_pinned=False,
+                        pivot_type_rank=3 if has_cursor else 0,
+                    ),
+                    {
+                        "user_id": history_plan_scale_rows[owner_key],
+                        "cursor_activity_at": (
+                            history_plan_scale_rows["base"]
+                            + timedelta(milliseconds=position)
+                            if has_cursor
+                            else None
+                        ),
+                        "cursor_id": (
+                            UUID("70000000-0000-0000-0000-" f"{position:012d}")
+                            if has_cursor
+                            else None
+                        ),
+                        "source_limit": 21,
+                    },
+                )
+                plans.append(cursor.fetchone()[0][0]["Plan"])
+
+    for plan_index, plan in enumerate(plans):
+        assert int(plan["Actual Rows"]) <= 42
+        source_scans = [
+            node
+            for node in _walk_plan(plan)
+            if node.get("Relation Name") in {"backtest_runs", "conversations", "messages"}
+            and node.get("Node Type")
+            in {"Index Scan", "Index Only Scan", "Bitmap Heap Scan", "Seq Scan"}
+        ]
+        assert source_scans
+        assert all(_physical_rows(node) <= 84 for node in source_scans)
+
+        index_names = {
+            str(node["Index Name"]) for node in source_scans if node.get("Index Name")
+        }
+        assert "idx_backtest_runs_user_created" in index_names
+        assert "idx_messages_conversation_created" in index_names
+        if plan_index >= 2:
+            assert "idx_conversations_active_page" in index_names
+
+
 def test_history_candidate_plan_keeps_a_limit_inside_each_source(
     history_identities,
 ) -> None:
@@ -831,28 +1104,25 @@ def test_history_candidate_plan_keeps_a_limit_inside_each_source(
             _insert_collection(cursor, user_id=owner_id, timestamp=item_at)
 
         cursor.execute(
-            "explain (analyze, buffers, format json) " + _CANDIDATES_SQL,
-            (
-                owner_id,
-                False,
-                False,
-                False,
-                False,
-                None,
-                0,
-                None,
-                6,
+            "explain (analyze, buffers, format json) "
+            + _candidate_sql(
+                archived=False,
+                deleted=False,
+                has_cursor=False,
+                pivot_pinned=False,
+                pivot_type_rank=0,
             ),
+            {
+                "user_id": owner_id,
+                "cursor_activity_at": None,
+                "cursor_id": None,
+                "source_limit": 6,
+            },
         )
         explained = cursor.fetchone()[0][0]
 
-    def plan_nodes(plan: dict[str, Any]):
-        yield plan
-        for child in plan.get("Plans", []):
-            yield from plan_nodes(child)
-
     plan = explained["Plan"]
-    nodes = list(plan_nodes(plan))
+    nodes = list(_walk_plan(plan))
     limits = [node for node in nodes if node["Node Type"] == "Limit"]
 
     assert len(limits) >= 4
