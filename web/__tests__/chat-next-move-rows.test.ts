@@ -158,7 +158,8 @@ describe("sources panel", () => {
 
 describe("locale parity for the new surface", () => {
   test.each([
-    "sources_panel_open",
+    "sources_panel_open_one",
+    "sources_panel_open_other",
     "sources_panel_title",
     "sources_panel_note",
     "sources_panel_close",
@@ -169,8 +170,15 @@ describe("locale parity for the new surface", () => {
     expect(es.chat.discovery_results[key].length).toBeGreaterThan(0);
   });
 
-  test("the source count interpolates the same variable in both catalogs", () => {
-    expect(en.chat.discovery_results.sources_panel_open).toContain("{{total}}");
-    expect(es.chat.discovery_results.sources_panel_open).toContain("{{total}}");
+  test("a single source reads as one source, not '1 sources'", () => {
+    for (const catalog of [en, es]) {
+      const singular = catalog.chat.discovery_results.sources_panel_open_one;
+      const plural = catalog.chat.discovery_results.sources_panel_open_other;
+      expect(singular).toContain("{{count}}");
+      expect(plural).toContain("{{count}}");
+      expect(singular).not.toBe(plural);
+    }
+    expect(en.chat.discovery_results.sources_panel_open_one).toContain("source ");
+    expect(en.chat.discovery_results.sources_panel_open_other).toContain("sources ");
   });
 });

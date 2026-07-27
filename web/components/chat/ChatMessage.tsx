@@ -399,8 +399,9 @@ export default function ChatMessage({
                       className="shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
                     >
                       {t("chat.discovery_results.sources_panel_open", {
-                        total: message.discovery.sources.length,
-                        defaultValue: "{{total}} sources ›",
+                        count: message.discovery.sources.length,
+                        defaultValue: "{{count}} sources ›",
+                        defaultValue_one: "{{count}} source ›",
                       })}
                     </button>
                   ) : null}

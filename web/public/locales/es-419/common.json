@@ -338,7 +338,8 @@
       "test_candidate": "Simular {{symbol}}",
       "sources_line": "Fuentes: {{domains}} · al {{date}}",
       "sources_line_undated": "Fuentes: {{domains}}",
-      "sources_panel_open": "{{total}} fuentes ›",
+      "sources_panel_open_one": "{{count}} fuente ›",
+      "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",
       "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
       "sources_panel_close": "Cerrar fuentes"
