@@ -306,6 +306,57 @@ def test_conversation_deep_page_uses_tuple_index_condition_at_64_and_12k(
     assert _buffer_blocks(plans[1]) <= _buffer_blocks(plans[0]) + 12
 
 
+def test_deleted_conversation_deep_page_is_page_bounded_at_12k(
+    keyset_scale_rows: dict[str, Any],
+) -> None:
+    from argus.domain.postgres_keyset_reader import _conversation_page_sql
+
+    owner_id = keyset_scale_rows["owner_id"]
+    with psycopg.connect(DSN) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            update public.conversations
+            set deleted_at = updated_at
+            where user_id = %s
+            """,
+            (owner_id,),
+        )
+        cursor.execute("analyze public.conversations")
+        cursor.execute(
+            """
+            select pinned, updated_at, id
+            from public.conversations
+            where user_id = %s
+              and deleted_at is not null
+            order by pinned desc, updated_at desc, id desc
+            offset 8000
+            limit 1
+            """,
+            (owner_id,),
+        )
+        pivot_pinned, pivot_updated_at, pivot_id = cursor.fetchone()
+        cursor.execute(
+            "explain (analyze, buffers, format json) "
+            + _conversation_page_sql(
+                archived=None,
+                deleted=True,
+                has_cursor=True,
+            ),
+            (
+                owner_id,
+                pivot_pinned,
+                pivot_updated_at,
+                pivot_id,
+                21,
+            ),
+        )
+        plan = cursor.fetchone()[0][0]["Plan"]
+        connection.rollback()
+
+    assert _scan_rows(plan) <= 84
+    assert int(plan["Actual Rows"]) <= 21
+
+
 def test_message_deep_page_uses_tuple_index_condition_at_64_and_12k(
     keyset_scale_rows: dict[str, Any],
 ) -> None:

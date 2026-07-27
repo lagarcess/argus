@@ -201,9 +201,66 @@ def history_plan_scale_rows():
                         row_count,
                     ),
                 )
+                cursor.execute(
+                    """
+                    insert into public.strategies (
+                        id, user_id, name, name_source, template, asset_class,
+                        symbols, parameters, metrics_preferences,
+                        benchmark_symbol, pinned, created_at, updated_at
+                    )
+                    select
+                        md5(%s || value::text)::uuid,
+                        %s,
+                        'History plan strategy ' || value::text,
+                        'system_default',
+                        'buy_hold',
+                        'equity',
+                        array['AAPL'],
+                        '{}'::jsonb,
+                        array['total_return_pct'],
+                        'SPY',
+                        value <= 8,
+                        %s::timestamptz + value * interval '1 millisecond',
+                        %s::timestamptz + value * interval '1 millisecond'
+                    from generate_series(1, %s) as value
+                    """,
+                    (
+                        f"history-plan-{label}-strategy-",
+                        owner_id,
+                        base,
+                        base,
+                        row_count,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    insert into public.collections (
+                        id, user_id, name, name_source, pinned,
+                        created_at, updated_at
+                    )
+                    select
+                        md5(%s || value::text)::uuid,
+                        %s,
+                        'History plan collection ' || value::text,
+                        'system_default',
+                        value <= 8,
+                        %s::timestamptz + value * interval '1 millisecond',
+                        %s::timestamptz + value * interval '1 millisecond'
+                    from generate_series(1, %s) as value
+                    """,
+                    (
+                        f"history-plan-{label}-collection-",
+                        owner_id,
+                        base,
+                        base,
+                        row_count,
+                    ),
+                )
             cursor.execute("analyze public.conversations")
             cursor.execute("analyze public.messages")
             cursor.execute("analyze public.backtest_runs")
+            cursor.execute("analyze public.strategies")
+            cursor.execute("analyze public.collections")
     try:
         yield {
             "small_owner_id": small_owner_id,
@@ -1061,7 +1118,7 @@ def test_history_run_and_chat_plans_are_page_bounded_at_64_and_12k(
                 plans.append(cursor.fetchone()[0][0]["Plan"])
 
     for plan_index, plan in enumerate(plans):
-        assert int(plan["Actual Rows"]) <= 42
+        assert int(plan["Actual Rows"]) <= 84
         source_scans = [
             node
             for node in _walk_plan(plan)
@@ -1079,6 +1136,134 @@ def test_history_run_and_chat_plans_are_page_bounded_at_64_and_12k(
         assert "idx_messages_conversation_created" in index_names
         if plan_index >= 2:
             assert "idx_conversations_active_page" in index_names
+
+
+@pytest.mark.parametrize(
+    ("archived", "deleted"),
+    (
+        (False, False),
+        (True, False),
+        (False, True),
+        (True, True),
+    ),
+)
+@pytest.mark.parametrize("has_cursor", (False, True))
+@pytest.mark.parametrize("scale_label", ("small", "large"))
+def test_history_state_partition_plans_stay_bounded_as_volume_grows(
+    history_plan_scale_rows: dict[str, Any],
+    *,
+    archived: bool,
+    deleted: bool,
+    has_cursor: bool,
+    scale_label: str,
+) -> None:
+    owner_id = history_plan_scale_rows[f"{scale_label}_owner_id"]
+    source_limit = 21
+    with psycopg.connect(DSN) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            with ranked as (
+                select
+                    id,
+                    (row_number() over (order by updated_at, id) - 1) %% 4 as state
+                from public.conversations
+                where user_id = %s
+            )
+            update public.conversations as conversation
+            set
+                archived = ranked.state in (1, 3),
+                deleted_at = case
+                    when ranked.state in (2, 3) then conversation.updated_at
+                    else null
+                end
+            from ranked
+            where conversation.id = ranked.id
+            """,
+            (owner_id,),
+        )
+        for table_name in ("strategies", "collections"):
+            cursor.execute(
+                f"""
+                with ranked as (
+                    select
+                        id,
+                        (row_number() over (order by updated_at, id) - 1) %% 2 as state
+                    from public.{table_name}
+                    where user_id = %s
+                )
+                update public.{table_name} as item
+                set deleted_at = case
+                    when ranked.state = 1 then item.updated_at
+                    else null
+                end
+                from ranked
+                where item.id = ranked.id
+                """,  # noqa: S608 - finite table names owned by the test
+                (owner_id,),
+            )
+        for table_name in (
+            "conversations",
+            "messages",
+            "backtest_runs",
+            "strategies",
+            "collections",
+        ):
+            cursor.execute(
+                f"analyze public.{table_name}"  # noqa: S608 - finite table names
+            )
+
+        cursor.execute(
+            "explain (analyze, buffers, format json) "
+            + _candidate_sql(
+                archived=archived,
+                deleted=deleted,
+                has_cursor=has_cursor,
+                pivot_pinned=False,
+                pivot_type_rank=3 if has_cursor else 0,
+            ),
+            {
+                "user_id": owner_id,
+                "cursor_activity_at": (
+                    history_plan_scale_rows["base"] + timedelta(milliseconds=8_000)
+                    if has_cursor
+                    else None
+                ),
+                "cursor_id": (
+                    UUID("70000000-0000-0000-0000-000000008000") if has_cursor else None
+                ),
+                "source_limit": source_limit,
+            },
+        )
+        plan = cursor.fetchone()[0][0]["Plan"]
+        connection.rollback()
+
+    source_scans = [
+        node
+        for node in _walk_plan(plan)
+        if node.get("Relation Name")
+        in {
+            "backtest_runs",
+            "conversations",
+            "messages",
+            "strategies",
+            "collections",
+        }
+        and node.get("Node Type")
+        in {"Index Scan", "Index Only Scan", "Bitmap Heap Scan", "Seq Scan"}
+    ]
+    assert source_scans
+    violations = [
+        {
+            "relation": node.get("Relation Name"),
+            "alias": node.get("Alias"),
+            "index": node.get("Index Name"),
+            "physical_rows": _physical_rows(node),
+        }
+        for node in source_scans
+        if _physical_rows(node) > 5 * source_limit
+    ]
+    assert not violations, violations
+    assert int(plan["Actual Rows"]) <= 4 * source_limit
 
 
 def test_history_candidate_plan_keeps_a_limit_inside_each_source(

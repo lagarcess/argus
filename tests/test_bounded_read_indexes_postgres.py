@@ -19,8 +19,11 @@ pytestmark = pytest.mark.skipif(
 
 EXPECTED_INDEXES = {
     "idx_conversations_active_page",
+    "idx_conversations_deleted_page",
     "idx_messages_reload_artifact_page",
     "idx_decision_notes_idea_latest",
+    "idx_strategies_history_page",
+    "idx_collections_history_page",
 }
 SEARCH_EXPECTED_INDEXES = {
     "idx_conversations_search_norm_trgm",
@@ -415,6 +418,42 @@ def test_current_read_predicates_select_each_forward_index(
                     limit 1
                     """,
                     (owner_id, idea_id),
+                ),
+                "idx_conversations_deleted_page": (
+                    """
+                    explain (format json)
+                    select *
+                    from public.conversations
+                    where user_id = %s
+                      and deleted_at is not null
+                    order by pinned desc, updated_at desc, id desc
+                    limit 21
+                    """,
+                    (owner_id,),
+                ),
+                "idx_strategies_history_page": (
+                    """
+                    explain (format json)
+                    select *
+                    from public.strategies
+                    where user_id = %s
+                      and deleted_at is null
+                    order by pinned desc, updated_at desc, id desc
+                    limit 21
+                    """,
+                    (owner_id,),
+                ),
+                "idx_collections_history_page": (
+                    """
+                    explain (format json)
+                    select *
+                    from public.collections
+                    where user_id = %s
+                      and deleted_at is null
+                    order by pinned desc, updated_at desc, id desc
+                    limit 21
+                    """,
+                    (owner_id,),
                 ),
             }
             for expected_index, (query, params) in queries.items():

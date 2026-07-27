@@ -5,6 +5,7 @@ MIGRATION = (
     ROOT / "supabase" / "migrations" / "20260727000001_add_bounded_read_indexes.sql"
 )
 SEARCH_MIGRATION_GLOB = "*_add_search_trigram_indexes.sql"
+HISTORY_STATE_MIGRATION_GLOB = "*_add_history_state_page_indexes.sql"
 
 
 def _migration_sql() -> str:
@@ -98,6 +99,42 @@ def test_search_trigram_migration_is_private_and_index_only() -> None:
 
     assert migration.count("create index if not exists") == 6
     assert " extensions.gin_trgm_ops" in migration
+    assert "create function" not in migration
+    assert "create view" not in migration
+    assert "create materialized view" not in migration
+    assert "generated always as" not in migration
+    assert "grant " not in migration
+
+
+def test_history_state_page_migration_adds_only_plan_proven_indexes() -> None:
+    migrations = sorted(
+        (ROOT / "supabase" / "migrations").glob(HISTORY_STATE_MIGRATION_GLOB)
+    )
+    assert len(migrations) == 1, "History state-page migration is missing or ambiguous"
+    migration = " ".join(migrations[0].read_text(encoding="utf-8").lower().split())
+
+    assert (
+        "create index if not exists idx_conversations_deleted_page "
+        "on public.conversations "
+        "(user_id, pinned desc, updated_at desc, id desc) "
+        "where deleted_at is not null"
+    ) in migration
+    for table_name in ("strategies", "collections"):
+        assert (
+            f"create index if not exists idx_{table_name}_history_page "
+            f"on public.{table_name} "
+            "(user_id, pinned desc, updated_at desc, id desc)"
+        ) in migration
+
+    assert migration.count("create index if not exists") == 3
+    for index_name in (
+        "idx_conversations_deleted_page",
+        "idx_strategies_history_page",
+        "idx_collections_history_page",
+    ):
+        assert f"drop index if exists public.{index_name}" in migration
+
+    assert "create unique index" not in migration
     assert "create function" not in migration
     assert "create view" not in migration
     assert "create materialized view" not in migration

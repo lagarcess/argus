@@ -193,13 +193,15 @@ def _candidate_sql(
     archive_state = "true" if archived else "false"
     deleted_state = "is not null" if deleted else "is null"
 
-    run_parent_filter = (
-        "(parent.id is not null "
-        f"and parent.archived is {archive_state} "
-        f"and parent.deleted_at {deleted_state})"
-    )
-    if not archived and not deleted:
-        run_parent_filter = f"(parent.id is null or {run_parent_filter})"
+    missing_parent_default = "true" if not archived and not deleted else "false"
+    run_parent_filter = f"""coalesce((
+        select parent.archived is {archive_state}
+           and parent.deleted_at {deleted_state}
+        from public.conversations as parent
+        where parent.id = run.conversation_id
+          and parent.user_id = %(user_id)s
+        offset 0
+    ), {missing_parent_default})"""
     run_filters: tuple[str, ...] = (
         "run.user_id = %(user_id)s",
         run_parent_filter,
@@ -226,10 +228,7 @@ def _candidate_sql(
             'conversation_result_card', run.conversation_result_card,
             'created_at', run.created_at
         ) as payload""",
-        from_sql="""public.backtest_runs as run
-    left join public.conversations as parent
-      on parent.id = run.conversation_id
-     and parent.user_id = %(user_id)s""",
+        from_sql="public.backtest_runs as run",
         filters=run_filters,
         order_sql="run.created_at desc, run.id desc",
     )
