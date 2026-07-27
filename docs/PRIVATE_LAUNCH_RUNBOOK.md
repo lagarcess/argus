@@ -303,6 +303,11 @@ private-alpha launch; record any override in the release manifest.
 
 ## Guest Staged Rollout
 
+The operational security checklist for later internet-facing Guest exposure is
+[Guest Public Launch Safety](GUEST_PUBLIC_LAUNCH_SAFETY.md). It is a promotion
+and traffic-exposure gate, not a prerequisite for merging the Guest
+implementation into the internal integration branch.
+
 Product defaults:
 
 ```bash
