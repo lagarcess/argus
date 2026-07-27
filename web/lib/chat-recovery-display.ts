@@ -86,6 +86,11 @@ export function recoveryDisplayFromRecoveryState(
   if (!code) {
     return null;
   }
+  // llm_generated means the persisted assistant prose owns the display; the
+  // typed code stays in metadata for hydration and analytics only.
+  if (stringOrNull(recovery?.prompt_source) === "llm_generated") {
+    return null;
+  }
   const params = recordOrNull(recovery?.params);
   return {
     kind: "recovery_code",

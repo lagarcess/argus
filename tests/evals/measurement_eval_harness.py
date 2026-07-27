@@ -37,6 +37,7 @@ LOCKED_EVAL_CATEGORIES = {
     "capability_honesty",
     "backtest_metric_correctness",
     "graceful_recovery",
+    "asset_discovery_routing",
 }
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
@@ -97,6 +98,8 @@ class TypedExpectations:
     launch_execution_realism: dict[str, Any] | None = None
     stage_outcomes: tuple[str, ...] = ()
     clarification: dict[str, Any] | None = None
+    semantic_turn_act: str | None = None
+    asset_discovery: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -370,6 +373,18 @@ def typed_expectation_failures(
             "clarification",
             expected.clarification,
             outcome.get("clarification"),
+            failures,
+        )
+    _compare(
+        "semantic_turn_act",
+        expected.semantic_turn_act,
+        outcome.get("semantic_turn_act"),
+        failures,
+    )
+    if expected.asset_discovery is not None:
+        _compare_asset_discovery(
+            expected.asset_discovery,
+            outcome.get("asset_discovery"),
             failures,
         )
     return failures
@@ -667,6 +682,8 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             launch_execution_realism=expected.get("launch_execution_realism"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
             clarification=expected.get("clarification"),
+            semantic_turn_act=expected.get("semantic_turn_act"),
+            asset_discovery=expected.get("asset_discovery"),
         ),
         action=(
             None
@@ -907,6 +924,8 @@ def _typed_outcome(
             patch=final_patch,
         ),
         "clarification": final_patch.get("clarification"),
+        "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
+        "asset_discovery": interpret_patch.get("asset_discovery"),
     }
 
 
@@ -988,6 +1007,47 @@ def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None
         return
     if actual != expected:
         failures.append(f"{name}: expected {expected!r}, got {actual!r}")
+
+
+def _compare_asset_discovery(
+    expected: dict[str, Any],
+    actual: Any,
+    failures: list[str],
+) -> None:
+    if not isinstance(actual, dict):
+        failures.append(f"asset_discovery: expected payload {expected!r}, got {actual!r}")
+        return
+    _compare(
+        "asset_discovery.relationship",
+        expected.get("relationship"),
+        actual.get("relationship"),
+        failures,
+    )
+    _compare(
+        "asset_discovery.asset_class_hint",
+        expected.get("asset_class_hint"),
+        actual.get("asset_class_hint"),
+        failures,
+    )
+    expected_anchors = expected.get("anchor_symbols")
+    if expected_anchors is not None:
+        actual_anchors = sorted(
+            str(symbol).upper() for symbol in (actual.get("anchor_symbols") or [])
+        )
+        _compare(
+            "asset_discovery.anchor_symbols",
+            sorted(str(symbol).upper() for symbol in expected_anchors),
+            actual_anchors,
+            failures,
+        )
+    include_terms = expected.get("category_description_includes_any")
+    if include_terms:
+        description = str(actual.get("category_description") or "").lower()
+        if not any(str(term).lower() in description for term in include_terms):
+            failures.append(
+                "asset_discovery.category_description: expected any of "
+                f"{list(include_terms)!r} in {description!r}"
+            )
 
 
 def _compare_subset(

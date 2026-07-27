@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from argus.agent_runtime import turn_execution
 from argus.env import load_project_dotenv
+from argus.llm.openrouter_model_env import TIER_FALLBACK_ENV, TIER_PRIMARY_ENV
 from argus.llm.openrouter_usage import (
     merge_openrouter_token_usage,
     normalize_openrouter_token_usage,
@@ -38,6 +39,8 @@ OpenRouterTask = Literal[
     "result_summary",
     "result_breakdown",
     "name_suggestion",
+    "discovery_extraction",
+    "discovery_voicing",
 ]
 _OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
@@ -148,6 +151,12 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "name_suggestion": OpenRouterProfile(
         "name_suggestion", temperature=0, max_tokens=400
     ),
+    "discovery_extraction": OpenRouterProfile(
+        "discovery_extraction", temperature=0, max_tokens=1200, timeout_seconds=20
+    ),
+    "discovery_voicing": OpenRouterProfile(
+        "discovery_voicing", temperature=0.2, max_tokens=900, timeout_seconds=20
+    ),
 }
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
@@ -160,21 +169,12 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "result_summary": "chat",
     "result_breakdown": "context",
     "name_suggestion": "utility",
+    "discovery_extraction": "structured",
+    "discovery_voicing": "chat",
 }
 
-_TIER_PRIMARY_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
-    "utility": ("ARGUS_UTILITY_MODEL",),
-    "chat": ("ARGUS_CHAT_MODEL",),
-    "structured": ("ARGUS_STRUCTURED_MODEL",),
-    "context": ("ARGUS_CONTEXT_MODEL",),
-}
-
-_TIER_FALLBACK_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
-    "utility": ("ARGUS_UTILITY_FALLBACK_MODEL",),
-    "chat": ("ARGUS_CHAT_FALLBACK_MODEL",),
-    "structured": ("ARGUS_STRUCTURED_FALLBACK_MODEL",),
-    "context": ("ARGUS_CONTEXT_FALLBACK_MODEL",),
-}
+_TIER_PRIMARY_ENV = TIER_PRIMARY_ENV
+_TIER_FALLBACK_ENV = TIER_FALLBACK_ENV
 
 _TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
     "utility": (

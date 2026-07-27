@@ -14,6 +14,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -951,10 +952,8 @@ class OpenRouterStructuredInterpreter:
             "for a fresh testable idea, answer_pending_need when the user answers the "
             "latest missing fact, educational_question for product or investing concept "
             "questions, result_followup for questions about the latest completed run, "
-            "retry_failed_action when the user asks to try again, retry, rerun the same "
-            "one, or otherwise repeat the latest failed run without changing the idea, "
-            "and unsupported_request when the user asks for unsupported capabilities. "
-            "When semantic_turn_act is result_followup, set result_followup_focus to "
+            + DISCOVERY_ACT_GUIDANCE
+            + "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
             "peak_date, peak_value, result_card_fact, what_tested, "
             "next_experiment, assumptions, or general. Use peak_date when the user "
@@ -1085,6 +1084,7 @@ class OpenRouterStructuredInterpreter:
             capability_question_focus=response.capability_question_focus,
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
+            asset_discovery=response.asset_discovery,
         )
 
 

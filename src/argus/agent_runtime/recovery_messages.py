@@ -32,6 +32,11 @@ RecoveryMessageCode = Literal[
     "artifact_action_retry_rebuilt_confirmation",
     "artifact_action_retry_inactive",
     "execution_data_unavailable",
+    "discovery_unavailable",
+    "discovery_search_failed",
+    "discovery_no_verified_candidates",
+    "discovery_limit_reached",
+    "discovery_target_missing",
 ]
 
 
@@ -155,6 +160,30 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "right now. Try again, change the dates, or choose a different supported "
         "asset."
     ),
+    "discovery_unavailable": (
+        "I cannot look up current source-backed candidates yet, and I do not "
+        "want to guess from memory. Name a symbol or company you already have "
+        "in mind and I can test it. Everything in this chat is unchanged."
+    ),
+    "discovery_search_failed": (
+        "I could not complete a source-backed lookup just now, and I will not "
+        "guess names from memory. Everything in this chat is unchanged; ask "
+        "again in a moment or name a symbol and I can test it."
+    ),
+    "discovery_no_verified_candidates": (
+        "I found sources but could not verify any tradable match for that "
+        "request. Name a symbol or company you have in mind and I can test it; "
+        "everything in this chat is unchanged."
+    ),
+    "discovery_limit_reached": (
+        "You have used all the grounded lookups available for now. The "
+        "allowance resets on a schedule; meanwhile, name a symbol you already "
+        "have in mind and I can test it."
+    ),
+    "discovery_target_missing": (
+        "Tell me what to look for: a category like cybersecurity stocks, or a "
+        "company to find peers of, and I can bring back verified candidates."
+    ),
 }
 
 
@@ -216,9 +245,7 @@ def recovery_state(
         "retryable": retryable,
     }
     cleaned_params = {
-        key: value
-        for key, value in params.items()
-        if value is not None and value != ""
+        key: value for key, value in params.items() if value is not None and value != ""
     }
     if cleaned_params:
         state["params"] = cleaned_params

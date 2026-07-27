@@ -1,0 +1,239 @@
+from __future__ import annotations
+
+import json
+
+import httpx
+import pytest
+from argus.domain.discovery_search import (
+    SearchUnavailableError,
+)
+from argus.domain.discovery_search.openrouter_web_search import (
+    OpenRouterWebSearchProvider,
+)
+from argus.domain.discovery_search.perplexity_direct import (
+    DOCUMENTED_PERPLEXITY_SEARCH_COST_USD,
+    PerplexityDirectProvider,
+)
+from argus.domain.discovery_search.selection import search_provider_for_config
+
+
+def _perplexity_payload() -> dict:
+    return {
+        "id": "req-1",
+        "results": [
+            {
+                "title": "Vertiv expands data center cooling",
+                "url": "https://example.com/vertiv",
+                "snippet": "Vertiv builds data center cooling equipment.",
+                "last_updated": "2026-07-20",
+            },
+            {
+                "title": "Bad URL result",
+                "url": "http://insecure.example.com",
+                "snippet": "should be dropped",
+                "date": "2026-07-19",
+            },
+            {
+                "title": "Modine partners on cooling",
+                "url": "https://example.com/modine",
+                "snippet": "Modine announced a cooling partnership.",
+                "date": "2026-07-18",
+            },
+        ],
+    }
+
+
+def _openrouter_payload() -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "content": "Here are some companies.",
+                    "annotations": [
+                        {
+                            "type": "url_citation",
+                            "url_citation": {
+                                "url": "https://example.com/crwd",
+                                "title": "CrowdStrike overview",
+                                "content": "CrowdStrike is a cybersecurity vendor.",
+                            },
+                        },
+                        {
+                            "type": "url_citation",
+                            "url_citation": {
+                                "url": "javascript:alert(1)",
+                                "title": "Injected",
+                                "content": "drop me",
+                            },
+                        },
+                    ],
+                }
+            }
+        ],
+        "usage": {"cost": 0.0123},
+    }
+
+
+def _perplexity(transport: httpx.MockTransport) -> PerplexityDirectProvider:
+    return PerplexityDirectProvider(api_key="test-key", transport=transport)
+
+
+def _openrouter(transport: httpx.MockTransport) -> OpenRouterWebSearchProvider:
+    return OpenRouterWebSearchProvider(
+        api_key="test-key",
+        model="test/search-model",
+        transport=transport,
+    )
+
+
+class TestPerplexityDirect:
+    def test_parses_documented_response_shape_with_source_dates(self) -> None:
+        seen: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            seen["auth"] = request.headers.get("authorization")
+            seen["body"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(200, json=_perplexity_payload())
+
+        packet = _perplexity(httpx.MockTransport(handler)).search(
+            "data center cooling companies", max_results=5, timeout_seconds=8.0
+        )
+        assert seen["url"] == "https://api.perplexity.ai/search"
+        assert seen["auth"] == "Bearer test-key"
+        assert seen["body"]["query"] == "data center cooling companies"
+        assert seen["body"]["max_results"] == 5
+        assert packet.provider_id == "perplexity_direct"
+        assert [result.url for result in packet.results] == [
+            "https://example.com/vertiv",
+            "https://example.com/modine",
+        ]
+        assert packet.results[0].source_date == "2026-07-20"
+        assert packet.results[1].source_date == "2026-07-18"
+        assert packet.cost_usd == DOCUMENTED_PERPLEXITY_SEARCH_COST_USD
+        assert packet.latency_ms >= 0
+
+    def test_http_error_raises_typed_unavailable(self) -> None:
+        transport = httpx.MockTransport(lambda request: httpx.Response(500, text="boom"))
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            _perplexity(transport).search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "http_error"
+
+    def test_timeout_raises_typed_unavailable(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectTimeout("slow", request=request)
+
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            _perplexity(httpx.MockTransport(handler)).search(
+                "q", max_results=5, timeout_seconds=0.01
+            )
+        assert excinfo.value.reason == "timeout"
+
+    def test_malformed_json_raises_typed_unavailable(self) -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, text="not json")
+        )
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            _perplexity(transport).search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "malformed_response"
+
+    def test_missing_api_key_fails_closed_without_http(self) -> None:
+        calls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(str(request.url))
+            return httpx.Response(200, json=_perplexity_payload())
+
+        provider = PerplexityDirectProvider(
+            api_key="", transport=httpx.MockTransport(handler)
+        )
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            provider.search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "not_configured"
+        assert calls == []
+
+    def test_single_attempt_no_retry(self) -> None:
+        calls: list[int] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(1)
+            return httpx.Response(503, text="unavailable")
+
+        with pytest.raises(SearchUnavailableError):
+            _perplexity(httpx.MockTransport(handler)).search(
+                "q", max_results=5, timeout_seconds=8.0
+            )
+        assert len(calls) == 1
+
+
+class TestOpenRouterWebSearch:
+    def test_parses_annotation_citations_without_date_guarantee(self) -> None:
+        seen: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            seen["body"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(200, json=_openrouter_payload())
+
+        packet = _openrouter(httpx.MockTransport(handler)).search(
+            "cybersecurity companies", max_results=5, timeout_seconds=8.0
+        )
+        assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
+        assert seen["body"]["model"] == "test/search-model"
+        assert seen["body"]["plugins"] == [{"id": "web", "max_results": 5}]
+        assert packet.provider_id == "openrouter_web_search"
+        assert [result.url for result in packet.results] == ["https://example.com/crwd"]
+        assert packet.results[0].source_date is None
+        assert packet.cost_usd == 0.0123
+
+    def test_missing_model_fails_closed_without_http(self) -> None:
+        calls: list[int] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(1)
+            return httpx.Response(200, json=_openrouter_payload())
+
+        provider = OpenRouterWebSearchProvider(
+            api_key="test-key", model="", transport=httpx.MockTransport(handler)
+        )
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            provider.search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "not_configured"
+        assert calls == []
+
+    def test_http_error_and_malformed_shape_raise_typed_unavailable(self) -> None:
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            _openrouter(
+                httpx.MockTransport(lambda request: httpx.Response(429, text="rate"))
+            ).search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "http_error"
+
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            _openrouter(
+                httpx.MockTransport(
+                    lambda request: httpx.Response(200, json={"choices": []})
+                )
+            ).search("q", max_results=5, timeout_seconds=8.0)
+        assert excinfo.value.reason == "malformed_response"
+
+
+class TestProviderSelection:
+    def test_known_provider_ids_resolve(self, monkeypatch) -> None:
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "k")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+        monkeypatch.setenv("ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL", "m/x")
+        assert (
+            search_provider_for_config(provider_id="perplexity_direct").__class__.__name__
+            == "PerplexityDirectProvider"
+        )
+        assert (
+            search_provider_for_config(
+                provider_id="openrouter_web_search"
+            ).__class__.__name__
+            == "OpenRouterWebSearchProvider"
+        )
+
+    def test_unknown_provider_id_fails_closed(self) -> None:
+        with pytest.raises(SearchUnavailableError) as excinfo:
+            search_provider_for_config(provider_id="mystery_engine")
+        assert excinfo.value.reason == "not_configured"
