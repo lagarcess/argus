@@ -284,11 +284,95 @@ class _ConversationReloadGateway(_ByActionGateway):
         user_id: str,
         conversation_id: str,
         limit: int | None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
+        page: bool = False,
     ) -> list[Message]:
         assert user_id == self.user.id
         assert conversation_id == "conversation-1"
-        assert limit is None
-        return list(self.raw_messages)
+        assert (cursor_created_at is None) == (cursor_id is None)
+        ordered = sorted(
+            self.raw_messages,
+            key=lambda message: (message.created_at, message.id),
+        )
+        if cursor_created_at is not None and cursor_id is not None:
+            cursor_key = (cursor_created_at, cursor_id)
+            ordered = [
+                message
+                for message in ordered
+                if (message.created_at, message.id) > cursor_key
+            ]
+        if page:
+            assert limit is not None
+            return ordered[: limit + 1]
+        return ordered if limit is None else ordered[:limit]
+
+    def list_message_page_context(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        page_messages: list[Message],
+    ) -> tuple[list[Message], set[str]]:
+        assert user_id == self.user.id
+        assert conversation_id == "conversation-1"
+        if not page_messages:
+            return [], set()
+
+        last_key = max(
+            (message.created_at, message.id) for message in page_messages
+        )
+        later = [
+            message
+            for message in sorted(
+                self.raw_messages,
+                key=lambda message: (message.created_at, message.id),
+            )
+            if (message.created_at, message.id) > last_key
+        ]
+        witnesses: dict[str, Message] = {}
+
+        later_user = next(
+            (message for message in later if message.role == "user"),
+            None,
+        )
+        if later_user is not None:
+            witnesses[later_user.id] = later_user
+
+        action_message_ids = {
+            message.id
+            for message in page_messages
+            if message.role == "user"
+            and isinstance(message.metadata, dict)
+            and isinstance(message.metadata.get("chat_action"), dict)
+            and message.metadata["chat_action"].get("type") == "run_backtest"
+        }
+        represented_request_ids: set[str] = set()
+        for message in later:
+            job = (
+                message.metadata.get("backtest_job")
+                if message.role == "assistant"
+                and isinstance(message.metadata, dict)
+                else None
+            )
+            if not isinstance(job, dict):
+                continue
+            request_message_id = job.get("request_message_id")
+            if (
+                isinstance(request_message_id, str)
+                and request_message_id in action_message_ids
+                and request_message_id not in represented_request_ids
+            ):
+                represented_request_ids.add(request_message_id)
+                witnesses[message.id] = message
+
+        return (
+            sorted(
+                witnesses.values(),
+                key=lambda message: (message.created_at, message.id),
+            ),
+            represented_request_ids,
+        )
 
     def list_backtest_job_reservations(
         self,
@@ -320,9 +404,14 @@ class _ConversationReloadGateway(_ByActionGateway):
         return []
 
 
-def _run_action_message(index: int, confirmation_id: str) -> Message:
+def _run_action_message(
+    index: int,
+    confirmation_id: str,
+    *,
+    message_id: str | None = None,
+) -> Message:
     return Message(
-        id=f"request-message-{index}",
+        id=message_id or f"request-message-{index}",
         conversation_id="conversation-1",
         role="user",
         content="Run backtest",
@@ -495,15 +584,23 @@ def test_conversation_reload_batches_only_page_run_actions_across_cursors(
     from argus.api import state as api_state
 
     gateway = _ConversationReloadGateway()
+    message_ids = {
+        index: f"10000000-0000-0000-0000-{index:012d}"
+        for index in range(1, 5)
+    }
     gateway.raw_messages = [
-        _run_action_message(index, f"confirmation-{index}")
+        _run_action_message(
+            index,
+            f"confirmation-{index}",
+            message_id=message_ids[index],
+        )
         for index in range(1, 5)
     ]
     gateway.jobs_by_action = {
         f"confirmation-{index}": {
             **gateway.job,
             "id": f"job-{index}",
-            "request_message_id": f"request-message-{index}",
+            "request_message_id": message_ids[index],
             "idempotency_key": f"confirmation-{index}",
         }
         for index in range(1, 5)
