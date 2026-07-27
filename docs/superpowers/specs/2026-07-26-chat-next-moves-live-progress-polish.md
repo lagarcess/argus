@@ -1,7 +1,32 @@
 # Chat Polish: Stacked Next-Move Rows + Honest Live Progress
 
 **Status:** FOUNDER-DIRECTED FOLLOW-UP — direction approved 2026-07-26; row anatomy, resolved-group rule, and sources-drawer promotion approved 2026-07-27; implementation not started.
-**Shape:** three PRs, in order. **PR 1** = Slices A + C — every UI change, zero runtime change. **PR 2** = Slice D, discovery selection carries resolved identity. **PR 3** = Slice B, live progress lines, blocked on three backend prerequisites recorded in §4.
+**Shape:** three PRs, in order.
+
+| PR | Scope | State |
+| --- | --- | --- |
+| **PR 1** — Slices A + C | Every UI change, zero runtime change | ✅ **Merged** — [#281](https://github.com/lagarcess/argus/pull/281), reconciled with integration (guest #279, costs #280) before merge |
+| **PR 2** — Slice D | Discovery selection carries resolved identity | Not started |
+| **PR 3** — Slice B | Live progress lines | Not started; blocked on three backend prerequisites in §4 |
+
+**Delivered in PR 1 beyond the original slice definition,** found during implementation and browser QA:
+
+- A shared `turnInFlight` lock so persistent discovery rows cannot fire turns
+  around a disabled composer (§2). Per-tab UI state only — the concurrency gap
+  is recorded as backend scope in §5.
+- Source dates format in UTC when they are calendar dates, so a publisher's date
+  is not shifted a day west of UTC.
+- The source count pluralizes through the catalog's `_one`/`_other` convention.
+- Both sources-panel controls carry measured 44px tap targets (Codex P2).
+- `markComposerActionsInactive` scoped to what it owns: retry and artifact
+  actions are superseded, conversational options are left to the row renderer.
+  This completes the intent of #85, which introduced the function to replace an
+  indiscriminate wipe; the non-card branch was the last unconverted remnant.
+- Dead `inputActions` state removed with the composer strip it fed.
+
+**Deferred out of PR 1 by founder decision:** the chosen-state marker and
+carry-forward on switch (both Slice D), and the guest grounded-discovery
+allowance (its own slice, `2026-07-27-guest-grounded-discovery-quota.md`).
 **Owner:** Follow-up lane after PR #276 merges (branch from `codex/private-alpha-next`; if #276's merge is held, stack a child branch on `claude/grounded-discovery-release-9cc859` and review against it as parent).
 **Parent context:** Grounded Discovery Search v1 (issue #244, PR #276), founder UI-taste review of 2026-07-26.
 **Scope class:** Small full-slice polish lane. Frontend presentation + one additive runtime event surface. No API-contract breaks, no new tables, no new flags, no new provider calls. One recorded product contract does change: outbound source links (Slice C).
