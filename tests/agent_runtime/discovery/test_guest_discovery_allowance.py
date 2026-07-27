@@ -9,6 +9,7 @@ from argus.api.chat.discovery_evidence import (
 from argus.domain.usage_limits import (
     GLOBAL_DISCOVERY_CEILING_SUBJECT,
     GUEST_DISCOVERY_ALLOWANCE,
+    global_discovery_daily_ceiling,
 )
 
 
@@ -112,3 +113,18 @@ class TestGlobalCeiling:
         )
         assert seen[0] == GLOBAL_DISCOVERY_CEILING_SUBJECT
         assert seen[1].endswith("203.0.113.7")
+
+
+class TestCeilingIsConfigurable:
+    def test_the_ceiling_can_be_reset_without_a_deploy(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING", "7")
+        assert global_discovery_daily_ceiling() == 7
+
+    @pytest.mark.parametrize("bad", ["", "   ", "nonsense", "0", "-5"])
+    def test_a_bad_override_falls_back_rather_than_disabling_the_breaker(
+        self, monkeypatch: pytest.MonkeyPatch, bad: str
+    ) -> None:
+        monkeypatch.setenv("ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING", bad)
+        assert global_discovery_daily_ceiling() > 0

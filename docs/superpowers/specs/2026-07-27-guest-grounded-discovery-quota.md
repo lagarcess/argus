@@ -120,10 +120,21 @@ Three changes, all on machinery that already exists.
 `usage_limits.allowance_windows()` already resolves per-account-class limits,
 and guests already have a `guest_session` period spanning their fixed expiry.
 `_GUEST_ALLOWANCES` covers messages (10), simulations (1), and feedback (5).
-**Discovery is the only metered resource missing.** Add
-`GUEST_DISCOVERY_ALLOWANCE` beside the others so it is tuned where the rest are,
-and make `discovery_evidence.discovery_usage_limits()` consult account class
-instead of returning registered limits unconditionally.
+Discovery is the only metered resource missing.
+
+**Correction, found while implementing:** discovery must *not* join
+`_GUEST_ALLOWANCES`. That table produces `guest_session` windows anchored to
+`account.expires_at`, and workspace expiry moves every time a workspace renews
+— so a guest_session window would reset the very allowance this slice exists to
+hold. Discovery uses a plain **day** window instead, paired with the
+visitor-scoped subject in §4.2. The two changes only work together: a day
+window keyed on `user_id` would still reset on renewal, and a guest_session
+window keyed on the visitor would still slide with expiry.
+
+`GUEST_DISCOVERY_ALLOWANCE` and `GUEST_DISCOVERY_ALLOWANCE_LIMITS` live beside
+the other guest constants so policy stays in one place, and
+`discovery_evidence.discovery_usage_limits()` consults account class instead of
+returning registered limits unconditionally.
 
 ### 4.2 Key the guest discovery counter to the visitor, not the workspace
 

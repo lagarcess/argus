@@ -10,9 +10,9 @@ from argus.domain.discovery_search import discovery_search_config
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     GLOBAL_DISCOVERY_CEILING_SUBJECT,
-    GLOBAL_DISCOVERY_DAILY_CEILING,
     GUEST_DISCOVERY_ALLOWANCE_LIMITS,
     QuotaExceededError,
+    global_discovery_daily_ceiling,
     read_memory_usage,
     settle_memory_usage,
 )
@@ -111,12 +111,12 @@ def discovery_allowance_available(
     try:
         if not _subject_within_limits(
             subject=GLOBAL_DISCOVERY_CEILING_SUBJECT,
-            limits=[("day", GLOBAL_DISCOVERY_DAILY_CEILING)],
+            limits=[("day", global_discovery_daily_ceiling())],
             now=now,
         ):
             logger.warning(
                 "Grounded discovery stopped by the global daily ceiling",
-                ceiling=GLOBAL_DISCOVERY_DAILY_CEILING,
+                ceiling=global_discovery_daily_ceiling(),
             )
             return False
         return _subject_within_limits(
@@ -179,7 +179,7 @@ def _charge_discovery_attempt(
     # the per-subject allowance would be the only real limit.
     _charge_subject(
         subject=GLOBAL_DISCOVERY_CEILING_SUBJECT,
-        limits=[("day", GLOBAL_DISCOVERY_DAILY_CEILING)],
+        limits=[("day", global_discovery_daily_ceiling())],
     )
     _charge_subject(
         subject=discovery_counter_subject(
