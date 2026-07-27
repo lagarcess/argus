@@ -11,6 +11,10 @@ from uuid import UUID, uuid4
 
 import httpx
 
+from argus.api.chat.legacy_onboarding_markers import (
+    _LEGACY_GOAL_PREFIX,
+    _LEGACY_SKIP_MARKER,
+)
 from argus.api.schemas import (
     BacktestRun,
     Collection,
@@ -66,14 +70,63 @@ class ConversationCursorError(ValueError):
     """Raised when a conversation cursor pivot cannot be resolved exactly."""
 
 
+class MessageCursorError(ValueError):
+    """Raised when a message cursor cannot be applied safely."""
+
+
 _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "en": "en-US",
     "es-419": "es-419",
 }
+_MESSAGE_SELECT = "id,conversation_id,role,content,metadata,created_at"
+_MESSAGE_ARTIFACT_FILTER = ",".join(
+    (
+        "metadata->active_confirmation_reference.not.is.null",
+        "metadata->backtest_job.not.is.null",
+        "metadata->backtest_job_id.not.is.null",
+        "metadata->confirmation_card.not.is.null",
+        "metadata->confirmation_payload.not.is.null",
+        "metadata->latest_run_id.not.is.null",
+        "metadata->result_card.not.is.null",
+        "metadata->result_run_id.not.is.null",
+        'metadata->artifact_references.cs.[{"artifact_kind":"confirmation"}]',
+        'metadata->artifact_references.cs.[{"artifact_kind":"result"}]',
+        'metadata->artifact_references.cs.[{"artifact_kind":"backtest_result"}]',
+        'metadata->artifact_references.cs.[{"artifact_kind":"backtest_job"}]',
+    )
+)
+_LEGACY_ONBOARDING_GOAL_LIKE = (
+    _LEGACY_GOAL_PREFIX.replace("_", r"\_").replace("%", r"\%") + "*"
+)
 
 
 def _now_iso() -> str:
     return utcnow().isoformat()
+
+
+def _visible_runtime_failure_request_id(message: Message) -> str | None:
+    if message.role != "assistant" or not isinstance(message.metadata, dict):
+        return None
+    metadata = message.metadata
+    if metadata.get("agent_runtime_stage_outcome") != "agent_runtime_failure":
+        return None
+    recovery = metadata.get("recovery")
+    if not (
+        metadata.get("conversation_mode") == "recovery"
+        or (
+            isinstance(recovery, dict)
+            and recovery.get("code")
+            in {"runtime_failure", "agent_runtime_failure"}
+        )
+    ):
+        return None
+    runtime_turn = metadata.get("agent_runtime_turn")
+    if not isinstance(runtime_turn, dict):
+        return None
+    request_id = runtime_turn.get("request_id")
+    if not isinstance(request_id, str) or not request_id.strip():
+        return None
+    return request_id.strip()
 
 
 def _row_one(result: Any) -> dict[str, Any] | None:
@@ -509,19 +562,55 @@ class SupabaseGateway(
         return len(result.data or [])
 
     def list_messages(
-        self, *, user_id: str, conversation_id: str, limit: int | None
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int | None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
+        page: bool = False,
     ) -> list[Message]:
+        if (cursor_created_at is None) != (cursor_id is None):
+            raise MessageCursorError("invalid message cursor")
+        if cursor_id is not None:
+            try:
+                normalized_cursor_id = str(UUID(cursor_id))
+            except (AttributeError, TypeError, ValueError):
+                raise MessageCursorError("invalid message cursor") from None
+            if normalized_cursor_id != cursor_id:
+                raise MessageCursorError("invalid message cursor")
+        if page and limit is None:
+            raise ValueError("Message pages require a finite limit.")
+        if not page and cursor_created_at is not None:
+            raise ValueError("Message cursors are only valid for page reads.")
+
         query = (
             self.client.table("messages")
-            .select("id,conversation_id,role,content,metadata,created_at")
+            .select(_MESSAGE_SELECT)
             .eq("user_id", user_id)
             .eq("conversation_id", conversation_id)
-            .order("created_at", desc=False)
         )
-        if limit is None:
-            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        if page:
+            query = query.or_(
+                r"role.neq.user,"
+                f"and(content.neq.{_LEGACY_SKIP_MARKER},"
+                f"content.not.like.{_LEGACY_ONBOARDING_GOAL_LIKE})"
+            )
+            if cursor_created_at is not None and cursor_id is not None:
+                timestamp = cursor_created_at.isoformat()
+                query = query.or_(
+                    f"created_at.gt.{timestamp},"
+                    f"and(created_at.eq.{timestamp},id.gt.{cursor_id})"
+                )
+        ordered = query.order("created_at", desc=False).order("id", desc=False)
+        if page:
+            assert limit is not None
+            rows_data = ordered.limit(limit + 1).execute().data or []
+        elif limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
         else:
-            rows_data = query.limit(limit).execute().data or []
+            rows_data = ordered.limit(limit).execute().data or []
         messages = [Message.model_validate(row) for row in rows_data]
         return hydrate_completed_backtest_job_messages(
             messages,
@@ -533,6 +622,109 @@ class SupabaseGateway(
                 user_id=user_id,
                 run_id=run_id,
             ),
+        )
+
+    def list_message_page_context(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        page_messages: list[Message],
+    ) -> tuple[list[Message], set[str]]:
+        """Return bounded later-work witnesses needed by read-time projection."""
+
+        if not page_messages:
+            return [], set()
+        last = max(page_messages, key=lambda message: (message.created_at, message.id))
+        timestamp = last.created_at.isoformat()
+        keyset_filter = (
+            f"created_at.gt.{timestamp},"
+            f"and(created_at.eq.{timestamp},id.gt.{last.id})"
+        )
+
+        def first_later(query: Any) -> Message | None:
+            rows = (
+                query.or_(keyset_filter)
+                .order("created_at", desc=False)
+                .order("id", desc=False)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            return Message.model_validate(rows[0]) if rows else None
+
+        def base_query() -> Any:
+            return (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+            )
+
+        witnesses: dict[str, Message] = {}
+        later_user = first_later(
+            base_query()
+            .eq("role", "user")
+            .neq("content", _LEGACY_SKIP_MARKER)
+            .not_.like("content", _LEGACY_ONBOARDING_GOAL_LIKE)
+        )
+        if later_user is not None:
+            witnesses[later_user.id] = later_user
+
+        later_artifact = first_later(
+            base_query().eq("role", "assistant").or_(_MESSAGE_ARTIFACT_FILTER)
+        )
+        if later_artifact is not None:
+            witnesses[later_artifact.id] = later_artifact
+
+        request_ids = {
+            request_id
+            for message in page_messages
+            if (request_id := _visible_runtime_failure_request_id(message)) is not None
+        }
+        for request_id in sorted(request_ids):
+            matching_artifact = first_later(
+                base_query()
+                .eq("role", "assistant")
+                .eq(
+                    "metadata->agent_runtime_turn->>request_id",
+                    request_id,
+                )
+                .or_(_MESSAGE_ARTIFACT_FILTER)
+            )
+            if matching_artifact is not None:
+                witnesses[matching_artifact.id] = matching_artifact
+
+        action_message_ids = {
+            message.id
+            for message in page_messages
+            if message.role == "user"
+            and isinstance(message.metadata, dict)
+            and isinstance(message.metadata.get("chat_action"), dict)
+            and message.metadata["chat_action"].get("type") == "run_backtest"
+        }
+        represented_request_ids: set[str] = set()
+        for message_id in sorted(action_message_ids):
+            representation = first_later(
+                base_query()
+                .eq("role", "assistant")
+                .eq(
+                    "metadata->backtest_job->>request_message_id",
+                    message_id,
+                )
+            )
+            if representation is None:
+                continue
+            represented_request_ids.add(message_id)
+            witnesses[representation.id] = representation
+
+        return (
+            sorted(
+                witnesses.values(),
+                key=lambda message: (message.created_at, message.id),
+            ),
+            represented_request_ids,
         )
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:

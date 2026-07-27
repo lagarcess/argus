@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -42,7 +43,7 @@ from argus.domain.backtest_message_projection import (
     represented_backtest_job_request_ids,
 )
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import ConversationCursorError
+from argus.domain.supabase_gateway import ConversationCursorError, MessageCursorError
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
@@ -467,23 +468,64 @@ def list_messages(
             detail="Conversation not found.",
         )
 
+    cursor_created_at: datetime | None = None
+    cursor_id: str | None = None
+    if cursor:
+        raw_cursor_created_at, cursor_id = decode_cursor(cursor, request)
+        try:
+            cursor_created_at = datetime.fromisoformat(raw_cursor_created_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+        if api_state.supabase_gateway is not None:
+            try:
+                normalized_cursor_id = str(UUID(cursor_id))
+            except (AttributeError, TypeError, ValueError):
+                raise invalid_cursor_problem(request) from None
+            if normalized_cursor_id != cursor_id:
+                raise invalid_cursor_problem(request)
+
     items: list[Message] | None = None
+    database_page = False
+    database_page_ids: set[str] = set()
+    transcript_represented_request_ids: set[str] = set()
     if api_state.supabase_gateway is not None:
         try:
             items = api_state.supabase_gateway.list_messages(
                 user_id=user.id,
                 conversation_id=conversation_id,
-                limit=None,
+                limit=limit,
+                cursor_created_at=cursor_created_at,
+                cursor_id=cursor_id,
+                page=True,
             )
+            database_page = True
+            database_page_ids = {message.id for message in items}
             if (
                 dev_memory_fallback_enabled()
                 and conversation_id in api_state.store.conversations
                 and api_state.store.messages.get(conversation_id)
             ):
                 items = api_state.store.messages.get(conversation_id, [])
+                database_page = False
+                database_page_ids = set()
+            elif items:
+                later_work, transcript_represented_request_ids = (
+                    api_state.supabase_gateway.list_message_page_context(
+                        user_id=user.id,
+                        conversation_id=conversation_id,
+                        page_messages=items,
+                    )
+                )
+                items = [*items, *later_work]
+        except MessageCursorError:
+            raise invalid_cursor_problem(request) from None
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
+            items = None
+            database_page = False
+            database_page_ids = set()
+            transcript_represented_request_ids = set()
             logger.warning(
                 "Supabase message list failed; using dev memory fallback",
                 error=str(exc),
@@ -518,17 +560,14 @@ def list_messages(
         messages=items,
     )
     represented_request_ids = represented_backtest_job_request_ids(items)
+    represented_request_ids.update(transcript_represented_request_ids)
     items = _public_message_projection(items)
-    filtered = items
-    if cursor:
-        cursor_created_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            cursor_dt = datetime.fromisoformat(cursor_created_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
-        cursor_key = (cursor_dt, cursor_id)
-        filtered = [item for item in items if (item.created_at, item.id) > cursor_key]
-    page = filtered[: limit + 1]
+    if database_page:
+        items = [item for item in items if item.id in database_page_ids]
+    if not database_page and cursor_created_at is not None and cursor_id is not None:
+        cursor_key = (cursor_created_at, cursor_id)
+        items = [item for item in items if (item.created_at, item.id) > cursor_key]
+    page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
     page_items = _project_backtest_job_actions(

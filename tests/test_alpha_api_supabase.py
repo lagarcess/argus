@@ -454,6 +454,7 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.list_message_page_context.return_value = ([], set())
     gateway.reconcile_stale_chat_turns.return_value = []
     gateway.list_projectable_chat_turns.return_value = []
     gateway.get_latest_completed_run_for_conversation.return_value = None
@@ -2959,3 +2960,390 @@ def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gatew
         for item in payload["items"]
     ]
     assert len(all_ids) == len(set(all_ids)) == 130
+
+
+def test_message_first_middle_final_and_empty_pages(mock_gateway):
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000001",
+        title="Paged messages",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    messages = [
+        Message(
+            id=f"30000000-0000-0000-0000-{idx:012d}",
+            conversation_id=conversation.id,
+            role="user",
+            content=f"Message {idx}",
+            created_at=created_at,
+            metadata={},
+        )
+        for idx in range(5)
+    ]
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_messages.side_effect = [
+        messages[:3],
+        messages[2:5],
+        messages[4:],
+        [],
+    ]
+
+    first_page = client.get(
+        f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    payload = first_page.json()
+    assert [item["id"] for item in payload["items"]] == [
+        messages[0].id,
+        messages[1].id,
+    ]
+    assert payload["next_cursor"] is not None
+
+    second_page = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={payload['next_cursor']}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert [item["id"] for item in second_payload["items"]] == [
+        messages[2].id,
+        messages[3].id,
+    ]
+    assert second_payload["next_cursor"] is not None
+
+    final_page = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={second_payload['next_cursor']}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert final_page.status_code == 200
+    assert final_page.json() == {
+        "items": [messages[4].model_dump(mode="json")],
+        "next_cursor": None,
+    }
+
+    empty_page = client.get(
+        f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert empty_page.status_code == 200
+    assert empty_page.json() == {"items": [], "next_cursor": None}
+
+    calls = mock_gateway.list_messages.call_args_list
+    assert calls[0].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "conversation_id": conversation.id,
+        "limit": 2,
+        "cursor_created_at": None,
+        "cursor_id": None,
+        "page": True,
+    }
+    assert calls[1].kwargs["cursor_created_at"] == created_at
+    assert calls[1].kwargs["cursor_id"] == messages[1].id
+    assert calls[2].kwargs["cursor_created_at"] == created_at
+    assert calls[2].kwargs["cursor_id"] == messages[3].id
+    assert calls[3].kwargs["cursor_created_at"] is None
+    assert calls[3].kwargs["cursor_id"] is None
+
+
+def test_message_malformed_pivot_uses_existing_invalid_cursor_problem(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000002",
+        title="Malformed message cursor",
+        title_source="system_default",
+        language="en",
+        created_at=now,
+        updated_at=now,
+    )
+    cursor = encode_cursor(
+        datetime(2026, 7, 1, tzinfo=timezone.utc).isoformat(),
+        "missing-message",
+    )
+    mock_gateway.get_conversation.return_value = conversation
+
+    response = client.get(
+        (
+            f"/api/v1/conversations/{conversation.id}/messages"
+            f"?limit=2&cursor={cursor}"
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
+    mock_gateway.list_messages.assert_not_called()
+
+
+class _MessagePageContextGateway:
+    def __init__(
+        self,
+        delegate: Any,
+        *,
+        page_messages: list[Message],
+        later_work: list[Message],
+        represented_request_ids: set[str] | None = None,
+    ) -> None:
+        self._delegate = delegate
+        self._page_messages = page_messages
+        self._later_work = later_work
+        self._represented_request_ids = represented_request_ids or set()
+        self.context_calls: list[dict[str, Any]] = []
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
+
+    def list_messages(self, **_: Any) -> list[Message]:
+        return list(self._page_messages)
+
+    def list_message_page_context(
+        self,
+        **kwargs: Any,
+    ) -> tuple[list[Message], set[str]]:
+        self.context_calls.append(kwargs)
+        return list(self._later_work), set(self._represented_request_ids)
+
+
+def test_message_page_later_artifact_preserves_retry_supersession(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000003",
+        title="Retry reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    user_message = Message(
+        id="30000000-0000-0000-0000-000000000010",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test AAPL.",
+        created_at=created_at,
+        metadata={},
+    )
+    failed_message = Message(
+        id="30000000-0000-0000-0000-000000000011",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Something went wrong.",
+        created_at=created_at + timedelta(microseconds=1),
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": {"code": "runtime_failure", "retryable": True},
+            "retry_last_turn": {"message": user_message.content},
+        },
+    )
+    lookahead = Message(
+        id="30000000-0000-0000-0000-000000000012",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Still working.",
+        created_at=created_at + timedelta(microseconds=2),
+        metadata={},
+    )
+    later_artifact = Message(
+        id="30000000-0000-0000-0000-000000000013",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Ready to run.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={"confirmation_card": {"status": "ready_to_run"}},
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=[user_message, failed_message, lookahead],
+        later_work=[later_artifact],
+    )
+    mock_gateway.get_conversation.return_value = conversation
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    failed = response.json()["items"][1]
+    assert failed["id"] == failed_message.id
+    assert "retry_last_turn" not in failed["metadata"]
+    assert failed["metadata"]["recovery"]["retryable"] is False
+    assert len(gateway.context_calls) == 1
+
+
+def test_message_page_later_user_preserves_abandoned_retry_suppression(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000004",
+        title="Abandoned reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    abandoned_user = Message(
+        id="30000000-0000-0000-0000-000000000020",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test AAPL.",
+        created_at=created_at,
+        metadata={},
+    )
+    page_messages = [
+        abandoned_user,
+        Message(
+            id="30000000-0000-0000-0000-000000000021",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Waiting.",
+            created_at=created_at + timedelta(microseconds=1),
+            metadata={},
+        ),
+        Message(
+            id="30000000-0000-0000-0000-000000000022",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Still waiting.",
+            created_at=created_at + timedelta(microseconds=2),
+            metadata={},
+        ),
+    ]
+    later_user = Message(
+        id="30000000-0000-0000-0000-000000000023",
+        conversation_id=conversation.id,
+        role="user",
+        content="Test MSFT instead.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={},
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=page_messages,
+        later_work=[later_user],
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_projectable_chat_turns.return_value = [
+        {
+            "turn_id": abandoned_user.id,
+            "request_id": "abandoned-request",
+            "assistant_message_id": None,
+            "status": "abandoned",
+            "reconciled_outcome": None,
+            "failure_code": "turn_abandoned",
+            "retryable": True,
+        }
+    ]
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    abandoned = response.json()["items"][0]
+    assert abandoned["id"] == abandoned_user.id
+    assert abandoned["metadata"]["agent_runtime_turn"]["status"] == "abandoned"
+    assert "retry_last_turn" not in abandoned["metadata"]
+    assert len(gateway.context_calls) == 1
+
+
+def test_message_page_transcript_representation_prevents_duplicate_job_projection(
+    mock_gateway,
+) -> None:
+    created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversation = Conversation(
+        id="20000000-0000-0000-0000-000000000005",
+        title="Run action reconciliation",
+        title_source="system_default",
+        language="en",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    action_message = Message(
+        id="30000000-0000-0000-0000-000000000030",
+        conversation_id=conversation.id,
+        role="user",
+        content="Run backtest",
+        created_at=created_at,
+        metadata={
+            "chat_action": {
+                "type": "run_backtest",
+                "payload": {"confirmation_id": "confirmation-1"},
+            }
+        },
+    )
+    page_messages = [
+        action_message,
+        Message(
+            id="30000000-0000-0000-0000-000000000031",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Waiting.",
+            created_at=created_at + timedelta(microseconds=1),
+            metadata={},
+        ),
+        Message(
+            id="30000000-0000-0000-0000-000000000032",
+            conversation_id=conversation.id,
+            role="assistant",
+            content="Still waiting.",
+            created_at=created_at + timedelta(microseconds=2),
+            metadata={},
+        ),
+    ]
+    represented_message = Message(
+        id="30000000-0000-0000-0000-000000000033",
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Run queued.",
+        created_at=created_at + timedelta(microseconds=3),
+        metadata={
+            "backtest_job": {
+                "id": "job-1",
+                "request_message_id": action_message.id,
+            }
+        },
+    )
+    gateway = _MessagePageContextGateway(
+        mock_gateway,
+        page_messages=page_messages,
+        later_work=[represented_message],
+        represented_request_ids={action_message.id},
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.list_backtest_job_reservations.return_value = [
+        {
+            "id": "job-1",
+            "idempotency_key": "confirmation-1",
+            "conversation_id": conversation.id,
+            "request_message_id": action_message.id,
+            "status": "queued",
+        }
+    ]
+
+    with patch("argus.api.state.supabase_gateway", gateway):
+        response = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages?limit=2",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    action = response.json()["items"][0]
+    assert action["id"] == action_message.id
+    assert "backtest_job" not in action["metadata"]
+    assert len(gateway.context_calls) == 1
