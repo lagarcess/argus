@@ -1036,7 +1036,10 @@ export async function streamChatMessage(
     body: JSON.stringify({
       conversation_id: conversationId,
       ...(typeof input === "string" ? { message: input } : { action: input }),
-      ...(typeof input === "string" && mentions.length > 0 ? { mentions } : {}),
+      // Callers decide which turns carry mentions; this layer only forwards
+      // them. Gating on a string input silently dropped the resolver identity
+      // that a discovery selection attaches to its action turn.
+      ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
     }),
   }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
