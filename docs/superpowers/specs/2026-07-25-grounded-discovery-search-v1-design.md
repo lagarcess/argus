@@ -264,7 +264,7 @@ not a hard gate).
   valid); combining candidates into one run remains governed by the existing
   same-class and 5-symbol guardrails at confirmation time.
 
-### 5.1 OPEN DEFECT — resolution ignores the request's asset class (found 2026-07-27)
+### 5.1 FIXED 2026-07-27 — resolution ignored the entity the sources named
 
 Validation resolves the bare `symbol_guess` (`discovery/validation.py`,
 `resolve(symbol_guess)`), and `resolve_asset(symbol: str)` takes no asset-class
@@ -309,8 +309,27 @@ chance that the interpreter re-derives a better answer from the text, so this
 defect now propagates with more confidence. Fixing resolution is the
 prerequisite for trusting the identity we pass.
 
-Not yet scheduled. Owned by #244; blocks the crypto/currency-pair acceptance
-journey already on that register.
+**Fix shipped.** Validation now requires the resolved asset to corroborate the
+entity extraction named, reusing the interpreter's existing token-structural
+grounding helper (`text_corroborates_resolved_asset`) so the check never
+becomes an alias table or per-language phrasebook. When extraction names no
+entity beyond the ticker there is nothing to corroborate, and the request's
+`asset_class_hint` decides.
+
+**Known limitation, accepted with the fix.** Crypto-exposure ETFs are dropped
+too. Corroboration requires the named token to lead a short resolved name —
+precisely what stops "Apple" matching "Apple Hospitality REIT" — and
+"Grayscale Bitcoin Mini Trust ETF" fails on both counts. Loosening the rule to
+keep it would reopen the collision class this closes; the two are structurally
+indistinguishable. Dropped candidates become honest unverified prose, never
+something the user can run, so the failure direction is safe. **Surfacing
+exposure vehicles is real product value and needs its own design** — most
+likely extraction naming the vehicle explicitly rather than a weaker token
+rule. Not scheduled; owned by #244.
+
+The test stubs resolved every symbol to `"<SYM> Inc"`, which no real provider
+does, which is why no existing test could see this. They now return real
+catalog names.
 
 ## 6. Source, citation, freshness, and persistence contract
 
