@@ -6,7 +6,7 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `53e812e9`. The accepted post-promotion
+Current stable integration checkpoint: `75e87206`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -15,8 +15,10 @@ title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
 truthful stale Run settlement (PR #277), and supported strategy-transition
 preservation (PR #278), plus the default-on grounded-discovery baseline
 (PR #276), modeled-cost preservation (PR #280), and the Guest experience
-(PR #279). This is an integration checkpoint, not a deployed or tester-exposed
-SHA.
+(PR #279), followed by chat next-move presentation (PR #281). Provider-free
+backend test isolation landed through PR #282, and PR #286 made the complete
+`tests/` directory the backend CI gate. This is an integration checkpoint, not
+a deployed or tester-exposed SHA.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -256,6 +258,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   shell, capability gates, and privacy-safe funnel evidence. Guest defaults on
   with explicit-off rollback; public-account access remains separately off.
   Hosted configuration, canary, and public traffic remain later release gates.
+- Backend verification is provider-free by default after PR #282 at
+  `059f8e82`: root test fixtures force synthetic market data and keep provider
+  credentials explicitly empty so dotenv cannot silently restore them. Both
+  alpha API suites are part of `backend-checks`.
+- Backend CI is directory-complete after PR #286 at `75e87206`: the gate runs
+  the full `tests/` tree, the stale pure-approval fixture is corrected, and a
+  guard test prevents the workflow from returning to a curated file list.
+  Issues #283 and #284 are closed. This changes verification coverage, not
+  runtime behavior.
 
 ## P0 Reintegration Checkpoint
 
@@ -287,10 +298,11 @@ Codex should own or closely supervise this:
    - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
      a second runtime lane.
    - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
-     closure journey. #272 may now start from `53e812e9` or later.
+     closure journey. New #272 work must start from `75e87206` or later.
    - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
-     released the shared shell owner, so #249 may now start from `8fde4ac1` or
-     later. Preserve PR #281's stacked rows, source panel, and in-flight lock;
+     released the shared shell owner, so new #249 work must start from
+     `75e87206` or later. Preserve PR #281's stacked rows, source panel, and
+     in-flight lock;
      #249 owns the remaining Quick take, Explain, Try next, and recovery roles.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.

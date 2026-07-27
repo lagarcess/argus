@@ -7,7 +7,7 @@ Original roadmap date: 2026-07-16
 Last reconciled: 2026-07-27
 
 Current stable integration checkpoint: `codex/private-alpha-next` at
-`53e812e936f10cfa778bfce5ef7e5da54204fedd`.
+`75e87206574cca41a715d357b366bda569beb8bd`.
 
 That checkpoint contains the founder-accepted outcome baselines delivered
 through independently revertible vertical slices:
@@ -29,7 +29,12 @@ private-alpha onboarding product from PR #275 at `88ae8c77`, and truthful stale
 Run settlement from PR #277 at `2d5a2b52`. Supported strategy transitions
 through confirmation then landed from PR #278 at `b80d95a2`.
 Modeled-cost preservation landed from PR #280 at `d16f7496`, followed by the
-Guest experience from PR #279 at `53e812e9`.
+Guest experience from PR #279 at `53e812e9` and chat next-move presentation
+from PR #281 at `8fde4ac1`. PR #282 then made ordinary backend tests
+provider-free and added the alpha API suites to CI at `059f8e82`; PR #286 made
+the complete backend `tests/` directory the required CI gate at `75e87206`.
+Those two CI landings improve verification truth without changing product
+behavior.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -143,7 +148,7 @@ Execute serially:
    preservation repetition.
 3. [#272 — Recover without re-asking facts the conversation owns](https://github.com/lagarcess/argus/issues/272).
    This is now the next protected interpreter/edit-spine issue and must start
-   from `53e812e9` or a later clean integration checkpoint.
+   from `75e87206` or a later clean integration checkpoint.
 
 Only one agent owns the interpreter/edit spine at a time. Do not combine these
 issues into another open-ended continuity rewrite.
@@ -156,7 +161,7 @@ Execute serially:
    is **complete**. PR #277 landed as `2d5a2b52`; all eight acceptance criteria
    were reconciled and #273 is closed.
 2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249)
-   is now ready to start from `53e812e9` or later. Guest has landed, so the
+   is now ready to start from `75e87206` or later. Guest has landed, so the
    overlapping chat-shell and recovery-presentation owner is stable.
 
 Issue #249 was updated instead of duplicating presentation ownership. It
@@ -181,12 +186,12 @@ This is the current dispatch gate, not another speculative backlog:
 | Ownership lane | Current owner | Next handoff |
 | --- | --- | --- |
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
-| Protected interpreter/edit spine | #271 implementation landed through PR #280 at `d16f7496` | Run its focused integrated closure journey, then close #271. #272 may now start from `53e812e9` or later. |
-| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from `53e812e9` or later. |
+| Protected interpreter/edit spine | #271 implementation landed through PR #280 at `d16f7496` | Run its focused integrated closure journey, then close #271. #272 must use `75e87206` or later. |
+| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from `75e87206` or later. |
 | Grounded discovery | PR #276 landed as `c212107a`; chat next-moves polish PR #281 landed as `8fde4ac1`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, configure Render, and prove the exact deployed SHA/canary. |
-| Chat next-move presentation | PR #281 landed as `8fde4ac1`: clarify options, follow-ups, and discovery candidates render as stacked rows under their owning message; sources panel with outbound links; shared in-flight lock. Frontend only | Two specified follow-ups remain in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md`: Slice D (discovery selection carries resolved identity, plus chosen-state and switch continuity) and Slice B (live progress lines, blocked on three backend prerequisites). Start either from `8fde4ac1` or later. |
+| Chat next-move presentation | PR #281 landed as `8fde4ac1`: clarify options, follow-ups, and discovery candidates render as stacked rows under their owning message; sources panel with outbound links; shared in-flight lock. Frontend only | Two specified follow-ups remain in `docs/superpowers/specs/2026-07-26-chat-next-moves-live-progress-polish.md`: Slice D (discovery selection carries resolved identity, plus chosen-state and switch continuity) and Slice B (live progress lines, blocked on three backend prerequisites). New work must start from `75e87206` or later. |
 | Guest grounded discovery | Specified, not started — `docs/superpowers/specs/2026-07-27-guest-grounded-discovery-quota.md` | Meter the guest ask per session; do not gate the candidate tap. Supersedes the "registered users only" line in the grounded discovery design. Allowance number is founder-owned. |
-| Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto `53e812e9` or later; do not invent discovery truth or activate Search implicitly. |
+| Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto `75e87206` or later; do not invent discovery truth or activate Search implicitly. |
 
 The next bounded continuity lanes are #272 and #249. They have different owners
 and may proceed in parallel, but work inside each ownership queue remains

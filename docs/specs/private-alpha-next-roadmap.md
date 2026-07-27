@@ -18,17 +18,21 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-26
+## Active Post-Promotion Pointer — 2026-07-27
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `b80d95a2`.
+`main` at `217ead12`. The current stable integration checkpoint is `75e87206`.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
 #259, #266, and #268, plus the bounded calendar-materiality correction from
 PR #267. It also contains the bounded chat-header correction from PR #274,
 explicit onboarding removal from PR #275, and stale Run settlement from PR
-#277, plus supported strategy-transition preservation from PR #278. This
+#277, supported strategy-transition preservation from PR #278, the default-on
+Grounded Discovery and Guest baselines from PRs #276 and #279, modeled-cost
+preservation from PR #280, and chat next-move presentation from PR #281.
+Provider-free test isolation landed through PR #282, and PR #286 replaced the
+partial backend test list with the complete `tests/` directory gate. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -930,6 +934,14 @@ in a sources panel without re-querying. The remaining chat-polish work is
 explicitly separate: resolved-identity carry-forward (Slice D), honest live
 progress (Slice B), and guest discovery allowance. Full Omnisearch is the
 remaining unbuilt founder outcome.
+
+Integration-verification checkpoint (2026-07-27): PR #282 landed as
+`059f8e82` and made the ordinary backend test environment provider-free by
+default while adding both alpha API suites to CI. PR #286 then landed as
+`75e87206`, closed #283 and #284, corrected the stale pure-approval fixture, and
+made `backend-checks` run the complete `tests/` directory instead of a curated
+file list. These are test/CI truth improvements, not product behavior changes,
+provider-backed evidence, deployment, or tester exposure.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration
