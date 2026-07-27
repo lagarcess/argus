@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -63,19 +64,24 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
         str(step.get("run", "")) for step in jobs["backend-checks"]["steps"]
     )
     assert "poetry run ruff check src tests workflows scripts" in backend_steps
-    assert "tests/test_environment_scripts.py" in backend_steps
-    assert "tests/test_api_import_boundary.py" in backend_steps
-    assert "tests/test_alpha_api.py" in backend_steps
-    assert "tests/test_alpha_api_supabase.py" in backend_steps
-    assert "tests/test_render_canary_script.py" in backend_steps
-    assert "tests/test_legacy_orchestrator_retirement.py" in backend_steps
-    assert "tests/test_chat_backtest_state_machine.py" in backend_steps
-    assert "tests/test_chat_runtime_reload_guardrails.py" in backend_steps
-    assert "tests/test_openrouter_policy.py" in backend_steps
-    assert "tests/agent_runtime/test_execute_recovery.py" in backend_steps
-    assert "tests/agent_runtime/test_latest_result_fact_answers.py" in backend_steps
-    assert "tests/section3/test_market_data_provider.py" in backend_steps
-    assert "--no-cov" in backend_steps
+    assert "poetry run pytest tests -q --no-cov" in backend_steps
+
+
+def test_backend_checks_gates_the_suite_by_directory() -> None:
+    """New test files must be gated without editing this workflow.
+
+    A curated file list drops new tests silently, so the backend suite step
+    runs `tests` as a directory and must never enumerate individual files.
+    """
+    jobs = _workflow()["jobs"]
+    backend_steps = "\n".join(
+        str(step.get("run", "")) for step in jobs["backend-checks"]["steps"]
+    )
+
+    assert re.search(r"pytest\s+tests\s", backend_steps)
+    assert "tests/test_" not in backend_steps
+    assert "tests/agent_runtime/" not in backend_steps
+    assert "tests/section3/" not in backend_steps
 
     frontend_steps = "\n".join(
         str(step.get("run", "")) for step in jobs["frontend-checks"]["steps"]

@@ -77,7 +77,10 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
-import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import {
+  discoveryCandidateMention,
+  discoverySidecarFromMetadata,
+} from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
@@ -1340,7 +1343,13 @@ export default function ChatInterface() {
           runStreamFinalSeen ||= event.event === "final";
           handleStreamEvent(event);
         },
-        action?.type ? [] : mentions,
+        // Action turns drop composer mentions, but a discovery selection has no
+        // composer input to drop -- its mention *is* the resolver identity the
+        // candidate already earned, and dropping it is what forces the
+        // interpreter to re-derive the asset from the chip text.
+        action?.type && action.type !== "select_discovery_candidate"
+          ? []
+          : mentions,
       );
       throwIfAmbiguousRunStreamTermination(
         action?.type === "run_backtest",
@@ -1723,11 +1732,17 @@ export default function ChatInterface() {
       const failedAssistantId =
         retryLastTurnFailedAssistantIdFromAction(action);
       const requestMessageId = retryLastTurnRequestMessageIdFromAction(action);
+      // A replayed discovery selection has to carry its identity too, or the
+      // retry sends bare chip text and reintroduces the asset re-derivation
+      // this lane fixes. The persisted chat_action still holds the payload.
+      const retryMention = retryChatAction
+        ? discoveryCandidateMention(retryChatAction)
+        : null;
       if (retryText) {
         void handleSend(
           retryText,
-          retryChatAction ?? [],
-          undefined,
+          retryMention ? [retryMention] : (retryChatAction ?? []),
+          retryMention ? (retryChatAction ?? undefined) : undefined,
           requestMessageId
             ? { renderUserMessage: true }
             : {
@@ -1747,6 +1762,11 @@ export default function ChatInterface() {
     }
     if (isFailedActionRetry(action)) {
       void handleSend(action.label || value, action);
+      return;
+    }
+    const discoveryMention = discoveryCandidateMention(action);
+    if (discoveryMention) {
+      void handleSend(action.label || value, [discoveryMention], action);
       return;
     }
     void handleSend(action.label || value, action.type ? action : undefined);

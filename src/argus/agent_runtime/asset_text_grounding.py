@@ -256,6 +256,16 @@ def _asset_candidate_tokens(message: str) -> list[str]:
     return tokens
 
 
+def text_corroborates_resolved_asset(phrase: str, asset: Any) -> bool:
+    """Does a resolved asset actually correspond to the named entity?
+
+    Token-structural only: it compares the phrase against the asset's own
+    symbol and name tokens, so it never becomes an alias table or a
+    per-language phrasebook.
+    """
+    return _candidate_text_supports_resolved_asset(phrase, asset)
+
+
 def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
     candidate = str(phrase or "").strip()
     if not candidate:

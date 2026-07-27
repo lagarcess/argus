@@ -18,17 +18,25 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-26
+## Active Post-Promotion Pointer — 2026-07-27
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `b80d95a2`.
+`main` at `217ead12`. The current integrated product checkpoint contains PR
+#287 at `ea2b3f35`; new work must branch from the current remote
+`codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
 #259, #266, and #268, plus the bounded calendar-materiality correction from
 PR #267. It also contains the bounded chat-header correction from PR #274,
 explicit onboarding removal from PR #275, and stale Run settlement from PR
-#277, plus supported strategy-transition preservation from PR #278. This
+#277, supported strategy-transition preservation from PR #278, the default-on
+Grounded Discovery and Guest baselines from PRs #276 and #279, modeled-cost
+preservation from PR #280, and chat next-move presentation from PR #281.
+Provider-free test isolation landed through PR #282, and PR #286 replaced the
+partial backend test list with the complete `tests/` directory gate. PR #287
+then delivered resolver-owned discovery selection identity and
+candidate/entity corroboration. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -926,10 +934,30 @@ canary evidence are still required before tester exposure. PR #281 then landed
 the frontend presentation slice as `8fde4ac1`: conversational next moves and
 discovery candidates render as stacked rows under their owning message,
 candidate reasons remain visible, and the persisted discovery evidence opens
-in a sources panel without re-querying. The remaining chat-polish work is
-explicitly separate: resolved-identity carry-forward (Slice D), honest live
-progress (Slice B), and guest discovery allowance. Full Omnisearch is the
-remaining unbuilt founder outcome.
+in a sources panel without re-querying. PR #287 then landed Slice D as
+`ea2b3f35`: discovery selection carries the resolver-owned identity through the
+normal mention channel, durable Retry preserves it, and candidate validation
+rejects unrelated ticker collisions. The chosen-state marker was cut, and
+broader assumption carry-forward remains general interpreter work rather than
+discovery debt. Honest live progress (Slice B) and guest discovery allowance
+remain. Full Omnisearch is the remaining unbuilt founder outcome.
+
+Integration-verification checkpoint (2026-07-27): PR #282 landed as
+`059f8e82` and made the ordinary backend test environment provider-free by
+default while adding both alpha API suites to CI. PR #286 then landed as
+`75e87206`, closed #283 and #284, corrected the stale pure-approval fixture, and
+made `backend-checks` run the complete `tests/` directory instead of a curated
+file list. These are test/CI truth improvements, not product behavior changes,
+provider-backed evidence, deployment, or tester exposure.
+
+Discovery-selection checkpoint (2026-07-27): PR #287 landed as `ea2b3f35` and
+closed Slice D of the chat next-moves lane. The selected asset's resolved symbol
+and class now survive initial submission and durable Retry as a normal mention;
+interpretation, guardrails, and confirmation remain mandatory. The same PR
+added candidate/entity corroboration to prevent unrelated cross-class ticker
+collisions. It intentionally filters crypto-exposure vehicles along with true
+collisions; #244 remains open for that product decision, comparison-phrase
+reliability, hosted configuration, and exact-SHA canary evidence.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration
