@@ -8,14 +8,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.response_language import response_language_instruction
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _supported_experiment_fact_packet,
+)
 from argus.agent_runtime.stages.interpret_types import (
     CapabilityQuestionFocus,
     ContextQuestionFocus,
+    SemanticTurnAct,
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import executable_strategy_type
 from argus.context import ContextPacket
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
 
@@ -401,3 +407,72 @@ def _route_contextual_money_answer(
     initial_capital = updated.capital_amount
     updated.capital_amount = None
     return updated, {"initial_capital": initial_capital}
+
+
+async def _unhandled_response_recovery_if_needed(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    assistant_response: str | None,
+    current_user_message: str,
+    language: str,
+) -> str | None:
+    if expects_strategy_route or requires_clarification or assistant_response:
+        return None
+    composed = await _compose_unhandled_conversation_answer(
+        semantic_turn_act=semantic_turn_act,
+        current_user_message=current_user_message,
+        language=language,
+    )
+    if composed:
+        return composed
+    return _llm_composition_unavailable_recovery_answer(language=language)
+
+
+async def _compose_unhandled_conversation_answer(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    current_user_message: str,
+    language: str = "en",
+) -> str | None:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "The runtime has no executable strategy, no clarification contract, "
+                "and no user-facing answer for this turn. "
+                f"{response_language_instruction(language)} "
+                "Recover by answering in warm, plain language. Do not use report tone. "
+                "Do not name data "
+                "vendors, imply live market-news coverage, invent current facts, "
+                "or give investment advice. Preserve continuity of exploration by "
+                "offering one nearby historical experiment or recoverable next step "
+                "from the supported experiment paths. Do not suggest live screens, "
+                "feeds, rankings, sector screens, filter pipelines, volume-surge "
+                "tests, event-driven execution, or macro data as direct trading "
+                "signals."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Semantic turn act: {semantic_turn_act or 'unspecified'}",
+        },
+        {
+            "role": "system",
+            "content": (
+                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
+            ),
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        response = await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
+    cleaned = str(response or "").strip()
+    return cleaned or None

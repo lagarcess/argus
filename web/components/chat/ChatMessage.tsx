@@ -21,6 +21,10 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
+import {
+  discoveryFreshnessDate,
+  discoverySourceDomains,
+} from "@/lib/chat-discovery-sidecar";
 
 type ChatMessageProps = {
   message: Message;
@@ -188,7 +192,12 @@ export default function ChatMessage({
   };
 
   const actionLabel = (action: ChatActionOption) =>
-    action.labelKey ? t(action.labelKey, action.label) : action.label;
+    action.labelKey
+      ? t(action.labelKey, {
+          defaultValue: action.label,
+          ...((action.payload ?? {}) as Record<string, unknown>),
+        })
+      : action.label;
   const retryAction = message.actions?.find(isRetryAction);
   const userRecoveryText =
     isUser && message.recoveryDisplay
@@ -203,6 +212,22 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  const discoverySourcesLineText = (() => {
+    if (isUser || !message.discovery) return "";
+    const domains = discoverySourceDomains(message.discovery);
+    if (domains.length === 0) return "";
+    const date = discoveryFreshnessDate(message.discovery, i18n.language);
+    return date
+      ? t("chat.discovery_results.sources_line", {
+          domains: domains.join(", "),
+          date,
+          defaultValue: "Sources: {{domains}} · as of {{date}}",
+        })
+      : t("chat.discovery_results.sources_line_undated", {
+          domains: domains.join(", "),
+          defaultValue: "Sources: {{domains}}",
+        });
+  })();
   // Localized heading chrome for latest-result fact answers, driven by the
   // typed fact key. Unknown keys render no heading.
   const factHeadingLabel = message.resultFactHeadingKey
@@ -312,6 +337,50 @@ export default function ChatMessage({
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
               </ReactMarkdown>
+            </div>
+          )}
+
+          {!isUser && !isStreaming && message.discovery && (
+            <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {message.discovery.candidates.map((candidate) => {
+                  const sendText = t("chat.discovery_results.test_candidate", {
+                    symbol: candidate.symbol,
+                    defaultValue: "Backtest {{symbol}}",
+                  });
+                  return (
+                    <button
+                      key={candidate.symbol}
+                      type="button"
+                      onClick={() =>
+                        onAction?.({
+                          type: "select_discovery_candidate",
+                          label: sendText,
+                          labelKey: "chat.discovery_results.test_candidate",
+                          value: sendText,
+                          payload: {
+                            symbol: candidate.symbol,
+                            name: candidate.name,
+                          },
+                        })
+                      }
+                      title={candidate.reason_text || candidate.name}
+                      aria-label={sendText}
+                      className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
+                    >
+                      <span className="font-semibold">{candidate.symbol}</span>
+                      {candidate.name && candidate.name !== candidate.symbol ? (
+                        <span className="opacity-70"> · {candidate.name}</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {discoverySourcesLineText ? (
+                <p className="text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 dark:text-white/50">
+                  {discoverySourcesLineText}
+                </p>
+              ) : null}
             </div>
           )}
 

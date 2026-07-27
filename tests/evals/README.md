@@ -155,6 +155,13 @@ This slice covers the locked built-surface categories present in the fixtures.
 Categories for unbuilt surfaces, including comparison, freshness on return, and
 research-to-test, get added when their lanes land.
 
+`asset_discovery_routing` (issue #244) landed with the Grounded Discovery lane.
+It asserts the `semantic_turn_act=asset_discovery` routing boundary and its
+typed payload (relationship, anchors, category terms), plus near-miss negatives
+(direct backtest, post-result "what next", capability questions). Discovery
+turns end `ready_to_respond` on both the flag-off recovery path and the flag-on
+search path, so the category holds in any sanctioned live environment.
+
 ## Prose Judge
 
 Judge rubric version: `argus-prose-quality-v1`.

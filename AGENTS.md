@@ -42,13 +42,15 @@ Before making code changes, agents must review these source-of-truth docs in thi
 - Brokerage integrations & real money trading
 - Social feeds & institutional tools
 - Advanced portfolio analytics
-- Mixed-asset backtests (Equity + Crypto in one run)
+- Mixed-asset backtests (Equity, Crypto, and Currency Pair in one run)
 - Native mobile apps (PWA/Mobile-web only)
 
 # ⚙️ Canonical Current Constraints
 
-- **Same-Asset Simulations Only**: Runs must be either 100% Equity or 100% Crypto.
-- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`.
+- **Same-Asset Simulations Only**: Runs must be 100% Equity, 100% Crypto, or
+  100% Currency Pair.
+- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`, Currency Pair ->
+  the tested pair.
 - **Logic**: Long-only, equal-weight multi-symbol runs.
 - **Limits**: Max 5 symbols per run.
 - **Localization**: Static UI must support English (`en`) and Spanish (`es-419`).
@@ -526,6 +528,14 @@ the same provider-backed resolution path production will use.
 ### Feature Flags (All Private-Alpha)
 Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
 by default and should only be disabled for a targeted regression check:
+
+- Once the founder accepts and merges a feature as part of the normal Argus
+  product shape, its runtime default is **on**. Retain its flag as an emergency
+  kill switch, not as an opt-in gate.
+- Local/runtime defaults and Render activation are separate concerns. A merged
+  default-on feature still requires its documented Render configuration and
+  exact-SHA canary before tester exposure.
+
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false

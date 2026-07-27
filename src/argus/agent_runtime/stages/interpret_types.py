@@ -40,7 +40,9 @@ SemanticTurnAct = Literal[
     "retry_failed_action",
     "approval",
     "unsupported_request",
+    "asset_discovery",
 ]
+AssetDiscoveryRelationship = Literal["category", "peer", "comparison"]
 ResultFollowupFocus = Literal[
     "why_underperformed",
     "max_drawdown",
@@ -73,6 +75,15 @@ ArtifactTarget = Literal[
 ]
 
 
+class AssetDiscoveryRequest(BaseModel):
+    """Typed payload for an explicit peer/category asset-discovery request."""
+
+    relationship: AssetDiscoveryRelationship
+    category_description: str | None = Field(default=None, max_length=200)
+    anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
+    asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
+
+
 class InterpretDecision(BaseModel):
     intent: IntentName
     task_relation: TaskRelation
@@ -97,6 +108,7 @@ class InterpretDecision(BaseModel):
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None
+    asset_discovery: AssetDiscoveryRequest | None = None
 
     def to_patch(self) -> dict[str, Any]:
         ambiguous = [item.model_dump(mode="python") for item in self.ambiguous_fields]
@@ -140,6 +152,11 @@ class InterpretDecision(BaseModel):
             "result_followup_fact_key": self.result_followup_fact_key,
             "capability_question_focus": self.capability_question_focus,
             "context_question_focus": self.context_question_focus,
+            "asset_discovery": (
+                None
+                if self.asset_discovery is None
+                else self.asset_discovery.model_dump(mode="python")
+            ),
         }
 
 
@@ -184,6 +201,7 @@ class StructuredInterpretation(BaseModel):
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None
+    asset_discovery: AssetDiscoveryRequest | None = None
 
 
 class InterpretationRequest(BaseModel):

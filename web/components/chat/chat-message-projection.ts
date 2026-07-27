@@ -5,6 +5,7 @@ import {
   type ChatActionRequest,
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
+import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
@@ -311,13 +312,18 @@ export function hydrateMessagesFromApi(
           actions: confirmation.actions ?? [],
         };
       }
-      return hydrateTextMessageFromApi(message, {
+      const hydratedText = hydrateTextMessageFromApi(message, {
         contentPresentation:
           message.role !== "user" && isBreakdownActionMetadata(metadata)
             ? "result_breakdown"
             : undefined,
         retryRequestMessage: retryRequestMessageForAssistant(items, message),
       });
+      if (message.role !== "user") {
+        const discovery = discoverySidecarFromMetadata(metadata);
+        if (discovery) return { ...hydratedText, discovery };
+      }
+      return hydratedText;
     });
 
   const normalized = normalizeDurableRetryActionHistory(
