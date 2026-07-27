@@ -2515,236 +2515,44 @@ def test_p1_decision_gateway_upsert_keeps_one_current_decision() -> None:
     assert len(client.rows_by_table["decision_notes"]) == 1
 
 
-class _HistoryClient:
-    def __init__(self) -> None:
-        self.selected_columns: dict[str, list[str]] = {}
-        self.rows_by_table: dict[str, list[dict[str, Any]]] = {
-            "conversations": [
-                {
-                    "id": "conv-other",
-                    "user_id": "user-1",
-                    "title": "Other active idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-active",
-                    "user_id": "user-1",
-                    "title": "Active idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-archived",
-                    "user_id": "user-1",
-                    "title": "Archived idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": True,
-                    "deleted_at": None,
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "conv-deleted",
-                    "user_id": "user-1",
-                    "title": "Deleted idea",
-                    "last_message_preview": None,
-                    "pinned": False,
-                    "archived": False,
-                    "deleted_at": "2026-05-31T01:00:00+00:00",
-                    "updated_at": "2026-05-31T00:00:00+00:00",
-                },
-            ],
-            "messages": [
-                {
-                    "id": "msg-active",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-active",
-                },
-                {
-                    "id": "msg-archived",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-archived",
-                },
-                {
-                    "id": "msg-deleted",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-deleted",
-                },
-                {
-                    "id": "msg-other-user",
-                    "user_id": "user-2",
-                    "conversation_id": "conv-other",
-                },
-            ],
-            "backtest_runs": [
-                {
-                    "id": "run-active",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-active",
-                    "conversation_result_card": {"title": "AAPL run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-archived",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-archived",
-                    "conversation_result_card": {"title": "TSLA run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-deleted",
-                    "user_id": "user-1",
-                    "conversation_id": "conv-deleted",
-                    "conversation_result_card": {"title": "MSFT run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-                {
-                    "id": "run-orphan",
-                    "user_id": "user-1",
-                    "conversation_id": None,
-                    "conversation_result_card": {"title": "Direct run", "rows": []},
-                    "created_at": "2026-05-31T00:00:00+00:00",
-                },
-            ],
-            "strategies": [],
-            "collections": [],
-        }
-
-    def table(self, table_name: str):
-        return _HistoryTable(self.rows_by_table[table_name], table_name, self)
-
-
-class _HistoryTable:
-    def __init__(
-        self,
-        rows: list[dict[str, Any]],
-        table_name: str | None = None,
-        client: _HistoryClient | None = None,
-    ) -> None:
-        self.rows = list(rows)
-        self.table_name = table_name
-        self.client = client
-
-    def select(self, *args: object, **_kwargs: object):
-        if self.client is not None and self.table_name is not None and args:
-            self.client.selected_columns.setdefault(self.table_name, []).append(
-                str(args[0])
-            )
-        return self
-
-    def eq(self, key: str, value: object):
-        self.rows = [row for row in self.rows if row.get(key) == value]
-        return self
-
-    def in_(self, key: str, values: list[object]):
-        expected = {str(value) for value in values}
-        self.rows = [
-            row
-            for row in self.rows
-            if row.get(key) is not None and str(row[key]) in expected
-        ]
-        return self
-
-    def is_(self, key: str, value: object):
-        if value == "null":
-            self.rows = [row for row in self.rows if row.get(key) is None]
-        return self
-
-    @property
-    def not_(self):
-        return _HistoryNotFilter(self)
-
-    def order(self, *_args: object, **_kwargs: object):
-        return self
-
-    def limit(self, count: int):
-        self.rows = self.rows[:count]
-        return self
-
-    def range(self, start: int, end: int):
-        self.rows = self.rows[start : end + 1]
-        return self
-
-    def execute(self):
-        return SimpleNamespace(data=list(self.rows))
-
-
-class _HistoryNotFilter:
-    def __init__(self, query: _HistoryTable) -> None:
-        self.query = query
-
-    def is_(self, key: str, value: object):
-        if value == "null":
-            self.query.rows = [row for row in self.query.rows if row.get(key) is not None]
-        return self.query
-
-
-def test_gateway_history_selects_conversation_title_source() -> None:
-    client = _HistoryClient()
-    gateway = SupabaseGateway(client=client)
-
-    gateway.list_history_rows(user_id="user-1", limit=100)
-
-    title_selects = [
-        columns
-        for columns in client.selected_columns["conversations"]
-        if "title" in columns.split(",")
-    ]
-    assert title_selects
-    assert all("title_source" in columns.split(",") for columns in title_selects)
-
-
-def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
-    gateway = SupabaseGateway(client=_HistoryClient())
-
-    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
-    archived_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
-        archived=True,
-    )
-    deleted_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
-        deleted=True,
-    )
-
-    assert {row["id"] for row in default_rows["runs"]} == {
-        "run-active",
-        "run-orphan",
+def test_gateway_history_delegates_to_bounded_postgres_reader() -> None:
+    reader = MagicMock()
+    reader.list_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
     }
-    assert {
-        row["id"] for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
-    } == {"run-active"}
-    assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
-    assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}
+    gateway = SupabaseGateway(client=MagicMock(), history_reader=reader)
 
-
-def test_gateway_history_filters_chats_without_visible_messages() -> None:
-    gateway = SupabaseGateway(client=_HistoryClient())
-
-    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
-    archived_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
+    result = gateway.list_history_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=21,
         archived=True,
-    )
-    deleted_rows = gateway.list_history_rows(
-        user_id="user-1",
-        limit=100,
         deleted=True,
+        cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        cursor_id="11111111-1111-1111-1111-111111111111",
     )
 
-    assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
-    assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
-    assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}
+    assert result == reader.list_rows.return_value
+    reader.list_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=21,
+        archived=True,
+        deleted=True,
+        cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        cursor_id="11111111-1111-1111-1111-111111111111",
+    )
+
+
+def test_gateway_history_fails_closed_without_postgres_reader() -> None:
+    gateway = SupabaseGateway(client=MagicMock())
+
+    with pytest.raises(RuntimeError, match="Postgres reader"):
+        gateway.list_history_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=21,
+        )
 
 
 class _SearchRowsTable:

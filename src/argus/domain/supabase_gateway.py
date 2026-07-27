@@ -42,6 +42,10 @@ from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
+from argus.domain.postgres_history_reader import (
+    PostgresHistoryReader,
+    history_reader_for_database_url,
+)
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
@@ -190,57 +194,6 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return data
 
 
-def _filter_history_runs_by_conversation_state(
-    runs: list[dict[str, Any]],
-    conversations: list[dict[str, Any]],
-    *,
-    archived: bool,
-    deleted: bool,
-) -> list[dict[str, Any]]:
-    conversations_by_id = {
-        str(row["id"]): row for row in conversations if row.get("id") is not None
-    }
-    include_orphan_runs = not archived and not deleted
-    filtered: list[dict[str, Any]] = []
-
-    for run in runs:
-        conversation_id = run.get("conversation_id")
-        if conversation_id is None:
-            if include_orphan_runs:
-                filtered.append(run)
-            continue
-        conversation = conversations_by_id.get(str(conversation_id))
-        if conversation is None:
-            if include_orphan_runs:
-                filtered.append(run)
-            continue
-        deleted_matches = (
-            conversation.get("deleted_at") is not None
-            if deleted
-            else conversation.get("deleted_at") is None
-        )
-        if deleted_matches and bool(conversation.get("archived", False)) == archived:
-            filtered.append(run)
-
-    return filtered
-
-
-def _filter_history_conversations_by_message_state(
-    conversations: list[dict[str, Any]],
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    conversation_ids_with_messages = {
-        str(row["conversation_id"])
-        for row in messages
-        if row.get("conversation_id") is not None
-    }
-    return [
-        row
-        for row in conversations
-        if row.get("id") is not None and str(row["id"]) in conversation_ids_with_messages
-    ]
-
-
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -261,6 +214,7 @@ class SupabaseGateway(
 ):
     client: Client
     auth_client: Client | None = None
+    history_reader: PostgresHistoryReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -270,9 +224,11 @@ class SupabaseGateway(
     def from_env(cls) -> SupabaseGateway:
         url = os.getenv("SUPABASE_URL") or os.getenv("SUPABASE_PROJECT_URL")
         key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if not url or not key:
+        database_url = os.getenv("DATABASE_URL", "").strip()
+        if not url or not key or not database_url:
             raise RuntimeError(
-                "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+                "Supabase mode requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, "
+                "and DATABASE_URL."
             )
         auth_key = (
             os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_PUBLIC_KEY") or key
@@ -284,6 +240,7 @@ class SupabaseGateway(
                 auth_key,
                 options=_supabase_client_options(),
             ),
+            history_reader=history_reader_for_database_url(database_url),
         )
 
     def new_id(self) -> str:
@@ -1924,139 +1881,22 @@ class SupabaseGateway(
         self,
         *,
         user_id: str,
-        limit: int | None,
+        limit: int,
         archived: bool = False,
         deleted: bool = False,
+        cursor_activity_at: datetime | None = None,
+        cursor_id: str | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        query_runs = (
-            self.client.table("backtest_runs")
-            .select("id,conversation_id,conversation_result_card,created_at")
-            .eq("user_id", user_id)
-        )
-        query_chats = (
-            self.client.table("conversations")
-            .select(
-                "id,title,title_source,last_message_preview,pinned,updated_at,deleted_at,archived"
-            )
-            .eq("user_id", user_id)
-            .eq("archived", archived)
-        )
-        query_strategies = (
-            self.client.table("strategies")
-            .select("id,name,symbols,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-        )
-        query_collections = (
-            self.client.table("collections")
-            .select("id,name,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-        )
-
-        if deleted:
-            # We don't soft-delete backtest_runs usually, but if we did:
-            # query_runs = query_runs.not_.is_("deleted_at", "null")
-            query_chats = query_chats.not_.is_("deleted_at", "null")
-            query_strategies = query_strategies.not_.is_("deleted_at", "null")
-            query_collections = query_collections.not_.is_("deleted_at", "null")
-        else:
-            query_chats = query_chats.is_("deleted_at", "null")
-            query_strategies = query_strategies.is_("deleted_at", "null")
-            query_collections = query_collections.is_("deleted_at", "null")
-
-        ordered_runs = query_runs.order("created_at", desc=True)
-        ordered_chats = query_chats.order("updated_at", desc=True)
-        ordered_strategies = query_strategies.order("updated_at", desc=True)
-        ordered_collections = query_collections.order("updated_at", desc=True)
-
-        if limit is None:
-            runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
-            chats = self._fetch_all_rows(
-                lambda start, end: ordered_chats.range(start, end)
-            )
-            strategies = self._fetch_all_rows(
-                lambda start, end: ordered_strategies.range(start, end)
-            )
-            collections = self._fetch_all_rows(
-                lambda start, end: ordered_collections.range(start, end)
-            )
-        else:
-            runs = ordered_runs.limit(limit).execute().data or []
-            chats = ordered_chats.limit(limit).execute().data or []
-            strategies = ordered_strategies.limit(limit).execute().data or []
-            collections = ordered_collections.limit(limit).execute().data or []
-        run_parent_conversations = self._fetch_history_run_conversation_states(
+        if self.history_reader is None:
+            raise RuntimeError("Persistent History requires its Postgres reader.")
+        return self.history_reader.list_rows(
             user_id=user_id,
-            runs=runs,
-        )
-        chat_message_states = self._fetch_history_conversation_message_states(
-            user_id=user_id,
-            conversations=chats,
-        )
-        runs = _filter_history_runs_by_conversation_state(
-            runs,
-            run_parent_conversations,
+            limit=limit,
             archived=archived,
             deleted=deleted,
+            cursor_activity_at=cursor_activity_at,
+            cursor_id=cursor_id,
         )
-        chats = _filter_history_conversations_by_message_state(
-            chats,
-            chat_message_states,
-        )
-
-        return {
-            "runs": runs,
-            "conversations": chats,
-            "strategies": strategies,
-            "collections": collections,
-        }
-
-    def _fetch_history_run_conversation_states(
-        self,
-        *,
-        user_id: str,
-        runs: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        conversation_ids = sorted(
-            {
-                str(run["conversation_id"])
-                for run in runs
-                if run.get("conversation_id") is not None
-            }
-        )
-        if not conversation_ids:
-            return []
-        return (
-            self.client.table("conversations")
-            .select("id,archived,deleted_at")
-            .eq("user_id", user_id)
-            .in_("id", conversation_ids)
-            .execute()
-            .data
-            or []
-        )
-
-    def _fetch_history_conversation_message_states(
-        self,
-        *,
-        user_id: str,
-        conversations: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        conversation_ids = sorted(
-            {
-                str(conversation["id"])
-                for conversation in conversations
-                if conversation.get("id") is not None
-            }
-        )
-        if not conversation_ids:
-            return []
-        query = (
-            self.client.table("messages")
-            .select("conversation_id")
-            .eq("user_id", user_id)
-            .in_("conversation_id", conversation_ids)
-        )
-        return self._fetch_all_rows(lambda start, end: query.range(start, end))
 
     def search_rows(
         self, *, user_id: str, query: str, limit: int | None

@@ -26,6 +26,7 @@ from argus.api.schemas import (
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.postgres_history_reader import HistoryCursorError
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import (
     ConversationCursorError,
@@ -2740,7 +2741,9 @@ def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
     assert response.status_code == 200
     mock_gateway.list_history_rows.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
-        limit=None,
+        limit=21,
+        cursor_activity_at=None,
+        cursor_id=None,
         deleted=False,
         archived=False,
     )
@@ -2804,10 +2807,78 @@ def test_history_supabase_can_request_archived_rows(mock_gateway):
     assert response.status_code == 200
     mock_gateway.list_history_rows.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
-        limit=None,
+        limit=21,
+        cursor_activity_at=None,
+        cursor_id=None,
         deleted=False,
         archived=True,
     )
+
+
+def test_history_supabase_middle_page_uses_cursor_pivot_outside_candidates(
+    mock_gateway,
+):
+    pivot_at = datetime(2026, 7, 2, tzinfo=timezone.utc)
+    candidate_at = pivot_at - timedelta(minutes=1)
+    pivot_id = "22222222-2222-2222-2222-222222222222"
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "name": "Next strategy",
+                "symbols": ["AAPL"],
+                "pinned": False,
+                "updated_at": candidate_at.isoformat(),
+            }
+        ],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "limit": 2,
+            "cursor": encode_cursor(pivot_at.isoformat(), pivot_id),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [
+        "11111111-1111-1111-1111-111111111111"
+    ]
+    mock_gateway.list_history_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=3,
+        cursor_activity_at=pivot_at,
+        cursor_id=pivot_id,
+        deleted=False,
+        archived=False,
+    )
+
+
+def test_history_supabase_missing_or_ambiguous_pivot_uses_invalid_cursor_problem(
+    mock_gateway,
+):
+    pivot_at = datetime(2026, 7, 2, tzinfo=timezone.utc)
+    mock_gateway.list_history_rows.side_effect = HistoryCursorError
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "cursor": encode_cursor(
+                pivot_at.isoformat(),
+                "22222222-2222-2222-2222-222222222222",
+            )
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
 
 
 def test_conversation_first_middle_final_and_empty_pages(mock_gateway):

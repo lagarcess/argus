@@ -252,7 +252,7 @@ def test_guest_start_over_replaces_the_bound_conversation_in_place(
     )
 
 
-def test_guest_history_returns_only_the_bound_conversation_with_expiry(
+def test_history_guest_single_workspace_behavior_is_unchanged(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
