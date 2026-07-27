@@ -1,5 +1,12 @@
 # Guest Settings and Empty-State Polish Implementation Plan
 
+Status: **COMPLETED HISTORICAL EXECUTION RECORD — INCLUDED IN PR #279,
+LANDED AS `53e812e9`**
+
+This plan is retained for evidence lineage, not active dispatch. Its historical
+flag assumptions are superseded by current canon: Guest server and presentation
+flags default on with explicit-off rollback.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the approved compact guest settings menu and one surgical guest empty-state hierarchy correction without changing guest policy, registered chat behavior, starter actions, or backend/runtime behavior.

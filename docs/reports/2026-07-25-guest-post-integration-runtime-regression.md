@@ -1,7 +1,6 @@
 # Guest post-integration runtime regression observation
 
-Status: **HISTORICAL DIAGNOSIS — ROOT CAUSE PROVEN GUEST-ONLY; FIX CARRIED BY
-PR #279**
+Status: **ARCHIVED IN PLACE — ROOT CAUSE RESOLVED BY PR #279 AT `53e812e9`**
 
 Disposition (2026-07-26): issue #269 proved that the seven receipts belonged to
 two Guest requests, not one exhausted runtime turn. The failure occurred after
@@ -9,8 +8,10 @@ successful interpretation when Guest terminal settlement tried to serialize a
 mapping-shaped `guest_session` allowance as a tuple. Guest commit `5adff1f4`
 uses the existing allowance serializer and owns the focused correction.
 Integration runtime policy, the seven-call allowance, fallback accounting, and
-provider routing require no change. This report remains at its original path
-for evidence lineage; use issue #269 and PR #279 for current status.
+provider routing require no change. PR #279 landed on integration as
+`53e812e9` on 2026-07-27. This report remains at its original path for evidence
+lineage and is not an active dispatch document; use issue #269, the interim
+roadmap, and the Guest launch-safety checklist for current status.
 
 - Recorded: 2026-07-25
 - Stable integration checkpoint: `b7fd6f08c2fb28166bc67a808ffdad0d65164f06`

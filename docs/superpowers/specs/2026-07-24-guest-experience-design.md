@@ -1,7 +1,7 @@
 # Argus Guest Experience: Value-Before-Account Design
 
-Status: **FOUNDER-APPROVED DESIGN — implementation remains separately gated by
-the serialized plan and release checks below**
+Status: **COMPLETED DESIGN RECORD — IMPLEMENTED BY PR #279 AND LANDED AS
+`53e812e9`**
 
 Date: 2026-07-24
 
@@ -23,9 +23,10 @@ Strategic context:
 Parallel runtime dependency:
 [`docs/superpowers/specs/2026-07-23-always-progresses-continuity-design.md`](2026-07-23-always-progresses-continuity-design.md)
 
-This is a product and architecture design. It does not claim that guest access,
-public signup, Omnisearch discovery, voice, memory, sharing, or the
-Always-Progresses runtime has been implemented, deployed, or exposed.
+This is the historical product and architecture design for the integrated Guest
+experience. It does not claim deployment, public traffic, public signup,
+memory, sharing, or completion of the later promotion gates. Current public
+exposure requirements live in `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`.
 
 ## Outcome
 

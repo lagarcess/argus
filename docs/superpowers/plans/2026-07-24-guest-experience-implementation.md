@@ -1,5 +1,14 @@
 # Argus Guest Experience Implementation Plan
 
+Status: **COMPLETED HISTORICAL EXECUTION RECORD — PR #279 LANDED AS
+`53e812e9`**
+
+Do not dispatch this plan again or infer current defaults from unchecked task
+boxes. Current integration sequencing lives in
+`docs/specs/private-alpha-interim-roadmap.md`; later main/public exposure gates
+live in `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` and
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a public visitor use the real Argus chat, complete one historical simulation, and convert into a permanent account without losing the temporary workspace.

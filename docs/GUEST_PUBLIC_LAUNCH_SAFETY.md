@@ -4,6 +4,10 @@ Status: deferred public-exposure gate
 
 Last reviewed: 2026-07-27
 
+Integration checkpoint: Guest implementation landed through PR #279 at
+`53e812e936f10cfa778bfce5ef7e5da54204fedd`. None of the unchecked items below
+was implied complete by that internal integration merge.
+
 This checklist applies when Argus is being prepared for an internet-facing
 Guest canary or production exposure. It is **not** a prerequisite for merging
 the completed Guest experience into `codex/private-alpha-next` while that

@@ -933,11 +933,13 @@ recovery-heading ownership. Quick take voice variance and one provider-timeout
 fallback were recorded separately from confirmed continuity defects. Those
 observations are now owner-bounded as #269-#273 and updated #249. Stale-action
 settlement (#273) is complete through PR #277 at `2d5a2b52`; #269 was
-classified as a Guest-only settlement defect and is carried by Guest PR #279.
+classified as a Guest-only settlement defect, landed with Guest PR #279 at
+`53e812e9`, and is closed.
 Supported strategy-transition preservation (#270) is complete through PR #278
-at `b80d95a2`; #271 is now the next protected interpreter/edit-spine issue,
-#272 remains serialized after it, and #249 waits for the overlapping Guest
-shell to land. See
+at `b80d95a2`; modeled-cost preservation (#271) landed through PR #280 at
+`d16f7496` and remains open only for its focused integrated closure journey.
+#272 is now the next protected interpreter/edit-spine issue, and #249 may now
+start because the overlapping Guest shell has landed. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
@@ -1002,22 +1004,24 @@ shell to land. See
   those product lanes land; instrumentation must not pretend an unbuilt surface
   exists.
 
-##### Guest experience — Blocks 1–4 local candidate (LOCAL EVIDENCE GATE)
+##### Guest experience — integrated checkpoint (PUBLIC EXPOSURE GATE OPEN)
 
-- Status: Blocks 1–3 implement verified anonymous identity, fixed temporary
+- Status: PR #279 landed on `codex/private-alpha-next` as `53e812e9`. Blocks
+  1–3 implement verified anonymous identity, fixed temporary
   workspace policy, lifetime allowances, cleanup, guest shell, conversion, and
-  owner-scoped capability gates on `codex/guest-experience`. Block 4 adds the
-  approved privacy-safe funnel through the existing observability envelope.
-  This is a local candidate only, not a public-ready or integrated release.
+  owner-scoped capability gates. Block 4 adds the approved privacy-safe funnel
+  through the existing observability envelope. The integrated code is not a
+  public-ready or deployed release.
 - Guest is now an accepted part of the normal product shape:
   `ARGUS_GUEST_ACCESS_ENABLED=true` and
   `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill
   switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false` remains the independent
   permanent-account gate.
-- Public exposure still requires the exact-head local browser matrix, clean
-  reconciliation with the moving integration branch, a branch-deployed
-  exact-SHA canary, hosted anonymous-Auth abuse controls, cleanup scheduling,
-  cost/latency calibration, and founder go/no-go.
+- Public exposure still requires a branch-deployed exact-SHA canary, hosted
+  anonymous-Auth and Turnstile controls, trusted-origin/rate-limit proof, a hard
+  provider budget, cleanup scheduling, cost/latency calibration, a completed
+  release manifest, and founder go/no-go. The authoritative checklist is
+  `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`.
 - Grounded Discovery and Always Progresses are integrated dependencies. Guest
   Omnisearch remains owner-scoped, while the ordinary chat runtime preserves
   the integrated provider-backed discovery contract.

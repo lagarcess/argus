@@ -1,5 +1,11 @@
 # Guest Settings Menu Polish
 
+Status: **COMPLETED HISTORICAL DESIGN RECORD — INCLUDED IN PR #279,
+LANDED AS `53e812e9`**
+
+Retained for evidence lineage; use the design canon and active roadmap for
+current behavior and sequencing.
+
 ## Goal
 
 Make the guest gear menu quieter and more deliberate while preserving the
