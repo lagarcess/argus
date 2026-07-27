@@ -18,7 +18,8 @@ from argus.domain.usage_limits import (
 )
 
 DISCOVERY_USAGE_RESOURCE = "discovery_searches"
-_GUEST_SUBJECT_PREFIX = "guest-visitor:"
+# Namespaced so a visitor key can never be mistaken for an account id.
+_GUEST_SUBJECT_PREFIX = "visitor:"
 
 
 def discovery_usage_limits(*, is_guest: bool = False) -> list[tuple[str, int]]:
@@ -47,8 +48,66 @@ def discovery_counter_subject(
 
     if not is_guest:
         return user_id
-    identity = (client_identity or "").strip()
-    return f"{_GUEST_SUBJECT_PREFIX}{identity or 'unknown'}"
+    identity = (client_identity or "").strip() or "unknown"
+    return f"{_GUEST_SUBJECT_PREFIX}{identity}"
+
+
+VISITOR_USAGE_TABLE = "visitor_usage_counters"
+
+
+def _visitor_within_limits(
+    *,
+    visitor_key: str,
+    limits: list[tuple[str, int]],
+    now: datetime,
+) -> bool:
+    """Visitor allowances live outside usage_counters.
+
+    usage_counters.user_id is a foreign key to profiles, so it can only express
+    an account-owned allowance. A visitor has no account, and keying a guest by
+    its workspace user_id would reset the allowance every renewal.
+    """
+    client = api_state.supabase_gateway.client
+    for period, limit_count in limits:
+        start, _ = align_usage_period(now, period)
+        rows = (
+            client.table(VISITOR_USAGE_TABLE)
+            .select("used_count")
+            .eq("visitor_key", visitor_key)
+            .eq("resource", DISCOVERY_USAGE_RESOURCE)
+            .eq("period", period)
+            .eq("period_start", start.isoformat())
+            .limit(1)
+            .execute()
+            .data
+        )
+        used = int(rows[0].get("used_count", 0)) if rows else 0
+        if used >= limit_count:
+            return False
+    return True
+
+
+def _charge_visitor(*, visitor_key: str, limits: list[tuple[str, int]]) -> None:
+    now = datetime.now(timezone.utc)
+    windows = []
+    for period, limit_count in limits:
+        start, end = align_usage_period(now, period)
+        windows.append(
+            {
+                "period": period,
+                "limit": limit_count,
+                "period_start": start.isoformat(),
+                "period_end": end.isoformat(),
+            }
+        )
+    api_state.supabase_gateway.client.rpc(
+        "settle_visitor_usage",
+        {
+            "p_visitor_key": visitor_key,
+            "p_resource": DISCOVERY_USAGE_RESOURCE,
+            "p_windows": windows,
+        },
+    ).execute()
 
 
 def _subject_within_limits(
@@ -119,15 +178,15 @@ def discovery_allowance_available(
                 ceiling=global_discovery_daily_ceiling(),
             )
             return False
-        return _subject_within_limits(
-            subject=discovery_counter_subject(
-                user_id=user_id,
-                is_guest=is_guest,
-                client_identity=client_identity,
-            ),
-            limits=discovery_usage_limits(is_guest=is_guest),
-            now=now,
+        subject = discovery_counter_subject(
+            user_id=user_id, is_guest=is_guest, client_identity=client_identity
         )
+        limits = discovery_usage_limits(is_guest=is_guest)
+        if is_guest and api_state.supabase_gateway is not None:
+            return _visitor_within_limits(
+                visitor_key=subject, limits=limits, now=now
+            )
+        return _subject_within_limits(subject=subject, limits=limits, now=now)
     except Exception as exc:
         # Fail closed: without readable allowance truth, no spend is allowed.
         logger.warning(
@@ -181,14 +240,21 @@ def _charge_discovery_attempt(
         subject=GLOBAL_DISCOVERY_CEILING_SUBJECT,
         limits=[("day", global_discovery_daily_ceiling())],
     )
-    _charge_subject(
-        subject=discovery_counter_subject(
-            user_id=user_id,
-            is_guest=is_guest,
-            client_identity=client_identity,
-        ),
-        limits=discovery_usage_limits(is_guest=is_guest),
+    subject = discovery_counter_subject(
+        user_id=user_id, is_guest=is_guest, client_identity=client_identity
     )
+    limits = discovery_usage_limits(is_guest=is_guest)
+    if is_guest and api_state.supabase_gateway is not None:
+        try:
+            _charge_visitor(visitor_key=subject, limits=limits)
+        except Exception as exc:
+            logger.warning(
+                "Visitor discovery settlement failed",
+                error=str(exc),
+                failure_classification="telemetry_only",
+            )
+        return
+    _charge_subject(subject=subject, limits=limits)
 
 
 def _charge_subject(*, subject: str, limits: list[tuple[str, int]]) -> None:

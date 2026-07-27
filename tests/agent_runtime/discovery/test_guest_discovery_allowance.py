@@ -54,6 +54,9 @@ class TestCounterSubject:
         # visitor, so the allowance must not reset.
         assert first == renewed
         assert "guest-workspace" not in first
+        # Opaque text, not a uuid: it keys visitor_usage_counters, which has no
+        # foreign key to profiles precisely because a visitor has no account.
+        assert first.startswith("visitor:")
 
     def test_different_visitors_are_charged_separately(self) -> None:
         assert discovery_counter_subject(
@@ -72,6 +75,7 @@ class TestCounterSubject:
         )
         assert subject.endswith("unknown")
         assert subject != "guest-1"
+        assert subject.startswith("visitor:")
 
 
 class TestGlobalCeiling:

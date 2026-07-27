@@ -47,7 +47,9 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
 # reaches it. Env-overridable because a circuit breaker is worth nothing if
 # resetting it needs a deploy.
 _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT = 500
-GLOBAL_DISCOVERY_CEILING_SUBJECT = "__global__"
+# Also a uuid: usage_counters.user_id is uuid-typed, so the global bucket
+# needs a storable subject like every other counter row.
+GLOBAL_DISCOVERY_CEILING_SUBJECT = "00000000-0000-4000-8000-000000000d15"
 
 
 def global_discovery_daily_ceiling() -> int:
