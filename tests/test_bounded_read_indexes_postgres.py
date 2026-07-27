@@ -22,6 +22,14 @@ EXPECTED_INDEXES = {
     "idx_messages_reload_artifact_page",
     "idx_decision_notes_idea_latest",
 }
+SEARCH_EXPECTED_INDEXES = {
+    "idx_conversations_search_norm_trgm",
+    "idx_strategies_search_norm_trgm",
+    "idx_collections_search_norm_trgm",
+    "idx_backtest_runs_search_norm_trgm",
+    "idx_ideas_search_norm_trgm",
+    "idx_evidence_search_norm_trgm",
+}
 
 
 def _plan_index_names(node: dict[str, Any]) -> set[str]:
@@ -104,6 +112,51 @@ def _insert_p1_spine(cursor: Any, *, user_id: UUID) -> dict[str, UUID]:
     }
 
 
+def _insert_search_rows(
+    cursor: Any,
+    *,
+    user_id: UUID,
+    conversation_id: UUID,
+) -> None:
+    cursor.execute(
+        """
+        insert into public.strategies (
+            id, user_id, conversation_id, name, name_source, template,
+            asset_class, symbols, parameters, metrics_preferences,
+            benchmark_symbol
+        )
+        values (
+            %s, %s, %s, 'Fixture strategy', 'ai_generated', 'buy_hold',
+            'equity', array['AAPL'], '{}'::jsonb,
+            array['total_return_pct'], 'SPY'
+        )
+        """,
+        (uuid4(), user_id, conversation_id),
+    )
+    cursor.execute(
+        """
+        insert into public.collections (id, user_id, name, name_source)
+        values (%s, %s, 'Fixture collection', 'ai_generated')
+        """,
+        (uuid4(), user_id),
+    )
+    cursor.execute(
+        """
+        insert into public.backtest_runs (
+            id, user_id, conversation_id, status, asset_class, symbols,
+            allocation_method, benchmark_symbol, config_snapshot, metrics,
+            conversation_result_card
+        )
+        values (
+            %s, %s, %s, 'completed', 'equity', array['AAPL'],
+            'equal_weight', 'SPY', '{}'::jsonb, '{}'::jsonb,
+            '{"title":"Fixture run","symbols":["AAPL"]}'::jsonb
+        )
+        """,
+        (uuid4(), user_id, conversation_id),
+    )
+
+
 @pytest.fixture
 def bounded_index_rows() -> Iterator[dict[str, Any]]:
     owner_id = uuid4()
@@ -153,6 +206,16 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
                     other_id,
                 ),
             )
+            _insert_search_rows(
+                cursor,
+                user_id=owner_id,
+                conversation_id=owner_conversation_id,
+            )
+            _insert_search_rows(
+                cursor,
+                user_id=other_id,
+                conversation_id=other_conversation_id,
+            )
             owner_spine = _insert_p1_spine(cursor, user_id=owner_id)
             other_spine = _insert_p1_spine(cursor, user_id=other_id)
     try:
@@ -183,9 +246,11 @@ def test_forward_indexes_exist_without_changing_rls_or_select_grants() -> None:
                 where schemaname = 'public'
                   and indexname = any(%s)
                 """,
-                (list(EXPECTED_INDEXES),),
+                (list(EXPECTED_INDEXES | SEARCH_EXPECTED_INDEXES),),
             )
-            assert {str(row[0]) for row in cursor.fetchall()} == EXPECTED_INDEXES
+            assert {str(row[0]) for row in cursor.fetchall()} == (
+                EXPECTED_INDEXES | SEARCH_EXPECTED_INDEXES
+            )
 
             cursor.execute(
                 """
@@ -197,6 +262,11 @@ def test_forward_indexes_exist_without_changing_rls_or_select_grants() -> None:
                 (
                     [
                         "conversations",
+                        "strategies",
+                        "collections",
+                        "backtest_runs",
+                        "ideas",
+                        "evidence_artifacts",
                         "messages",
                         "decision_notes",
                     ],
@@ -204,6 +274,11 @@ def test_forward_indexes_exist_without_changing_rls_or_select_grants() -> None:
             )
             assert dict(cursor.fetchall()) == {
                 "conversations": True,
+                "strategies": True,
+                "collections": True,
+                "backtest_runs": True,
+                "ideas": True,
+                "evidence_artifacts": True,
                 "decision_notes": True,
                 "messages": True,
             }
@@ -220,6 +295,11 @@ def test_forward_indexes_exist_without_changing_rls_or_select_grants() -> None:
                 (
                     [
                         "conversations",
+                        "strategies",
+                        "collections",
+                        "backtest_runs",
+                        "ideas",
+                        "evidence_artifacts",
                         "messages",
                         "decision_notes",
                     ],
@@ -227,6 +307,11 @@ def test_forward_indexes_exist_without_changing_rls_or_select_grants() -> None:
             )
             assert dict(cursor.fetchall()) == {
                 "conversations": False,
+                "strategies": False,
+                "collections": False,
+                "backtest_runs": False,
+                "ideas": False,
+                "evidence_artifacts": False,
                 "decision_notes": False,
                 "messages": False,
             }
@@ -242,7 +327,9 @@ def test_authenticated_claims_keep_both_owners_isolated(
             with connection.cursor() as cursor:
                 cursor.execute(
                     "grant select on public.conversations, public.messages, "
-                    "public.decision_notes to authenticated"
+                    "public.decision_notes, public.strategies, "
+                    "public.collections, public.backtest_runs, public.ideas, "
+                    "public.evidence_artifacts to authenticated"
                 )
                 cursor.execute("set local role authenticated")
                 cursor.execute(
@@ -258,6 +345,11 @@ def test_authenticated_claims_keep_both_owners_isolated(
                 )
                 for table_name in (
                     "conversations",
+                    "strategies",
+                    "collections",
+                    "backtest_runs",
+                    "ideas",
+                    "evidence_artifacts",
                     "messages",
                     "decision_notes",
                 ):

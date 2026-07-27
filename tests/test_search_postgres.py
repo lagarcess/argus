@@ -484,8 +484,8 @@ def test_search_each_source_returns_at_most_limit_plus_one_candidates(
         "decisions": 4,
     }
     assert all(len(rows) <= public_limit + 1 for rows in result.rows.values())
-    assert pool.tracker["query_count"] == 2
-    assert pool.tracker["row_counts"] == [28, 4]
+    assert pool.tracker["query_count"] == 9
+    assert pool.tracker["row_counts"] == [4] * 9
 
 
 def test_search_preserves_all_token_matching_and_rank_buckets(
@@ -517,6 +517,69 @@ def test_search_preserves_all_token_matching_and_rank_buckets(
     ranked = _ranked(result.rows, "alpha beta")
 
     assert [item.type for _, item in ranked] == ["collection", "chat"]
+
+
+def test_search_preserves_short_mixed_tokens_and_cross_artifact_decision_text(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    other_id = search_identities["other"]
+    now = datetime(2026, 7, 27, 13, 5, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        expected_chat = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Alpha x thesis",
+        )
+        _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(seconds=1),
+            title="Alpha y thesis",
+        )
+        _insert_conversation(
+            cursor,
+            user_id=other_id,
+            timestamp=now + timedelta(seconds=1),
+            title="Alpha x foreign",
+        )
+        identities = _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Decision bridge",
+            summary="Ordinary summary",
+            evidence_title="Evidence title",
+            evidence_digest="evidencetoken",
+        )
+        cursor.execute(
+            "update public.decision_notes set note = 'localtoken' where id = %s",
+            (identities["decision"],),
+        )
+
+    reader, _ = _reader()
+    mixed = reader.search_rows(
+        user_id=str(owner_id),
+        query="alpha x",
+        source_limit=5,
+    )
+    short = reader.search_rows(
+        user_id=str(owner_id),
+        query="x",
+        source_limit=5,
+    )
+    bridged = reader.search_rows(
+        user_id=str(owner_id),
+        query="localtoken evidencetoken",
+        source_limit=5,
+    )
+
+    assert [str(row["id"]) for row in mixed.rows["conversations"]] == [str(expected_chat)]
+    assert [str(row["id"]) for row in short.rows["conversations"]] == [str(expected_chat)]
+    assert [str(row["id"]) for row in bridged.rows["decisions"]] == [
+        str(identities["decision"])
+    ]
 
 
 @pytest.mark.parametrize("query", ["\x00needle\x00", "nee\x00dle"])
@@ -714,7 +777,7 @@ def test_old_pinned_exact_title_and_exact_symbol_beat_newer_plain_matches(
     assert ordered_types.index("strategy") < ordered_types.index("evidence")
 
 
-def test_search_first_middle_final_equal_timestamp_and_empty_pages(
+def test_search_first_middle_final_equal_timestamp_deletion_and_empty_pages(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
@@ -737,7 +800,7 @@ def test_search_first_middle_final_equal_timestamp_and_empty_pages(
     seen: list[str] = []
     cursor_at = None
     cursor_id = None
-    for expected_count in (3, 3, 1, 0):
+    for page_number, expected_count in enumerate((3, 3, 1, 0)):
         result = reader.search_rows(
             user_id=str(owner_id),
             query="needle",
@@ -751,6 +814,12 @@ def test_search_first_middle_final_equal_timestamp_and_empty_pages(
         if page:
             cursor_at = page[-1][1].updated_at
             cursor_id = page[-1][1].id
+        if page_number == 0:
+            with _connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from public.strategies where id = %s",
+                    (seen[0],),
+                )
 
     assert len(seen) == len(set(seen))
     assert set(seen) == inserted
@@ -1004,6 +1073,58 @@ def test_ledger_groups_are_exact_and_not_candidate_or_decision_filter_relative(
     }
 
 
+def test_filtered_idea_ledger_pages_keep_cursor_order_and_exact_counts(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    timestamp = datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc)
+    inserted: set[str] = set()
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(7):
+            inserted.add(
+                str(
+                    _insert_idea_spine(
+                        cursor,
+                        user_id=owner_id,
+                        timestamp=timestamp,
+                        title=f"Ledger idea {offset}",
+                        summary=f"Ledger summary {offset}",
+                        decision_state="promising",
+                    )["idea"]
+                )
+            )
+
+    reader, _ = _reader()
+    seen: list[str] = []
+    cursor_at = None
+    cursor_id = None
+    for expected_count in (3, 3, 1, 0):
+        result = reader.search_rows(
+            user_id=str(owner_id),
+            query="",
+            source_limit=4,
+            cursor_updated_at=cursor_at,
+            cursor_id=cursor_id,
+            decision_state="promising",
+            include_ledger_groups=True,
+        )
+        page = result.rows["ideas"][:3]
+        assert len(page) == expected_count
+        assert result.ledger_counts == {
+            "promising": 7,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        }
+        seen.extend(str(row["id"]) for row in page)
+        if page:
+            cursor_at = datetime.fromisoformat(str(page[-1]["updated_at"]))
+            cursor_id = str(page[-1]["id"])
+
+    assert len(seen) == len(set(seen))
+    assert set(seen) == inserted
+
+
 @pytest.mark.parametrize("initial_volume,larger_volume", [(40, 400)])
 def test_search_query_and_row_budget_are_constant_as_volume_grows(
     search_identities,
@@ -1039,90 +1160,110 @@ def test_search_query_and_row_budget_are_constant_as_volume_grows(
     )
 
     assert len(first.rows["strategies"]) == len(larger.rows["strategies"]) == 6
-    assert first_pool.tracker == {"query_count": 1, "row_counts": [6]}
-    assert larger_pool.tracker == {"query_count": 1, "row_counts": [6]}
+    expected_budget = {
+        "query_count": 7,
+        "row_counts": [0, 6, 0, 0, 0, 0, 0],
+    }
+    assert first_pool.tracker == expected_budget
+    assert larger_pool.tracker == expected_budget
 
 
 def test_search_candidate_plan_keeps_a_limit_inside_each_source(
     search_identities,
 ) -> None:
-    from argus.domain.postgres_search_reader import _CANDIDATES_SQL
+    from argus.domain.postgres_search_reader import (
+        _LATE_SOURCES,
+        _late_source_sql,
+    )
 
     owner_id = search_identities["owner"]
     timestamp = datetime(2026, 7, 27, 22, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute("set local enable_seqscan = off")
         for offset in range(40):
             item_at = timestamp - timedelta(seconds=offset)
+            label = "Needle" if offset == 0 else "Haystack"
             conversation_id = _insert_conversation(
                 cursor,
                 user_id=owner_id,
                 timestamp=item_at,
-                title=f"Needle conversation {offset}",
+                title=f"{label} conversation {offset}",
             )
             _insert_strategy(
                 cursor,
                 user_id=owner_id,
                 timestamp=item_at,
-                name=f"Needle strategy {offset}",
+                name=f"{label} strategy {offset}",
             )
             _insert_collection(
                 cursor,
                 user_id=owner_id,
                 timestamp=item_at,
-                name=f"Needle collection {offset}",
+                name=f"{label} collection {offset}",
             )
             _insert_run(
                 cursor,
                 user_id=owner_id,
                 timestamp=item_at,
-                title=f"Needle run {offset}",
+                title=f"{label} run {offset}",
                 conversation_id=conversation_id,
             )
             _insert_idea_spine(
                 cursor,
                 user_id=owner_id,
                 timestamp=item_at,
-                title=f"Needle idea {offset}",
-                summary=f"Needle summary {offset}",
+                title=f"{label} idea {offset}",
+                summary=f"{label} summary {offset}",
                 conversation_id=conversation_id,
             )
 
-        cursor.execute(
-            sql.SQL("explain (analyze, buffers, format json) {}").format(_CANDIDATES_SQL),
-            {
-                "user_id": owner_id,
-                "normalized_query": "needle",
-                "symbol_query": "needle",
-                "source_limit": 6,
-                "has_cursor": False,
-                "cursor_pinned_rank": 0,
-                "cursor_exact_rank": 0,
-                "cursor_symbol_rank": 0,
-                "cursor_type_rank": 0,
-                "cursor_updated_at": None,
-                "cursor_text_rank": 0,
-                "cursor_id": None,
-                "decision_state": None,
-                "ledger_browse": False,
-                "ideas_only": False,
-                "guest_scope": False,
-                "guest_conversation_id": None,
-                "pivot_only": False,
-                "pivot_id": None,
-            },
-        )
-        explained = cursor.fetchone()[0][0]
+        params = {
+            "user_id": owner_id,
+            "normalized_query": "needle",
+            "symbol_query": "needle",
+            "token_0_pattern": "%needle%",
+            "source_limit": 6,
+            "has_cursor": False,
+            "cursor_pinned_rank": 0,
+            "cursor_exact_rank": 0,
+            "cursor_symbol_rank": 0,
+            "cursor_type_rank": 0,
+            "cursor_updated_at": None,
+            "cursor_text_rank": 0,
+            "cursor_id": None,
+            "decision_state": None,
+            "ledger_browse": False,
+            "ideas_only": False,
+            "guest_scope": False,
+            "guest_conversation_id": None,
+            "pivot_only": False,
+            "pivot_id": None,
+        }
+        explained_sources = []
+        for source in _LATE_SOURCES:
+            cursor.execute(
+                sql.SQL("explain (analyze, buffers, format json) {}").format(
+                    _late_source_sql(
+                        source,
+                        normalized_tokens=("needle",),
+                        has_cursor=False,
+                    )
+                ),
+                params,
+            )
+            explained_sources.append(cursor.fetchone()[0][0])
 
     def plan_nodes(plan: dict[str, Any]):
         yield plan
         for child in plan.get("Plans", []):
             yield from plan_nodes(child)
 
-    plan = explained["Plan"]
-    nodes = list(plan_nodes(plan))
-    limits = [node for node in nodes if node["Node Type"] == "Limit"]
+    for explained in explained_sources:
+        plan = explained["Plan"]
+        nodes = list(plan_nodes(plan))
+        limits = [node for node in nodes if node["Node Type"] == "Limit"]
 
-    assert len(limits) >= 7
-    assert all(node["Actual Rows"] <= 6 for node in limits)
-    assert plan["Actual Rows"] <= 42
-    assert explained["Execution Time"] < 2_000
+        assert limits
+        assert all(node["Actual Rows"] <= 6 for node in limits)
+        assert plan["Actual Rows"] <= 6
+        assert explained["Execution Time"] < 2_000

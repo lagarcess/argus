@@ -140,7 +140,13 @@ def test_search_first_page_uses_bounded_candidate_evidence_and_ledger_queries() 
     ]
     pool = _RecordingPool(
         [
-            candidate_rows,
+            *[[candidate] for candidate in candidate_rows],
+            [
+                {
+                    "idea_id": candidate_rows[4]["payload"]["id"],
+                    "decision_state": "promising",
+                }
+            ],
             [
                 {
                     "id": artifact_id,
@@ -179,9 +185,9 @@ def test_search_first_page_uses_bounded_candidate_evidence_and_ledger_queries() 
         "rejected": 0,
         "revisit_later": 0,
     }
-    assert len(pool.cursor.executions) == 3
-    assert pool.cursor.executions[0][1]["source_limit"] == 4
-    assert pool.cursor.executions[1][1]["artifact_ids"] == [artifact_id]
+    assert len(pool.cursor.executions) == 10
+    assert all(params["source_limit"] == 4 for _, params in pool.cursor.executions[:7])
+    assert pool.cursor.executions[8][1]["artifact_ids"] == [artifact_id]
     assert pool.acquisition_timeouts == [2.0]
 
 
@@ -231,7 +237,7 @@ def test_search_naive_cursor_fails_before_database_read() -> None:
 
 def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[]])
+    pool = _RecordingPool([[] for _ in range(7)])
 
     reader_type(pool).search_rows(
         user_id="00000000-0000-0000-0000-000000000001",
@@ -242,6 +248,133 @@ def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> Non
     params = pool.cursor.executions[0][1]
     assert params["normalized_query"] == "nee dle"
     assert params["symbol_query"] is None
+
+
+def test_search_uses_parameterized_token_likes_without_row_token_splitting() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[] for _ in range(7)])
+
+    reader_type(pool).search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="Alpha x beta alpha",
+        source_limit=4,
+    )
+
+    query, params = pool.cursor.executions[0]
+    rendered = query.as_string()
+
+    assert "regexp_split_to_table" not in rendered
+    assert params["token_0_pattern"] == "%alpha%"
+    assert params["token_1_pattern"] == "%x%"
+    assert params["token_2_pattern"] == "%beta%"
+    assert "token_0_pattern" in rendered
+    assert "token_1_pattern" in rendered
+    assert "token_2_pattern" in rendered
+    assert "alpha" not in rendered
+    assert "beta" not in rendered
+
+
+def test_search_exact_index_predicate_keeps_mixed_short_token_recheck() -> None:
+    from argus.domain.postgres_search_reader import (
+        _LATE_CHAT,
+        _source_token_predicate,
+    )
+
+    rendered = _source_token_predicate(
+        _LATE_CHAT,
+        normalized_tokens=("alpha", "x"),
+    ).as_string()
+
+    assert "token_0_pattern" in rendered
+    assert "token_1_pattern" in rendered
+
+
+def test_search_executes_one_bounded_candidate_query_per_source() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[] for _ in range(7)])
+
+    reader_type(pool).search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="alpha",
+        source_limit=4,
+    )
+
+    candidate_queries = pool.cursor.executions[:7]
+    assert len(candidate_queries) == 7
+    assert all("fetch first" in query.as_string() for query, _ in candidate_queries)
+    assert all(params["source_limit"] == 4 for _, params in candidate_queries)
+
+
+def test_search_cursor_uses_direct_source_primary_key_probes() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool(
+        [
+            [
+                {
+                    "source_type": "strategy",
+                    "pinned_rank": 0,
+                    "exact_rank": 0,
+                    "symbol_rank": 0,
+                    "type_rank": 3,
+                    "text_rank": 0,
+                }
+            ],
+            *([[]] * 7),
+        ]
+    )
+
+    reader_type(pool).search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="Alpha x",
+        source_limit=4,
+        cursor_updated_at=datetime(2026, 7, 27, tzinfo=timezone.utc),
+        cursor_id="00000000-0000-0000-0000-000000000101",
+    )
+
+    pivot_query = pool.cursor.executions[0][0].as_string()
+    assert "pivot_only" not in pivot_query
+    assert "chat.id = %(cursor_id)s::uuid" in pivot_query
+    assert "strategy.id = %(cursor_id)s::uuid" in pivot_query
+    assert "collection.id = %(cursor_id)s::uuid" in pivot_query
+    assert "run.id = %(cursor_id)s::uuid" in pivot_query
+    assert "idea.id = %(cursor_id)s::uuid" in pivot_query
+    assert "evidence.id = %(cursor_id)s::uuid" in pivot_query
+    assert "decision.id = %(cursor_id)s::uuid" in pivot_query
+
+
+def test_search_hydrates_returned_idea_decisions_in_one_bounded_batch() -> None:
+    reader_type, _ = _reader_types()
+    idea_id = "00000000-0000-0000-0000-000000000201"
+    idea = _candidate("idea", idea_id)
+    idea["payload"]["decision_state"] = None
+    pool = _RecordingPool(
+        [
+            [],
+            [],
+            [],
+            [],
+            [idea],
+            [],
+            [],
+            [{"idea_id": idea_id, "decision_state": "watching"}],
+        ]
+    )
+
+    result = reader_type(pool).search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="search",
+        source_limit=4,
+    )
+
+    assert result.rows["ideas"][0]["decision_state"] == "watching"
+    assert len(pool.cursor.executions) == 8
+    assert all(
+        "join lateral" not in query.as_string() for query, _ in pool.cursor.executions[:7]
+    )
+    query, params = pool.cursor.executions[7]
+    assert "distinct on (idea_id)" in query
+    assert params["idea_ids"] == [idea_id]
+    assert str(params["user_id"]) == "00000000-0000-0000-0000-000000000001"
 
 
 def test_search_decision_evidence_batch_is_bounded_and_owner_scoped() -> None:
@@ -256,6 +389,12 @@ def test_search_decision_evidence_batch_is_bounded_and_owner_scoped() -> None:
     ]
     pool = _RecordingPool(
         [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
             candidates,
             [
                 {
@@ -275,6 +414,6 @@ def test_search_decision_evidence_batch_is_bounded_and_owner_scoped() -> None:
     )
 
     assert len(result.rows["decisions"]) == 3
-    evidence_params = pool.cursor.executions[1][1]
+    evidence_params = pool.cursor.executions[7][1]
     assert str(evidence_params["user_id"]) == ("00000000-0000-0000-0000-000000000001")
     assert len(evidence_params["artifact_ids"]) == 3
