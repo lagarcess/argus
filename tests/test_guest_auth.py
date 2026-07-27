@@ -88,7 +88,11 @@ def _enable_guest(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
 
 
-def test_guest_flag_off_creates_no_anonymous_auth_user(gateway) -> None:
+def test_guest_flag_off_creates_no_anonymous_auth_user(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "false")
     with (
         patch.object(api_state, "supabase_gateway", gateway),
         TestClient(app) as client,
@@ -105,7 +109,9 @@ def test_guest_flag_off_creates_no_anonymous_auth_user(gateway) -> None:
 
 def test_guest_flag_off_drains_an_existing_verified_guest_session(
     gateway,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "false")
     gateway.get_auth_user_from_token.return_value = (
         gateway.sign_in_anonymously.return_value["user"]
     )

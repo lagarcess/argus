@@ -64,9 +64,17 @@ def _clear_flags(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_server_guest_and_public_account_flags_default_off() -> None:
-    assert guest_access_enabled() is False
+def test_guest_access_defaults_on_while_public_account_access_defaults_off() -> None:
+    assert guest_access_enabled() is True
     assert public_account_access_enabled() is False
+
+
+def test_explicit_server_guest_kill_switch_disables_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "false")
+
+    assert guest_access_enabled() is False
 
 
 def test_explicit_client_server_guest_flag_mismatch_fails_closed(

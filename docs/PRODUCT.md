@@ -528,23 +528,27 @@ should carry sources and freshness, acknowledge uncertainty, and remain
 informational. It is not financial advice or a recommendation to buy, sell, or
 hold an asset.
 
-## Guest Entry (Flagged)
+## Guest Entry (Default-On Kill Switch)
 
-Guest mode supersedes the auth-first landing page when enabled. A guest is a
+Guest mode is part of the normal Argus product shape and supersedes the
+auth-first landing page by default. A guest is a
 real Supabase anonymous authenticated user with one temporary workspace, never
 the unauthenticated Postgres `anon` role, the mock developer, or a synthetic
 email profile.
 
-The first exposure stage is intentionally asymmetric:
+The checked-in policy is intentionally asymmetric:
 
 - `ARGUS_GUEST_ACCESS_ENABLED=true`
+- `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true`
 - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`
 
 The frontend presentation flag cannot grant access. The server remains
-authoritative, and both server flags default to `false`. While public-account
-access is off, permanent signup and login remain allowlist-gated, the guest
-surface offers **Sign in**, and unlisted guests cannot create permanent
-accounts. Existing admin and developer roles remain unchanged.
+authoritative. The Guest server and presentation flags default on; explicit
+`false` is their emergency rollback kill switch. Public-account access remains
+an independent false-by-default gate. While it is off, permanent signup and
+login remain allowlist-gated, the guest surface offers **Sign in**, and
+unlisted guests cannot create permanent accounts. Existing admin and developer
+roles remain unchanged.
 
 Each guest identity receives seven fixed days, one conversation, ten useful
 assistant terminals, one unique simulation, and five feedback submissions.

@@ -303,19 +303,20 @@ private-alpha launch; record any override in the release manifest.
 
 ## Guest Staged Rollout
 
-Safe defaults:
+Product defaults:
 
 ```bash
-ARGUS_GUEST_ACCESS_ENABLED=false
+ARGUS_GUEST_ACCESS_ENABLED=true
 ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
-NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false
+NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
 ```
 
-The initial founder-approved staged mode, when explicitly enabled on a
-branch-deployed candidate, is guest access on and public-account access off.
-The frontend flag controls presentation only; the API remains authoritative.
-Permanent signup/login stays allowlist-gated, existing admin/developer behavior
-is unchanged, and no Create account promise is shown.
+Guest access is part of the normal product shape. The two Guest flags are
+default-on emergency kill switches; explicit `false` activates rollback. The
+frontend flag controls presentation only and the API remains authoritative.
+Public-account access remains off, permanent signup/login stays
+allowlist-gated, existing admin/developer behavior is unchanged, and no Create
+account promise is shown.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,

@@ -303,8 +303,9 @@ Argus is **NOT**:
 
 ## 22. Guest Entry and Rollback
 
-- When the guest flag is enabled, `/` presents the chat-first guest entry
-  instead of the auth-first landing page.
+- `/` presents the chat-first guest entry by default. The Guest server and
+  presentation flags are emergency kill switches: explicit `false` restores
+  the auth-first landing and stops new anonymous bootstrap.
 - Preserve the current landing implementation and centered auth modal for
   configuration rollback and later conversion.
 - While public permanent accounts remain disabled, guest chrome offers

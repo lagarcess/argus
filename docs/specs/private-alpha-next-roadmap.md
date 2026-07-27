@@ -1009,20 +1009,18 @@ shell to land. See
   owner-scoped capability gates on `codex/guest-experience`. Block 4 adds the
   approved privacy-safe funnel through the existing observability envelope.
   This is a local candidate only, not a public-ready or integrated release.
-- Checked-in defaults remain
-  `ARGUS_GUEST_ACCESS_ENABLED=false`,
-  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, and
-  `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`. The staged exposure target remains
-  guest access on with public-account access off only after founder approval.
+- Guest is now an accepted part of the normal product shape:
+  `ARGUS_GUEST_ACCESS_ENABLED=true` and
+  `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill
+  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false` remains the independent
+  permanent-account gate.
 - Public exposure still requires the exact-head local browser matrix, clean
   reconciliation with the moving integration branch, a branch-deployed
   exact-SHA canary, hosted anonymous-Auth abuse controls, cleanup scheduling,
   cost/latency calibration, and founder go/no-go.
-- Grounded Discovery remains a separate active dependency. Guest Omnisearch is
-  limited to the owned temporary workspace and must continue to describe
-  broader discovery as unavailable until that pillar lands.
-- Always Progresses remains a separate active dependency. Do not reconcile its
-  runtime work into the guest lane during this local evidence pass.
+- Grounded Discovery and Always Progresses are integrated dependencies. Guest
+  Omnisearch remains owner-scoped, while the ordinary chat runtime preserves
+  the integrated provider-backed discovery contract.
 - Authentication now lands both guest and registered identities directly in
   ordinary chat. There is no guest onboarding bypass or registered
   onboarding/`primary_goal` branch; guest behavior differs only through

@@ -1504,9 +1504,11 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 
 ## Guest identity and policy endpoints
 
-Guest access is additive and server-flagged. Both
-`ARGUS_GUEST_ACCESS_ENABLED` and `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` default
-to `false`; the frontend flag controls presentation only.
+Guest access is additive and server-authoritative.
+`ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
+emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
+defaults to `true` and controls presentation only. The independent
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1871,8 +1873,8 @@ Argus supports English and Spanish (Latin America) in Alpha.
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
 - **Logged-out Users**: Frontend may store pre-session hints in `localStorage`.
-  When guest access is enabled, the resolved language is persisted on the real
-  anonymous profile and becomes authoritative after bootstrap.
+  For a guest, the resolved language is persisted on the real anonymous
+  profile and becomes authoritative after bootstrap.
 - Successful signup writes both profile values from the validated signup
   language before the authenticated application renders. Login, session
   hydration, and reload replace browser/local hints with the stored profile;

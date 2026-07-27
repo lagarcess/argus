@@ -579,8 +579,9 @@ A guest candidate adds gates; it does not bypass the release sequence above.
 Before any guest traffic:
 
 - the exact candidate SHA must pass the local real-Auth/Postgres browser matrix
-  with server guest access enabled only for the isolated process;
-- checked-in guest, public-account, and frontend guest flags must remain false;
+  in an isolated process;
+- checked-in server/frontend Guest defaults must remain true, explicit false
+  must preserve rollback, and public-account access must remain false;
 - the branch-deployed canary must prove `/` opens guest chat only in the
   approved staged mode, while permanent signup/login remains allowlist-gated;
 - hosted Supabase must explicitly enable anonymous Auth, configure an approved

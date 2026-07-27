@@ -24,9 +24,10 @@
 - Server truth comes from a verified Supabase Auth user plus a server-owned
   guest-workspace record. Never trust email, display name, editable metadata,
   or a public frontend flag as proof of guest status.
-- `ARGUS_GUEST_ACCESS_ENABLED` and
-  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` default off. The frontend flag is
-  presentation-only.
+- `ARGUS_GUEST_ACCESS_ENABLED` and `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` default
+  on as emergency kill switches; explicit `false` is rollback.
+  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains independently default-off. The
+  frontend flag is presentation-only.
 - The initial public guest stage targets
   `ARGUS_GUEST_ACCESS_ENABLED=true` with
   `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`. Guest chat supersedes `/`, but
@@ -185,14 +186,15 @@ canon and static contract agree.
 - Test: `tests/test_render_release_profile_contract.py`
 
 - [ ] Write failing tests for:
-  - both server flags defaulting off;
+  - Guest bootstrap defaulting on and explicit false disabling it;
+  - public-account access defaulting off;
   - client/server flag mismatch failing closed;
   - verified `is_anonymous=true` producing `account_kind=guest`;
   - a registered user producing `account_kind=registered`;
   - editable metadata never changing account kind;
   - guest expiry and capabilities coming from the server record;
-  - current private-alpha behavior remaining byte-compatible when flags are
-    off.
+  - the preserved auth-first behavior remaining byte-compatible when the Guest
+    kill switches are explicitly off.
 
 - [ ] Implement the exact interfaces `guest_access_enabled() -> bool`,
   `public_account_access_enabled() -> bool`, and

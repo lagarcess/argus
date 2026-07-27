@@ -53,14 +53,14 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED" not in profile["services"]["web"]["env"]
 
 
-def test_guest_flags_are_documented_off_without_enabling_hosted_release() -> None:
+def test_guest_kill_switches_are_documented_on_without_opening_public_accounts() -> None:
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
 
-    assert "ARGUS_GUEST_ACCESS_ENABLED=false" in backend_example
+    assert "ARGUS_GUEST_ACCESS_ENABLED=true" in backend_example
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false" in backend_example
-    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false" in backend_example
-    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false" in web_example
+    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in backend_example
+    assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in web_example
 
 
 def test_profile_utility_validates_hashes_and_emits_expected_pairs() -> None:

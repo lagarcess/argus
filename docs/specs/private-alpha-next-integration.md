@@ -322,18 +322,19 @@ The conversion contract has two owners:
   same-destination response without repeating transfer.
 
 Neither path copies visible prose in the browser or merges guest lifetime
-counters into registered hour/day counters. Rollback is flags first: disable
-the frontend guest presentation, then server guest bootstrap; keep public
-account access false. Do not roll back by deleting guest rows or reverting
-already-applied migrations.
+counters into registered hour/day counters. Guest server/bootstrap and
+presentation flags default on as emergency kill switches. Rollback is flags
+first: explicitly disable the frontend guest presentation, then server guest
+bootstrap; keep public-account access false. Do not roll back by deleting guest
+rows or reverting already-applied migrations.
 The server guest flag is the creation gate: disabling it stops new anonymous
 sessions while existing verified guests drain to conversion, fixed expiry, or
 transactional cleanup.
 
-Reconciliation gates remain external to this branch: Always Progresses,
-Grounded Discovery, the branch-deployed exact-SHA canary, hosted anonymous Auth
-and CAPTCHA/rate-limit configuration, scheduled cleanup ownership, and founder
-traffic/cost approval.
+Always Progresses and Grounded Discovery are reconciled into this candidate.
+Remaining external gates are the branch-deployed exact-SHA canary, hosted
+anonymous Auth and CAPTCHA/rate-limit configuration, scheduled cleanup
+ownership, and founder traffic/cost approval.
 
 ## Historical Evidence Retention
 

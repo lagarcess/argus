@@ -15,6 +15,7 @@ import {
   normalizeApiLanguage,
   signupWithEmail,
 } from "@/lib/argus-api";
+import { guestAccessEnabled } from "@/lib/private-alpha-flags";
 
 type AuthMode = "intro" | "signup" | "login";
 
@@ -39,8 +40,6 @@ export default function LandingPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const guestAccessEnabled =
-    process.env.NEXT_PUBLIC_GUEST_ACCESS_ENABLED === "true";
   const [authMode, setAuthMode] = useState<AuthMode>("intro");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 

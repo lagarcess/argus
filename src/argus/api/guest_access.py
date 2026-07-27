@@ -15,12 +15,15 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
 
-def _enabled(name: str) -> bool:
-    return os.getenv(name, "").strip().lower() in _TRUE_VALUES
+def _enabled(name: str, *, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    return raw_value.strip().lower() in _TRUE_VALUES
 
 
 def guest_access_enabled() -> bool:
-    server_enabled = _enabled("ARGUS_GUEST_ACCESS_ENABLED")
+    server_enabled = _enabled("ARGUS_GUEST_ACCESS_ENABLED", default=True)
     presentation = os.getenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED")
     if presentation is None or not presentation.strip():
         return server_enabled

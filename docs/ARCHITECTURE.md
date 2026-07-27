@@ -756,15 +756,18 @@ capabilities, fixed expiry, and lifetime allowances. The existing conversation,
 LangGraph, message settlement, and backtest-admission paths remain the only
 runtime and accounting owners.
 
-Two server flags control rollout and default off:
+Two server flags own separate policy boundaries:
 
-- `ARGUS_GUEST_ACCESS_ENABLED`
-- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`
+- `ARGUS_GUEST_ACCESS_ENABLED` defaults on; explicit `false` is the emergency
+  bootstrap kill switch.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` defaults off and separately controls
+  ordinary permanent-account access.
 
-`NEXT_PUBLIC_GUEST_ACCESS_ENABLED` selects presentation only. An explicit
-client/server disagreement fails closed. Guest access may be enabled while
-public permanent accounts remain disabled; in that state the current
-private-alpha allowlist continues to own signup/login and role elevation.
+`NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also defaults on and selects presentation
+only; explicit `false` restores the preserved auth-first landing. An explicit
+client/server disagreement fails closed. With public permanent accounts
+disabled, the current private-alpha allowlist continues to own signup/login and
+role elevation.
 Turning the server guest flag off stops bootstrap only: active verified guests
 drain through their fixed expiry or conversion instead of being abruptly
 deauthorized.

@@ -303,7 +303,9 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
         (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
     )
 
-    assert "Guest mode supersedes the auth-first landing page when enabled." in product
+    assert "Guest Entry (Default-On Kill Switch)" in product
+    assert "`ARGUS_GUEST_ACCESS_ENABLED=true`" in product
+    assert "`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`" in product
     assert "ARGUS_GUEST_ACCESS_ENABLED" in architecture
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in architecture
     assert "`POST /api/v1/auth/guest`" in api_contract

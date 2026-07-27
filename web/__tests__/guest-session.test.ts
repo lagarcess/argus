@@ -5,17 +5,26 @@ import {
   createGuestSessionBootstrapper,
   guestCaptchaTokenForEnvironment,
 } from "../lib/guest-session";
+import { guestAccessEnabledFromEnv } from "../lib/private-alpha-flags";
 
 const root = join(import.meta.dir, "..");
 
 describe("guest session entry contract", () => {
+  test("defaults Guest presentation on and keeps explicit false as a kill switch", () => {
+    expect(guestAccessEnabledFromEnv(undefined)).toBe(true);
+    expect(guestAccessEnabledFromEnv("true")).toBe(true);
+    expect(guestAccessEnabledFromEnv("false")).toBe(false);
+    expect(guestAccessEnabledFromEnv(" OFF ")).toBe(false);
+    expect(guestAccessEnabledFromEnv("invalid")).toBe(false);
+  });
+
   test("keeps the auth landing as rollback and makes guest entry dynamic", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
     const guestEntryPath = join(root, "components/guest/GuestEntry.tsx");
 
     expect(existsSync(guestEntryPath)).toBe(true);
     expect(page).toContain("<GuestEntry");
-    expect(page).toContain("NEXT_PUBLIC_GUEST_ACCESS_ENABLED");
+    expect(page).toContain("guestAccessEnabled");
     expect(page).toContain("loginWithEmail");
     expect(page).toContain("signupWithEmail");
   });
