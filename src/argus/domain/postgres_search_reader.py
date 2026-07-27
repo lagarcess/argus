@@ -779,7 +779,10 @@ class PostgresSearchReader:
         params: dict[str, Any] = {
             "user_id": owner_id,
             "normalized_query": normalized_query,
-            "symbol_query": query,
+            # PostgreSQL text cannot represent NUL. Normalized matching remains
+            # exact, while raw symbol equality must be false for such a query
+            # because stored Postgres symbols cannot contain NUL either.
+            "symbol_query": None if "\x00" in query else query,
             "source_limit": source_limit,
             "has_cursor": has_cursor,
             "cursor_pinned_rank": 0,

@@ -519,6 +519,31 @@ def test_search_preserves_all_token_matching_and_rank_buckets(
     assert [item.type for _, item in ranked] == ["collection", "chat"]
 
 
+@pytest.mark.parametrize("query", ["\x00needle\x00", "nee\x00dle"])
+def test_search_nul_query_preserves_normalized_matching(
+    search_identities,
+    query: str,
+) -> None:
+    owner_id = search_identities["owner"]
+    timestamp = datetime(2026, 7, 27, 13, 15, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        expected = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp,
+            title="Needle thesis",
+        )
+
+    reader, _ = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query=query,
+        source_limit=2,
+    )
+
+    assert [str(row["id"]) for row in result.rows["conversations"]] == [str(expected)]
+
+
 def test_search_score_projection_uses_title_when_optional_preview_text_is_empty(
     search_identities,
 ) -> None:

@@ -104,14 +104,27 @@ projection mismatch: an empty chat preview, Idea summary, or Evidence digest
 did not fall back to the title like Python assembly. SQL selected the lower UUID
 at an equal timestamp. `nullif(..., '')` title fallback fixed all three surfaces.
 
+Post-commit review then reproduced a NUL-bearing raw query failure. The focused
+RED run had `3 failed`: the parameter proof showed raw NUL still bound as
+`symbol_query`, and both boundary and embedded NUL real-Postgres cases raised
+`psycopg.DataError: PostgreSQL text fields cannot contain NUL (0x00) bytes`.
+The correction keeps `normalized_query` unchanged and binds SQL `NULL` only for
+the raw exact-symbol parameter when the query contains NUL. PostgreSQL symbols
+cannot contain NUL, so this preserves the old nonmatch for exact-symbol rank
+without changing normalized matching or API validation. The same focused run
+then passed `3/3`.
+
 ## Final green evidence
 
 ```text
-82 passed
+85 passed
   tests/test_search_bounded_reads.py
   tests/test_search_postgres.py
   tests/test_history_bounded_reads.py
   tests/test_supabase_gateway.py
+
+43 passed, 132 deselected
+  focused Search reader, real-Postgres, Supabase API, memory API, and Guest tests
 
 89 passed, 1 inherited deprecation warning
   tests/test_alpha_api_supabase.py

@@ -229,6 +229,21 @@ def test_search_naive_cursor_fails_before_database_read() -> None:
     assert pool.cursor.executions == []
 
 
+def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="nee\x00dle",
+        source_limit=4,
+    )
+
+    params = pool.cursor.executions[0][1]
+    assert params["normalized_query"] == "nee dle"
+    assert params["symbol_query"] is None
+
+
 def test_search_decision_evidence_batch_is_bounded_and_owner_scoped() -> None:
     reader_type, _ = _reader_types()
     candidates = [
