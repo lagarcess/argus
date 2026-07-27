@@ -13,6 +13,7 @@ import {
   confirmationStatusLabel,
 } from "@/components/chat/confirmation-display";
 import type { StrategyConfirmationStatus } from "@/components/chat/types";
+import { retainCanonicalResultOwnersForJobUpdate } from "./chat-result-projection-ownership";
 
 const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
   "queued",
@@ -79,7 +80,15 @@ export function applyBacktestJobUpdate(
   messages: Message[],
   response: BacktestJobResponse,
 ): Message[] {
-  const updatedMessages = messages.map((message) => {
+  const ownerSafeMessages =
+    response.job.status === "succeeded" && response.run
+      ? retainCanonicalResultOwnersForJobUpdate(
+          messages,
+          response.job,
+          response.run.id,
+        )
+      : messages;
+  const updatedMessages = ownerSafeMessages.map((message) => {
     if (
       message.kind === "backtest_job" &&
       message.backtestJob?.id === response.job.id

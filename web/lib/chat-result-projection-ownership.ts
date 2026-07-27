@@ -1,4 +1,5 @@
-import type { ApiMessage } from "./argus-api";
+import type { ApiMessage, BacktestJob } from "./argus-api";
+import type { Message } from "@/components/chat/types";
 import {
   isHydratableResultCard,
   recordOrNull,
@@ -95,4 +96,43 @@ export function retainCanonicalResultProjectionOwners(
       fallbackOwner.messageId === message.id
     );
   });
+}
+
+/**
+ * Keep the durable result message as the result owner when polling resolves a
+ * completed job alias. Without a durable result, one stable job-message alias
+ * remains available for promotion into the completed-result fallback.
+ */
+export function retainCanonicalResultOwnersForJobUpdate(
+  messages: Message[],
+  job: BacktestJob,
+  runId: string,
+): Message[] {
+  if (job.status !== "succeeded") return messages;
+
+  const matchingJobAliases = messages.filter(
+    (message) =>
+      message.kind === "backtest_job" &&
+      message.backtestJob?.id === job.id,
+  );
+  if (matchingJobAliases.length === 0) return messages;
+
+  const durableResultExists = messages.some(
+    (message) =>
+      message.kind === "strategy_result" && message.result?.runId === runId,
+  );
+  const fallbackOwnerMessageId = durableResultExists
+    ? null
+    : matchingJobAliases.reduce<string | null>(
+        (ownerId, message) =>
+          ownerId === null || message.id < ownerId ? message.id : ownerId,
+        null,
+      );
+
+  return messages.filter(
+    (message) =>
+      message.kind !== "backtest_job" ||
+      message.backtestJob?.id !== job.id ||
+      message.id === fallbackOwnerMessageId,
+  );
 }

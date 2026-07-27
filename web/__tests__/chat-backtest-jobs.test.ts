@@ -569,6 +569,148 @@ describe("chat backtest jobs", () => {
     });
   }
 
+  test("reload polling keeps the durable result as the sole owner for a succeeded job alias", () => {
+    const resultReadout =
+      "**Quick take**\n\nMSFT returned 12.4% while SPY returned 10.1%.";
+    const resultCard = {
+      ...run().conversation_result_card,
+      evidence_artifact_id: "evidence-result-1",
+      actions: [
+        {
+          type: "show_breakdown" as const,
+          label: "Explain result",
+          presentation: "result" as const,
+          payload: {},
+        },
+        {
+          type: "refine_strategy" as const,
+          label: "Refine idea",
+          presentation: "result" as const,
+          payload: {},
+        },
+      ],
+    };
+    const completedJob = job({
+      id: "job-result-1",
+      status: "succeeded",
+      result_run_id: "run-result-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const completedRun: BacktestRun = {
+      ...run(),
+      id: "run-result-1",
+      conversation_result_card: resultCard,
+    };
+    const apiTranscript: ApiMessage[] = [
+      {
+        id: "message-run-action-1",
+        conversation_id: "conversation-1",
+        role: "user",
+        content: "Run backtest",
+        created_at: "2026-06-06T12:00:03Z",
+        metadata: {
+          chat_action: {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirmation-1" },
+          },
+          backtest_job_id: completedJob.id,
+          backtest_job: completedJob,
+        },
+      },
+      {
+        id: "message-result-1",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: resultReadout,
+        created_at: "2026-06-06T12:00:04Z",
+        metadata: {
+          result_card: resultCard,
+          result_run_id: completedRun.id,
+          latest_run_id: completedRun.id,
+          result_conversation_id: "conversation-1",
+          result_fact_bank: {
+            run_id: completedRun.id,
+            symbols: ["MSFT"],
+            benchmark_symbol: "SPY",
+            asset_class: "equity",
+            config_snapshot: { template: "buy_and_hold" },
+          },
+        },
+      },
+    ];
+
+    const hydrated = hydrateMessagesFromApi(apiTranscript).messages;
+    expect(
+      hydrated.map((message) => ({
+        messageId: message.id,
+        kind: message.kind,
+        jobId: message.backtestJob?.id ?? null,
+        runId: message.result?.runId ?? message.backtestJob?.result_run_id ?? null,
+        ownsResult: message.kind === "strategy_result",
+      })),
+    ).toEqual([
+      {
+        messageId: "message-run-action-1",
+        kind: "backtest_job",
+        jobId: "job-result-1",
+        runId: "run-result-1",
+        ownsResult: false,
+      },
+      {
+        messageId: "message-result-1",
+        kind: "strategy_result",
+        jobId: null,
+        runId: "run-result-1",
+        ownsResult: true,
+      },
+    ]);
+    expect(pendingBacktestJobIds(hydrated)).toEqual(["job-result-1"]);
+
+    const afterPolling = applyBacktestJobUpdate(hydrated, {
+      job: completedJob,
+      run: completedRun,
+      result_readout: null,
+    });
+    const resultOwners = afterPolling.filter(
+      (message) =>
+        message.kind === "strategy_result" &&
+        message.result?.runId === completedRun.id,
+    );
+    const quickTakeOwners = resultOwners.filter((message) =>
+      message.content?.includes("**Quick take**"),
+    );
+    const decisionOwners = resultOwners.filter(
+      (message) =>
+        message.result?.evidenceArtifactId === "evidence-result-1",
+    );
+    const actionOwners = resultOwners.filter(
+      (message) => (message.result?.actions?.length ?? 0) > 0,
+    );
+
+    expect(
+      resultOwners.map((message) => ({
+        messageId: message.id,
+        kind: message.kind,
+        jobId: message.backtestJob?.id ?? null,
+        runId: message.result?.runId ?? null,
+        evidenceId: message.result?.evidenceArtifactId ?? null,
+      })),
+    ).toEqual([
+      {
+        messageId: "message-result-1",
+        kind: "strategy_result",
+        jobId: null,
+        runId: "run-result-1",
+        evidenceId: "evidence-result-1",
+      },
+    ]);
+    expect(quickTakeOwners).toHaveLength(1);
+    expect(decisionOwners).toHaveLength(1);
+    expect(actionOwners).toHaveLength(1);
+  });
+
   test("completed job projection remains the result owner when the durable result message is absent", () => {
     const completedJob = job({
       status: "succeeded",
@@ -650,6 +792,35 @@ describe("chat backtest jobs", () => {
     expect(resultMessages[0]?.id).toBe("assistant-job-a");
     expect(resultMessages[0]?.result?.runId).toBe("run-1");
     expect(resultMessages[0]?.result?.evidenceArtifactId).toBe("evidence-1");
+  });
+
+  test("succeeded polling chooses one stable fallback when no durable result exists", () => {
+    const completedJob = job({
+      id: "job-result-1",
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const alias = (id: string): Message => ({
+      ...queuedJobMessage(),
+      id,
+      backtestJob: completedJob,
+      artifactId: completedJob.id,
+      artifactStatus: completedJob.status,
+    });
+
+    const resultMessages = applyBacktestJobUpdate(
+      [alias("message-job-z"), alias("message-job-a")],
+      {
+        job: completedJob,
+        run: run(),
+        result_readout: null,
+      },
+    ).filter((message) => message.kind === "strategy_result");
+
+    expect(resultMessages).toHaveLength(1);
+    expect(resultMessages[0]?.id).toBe("message-job-a");
+    expect(resultMessages[0]?.result?.runId).toBe("run-1");
   });
 
   test("durable job hydration does not generate backend-owned quick takes in the frontend", () => {
