@@ -1,138 +1,219 @@
-# Guest Grounded Discovery: Meter the Ask, Don't Gate the Tap
+# Guest Grounded Discovery: One Allowance Model, Two Account Classes
 
 **Status:** FOUNDER-DIRECTED — direction approved 2026-07-27; implementation not started.
 **Owning issue:** [#244](https://github.com/lagarcess/argus/issues/244) (grounded discovery), consuming the guest surface from #279.
-**Scope class:** Small backend slice. One allowance, no new conversion reason, no new UI.
+**Scope class:** Small backend slice. One allowance row, one capability truth fix, no new mechanism.
+**Base:** `codex/private-alpha-next` at `ea2b3f35` or later.
 
 ---
 
-## 1. Why now
+## 1. Why this exists
 
-The guest experience landed (#279) after the grounded discovery design was
-written. Two things changed:
+Guest mode is the acquisition funnel. Discovery is the most persuasive thing
+Argus does for a stranger: five real, resolver-verified, source-backed names in
+seconds. Withhold it and guest mode demonstrates a chat box.
 
-- **"Registered users only" is stale.** The grounded discovery design §1 records
-  guest discovery as needing a separate founder decision. That decision is made:
-  Argus is for everyone, and the guest surface is an acquisition funnel that
-  shows value and converts at points of high value.
-- **Discovery has no guest gate of any kind.** Verified against integration
-  `94296ab8`: `src/argus/agent_runtime/discovery/` and
-  `src/argus/domain/discovery_search/` contain no guest handling, and
-  `discovery_evidence.py` does not distinguish account kind. Guests reach the
-  same chat runtime, so a guest discovery question runs a real metered search.
+It is also the only guest action that spends **third-party money per use on an
+unauthenticated visitor**. Messages and simulations cost compute; a discovery
+ask costs a metered search on top. So the question was never whether guests
+should discover — it is how to show them the best thing Argus does without
+opening a faucet.
 
-Not a live exposure today — Render carries neither the flag nor the provider
-key, so discovery is inert for everyone. It becomes real the moment the key is
-set for the canary. Render/promotion configuration is owned elsewhere and is not
-this slice's concern; the runtime gap is.
+Founder decision 2026-07-27: **"registered users only" in the grounded
+discovery design §1 is superseded.** Argus is for everyone, gated at points of
+high value.
 
-## 2. The decision
+## 2. Current state, verified against `ea2b3f35`
 
-**Meter the ask. Do not gate the tap.**
+Read this before designing anything; four of these findings shrink the work.
 
-For a backtest, cost and value coincide — you run it, you see it. For discovery,
-Argus pays the provider on the **ask**, before knowing whether the guest cares.
-That asymmetry is why one control cannot do both jobs:
+- **Guests are real users.** `GuestWorkspace` carries a `user_id`, so every
+  per-user mechanism already applies to them. No parallel identity.
+- **A guest allowance model already exists.** `usage_limits.allowance_windows()`
+  resolves per-account-class limits, and guests already have a `guest_session`
+  period spanning their fixed expiry. `_GUEST_ALLOWANCES` currently covers
+  messages (10), simulations (1), and feedback (5).
+- **Discovery is the only metered resource missing from that table.**
+  `discovery_evidence.discovery_usage_limits()` returns registered
+  hour/day limits unconditionally and never consults account class.
+- **A guest workspace lives 10 minutes** (`supabase_guest_accounts`), and guest
+  creation is IP-rate-limited to 5 attempts per 10 minutes
+  (`AUTH_GUEST_ATTEMPT_LIMIT`, `_AUTH_ATTEMPT_WINDOW_SECONDS`).
+- **`can_use_grounded_discovery` is dead and wrong.** Declared on
+  `AccountCapabilities`, set `False` for *both* guest and registered, and never
+  read by the discovery runtime — discovery runs regardless. Its only consumer
+  is a guest command-palette notice claiming discovery "isn't available yet",
+  which is false today.
 
-| Moment | Instrument | Visible to the guest? |
+## 3. The design
+
+**Do not build guest quota. Add discovery to the allowance model that already
+distinguishes account classes.**
+
+Two layers, both already in place:
+
+| Layer | Mechanism | Change needed |
 | --- | --- | --- |
-| Guest asks a discovery question | Per-session allowance | No — silent, like message metering |
-| Allowance exhausted | Existing `discovery_limit_reached` recovery | Yes — honest copy, zero provider cost |
-| Guest taps a candidate | **Nothing new** | — flows into the ordinary lifecycle |
+| **Allowance** — how many searches an account may make | `discovery_searches` usage counter, limits resolved by `allowance_windows()` | Add one `_GUEST_ALLOWANCES` row; make discovery consult account class |
+| **Admission** — how cheaply a new guest identity is minted | IP limiter on `POST /auth/guest` | **None.** Already exists; do not duplicate |
 
-### Why the tap must not be gated
+### Why this is durable rather than a v1
 
-Every existing guest conversion reason — `second_simulation`, `message_limit`,
-`save_decision`, `new_conversation`, `keep_history` — fires after real value has
-been *demonstrated*. `isExactGuestRunReplay` shows the same care: re-running an
-identical backtest stays free, and only a genuinely new simulation converts.
+- **Policy becomes data.** A limit is a table entry, not a branch. A future
+  account tier is another row, not another code path.
+- **One counter, one settlement path, one recovery message.** Guests and
+  registered users share `discovery_searches`, so accounting, reconciliation,
+  and the honest `discovery_limit_reached` recovery are identical for both.
+- **No new table, no migration, no parallel guest code.**
+- **Backend-owned.** A frontend bypass obtains nothing.
 
-A guest's "aha" is a backtest result with real numbers. Walling the discovery tap
-would convert them on a list of names, before they have ever seen a result —
-gating earlier, on weaker proof, and cannibalizing `second_simulation`.
+### Why per-guest is inherently per-session
 
-Letting the tap through makes discovery a conversion **amplifier**: it
-manufactures more distinct things the guest wants to run, which drives them into
-the existing gate faster and with higher intent. Guest journey:
+Each guest workspace mints a **new `user_id`**, so a per-user counter resets
+when the workspace does. The allowance is therefore per-workspace *by
+construction* — no new period type, no lifetime bookkeeping. The `guest_session`
+window already spans the account's fixed expiry.
+
+This also names the real bound honestly: **what limits a determined visitor is
+the IP limiter on guest creation, not the per-account allowance.** The allowance
+shapes the funnel; admission control bounds abuse. Conflating them would lead to
+over-building the wrong layer.
+
+### The tap stays ungated
+
+Settled 2026-07-27 and unchanged here. Discovery feeds the **existing**
+`second_simulation` conversion moment rather than competing with it:
 
 ```text
 discovery ask (metered, silent)
-  -> full result: rows, reasons, sources line
+  -> full result: rows, reasons, sources
   -> tap a candidate (no gate)
   -> confirmation card
   -> first run free
-  -> real result with numbers        <- the aha
-  -> second distinct run converts    <- existing second_simulation gate
+  -> a real result with numbers      <- the aha
+  -> second distinct run converts    <- existing gate, unchanged
 ```
 
-No new conversion reason, no new wall, no new copy.
+Walling the tap would convert a guest on a list of names before they had ever
+seen a result — earlier, on weaker proof, cannibalising `second_simulation`. No
+new `GuestConversionReason`, no new wall, no new copy.
 
-## 3. Behavior
+## 4. Behavior
 
-- A guest session carries a small grounded-discovery allowance. The exact number
-  is founder-owned (§6); the shape is per session, not per hour/day, because a
-  guest session is the unit the funnel cares about.
-- Within allowance, a guest discovery turn behaves exactly as it does for a
+- A guest discovery ask within allowance behaves **exactly** as it does for a
   registered user: one bounded search, resolver-validated candidates, rows,
-  reasons, and the sources line.
-- **The result is shown in full.** No blur, no teaser, no redacted candidate
-  list. A partial result destroys the proof the funnel depends on.
+  reasons, sources line.
+- **The result is shown in full.** No blur, no teaser, no partial list. A
+  redacted result destroys the proof the funnel depends on.
 - Beyond allowance, the turn returns the existing typed
-  `discovery_limit_reached` recovery with **zero provider calls**. It is honest
-  copy, not a conversion wall.
-- Registered-user allowances (`ARGUS_DISCOVERY_HOURLY_LIMIT`,
+  `discovery_limit_reached` recovery with **zero provider calls**. Honest copy,
+  not a conversion wall.
+- Registered allowances (`ARGUS_DISCOVERY_HOURLY_LIMIT` /
   `ARGUS_DISCOVERY_DAILY_LIMIT`) are unchanged.
+- The global kill switch (`ARGUS_GROUNDED_DISCOVERY_ENABLED`) still precedes
+  everything and is unchanged.
 
-## 4. Metering identity
+### The allowance number
 
-The allowance must be counted on whatever identity the guest lane already uses
-for its own limits. **Do not invent a second scheme.**
+**One search per guest workspace.** A workspace lives 10 minutes; one grounded
+search is enough to prove the value, and a second in that window adds cost
+without adding persuasion. Raising a limit is cheap and reversible; lowering one
+after testers have seen it is not.
 
-A fresh guest session otherwise buys another search, which is the same
-session-recycling problem the guest lane already had to solve for messages. This
-slice inherits that answer rather than re-deriving it — and if the guest lane's
-identity turns out to be weaker than this cost warrants, that is a finding to
-raise, not to paper over with a frontend check.
+Recorded as `GUEST_DISCOVERY_ALLOWANCE` beside the existing guest constants so
+it is tuned in the same place as messages and simulations.
 
-Backend owns the count. Frontend gating alone is bypassable, and this one costs
-money.
+## 5. Capability truth fix (in scope, not a gate)
 
-## 5. Non-goals
+`can_use_grounded_discovery=False` is a false statement: discovery works for
+both classes today. Set it **`True` for both**, which:
 
-- No new `GuestConversionReason`, no tap wall, no discovery-specific paywall UI.
+- makes the contract match observable behavior;
+- removes the guest command-palette notice that wrongly says discovery is
+  unavailable.
+
+**This is a correction, not a mechanism.** Per-class on/off gating is
+deliberately *not* built: the global flag and the per-account allowance already
+cover every real need, discovery has no UI affordance to hide (it is triggered
+by what the user says, classified by the interpreter), and with discovery
+rolling out to everyone both switch positions would be identical. Building it
+would add a control with no consumer.
+
+## 6. Dropped-candidate copy is inaccurate (in scope)
+
+When a candidate is dropped it lands in `unverified_names`, and the voicing call
+may mention it as *"mentioned in sources but not verifiable as tradable."*
+
+That sentence became false for one case in `ea2b3f35`. A Grayscale Bitcoin
+trust **is** tradable — it was dropped because we could not confirm it was the
+asset the user meant, which is a different statement. The copy conflates two
+distinct reasons:
+
+| Why it was dropped | Honest statement |
+| --- | --- |
+| Symbol resolved to nothing | not verifiable as tradable |
+| Resolved asset did not correspond to the named entity | could not confirm this is the asset you meant |
+
+Voicing consumes only typed facts, so the fix is to carry the drop **reason**
+alongside the name rather than to write per-case prose: validation already knows
+which branch rejected each candidate. Two reason codes are enough
+(`unresolved`, `uncorroborated`), and the voicing prompt states the matching
+fact.
+
+Small, but this product's whole claim is that it does not say things it cannot
+support. A wrong explanation for a correct decision is the same class of defect
+as a wrong candidate.
+
+## 7. Non-goals
+
+- No new `GuestConversionReason`, tap wall, or discovery paywall UI.
 - No blurred, teased, or partial candidate lists.
-- No change to registered-user quotas or to the discovery pipeline itself.
-- No cost dashboard, no per-turn cost equation, no ledger rework. Deliberately
-  deferred; the ledger has known gaps (the discovery row is skipped when no
-  Supabase gateway is present, and market-data provider coverage is unaudited)
-  and those must be resolved before any cost number is trustworthy.
-- No Render, flag, or promotion work — owned at promotion time.
+- No per-class capability gating (§5).
+- No change to registered quotas, the discovery pipeline, or the search boundary.
+- No new admission control — the IP limiter is sufficient and already exists.
+- No cost dashboard or per-turn cost equation. The ledger has known gaps (the
+  discovery row is skipped without a Supabase gateway; market-data coverage is
+  unaudited) and must be trusted before any number derived from it is.
+- No Render, flag, or promotion work.
 
-## 6. Open decision
+## 8. Edge cases the implementation must handle
 
-- **The allowance number.** One search per guest session is the smallest thing
-  that shows the value; two allows a second, better-aimed question after the
-  first result teaches them what Argus can do. Recommend starting at **one** and
-  raising it on evidence, since raising a limit is reversible and cheap while
-  lowering one after testers see it is not.
+1. **Allowance read fails.** `discovery_allowance_available` fails closed today,
+   which is right for spend — but it currently maps to
+   `discovery_limit_reached`, telling the user they are out of searches when the
+   counter simply could not be read. That is a false statement to the user and
+   must be distinguished. *(Pre-existing; recorded on #244.)*
+2. **Guest expires mid-turn.** A workspace can lapse between the pre-turn
+   allowance read and post-turn settlement. Settlement is already best-effort
+   and must not fail the turn.
+3. **Guest converts mid-conversation.** After claiming a workspace the account
+   becomes registered; the next discovery ask resolves registered limits. Prior
+   guest usage does not transfer, and must not be double-counted.
+4. **Concurrent asks in one workspace.** The same race the registered path
+   already handles: the counter clamps at the ceiling and the attempt is logged.
 
-## 7. Acceptance
+## 9. Acceptance
 
 1. A guest discovery ask within allowance returns a full, resolver-validated
-   result identical to the registered-user experience.
-2. A guest discovery ask beyond allowance makes **zero** provider calls and
-   returns the existing `discovery_limit_reached` recovery.
+   result identical to the registered experience.
+2. A guest ask beyond allowance makes **zero** provider calls and returns
+   `discovery_limit_reached`.
 3. Tapping a candidate as a guest raises no wall and reaches a confirmation card.
 4. A guest's first run stays free; the second distinct run converts through the
    existing `second_simulation` reason, unchanged.
-5. The allowance is enforced backend-side and counted on the guest lane's
-   existing identity; a frontend-only bypass attempt does not obtain a search.
-6. Registered-user discovery behavior is byte-identical to today.
+5. The allowance is enforced backend-side; a frontend-only bypass obtains no
+   search.
+6. Registered discovery behavior is byte-identical to today.
+7. `can_use_grounded_discovery` reports `True` for both classes, and the guest
+   command-palette notice no longer appears.
+8. A candidate dropped for failing corroboration is described as one Argus
+   could not confirm, never as one that is not tradable.
+9. A fresh guest workspace gets a fresh allowance, and guest creation remains
+   bounded only by the existing IP limiter.
 
-## 8. Documentation
+## 10. Documentation
 
-- Grounded discovery design §1: mark "Registered users only" superseded by this
-  slice, with the date and the owning decision.
-- `docs/DATA_MODEL.md`: note the guest allowance alongside the existing
-  `discovery_searches` resource.
-- Issue #244 pending register: replace the guest line with this slice.
+- Grounded discovery design §1: already marked superseded; point it here.
+- `docs/DATA_MODEL.md`: note `discovery_searches` now resolves per account class.
+- `docs/API_CONTRACT.md`: note the capability's corrected value.
+- Issue #244 register: replace the guest line with this slice.
