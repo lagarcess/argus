@@ -143,6 +143,7 @@ async def discovery_stage_result_if_applicable(
         packet=packet,
         resolve=resolve_asset,
         max_candidates=config.max_candidates,
+        asset_class_hint=request.asset_class_hint,
     )
     usage.update(
         extracted_count=len(extraction.candidates),

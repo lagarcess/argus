@@ -51,13 +51,11 @@ def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
 def hydrate_completed_backtest_job_messages(
     messages: list[Message],
     *,
-    load_job: Callable[[str], dict[str, Any] | None],
-    load_run: Callable[[str], BacktestRun | None],
+    jobs_by_id: Mapping[str, dict[str, Any]],
+    runs_by_id: Mapping[str, BacktestRun],
 ) -> list[Message]:
     """Project canonical completed runs over stale queued-job messages."""
 
-    jobs: dict[str, dict[str, Any] | None] = {}
-    runs: dict[str, BacktestRun | None] = {}
     projected: list[Message] = []
     for message in messages:
         metadata = message.metadata
@@ -69,18 +67,14 @@ def hydrate_completed_backtest_job_messages(
             projected.append(message)
             continue
 
-        if job_id not in jobs:
-            jobs[job_id] = load_job(job_id)
-        job = jobs[job_id]
+        job = jobs_by_id.get(job_id)
         if not _is_completed_job_for_message(job, message):
             projected.append(message)
             continue
         assert job is not None
 
         run_id = str(job.get("result_run_id") or "").strip()
-        if run_id not in runs:
-            runs[run_id] = load_run(run_id)
-        run = runs[run_id]
+        run = runs_by_id.get(run_id)
         if not _is_completed_run_for_message(run, message, run_id=run_id):
             projected.append(message)
             continue
@@ -111,6 +105,41 @@ def hydrate_completed_backtest_job_messages(
             )
         )
     return projected
+
+
+def completed_backtest_job_ids(messages: list[Message]) -> list[str]:
+    """Return distinct completed-result candidate job ids in message order."""
+
+    job_ids: list[str] = []
+    for message in messages:
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        job_id = _backtest_job_id(message.metadata)
+        if job_id is not None and job_id not in job_ids:
+            job_ids.append(job_id)
+    return job_ids
+
+
+def completed_backtest_run_ids(
+    messages: list[Message],
+    *,
+    jobs_by_id: Mapping[str, dict[str, Any]],
+) -> list[str]:
+    """Return distinct Run ids from eligible succeeded jobs in message order."""
+
+    run_ids: list[str] = []
+    for message in messages:
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        job_id = _backtest_job_id(message.metadata)
+        job = jobs_by_id.get(job_id) if job_id is not None else None
+        if not _is_completed_job_for_message(job, message):
+            continue
+        assert job is not None
+        run_id = str(job.get("result_run_id") or "").strip()
+        if run_id not in run_ids:
+            run_ids.append(run_id)
+    return run_ids
 
 
 def hydrate_backtest_job_action_messages(
