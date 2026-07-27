@@ -241,8 +241,9 @@ Do not reopen these as debt unless a new bug is reproduced:
   date, capital, and strategy edits preserve explicitly owned fee/slippage
   assumptions; card and natural-language edits share the canonical evidence
   boundary; explicit zero clears costs; and confirmation, launch, and reload
-  agree. Issue #271 remains open only for its named focused integrated closure
-  journey.
+  agree. Issue #271 is complete; PR #280's bounded same-chat integration
+  journey is the closure evidence. Any later repetition belongs to promotion
+  qualification, not issue acceptance.
 - Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
   Explicit peer/category discovery has one typed route, bounded source-backed
   Search, resolver-validated candidates for equity, crypto, and currency-pair
@@ -328,9 +329,9 @@ Codex should own or closely supervise this:
 2. **Advance bounded continuity follow-ups by owner**
    - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
      a second runtime lane.
-   - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
-     closure journey. #272 landed through PR #288 at `9f3453a3` and is closed;
-     do not open another canonical recovery lane without a new reproduction.
+   - #271 landed through PR #280 at `d16f7496` and is closed. #272 landed
+     through PR #288 at `9f3453a3` and is closed; do not open another modeled
+     cost or canonical recovery lane without a new reproduction.
    - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
      released the shared shell owner, so new #249 work must start from the
      current remote integration head. Preserve PR #281's stacked rows, source panel, and

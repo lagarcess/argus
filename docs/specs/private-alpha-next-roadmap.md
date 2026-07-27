@@ -979,13 +979,15 @@ classified as a Guest-only settlement defect, landed with Guest PR #279 at
 `53e812e9`, and is closed.
 Supported strategy-transition preservation (#270) is complete through PR #278
 at `b80d95a2`; modeled-cost preservation (#271) landed through PR #280 at
-`d16f7496` and remains open only for its focused integrated closure journey.
+`d16f7496` and is complete based on PR #280's bounded same-chat integration
+journey.
 #272 is complete through PR #288 at `9f3453a3`: recovery restores the current
 canonical artifact anchor, preserves already-owned facts, asks only for
 genuinely missing fields, keeps prior results immutable, and creates no
 duplicate compute. No further protected-spine implementation lane is queued;
-#271 only retains its named integrated closure check. #249 may start from the
-current remote integration head because the overlapping Guest,
+#270–#272 are closed, and representative repetition belongs to later promotion
+qualification. #249 may start from the current remote integration head because
+the overlapping Guest,
 chat-next-move, and recovery-state owners have landed; it must preserve PR
 #281's stacked rows, source panel, and shared in-flight lock while changing only
 Quick take, Explain, Try next, and recovery presentation ownership. See
