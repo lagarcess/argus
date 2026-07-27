@@ -20,6 +20,10 @@ from argus.agent_runtime.interpreter.draft_shape import (
 from argus.agent_runtime.interpreter.executable_grounding import (
     _draft_has_non_executable_timeframe_label,
 )
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    EXECUTION_COST_FIDELITY_INSTRUCTIONS,
+    apply_cost_fidelity,
+)
 from argus.agent_runtime.interpreter.shared import (
     _bounded_date_evidence_candidates,
     _date_range_from_bounded_evidence,
@@ -57,6 +61,7 @@ from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
@@ -990,7 +995,7 @@ def _stated_run_field_fidelity_messages(
                 "You are Argus's run-field fidelity audit. Compare the current "
                 "user message with the structured draft and return only run fields "
                 "the user explicitly stated but the draft may have dropped or "
-                "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
+                "reshaped. Do not infer defaults, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
                 "for that field. Normalize starting capital exactly from the "
                 "current message: 10k -> 10000, 100K -> 100000, $10,000 "
@@ -1028,8 +1033,9 @@ def _stated_run_field_fidelity_messages(
                 "comparison target, that asset belongs in comparison_baseline. "
                 "If the draft has a default benchmark but the current "
                 "message states a different comparison asset, return the user-stated "
-                "comparison asset. Return "
-                "only JSON matching the schema."
+                "comparison asset. "
+                + EXECUTION_COST_FIDELITY_INSTRUCTIONS
+                + "Return only JSON matching the schema."
             ),
         },
         {
@@ -1048,6 +1054,7 @@ def _response_from_stated_run_field_fidelity_audit(
     response: LLMInterpretationResponse,
     audit: StatedRunFieldFidelityAudit,
     current_message: str = "",
+    prior_strategy: StrategySummary | None = None,
 ) -> LLMInterpretationResponse | None:
     repaired = response.model_copy(deep=True)
     draft = repaired.candidate_strategy_draft
@@ -1078,7 +1085,6 @@ def _response_from_stated_run_field_fidelity_audit(
         changed = True
     if audit.date_range not in (None, "", [], {}):
         audited_date_range: Any = audit.date_range
-        del current_message
         expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
         if (
             isinstance(expected_date_range, dict)
@@ -1108,6 +1114,7 @@ def _response_from_stated_run_field_fidelity_audit(
                     "stated_run_field_fidelity_audit"
                 )
                 changed = True
+    changed |= apply_cost_fidelity(repaired, audit, current_message, prior_strategy)
     if not changed:
         return None
     repaired.reason_codes = list(

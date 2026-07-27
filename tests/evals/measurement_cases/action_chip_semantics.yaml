@@ -592,3 +592,141 @@ cases:
       capital_amount: 2000
       stage_outcomes:
         ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: natural_language_establishes_modeled_costs_issue_271
+    prompt: "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage."
+    user_language: en
+    ui_language: en
+    expected:
+      intent: [strategy_drafting, backtest_execution]
+      capability_verdict: executable
+      assets: ["MSFT"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 12000
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+      launch_execution_realism:
+        enabled: true
+        fee_bps: 10.0
+        slippage_bps: 5.0
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_add_asset_preserves_modeled_costs_issue_271
+    prompt: ""
+    followup_prompt: "Add AAPL and keep every other assumption unchanged."
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-msft-costs-271"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold MSFT with modeled execution costs."
+        asset_universe: ["MSFT"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-03"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 12000
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+    confirmation_payload:
+      confirmation_id: "eval-confirm-msft-costs-271"
+      artifact_id: "eval-confirm-msft-costs-271"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold MSFT with modeled execution costs."
+        asset_universe: ["MSFT"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-03"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 12000
+        extra_parameters:
+          fee_rate: 0.001
+          slippage: 0.0005
+          field_provenance:
+            fee_rate: explicit_user
+            slippage: explicit_user
+      optional_parameters:
+        fees:
+          value: 0.001
+          source: user
+        slippage:
+          value: 0.0005
+          source: user
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: MSFT
+        symbols: ["MSFT"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2023-01-03"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 12000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+        _execution_realism:
+          enabled: true
+          fee_bps: 10.0
+          slippage_bps: 5.0
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "AAPL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      effective_date_range:
+        start: "2023-01-03"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 12000
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+      launch_execution_realism:
+        enabled: true
+        fee_bps: 10.0
+        slippage_bps: 5.0
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]

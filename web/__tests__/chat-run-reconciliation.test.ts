@@ -314,8 +314,8 @@ describe("ambiguous Run response reconciliation", () => {
     expect(chat).toContain(
       'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
     );
-    expect(chat).toContain(
-      'throwIfAmbiguousRunStreamTermination(action?.type === "run_backtest", runStreamFinalSeen)',
+    expect(chat).toMatch(
+      /throwIfAmbiguousRunStreamTermination\(\s*action\?\.type === "run_backtest",\s*runStreamFinalSeen,?\s*\)/,
     );
   });
 

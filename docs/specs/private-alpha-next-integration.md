@@ -6,7 +6,7 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `c212107a`. The accepted post-promotion
+Current stable integration checkpoint: `53e812e9`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -14,7 +14,8 @@ baseline (PR #268), calendar-materiality classification (PR #267), chat-header
 title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
 truthful stale Run settlement (PR #277), and supported strategy-transition
 preservation (PR #278), plus the default-on grounded-discovery baseline
-(PR #276). This is an integration checkpoint, not a deployed or tester-exposed
+(PR #276), modeled-cost preservation (PR #280), and the Guest experience
+(PR #279). This is an integration checkpoint, not a deployed or tester-exposed
 SHA.
 
 Current note: while the interim pivot is active, use
@@ -226,6 +227,12 @@ Do not reopen these as debt unless a new bug is reproduced:
   preserving assets, capital, dates, daily timeframe, benchmark, and modeled
   costs through confirmation, launch projection, and reload. It landed as
   `b80d95a2`.
+- Modeled-cost preservation is integrated from PR #280 at `d16f7496`: asset,
+  date, capital, and strategy edits preserve explicitly owned fee/slippage
+  assumptions; card and natural-language edits share the canonical evidence
+  boundary; explicit zero clears costs; and confirmation, launch, and reload
+  agree. Issue #271 remains open only for its named focused integrated closure
+  journey.
 - Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
   Explicit peer/category discovery has one typed route, bounded source-backed
   Search, resolver-validated candidates for equity, crypto, and currency-pair
@@ -235,6 +242,12 @@ Do not reopen these as debt unless a new bug is reproduced:
   open because one comparison phrasing missed the typed route in the sanctioned
   eval; that gap, Render configuration, and an exact-SHA canary are required
   before tester exposure.
+- Guest access is integrated from PR #279 at `53e812e9`: verified anonymous
+  identity, one temporary owner-scoped workspace, fixed lifetime allowances,
+  exact-once settlement, one simulation, conversion/claim, cleanup, Guest
+  shell, capability gates, and privacy-safe funnel evidence. Guest defaults on
+  with explicit-off rollback; public-account access remains separately off.
+  Hosted configuration, canary, and public traffic remain later release gates.
 
 ## P0 Reintegration Checkpoint
 
@@ -263,12 +276,12 @@ Codex should own or closely supervise this:
      slices; it is not the next broad pillar to redispatch.
 
 2. **Advance bounded continuity follow-ups by owner**
-   - Guest PR #279 owns the proven #269 settlement correction. Do not open a
-     second runtime lane.
-   - #270 is complete at `b80d95a2`. Start #271 from this updated integration
-     checkpoint; start #272 only after #271 lands.
-   - #273 is closed at `2d5a2b52`. Start #249 only after Guest PR #279 lands,
-     because both touch chat-shell and recovery presentation.
+   - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
+     a second runtime lane.
+   - #271 landed through PR #280 at `d16f7496`; complete its focused integrated
+     closure journey. #272 may now start from `53e812e9` or later.
+   - #273 is closed at `2d5a2b52`. Guest has released the shared shell owner, so
+     #249 may now start from `53e812e9` or later.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
@@ -284,6 +297,61 @@ Codex should own or closely supervise this:
      `docs/specs/private-alpha-next-roadmap.md` for current execution. This
      branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
+
+## Integrated Guest Checkpoint And Later Promotion Gates
+
+PR #279 landed on `codex/private-alpha-next` as `53e812e9`. The section below
+preserves its migration, ownership, rollback, and later promotion contract; it
+is not an active worker-branch instruction.
+
+Migration order is fixed:
+
+1. `20260724101324_add_guest_workspaces.sql`
+2. `20260724102309_add_guest_session_allowances.sql`
+3. `20260724102645_guest_conversation_and_cleanup.sql`
+4. `20260724110000_restore_settle_only_usage.sql`
+5. `20260724110100_serialize_guest_feedback.sql`
+6. `20260724110200_align_guest_cleanup_candidates.sql`
+7. `20260724211312_guest_workspace_handoffs.sql`
+8. `20260724223000_replace_guest_conversation.sql`
+9. `20260724230000_harden_guest_public_boundaries.sql`
+10. `20260725220148_fix_expired_guest_complete_graph_cleanup.sql`
+11. `20260726001954_isolate_guest_cleanup_candidates.sql`
+12. `20260726001955_enforce_guest_terminal_message_limit.sql`
+13. `20260726002158_respect_permanent_conversation_ownership.sql`
+14. `20260726014754_isolate_poisoned_guest_orphans.sql`
+15. `20260726185021_harden_guest_lifecycle_ownership.sql`
+
+The earlier message-settlement and atomic-backtest-admission migrations remain
+prerequisites and must retain their existing order. Integration must reset a
+fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
+promotion.
+
+The conversion contract has two owners:
+
+- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- an existing registered account claims the complete guest graph through the
+  short-lived, email-hash-bound, single-use server handoff. Login completes
+  the claim before returning its session and can reconcile one ambiguous
+  same-destination response without repeating transfer.
+
+Neither path copies visible prose in the browser or merges guest lifetime
+counters into registered hour/day counters. Guest server/bootstrap and
+presentation flags default on as emergency kill switches. Rollback is flags
+first: explicitly disable the frontend guest presentation, then server guest
+bootstrap; keep public-account access false. Do not roll back by deleting guest
+rows or reverting already-applied migrations.
+The server guest flag is the creation gate: disabling it stops new anonymous
+sessions while existing verified guests drain to conversion, fixed expiry, or
+transactional cleanup.
+
+Always Progresses, Grounded Discovery, modeled-cost preservation, and Guest are
+reconciled at the integration checkpoint. Before promotion to `main` or public
+traffic, complete `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`: branch-deployed
+exact-SHA canary, hosted anonymous Auth and server-validated Turnstile,
+trusted-origin/rate-limit verification, hard provider budget, scheduled cleanup
+ownership, first-traffic monitoring, release manifest, and founder
+traffic/cost approval.
 
 ## Historical Evidence Retention
 

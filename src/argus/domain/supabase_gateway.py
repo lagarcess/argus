@@ -42,6 +42,8 @@ from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
+from argus.domain.supabase_guest_accounts import GuestAccountPersistenceMixin
+from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
@@ -143,6 +145,7 @@ def _supabase_client_options() -> ClientOptions:
 
 @dataclass
 class SupabaseGateway(
+    GuestAccountPersistenceMixin,
     ChatTurnLifecycleGatewayMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
@@ -180,19 +183,8 @@ class SupabaseGateway(
     def _fetch_all_rows(
         self,
         query_factory: Callable[[int, int], Any],
-        *,
-        batch_size: int = 500,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        start = 0
-        while True:
-            response = query_factory(start, start + batch_size - 1).execute()
-            data = response.data or []
-            rows.extend(data)
-            if len(data) < batch_size:
-                break
-            start += batch_size
-        return rows
+        return fetch_all_rows_batched(query_factory)
 
     def reset_dev_data(self) -> None:
         user = self.get_or_create_mock_user()
@@ -2033,19 +2025,23 @@ class SupabaseGateway(
             f"Failed to initialize usage counter for {resource} ({period})."
         )
 
-    def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
-        response = self.client.auth.get_user(token)
-        if not response or not response.user:
-            raise RuntimeError("Invalid or missing user in token response.")
-        return response.user.model_dump(mode="json")
-
     def get_or_create_profile_for_auth_user(self, auth_user: dict[str, Any]) -> User:
         user_id = auth_user["id"]
-        email = str(auth_user.get("email") or "").strip()
-        allowlist_role = self.private_alpha_role_for_email(email)
+        is_anonymous = auth_user.get("is_anonymous") is True
+        email = None if is_anonymous else str(auth_user.get("email") or "").strip()
+        if not is_anonymous and not email:
+            raise RuntimeError("Permanent Auth user is missing a verified email.")
+        allowlist_role = (
+            None if is_anonymous else self.private_alpha_role_for_email(email or "")
+        )
         is_admin = allowlist_role in {"admin", "developer"}
         existing = self.get_user(user_id=user_id)
         if existing is not None:
+            if not is_anonymous and existing.email is None:
+                return self.update_user(
+                    user_id=user_id,
+                    updates={"id": user_id, "email": email, "is_admin": is_admin},
+                )
             if is_admin and not existing.is_admin:
                 return self.update_user(user_id, {"id": user_id, "is_admin": True})
             return existing
@@ -2068,9 +2064,11 @@ class SupabaseGateway(
             "updated_at": now,
         }
 
-        created = self.client.table("profiles").upsert(
-            payload, on_conflict="id", ignore_duplicates=True
-        ).execute()
+        created = (
+            self.client.table("profiles")
+            .upsert(payload, on_conflict="id", ignore_duplicates=True)
+            .execute()
+        )
         row = _row_one(created)
         if row is not None:
             return User.model_validate(row)

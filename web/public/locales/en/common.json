@@ -143,6 +143,7 @@
     "attach_files_feature": "Optional: add a screenshot, sketch, or example.",
     "consent": "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
     "consent_feature": "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
+    "include_conversation_context": "Include approved context from this conversation",
     "rating_positive_prompt": "What went well?",
     "rating_negative_prompt": "What went wrong?",
     "subheading": {
@@ -173,8 +174,8 @@
     "placeholder_details": "Share details (optional)",
     "success": "Thank you for your feedback!",
     "error": "Failed to send feedback. Please try again.",
-    "footer_note": "App context like this page and timestamp may be included to help us understand this feedback.",
-    "footer_note_conversation": "Your current conversation context may be included to help us understand this feedback.",
+    "footer_note": "No conversation transcript or contact information is attached.",
+    "footer_note_conversation": "Approved conversation identifiers will be included. The transcript is not attached.",
     "tags": {
       "positive": {
         "accurate": "Accurate and complete",
@@ -223,7 +224,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
-        "value": "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+        "value": "Compare Apple with SPY over the last 12 months."
       },
       "btc": {
         "label": "Test Bitcoin (BTC) hold",
@@ -756,6 +757,7 @@
     "app": {
       "title": "App",
       "language": "App language",
+      "close_language_modal": "Close language modal",
       "sidebar": "Sidebar",
       "security": "Security",
       "appearance": "Appearance",
@@ -850,6 +852,9 @@
   "command_palette": {
     "close": "Close search",
     "search_placeholder": "Search Argus...",
+    "guest": {
+      "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
+    },
     "no_results": "No results found",
     "no_conversations": "No conversations yet",
     "clear_search": "Clear search",
@@ -927,6 +932,9 @@
       "submit": "Sign up",
       "loading": "Creating account...",
       "new_account": "new to argus?"
+    },
+    "legal": {
+      "continuing_prefix": "By continuing, you agree to our"
     },
     "password": {
       "show": "Show password",
@@ -1008,5 +1016,72 @@
     "legal_prefix": "By signing up, you agree to our",
     "terms": "Terms",
     "privacy": "Privacy Policy"
+  },
+  "guest": {
+    "entry": {
+      "loading": "Opening Argus",
+      "error": "Argus couldn't open a temporary chat. Try again."
+    },
+    "expired": {
+      "title": "This temporary chat has expired",
+      "detail": "Its messages and results can’t be recovered.",
+      "start_new": "Start a new temporary chat",
+      "sign_in": "Sign in",
+      "create_account": "Create account",
+      "restart_error": "Argus could not start a new temporary chat. Try again."
+    },
+    "conversion": {
+      "eyebrow": "Keep going with Argus",
+      "sign_in_title": "Sign in",
+      "create_title": "Create your account",
+      "second_simulation": "Sign in to run another simulation.",
+      "message_limit": "Sign in to keep this conversation and continue.",
+      "save_decision": "Sign in to save this decision.",
+      "new_conversation": "Sign in to keep this conversation and start another.",
+      "new_conversation_create": "Create an account to keep this conversation and start another.",
+      "keep_history": "Sign in to keep this conversation and start another."
+    },
+    "new_conversation": {
+      "title": "Start a new conversation?",
+      "description": "Start over replaces this temporary conversation. Sign in to keep it and start another.",
+      "public_description": "Start over replaces this temporary conversation. Create an account to keep it and start another.",
+      "start_over": "Start over",
+      "sign_in": "Sign in to keep it",
+      "create_account": "Create account",
+      "error": "The temporary chat was left unchanged."
+    },
+    "history": {
+      "expires_at": "Available until {{date}}",
+      "keep_history": "Sign in to keep your history"
+    },
+    "shell": {
+      "value_title": "Test an investing idea against history.",
+      "input_placeholder": "What do you want to test?",
+      "sign_in": "Sign in",
+      "settings": "Guest settings",
+      "language": "Language",
+      "feedback": "Feedback",
+      "temporary_until": "Temporary chat · available until {{date}}",
+      "before_message": {
+        "prefix": "By messaging Argus, you agree to ",
+        "terms": "Terms",
+        "middle": " and acknowledge ",
+        "privacy": "Privacy"
+      },
+      "after_message": {
+        "safety": "Argus can make mistakes. For education only. Not financial advice.",
+        "terms": "Terms",
+        "privacy": "Privacy"
+      },
+      "new_chat_unavailable": "Sign in to keep this conversation and start another.",
+      "search_unavailable": "Search isn't available for temporary chats yet.",
+      "decision_unavailable": "Sign in to save this decision.",
+      "sign_in_unavailable": "Sign in is not available in this preview. Your temporary chat stays here."
+    },
+    "hints": {
+      "confirmation": "Review the assumptions, then run the test.",
+      "result": "Change the chart range or ask a follow-up.",
+      "dismiss": "Dismiss hint"
+    }
   }
 }

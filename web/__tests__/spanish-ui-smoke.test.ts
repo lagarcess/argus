@@ -60,6 +60,23 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.result_followup.headings.general",
     "chat.result_followup.headings.next_experiment",
     "chat.history.pinned",
+    "guest.shell.value_title",
+    "guest.shell.input_placeholder",
+    "guest.shell.sign_in",
+    "guest.shell.settings",
+    "guest.shell.language",
+    "guest.shell.feedback",
+    "guest.shell.temporary_until",
+    "guest.shell.before_message.prefix",
+    "guest.shell.before_message.terms",
+    "guest.shell.before_message.middle",
+    "guest.shell.before_message.privacy",
+    "guest.shell.after_message.safety",
+    "guest.shell.after_message.terms",
+    "guest.shell.after_message.privacy",
+    "guest.hints.confirmation",
+    "guest.hints.result",
+    "guest.hints.dismiss",
   ];
 
   const requiredSpanishStaticValues = {
@@ -71,6 +88,9 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.sidebar.collapsed": "Solo iconos",
     "settings.sidebar.hover": "Al pasar el cursor",
     "settings.sidebar.close": "Cerrar modal de preferencias de la barra lateral",
+    "guest.shell.input_placeholder": "¿Qué quieres probar?",
+    "guest.shell.language": "Idioma",
+    "guest.shell.temporary_until": "Chat temporal · disponible hasta {{date}}",
   };
 
   function readLocale(localePath: string) {

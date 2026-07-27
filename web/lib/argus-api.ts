@@ -12,6 +12,7 @@ import {
 } from "./language-features";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -164,24 +165,16 @@ export type Conversation = {
   language?: "en" | "es-419" | null;
 };
 
-export type ApiUser = {
-  id: string;
-  email: string;
-  username: string | null;
-  display_name: string | null;
-  language: "en" | "es-419";
-  locale: "en-US" | "es-419";
-};
-
 type AuthSessionPayload = {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
 };
 
-type AuthResponsePayload = {
+export type AuthResponsePayload = {
   session?: AuthSessionPayload | null;
   user?: Record<string, unknown> | null;
+  guest_claim?: { conversation_id: string; pending_action: GuestPendingActionSummary | null } | null;
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */
@@ -246,6 +239,7 @@ export type HistoryItem = {
   pinned: boolean;
   created_at: string;
   conversation_id?: string | null;
+  expires_at?: string | null;
 };
 
 export type ArtifactLifecycle =
@@ -590,7 +584,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return response.json() as Promise<T>;
 }
 
-async function unauthenticatedApiFetch<T>(
+export async function unauthenticatedApiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
@@ -622,7 +616,7 @@ async function unauthenticatedApiFetch<T>(
   return response.json() as Promise<T>;
 }
 
-async function persistBrowserSession(payload: AuthResponsePayload) {
+export async function persistBrowserSession(payload: AuthResponsePayload) {
   const session = payload.session;
   if (!session?.access_token || !session.refresh_token) {
     return;
@@ -631,10 +625,13 @@ async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  await supabase.auth.setSession({
+  const { error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
+  if (error) {
+    throw error;
+  }
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -647,7 +644,7 @@ export type ProfilePatch = {
 };
 
 export async function getMe() {
-  return apiFetch<{ user: ApiUser }>("/me");
+  return apiFetch<UserResponse>("/me");
 }
 
 export async function getUsageAllowances() {
@@ -655,7 +652,7 @@ export async function getUsageAllowances() {
 }
 
 export async function patchMe(patch: ProfilePatch) {
-  return apiFetch<{ user: ApiUser }>("/me", {
+  return apiFetch<UserResponse>("/me", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
@@ -1231,3 +1228,11 @@ export async function postFeedback(payload: {
     body: JSON.stringify(payload),
   });
 }
+import type { UserResponse } from "./guest-account";
+
+export type {
+  AccountCapabilities,
+  ApiUser,
+  GuestAccountSummary,
+  UserResponse,
+} from "./guest-account";

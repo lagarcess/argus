@@ -28,6 +28,25 @@ def _row_one(result: Any) -> Any:
     return data
 
 
+def _serialized_allowance_limits(
+    limits: list[dict[str, object]] | None,
+) -> list[dict[str, object]]:
+    if limits is None:
+        return [
+            {"period": period, "limit": limit_count}
+            for period, limit_count in SIMULATION_ALLOWANCE_LIMITS
+        ]
+    serialized: list[dict[str, object]] = []
+    for window in limits:
+        item = dict(window)
+        for key in ("period_start", "period_end"):
+            value = item.get(key)
+            if hasattr(value, "isoformat"):
+                item[key] = value.isoformat()  # type: ignore[union-attr]
+        serialized.append(item)
+    return serialized
+
+
 def admit_backtest_job(
     client: Any,
     *,
@@ -42,6 +61,7 @@ def admit_backtest_job(
     request_message_id: str | None = None,
     confirmation_message_id: str | None = None,
     execution_metadata: dict[str, Any] | None = None,
+    allowance_limits: list[dict[str, object]] | None = None,
 ) -> dict[str, Any]:
     """One database-owned admission: replay/collision, allowance, per-user
     then global capacity, then insert plus the hour and day allowance charge."""
@@ -65,10 +85,7 @@ def admit_backtest_job(
             "p_user_queued_limit": limits.user_queued,
             "p_global_running_limit": limits.global_running,
             "p_global_queued_limit": limits.global_queued,
-            "p_allowance_limits": [
-                {"period": period, "limit": limit_count}
-                for period, limit_count in SIMULATION_ALLOWANCE_LIMITS
-            ],
+            "p_allowance_limits": _serialized_allowance_limits(allowance_limits),
         },
     ).execute()
     row = result.data if isinstance(result.data, dict) else _row_one(result)

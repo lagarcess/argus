@@ -36,6 +36,7 @@ type AllowanceSectionProps = {
 
 function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
   const { t } = useTranslation();
+  if (allowance.day === null || allowance.hour === null) return null;
   const state = classifyAllowance(allowance);
   const day = allowance.day;
   const dayExhausted = state === "exhausted";

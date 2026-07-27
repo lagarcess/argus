@@ -210,8 +210,7 @@ def test_conversation_message_append_migration_is_one_locked_service_role_bounda
     assert "from anon, authenticated" in sql
 
     gateway_source = (
-        Path(__file__).resolve().parents[1]
-        / "src/argus/domain/supabase_gateway.py"
+        Path(__file__).resolve().parents[1] / "src/argus/domain/supabase_gateway.py"
     ).read_text()
     message_persistence_source = (
         Path(__file__).resolve().parents[1]
@@ -250,12 +249,8 @@ def test_p1_spine_migration_enforces_artifact_truth_immutability() -> None:
 
     assert "prevent_idea_version_immutable_update" in migration
     assert "prevent_evidence_artifact_immutable_update" in migration
-    assert (
-        "create trigger prevent_idea_versions_immutable_update" in migration
-    )
-    assert (
-        "create trigger prevent_evidence_artifacts_immutable_update" in migration
-    )
+    assert "create trigger prevent_idea_versions_immutable_update" in migration
+    assert "create trigger prevent_evidence_artifacts_immutable_update" in migration
 
     for field in (
         "canonical_spec",
@@ -392,9 +387,7 @@ class _SerializedMessageRpcCall:
                     ]
                 )
 
-            expected_source_id = self.params.get(
-                "p_expected_source_assistant_id"
-            )
+            expected_source_id = self.params.get("p_expected_source_assistant_id")
             source = None
             if expected_source_id is not None:
                 latest = max(
@@ -410,9 +403,7 @@ class _SerializedMessageRpcCall:
                     None,
                 )
                 options = (
-                    source.get("metadata", {})
-                    .get("clarification", {})
-                    .get("options", [])
+                    source.get("metadata", {}).get("clarification", {}).get("options", [])
                     if source is not None
                     else []
                 )
@@ -534,9 +525,7 @@ def _claim_response_option(
 def test_supabase_newer_message_wins_before_response_option_admission() -> None:
     client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
     gateway = SupabaseGateway(client=client)
-    request_message = _response_option_request(
-        "00000000-0000-0000-0000-000000000304"
-    )
+    request_message = _response_option_request("00000000-0000-0000-0000-000000000304")
 
     executor = ThreadPoolExecutor(max_workers=1)
     client.lock.acquire()
@@ -564,9 +553,7 @@ def test_supabase_newer_message_wins_before_response_option_admission() -> None:
 def test_supabase_response_option_admission_wins_before_newer_message() -> None:
     client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
     gateway = SupabaseGateway(client=client)
-    request_message = _response_option_request(
-        "00000000-0000-0000-0000-000000000305"
-    )
+    request_message = _response_option_request("00000000-0000-0000-0000-000000000305")
 
     executor = ThreadPoolExecutor(max_workers=1)
     client.lock.acquire()
@@ -602,12 +589,8 @@ def test_supabase_duplicate_response_option_click_is_exactly_once_and_replay_saf
 ):
     client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
     gateway = SupabaseGateway(client=client)
-    first_request = _response_option_request(
-        "00000000-0000-0000-0000-000000000306"
-    )
-    second_request = _response_option_request(
-        "00000000-0000-0000-0000-000000000307"
-    )
+    first_request = _response_option_request("00000000-0000-0000-0000-000000000306")
+    second_request = _response_option_request("00000000-0000-0000-0000-000000000307")
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(
@@ -637,9 +620,7 @@ def test_supabase_exact_replay_uses_source_immediately_before_request_after_late
 ):
     client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
     gateway = SupabaseGateway(client=client)
-    request = _response_option_request(
-        "00000000-0000-0000-0000-000000000309"
-    )
+    request = _response_option_request("00000000-0000-0000-0000-000000000309")
 
     accepted = _claim_response_option(gateway, request_message=request)
     assert accepted is not None
@@ -671,9 +652,7 @@ def test_supabase_timestamp_tie_uses_id_and_next_append_is_strictly_newer() -> N
 
     rejected = _claim_response_option(
         gateway,
-        request_message=_response_option_request(
-            "00000000-0000-0000-0000-000000000308"
-        ),
+        request_message=_response_option_request("00000000-0000-0000-0000-000000000308"),
     )
     appended = gateway.create_message(
         user_id="00000000-0000-0000-0000-000000000303",
@@ -1067,17 +1046,13 @@ def test_list_current_usage_counters_is_owner_scoped_and_bounded() -> None:
 
     assert rows == table.execute.return_value.data
     client.table.assert_called_once_with("usage_counters")
-    table.select.assert_called_once_with(
-        "resource,limit_count,used_count,period_end"
-    )
+    table.select.assert_called_once_with("resource,limit_count,used_count,period_end")
     assert table.eq.call_args_list == [
         call("user_id", "user-1"),
         call("period", "day"),
         call("period_start", "2026-07-16T00:00:00+00:00"),
     ]
-    table.in_.assert_called_once_with(
-        "resource", ["chat_messages", "backtest_runs"]
-    )
+    table.in_.assert_called_once_with("resource", ["chat_messages", "backtest_runs"])
     table.limit.assert_called_once_with(2)
 
 
@@ -1814,13 +1789,14 @@ class _P1EvidenceTable:
             ):
                 self.client.raise_on_next_artifact_insert = False
                 if self.client.commit_artifact_before_insert_error:
-                    self.client.rows_by_table[self.table_name].append(
-                        dict(self.payload)
+                    self.client.rows_by_table[self.table_name].append(dict(self.payload))
+                for (
+                    table_name,
+                    rows,
+                ) in self.client.concurrent_rows_on_artifact_insert_error.items():
+                    self.client.rows_by_table[table_name].extend(
+                        dict(row) for row in rows
                     )
-                for table_name, rows in (
-                    self.client.concurrent_rows_on_artifact_insert_error.items()
-                ):
-                    self.client.rows_by_table[table_name].extend(dict(row) for row in rows)
                 raise RuntimeError("duplicate source_run_id")
             self.client.rows_by_table[self.table_name].append(dict(self.payload))
             return SimpleNamespace(data=[dict(self.payload)])
@@ -1966,8 +1942,7 @@ def test_p1_evidence_capture_gateway_satisfies_active_version_fk_order() -> None
 
     assert persisted.idea.active_version_id == "version-1"
     assert [
-        (operation, table)
-        for operation, table, _payload, _filters in client.operations
+        (operation, table) for operation, table, _payload, _filters in client.operations
     ] == [
         ("insert", "ideas"),
         ("insert", "idea_versions"),
@@ -2106,9 +2081,7 @@ def test_p1_evidence_capture_gateway_cleans_sidecars_after_source_run_race() -> 
     ]
 
 
-def test_p1_evidence_capture_gateway_reuses_post_commit_artifact_insert_failure() -> (
-    None
-):
+def test_p1_evidence_capture_gateway_reuses_post_commit_artifact_insert_failure() -> None:
     client = _P1EvidenceClient()
     client.raise_on_next_artifact_insert = True
     client.commit_artifact_before_insert_error = True

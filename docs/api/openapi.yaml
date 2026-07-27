@@ -15,7 +15,95 @@ paths:
     post:
       responses:
         "200":
-          description: Session created.
+          description: Session created. When a server-cookie-bound guest handoff exists, the product graph is claimed before the session response and `guest_claim` returns the original conversation plus optional typed pending action.
+  /api/v1/auth/guest:
+    post:
+      description: Create or reuse one verified anonymous guest session when server policy permits it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestBootstrapRequest"
+      responses:
+        "200":
+          description: Guest session and temporary workspace are ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestBootstrapResponse"
+        "403":
+          description: Guest access is disabled or the browser origin is rejected.
+        "429":
+          description: Anonymous-session creation is temporarily rate limited.
+        "503":
+          description: Anonymous Auth or temporary-workspace bootstrap is unavailable.
+  /api/v1/auth/guest/link:
+    post:
+      description: Link the verified anonymous identity to a new permanent account without changing its Auth UUID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestIdentityLinkRequest"
+      responses:
+        "200":
+          description: The same Auth identity and product graph are now registered.
+        "403":
+          description: Public account access is disabled or the session is not an active guest.
+        "409":
+          description: The current session is already registered.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/auth/guest/handoffs:
+    post:
+      description: Create a ten-minute guest handoff bound to a normalized destination-email hash. Store its id and opaque secret only in HttpOnly cookies used by login reconciliation; account existence is not resolved at creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestHandoffCreateRequest"
+      responses:
+        "201":
+          description: A single-use guest handoff is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestHandoffCreateResponse"
+        "401":
+          description: The destination account is unavailable or not permitted.
+        "409":
+          description: The current session is already registered.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/auth/guest/handoffs/{handoff_id}/claim:
+    post:
+      description: Atomically claim the complete guest product graph into the signed-in destination account. Browser login performs this operation before returning its permanent session; this explicit endpoint remains a strict single-use compatibility boundary.
+      parameters:
+        - name: handoff_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The original conversation and optional typed action were claimed once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestHandoffClaimResponse"
+        "400":
+          description: The handoff cookie or secret is invalid.
+        "403":
+          description: The signed-in account is not the bound destination.
+        "409":
+          description: The handoff was consumed or the product graph is unsafe.
+        "410":
+          description: The handoff expired.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/auth/logout:
     post:
       responses:
@@ -28,6 +116,24 @@ paths:
       responses:
         "200":
           description: Current authentication state and user.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/analytics/guest-events:
+    post:
+      description: Capture one approved browser-owned guest funnel fact through the authenticated, same-origin server envelope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestFunnelClientEventRequest"
+      responses:
+        "200":
+          description: The sanitized guest event was accepted for background capture.
+        "403":
+          description: The origin or verified guest account context was rejected.
+        "422":
+          description: The event or property combination is outside the approved contract.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me:
@@ -83,13 +189,29 @@ paths:
     post:
       responses:
         "200":
-          description: Created conversation.
+          description: Created a conversation, or returned the one empty guest conversation.
+        "403":
+          description: A guest with accepted content must convert before creating another conversation.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted all non-deleted conversations for the user.
+        "403":
+          description: Guest account conversion is required for conversation management.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/conversations/guest/replace:
+    post:
+      description: Atomically replace the current guest conversation while preserving the anonymous identity, fixed expiry, and lifetime allowances.
+      responses:
+        "200":
+          description: The one guest workspace is bound to the replacement empty conversation.
+        "403":
+          description: The session is not an active verified guest.
+        "409":
+          description: Replacement failed closed and the existing conversation was left unchanged.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}:
@@ -97,12 +219,16 @@ paths:
       responses:
         "200":
           description: Updated conversation title, pin, or archive state.
+        "403":
+          description: Guest account conversion is required for conversation management.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted conversation.
+        "403":
+          description: Guest account conversion is required for conversation management.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}/messages:
@@ -320,6 +446,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DecisionNoteResponse"
+        "403":
+          description: Guest account conversion is required to save a decision.
         "404":
           description: Evidence artifact not found or inaccessible.
           content:
@@ -402,6 +530,308 @@ components:
             code: auth_session_verification_unavailable
             request_id: req_123
   schemas:
+    GuestBootstrapRequest:
+      type: object
+      required:
+        - captcha_token
+      properties:
+        captcha_token:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        language:
+          type: string
+          enum: [en, es-419]
+          default: en
+    GuestBootstrapResponse:
+      type: object
+      required:
+        - authenticated
+        - reused
+        - renewed_after_expiry
+        - public_account_access_enabled
+        - account_kind
+      properties:
+        authenticated:
+          type: boolean
+          const: true
+        reused:
+          type: boolean
+        renewed_after_expiry:
+          type: boolean
+          description: True only when an expired verified anonymous session was replaced with a fresh guest identity.
+        public_account_access_enabled:
+          type: boolean
+          description: Server-owned permission to present anonymous-to-permanent account creation.
+        account_kind:
+          type: string
+          const: guest
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+        session:
+          type:
+            - object
+            - "null"
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        email:
+          type:
+            - string
+            - "null"
+        username:
+          type:
+            - string
+            - "null"
+        display_name:
+          type:
+            - string
+            - "null"
+        language:
+          type: string
+          enum: [en, es-419]
+        locale:
+          type: string
+          enum: [en-US, es-419]
+        theme:
+          type: string
+          enum: [dark, light, system]
+        is_admin:
+          type: boolean
+        onboarding:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GuestAccountSummary:
+      type: object
+      required:
+        - expires_at
+        - conversation_limit
+        - message_limit
+        - simulation_limit
+        - feedback_limit
+      properties:
+        expires_at:
+          type: string
+          format: date-time
+        conversation_limit:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        message_limit:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        simulation_limit:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        feedback_limit:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+    AccountCapabilities:
+      type: object
+      required:
+        - can_create_additional_conversation
+        - can_manage_conversation
+        - can_save_decision
+        - can_manage_account
+        - can_use_omnisearch
+        - can_search_current_workspace
+        - can_use_grounded_discovery
+        - can_submit_feedback
+      properties:
+        can_create_additional_conversation:
+          type: boolean
+        can_manage_conversation:
+          type: boolean
+        can_save_decision:
+          type: boolean
+        can_manage_account:
+          type: boolean
+        can_use_omnisearch:
+          type: boolean
+        can_search_current_workspace:
+          type: boolean
+          description: Owner-scoped search over the current account workspace.
+        can_use_grounded_discovery:
+          type: boolean
+          description: Server-authoritative availability of broader grounded discovery.
+        can_submit_feedback:
+          type: boolean
+    UserResponse:
+      type: object
+      required:
+        - user
+        - account_kind
+        - guest
+        - capabilities
+        - public_account_access_enabled
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        account_kind:
+          type: string
+          enum:
+            - guest
+            - registered
+        guest:
+          anyOf:
+            - $ref: "#/components/schemas/GuestAccountSummary"
+            - type: "null"
+        capabilities:
+          $ref: "#/components/schemas/AccountCapabilities"
+        public_account_access_enabled:
+          type: boolean
+          description: Server-authoritative permission to expose ordinary account creation.
+    GuestConversionReason:
+      type: string
+      enum:
+        - second_simulation
+        - message_limit
+        - save_decision
+        - new_conversation
+        - keep_history
+    GuestPendingAction:
+      type: object
+      additionalProperties: false
+      required:
+        - reason
+        - conversation_id
+        - action_id
+      properties:
+        reason:
+          $ref: "#/components/schemas/GuestConversionReason"
+        conversation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        action_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        artifact_id:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 128
+          description: Required only for save_decision.
+    GuestHandoffCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - destination_email
+        - source_conversation_id
+      properties:
+        destination_email:
+          type: string
+          format: email
+          maxLength: 320
+        source_conversation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        pending_action:
+          anyOf:
+            - $ref: "#/components/schemas/GuestPendingAction"
+            - type: "null"
+    GuestHandoffCreateResponse:
+      type: object
+      required:
+        - handoff_id
+        - expires_at
+      properties:
+        handoff_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    GuestHandoffClaimResponse:
+      type: object
+      required:
+        - conversation_id
+        - pending_action
+      properties:
+        conversation_id:
+          type: string
+        pending_action:
+          anyOf:
+            - $ref: "#/components/schemas/GuestPendingAction"
+            - type: "null"
+    GuestIdentityLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+        refresh_token:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 4096
+          description: Current browser session refresh token, used to survive provider token rotation.
+    GuestFunnelClientEventRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - event
+        - language
+        - surface
+        - terminal_outcome
+      properties:
+        event:
+          type: string
+          enum: [starter_action_selected, conversion_prompt_shown]
+        language:
+          type: string
+          enum: [en, es-419]
+        surface:
+          type: string
+          enum: [starter_actions, conversion_modal]
+        strategy_category:
+          type:
+            - string
+            - "null"
+          enum: [buy_and_hold, dca_accumulation, null]
+        conversion_reason:
+          type:
+            - string
+            - "null"
+          enum:
+            - second_simulation
+            - message_limit
+            - save_decision
+            - new_conversation
+            - keep_history
+            - null
+        terminal_outcome:
+          type: string
+          enum: [selected, shown]
     ChatClarification:
       type: object
       description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.
@@ -813,17 +1243,26 @@ components:
           format: date-time
     UsageAllowance:
       type: object
-      description: Backend-derived allowance truth for one resource, covering both active UTC windows plus availability and the most restrictive window.
+      description: Backend-derived allowance truth for the account's active windows.
       required:
         - hour
         - day
+        - guest_session
         - available_now
         - limiting_window
       properties:
         hour:
-          $ref: "#/components/schemas/UsageWindow"
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
         day:
-          $ref: "#/components/schemas/UsageWindow"
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
+        guest_session:
+          anyOf:
+            - $ref: "#/components/schemas/UsageWindow"
+            - type: "null"
         available_now:
           type: boolean
         limiting_window:
@@ -831,6 +1270,7 @@ components:
           enum:
             - hour
             - day
+            - guest_session
     UsageAllowances:
       type: object
       required:

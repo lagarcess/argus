@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -122,6 +122,14 @@ class LLMDateRangeIntent(BaseModel):
 
 
 class LLMStrategyDraft(BaseModel):
+    # Only deterministic runtime code can write this channel; model output cannot
+    # reach a private attribute. A str span is fidelity-audit evidence bound to a
+    # quote from the current message; a None span is typed edit-plan evidence,
+    # which has no bounded quote.
+    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = (
+        PrivateAttr(default_factory=dict)
+    )
+
     raw_user_phrasing: str | None = None
     language: str | None = Field(
         default=None,
@@ -189,7 +197,10 @@ class LLMStrategyDraft(BaseModel):
         description=(
             "Short user-message spans that justify extracted canonical fields, keyed "
             "by field name such as strategy_type, asset_universe, date_range, "
-            "capital_amount, cadence, or comparison_baseline."
+            "capital_amount, cadence, comparison_baseline, fee_rate, or slippage. "
+            "For populated fee_rate or slippage, copy the exact bounded phrase from "
+            "the current user message into the corresponding evidence key; canonical "
+            "explicit-user provenance is derived from that evidence."
         ),
     )
     extra_parameters: dict[str, Any] = Field(default_factory=dict)

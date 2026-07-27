@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { ChatActionOption } from "@/components/chat/types";
 import { visibleComposerActions } from "@/lib/chat-action-ownership";
+import { isRetryAction } from "@/lib/chat-retry-actions";
 
 const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 const NO_PROGRESS_ACTION_ID_PREFIX = "no-progress-";
@@ -538,6 +539,7 @@ export function visibleComposerResponseActions(
 ): ChatActionOption[] {
   return visibleComposerActions(actions).filter(
     (action) =>
+      !isRetryAction(action) &&
       !isUnsupportedStrategyResponseAction(action) &&
       !isNoProgressResponseAction(action),
   );

@@ -5,12 +5,23 @@ export type UsageWindow = {
   period_end: string;
 };
 
-export type UsageAllowance = {
+export type RegisteredUsageAllowance = {
   hour: UsageWindow;
   day: UsageWindow;
+  guest_session: null;
   available_now: boolean;
   limiting_window: "hour" | "day";
 };
+
+export type GuestUsageAllowance = {
+  hour: null;
+  day: null;
+  guest_session: UsageWindow;
+  available_now: boolean;
+  limiting_window: "guest_session";
+};
+
+export type UsageAllowance = RegisteredUsageAllowance | GuestUsageAllowance;
 
 export type UsageAllowanceResponse = {
   allowances: {
@@ -42,6 +53,10 @@ export function runActionIdempotencyKey(input: {
   payload?: Record<string, unknown>;
 }): string | null {
   if (input.type !== "run_backtest") return null;
+  const explicitKey = input.payload?.idempotency_key;
+  if (typeof explicitKey === "string" && explicitKey.trim()) {
+    return explicitKey.trim();
+  }
   const confirmationId = input.payload?.confirmation_id;
   return typeof confirmationId === "string" && confirmationId.trim()
     ? confirmationId.trim()

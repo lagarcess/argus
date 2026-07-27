@@ -1,7 +1,7 @@
 # Argus Guest Experience: Value-Before-Account Design
 
-Status: **FOUNDER-APPROVED DESIGN — implementation remains separately gated by
-the serialized plan and release checks below**
+Status: **COMPLETED DESIGN RECORD — IMPLEMENTED BY PR #279 AND LANDED AS
+`53e812e9`**
 
 Date: 2026-07-24
 
@@ -23,9 +23,10 @@ Strategic context:
 Parallel runtime dependency:
 [`docs/superpowers/specs/2026-07-23-always-progresses-continuity-design.md`](2026-07-23-always-progresses-continuity-design.md)
 
-This is a product and architecture design. It does not claim that guest access,
-public signup, Omnisearch discovery, voice, memory, sharing, or the
-Always-Progresses runtime has been implemented, deployed, or exposed.
+This is the historical product and architecture design for the integrated Guest
+experience. It does not claim deployment, public traffic, public signup,
+memory, sharing, or completion of the later promotion gates. Current public
+exposure requirements live in `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`.
 
 ## Outcome
 
@@ -160,10 +161,10 @@ above to reach their named guest-facing gates.
     candidate before public exposure.
 22. Public enablement is a separate founder decision. Building the slice does
     not authorize deployment or removal of private-alpha protections.
-23. When guest access is enabled, guest chat supersedes the current auth-first
-    landing page at `/`. The existing landing implementation remains in the
-    codebase as the auth-modal source and the configuration-first rollback
-    surface; it is not a second public entry experience.
+23. Guest chat supersedes the current auth-first landing page at `/` by
+    default. The existing landing implementation remains in the codebase as
+    the auth-modal source and explicit-off rollback surface; it is not a second
+    public entry experience.
 24. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false` during the initial
     guest traffic stage. Broader permanent-account creation is not enabled
     until observed concurrency, provider cost, latency, backpressure, and
@@ -662,17 +663,19 @@ existing profiles but is not collected from guests.
 Guest implementation, guest traffic enablement, and public permanent-account
 enablement are three separate decisions.
 
-Two server-side controls are required:
+Two server-side controls own separate policies:
 
-- `ARGUS_GUEST_ACCESS_ENABLED=false`;
+- `ARGUS_GUEST_ACCESS_ENABLED=true`;
 - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`.
 
 The web surface uses
-`NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false` only to select the entry presentation.
-The server flags remain authoritative. A client/server disagreement fails
-closed and is a release-profile error.
+`NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` only to select the entry presentation.
+The server remains authoritative. A client/server disagreement fails closed
+and is a release-profile error.
 
-Both default off outside explicitly configured QA.
+The Guest server and presentation flags are default-on emergency kill
+switches; explicit `false` restores the preserved auth-first entry and stops
+new anonymous bootstrap. Public-account access remains separately default-off.
 
 The first public guest stage intentionally uses:
 
@@ -684,14 +687,10 @@ ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
 That makes guest chat the public front door without opening permanent accounts
 to uncalibrated traffic.
 
-While public access is off:
+While public-account access is off:
 
 - current private-alpha allowlist behavior remains unchanged for permanent
   signup/login;
-- no public traffic can create a guest session.
-
-When the founder enables guest access but keeps public accounts off:
-
 - anonymous sessions are permitted;
 - `/` opens the guest chat rather than the auth-first landing page;
 - permanent signup/login remains allowlist-gated;
@@ -1240,9 +1239,10 @@ Guest mode is not ready for public exposure until all are true:
 - [ ] Cost per completed guest result is measured and acceptable.
 - [ ] Guest concurrency, latency, backpressure, and compute saturation are
       calibrated under representative traffic before public accounts open.
-- [ ] Guest and public-account server flags remain off by default.
+- [ ] Guest server/presentation defaults remain on with explicit-off rollback,
+      while public-account access remains off by default.
 - [ ] Rollback is proven.
-- [ ] Founder explicitly authorizes guest traffic enablement.
+- [ ] Founder explicitly authorizes Render traffic exposure.
 - [ ] Founder separately authorizes public permanent-account enablement.
 
 No paid live-eval scorecard is required solely for guest-shell changes. If the

@@ -253,9 +253,20 @@ def patched_draft_from_candidate(
         if _blank(candidate_value):
             continue
         anchored_value = getattr(anchor.draft, field_name)
+        if field_name == "extra_parameters":
+            candidate_value = _merged_extra_parameters(
+                anchored=anchored_value,
+                candidate=candidate_value,
+            )
         if _equivalent_strategy_value(field_name, candidate_value, anchored_value):
             continue
         patch_values[field_name] = candidate_value
+    if "date_range" in patch_values:
+        patch_values["extra_parameters"] = _merged_extra_parameters(
+            anchored=anchor.draft.extra_parameters,
+            candidate=candidate.extra_parameters,
+            discard_stale_date_metadata=True,
+        )
     operation = normalized_asset_universe_operation(
         _dict(candidate.extra_parameters).get("asset_universe_operation")
     )
@@ -267,6 +278,39 @@ def patched_draft_from_candidate(
         return None
     patch = ArtifactPatch(source=source, **patch_values)
     return apply_artifact_patch(anchor.draft, patch)
+
+
+def _merged_extra_parameters(
+    *,
+    anchored: Any,
+    candidate: Any,
+    discard_stale_date_metadata: bool = False,
+) -> dict[str, Any]:
+    merged = _dict(anchored)
+    incoming = _dict(candidate)
+    incoming.pop("asset_universe_operation", None)
+    for key, value in incoming.items():
+        if (
+            key == "field_provenance"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            merged[key] = {**merged[key], **value}
+            continue
+        merged[key] = value
+    if discard_stale_date_metadata:
+        for key in ("date_range_intent", "date_range_raw_text"):
+            if key not in incoming:
+                merged.pop(key, None)
+        incoming_evidence = _dict(incoming.get("evidence_spans"))
+        if "date_range" not in incoming_evidence:
+            merged_evidence = _dict(merged.get("evidence_spans"))
+            merged_evidence.pop("date_range", None)
+            if merged_evidence:
+                merged["evidence_spans"] = merged_evidence
+            else:
+                merged.pop("evidence_spans", None)
+    return merged
 
 
 def _equivalent_strategy_value(

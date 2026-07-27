@@ -143,6 +143,7 @@
     "attach_files_feature": "Opcional: agrega una captura, boceto o ejemplo.",
     "consent": "Autorizo al equipo de Argus a procesar estos comentarios y contactarme si necesitan más detalles.",
     "consent_feature": "Autorizo al equipo de Argus a usar esta solicitud de función y contactarme si necesitan más contexto.",
+    "include_conversation_context": "Incluir el contexto aprobado de esta conversación",
     "rating_positive_prompt": "¿Qué salió bien?",
     "rating_negative_prompt": "¿Qué salió mal?",
     "subheading": {
@@ -173,8 +174,8 @@
     "placeholder_details": "Compartir detalles (opcional)",
     "success": "¡Gracias por tus comentarios!",
     "error": "Error al enviar comentarios. Inténtalo de nuevo.",
-    "footer_note": "Se puede incluir contexto de la app, como esta página y la hora, para entender mejor tus comentarios.",
-    "footer_note_conversation": "Se puede incluir el contexto de tu conversación actual para entender mejor estos comentarios.",
+    "footer_note": "No se adjunta la conversación ni información de contacto.",
+    "footer_note_conversation": "Se incluirán identificadores aprobados de la conversación. No se adjunta la transcripción.",
     "tags": {
       "positive": {
         "accurate": "Preciso y completo",
@@ -223,7 +224,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
-        "value": "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia."
+        "value": "Compara Apple con SPY durante los últimos 12 meses."
       },
       "btc": {
         "label": "Prueba mantener Bitcoin (BTC)",
@@ -756,6 +757,7 @@
     "app": {
       "title": "App",
       "language": "Idioma de la app",
+      "close_language_modal": "Cerrar selector de idioma",
       "sidebar": "Barra lateral",
       "security": "Seguridad",
       "appearance": "Apariencia",
@@ -850,6 +852,9 @@
   "command_palette": {
     "close": "Cerrar búsqueda",
     "search_placeholder": "Buscar en Argus...",
+    "guest": {
+      "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
+    },
     "no_results": "No se encontraron resultados",
     "no_conversations": "No hay conversaciones aún",
     "clear_search": "Borrar búsqueda",
@@ -927,6 +932,9 @@
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
       "new_account": "¿nuevo en argus?"
+    },
+    "legal": {
+      "continuing_prefix": "Al continuar, aceptas nuestros"
     },
     "password": {
       "show": "Mostrar contrasena",
@@ -1008,5 +1016,72 @@
     "legal_prefix": "Al registrarte, aceptas nuestros",
     "terms": "Términos",
     "privacy": "Política de Privacidad"
+  },
+  "guest": {
+    "entry": {
+      "loading": "Abriendo Argus",
+      "error": "Argus no pudo abrir un chat temporal. Inténtalo de nuevo."
+    },
+    "expired": {
+      "title": "Este chat temporal venció",
+      "detail": "Sus mensajes y resultados no se pueden recuperar.",
+      "start_new": "Iniciar un nuevo chat temporal",
+      "sign_in": "Iniciar sesión",
+      "create_account": "Crear cuenta",
+      "restart_error": "Argus no pudo iniciar un nuevo chat temporal. Inténtalo de nuevo."
+    },
+    "conversion": {
+      "eyebrow": "Sigue con Argus",
+      "sign_in_title": "Iniciar sesión",
+      "create_title": "Crea tu cuenta",
+      "second_simulation": "Inicia sesión para ejecutar otra simulación.",
+      "message_limit": "Inicia sesión para conservar esta conversación y continuar.",
+      "save_decision": "Inicia sesión para guardar esta decisión.",
+      "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
+      "new_conversation_create": "Crea una cuenta para conservar esta conversación y comenzar otra.",
+      "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra."
+    },
+    "new_conversation": {
+      "title": "¿Quieres iniciar otra conversación?",
+      "description": "Empezar de nuevo reemplaza esta conversación temporal. Inicia sesión para conservarla y comenzar otra.",
+      "public_description": "Empezar de nuevo reemplaza esta conversación temporal. Crea una cuenta para conservarla y comenzar otra.",
+      "start_over": "Empezar de nuevo",
+      "sign_in": "Iniciar sesión para conservarla",
+      "create_account": "Crear cuenta",
+      "error": "El chat temporal no cambió."
+    },
+    "history": {
+      "expires_at": "Disponible hasta {{date}}",
+      "keep_history": "Inicia sesión para conservar tu historial"
+    },
+    "shell": {
+      "value_title": "Prueba una idea de inversión con datos históricos.",
+      "input_placeholder": "¿Qué quieres probar?",
+      "sign_in": "Iniciar sesión",
+      "settings": "Ajustes de invitado",
+      "language": "Idioma",
+      "feedback": "Comentarios",
+      "temporary_until": "Chat temporal · disponible hasta {{date}}",
+      "before_message": {
+        "prefix": "Al enviar mensajes a Argus, aceptas los ",
+        "terms": "Términos",
+        "middle": " y reconoces la ",
+        "privacy": "Privacidad"
+      },
+      "after_message": {
+        "safety": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+        "terms": "Términos",
+        "privacy": "Privacidad"
+      },
+      "new_chat_unavailable": "Inicia sesión para conservar esta conversación y comenzar otra.",
+      "search_unavailable": "La búsqueda aún no está disponible para chats temporales.",
+      "decision_unavailable": "Inicia sesión para guardar esta decisión.",
+      "sign_in_unavailable": "El inicio de sesión no está disponible en esta vista previa. Tu chat temporal permanece aquí."
+    },
+    "hints": {
+      "confirmation": "Revisa los supuestos y luego ejecuta la prueba.",
+      "result": "Cambia el rango del gráfico o haz una pregunta de seguimiento.",
+      "dismiss": "Descartar sugerencia"
+    }
   }
 }

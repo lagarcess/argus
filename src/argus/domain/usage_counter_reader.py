@@ -27,10 +27,13 @@ class UsageCounterReader:
         resources: tuple[str, ...],
         period: str,
         at: datetime,
+        period_start: datetime | None = None,
     ) -> list[dict[str, Any]]:
         if not resources:
             return []
-        start, _ = align_usage_period(at, period)
+        start = period_start
+        if start is None:
+            start, _ = align_usage_period(at, period)
         result = (
             self.client.table("usage_counters")
             .select("resource,limit_count,used_count,period_end")

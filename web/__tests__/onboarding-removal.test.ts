@@ -54,6 +54,10 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
     expect(envExample).not.toContain("ONBOARDING");
     const playwrightConfig = read("playwright.config.ts");
     expect(playwrightConfig).not.toContain("ONBOARDING");
+    const guestQaRunner = read("../scripts/qa/run-guest-experience-qa.sh");
+    expect(guestQaRunner).not.toContain("ONBOARDING");
+    const guestQaSupport = read("e2e/support/guest-qa.ts");
+    expect(guestQaSupport).not.toContain("ONBOARDING");
   });
 
   test("profile api surface cannot write onboarding state", () => {
@@ -79,9 +83,11 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
 
   test("generic localized starter prompts remain on the empty chat surface", () => {
     const chat = read("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("chat.starter_actions.tsla.value");
-    expect(chat).toContain("chat.starter_actions.btc.value");
-    expect(chat).toContain("chat.starter_actions.dca.value");
+    const starters = read("components/chat/StarterActions.tsx");
+    expect(chat).toContain("<StarterActions");
+    expect(starters).toContain("chat.starter_actions.tsla.value");
+    expect(starters).toContain("chat.starter_actions.btc.value");
+    expect(starters).toContain("chat.starter_actions.dca.value");
     const en = JSON.parse(read("public/locales/en/common.json"));
     const es = JSON.parse(read("public/locales/es-419/common.json"));
     expect(en.chat.starter_actions.tsla.value.length).toBeGreaterThan(0);

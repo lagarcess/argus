@@ -343,7 +343,22 @@ Argus is **NOT**:
 
 ---
 
-## 22. Design Decision Filter
+## 22. Guest Entry and Rollback
+
+- `/` presents the chat-first guest entry by default. The Guest server and
+  presentation flags are emergency kill switches: explicit `false` restores
+  the auth-first landing and stops new anonymous bootstrap.
+- Preserve the current landing implementation and centered auth modal for
+  configuration rollback and later conversion.
+- While public permanent accounts remain disabled, guest chrome offers
+  **Sign in**, never a public **Create account** action.
+- Temporary status, fixed expiry, allowance boundaries, feedback, and errors
+  must remain calm, accessible, and localized in English and Spanish.
+- The frontend flag selects presentation only; a server-denied guest session
+  must stay on the entry surface with one honest retry and no fake local
+  conversation.
+
+## 23. Design Decision Filter
 
 When designing any Argus surface, ask:
 

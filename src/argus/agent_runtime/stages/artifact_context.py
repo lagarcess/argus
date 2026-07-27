@@ -6,6 +6,9 @@ from argus.agent_runtime.artifacts.drafts import (
     draft_from_confirmation_payload,
     draft_from_result_metadata,
 )
+from argus.agent_runtime.artifacts.drafts import (
+    draft_from_failed_launch_payload as canonical_failed_launch_draft,
+)
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
@@ -399,41 +402,52 @@ def launch_payload_from_failed_action(
 
 
 def strategy_from_failed_launch_payload(payload: dict[str, Any]) -> StrategySummary:
-    symbols = _symbols_from_launch_payload(payload)
-    benchmark_symbol = str(payload.get("benchmark_symbol") or "").upper()
-    asset_class = payload.get("asset_class")
-    if not isinstance(asset_class, str) or not asset_class.strip():
-        asset_class = "crypto" if benchmark_symbol == "BTC" else "equity"
-
-    strategy_payload: dict[str, Any] = {
-        "strategy_type": payload.get("strategy_type"),
-        "strategy_thesis": _retry_strategy_thesis(payload, symbols),
-        "asset_universe": symbols,
-        "asset_class": asset_class,
-        "date_range": payload.get("date_range"),
-        "capital_amount": payload.get("capital_amount"),
-    }
-    if benchmark_symbol:
-        strategy_payload["comparison_baseline"] = benchmark_symbol
-    if payload.get("entry_rule") not in (None, "", [], {}):
-        strategy_payload["entry_logic"] = payload.get("entry_rule")
-    if payload.get("exit_rule") not in (None, "", [], {}):
-        strategy_payload["exit_logic"] = payload.get("exit_rule")
-    if payload.get("rule_spec") not in (None, "", [], {}):
-        strategy_payload["rule_spec"] = payload.get("rule_spec")
-    if payload.get("cadence") not in (None, "", [], {}):
-        strategy_payload["cadence"] = payload.get("cadence")
-    return StrategySummary.model_validate(strategy_payload)
+    strategy = canonical_failed_launch_draft(payload)
+    strategy.strategy_thesis = _retry_strategy_thesis(
+        payload,
+        strategy.asset_universe,
+    )
+    return strategy
 
 
-def _symbols_from_launch_payload(payload: dict[str, Any]) -> list[str]:
-    raw_symbols = payload.get("symbols")
-    if isinstance(raw_symbols, list):
-        symbols = [str(symbol).strip().upper() for symbol in raw_symbols if symbol]
+def strategy_from_failed_action_snapshot(
+    payload: dict[str, Any],
+    snapshot: TaskSnapshot | None,
+) -> StrategySummary:
+    strategy = strategy_from_failed_launch_payload(payload)
+    authoritative = (
+        snapshot.pending_strategy_summary if snapshot is not None else None
+    )
+    if authoritative is None:
+        return strategy
+    authoritative_parameters = dict(authoritative.extra_parameters)
+    modeled_cost_fields = [
+        field_name
+        for field_name in ("fee_rate", "slippage")
+        if field_name in authoritative_parameters
+    ]
+    if not modeled_cost_fields:
+        return strategy
+
+    extra_parameters = dict(strategy.extra_parameters)
+    field_provenance = dict(extra_parameters.get("field_provenance") or {})
+    authoritative_provenance = dict(
+        authoritative_parameters.get("field_provenance") or {}
+    )
+    for field_name in modeled_cost_fields:
+        extra_parameters[field_name] = authoritative_parameters[field_name]
+        if field_name in authoritative_provenance:
+            field_provenance[field_name] = authoritative_provenance[field_name]
+        else:
+            field_provenance.pop(field_name, None)
+    if field_provenance:
+        extra_parameters["field_provenance"] = field_provenance
     else:
-        symbol = str(payload.get("symbol") or "").strip().upper()
-        symbols = [symbol] if symbol else []
-    return list(dict.fromkeys(symbols))
+        extra_parameters.pop("field_provenance", None)
+    return strategy.model_copy(
+        update={"extra_parameters": extra_parameters},
+        deep=True,
+    )
 
 
 def _retry_strategy_thesis(payload: dict[str, Any], symbols: list[str]) -> str:

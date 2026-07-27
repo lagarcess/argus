@@ -32,6 +32,13 @@ RESULT_ACTION_TYPES = {
     "save_strategy",
 }
 
+
+@dataclass(frozen=True)
+class ConfirmationCancellationAdmission:
+    confirmation_id: str
+    replay_message: Message | None = None
+
+
 _ACTION_LABELS = {
     "en": {
         "chat.confirmation.actions.run_backtest": "Run backtest",
@@ -178,6 +185,59 @@ def is_confirmation_action(payload: ChatStreamRequest) -> bool:
 
 def is_cancel_confirmation_action(payload: ChatStreamRequest) -> bool:
     return payload.action is not None and payload.action.type == "cancel_confirmation"
+
+
+def recent_confirmation_messages(
+    *,
+    payload: ChatStreamRequest,
+    user_id: str,
+    conversation_id: str,
+) -> list[Message] | None:
+    if not is_confirmation_action(payload):
+        return None
+    return _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+
+
+def confirmation_cancellation_admission(
+    *,
+    payload: ChatStreamRequest,
+    recent_messages: list[Message],
+) -> ConfirmationCancellationAdmission | None:
+    if not is_cancel_confirmation_action(payload) or payload.action is None:
+        return None
+    requested_id = _confirmation_id_from_action_payload(payload.action.payload)
+    if requested_id is None:
+        return None
+
+    for message in reversed(recent_messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        metadata = message.metadata
+        artifact_event = metadata.get("artifact_event")
+        if (
+            isinstance(artifact_event, dict)
+            and artifact_event.get("type") == "confirmation_cancelled"
+        ):
+            cancelled_id = _clean_action_payload_id(artifact_event.get("confirmation_id"))
+            if cancelled_id != requested_id:
+                return None
+            return ConfirmationCancellationAdmission(
+                confirmation_id=requested_id,
+                replay_message=message,
+            )
+        if _metadata_invalidates_confirmation(metadata):
+            return None
+        card = metadata.get("confirmation_card")
+        if isinstance(card, dict):
+            active_id = _confirmation_id_from_card(card)
+            if active_id != requested_id:
+                return None
+            return ConfirmationCancellationAdmission(confirmation_id=requested_id)
+    return None
 
 
 def is_result_action(payload: ChatStreamRequest) -> bool:

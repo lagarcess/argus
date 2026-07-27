@@ -12,6 +12,16 @@ import {
 
 const root = join(import.meta.dir, "..");
 
+function readChatImplementationSource(): string {
+  return [
+    readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8"),
+    readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    ),
+  ].join("\n");
+}
+
 describe("Argus Alpha frontend contract", () => {
   test("maps API conversation_result_card into chat result payload", () => {
     const result = resultCardFromRun({
@@ -179,6 +189,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const starterActions = readFileSync(
+      join(root, "components/chat/StarterActions.tsx"),
+      "utf-8",
+    );
     const input = readFileSync(
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
@@ -206,9 +220,10 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(chat).toContain("chatExploratorySuggestionsEnabled");
     expect(chat).toContain("showExploratorySuggestions");
-    expect(chat).toContain("chat.starter_actions.tsla.value");
-    expect(chat).toContain("chat.starter_actions.btc.value");
-    expect(chat).toContain("chat.starter_actions.dca.value");
+    expect(starterActions).toContain("chat.starter_actions.tsla.value");
+    expect(starterActions).toContain("chat.starter_actions.btc.value");
+    expect(starterActions).toContain("chat.starter_actions.dca.value");
+    expect(chat).toContain("<StarterActions");
     expect(chat).toContain("showExploratorySuggestions &&");
     expect(input).toContain("chatExploratorySuggestionsEnabled");
     expect(input).toContain(
@@ -240,7 +255,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(starterAndPlaceholderText).not.toContain("Activo:");
     expect(starterAndPlaceholderText).not.toContain("Periodo:");
     expect(en.chat.starter_actions.tsla.value).toBe(
-      "Buy and hold AAPL over the last 12 months with SPY as the benchmark.",
+      "Compare Apple with SPY over the last 12 months.",
     );
     expect(en.chat.starter_actions.btc.value).toBe(
       "What if I bought Bitcoin this year so far?",
@@ -249,7 +264,7 @@ describe("Argus Alpha frontend contract", () => {
       "What if I bought $250 of Nvidia every week over the last 12 months?",
     );
     expect(es.chat.starter_actions.tsla.value).toBe(
-      "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia.",
+      "Compara Apple con SPY durante los últimos 12 meses.",
     );
     expect(es.chat.starter_actions.btc.value).toBe(
       "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
@@ -279,34 +294,25 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat result messages preserve assistant explanation next to card", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
     );
 
-    expect(chat).toContain("content: m.content");
+    expect(chat).toContain("content: message.content");
     expect(message).toContain('message.kind === "strategy_result"');
     expect(message).toContain("const displayContent = getDisplayContent()");
     expect(message).toContain("displayContent &&");
-    expect(message).toContain(
-      "<StrategyResultCard result={message.result} onAction={onAction} />",
+    expect(message).toContain("<StrategyResultCard");
+    expect(message).toContain("result={message.result}");
+    expect(message.indexOf("<StrategyResultCard")).toBeLessThan(
+      message.indexOf("displayContent &&"),
     );
-    expect(
-      message.indexOf(
-        "<StrategyResultCard result={message.result} onAction={onAction} />",
-      ),
-    ).toBeLessThan(message.indexOf("displayContent &&"));
   });
 
   test("failed-action retry stays a structured footer action and message menus close on focus loss", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -324,7 +330,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("hydrateTextMessageFromApi(m,");
+    expect(chat).toContain("hydrateTextMessageFromApi(message,");
     expect(hydration).toContain(
       "failedActionRetryActionFromMetadata(metadata)",
     );
@@ -559,10 +565,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat renders structured confirmation cards with card-scoped actions only", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -587,7 +590,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("visibleInputActions(inputActions).map");
     expect(chat).not.toContain('event.event === "confirmation"');
     expect(chat).not.toContain('event.event === "result"');
-    expect(chat).toContain("slide-in-from-bottom-2");
+    // The entrance motion belongs to the message that carries the actions now
+    // that the floating composer strip is gone.
+    expect(message).toContain("slide-in-from-bottom-2");
     expect(message).toContain(
       "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
     );
@@ -619,10 +624,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("next moves hide whenever any active card owns the conversation's actions", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
 
     const activeArtifactHelper = chat.slice(
       chat.indexOf("function hasActiveArtifactActionSet"),
@@ -692,10 +694,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const artifactHistory = readFileSync(
       join(root, "components/chat/artifact-history.ts"),
       "utf-8",
@@ -721,10 +720,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("confirmation action chips render as action transcript items", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -997,8 +993,8 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(chat).toContain("latestAssistantContent");
-    expect(chat).toContain(
-      "const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0)",
+    expect(chat).toMatch(
+      /const showStreamStatus = Boolean\s*\(\s*streamStatus && latestAssistantContent\.length === 0,?\s*\)/,
     );
     expect(chat).toContain("{showStreamStatus && (");
   });
@@ -1013,7 +1009,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("if (isStreamingResponse) return;");
+    expect(chat).toContain("if (isStreamingResponse) return false;");
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
     expect(chat).toContain("disabled={isStreamingResponse}");
@@ -1044,10 +1040,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat hydrates persisted structured cards from message metadata", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const artifactHistory = readFileSync(
       join(root, "components/chat/artifact-history.ts"),
@@ -1063,10 +1056,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("result actions carry canonical run and conversation context", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const resultActions = readFileSync(
       join(root, "lib/chat-result-actions.ts"),
       "utf-8",
@@ -1091,10 +1081,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("artifact actions stay attached to historical cards", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
 
     expect(chat).toContain("markComposerActionsInactive");
     expect(chat).not.toContain(
@@ -1153,10 +1140,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat updates saved state from save strategy final payloads", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
     expect(types).toContain("savedStrategyId?: string | null");
@@ -1169,10 +1153,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("saved result state is not inferred from plain result strategy linkage", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
 
     const metadataHelper = chat.slice(
       chat.indexOf("function savedStrategyIdFromMetadata"),
@@ -1196,6 +1177,10 @@ describe("Argus Alpha frontend contract", () => {
     );
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const toast = readFileSync(
+      join(root, "components/chat/ChatToast.tsx"),
       "utf-8",
     );
     const en = readFileSync(
@@ -1222,20 +1207,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("onToast={showToast}");
     expect(chat).toContain("pb-[190px]");
     expect(chat).toContain('className="h-28"');
-    expect(chat).toContain("absolute inset-x-0 bottom-24");
-    expect(chat).toContain("flex justify-center");
-    expect(chat).toContain('role="status"');
-    expect(chat).toContain("dark:bg-[#1f2225]");
+    expect(toast).toContain("absolute inset-x-0 bottom-24");
+    expect(toast).toContain("flex justify-center");
+    expect(toast).toContain('role="status"');
+    expect(toast).toContain("dark:bg-[#1f2225]");
     expect(chat).not.toContain("rounded-full bg-black dark:bg-white");
     expect(en).toContain('"copy_success": "Copied"');
     expect(es).toContain('"copy_failed": "No se pudo copiar"');
   });
 
   test("chat consumes result action chips after breakdown is requested", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatImplementationSource();
 
     // Result-card chip consumption is message-scoped and still live. The
     // composer-strip half of this mechanism went away with the strip itself.
@@ -1463,11 +1445,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain("steps");
     expect(dialog).toContain("expected");
     expect(dialog).toContain("actual");
-    expect(dialog).toContain("consent");
+    expect(dialog).toContain("includeConversationContext");
     expect(dialog).toContain("files");
     expect(dialog).toContain("Paperclip");
     expect(dialog).toContain("ChevronDown");
-    expect(dialog).toContain("hasAttachments");
+    expect(dialog).toContain("attachmentCount: files.length");
     expect(dialog).toContain("Maximum 5 files");
     expect(dialog).toContain("attachments_with_count");
     expect(dialog).toContain("Attachments ({{count}}/5)");
@@ -1475,8 +1457,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain("General Feedback");
     expect(dialog).toContain("Report a Bug");
     expect(dialog).toContain("Request a Feature");
-    expect(dialog).toContain("I consent to the Argus team");
-    expect(dialog).toContain("consent_feature");
+    expect(dialog).toContain("Include approved context from this conversation");
     expect(dialog).toContain("hasConversationContext");
     expect(dialog).toContain('event.key === "Escape"');
     expect(dialog).toContain('document.addEventListener("keydown"');
@@ -1487,10 +1468,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain('"What worked well in this response?"');
     expect(dialog).toContain('"What should be improved in this response?"');
     expect(dialog).toContain(
-      "Your current conversation context may be included to help us understand this feedback.",
+      "Approved conversation identifiers will be included. The transcript is not attached.",
     );
     expect(dialog).toContain(
-      "App context like this page and timestamp may be included to help us understand this feedback.",
+      "No conversation transcript or contact information is attached.",
     );
     expect(dialog).toContain("Learn more");
     expect(dialog).not.toContain("Provide positive feedback");
@@ -1542,7 +1523,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("MessageSquareWarning");
     expect(message).toContain("chat.report_issue");
     expect(message).toContain('onFeedback?.("rating"');
-    expect(message).toContain("postFeedback");
+    expect(message).not.toContain("postFeedback");
     expect(message).toContain("conversationId?: string | null");
     expect(message).toContain(
       "feedbackContextForMessage(message, conversationId, extra)",
@@ -1818,11 +1799,14 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("account recovery and session controls expose localized dedicated surfaces", () => {
-    const landing = readFileSync(join(root, "app/page.tsx"), "utf-8");
     const forgot = join(root, "app/auth/forgot-password/page.tsx");
     const recovery = join(root, "app/auth/recovery/page.tsx");
     const security = join(root, "app/account/security/page.tsx");
     const recoveryRoute = join(root, "app/api/auth/recovery/route.ts");
+    const authForm = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
     const en = JSON.parse(
       readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
     );
@@ -1830,7 +1814,7 @@ describe("Argus Alpha frontend contract", () => {
       readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
     );
 
-    expect(landing).toContain('/auth/forgot-password');
+    expect(authForm).toContain('/auth/forgot-password');
     expect(existsSync(forgot)).toBe(true);
     expect(existsSync(recovery)).toBe(true);
     expect(existsSync(security)).toBe(true);
@@ -1895,14 +1879,18 @@ describe("Argus Alpha frontend contract", () => {
 
   test("landing front door adapts signup and login inline", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const authForm = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
 
-    expect(page).toContain("Eye");
-    expect(page).toContain("EyeClosed");
-    expect(page).not.toContain("EyeOff");
-    expect(page).toContain("showPassword");
-    expect(page).toContain('type={showPassword ? "text" : "password"}');
-    expect(page).toContain("auth.password.show");
-    expect(page).toContain("auth.password.hide");
+    expect(authForm).toContain("Eye");
+    expect(authForm).toContain("EyeClosed");
+    expect(authForm).not.toContain("EyeOff");
+    expect(authForm).toContain("showPassword");
+    expect(authForm).toContain('type={showPassword ? "text" : "password"}');
+    expect(authForm).toContain("auth.password.show");
+    expect(authForm).toContain("auth.password.hide");
     expect(page).toContain("signupWithEmail");
     expect(page).toContain("loginWithEmail");
     expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');
@@ -1986,7 +1974,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(flags).toContain(
       'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
     );
-    expect(chat).toContain("{omnisearchEnabled && searchOverlayOpen && (");
+    expect(chat).toMatch(
+      /omnisearchEnabled &&\s*\(!isGuest \|\| canUseOmnisearch\) &&\s*searchOverlayOpen/,
+    );
     expect(sidebar).toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");
     expect(sidebar).toContain("{omnisearchEnabled && (");

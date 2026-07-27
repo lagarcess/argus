@@ -12,6 +12,9 @@ from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_universe_operation,
     same_asset_universe,
 )
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    supported_cost_rate_value,
+)
 from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
 from argus.agent_runtime.rule_specs import opposite_moving_average_crossover_rule
 from argus.domain.backtesting.rules import (
@@ -459,9 +462,21 @@ def apply_edit_operations(
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount
                 elif target == "fees":
-                    resolved.fee_rate = amount
+                    fee_rate = supported_cost_rate_value(
+                        amount, field_name="fee_rate"
+                    )
+                    if fee_rate is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.fee_rate = fee_rate
                 elif target == "slippage":
-                    resolved.slippage = amount
+                    slippage = supported_cost_rate_value(
+                        amount, field_name="slippage"
+                    )
+                    if slippage is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.slippage = slippage
                 resolved.applied.append(f"set.{target}")
             else:
                 resolved.unsupported.append(f"{op}.{target}")

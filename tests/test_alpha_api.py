@@ -1218,9 +1218,9 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     response = client.get("/api/v1/search", params={"q": "tesla chat"})
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [
-        item["id"] for item in items if item["type"] == "chat"
-    ] == [conversation["id"]]
+    assert [item["id"] for item in items if item["type"] == "chat"] == [
+        conversation["id"]
+    ]
 
 
 def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
@@ -1825,9 +1825,7 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
         and card.get("decision_state") == "promising"
         for card in assistant_result_cards
     )
-    reloaded = client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    )
+    reloaded = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert reloaded.status_code == 200
     reloaded_cards = [
         item.get("metadata", {}).get("result_card")

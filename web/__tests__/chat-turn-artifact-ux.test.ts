@@ -50,6 +50,22 @@ describe("chat turn artifact UX", () => {
     ]);
   });
 
+  test("retry stays icon-owned by its message instead of duplicating as a composer chip", () => {
+    const retryAction = {
+      type: "retry_last_turn",
+      label: "Retry",
+      value: "Retry",
+    } satisfies ChatActionOption;
+    const followUpAction = {
+      id: "ask-follow-up",
+      label: "Ask follow-up",
+    } satisfies ChatActionOption;
+
+    expect(
+      visibleComposerResponseActions([retryAction, followUpAction]),
+    ).toEqual([followUpAction]);
+  });
+
   test("live unsupported-strategy alternatives stay once on their owning assistant", () => {
     const alternatives = [
       {
@@ -205,12 +221,12 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
     expect(card).toContain("confirmationStatusAllowsActions(displayState.status)");
-    expect(chat).toContain("confirmationStatusAllowsActions(confirmationStatus)");
+    expect(chat).toContain("confirmationStatusAllowsActions(status)");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {
@@ -233,7 +249,7 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
@@ -242,7 +258,9 @@ describe("chat turn artifact UX", () => {
     expect(chat).toContain(
       "visibleComposerResponseActions(latestAi?.actions ?? [])",
     );
-    expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
+    expect(message).toMatch(
+      /import \{\s*actionHasCardScopedOwnership\s*\} from "@\/lib\/chat-action-ownership";/,
+    );
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
     expect(message).toContain("const shouldShowAssistantFooter =");
@@ -254,24 +272,25 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
 
-  test("card-scoped confirmation actions close the source card before sending", () => {
+  test("card-scoped confirmation actions close only after guest admission", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
-    const handleActionStart = chat.indexOf("const handleAction =");
-    const handleActionEnd = chat.indexOf("// ── Chat options helpers", handleActionStart);
-    const handleActionBlock = chat.slice(handleActionStart, handleActionEnd);
+    const handleSendStart = chat.indexOf("const handleSend =");
+    const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
+    const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
+    const admissionIndex = handleSendBlock.indexOf(
+      "await guestExperience.admitSend",
+    );
+    const consumeIndex = handleSendBlock.indexOf(
+      "consumeConfirmationActionOnMessages",
+    );
 
-    expect(handleActionStart).toBeGreaterThan(-1);
-    expect(handleActionBlock).toContain(
-      "const confirmationEffect = confirmationActionEffectFromAction(action)",
-    );
-    expect(handleActionBlock).toContain("setMessages((prev) =>");
-    expect(handleActionBlock).toContain("normalizeConfirmationHistory(");
-    expect(handleActionBlock).toContain(
-      "applyConfirmationActionEffects(prev, [confirmationEffect])",
-    );
+    expect(handleSendStart).toBeGreaterThan(-1);
+    expect(admissionIndex).toBeGreaterThan(-1);
+    expect(consumeIndex).toBeGreaterThan(admissionIndex);
+    expect(handleSendBlock).toContain("setMessages((prev) =>");
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {

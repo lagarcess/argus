@@ -20,6 +20,9 @@ from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_fr
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
     _edit_plan_reshapes_non_recurring_strategy,
 )
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    planned_cost_change_is_grounded,
+)
 from argus.agent_runtime.interpreter.pending_option import (
     _apply_pending_response_option_replacement,
     _llm_draft_from_strategy_summary,
@@ -236,12 +239,49 @@ def draft_only_indicator_interpretation_when_interpreter_unavailable(
     )
 
 
+def _resolved_cost_changes_are_grounded(
+    resolved: Any,
+    *,
+    current_user_message: str,
+    corroborating_strategy: StrategySummary | None,
+) -> bool:
+    corroborating_values = (
+        corroborating_strategy.extra_parameters
+        if corroborating_strategy is not None
+        else None
+    )
+    corroborating_spans = (
+        corroborating_values.get("evidence_spans")
+        if isinstance(corroborating_values, dict)
+        else None
+    )
+    if not isinstance(corroborating_spans, dict):
+        corroborating_spans = None
+    for field_name, rate in (
+        ("fee_rate", resolved.fee_rate),
+        ("slippage", resolved.slippage),
+    ):
+        if rate is None:
+            continue
+        grounded, _span = planned_cost_change_is_grounded(
+            rate,
+            field_name=field_name,
+            current_message=current_user_message,
+            corroborating_values=corroborating_values,
+            corroborating_spans=corroborating_spans,
+        )
+        if not grounded:
+            return False
+    return True
+
+
 async def planned_active_confirmation_edit_interpretation(
     *,
     snapshot: TaskSnapshot,
     current_user_message: str,
     resolve_asset_candidate: ResolveAssetCandidate,
     plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StructuredInterpretation | None:
     active_confirmation = snapshot.active_confirmation_reference
     if active_confirmation is None:
@@ -263,6 +303,7 @@ async def planned_active_confirmation_edit_interpretation(
         artifact_target="active_confirmation",
         default_goal_summary="User changed a visible confirmation assumption.",
         latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+        corroborating_strategy=corroborating_strategy,
     )
 
 
@@ -273,6 +314,7 @@ async def planned_pending_confirmation_edit_interpretation(
     requested_field: str,
     resolve_asset_candidate: ResolveAssetCandidate,
     plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StructuredInterpretation | None:
     """Plan a chip-clarify answer against the pending confirmation draft.
 
@@ -299,6 +341,7 @@ async def planned_pending_confirmation_edit_interpretation(
         artifact_target="active_confirmation",
         default_goal_summary="User changed a visible confirmation assumption.",
         latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+        corroborating_strategy=corroborating_strategy,
     )
 
 
@@ -309,6 +352,7 @@ async def planned_pending_refinement_edit_interpretation(
     selected_thread_metadata: dict[str, Any],
     resolve_asset_candidate: ResolveAssetCandidate,
     plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StructuredInterpretation | None:
     """Offline edit planning for the result-card refine pending state.
 
@@ -334,6 +378,7 @@ async def planned_pending_refinement_edit_interpretation(
         artifact_target="pending_refinement",
         default_goal_summary="User changed the refine draft.",
         latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+        corroborating_strategy=corroborating_strategy,
     )
 
 
@@ -343,6 +388,7 @@ async def planned_latest_result_edit_interpretation(
     current_user_message: str,
     resolve_asset_candidate: ResolveAssetCandidate,
     plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StructuredInterpretation | None:
     """Planned edit against the completed run when nothing is pending.
 
@@ -368,6 +414,7 @@ async def planned_latest_result_edit_interpretation(
         artifact_target="latest_result",
         default_goal_summary="User changed an assumption of the completed run.",
         latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+        corroborating_strategy=corroborating_strategy,
     )
 
 
@@ -381,6 +428,7 @@ async def _planned_artifact_edit_interpretation(
     artifact_target: str,
     default_goal_summary: str,
     latest_result_window: dict[str, str] | None = None,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StructuredInterpretation | None:
     if not prior_strategy.asset_universe:
         return None
@@ -407,12 +455,22 @@ async def _planned_artifact_edit_interpretation(
         candidate.strategy_type = prior_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     if plan.operations:
+        resolved = apply_edit_operations(
+            plan.operations,
+            current_asset_universe=prior_strategy.asset_universe,
+            asset_symbol_resolver=asset_edit_symbol_resolver(resolve_asset_candidate),
+        )
+        if not _resolved_cost_changes_are_grounded(
+            resolved,
+            current_user_message=current_user_message,
+            corroborating_strategy=corroborating_strategy,
+        ):
+            # A planned cost change without current-turn corroborating evidence
+            # cannot become an owned fact; decline so the turn resolves through
+            # the caller's ordinary route instead.
+            return None
         apply_resolved_artifact_edit_to_strategy_summary(
-            apply_edit_operations(
-                plan.operations,
-                current_asset_universe=prior_strategy.asset_universe,
-                asset_symbol_resolver=asset_edit_symbol_resolver(resolve_asset_candidate),
-            ),
+            resolved,
             candidate=candidate,
             field_provenance=field_provenance,
             allow_indicator_parameters=strategy_summary_uses_rsi(prior_strategy),

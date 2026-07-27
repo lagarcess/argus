@@ -87,6 +87,9 @@ export type ChatSidebarProps = {
   onOpenSidebarPreference?: () => void;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
+  canManageConversation?: boolean;
+  showProfileMenu?: boolean;
+  isGuest?: boolean;
 };
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
@@ -175,8 +178,11 @@ export default function ChatSidebar({
   onOpenSidebarPreference,
   strategiesEnabled = false,
   omnisearchEnabled = false,
+  canManageConversation = true,
+  showProfileMenu = true,
+  isGuest = false,
 }: ChatSidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -391,7 +397,7 @@ export default function ChatSidebar({
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
+      className={`flex shrink-0 flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
         isOpen ? "w-72" : "w-14"
       }`}
     >
@@ -598,10 +604,28 @@ export default function ChatSidebar({
                                 }`}>
                                   {item.subtitle}
                                 </span>
+                                {isGuest && item.expires_at ? (
+                                  <time
+                                    dateTime={item.expires_at}
+                                    title={item.expires_at}
+                                    className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
+                                  >
+                                    {t("guest.history.expires_at", {
+                                      defaultValue: "Available until {{date}}",
+                                      date: new Intl.DateTimeFormat(
+                                        i18n.resolvedLanguage ?? i18n.language,
+                                        {
+                                          dateStyle: "medium",
+                                          timeStyle: "short",
+                                        },
+                                      ).format(new Date(item.expires_at)),
+                                    })}
+                                  </time>
+                                ) : null}
                               </>
                             )}
                           </div>
-                          {renamingId !== item.id && (
+                          {canManageConversation && renamingId !== item.id && (
                             <div data-actions className="absolute right-2 top-1/2 -translate-y-1/2">
                               <RecentChatActions
                                 item={conversationActionItem}
@@ -627,80 +651,94 @@ export default function ChatSidebar({
                       )}
                     </div>
                   )}
+                  {isGuest ? (
+                    <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
+                      {t(
+                        "guest.history.keep_history",
+                        "Sign in to keep your history",
+                      )}
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-      <ConfirmDialog
-        isOpen={Boolean(pendingDeleteItem)}
-        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
-        description={t(
-          "sidebar.delete_confirm.description",
-          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          {
-            title: pendingDeleteItem
-              ? conversationDisplayTitle(
-                  pendingDeleteItem,
-                  t("chat.new_chat", "New chat"),
-                )
-              : t("common.conversation", "Conversation"),
-          },
-        )}
-        confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
-        cancelLabel={t("common.cancel", "Cancel")}
-        isBusy={isDeleting}
-        onCancel={() => {
-          if (!isDeleting) setPendingDeleteId(null);
-        }}
-        onConfirm={() => void handleConfirmDelete()}
-      />
-      <ConfirmDialog
-        isOpen={isDeleteAllDialogOpen}
-        title={t(
-          "settings.data.delete_all_confirm.title",
-          "Delete all conversations?",
-        )}
-        description={t(
-          "settings.data.delete_all_confirm.description",
-          "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
-        )}
-        confirmLabel={t(
-          "settings.data.delete_all_confirm.confirm",
-          "Delete all conversations",
-        )}
-        cancelLabel={t("common.cancel", "Cancel")}
-        isBusy={isDeletingAllConversations}
-        onCancel={() => {
-          if (!isDeletingAllConversations) setIsDeleteAllDialogOpen(false);
-        }}
-        onConfirm={() => void handleConfirmDeleteAllConversations()}
-      />
+      {canManageConversation && (
+        <>
+          <ConfirmDialog
+            isOpen={Boolean(pendingDeleteItem)}
+            title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+            description={t(
+              "sidebar.delete_confirm.description",
+              "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+              {
+                title: pendingDeleteItem
+                  ? conversationDisplayTitle(
+                      pendingDeleteItem,
+                      t("chat.new_chat", "New chat"),
+                    )
+                  : t("common.conversation", "Conversation"),
+              },
+            )}
+            confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+            cancelLabel={t("common.cancel", "Cancel")}
+            isBusy={isDeleting}
+            onCancel={() => {
+              if (!isDeleting) setPendingDeleteId(null);
+            }}
+            onConfirm={() => void handleConfirmDelete()}
+          />
+          <ConfirmDialog
+            isOpen={isDeleteAllDialogOpen}
+            title={t(
+              "settings.data.delete_all_confirm.title",
+              "Delete all conversations?",
+            )}
+            description={t(
+              "settings.data.delete_all_confirm.description",
+              "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
+            )}
+            confirmLabel={t(
+              "settings.data.delete_all_confirm.confirm",
+              "Delete all conversations",
+            )}
+            cancelLabel={t("common.cancel", "Cancel")}
+            isBusy={isDeletingAllConversations}
+            onCancel={() => {
+              if (!isDeletingAllConversations) setIsDeleteAllDialogOpen(false);
+            }}
+            onConfirm={() => void handleConfirmDeleteAllConversations()}
+          />
+        </>
+      )}
 
       {/* Footer: Profile menu trigger */}
-      <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
-        <ProfileMenu
-          isOpen={isProfileMenuOpen}
-          onClose={() => setIsProfileMenuOpen(false)}
-          onLogout={onLogout}
-          onFeedback={onFeedback}
-          onDeleteAllConversations={handleRequestDeleteAllConversations}
-          onHistoryMutated={onHistoryMutated}
-          onOpenSidebarPreference={onOpenSidebarPreference}
-          anchorRef={profileButtonRef}
-          sidebarCollapsed={!isOpen}
-        />
-        <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
-          <SidebarNavButton
-            icon={User}
-            label={t("common.settings")}
-            collapsed={!isOpen}
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            iconSize={20}
+      {showProfileMenu ? (
+        <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
+          <ProfileMenu
+            isOpen={isProfileMenuOpen}
+            onClose={() => setIsProfileMenuOpen(false)}
+            onLogout={onLogout}
+            onFeedback={onFeedback}
+            onDeleteAllConversations={handleRequestDeleteAllConversations}
+            onHistoryMutated={onHistoryMutated}
+            onOpenSidebarPreference={onOpenSidebarPreference}
+            anchorRef={profileButtonRef}
+            sidebarCollapsed={!isOpen}
           />
+          <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
+            <SidebarNavButton
+              icon={User}
+              label={t("common.settings")}
+              collapsed={!isOpen}
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              iconSize={20}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
     </aside>
   );
 }

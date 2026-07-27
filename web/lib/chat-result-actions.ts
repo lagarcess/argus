@@ -1,4 +1,4 @@
-import type { ChatActionOption } from "@/components/chat/types";
+import type { ChatActionOption, Message } from "@/components/chat/types";
 import type { AssetClass, BacktestRun } from "./argus-api";
 
 type ResultActionContext = {
@@ -51,7 +51,9 @@ export function hydrateResultActions(
         conversation_id: context.conversationId,
         strategy_name: context.strategyName,
         symbols: context.symbols ?? [],
-        ...(context.template !== undefined ? { template: context.template } : {}),
+        ...(context.template !== undefined
+          ? { template: context.template }
+          : {}),
         ...(context.assetClass ? { asset_class: context.assetClass } : {}),
       },
       value: action.value,
@@ -70,6 +72,66 @@ export function hydrateResultActionsForRun(
     symbols: run.symbols,
     template: String(run.config_snapshot?.template ?? ""),
     assetClass: run.asset_class,
+  });
+}
+
+export function markResultCardSaved(
+  messages: Message[],
+  runId: string | null,
+  savedStrategyId: string,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (
+      message.kind !== "strategy_result" ||
+      !message.result ||
+      message.result.runId !== runId
+    ) {
+      return message;
+    }
+    const resultActions = message.result.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    const messageActions = message.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    return {
+      ...message,
+      savedStrategyId,
+      savingStrategy: false,
+      actions: messageActions ?? resultActions ?? message.actions,
+      result: {
+        ...message.result,
+        savedStrategyId,
+        savingStrategy: false,
+        strategyId: message.result.strategyId ?? savedStrategyId,
+        actions: resultActions ?? message.result.actions,
+      },
+    };
+  });
+}
+
+export function markResultCardSaving(
+  messages: Message[],
+  runId: string | null,
+  savingStrategy: boolean,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (
+      message.kind !== "strategy_result" ||
+      !message.result ||
+      message.result.runId !== runId
+    ) {
+      return message;
+    }
+    return {
+      ...message,
+      result: {
+        ...message.result,
+        savingStrategy,
+      },
+    };
   });
 }
 

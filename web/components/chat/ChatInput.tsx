@@ -25,7 +25,10 @@ import {
 import type { ChatMention } from "./types";
 
 type ChatInputProps = {
-  onSend: (text: string, mentions?: ChatMention[]) => void;
+  onSend: (
+    text: string,
+    mentions?: ChatMention[],
+  ) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
   placeholder?: string;
   onToast?: (message: string) => void;
@@ -350,13 +353,14 @@ export default function ChatInput({
     setActiveDiscoveryItemId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (disabled) return;
     const current = readCurrentSegments();
     const message = serializeComposerSegments(current);
     if (message) {
-      onSend(message, composerMentions(current));
+      const accepted = await onSend(message, composerMentions(current));
+      if (accepted === false) return;
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
       setComposerRawText("");

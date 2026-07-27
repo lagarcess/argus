@@ -7,7 +7,7 @@ from argus.api.chat.evidence import (
     EvidenceDecisionCaptureError,
     create_decision_for_evidence_artifact,
 )
-from argus.api.dependencies import current_user, problem
+from argus.api.dependencies import current_user, problem, require_account_capability
 from argus.api.schemas import DecisionNoteCreate, DecisionNoteResponse, User
 
 router = APIRouter(prefix="/api/v1/evidence-artifacts", tags=["evidence"])
@@ -20,6 +20,12 @@ def create_decision(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> DecisionNoteResponse:
+    require_account_capability(
+        request,
+        "can_save_decision",
+        detail="Sign in to save this decision.",
+        reason="save_decision",
+    )
     try:
         decision, artifact = create_decision_for_evidence_artifact(
             user=user,

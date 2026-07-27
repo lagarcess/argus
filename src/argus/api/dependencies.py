@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -11,6 +12,12 @@ from argus.api import state as api_state
 from argus.api.auth_sessions import (
     AuthSessionVerificationUnavailable,
     auth_session_is_active,
+)
+from argus.api.guest_access import (
+    guest_account_context,
+    permanent_account_access_allowed,
+    registered_account_context,
+    store_account_context,
 )
 from argus.api.schemas import User
 
@@ -59,11 +66,58 @@ def private_alpha_access_problem(request: Request) -> HTTPException:
     )
 
 
+AccountCapabilityName = Literal[
+    "can_create_additional_conversation",
+    "can_manage_conversation",
+    "can_save_decision",
+    "can_manage_account",
+]
+
+
+def require_account_capability(
+    request: Request,
+    capability: AccountCapabilityName,
+    *,
+    detail: str,
+    reason: str,
+) -> None:
+    from argus.api.guest_access import account_context
+
+    capabilities = account_context(request).capabilities
+    allowed = {
+        "can_create_additional_conversation": (
+            capabilities.can_create_additional_conversation
+        ),
+        "can_manage_conversation": capabilities.can_manage_conversation,
+        "can_save_decision": capabilities.can_save_decision,
+        "can_manage_account": capabilities.can_manage_account,
+    }[capability]
+    if allowed:
+        return
+    raise problem(
+        request,
+        status_code=403,
+        code="account_conversion_required",
+        title="Account Required",
+        detail=detail,
+        context={"reason": reason},
+    )
+
+
 def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
     response = JSONResponse(payload)
+    _apply_auth_session_cookies(request, response, payload)
+    return response
+
+
+def _apply_auth_session_cookies(
+    request: Request,
+    response: JSONResponse,
+    payload: dict[str, Any],
+) -> None:
     session = payload.get("session")
     if not isinstance(session, dict):
-        return response
+        return
 
     access_token = session.get("access_token")
     refresh_token = session.get("refresh_token")
@@ -81,7 +135,6 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
         response.set_cookie("sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
         response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
-    return response
 
 
 def _session_cookie_secure(request: Request) -> bool:
@@ -113,11 +166,15 @@ def current_user(request: Request) -> User:
     ):
         if api_state.supabase_gateway is not None:
             try:
-                return api_state.supabase_gateway.get_or_create_mock_user()
+                user = api_state.supabase_gateway.get_or_create_mock_user()
+                store_account_context(request, registered_account_context(user.id))
+                return user
             except Exception:
                 if not dev_memory_fallback_enabled():
                     raise
-        return api_state.store.get_or_create_dev_user()
+        user = api_state.store.get_or_create_dev_user()
+        store_account_context(request, registered_account_context(user.id))
+        return user
 
     if api_state.supabase_gateway is None:
         raise problem(
@@ -201,8 +258,27 @@ def current_user(request: Request) -> User:
             detail="Invalid or expired access token.",
         )
 
+    if auth_user.get("is_anonymous") is True:
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=auth_user_id,
+            at=datetime.now(timezone.utc),
+        )
+        if workspace is None:
+            raise problem(
+                request,
+                status_code=403,
+                code="guest_session_expired",
+                title="Guest Session Expired",
+                detail="This temporary guest session is no longer available.",
+            )
+        user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+        store_account_context(request, guest_account_context(workspace))
+        return user
+
     auth_email = str(auth_user.get("email") or "")
-    if not api_state.supabase_gateway.private_alpha_email_allowed(auth_email):
+    if not permanent_account_access_allowed(api_state.supabase_gateway, auth_email):
         raise private_alpha_access_problem(request)
 
-    return api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    store_account_context(request, registered_account_context(user.id))
+    return user

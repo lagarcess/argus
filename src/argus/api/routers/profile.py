@@ -1,13 +1,23 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 from loguru import logger
 from pydantic import ValidationError
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.dependencies import (
+    current_user,
+    dev_memory_fallback_enabled,
+    problem,
+    require_account_capability,
+)
+from argus.api.guest_access import (
+    AccountContext,
+    account_context,
+    public_account_access_enabled,
+)
 from argus.api.schemas import (
     ProfilePatch,
     UsageAllowance,
@@ -20,6 +30,10 @@ from argus.api.schemas import (
 from argus.domain.store import utcnow
 from argus.domain.usage_counter_reader import align_usage_period
 from argus.domain.usage_limits import (
+    GUEST_CONVERSATION_ALLOWANCE,
+    GUEST_FEEDBACK_ALLOWANCE,
+    GUEST_MESSAGE_ALLOWANCE,
+    GUEST_SIMULATION_ALLOWANCE,
     MESSAGE_ALLOWANCE_LIMITS,
     MESSAGE_USAGE_RESOURCE,
     SIMULATION_ALLOWANCE_LIMITS,
@@ -35,13 +49,37 @@ _ALLOWANCE_POLICIES: dict[str, tuple[str, dict[str, int]]] = {
 }
 
 
+def _user_response(user: User, context: AccountContext) -> UserResponse:
+    return UserResponse(
+        user=user,
+        account_kind=context.kind,
+        guest=(
+            {
+                "expires_at": context.expires_at,
+                "conversation_limit": GUEST_CONVERSATION_ALLOWANCE,
+                "message_limit": GUEST_MESSAGE_ALLOWANCE,
+                "simulation_limit": GUEST_SIMULATION_ALLOWANCE,
+                "feedback_limit": GUEST_FEEDBACK_ALLOWANCE,
+            }
+            if context.kind == "guest"
+            else None
+        ),
+        capabilities=context.capabilities,
+        public_account_access_enabled=public_account_access_enabled(),
+    )
+
+
 @router.get("/me", response_model=UserResponse)
-def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
+def get_me(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> UserResponse:
+    context = account_context(request)
     if api_state.supabase_gateway is not None:
         try:
             profile = api_state.supabase_gateway.get_user(user_id=user.id)
             if profile:
-                return UserResponse(user=profile)
+                return _user_response(profile, context)
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -50,7 +88,7 @@ def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
                 error=str(exc),
                 user_id=user.id,
             )
-    return UserResponse(user=user)
+    return _user_response(user, context)
 
 
 @router.get("/me/usage", response_model=UsageAllowanceResponse)
@@ -59,16 +97,32 @@ def get_me_usage(
     user: User = Depends(current_user),  # noqa: B008
 ) -> UsageAllowanceResponse:
     now = datetime.now(timezone.utc)
+    context = account_context(request)
     resources = tuple(resource for resource, _ in _ALLOWANCE_POLICIES.values())
-    rows_by_period: dict[str, dict[str, dict]] = {"hour": {}, "day": {}}
+    guest_period_start = (
+        context.expires_at - timedelta(days=7)
+        if context.kind == "guest" and context.expires_at is not None
+        else None
+    )
+    periods = (
+        (("guest_session", guest_period_start),)
+        if context.kind == "guest"
+        else (("hour", None), ("day", None))
+    )
+    rows_by_period: dict[str, dict[str, dict]] = {period: {} for period, _ in periods}
     if api_state.supabase_gateway is not None:
         try:
-            for period in ("hour", "day"):
+            for period, period_start in periods:
+                query = {
+                    "user_id": user.id,
+                    "resources": resources,
+                    "period": period,
+                    "at": now,
+                }
+                if period_start is not None:
+                    query["period_start"] = period_start
                 rows = api_state.supabase_gateway.list_current_usage_counters(
-                    user_id=user.id,
-                    resources=resources,
-                    period=period,
-                    at=now,
+                    **query,
                 )
                 rows_by_period[period] = {str(row.get("resource")): row for row in rows}
         except Exception as exc:
@@ -92,13 +146,14 @@ def get_me_usage(
             )
     else:
         for resource in resources:
-            for period in ("hour", "day"):
+            for period, period_start in periods:
                 row = read_memory_usage(
                     api_state.store.usage_counters,
                     user_id=user.id,
                     resource=resource,
                     period=period,
                     at=now,
+                    period_start=period_start,
                 )
                 if row is not None:
                     rows_by_period[period][resource] = {
@@ -108,9 +163,18 @@ def get_me_usage(
                         "period_end": row.get("period_end"),
                     }
 
-    def window(resource: str, period: str, policy_limit: int) -> UsageWindow:
+    def window(
+        resource: str,
+        period: str,
+        policy_limit: int,
+        *,
+        fixed_period_end: datetime | None = None,
+    ) -> UsageWindow:
         row = rows_by_period[period].get(resource, {})
-        _, default_period_end = align_usage_period(now, period)
+        if fixed_period_end is None:
+            _, default_period_end = align_usage_period(now, period)
+        else:
+            default_period_end = fixed_period_end
         limit = max(int(row.get("limit_count") or policy_limit), 0)
         used = max(int(row.get("used_count", 0)), 0)
         return UsageWindow(
@@ -127,8 +191,40 @@ def get_me_usage(
         return UsageAllowance(
             hour=hour,
             day=day,
+            guest_session=None,
             available_now=hour.remaining > 0 and day.remaining > 0,
             limiting_window="hour" if hour.remaining < day.remaining else "day",
+        )
+
+    def guest_allowance(resource: str, policy_limit: int) -> UsageAllowance:
+        if context.expires_at is None:
+            raise RuntimeError("Guest account context is missing its fixed expiry.")
+        guest_session = window(
+            resource,
+            "guest_session",
+            policy_limit,
+            fixed_period_end=context.expires_at,
+        )
+        return UsageAllowance(
+            hour=None,
+            day=None,
+            guest_session=guest_session,
+            available_now=guest_session.remaining > 0,
+            limiting_window="guest_session",
+        )
+
+    if context.kind == "guest":
+        return UsageAllowanceResponse(
+            allowances=UsageAllowances(
+                messages=guest_allowance(
+                    MESSAGE_USAGE_RESOURCE,
+                    GUEST_MESSAGE_ALLOWANCE,
+                ),
+                backtests=guest_allowance(
+                    SIMULATION_USAGE_RESOURCE,
+                    GUEST_SIMULATION_ALLOWANCE,
+                ),
+            )
         )
 
     return UsageAllowanceResponse(
@@ -145,6 +241,13 @@ def patch_me(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
+    context = account_context(request)
+    require_account_capability(
+        request,
+        "can_manage_account",
+        detail="Sign in to manage a permanent profile.",
+        reason="manage_account",
+    )
     current = (
         api_state.supabase_gateway.get_user(user_id=user.id)
         if api_state.supabase_gateway is not None
@@ -189,4 +292,4 @@ def patch_me(
         user_id=user.id,
         fields=updated_fields,
     )
-    return UserResponse(user=updated)
+    return _user_response(updated, context)
