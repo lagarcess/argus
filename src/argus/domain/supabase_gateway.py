@@ -62,6 +62,10 @@ class DecisionCaptureIntegrityError(RuntimeError):
     """Raised when the decision RPC does not return the committed object spine."""
 
 
+class ConversationCursorError(ValueError):
+    """Raised when a conversation cursor pivot cannot be resolved exactly."""
+
+
 _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "en": "en-US",
     "es-419": "es-419",
@@ -383,7 +387,34 @@ class SupabaseGateway(
         limit: int | None,
         archived: bool | None = None,
         deleted: bool = False,
+        cursor_updated_at: datetime | None = None,
+        cursor_id: str | None = None,
     ) -> list[Conversation]:
+        if (cursor_updated_at is None) != (cursor_id is None):
+            raise ConversationCursorError("invalid conversation cursor pivot")
+
+        cursor_pinned: bool | None = None
+        canonical_cursor_id: str | None = None
+        if cursor_updated_at is not None and cursor_id is not None:
+            pivot_rows = (
+                self.client.table("conversations")
+                .select("id,pinned")
+                .eq("user_id", user_id)
+                .eq("id", cursor_id)
+                .limit(2)
+                .execute()
+                .data
+                or []
+            )
+            if len(pivot_rows) != 1:
+                raise ConversationCursorError("invalid conversation cursor pivot")
+            pivot = pivot_rows[0]
+            canonical_cursor_id = str(pivot.get("id") or "")
+            pinned = pivot.get("pinned")
+            if canonical_cursor_id != cursor_id or not isinstance(pinned, bool):
+                raise ConversationCursorError("invalid conversation cursor pivot")
+            cursor_pinned = pinned
+
         query = self.client.table("conversations").select("*").eq("user_id", user_id)
         if deleted:
             query = query.not_.is_("deleted_at", "null")
@@ -393,11 +424,33 @@ class SupabaseGateway(
         if archived is not None:
             query = query.eq("archived", archived)
 
-        ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
+        if (
+            cursor_updated_at is not None
+            and canonical_cursor_id is not None
+            and cursor_pinned is not None
+        ):
+            timestamp = cursor_updated_at.isoformat()
+            within_tier = (
+                f"or(updated_at.lt.{timestamp},"
+                f"and(updated_at.eq.{timestamp},id.lt.{canonical_cursor_id}))"
+            )
+            if cursor_pinned:
+                keyset_filter = (
+                    f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
+                )
+            else:
+                keyset_filter = f"and(pinned.eq.false,{within_tier})"
+            query = query.or_(keyset_filter)
+
+        ordered = (
+            query.order("pinned", desc=True)
+            .order("updated_at", desc=True)
+            .order("id", desc=True)
+        )
         if limit is None:
             rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
         else:
-            rows_data = ordered.limit(limit).execute().data or []
+            rows_data = ordered.limit(limit + 1).execute().data or []
         return [Conversation.model_validate(row) for row in rows_data]
 
     def get_conversation(

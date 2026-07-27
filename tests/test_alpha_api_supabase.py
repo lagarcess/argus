@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -9,6 +9,7 @@ import pytest
 import yaml
 from argus.api import state as api_state
 from argus.api.main import app
+from argus.api.pagination import encode_cursor
 from argus.api.schemas import (
     AccountCapabilities,
     BacktestRun,
@@ -26,7 +27,11 @@ from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import AlphaStore, utcnow
-from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.domain.supabase_gateway import (
+    ConversationCursorError,
+    QuotaExceededError,
+    SupabaseGateway,
+)
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -2804,45 +2809,28 @@ def test_history_supabase_can_request_archived_rows(mock_gateway):
     )
 
 
-def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
-    now = utcnow()
-    mock_gateway.list_conversations.return_value = [
+def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
+    updated_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversations = [
         Conversation(
-            id="conv-1",
-            title="Idea 1",
+            id=f"conv-{idx}",
+            title=f"Idea {idx}",
             title_source="system_default",
             language="en",
-            pinned=True,
+            pinned=idx < 2,
             archived=False,
-            last_message_preview="A",
+            last_message_preview=f"Preview {idx}",
             deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
-        Conversation(
-            id="conv-2",
-            title="Idea 2",
-            title_source="system_default",
-            language="en",
-            pinned=False,
-            archived=False,
-            last_message_preview="B",
-            deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
-        Conversation(
-            id="conv-3",
-            title="Idea 3",
-            title_source="system_default",
-            language="en",
-            pinned=False,
-            archived=False,
-            last_message_preview="C",
-            deleted_at=None,
-            created_at=now,
-            updated_at=now,
-        ),
+            created_at=updated_at,
+            updated_at=updated_at,
+        )
+        for idx in range(5)
+    ]
+    mock_gateway.list_conversations.side_effect = [
+        conversations[:3],
+        conversations[2:5],
+        conversations[4:],
+        [],
     ]
 
     first_page = client.get(
@@ -2860,16 +2848,66 @@ def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
     )
     assert second_page.status_code == 200
     second_payload = second_page.json()
-    first_ids = {item["id"] for item in payload["items"]}
-    second_ids = {item["id"] for item in second_payload["items"]}
-    assert first_ids.isdisjoint(second_ids)
+    assert [item["id"] for item in second_payload["items"]] == ["conv-2", "conv-3"]
+    assert second_payload["next_cursor"] is not None
+
+    final_page = client.get(
+        f"/api/v1/conversations?limit=2&cursor={second_payload['next_cursor']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert final_page.status_code == 200
+    assert final_page.json() == {
+        "items": [conversations[4].model_dump(mode="json")],
+        "next_cursor": None,
+    }
+
+    empty_page = client.get(
+        "/api/v1/conversations?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert empty_page.status_code == 200
+    assert empty_page.json() == {"items": [], "next_cursor": None}
+
+    calls = mock_gateway.list_conversations.call_args_list
+    assert calls[0].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "limit": 2,
+        "archived": None,
+        "deleted": False,
+        "cursor_updated_at": None,
+        "cursor_id": None,
+    }
+    assert calls[1].kwargs["cursor_updated_at"] == updated_at
+    assert calls[1].kwargs["cursor_id"] == "conv-1"
+    assert calls[2].kwargs["cursor_updated_at"] == updated_at
+    assert calls[2].kwargs["cursor_id"] == "conv-3"
+    assert calls[3].kwargs["cursor_updated_at"] is None
+    assert calls[3].kwargs["cursor_id"] is None
+
+
+def test_conversation_missing_pivot_uses_existing_invalid_cursor_problem(mock_gateway):
+    cursor = encode_cursor(
+        datetime(2026, 7, 1, tzinfo=timezone.utc).isoformat(),
+        "missing-conversation",
+    )
+    mock_gateway.list_conversations.side_effect = ConversationCursorError(
+        "invalid conversation cursor pivot"
+    )
+
+    response = client.get(
+        f"/api/v1/conversations?limit=2&cursor={cursor}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
 
 
 def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gateway):
-    now = utcnow()
-    mock_gateway.list_conversations.return_value = [
+    now = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    conversations = [
         Conversation(
-            id=f"conv-{idx}",
+            id=f"conv-{idx:03d}",
             title=f"Idea {idx}",
             title_source="system_default",
             language="en",
@@ -2877,10 +2915,15 @@ def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gatew
             archived=False,
             last_message_preview=f"Preview {idx}",
             deleted_at=None,
-            created_at=now,
-            updated_at=now,
+            created_at=now - timedelta(seconds=idx),
+            updated_at=now - timedelta(seconds=idx),
         )
         for idx in range(130)
+    ]
+    mock_gateway.list_conversations.side_effect = [
+        conversations[:51],
+        conversations[50:101],
+        conversations[100:],
     ]
 
     first_page = client.get(
@@ -2909,3 +2952,10 @@ def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gatew
     third_payload = third_page.json()
     assert len(third_payload["items"]) == 30
     assert third_payload["next_cursor"] is None
+
+    all_ids = [
+        item["id"]
+        for payload in (first_payload, second_payload, third_payload)
+        for item in payload["items"]
+    ]
+    assert len(all_ids) == len(set(all_ids)) == 130

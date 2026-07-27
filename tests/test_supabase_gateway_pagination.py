@@ -1,21 +1,94 @@
-from unittest.mock import MagicMock
+from __future__ import annotations
 
+import os
+from contextlib import suppress
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
 from argus.domain.supabase_gateway import SupabaseGateway
 
+from supabase import create_client
 
-def _conversation_row(idx: int) -> dict[str, object]:
+
+def _conversation_row(
+    idx: int,
+    *,
+    pinned: bool = False,
+    deleted_at: str | None = None,
+    updated_at: str = "2026-04-27T00:00:00+00:00",
+) -> dict[str, object]:
     return {
         "id": f"conv-{idx}",
         "title": f"Conversation {idx}",
         "title_source": "system_default",
         "language": "en",
-        "pinned": False,
+        "pinned": pinned,
         "archived": False,
         "last_message_preview": None,
-        "deleted_at": None,
+        "deleted_at": deleted_at,
         "created_at": "2026-04-27T00:00:00+00:00",
-        "updated_at": "2026-04-27T00:00:00+00:00",
+        "updated_at": updated_at,
     }
+
+
+class _RecordingQuery:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+        self.operations: list[tuple[str, tuple[object, ...]]] = []
+
+    @property
+    def not_(self) -> _RecordingQuery:
+        return self
+
+    def select(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("select", args))
+        return self
+
+    def eq(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("eq", args))
+        return self
+
+    def is_(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("is_", args))
+        return self
+
+    def order(self, *args: object, **kwargs: object) -> _RecordingQuery:
+        self.operations.append(("order", args + tuple(kwargs.items())))
+        return self
+
+    def or_(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("or_", args))
+        return self
+
+    def limit(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("limit", args))
+        return self
+
+    def range(self, *args: object) -> _RecordingQuery:
+        self.operations.append(("range", args))
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        return SimpleNamespace(data=self.rows)
+
+
+class _RecordingClient:
+    def __init__(self, *row_sets: list[dict[str, object]]) -> None:
+        self._row_sets = list(row_sets)
+        self.queries: list[_RecordingQuery] = []
+
+    def table(self, table_name: str) -> _RecordingQuery:
+        assert table_name == "conversations"
+        query = _RecordingQuery(self._row_sets.pop(0))
+        self.queries.append(query)
+        return query
+
+
+def _operation_names(query: _RecordingQuery) -> list[str]:
+    return [name for name, _ in query.operations]
 
 
 def test_gateway_fetches_all_conversations_in_batches_when_limit_is_none() -> None:
@@ -50,3 +123,210 @@ def test_gateway_fetches_all_conversations_in_batches_when_limit_is_none() -> No
     ordered.range.assert_any_call(0, 499)
     ordered.range.assert_any_call(500, 999)
     ordered.limit.assert_not_called()
+
+
+def test_conversation_page_fetches_only_limit_plus_one() -> None:
+    client = _RecordingClient([_conversation_row(idx) for idx in range(3)])
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    rows = gateway.list_conversations(user_id="user-1", limit=2)
+
+    assert [row.id for row in rows] == ["conv-0", "conv-1", "conv-2"]
+    assert ("limit", (3,)) in client.queries[0].operations
+    assert "range" not in _operation_names(client.queries[0])
+
+
+def test_conversation_page_uses_pinned_updated_at_id_desc() -> None:
+    client = _RecordingClient([])
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    gateway.list_conversations(user_id="user-1", limit=20)
+
+    orders = [
+        operation for operation in client.queries[0].operations if operation[0] == "order"
+    ]
+    assert orders == [
+        ("order", ("pinned", ("desc", True))),
+        ("order", ("updated_at", ("desc", True))),
+        ("order", ("id", ("desc", True))),
+    ]
+
+
+def test_conversation_equal_timestamps_are_stable() -> None:
+    timestamp = datetime(2026, 4, 27, tzinfo=timezone.utc)
+    pivot = _conversation_row(2, updated_at=timestamp.isoformat())
+    page = [
+        _conversation_row(1, updated_at=timestamp.isoformat()),
+        _conversation_row(0, updated_at=timestamp.isoformat()),
+    ]
+    client = _RecordingClient([pivot], page)
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    rows = gateway.list_conversations(
+        user_id="user-1",
+        limit=2,
+        cursor_updated_at=timestamp,
+        cursor_id="conv-2",
+    )
+
+    assert [row.id for row in rows] == ["conv-1", "conv-0"]
+    keyset_filter = next(
+        args[0] for name, args in client.queries[1].operations if name == "or_"
+    )
+    assert f"updated_at.eq.{timestamp.isoformat()}" in keyset_filter
+    assert "id.lt.conv-2" in keyset_filter
+
+
+def test_conversation_soft_deleted_pivot_does_not_skip_or_duplicate() -> None:
+    timestamp = datetime(2026, 4, 27, tzinfo=timezone.utc)
+    deleted_pivot = _conversation_row(
+        2,
+        pinned=True,
+        deleted_at="2026-04-28T00:00:00+00:00",
+        updated_at="2026-04-28T00:00:00+00:00",
+    )
+    page = [
+        _conversation_row(1, pinned=True, updated_at=timestamp.isoformat()),
+        _conversation_row(9, pinned=False, updated_at=timestamp.isoformat()),
+    ]
+    client = _RecordingClient([deleted_pivot], page)
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    rows = gateway.list_conversations(
+        user_id="user-1",
+        limit=2,
+        cursor_updated_at=timestamp,
+        cursor_id="conv-2",
+    )
+
+    assert [row.id for row in rows] == ["conv-1", "conv-9"]
+    assert ("is_", ("deleted_at", "null")) not in client.queries[0].operations
+    assert ("is_", ("deleted_at", "null")) in client.queries[1].operations
+    keyset_filter = next(
+        args[0] for name, args in client.queries[1].operations if name == "or_"
+    )
+    assert "pinned.eq.false" in keyset_filter
+    assert "pinned.eq.true" in keyset_filter
+    assert f"updated_at.lt.{timestamp.isoformat()}" in keyset_filter
+
+
+@pytest.mark.parametrize(
+    "pivot_rows",
+    [
+        [],
+        [_conversation_row(1), _conversation_row(1)],
+    ],
+    ids=["missing-or-foreign", "ambiguous"],
+)
+def test_conversation_foreign_or_missing_pivot_fails_closed(
+    pivot_rows: list[dict[str, object]],
+) -> None:
+    client = _RecordingClient(pivot_rows)
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="conversation cursor"):
+        gateway.list_conversations(
+            user_id="user-1",
+            limit=2,
+            cursor_updated_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
+            cursor_id="conv-2",
+        )
+
+
+def test_conversation_owner_scope_is_present_in_every_query() -> None:
+    pivot = _conversation_row(2)
+    client = _RecordingClient([pivot], [])
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    gateway.list_conversations(
+        user_id="user-1",
+        limit=2,
+        cursor_updated_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
+        cursor_id="conv-2",
+    )
+
+    assert len(client.queries) == 2
+    assert all(
+        ("eq", ("user_id", "user-1")) in query.operations for query in client.queries
+    )
+
+
+@pytest.mark.skipif(
+    not all(
+        (
+            os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip(),
+            os.getenv("ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+        )
+    ),
+    reason="local Supabase pagination proof is not configured",
+)
+def test_conversation_soft_deleted_pivot_is_stable_in_real_postgres() -> None:
+    local_url = os.environ["ARGUS_LOCAL_SUPABASE_URL"].strip()
+    service_key = os.environ["ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY"].strip()
+    client = create_client(local_url, service_key)
+    gateway = SupabaseGateway(client=client)
+    email = f"conversation-pagination-{uuid4()}@argus.local"
+    created = client.auth.admin.create_user(
+        {
+            "email": email,
+            "password": f"Local-{uuid4()}",
+            "email_confirm": True,
+        }
+    )
+    assert created.user is not None
+    user_id = str(created.user.id)
+    timestamp = datetime(2026, 4, 27, tzinfo=timezone.utc)
+    conversation_ids = [f"00000000-0000-0000-0000-{value:012d}" for value in range(1, 7)]
+
+    try:
+        gateway.get_or_create_profile_for_auth_user(
+            {"id": user_id, "email": email, "user_metadata": {}}
+        )
+        client.table("conversations").insert(
+            [
+                {
+                    "id": conversation_id,
+                    "user_id": user_id,
+                    "title": f"Conversation {idx}",
+                    "title_source": "system_default",
+                    "language": "en",
+                    "pinned": idx >= 3,
+                    "archived": False,
+                    "created_at": timestamp.isoformat(),
+                    "updated_at": timestamp.isoformat(),
+                }
+                for idx, conversation_id in enumerate(conversation_ids)
+            ]
+        ).execute()
+
+        first_candidates = gateway.list_conversations(user_id=user_id, limit=2)
+        first_page = first_candidates[:2]
+        assert [item.id for item in first_candidates] == [
+            conversation_ids[5],
+            conversation_ids[4],
+            conversation_ids[3],
+        ]
+
+        pivot = first_page[-1]
+        assert gateway.soft_delete_conversation(
+            user_id=user_id,
+            conversation_id=pivot.id,
+        )
+        second_candidates = gateway.list_conversations(
+            user_id=user_id,
+            limit=2,
+            cursor_updated_at=timestamp,
+            cursor_id=pivot.id,
+        )
+
+        assert [item.id for item in second_candidates] == [
+            conversation_ids[3],
+            conversation_ids[2],
+            conversation_ids[1],
+        ]
+        assert {item.id for item in first_page}.isdisjoint(
+            item.id for item in second_candidates[:2]
+        )
+    finally:
+        with suppress(Exception):
+            gateway.delete_auth_user(user_id)

@@ -42,6 +42,7 @@ from argus.domain.backtest_message_projection import (
     represented_backtest_job_request_ids,
 )
 from argus.domain.store import utcnow
+from argus.domain.supabase_gateway import ConversationCursorError
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
@@ -229,13 +230,27 @@ def list_conversations(
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedConversations:
+    cursor_updated_at: datetime | None = None
+    cursor_id: str | None = None
+    if cursor:
+        raw_cursor_updated_at, cursor_id = decode_cursor(cursor, request)
+        try:
+            cursor_updated_at = datetime.fromisoformat(raw_cursor_updated_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+
     if api_state.supabase_gateway is not None:
-        items = api_state.supabase_gateway.list_conversations(
-            user_id=user.id,
-            limit=None,
-            archived=archived,
-            deleted=deleted,
-        )
+        try:
+            items = api_state.supabase_gateway.list_conversations(
+                user_id=user.id,
+                limit=limit,
+                archived=archived,
+                deleted=deleted,
+                cursor_updated_at=cursor_updated_at,
+                cursor_id=cursor_id,
+            )
+        except ConversationCursorError:
+            raise invalid_cursor_problem(request) from None
     else:
         items = []
         for conversation in api_state.store.conversations.values():
@@ -257,26 +272,22 @@ def list_conversations(
 
             items.append(conversation)
 
-    items.sort(
-        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
-    )
-    filtered = items
-    if cursor:
-        cursor_updated_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            cursor_dt = datetime.fromisoformat(cursor_updated_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
-        cursor_pinned = next(
-            (item.pinned for item in items if item.id == cursor_id), False
+        items.sort(
+            key=lambda item: (int(item.pinned), item.updated_at, item.id),
+            reverse=True,
         )
-        cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
-        filtered = [
-            item
-            for item in items
-            if (int(item.pinned), item.updated_at, item.id) < cursor_key
-        ]
-    page = filtered[: limit + 1]
+        if cursor_updated_at is not None and cursor_id is not None:
+            cursor_pinned = next(
+                (item.pinned for item in items if item.id == cursor_id), False
+            )
+            cursor_key = (int(bool(cursor_pinned)), cursor_updated_at, cursor_id)
+            items = [
+                item
+                for item in items
+                if (int(item.pinned), item.updated_at, item.id) < cursor_key
+            ]
+
+    page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
     next_cursor = None
