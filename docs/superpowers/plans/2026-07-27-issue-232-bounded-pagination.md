@@ -319,7 +319,90 @@ its comments/PR notes; runtime commits remain independently revertible.
 
 ---
 
-### Task 7: Fresh review and proportional corrections
+### Task 7: Exact indexed Search execution
+
+**Owned files:**
+
+- Modify `src/argus/domain/postgres_search_reader.py` and its focused tests.
+- Add one forward migration only for expression indexes whose before/after
+  plans prove they remove the measured normalized source scans.
+- Update the Task 6 measurement evidence without weakening Search semantics,
+  its two-second statement ceiling, or any public contract.
+
+**Red matrix:**
+
+```text
+search_large_common_query_completes_below_statement_timeout
+search_exact_all_token_match_survives_index_prefilter
+search_short_and_mixed_tokens_have_no_false_negatives
+search_phrase_score_rank_and_opaque_cursor_are_unchanged
+search_expression_indexes_are_selected_and_owner_scope_is_preserved
+search_zero_reset_catalog_and_rls_remain_valid
+```
+
+- [ ] Record the exact timeout and source-scan plans as RED.
+- [ ] Replace row-by-row regexp token splitting with parameterized, exact
+  per-token predicates and an exact final recheck.
+- [ ] Add only plan-proven normalized-expression trigram indexes. The
+  index-enabling extension is private database machinery; it must not add a
+  public RPC/view, generated search column, or API dependency.
+- [ ] Preserve arbitrary substring completeness, including one- and two-
+  character tokens, the complete rank tuple, exact ledger groups, Guest scope,
+  and artifact identity.
+- [ ] Prove the focused parity, cursor, scale, RLS, reset, plan, and endpoint
+  tests green.
+- [ ] Commit independently as
+  `perf(search): index exact bounded candidates`.
+
+**Stop:** any need to change Search completeness, rank/group semantics, the
+opaque cursor, add a public RPC/view or generated search column, or redesign
+schema/RLS beyond plan-proven forward expression indexes.
+
+**Rollback:** revert the runtime commit and its forward index migration; the
+prior exact reader remains independently restorable.
+
+---
+
+### Task 8: Physically bounded deep keysets and History sources
+
+**Owned files:**
+
+- Modify only the cohesive persistent Conversation/Message page helpers and
+  `src/argus/domain/postgres_history_reader.py`.
+- Add focused unit, API, real-Postgres, and plan regressions.
+- Add forward source-order indexes only if specialized exact plans prove they
+  materially reduce physical rows.
+
+**Red matrix:**
+
+```text
+conversation_deep_page_uses_tuple_keyset_and_constant_candidate_rows
+message_deep_page_uses_tuple_keyset_and_constant_candidate_rows
+history_specialized_sources_preserve_first_middle_final_pages
+history_equal_timestamps_deletion_and_owner_scope_remain_exact
+history_small_and_large_plan_rows_are_page_bounded_per_source
+```
+
+- [ ] Record the exact PostgREST OR and generic History plans as RED.
+- [ ] Move persistent Conversation and Message candidate pages to private,
+  owner-scoped parameterized tuple-keyset SQL while keeping their opaque
+  cursor meaning and response projection unchanged.
+- [ ] Specialize History source SQL for first/deep and archive/delete shapes
+  so existing order indexes can stop at `limit + 1`.
+- [ ] Add only source-order indexes selected by exact before/after plans.
+- [ ] Prove cursor compatibility, deletion stability, equal-timestamp ordering,
+  owner isolation, artifact hydration, scale, RLS, reset, and endpoint timing.
+- [ ] Commit Conversation/Message and History corrections as independently
+  revertible commits.
+
+**Stop:** any public cursor change, public RPC/view, schema/RLS redesign, or
+History ordering/grouping/collection-count change.
+
+**Rollback:** revert each runtime/index commit separately.
+
+---
+
+### Task 9: Fresh review and proportional corrections
 
 - [ ] Request fresh database/query correctness review.
 - [ ] Request fresh API/cursor compatibility review.
@@ -334,7 +417,7 @@ Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 
 ---
 
-### Task 8: Final integration, acceptance, and publication
+### Task 10: Final integration, acceptance, and publication
 
 - [ ] Fetch `origin/codex/private-alpha-next` and merge it normally exactly
   once; never rebase.
