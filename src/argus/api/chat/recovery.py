@@ -694,21 +694,28 @@ def ordinary_turn_metadata_fallback_context(
         conversation_id=conversation_id,
         language=language,
     )
+    pending_fallback: RuntimeFallbackContext | None = None
+    result_fallback: RuntimeFallbackContext | None = None
     if primary_fallback is None:
-        primary_fallback = pending_strategy_metadata_fallback_context(
+        pending_fallback = pending_strategy_metadata_fallback_context(
             user_id=user_id,
             conversation_id=conversation_id,
         )
-    if primary_fallback is None:
-        primary_fallback = latest_result_fallback_context(
+        result_fallback = latest_result_fallback_context(
             user_id=user_id,
             conversation_id=conversation_id,
         )
+        primary_fallback = pending_fallback or result_fallback
 
     failed_fallback = failed_action_metadata_fallback_context(
         user_id=user_id,
         conversation_id=conversation_id,
     )
+    if _pending_fallback_belongs_to_failed_action(
+        pending_fallback=pending_fallback,
+        failed_fallback=failed_fallback,
+    ):
+        primary_fallback = result_fallback or pending_fallback
     if primary_fallback is None:
         return failed_fallback
     if failed_fallback is None:
@@ -746,6 +753,33 @@ def ordinary_turn_metadata_fallback_context(
         confirmation_message_id=primary_fallback.confirmation_message_id,
         recovery_message=primary_fallback.recovery_message,
         recovery=primary_fallback.recovery,
+    )
+
+
+def _pending_fallback_belongs_to_failed_action(
+    *,
+    pending_fallback: RuntimeFallbackContext | None,
+    failed_fallback: RuntimeFallbackContext | None,
+) -> bool:
+    pending_snapshot = (
+        pending_fallback.latest_task_snapshot if pending_fallback is not None else None
+    )
+    failed_snapshot = (
+        failed_fallback.latest_task_snapshot if failed_fallback is not None else None
+    )
+    pending_strategy = (
+        pending_snapshot.pending_strategy_summary
+        if pending_snapshot is not None
+        else None
+    )
+    failed_pending_strategy = (
+        failed_snapshot.pending_strategy_summary if failed_snapshot is not None else None
+    )
+    return bool(
+        pending_strategy is not None
+        and failed_pending_strategy is not None
+        and failed_snapshot.latest_failed_action_reference is not None
+        and pending_strategy == failed_pending_strategy
     )
 
 

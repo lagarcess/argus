@@ -5479,6 +5479,7 @@ def test_issue_272_ordinary_turn_composes_owned_facts_after_failed_action(
 
     assert response.status_code == 200
     assert api_state.store.backtest_runs == runs_before_recovery
+    assert len(api_state.store.backtest_runs) - len(runs_before_recovery) == 0
     assert api_state.store.backtest_jobs == jobs_before_recovery == {}
     usage_after_recovery = api_state.store.usage_counters
     assert {
@@ -5490,9 +5491,22 @@ def test_issue_272_ordinary_turn_composes_owned_facts_after_failed_action(
         for key, value in usage_before_recovery.items()
         if key[1] != "chat_messages"
     }
-    assert {
-        key[1] for key in usage_after_recovery.keys() - usage_before_recovery.keys()
-    } <= {"chat_messages"}
+    for window in ("hour", "day"):
+        chat_key = (user_id, "chat_messages", window)
+        chat_before = int(
+            (usage_before_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        chat_after = int(
+            (usage_after_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        assert chat_after - chat_before == 1
+
+        run_key = (user_id, "backtest_runs", window)
+        runs_before = int(
+            (usage_before_recovery.get(run_key) or {}).get("used_count") or 0
+        )
+        runs_after = int((usage_after_recovery.get(run_key) or {}).get("used_count") or 0)
+        assert runs_after - runs_before == 0
     assert get_openrouter_route_receipts() == []
     snapshot = captured["fallback_latest_task_snapshot"]
     assert snapshot.active_confirmation_reference is not None
@@ -5733,6 +5747,85 @@ def test_issue_272_recovered_draft_clarifies_only_the_missing_field(
     assert clarification.patch["requested_field"] == "capital_amount"
     assert clarification.patch["requested_fields"] == ["capital_amount"]
     assert clarification.patch["response_intent"]["semantic_needs"] == ["sizing_amount"]
+
+
+def test_issue_272_failure_pending_does_not_displace_completed_result() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The later action failed before the draft was complete.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount", "date_range"],
+            },
+            "failed_action": {
+                "artifact_id": "issue-272-sparse-failed-action",
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["MSFT"],
+                    "timeframe": "1D",
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "invalid_request",
+                "error": "capital_amount_required",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is None
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert (
+        snapshot.latest_failed_action_reference.artifact_id
+        == "issue-272-sparse-failed-action"
+    )
 
 
 def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:

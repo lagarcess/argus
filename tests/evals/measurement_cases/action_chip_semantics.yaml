@@ -991,8 +991,7 @@ cases:
         enabled: true
         fee_bps: 10.0
         slippage_bps: 5.0
-      stage_outcomes:
-        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
 
   - id: ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es
     prompt: "Cambia el capital de la configuracion activa de NVDA a $30,000 y conserva los demas datos."
@@ -1254,5 +1253,4 @@ cases:
         enabled: true
         fee_bps: 10.0
         slippage_bps: 5.0
-      stage_outcomes:
-        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
