@@ -528,6 +528,14 @@ the same provider-backed resolution path production will use.
 ### Feature Flags (All Private-Alpha)
 Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
 by default and should only be disabled for a targeted regression check:
+
+- Once the founder accepts and merges a feature as part of the normal Argus
+  product shape, its runtime default is **on**. Retain its flag as an emergency
+  kill switch, not as an opt-in gate.
+- Local/runtime defaults and Render activation are separate concerns. A merged
+  default-on feature still requires its documented Render configuration and
+  exact-SHA canary before tester exposure.
+
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false

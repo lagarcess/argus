@@ -1,7 +1,7 @@
 # Grounded Discovery Search v1 Implementation Plan
 
-Status: **FOUNDER-APPROVED 2026-07-26 — implementation authorized; the Task 6
-live-spend gate still requires its own explicit founder go**
+Status: **COMPLETED BY PR #276 — post-merge flag policy changed 2026-07-27:
+Grounded Discovery now defaults on; explicit false remains the kill switch**
 
 > **For agentic workers:** steps use checkbox (`- [ ]`) syntax for tracking.
 > TDD-first: every behavioral task pins a red matrix before implementation.
@@ -13,7 +13,7 @@ suggest") as designed in
 explicit peer/category asset discovery through one typed route, one bounded
 provider-neutral Search call, resolver-validated candidates, chip selection
 into the normal confirmation lifecycle, honest typed recovery, EN/ES parity,
-and a default-off Search flag.
+and a default-on Search flag with an explicit emergency kill switch.
 
 **Architecture:** One new typed interpreter owner (`asset_discovery`) dispatches
 from `stages/interpret.py` into a new cohesive `agent_runtime/discovery/`

@@ -1,6 +1,7 @@
 # Grounded Discovery Search v1 — Design
 
-Status: Founder-approved design (2026-07-26, all sections approved)
+Status: Founder-approved design (2026-07-26); post-merge default-on flag policy
+approved 2026-07-27
 Date: 2026-07-26
 Branch: `claude/grounded-discovery-release-9cc859` (from integration checkpoint
 `50dff34c327c96e40a8a7056ae4b58996dcfbdda` on `codex/private-alpha-next`)
@@ -451,7 +452,8 @@ plus bounded LLM tokens. The provider comparison itself is capped at $5.00
 
 ## 16. Integration, feature flag, rollout, and rollback
 
-- **Flags/config:** `ARGUS_GROUNDED_DISCOVERY_ENABLED` (default **false**),
+- **Flags/config:** `ARGUS_GROUNDED_DISCOVERY_ENABLED` (default **true**;
+  explicit `false` is the emergency kill switch),
   `ARGUS_DISCOVERY_SEARCH_PROVIDER` (default the empirically selected
   provider), `ARGUS_DISCOVERY_SEARCH_TIMEOUT_SECONDS=8`,
   `ARGUS_DISCOVERY_MAX_CANDIDATES=5`, `ARGUS_DISCOVERY_HOURLY_LIMIT=10`,

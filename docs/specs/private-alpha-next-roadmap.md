@@ -915,15 +915,15 @@ independent review. Deployment and tester exposure remain separate release
 gates.
 
 Interim founder-outcome checkpoint (2026-07-27): PR #276 delivered the
-default-off **grounded discovery and suggestions** baseline at candidate
+default-on **grounded discovery and suggestions** baseline at candidate
 `cc8b5563`, which landed on `codex/private-alpha-next` as `c212107a`. The slice
 adds one typed discovery route, bounded source-backed Search,
 provider-resolved candidates for equity, crypto, and currency-pair assets,
-persisted EN/ES rendering, honest flag-off recovery, and operational cost
+persisted EN/ES rendering, honest kill-switch recovery, and operational cost
 evidence. Issue #244 remains open: one comparison phrasing missed the typed
-route in the sanctioned live eval, and exact-SHA activation/canary evidence is
-still required before tester exposure. Full Omnisearch is the remaining unbuilt
-founder outcome.
+route in the sanctioned live eval, and Render configuration plus exact-SHA
+canary evidence are still required before tester exposure. Full Omnisearch is
+the remaining unbuilt founder outcome.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration

@@ -79,6 +79,10 @@ def _result_snapshot() -> TaskSnapshot:
 
 
 class TestDiscoveryRouteFlagOff:
+    @pytest.fixture(autouse=True)
+    def _disable_discovery(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", "false")
+
     def test_asset_discovery_act_routes_to_discovery_recovery(self) -> None:
         result = _run(
             message="What cybersecurity stocks could I test?",

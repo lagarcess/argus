@@ -18,7 +18,7 @@ through independently revertible vertical slices:
 - executable capability truth from PR #266, with final candidate `e10bdd2` and
   integration merge `bbd1d2b`; and
 - the Always Progresses continuity baseline from PR #268 at `847c413`; and
-- the default-off grounded-discovery baseline from PR #276, candidate
+- the default-on grounded-discovery baseline from PR #276, candidate
   `cc8b5563`, merged as `c212107a`.
 
 The checkpoint also contains the bounded calendar-materiality correction from
@@ -83,7 +83,7 @@ deterministic test result by itself.
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
-| 5. Discovery is grounded and Argus can suggest | **Baseline landed default-off; activation closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest flag-off recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`. The flag remains off and #244 remains open: comparison phrasing reliability plus exact-SHA activation/canary evidence are required before tester exposure. |
+| 5. Discovery is grounded and Argus can suggest | **Baseline landed default-on; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. #244 remains open: comparison phrasing reliability plus Render configuration and exact-SHA canary evidence are required before tester exposure. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
 Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
@@ -179,7 +179,7 @@ This is the current dispatch gate, not another speculative backlog:
 | Runtime reliability | Guest PR #279 carries the proven #269 fix | Close #269 only after PR #279 lands and the integrated Guest starter passes. Do not open another runtime lane. |
 | Protected interpreter/edit spine | #270 is complete at `b80d95a2`; no active owner | Start #271 from `b80d95a2` or a later clean integration checkpoint. Open #272 only after #271 lands. |
 | Artifact lifecycle and presentation | #273 is complete at `2d5a2b52`; Guest PR #279 still overlaps the shell | Open #249 from the integration merge of PR #279. |
-| Grounded discovery | PR #276 landed default-off as `c212107a`; #244 remains open | Do not duplicate the implementation. Before activation, close the recorded comparison-routing gap and prove the exact deployed SHA/canary. |
+| Grounded discovery | PR #276 landed as `c212107a`; integration default is on and #244 remains open | Do not duplicate the implementation. Before tester exposure, close the recorded comparison-routing gap, configure Render, and prove the exact deployed SHA/canary. |
 | Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto `c212107a` or later; do not invent discovery truth or activate Search implicitly. |
 
 Therefore no additional continuity implementation lane should be opened at this
@@ -295,7 +295,7 @@ implementation queue.
 
 | Outcome | Product proof still required |
 | --- | --- |
-| Grounded discovery and suggestions | The default-off baseline is merged. Before tester exposure, prove reliable comparison phrasing and the exact-SHA activated canary; keep #244 open until then. |
+| Grounded discovery and suggestions | The default-on baseline is merged. Before tester exposure, prove reliable comparison phrasing, configure Render, and pass the exact-SHA canary; keep #244 open until then. |
 | Full Omnisearch | Owner-scoped conversations, results, decisions, and evidence are retrievable with truthful previews and useful navigation. |
 
 Do not select the next slice from the archived issue dependency graph. Select

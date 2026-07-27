@@ -2011,9 +2011,10 @@ actions and to ordinary user text.
 An explicit peer/category asset-discovery turn (typed
 `asset_discovery` interpretation) returns an ordinary assistant response whose
 final payload and persisted assistant-message metadata may include an additive
-`discovery` sidecar. The runtime Search path is gated by
-`ARGUS_GROUNDED_DISCOVERY_ENABLED` (default off); with the flag off, discovery
-turns return typed honest recovery and make zero Search-provider calls.
+`discovery` sidecar. The runtime Search path is enabled by default.
+`ARGUS_GROUNDED_DISCOVERY_ENABLED=false` is the emergency kill switch; with
+the flag off, discovery turns return typed honest recovery and make zero
+Search-provider calls.
 
 ```json
 {

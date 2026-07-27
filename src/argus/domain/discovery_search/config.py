@@ -27,8 +27,11 @@ class DiscoverySearchConfig(BaseModel):
     daily_limit: int
 
 
-def _env_flag(name: str) -> bool:
-    return os.getenv(name, "").strip().lower() in TRUE_VALUES
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in TRUE_VALUES
 
 
 def _env_float(name: str, default: float, *, minimum: float) -> float:
@@ -60,7 +63,7 @@ def _env_int(name: str, default: int, *, minimum: int, maximum: int | None = Non
 def discovery_search_config() -> DiscoverySearchConfig:
     """Read the grounded-discovery runtime config snapshot from the environment."""
     return DiscoverySearchConfig(
-        enabled=_env_flag("ARGUS_GROUNDED_DISCOVERY_ENABLED"),
+        enabled=_env_flag("ARGUS_GROUNDED_DISCOVERY_ENABLED", default=True),
         provider_id=(
             os.getenv("ARGUS_DISCOVERY_SEARCH_PROVIDER", "").strip().lower()
             or DEFAULT_PROVIDER_ID

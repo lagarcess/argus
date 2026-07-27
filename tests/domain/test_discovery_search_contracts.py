@@ -132,7 +132,7 @@ class TestSearchUnavailableError:
 
 
 class TestDiscoverySearchConfig:
-    def test_flag_defaults_off_and_bounds_default(self, monkeypatch) -> None:
+    def test_flag_defaults_on_and_bounds_default(self, monkeypatch) -> None:
         for name in (
             "ARGUS_GROUNDED_DISCOVERY_ENABLED",
             "ARGUS_DISCOVERY_SEARCH_PROVIDER",
@@ -143,7 +143,7 @@ class TestDiscoverySearchConfig:
         ):
             monkeypatch.delenv(name, raising=False)
         config = discovery_search_config()
-        assert config.enabled is False
+        assert config.enabled is True
         assert config.timeout_seconds == 8.0
         assert config.max_candidates == 5
         assert config.hourly_limit == 10

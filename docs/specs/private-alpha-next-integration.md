@@ -13,7 +13,7 @@ executable capability truth (PR #266), the Always Progresses continuity
 baseline (PR #268), calendar-materiality classification (PR #267), chat-header
 title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
 truthful stale Run settlement (PR #277), and supported strategy-transition
-preservation (PR #278), plus the default-off grounded-discovery baseline
+preservation (PR #278), plus the default-on grounded-discovery baseline
 (PR #276). This is an integration checkpoint, not a deployed or tester-exposed
 SHA.
 
@@ -229,10 +229,12 @@ Do not reopen these as debt unless a new bug is reproduced:
 - Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
   Explicit peer/category discovery has one typed route, bounded source-backed
   Search, resolver-validated candidates for equity, crypto, and currency-pair
-  assets, persisted EN/ES rendering, honest flag-off recovery, and operational
-  cost evidence. Search remains default-off. Issue #244 stays open because one
-  comparison phrasing missed the typed route in the sanctioned eval; that gap
-  and an exact-SHA activated canary are required before tester exposure.
+  assets, persisted EN/ES rendering, honest kill-switch recovery, and
+  operational cost evidence. Search is part of the normal Argus shape and
+  defaults on; explicit `false` is the emergency kill switch. Issue #244 stays
+  open because one comparison phrasing missed the typed route in the sanctioned
+  eval; that gap, Render configuration, and an exact-SHA canary are required
+  before tester exposure.
 
 ## P0 Reintegration Checkpoint
 
@@ -250,9 +252,10 @@ The clean reintegration strategy is now part of the process model:
 Codex should own or closely supervise this:
 
 1. **Finish the remaining interim product outcome and activation gates**
-   - Grounded discovery has landed default-off at `c212107a`. Do not duplicate
-     its implementation. Keep #244 open for the accepted comparison-routing
-     limitation and the exact-SHA activation/canary gate.
+   - Grounded discovery has landed at `c212107a` and now defaults on. Do not
+     duplicate its implementation. Keep #244 open for the accepted
+     comparison-routing limitation, Render configuration, and the exact-SHA
+     canary gate.
    - Full Omnisearch may now build against the accepted grounded-discovery
      contract. Its owner must reconcile onto this checkpoint and must not
      invent discovery truth or implicitly activate Search.
