@@ -264,6 +264,54 @@ not a hard gate).
   valid); combining candidates into one run remains governed by the existing
   same-class and 5-symbol guardrails at confirmation time.
 
+### 5.1 OPEN DEFECT — resolution ignores the request's asset class (found 2026-07-27)
+
+Validation resolves the bare `symbol_guess` (`discovery/validation.py`,
+`resolve(symbol_guess)`), and `resolve_asset(symbol: str)` takes no asset-class
+argument. The typed `AssetDiscoveryRequest.asset_class_hint` the interpreter
+already captured is never consulted, so a ticker that exists in more than one
+class resolves to whichever catalog entry matches first — in practice, equities.
+
+Live probe, "what layer 1 crypto coins could I test?" (real provider,
+2026-07-27):
+
+| Row | Resolved to | Verdict |
+| --- | --- | --- |
+| Backtest SOL | SOL/USD | correct |
+| Backtest ADA | ADA/USD | correct |
+| Backtest BTC | Grayscale Bitcoin Mini Trust ETF | **acceptable** |
+| Backtest ETH | Grayscale Ethereum Staking Mini ETF | **acceptable** |
+| Backtest TRX | TRX Gold Corporation | **wrong** |
+
+**The line is exposure, not asset class.** Founder decision: a
+crypto-*exposure* equity is a legitimate answer to a crypto question — many
+users can only reach crypto through a brokerage, so the Grayscale trusts are
+useful, not defects. TRX Gold Corporation is a gold miner that merely shares a
+ticker with Tron. It has no relationship to the thing the user asked about.
+
+So the fix is **not** "honour `asset_class_hint` and drop equities" — that
+would discard the Grayscale rows too. The resolved asset must be *about* the
+entity the source named. Extraction already carries that entity as the
+candidate's `name`, so the corroboration check is structural (does the resolved
+asset correspond to the named entity?) and must not become a phrasebook,
+alias table, or per-language token match.
+
+**Downstream consequence, also observed:** because TRX resolved as an equity,
+selecting it produced "What date range would you like to test TRX against
+SPY?". The equity benchmark is correct *given* the resolution; it is wrong
+because the resolution was. A wrong class silently propagates into benchmark
+defaults.
+
+**Interaction with Slice D of the chat polish lane:** discovery selection now
+carries the resolved identity as a mention (`asset:equity:TRX`). That works as
+designed — it transmits the resolution faithfully. But it also removes the
+chance that the interpreter re-derives a better answer from the text, so this
+defect now propagates with more confidence. Fixing resolution is the
+prerequisite for trusting the identity we pass.
+
+Not yet scheduled. Owned by #244; blocks the crypto/currency-pair acceptance
+journey already on that register.
+
 ## 6. Source, citation, freshness, and persistence contract
 
 **Persistence: assistant-message metadata sidecar; no new tables.** Additive
