@@ -122,17 +122,15 @@ cursor, or make hard-deleted pivots silently guess their pinned tier.
 
 ---
 
-### Task 2: Message keyset pagination and bounded result hydration
+### Task 2: Message keyset pagination
 
 **Owned files:**
 
 - Modify `src/argus/domain/supabase_gateway.py` and/or one cohesive message read
   helper.
-- Modify `src/argus/domain/backtest_message_projection.py`.
 - Modify `src/argus/api/routers/conversations.py`.
 - Modify `tests/test_supabase_gateway_pagination.py`.
-- Modify `tests/test_backtest_message_projection.py`.
-- Add focused reload/lifecycle projection regressions where required.
+- Add focused Message API/Postgres pagination regressions where required.
 
 **Red matrix:**
 
@@ -142,25 +140,17 @@ message_page_uses_created_at_id_asc_after_cursor
 message_first_middle_final_and_empty_pages
 message_equal_timestamps_and_deleted_pivot_are_stable
 message_owner_and_conversation_scope_are_present
-completed_job_and_run_hydration_is_two_bounded_batch_reads
-query_count_does_not_grow_with_completed_message_count
-durable_result_owner_beats_projected_alias
-stale_confirmation_settles_only_its_exact_owner
-guest_and_registered_reload_projection_match_prior_behavior
-later_work_and_represented_request_checks_remain_transcript_correct
 ```
 
 - [ ] Add regressions and capture the exact red.
 - [ ] Query the raw page with `(created_at,id)` keyset ordering and
   `limit + 1`.
-- [ ] Replace per-identity job/run loaders with owner/conversation-scoped batch
-  reads while keeping the current completed-job eligibility checks.
 - [ ] Preserve transcript-wide lifecycle truth with bounded existence/batch
-  reads; never infer artifacts from prose.
-- [ ] Prove focused API, projection, Guest, stale-card, and real-Postgres tests
+  reads where the page boundary otherwise depends on later work; never infer
+  artifacts from prose.
+- [ ] Prove focused API, Guest, lifecycle, and real-Postgres pagination tests
   green.
-- [ ] Commit
-  `perf(messages): bound keyset reads and batch result hydration`.
+- [ ] Commit `perf(messages): push keyset pagination into Postgres`.
 
 **Stop:** any need to hydrate each frontend page independently or change the
 public message/result metadata contract.
@@ -170,7 +160,45 @@ returns.
 
 ---
 
-### Task 3: Bounded merged History
+### Task 3: Bounded completed-job and Run projection
+
+**Owned files:**
+
+- Modify `src/argus/domain/backtest_message_projection.py`.
+- Modify the minimum cohesive Supabase batch-read helper.
+- Modify `tests/test_backtest_message_projection.py`.
+- Add focused Guest/reload/result-owner/stale-card regressions where required.
+
+**Red matrix:**
+
+```text
+completed_job_and_run_hydration_is_two_bounded_batch_reads
+query_count_does_not_grow_with_completed_message_count
+batch_reads_are_owner_and_conversation_scoped
+durable_result_owner_beats_projected_alias
+stale_confirmation_settles_only_its_exact_owner
+guest_and_registered_reload_projection_match_prior_behavior
+later_work_and_represented_request_checks_remain_transcript_correct
+```
+
+- [ ] Add regressions and capture the exact red.
+- [ ] Replace per-identity job/run loaders with owner/conversation-scoped batch
+  reads while keeping the current completed-job eligibility checks.
+- [ ] Preserve message, action, job, Run, result, EvidenceArtifact, and
+  DecisionNote identity; never infer artifacts from prose.
+- [ ] Prove focused projection, API, Guest, stale-card, and result-owner tests
+  green.
+- [ ] Commit `perf(messages): batch completed result hydration`.
+
+**Stop:** any change to public message/result metadata, Guest settlement,
+stale-card meaning, or one-result-owner behavior.
+
+**Rollback:** revert this commit independently; Message keyset paging remains
+useful without the batch-hydration optimization.
+
+---
+
+### Task 4: Bounded merged History
 
 **Owned files:**
 
@@ -211,7 +239,7 @@ public view/RPC.
 
 ---
 
-### Task 4: Bounded Omnisearch and exact Idea Ledger
+### Task 5: Bounded Omnisearch and exact Idea Ledger
 
 **Owned files:**
 
@@ -259,7 +287,7 @@ meaning.
 
 ---
 
-### Task 5: Query-plan-justified indexes and measurement proof
+### Task 6: Query-plan-justified indexes and measurement proof
 
 **Owned files:**
 
@@ -291,7 +319,7 @@ its comments/PR notes; runtime commits remain independently revertible.
 
 ---
 
-### Task 6: Fresh review and proportional corrections
+### Task 7: Fresh review and proportional corrections
 
 - [ ] Request fresh database/query correctness review.
 - [ ] Request fresh API/cursor compatibility review.
@@ -306,7 +334,7 @@ Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 
 ---
 
-### Task 7: Final integration, acceptance, and publication
+### Task 8: Final integration, acceptance, and publication
 
 - [ ] Fetch `origin/codex/private-alpha-next` and merge it normally exactly
   once; never rebase.
