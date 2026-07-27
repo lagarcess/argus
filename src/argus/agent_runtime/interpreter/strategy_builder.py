@@ -233,7 +233,7 @@ def _owned_execution_cost_provenance(
     payload: dict[str, Any],
     field_provenance: dict[str, Any],
     evidence_spans: dict[str, str],
-    validated_execution_cost_evidence: dict[str, tuple[float, str]],
+    validated_execution_cost_evidence: dict[str, tuple[float, str | None]],
     require_validated_evidence: bool,
 ) -> dict[str, Any]:
     updated = dict(field_provenance or {})
@@ -309,7 +309,7 @@ def _ground_execution_cost_evidence_spans(
     evidence_spans: dict[str, str],
     *,
     current_user_message: str,
-    validated_execution_cost_evidence: dict[str, tuple[float, str]],
+    validated_execution_cost_evidence: dict[str, tuple[float, str | None]],
 ) -> dict[str, str]:
     grounded = dict(evidence_spans)
     source_text = str(current_user_message)

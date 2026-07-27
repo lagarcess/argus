@@ -13,6 +13,10 @@ from argus.agent_runtime.artifact_edit_planner import (
     apply_edit_operations,
 )
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    record_typed_plan_cost_evidence,
+    supported_cost_rate_value,
+)
 from argus.agent_runtime.interpreter.shared import (
     _date_window_intent_bound_to_latest_result,
     _field_path_base,
@@ -246,9 +250,15 @@ def _apply_resolved_edit_to_draft(
     if resolved.fee_rate is not None:
         extra_parameters["fee_rate"] = resolved.fee_rate
         field_provenance["fee_rate"] = "explicit_user"
+        record_typed_plan_cost_evidence(
+            draft, field_name="fee_rate", rate=resolved.fee_rate
+        )
     if resolved.slippage is not None:
         extra_parameters["slippage"] = resolved.slippage
         field_provenance["slippage"] = "explicit_user"
+        record_typed_plan_cost_evidence(
+            draft, field_name="slippage", rate=resolved.slippage
+        )
     if resolved.indicator_parameters and allow_indicator_parameters:
         draft.strategy_type = "indicator_threshold"
         draft.indicator = "rsi"
@@ -313,11 +323,21 @@ def _apply_legacy_flat_edit_fields(
         draft.timeframe = plan.timeframe
         field_provenance["timeframe"] = "explicit_user"
     if plan.fee_rate is not None:
-        extra_parameters["fee_rate"] = plan.fee_rate
-        field_provenance["fee_rate"] = "explicit_user"
+        fee_rate = supported_cost_rate_value(plan.fee_rate, field_name="fee_rate")
+        if fee_rate is not None:
+            extra_parameters["fee_rate"] = fee_rate
+            field_provenance["fee_rate"] = "explicit_user"
+            record_typed_plan_cost_evidence(
+                draft, field_name="fee_rate", rate=fee_rate
+            )
     if plan.slippage is not None:
-        extra_parameters["slippage"] = plan.slippage
-        field_provenance["slippage"] = "explicit_user"
+        slippage = supported_cost_rate_value(plan.slippage, field_name="slippage")
+        if slippage is not None:
+            extra_parameters["slippage"] = slippage
+            field_provenance["slippage"] = "explicit_user"
+            record_typed_plan_cost_evidence(
+                draft, field_name="slippage", rate=slippage
+            )
 
 
 def _edit_plan_reshapes_non_recurring_strategy(

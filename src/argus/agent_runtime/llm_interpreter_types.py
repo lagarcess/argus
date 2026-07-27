@@ -122,8 +122,12 @@ class LLMDateRangeIntent(BaseModel):
 
 
 class LLMStrategyDraft(BaseModel):
-    _validated_execution_cost_evidence: dict[str, tuple[float, str]] = PrivateAttr(
-        default_factory=dict
+    # Only deterministic runtime code can write this channel; model output cannot
+    # reach a private attribute. A str span is fidelity-audit evidence bound to a
+    # quote from the current message; a None span is typed edit-plan evidence,
+    # which has no bounded quote.
+    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = (
+        PrivateAttr(default_factory=dict)
     )
 
     raw_user_phrasing: str | None = None

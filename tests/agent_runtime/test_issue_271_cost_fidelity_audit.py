@@ -918,3 +918,29 @@ async def test_runtime_blocks_confirmation_when_cost_audit_cannot_ground_values(
     assert "execution_cost_evidence_unresolved" in result.reason_codes
     assert "fee_rate" not in result.candidate_strategy_draft.extra_parameters
     assert "slippage" not in result.candidate_strategy_draft.extra_parameters
+
+
+def test_validated_cost_evidence_channel_is_unforgeable_from_model_output() -> None:
+    draft = LLMStrategyDraft.model_validate(
+        {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["MSFT"],
+            "extra_parameters": {"fee_rate": 0.001, "slippage": 0.0005},
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+            "_validated_execution_cost_evidence": {
+                "fee_rate": (0.001, None),
+                "slippage": (0.0005, None),
+            },
+        }
+    )
+
+    assert draft._validated_execution_cost_evidence == {}
+    strategy = _strategy_from_llm(
+        draft,
+        current_user_message="Use a 10 bps fee and 5 bps slippage.",
+    )
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters

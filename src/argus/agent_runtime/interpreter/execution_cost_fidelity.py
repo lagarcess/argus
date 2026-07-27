@@ -125,12 +125,28 @@ def _supported_cost_rate(
     *,
     field_name: str,
 ) -> float | None:
-    rate = float(cost.rate)
+    return supported_cost_rate_value(float(cost.rate), field_name=field_name)
+
+
+def supported_cost_rate_value(rate: float, *, field_name: str) -> float | None:
+    """One rate-sanity rule for every channel that can own a modeled cost."""
+
     if not math.isfinite(rate) or rate < 0.0:
         return None
     if field_name == "slippage" and rate > 0.05:
         return None
     return rate
+
+
+def record_typed_plan_cost_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    field_name: str,
+    rate: float,
+) -> None:
+    """Typed edit-plan resolution is validated cost evidence with no quote span."""
+
+    draft._validated_execution_cost_evidence[field_name] = (rate, None)
 
 
 def _candidate_agrees_with_cost(candidate: object, rate: float) -> bool:

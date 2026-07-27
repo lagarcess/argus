@@ -5,16 +5,25 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from argus.agent_runtime.artifact_edit_planner import (
+    ArtifactAssumptionEditPlan,
+    EditOperation,
+)
 from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
+from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+    _response_from_artifact_assumption_edit_plan,
+)
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
+from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
 )
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
@@ -821,3 +830,160 @@ def test_pending_option_selection_preserves_modeled_costs() -> None:
     assert strategy.extra_parameters["field_provenance"]["slippage"] == ("explicit_user")
     assert "pending_response_option_selected" in result.decision.reason_codes
     assert "backtest_job" not in result.patch
+
+
+def _planned_cost_edit_interpretation(
+    *,
+    message: str,
+    snapshot: TaskSnapshot,
+    operations: list[EditOperation],
+) -> StructuredInterpretation:
+    """Run the real planner-response route: typed plan -> planned response ->
+    canonical conversion. This is the production path for active-confirmation
+    cost edits, so these regressions must not inject a pre-built canonical
+    interpretation."""
+
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=snapshot,
+        user=UserState(user_id="u-271"),
+    )
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=list(operations),
+            user_goal_summary="Change the modeled execution costs.",
+        ),
+        request=request,
+    )
+    return OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(response, request=request)
+
+
+def test_planned_explicit_zero_cost_edit_clears_owned_costs() -> None:
+    message = "Set both the fee and slippage to 0 bps."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[
+            EditOperation(op="set", target="fees", number=0.0),
+            EditOperation(op="set", target="slippage", number=0.0),
+        ],
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u-271"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=_RecordingInterpreter(interpretation),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.0
+    assert strategy.extra_parameters["slippage"] == 0.0
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
+    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+
+    confirmation_state = RunState.new(
+        current_user_message=message,
+        recent_thread_history=[],
+    )
+    confirmation_state.candidate_strategy_draft = strategy
+    confirmation = confirm_stage(
+        state=confirmation_state,
+        contract=build_default_capability_contract(),
+    )
+    assert confirmation.outcome == "await_approval"
+    payload = confirmation.patch["confirmation_payload"]
+    assert payload["optional_parameters"]["fees"]["value"] == 0.0
+    assert payload["optional_parameters"]["slippage"]["value"] == 0.0
+    assert "No fees" in payload["strategy"]["assumptions"]
+    assert "No slippage" in payload["strategy"]["assumptions"]
+    assert "_execution_realism" not in payload["launch_payload"]
+
+
+def test_planned_nonzero_cost_edit_updates_owned_costs() -> None:
+    message = "Make it 20 bps fees and 7 bps slippage."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[
+            EditOperation(op="set", target="fees", number=0.002),
+            EditOperation(op="set", target="slippage", number=0.0007),
+        ],
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u-271"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=_RecordingInterpreter(interpretation),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.002
+    assert strategy.extra_parameters["slippage"] == 0.0007
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
+    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.capital_amount == 12000
+    assert "backtest_job" not in result.patch
+
+
+def test_legacy_flat_plan_cost_edit_updates_owned_costs() -> None:
+    message = "Set fees to 20 bps and slippage to 7 bps."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=snapshot,
+        user=UserState(user_id="u-271"),
+    )
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            fee_rate=0.002,
+            slippage=0.0007,
+            user_goal_summary="Change the modeled execution costs.",
+        ),
+        request=request,
+    )
+    interpretation = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(response, request=request)
+
+    strategy = interpretation.candidate_strategy_draft
+    assert strategy.extra_parameters["fee_rate"] == 0.002
+    assert strategy.extra_parameters["slippage"] == 0.0007
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
+    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+
+
+def test_planned_cost_edit_rejects_unsupported_rates() -> None:
+    message = "Set slippage to 5000 bps and fees to -10 bps."
+    snapshot = _active_confirmation_snapshot(_cost_strategy())
+    interpretation = _planned_cost_edit_interpretation(
+        message=message,
+        snapshot=snapshot,
+        operations=[
+            EditOperation(op="set", target="slippage", number=0.5),
+            EditOperation(op="set", target="fees", number=-0.001),
+        ],
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert interpretation.requires_clarification is True
