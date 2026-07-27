@@ -1118,7 +1118,14 @@ def test_filtered_idea_ledger_pages_keep_cursor_order_and_exact_counts(
         }
         seen.extend(str(row["id"]) for row in page)
         if page:
-            cursor_at = datetime.fromisoformat(str(page[-1]["updated_at"]))
+            raw_cursor_at = str(page[-1]["updated_at"])
+            try:
+                cursor_at = datetime.fromisoformat(raw_cursor_at)
+            except ValueError:
+                cursor_at = datetime.strptime(
+                    raw_cursor_at,
+                    "%Y-%m-%dT%H:%M:%S.%f%z",
+                )
             cursor_id = str(page[-1]["id"])
 
     assert len(seen) == len(set(seen))
