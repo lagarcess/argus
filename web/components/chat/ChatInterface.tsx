@@ -280,12 +280,6 @@ function hasActiveArtifactActionSet(messages: Message[]) {
   });
 }
 
-function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
-  if (action.type === "show_breakdown") {
-    return actions.filter((candidate) => candidate.type !== "show_breakdown");
-  }
-  return [];
-}
 
 function consumeConfirmationActionOnMessages(
   messages: Message[],
@@ -563,7 +557,6 @@ export default function ChatInterface() {
   const router = useRouter();
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [attentionConversationIds, setAttentionConversationIds] = useState<Set<string>>(
     () => new Set(),
@@ -706,7 +699,6 @@ export default function ChatInterface() {
     currentViewRef.current = "chat";
     setConversationId(null);
     setMessages([]);
-    setInputActions([]);
     setStreamStatus(null);
     setIsHydratingConversation(false);
     setIsStreamingResponse(false);
@@ -925,7 +917,6 @@ export default function ChatInterface() {
             rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
-            setInputActions(hydrated.inputActions);
             return;
           } catch (error) {
             if (cancelled) return;
@@ -941,7 +932,6 @@ export default function ChatInterface() {
             setMessages([
               conversationLoadFailureMessage(activeConversationId, t('chat.error_load')),
             ]);
-            setInputActions([]);
             return;
           }
         }
@@ -1012,7 +1002,6 @@ export default function ChatInterface() {
         return;
       }
       setMessages(hydrated.messages);
-      setInputActions(hydrated.inputActions);
     } catch (error) {
       if (isMissingConversationLoadError(error)) {
         setHistoryItems((prev) =>
@@ -1023,7 +1012,6 @@ export default function ChatInterface() {
         return;
       }
       setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
-      setInputActions([]);
       showToast(t('chat.error_load'));
     } finally {
       setStreamStatus(null);
@@ -1230,7 +1218,6 @@ export default function ChatInterface() {
         renderUserMessage,
       });
     });
-    setInputActions([]);
     setStreamStatus(null);
     activeStreamConversationIdRef.current = targetConversationId;
     setIsStreamingResponse(true);
@@ -1292,7 +1279,6 @@ export default function ChatInterface() {
                 assistantMessageId: persistedErrorMessageId,
               })
             : retryLastTurnAction);
-        setInputActions([]);
         clearActiveStreamState();
         setMessages((prev) =>
           normalizeDurableRetryActionHistory(
@@ -1369,7 +1355,6 @@ export default function ChatInterface() {
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
           const finalAssistantId = finalMessageId ?? assistantId;
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1398,7 +1383,6 @@ export default function ChatInterface() {
             savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
             actions: resultActions,
           };
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1420,7 +1404,6 @@ export default function ChatInterface() {
           );
         } else if (finalBacktestJob) {
           const finalAssistantId = finalMessageId ?? assistantId;
-          setInputActions([]);
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1447,9 +1430,6 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
-          setInputActions(
-            visibleComposerResponseActions(finalResponseActions),
-          );
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1577,7 +1557,6 @@ export default function ChatInterface() {
           );
           if (!reconciliationController.signal.aborted && canApplyOwnedStreamUpdate()) {
             setMessages(view.messages);
-            setInputActions(view.inputActions);
             if (!view.showChecking) {
               clearActiveStreamState();
             }
@@ -1593,7 +1572,6 @@ export default function ChatInterface() {
       const confirmationId = ambiguousRunConfirmationId(action, err);
       if (confirmationId) {
         if (canApplyConversationOwnedUpdate(activeStreamTargetConversationId)) {
-          setInputActions([]);
           setStreamStatus(t('chat.status.checking'));
           setMessages((prev) =>
             settleConfirmationAfterActionTransportError(prev, action, {
@@ -1648,7 +1626,6 @@ export default function ChatInterface() {
         activeStreamTargetConversationId,
       );
       if (canApplyOwnedUpdate) {
-        setInputActions([]);
         clearActiveStreamState();
       }
       const status = (err as { status?: number }).status;
@@ -1813,7 +1790,6 @@ export default function ChatInterface() {
       presentation: action.presentation,
     };
 
-    setInputActions([]);
     setStreamStatus(null);
     setIsStreamingResponse(true);
     try {
@@ -1895,7 +1871,6 @@ export default function ChatInterface() {
         ),
       );
     }
-    setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 

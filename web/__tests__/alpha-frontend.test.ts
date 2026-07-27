@@ -626,7 +626,7 @@ describe("Argus Alpha frontend contract", () => {
 
     const activeArtifactHelper = chat.slice(
       chat.indexOf("function hasActiveArtifactActionSet"),
-      chat.indexOf("function consumeInputAction"),
+      chat.indexOf("function consumeConfirmationActionOnMessages"),
     );
 
     expect(activeArtifactHelper).toContain("messages.some");
@@ -1237,17 +1237,15 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("consumeInputAction");
+    // Result-card chip consumption is message-scoped and still live. The
+    // composer-strip half of this mechanism went away with the strip itself.
     expect(chat).toContain("consumeResultActionOnMessages");
     expect(chat).toContain("consumedResultActionsFromApi");
     expect(chat).toContain("applyConsumedResultActions");
-    expect(chat).toContain('action.type === "show_breakdown"');
-    expect(chat).toContain('type !== "show_breakdown"');
-    expect(chat).toContain(
-      "setInputActions(consumeInputAction(action, inputActions))",
-    );
+    expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('latestAi?.kind === "strategy_result"');
-    expect(chat).toContain("setInputActions([])");
+    expect(chat).not.toContain("consumeInputAction");
+    expect(chat).not.toContain("setInputActions");
   });
 
   test("chat resumes explicit conversation routes instead of creating a fresh one on reload", () => {
