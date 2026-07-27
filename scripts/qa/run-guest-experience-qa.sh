@@ -15,14 +15,15 @@ case "$mode" in
 esac
 shift
 
-expected_root="/Users/garces/.codex/worktrees/2f927a60-b587-4135-aff4-24020c81fe93/private-alpha-next"
 actual_root="$(git rev-parse --show-toplevel)"
-[ "$actual_root" = "$expected_root" ] || {
-  echo "guest QA refused: wrong worktree" >&2
+[ "$actual_root" = "$ROOT_DIR" ] || {
+  echo "guest QA refused: script root does not match repository root" >&2
   exit 1
 }
-[ "$(git branch --show-current)" = "codex/guest-experience" ] || {
-  echo "guest QA refused: wrong or detached branch" >&2
+candidate_sha="$(git rev-parse HEAD)"
+expected_candidate_sha="${ARGUS_EXPECTED_CANDIDATE_SHA:-$candidate_sha}"
+[ "$candidate_sha" = "$expected_candidate_sha" ] || {
+  echo "guest QA refused: HEAD does not match ARGUS_EXPECTED_CANDIDATE_SHA" >&2
   exit 1
 }
 
@@ -47,7 +48,7 @@ else
   unset ARGUS_GUEST_QA_ALLOW_TEST_DIFF || true
 fi
 
-export ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
+export ARGUS_CANDIDATE_SHA="$candidate_sha"
 unset ARGUS_QA_APPROVED_SUPABASE_REF || true
 
 app_port="${ARGUS_GUEST_QA_APP_PORT:-3000}"

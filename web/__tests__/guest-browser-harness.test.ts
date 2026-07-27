@@ -1105,6 +1105,13 @@ describe("Checks 6–20 harness guards", () => {
     expect(runner).toContain('supabase status --workdir "$supabase_workdir"');
     expect(runner).toContain("com.supabase.cli.project");
     expect(runner).toContain("lsof");
+    expect(runner).not.toContain(
+      "/Users/garces/.codex/worktrees/2f927a60-b587-4135-aff4-24020c81fe93/private-alpha-next",
+    );
+    expect(runner).not.toContain(
+      '[ "$(git branch --show-current)" = "codex/guest-experience" ]',
+    );
+    expect(runner).toContain("ARGUS_EXPECTED_CANDIDATE_SHA");
     expect(config).toContain("bun run start");
     expect(config).not.toContain("bun run dev");
     expect(config).toContain("guestQaEndpointConfig");

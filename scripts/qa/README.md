@@ -80,8 +80,15 @@ bash scripts/qa/run-guest-experience-qa.sh authoritative
 ```
 
 Do not run the authoritative command against an existing server or a hosted
-Supabase project. The runner requires the exact clean `codex/guest-experience`
-HEAD and starts fresh local services itself.
+Supabase project. The runner requires a clean worktree and starts fresh local
+services itself. It is branch-agnostic so the same committed gate can verify a
+merged or reintegrated candidate. Pin the expected commit when handing the run
+between release captains:
+
+```bash
+ARGUS_EXPECTED_CANDIDATE_SHA="$(git rev-parse HEAD)" \
+bash scripts/qa/run-guest-experience-qa.sh authoritative
+```
 
 ## One-shot run
 
