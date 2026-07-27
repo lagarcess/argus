@@ -46,7 +46,10 @@ from argus.domain.postgres_history_reader import (
     PostgresHistoryReader,
     history_reader_for_database_url,
 )
-from argus.domain.search_text import normalize_search_text, search_text_matches_query
+from argus.domain.postgres_search_reader import (
+    PostgresSearchReader,
+    SearchReadResult,
+)
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
@@ -215,6 +218,7 @@ class SupabaseGateway(
     client: Client
     auth_client: Client | None = None
     history_reader: PostgresHistoryReader | None = None
+    search_reader: PostgresSearchReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -233,6 +237,7 @@ class SupabaseGateway(
         auth_key = (
             os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_PUBLIC_KEY") or key
         )
+        history_reader = history_reader_for_database_url(database_url)
         return cls(
             client=create_client(url, key, options=_supabase_client_options()),
             auth_client=create_client(
@@ -240,7 +245,8 @@ class SupabaseGateway(
                 auth_key,
                 options=_supabase_client_options(),
             ),
-            history_reader=history_reader_for_database_url(database_url),
+            history_reader=history_reader,
+            search_reader=PostgresSearchReader(history_reader.pool),
         )
 
     def new_id(self) -> str:
@@ -1899,204 +1905,31 @@ class SupabaseGateway(
         )
 
     def search_rows(
-        self, *, user_id: str, query: str, limit: int | None
-    ) -> dict[str, list[dict[str, Any]]]:
-        normalized_query = normalize_search_text(query)
-        conversations_query = (
-            self.client.table("conversations")
-            .select("id,title,last_message_preview,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
+        self,
+        *,
+        user_id: str,
+        query: str,
+        source_limit: int,
+        cursor_updated_at: datetime | None = None,
+        cursor_id: str | None = None,
+        decision_state: str | None = None,
+        include_ledger_groups: bool = False,
+        guest_scope: bool = False,
+        guest_conversation_id: str | None = None,
+    ) -> SearchReadResult:
+        if self.search_reader is None:
+            raise RuntimeError("Persistent Search requires its Postgres reader.")
+        return self.search_reader.search_rows(
+            user_id=user_id,
+            query=query,
+            source_limit=source_limit,
+            cursor_updated_at=cursor_updated_at,
+            cursor_id=cursor_id,
+            decision_state=decision_state,
+            include_ledger_groups=include_ledger_groups,
+            guest_scope=guest_scope,
+            guest_conversation_id=guest_conversation_id,
         )
-        strategies_query = (
-            self.client.table("strategies")
-            .select("id,name,symbols,template,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-        )
-        collections_query = (
-            self.client.table("collections")
-            .select("id,name,updated_at,deleted_at,pinned")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-        )
-        runs_query = (
-            self.client.table("backtest_runs")
-            .select(
-                "id,conversation_id,conversation_result_card,created_at,status,"
-                "asset_class,benchmark_symbol"
-            )
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .order("created_at", desc=True)
-        )
-        ideas_query = (
-            self.client.table("ideas")
-            .select(
-                "id,title,summary,lifecycle,active_version_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-        evidence_query = (
-            self.client.table("evidence_artifacts")
-            .select(
-                "id,title,digest,lifecycle,artifact_type,payload,source_run_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-        decisions_query = (
-            self.client.table("decision_notes")
-            .select(
-                "id,idea_id,decision_state,note,evidence_artifact_id,"
-                "source_conversation_id,updated_at"
-            )
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-        )
-
-        if limit is None:
-            conversations_raw = self._fetch_all_rows(
-                lambda start, end: conversations_query.range(start, end)
-            )
-            strategies_raw = self._fetch_all_rows(
-                lambda start, end: strategies_query.range(start, end)
-            )
-            collections_raw = self._fetch_all_rows(
-                lambda start, end: collections_query.range(start, end)
-            )
-            runs_raw = self._fetch_all_rows(
-                lambda start, end: runs_query.range(start, end)
-            )
-            ideas_raw = self._fetch_all_rows(
-                lambda start, end: ideas_query.range(start, end)
-            )
-            evidence_raw = self._fetch_all_rows(
-                lambda start, end: evidence_query.range(start, end)
-            )
-            decisions_raw = self._fetch_all_rows(
-                lambda start, end: decisions_query.range(start, end)
-            )
-        else:
-            conversations_raw = conversations_query.limit(limit).execute().data or []
-            strategies_raw = strategies_query.limit(limit).execute().data or []
-            collections_raw = collections_query.limit(limit).execute().data or []
-            runs_raw = runs_query.limit(limit).execute().data or []
-            ideas_raw = ideas_query.limit(limit).execute().data or []
-            evidence_raw = evidence_query.limit(limit).execute().data or []
-            decisions_raw = decisions_query.limit(limit).execute().data or []
-
-        conversations = [
-            row
-            for row in conversations_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=f"{row.get('title', '')} {row.get('last_message_preview') or ''}",
-            )
-        ]
-        strategies = [
-            row
-            for row in strategies_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{row.get('name', '')} {' '.join(row.get('symbols') or [])} "
-                    f"{row.get('template') or ''}"
-                ),
-            )
-        ]
-        collections = [
-            row
-            for row in collections_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=row.get("name", ""),
-            )
-        ]
-        runs = [
-            row
-            for row in runs_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{(row.get('conversation_result_card') or {}).get('title', '')} "
-                    f"{' '.join((row.get('conversation_result_card') or {}).get('symbols') or [])} "
-                    f"{(row.get('conversation_result_card') or {}).get('strategy_label', '')} "
-                    f"{row.get('benchmark_symbol') or ''}"
-                ),
-            )
-        ]
-        # Idea Ledger: roll up each idea's CURRENT (latest) decision_state from the
-        # UNFILTERED decisions, so the status survives a search that matched the idea
-        # by title/summary but not its decision text, and so an empty-query status
-        # browse (q="" + a decision_state filter, which the /search router permits)
-        # still returns ideas. raw["decisions"] below is query-filtered and must NOT
-        # be used for this rollup.
-        idea_decision_state: dict[str, Any] = {}
-        idea_decision_ts: dict[str, Any] = {}
-        for drow in decisions_raw:
-            idea_key = str(drow.get("idea_id") or "")
-            state = drow.get("decision_state")
-            if not idea_key or not state:
-                continue
-            ts = drow.get("updated_at")
-            prior_ts = idea_decision_ts.get(idea_key)
-            if idea_key not in idea_decision_state or (
-                ts is not None and (prior_ts is None or ts >= prior_ts)
-            ):
-                idea_decision_ts[idea_key] = ts
-                idea_decision_state[idea_key] = state
-        ideas = [
-            {**row, "decision_state": idea_decision_state.get(str(row.get("id")))}
-            for row in ideas_raw
-            if not normalized_query
-            or search_text_matches_query(
-                query=normalized_query,
-                text=f"{row.get('title', '')} {row.get('summary') or ''}",
-            )
-        ]
-        evidence = [
-            row
-            for row in evidence_raw
-            if search_text_matches_query(
-                query=normalized_query,
-                text=(
-                    f"{row.get('title', '')} {row.get('digest') or ''} "
-                    f"{' '.join(((row.get('payload') or {}).get('result_card') or {}).get('symbols') or [])}"
-                ),
-            )
-        ]
-        evidence_by_id = {str(row.get("id")): row for row in evidence_raw}
-        decisions = []
-        for row in decisions_raw:
-            artifact = evidence_by_id.get(str(row.get("evidence_artifact_id"))) or {}
-            haystack = (
-                f"{row.get('decision_state', '')} {row.get('note') or ''} "
-                f"{artifact.get('title', '')} {artifact.get('digest', '')}"
-            )
-            if search_text_matches_query(query=normalized_query, text=haystack):
-                decisions.append(
-                    {
-                        **row,
-                        "artifact_title": artifact.get("title"),
-                        "artifact_digest": artifact.get("digest"),
-                    }
-                )
-        return {
-            "conversations": conversations,
-            "strategies": strategies,
-            "collections": collections,
-            "runs": runs,
-            "ideas": ideas,
-            "evidence": evidence,
-            "decisions": decisions,
-        }
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
         self._require_owned_conversation(

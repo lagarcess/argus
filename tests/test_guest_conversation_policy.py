@@ -407,3 +407,14 @@ def test_guest_search_is_limited_to_current_workspace_artifacts(
         ("backtest", "00000000-0000-0000-0000-000000000064"),
     }
     assert payload["ledger_groups"] == []
+    gateway.search_rows.assert_called_once_with(
+        user_id=USER_ID,
+        query="btc",
+        source_limit=21,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=True,
+        guest_scope=True,
+        guest_conversation_id=CONVERSATION_ID,
+    )

@@ -13,6 +13,7 @@ from argus.domain.backtest_finalization import (
     finalize_backtest_completion,
 )
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
+from argus.domain.postgres_search_reader import SearchReadResult
 from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_conversation_messages import (
@@ -2630,20 +2631,61 @@ def _idea_ledger_search_client() -> _SearchRowsClient:
     )
 
 
-def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
+def test_search_rows_delegates_to_private_postgres_reader():
+    search_reader = MagicMock()
+    expected = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts=None,
+    )
+    search_reader.search_rows.return_value = expected
+    gateway = SupabaseGateway(
+        client=_idea_ledger_search_client(),
+        search_reader=search_reader,
+    )
+
+    result = gateway.search_rows(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="momentum",
+        source_limit=21,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=False,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+    assert result is expected
+    search_reader.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="momentum",
+        source_limit=21,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=False,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+
+def test_search_rows_requires_private_postgres_reader():
     gateway = SupabaseGateway(client=_idea_ledger_search_client())
 
-    raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
-
-    assert len(raw["ideas"]) == 1
-    assert raw["ideas"][0]["decision_state"] == "promising"
-    assert raw["decisions"] == []
-
-
-def test_search_rows_empty_query_status_browse_returns_ideas():
-    gateway = SupabaseGateway(client=_idea_ledger_search_client())
-
-    raw = gateway.search_rows(user_id="user-1", query="", limit=None)
-
-    assert len(raw["ideas"]) == 1
-    assert raw["ideas"][0]["decision_state"] == "promising"
+    with pytest.raises(
+        RuntimeError,
+        match="Persistent Search requires its Postgres reader",
+    ):
+        gateway.search_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            query="",
+            source_limit=21,
+        )

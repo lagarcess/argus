@@ -27,6 +27,7 @@ from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.postgres_history_reader import HistoryCursorError
+from argus.domain.postgres_search_reader import SearchReadResult
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import (
     ConversationCursorError,
@@ -2389,6 +2390,103 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     assert {item["type"] for item in payload["items"]}.issubset(
         {"chat", "strategy", "collection", "run"}
     )
+
+
+def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    pivot_id = "00000000-0000-0000-0000-000000000091"
+    mock_gateway.search_rows.return_value = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts={
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+    )
+    cursor = encode_cursor(now.isoformat(), pivot_id)
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "Needle",
+            "limit": 2,
+            "cursor": cursor,
+            "decision_state": "promising",
+            "include_ledger_groups": "true",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="needle",
+        source_limit=3,
+        cursor_updated_at=now,
+        cursor_id=pivot_id,
+        decision_state="promising",
+        include_ledger_groups=True,
+        guest_scope=False,
+        guest_conversation_id=None,
+    )
+
+
+def test_search_reader_cursor_failure_maps_to_invalid_cursor_problem(
+    mock_gateway,
+):
+    try:
+        from argus.domain.postgres_search_reader import SearchCursorError
+    except ModuleNotFoundError:
+        pytest.fail("bounded Postgres Search reader is not implemented")
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.side_effect = SearchCursorError("missing pivot")
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "needle",
+            "cursor": encode_cursor(
+                now.isoformat(),
+                "00000000-0000-0000-0000-000000000091",
+            ),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
+
+
+def test_search_supabase_rejects_naive_cursor_before_database_read(
+    mock_gateway,
+):
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "needle",
+            "cursor": encode_cursor(
+                "2026-07-27T12:00:00",
+                "00000000-0000-0000-0000-000000000091",
+            ),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid cursor."
+    mock_gateway.search_rows.assert_not_called()
 
 
 def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
