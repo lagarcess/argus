@@ -189,6 +189,273 @@ def test_latest_message_uses_owner_scope_and_descending_bounded_query() -> None:
     query.limit.assert_called_once_with(1)
 
 
+def test_conversation_has_user_message_uses_owned_role_scoped_existence_query() -> None:
+    client, query = _message_query_mock(
+        row={
+            "id": "user-message-1",
+            "conversation_id": "conversation-1",
+            "role": "user",
+            "content": "Test Apple.",
+            "metadata": {},
+            "created_at": "2026-07-17T10:00:00+00:00",
+        }
+    )
+    gateway = SupabaseGateway(client=client)
+
+    exists = gateway.conversation_has_user_message(
+        user_id="user-1",
+        conversation_id="conversation-1",
+    )
+
+    assert exists is True
+    assert query.eq.call_args_list == [
+        (("user_id", "user-1"),),
+        (("conversation_id", "conversation-1"),),
+        (("role", "user"),),
+    ]
+    query.limit.assert_called_once_with(1)
+
+
+def _json_filter_value(row: dict[str, Any], key: str) -> object:
+    value: object = row
+    for part in key.replace("->>", "->").split("->"):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+class _DecisionResultClient:
+    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+        self.rows_by_table = rows_by_table
+        self.queries: list[_DecisionResultQuery] = []
+
+    def table(self, table_name: str) -> "_DecisionResultQuery":
+        query = _DecisionResultQuery(self, table_name)
+        self.queries.append(query)
+        return query
+
+
+class _DecisionResultQuery:
+    def __init__(self, client: _DecisionResultClient, table_name: str) -> None:
+        self.client = client
+        self.table_name = table_name
+        self.operation = "select"
+        self.payload: dict[str, Any] | None = None
+        self.equal_filters: list[tuple[str, object]] = []
+        self.in_filters: list[tuple[str, tuple[object, ...]]] = []
+        self.range_window: tuple[int, int] | None = None
+        self.executed = False
+
+    def select(self, _columns: str) -> "_DecisionResultQuery":
+        self.operation = "select"
+        return self
+
+    def update(self, payload: dict[str, Any]) -> "_DecisionResultQuery":
+        self.operation = "update"
+        self.payload = payload
+        return self
+
+    def eq(self, key: str, value: object) -> "_DecisionResultQuery":
+        self.equal_filters.append((key, value))
+        return self
+
+    def in_(self, key: str, values: list[object]) -> "_DecisionResultQuery":
+        self.in_filters.append((key, tuple(values)))
+        return self
+
+    def order(
+        self,
+        _column: str,
+        *,
+        desc: bool = False,
+    ) -> "_DecisionResultQuery":
+        return self
+
+    def range(self, start: int, end: int) -> "_DecisionResultQuery":
+        self.range_window = (start, end)
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        self.executed = True
+        rows = [
+            row
+            for row in self.client.rows_by_table[self.table_name]
+            if all(
+                _json_filter_value(row, key) == value
+                for key, value in self.equal_filters
+            )
+            and all(
+                _json_filter_value(row, key) in values
+                for key, values in self.in_filters
+            )
+        ]
+        if self.operation == "update":
+            assert self.payload is not None
+            for row in rows:
+                row.update(self.payload)
+            return SimpleNamespace(data=rows)
+        if self.range_window is not None:
+            start, end = self.range_window
+            rows = rows[start : end + 1]
+        return SimpleNamespace(data=rows)
+
+
+def test_decision_enrichment_targets_every_direct_and_projected_result_identity() -> (
+    None
+):
+    now = utcnow()
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "buy_and_hold"},
+        conversation_result_card={
+            "title": "AAPL result",
+            "evidence_artifact_id": "evidence-1",
+        },
+        created_at=now,
+        chart=None,
+        trades=[],
+    )
+    messages = [
+        {
+            "id": "direct-run",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Completed.",
+            "metadata": {
+                "result_run_id": "run-1",
+                "result_card": {
+                    "title": "Direct result",
+                    "evidence_artifact_id": "evidence-1",
+                },
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "direct-artifact",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Saved result.",
+            "metadata": {
+                "result_card": {
+                    "title": "Artifact result",
+                    "evidence_artifact_id": "evidence-1",
+                }
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "projected-root-alias",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Queued.",
+            "metadata": {
+                "backtest_job_id": "job-1",
+                "backtest_job": {"id": "job-1", "status": "queued"},
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "projected-nested-alias",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Queued.",
+            "metadata": {
+                "backtest_job": {"id": "job-1", "status": "queued"},
+            },
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "unrelated-result",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Other result.",
+            "metadata": {
+                "result_run_id": "run-2",
+                "result_card": {
+                    "title": "Other",
+                    "evidence_artifact_id": "evidence-2",
+                },
+            },
+            "created_at": now.isoformat(),
+        },
+    ]
+    client = _DecisionResultClient(
+        {
+            "messages": messages,
+            "backtest_jobs": [
+                {
+                    "id": "job-1",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                    "result_run_id": "run-1",
+                    "execution_metadata": {
+                        "workflow_backtest": {"result_readout": "Completed."}
+                    },
+                }
+            ],
+        }
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+    gateway.get_backtest_run = MagicMock(return_value=run)  # type: ignore[method-assign]
+    gateway.update_backtest_run_result_card = MagicMock(  # type: ignore[method-assign]
+        return_value=run
+    )
+    gateway.list_messages = MagicMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("decision enrichment must not scan the transcript")
+    )
+
+    gateway.mark_result_card_decision_for_run(
+        user_id="user-1",
+        run_id="run-1",
+        evidence_artifact_id="evidence-1",
+        decision_id="decision-1",
+        decision_state="promising",
+    )
+
+    by_id = {row["id"]: row for row in messages}
+    for message_id in (
+        "direct-run",
+        "direct-artifact",
+        "projected-root-alias",
+        "projected-nested-alias",
+    ):
+        metadata = by_id[message_id]["metadata"]
+        assert metadata["result_card"]["decision_note_id"] == "decision-1"
+        assert metadata["result_card"]["decision_state"] == "promising"
+        assert metadata["decision_note_id"] == "decision-1"
+        assert metadata["decision_state"] == "promising"
+    assert "decision_note_id" not in by_id["unrelated-result"]["metadata"]
+    gateway.list_messages.assert_not_called()
+
+    select_queries = [
+        query
+        for query in client.queries
+        if query.operation == "select" and query.executed
+    ]
+    assert select_queries
+    assert all(query.range_window is not None for query in select_queries)
+    assert all(
+        ("user_id", "user-1") in query.equal_filters
+        and ("conversation_id", "conversation-1") in query.equal_filters
+        for query in select_queries
+    )
+
+
 def test_conversation_message_append_migration_is_one_locked_service_role_boundary() -> (
     None
 ):

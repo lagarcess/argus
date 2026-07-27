@@ -81,6 +81,8 @@ _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "es-419": "es-419",
 }
 _MESSAGE_SELECT = "id,conversation_id,role,content,metadata,created_at"
+_OWNED_MESSAGE_SELECT = f"{_MESSAGE_SELECT},user_id"
+_COMPLETED_RESULT_BATCH_SIZE = 100
 
 
 def _truthy_metadata_filter(field: str) -> str:
@@ -124,6 +126,34 @@ _LEGACY_ONBOARDING_GOAL_LIKE = (
 
 def _now_iso() -> str:
     return utcnow().isoformat()
+
+
+def _distinct_chunks(values: list[str], *, size: int) -> list[list[str]]:
+    distinct = list(dict.fromkeys(values))
+    return [distinct[start : start + size] for start in range(0, len(distinct), size)]
+
+
+def _unique_owned_rows_by_id(
+    rows: list[dict[str, Any]],
+    *,
+    requested_ids: set[str],
+    user_id: str,
+    conversation_id: str,
+) -> dict[str, dict[str, Any]]:
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    for raw_row in rows:
+        row = dict(raw_row)
+        candidate_id = str(row.get("id") or "").strip()
+        if candidate_id not in requested_ids:
+            continue
+        candidates.setdefault(candidate_id, []).append(row)
+    return {
+        candidate_id: matches[0]
+        for candidate_id, matches in candidates.items()
+        if len(matches) == 1
+        and matches[0].get("user_id") == user_id
+        and matches[0].get("conversation_id") == conversation_id
+    }
 
 
 def _visible_runtime_failure_request_id(message: Message) -> str | None:
@@ -583,6 +613,23 @@ class SupabaseGateway(
         )
         return len(result.data or [])
 
+    def conversation_has_user_message(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+    ) -> bool:
+        result = (
+            self.client.table("messages")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .eq("role", "user")
+            .limit(1)
+            .execute()
+        )
+        return bool(result.data)
+
     def list_messages(
         self,
         *,
@@ -818,6 +865,113 @@ class SupabaseGateway(
         )
         return BacktestRun.model_validate(_row_one(updated))
 
+    def _decision_result_messages(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        run: BacktestRun,
+        evidence_artifact_id: str,
+        enriched_card: dict[str, Any],
+    ) -> list[Message]:
+        def messages_equal_to(path: str, value: str) -> list[dict[str, Any]]:
+            ordered = (
+                self.client.table("messages")
+                .select(_OWNED_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .eq(path, value)
+                .order("created_at", desc=False)
+                .order("id", desc=False)
+            )
+            return self._fetch_all_rows(
+                lambda start, end: ordered.range(start, end)
+            )
+
+        candidate_rows = [
+            *messages_equal_to("metadata->>result_run_id", run.id),
+            *messages_equal_to("metadata->>latest_run_id", run.id),
+            *messages_equal_to(
+                "metadata->result_card->>evidence_artifact_id",
+                evidence_artifact_id,
+            ),
+        ]
+
+        ordered_jobs = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .eq("status", "succeeded")
+            .eq("result_run_id", run.id)
+            .order("id", desc=False)
+        )
+        job_rows = self._fetch_all_rows(
+            lambda start, end: ordered_jobs.range(start, end)
+        )
+        job_ids = {
+            str(row.get("id") or "").strip()
+            for row in job_rows
+            if row.get("id") is not None
+        }
+        jobs_by_id = _unique_owned_rows_by_id(
+            job_rows,
+            requested_ids=job_ids,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+        jobs_by_id = {
+            job_id: job
+            for job_id, job in jobs_by_id.items()
+            if job.get("status") == "succeeded"
+            and str(job.get("result_run_id") or "").strip() == run.id
+        }
+
+        for requested in _distinct_chunks(
+            list(jobs_by_id),
+            size=_COMPLETED_RESULT_BATCH_SIZE,
+        ):
+            for path in (
+                "metadata->>backtest_job_id",
+                "metadata->backtest_job->>id",
+            ):
+                ordered_aliases = (
+                    self.client.table("messages")
+                    .select(_OWNED_MESSAGE_SELECT)
+                    .eq("user_id", user_id)
+                    .eq("conversation_id", conversation_id)
+                    .in_(path, requested)
+                    .order("created_at", desc=False)
+                    .order("id", desc=False)
+                )
+                candidate_rows.extend(
+                    self._fetch_all_rows(
+                        lambda start, end, query=ordered_aliases: query.range(
+                            start,
+                            end,
+                        )
+                    )
+                )
+
+        messages_by_id: dict[str, Message] = {}
+        for row in candidate_rows:
+            if (
+                row.get("user_id") != user_id
+                or row.get("conversation_id") != conversation_id
+            ):
+                continue
+            message = Message.model_validate(row)
+            messages_by_id.setdefault(message.id, message)
+
+        enriched_run = run.model_copy(
+            update={"conversation_result_card": enriched_card}
+        )
+        return hydrate_completed_backtest_job_messages(
+            list(messages_by_id.values()),
+            jobs_by_id=jobs_by_id,
+            runs_by_id={run.id: enriched_run},
+        )
+
     def mark_result_card_decision_for_run(
         self,
         *,
@@ -842,10 +996,12 @@ class SupabaseGateway(
         )
         if not run.conversation_id:
             return
-        for message in self.list_messages(
+        for message in self._decision_result_messages(
             user_id=user_id,
             conversation_id=run.conversation_id,
-            limit=None,
+            run=run,
+            evidence_artifact_id=evidence_artifact_id,
+            enriched_card=enriched_card,
         ):
             metadata = dict(message.metadata or {})
             result_card = metadata.get("result_card")
@@ -1279,23 +1435,31 @@ class SupabaseGateway(
     ) -> dict[str, dict[str, Any]]:
         if not job_ids:
             return {}
-        rows = (
-            self.client.table("backtest_jobs")
-            .select("*")
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-            .in_("id", job_ids)
-            .limit(len(job_ids))
-            .execute()
-            .data
-            or []
-        )
-        requested_ids = set(job_ids)
-        return {
-            str(row["id"]): dict(row)
-            for row in rows
-            if row.get("id") is not None and str(row["id"]) in requested_ids
-        }
+        jobs_by_id: dict[str, dict[str, Any]] = {}
+        for requested in _distinct_chunks(
+            job_ids,
+            size=_COMPLETED_RESULT_BATCH_SIZE,
+        ):
+            rows = (
+                self.client.table("backtest_jobs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .in_("id", requested)
+                .limit(len(requested))
+                .execute()
+                .data
+                or []
+            )
+            jobs_by_id.update(
+                _unique_owned_rows_by_id(
+                    rows,
+                    requested_ids=set(requested),
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                )
+            )
+        return jobs_by_id
 
     def count_backtest_jobs(
         self, *, status: str, user_id: str | None = None, limit: int = 100
@@ -1678,24 +1842,35 @@ class SupabaseGateway(
     ) -> dict[str, BacktestRun]:
         if not run_ids:
             return {}
-        rows = (
-            self.client.table("backtest_runs")
-            .select("*")
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-            .in_("id", run_ids)
-            .limit(len(run_ids))
-            .execute()
-            .data
-            or []
-        )
-        requested_ids = set(run_ids)
-        runs = [
-            BacktestRun.model_validate(row)
-            for row in rows
-            if row.get("id") is not None and str(row["id"]) in requested_ids
-        ]
-        return {run.id: run for run in runs}
+        runs_by_id: dict[str, BacktestRun] = {}
+        for requested in _distinct_chunks(
+            run_ids,
+            size=_COMPLETED_RESULT_BATCH_SIZE,
+        ):
+            rows = (
+                self.client.table("backtest_runs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .in_("id", requested)
+                .limit(len(requested))
+                .execute()
+                .data
+                or []
+            )
+            owned_rows = _unique_owned_rows_by_id(
+                rows,
+                requested_ids=set(requested),
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+            runs_by_id.update(
+                {
+                    run_id: BacktestRun.model_validate(row)
+                    for run_id, row in owned_rows.items()
+                }
+            )
+        return runs_by_id
 
     def get_latest_completed_run_for_conversation(
         self, *, user_id: str, conversation_id: str

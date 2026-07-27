@@ -140,12 +140,13 @@ def create_conversation(
                     conversation_id=workspace.conversation_id,
                 )
                 if existing is not None:
-                    messages = api_state.supabase_gateway.list_messages(
-                        user_id=user.id,
-                        conversation_id=workspace.conversation_id,
-                        limit=None,
+                    has_user_message = (
+                        api_state.supabase_gateway.conversation_has_user_message(
+                            user_id=user.id,
+                            conversation_id=workspace.conversation_id,
+                        )
                     )
-                    if not any(message.role == "user" for message in messages):
+                    if not has_user_message:
                         return ConversationResponse(conversation=existing)
                     require_account_capability(
                         request,

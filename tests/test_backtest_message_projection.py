@@ -76,8 +76,14 @@ def _loader(value: Any) -> tuple[Callable[[str], Any], list[str]]:
 
 
 class _ProjectionBatchClient:
-    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+    def __init__(
+        self,
+        rows_by_table: dict[str, list[dict[str, Any]]],
+        *,
+        ignore_filters: bool = False,
+    ) -> None:
         self.rows_by_table = rows_by_table
+        self.ignore_filters = ignore_filters
         self.queries: list[_ProjectionBatchQuery] = []
 
     def table(self, table_name: str) -> _ProjectionBatchQuery:
@@ -100,6 +106,7 @@ class _ProjectionBatchQuery:
         self.equal_filters: list[tuple[str, object]] = []
         self.in_filters: list[tuple[str, tuple[object, ...]]] = []
         self.limit_count: int | None = None
+        self.range_window: tuple[int, int] | None = None
         self.executed = False
 
     def select(self, *_args: object) -> _ProjectionBatchQuery:
@@ -123,18 +130,27 @@ class _ProjectionBatchQuery:
         self.limit_count = count
         return self
 
+    def range(self, start: int, end: int) -> _ProjectionBatchQuery:
+        self.range_window = (start, end)
+        return self
+
     def execute(self) -> SimpleNamespace:
         self.executed = True
-        rows = [
-            row
-            for row in self.client.rows_by_table[self.table_name]
-            if all(row.get(key) == value for key, value in self.equal_filters)
-            and all(
-                row.get(key) in values for key, values in self.in_filters
-            )
-        ]
+        rows = list(self.client.rows_by_table[self.table_name])
+        if not self.client.ignore_filters:
+            rows = [
+                row
+                for row in rows
+                if all(row.get(key) == value for key, value in self.equal_filters)
+                and all(
+                    row.get(key) in values for key, values in self.in_filters
+                )
+            ]
         if self.limit_count is not None:
             rows = rows[: self.limit_count]
+        if self.range_window is not None:
+            start, end = self.range_window
+            rows = rows[start : end + 1]
         return SimpleNamespace(data=rows)
 
 
@@ -247,6 +263,149 @@ def test_completed_job_and_run_query_count_does_not_grow_with_message_count() ->
         assert run_queries[0].in_filters == [
             ("id", tuple(f"run-{index}" for index in range(candidate_count)))
         ]
+
+
+def test_unbounded_message_projection_chunks_job_and_run_identity_reads() -> None:
+    gateway, client = _projection_gateway_fixture(101)
+
+    messages = gateway.list_messages(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        limit=None,
+    )
+
+    assert len(messages) == 101
+    assert {
+        message.metadata["result_run_id"] for message in messages
+    } == {f"run-{index}" for index in range(101)}
+    for table_name in ("backtest_jobs", "backtest_runs"):
+        queries = client.executed_queries(table_name)
+        assert len(queries) == 2
+        assert all(query.limit_count is not None for query in queries)
+        assert all(
+            len(query.in_filters[0][1]) <= 100
+            for query in queries
+        )
+
+
+def test_job_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
+    requested = [f"job-{index}" for index in range(6)]
+    client = _ProjectionBatchClient(
+        {
+            "backtest_jobs": [
+                {
+                    "id": "job-0",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                },
+                {
+                    "id": "unrequested",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                },
+                {
+                    "id": "job-1",
+                    "user_id": "user-2",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                },
+                {
+                    "id": "job-2",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-2",
+                    "status": "succeeded",
+                },
+                {
+                    "id": "job-3",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "running",
+                },
+                {
+                    "id": "job-3",
+                    "user_id": "user-1",
+                    "conversation_id": "conversation-1",
+                    "status": "succeeded",
+                },
+            ]
+        },
+        ignore_filters=True,
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    jobs = gateway.get_backtest_jobs_by_ids(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        job_ids=requested,
+    )
+
+    assert jobs == {
+        "job-0": {
+            "id": "job-0",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "status": "succeeded",
+        }
+    }
+
+
+def test_run_batch_map_rejects_unexpected_foreign_and_duplicate_rows() -> None:
+    requested = [f"run-{index}" for index in range(6)]
+    valid_run = (
+        _completed_run().model_copy(update={"id": "run-0"}).model_dump(mode="json")
+        | {"user_id": "user-1"}
+    )
+    duplicate_run = (
+        _completed_run().model_copy(update={"id": "run-3"}).model_dump(mode="json")
+        | {"user_id": "user-1"}
+    )
+    client = _ProjectionBatchClient(
+        {
+            "backtest_runs": [
+                valid_run,
+                (
+                    _completed_run()
+                    .model_copy(update={"id": "unrequested"})
+                    .model_dump(mode="json")
+                    | {"user_id": "user-1"}
+                ),
+                (
+                    _completed_run()
+                    .model_copy(update={"id": "run-1"})
+                    .model_dump(mode="json")
+                    | {"user_id": "user-2"}
+                ),
+                (
+                    _completed_run()
+                    .model_copy(
+                        update={
+                            "id": "run-2",
+                            "conversation_id": "conversation-2",
+                        }
+                    )
+                    .model_dump(mode="json")
+                    | {"user_id": "user-1"}
+                ),
+                duplicate_run,
+                {
+                    **duplicate_run,
+                    "metrics": {"conflicting": True},
+                },
+            ]
+        },
+        ignore_filters=True,
+    )
+    gateway = SupabaseGateway(client=client)  # type: ignore[arg-type]
+
+    runs = gateway.get_backtest_runs_by_ids(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        run_ids=requested,
+    )
+
+    assert runs == {"run-0": BacktestRun.model_validate(valid_run)}
 
 
 def test_run_batch_ids_include_only_eligible_succeeded_jobs() -> None:
