@@ -674,6 +674,117 @@ def test_history_pinned_cursor_executes_split_pin_tiers(history_identities) -> N
     assert str(pivot_id) not in visible_ids
 
 
+def test_history_cursor_retains_unpinned_rank_after_pivot_is_pinned(
+    history_identities,
+) -> None:
+    timestamp = datetime(2026, 7, 3, 13, tzinfo=timezone.utc)
+    owner_id = history_identities["owner"]
+    with _connect() as connection, connection.cursor() as cursor:
+        already_seen_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=3),
+        )
+        pivot_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=2),
+        )
+        next_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=1),
+        )
+        final_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp,
+        )
+
+    reader, _ = _reader()
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            update public.strategies
+            set pinned = true, updated_at = %s
+            where user_id = %s and id = %s
+            """,
+            (timestamp + timedelta(days=1), owner_id, pivot_id),
+        )
+
+    rows = reader.list_rows(
+        user_id=str(owner_id),
+        limit=3,
+        archived=False,
+        deleted=False,
+        cursor_activity_at=timestamp + timedelta(minutes=2),
+        cursor_id=str(pivot_id),
+        cursor_pinned=False,
+        cursor_type_rank=3,
+    )
+    visible_ids = [str(row["id"]) for _, row in _flatten(rows)]
+
+    assert visible_ids == [str(next_id), str(final_id)]
+    assert str(already_seen_id) not in visible_ids
+    assert str(pivot_id) not in visible_ids
+
+
+def test_history_cursor_retains_pinned_rank_after_pivot_is_unpinned(
+    history_identities,
+) -> None:
+    timestamp = datetime(2026, 7, 3, 14, tzinfo=timezone.utc)
+    owner_id = history_identities["owner"]
+    with _connect() as connection, connection.cursor() as cursor:
+        _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=3),
+            pinned=True,
+        )
+        pivot_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=2),
+            pinned=True,
+        )
+        newer_unpinned_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=4),
+        )
+        lower_unpinned_id = _insert_strategy(
+            cursor,
+            user_id=owner_id,
+            timestamp=timestamp + timedelta(minutes=1),
+        )
+
+    reader, _ = _reader()
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            update public.strategies
+            set pinned = false, updated_at = %s
+            where user_id = %s and id = %s
+            """,
+            (timestamp + timedelta(days=1), owner_id, pivot_id),
+        )
+
+    rows = reader.list_rows(
+        user_id=str(owner_id),
+        limit=3,
+        archived=False,
+        deleted=False,
+        cursor_activity_at=timestamp + timedelta(minutes=2),
+        cursor_id=str(pivot_id),
+        cursor_pinned=True,
+        cursor_type_rank=3,
+    )
+    visible_ids = [str(row["id"]) for _, row in _flatten(rows)]
+
+    assert visible_ids == [str(newer_unpinned_id), str(lower_unpinned_id)]
+    assert str(pivot_id) not in visible_ids
+
+
 def test_history_all_specialized_sql_variants_prepare(history_identities) -> None:
     owner_id = history_identities["owner"]
     timestamp = datetime(2026, 7, 3, 15, tzinfo=timezone.utc)

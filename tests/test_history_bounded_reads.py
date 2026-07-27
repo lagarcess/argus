@@ -126,7 +126,14 @@ def test_history_cursor_uses_one_pivot_query_and_one_candidate_query() -> None:
     cursor_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
     pool = _RecordingPool(
         [
-            [{"source_type": "strategy", "pinned": True, "type_rank": 3}],
+            [
+                {
+                    "source_type": "strategy",
+                    "pinned": True,
+                    "type_rank": 3,
+                    "activity_at": cursor_at,
+                }
+            ],
             [],
         ]
     )
@@ -154,6 +161,67 @@ def test_history_cursor_uses_one_pivot_query_and_one_candidate_query() -> None:
         "cursor_id": UUID("11111111-1111-1111-1111-111111111111"),
         "source_limit": 4,
     }
+
+
+def test_history_legacy_cursor_rejects_changed_pivot_activity() -> None:
+    cursor_error, reader_type = _reader_types()
+    cursor_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    pool = _RecordingPool(
+        [
+            [
+                {
+                    "source_type": "strategy",
+                    "pinned": True,
+                    "type_rank": 3,
+                    "activity_at": cursor_at.replace(day=2),
+                }
+            ],
+            [],
+        ]
+    )
+
+    with pytest.raises(cursor_error, match="pivot changed"):
+        reader_type(pool).list_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=4,
+            archived=False,
+            deleted=False,
+            cursor_activity_at=cursor_at,
+            cursor_id="11111111-1111-1111-1111-111111111111",
+        )
+
+    assert len(pool.cursor.executions) == 1
+
+
+def test_history_ranked_cursor_rejects_source_rank_mismatch() -> None:
+    cursor_error, reader_type = _reader_types()
+    cursor_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    pool = _RecordingPool(
+        [
+            [
+                {
+                    "source_type": "strategy",
+                    "pinned": False,
+                    "type_rank": 3,
+                    "activity_at": cursor_at,
+                }
+            ]
+        ]
+    )
+
+    with pytest.raises(cursor_error, match="pivot rank"):
+        reader_type(pool).list_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=4,
+            archived=False,
+            deleted=False,
+            cursor_activity_at=cursor_at,
+            cursor_id="11111111-1111-1111-1111-111111111111",
+            cursor_pinned=False,
+            cursor_type_rank=2,
+        )
+
+    assert len(pool.cursor.executions) == 1
 
 
 def test_history_cursor_rejects_timezone_naive_timestamp_before_pool_acquisition() -> (

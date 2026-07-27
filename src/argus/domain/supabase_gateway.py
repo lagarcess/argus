@@ -1512,6 +1512,8 @@ class SupabaseGateway(
         deleted: bool = False,
         cursor_activity_at: datetime | None = None,
         cursor_id: str | None = None,
+        cursor_pinned: bool | None = None,
+        cursor_type_rank: int | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         if self.history_reader is None:
             raise RuntimeError("Persistent History requires its Postgres reader.")
@@ -1522,6 +1524,8 @@ class SupabaseGateway(
             deleted=deleted,
             cursor_activity_at=cursor_activity_at,
             cursor_id=cursor_id,
+            cursor_pinned=cursor_pinned,
+            cursor_type_rank=cursor_type_rank,
         )
 
     def search_rows(

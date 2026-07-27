@@ -2533,6 +2533,8 @@ def test_gateway_history_delegates_to_bounded_postgres_reader() -> None:
         deleted=True,
         cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
         cursor_id="11111111-1111-1111-1111-111111111111",
+        cursor_pinned=True,
+        cursor_type_rank=3,
     )
 
     assert result == reader.list_rows.return_value
@@ -2543,6 +2545,8 @@ def test_gateway_history_delegates_to_bounded_postgres_reader() -> None:
         deleted=True,
         cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
         cursor_id="11111111-1111-1111-1111-111111111111",
+        cursor_pinned=True,
+        cursor_type_rank=3,
     )
 
 

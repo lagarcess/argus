@@ -21,16 +21,24 @@ class HistoryCursorError(ValueError):
 
 
 _PIVOT_SQL = """
-select source_type, pinned, type_rank
+select source_type, pinned, type_rank, activity_at
 from (
-    select 'run'::text as source_type, false as pinned, 1 as type_rank
+    select
+        'run'::text as source_type,
+        false as pinned,
+        1 as type_rank,
+        run.created_at as activity_at
     from public.backtest_runs as run
     where run.user_id = %s
       and run.id = %s
 
     union all
 
-    select 'chat'::text as source_type, chat.pinned, 4 as type_rank
+    select
+        'chat'::text as source_type,
+        chat.pinned,
+        4 as type_rank,
+        chat.updated_at as activity_at
     from public.conversations as chat
     where chat.user_id = %s
       and chat.id = %s
@@ -43,14 +51,22 @@ from (
 
     union all
 
-    select 'strategy'::text as source_type, strategy.pinned, 3 as type_rank
+    select
+        'strategy'::text as source_type,
+        strategy.pinned,
+        3 as type_rank,
+        strategy.updated_at as activity_at
     from public.strategies as strategy
     where strategy.user_id = %s
       and strategy.id = %s
 
     union all
 
-    select 'collection'::text as source_type, collection.pinned, 2 as type_rank
+    select
+        'collection'::text as source_type,
+        collection.pinned,
+        2 as type_rank,
+        collection.updated_at as activity_at
     from public.collections as collection
     where collection.user_id = %s
       and collection.id = %s
@@ -116,17 +132,22 @@ def _variable_source_sql(
     pivot_pinned: bool,
     pivot_type_rank: int,
 ) -> str:
+    cursor_filters = (
+        (*base_filters, f"{source_alias}.id <> %(cursor_id)s")
+        if has_cursor
+        else base_filters
+    )
     if not has_cursor:
         pinned_leaf = _bounded_leaf(
             select_sql=select_sql,
             from_sql=from_sql,
-            filters=(*base_filters, f"{source_alias}.pinned is true"),
+            filters=(*cursor_filters, f"{source_alias}.pinned is true"),
             order_sql=order_sql,
         )
         unpinned_leaf = _bounded_leaf(
             select_sql=select_sql,
             from_sql=from_sql,
-            filters=(*base_filters, f"{source_alias}.pinned is false"),
+            filters=(*cursor_filters, f"{source_alias}.pinned is false"),
             order_sql=order_sql,
         )
         return f"""
@@ -150,20 +171,28 @@ def _variable_source_sql(
         return _bounded_leaf(
             select_sql=select_sql,
             from_sql=from_sql,
-            filters=(*base_filters, f"{source_alias}.pinned is false", cursor_predicate),
+            filters=(
+                *cursor_filters,
+                f"{source_alias}.pinned is false",
+                cursor_predicate,
+            ),
             order_sql=order_sql,
         )
 
     pinned_leaf = _bounded_leaf(
         select_sql=select_sql,
         from_sql=from_sql,
-        filters=(*base_filters, f"{source_alias}.pinned is true", cursor_predicate),
+        filters=(
+            *cursor_filters,
+            f"{source_alias}.pinned is true",
+            cursor_predicate,
+        ),
         order_sql=order_sql,
     )
     unpinned_leaf = _bounded_leaf(
         select_sql=select_sql,
         from_sql=from_sql,
-        filters=(*base_filters, f"{source_alias}.pinned is false"),
+        filters=(*cursor_filters, f"{source_alias}.pinned is false"),
         order_sql=order_sql,
     )
     return f"""
@@ -206,6 +235,8 @@ def _candidate_sql(
         "run.user_id = %(user_id)s",
         run_parent_filter,
     )
+    if has_cursor:
+        run_filters = (*run_filters, "run.id <> %(cursor_id)s")
     if has_cursor and not pivot_pinned:
         run_filters = (
             *run_filters,
@@ -390,6 +421,8 @@ class PostgresHistoryReader:
         deleted: bool,
         cursor_activity_at: datetime | None = None,
         cursor_id: str | None = None,
+        cursor_pinned: bool | None = None,
+        cursor_type_rank: int | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         if limit < 1:
             raise ValueError("History source limit must be positive.")
@@ -401,6 +434,15 @@ class PostgresHistoryReader:
         has_cursor = cursor_activity_at is not None or cursor_id is not None
         if has_cursor and (cursor_activity_at is None or cursor_id is None):
             raise HistoryCursorError("History cursor is incomplete.")
+        has_ranked_cursor = cursor_pinned is not None or cursor_type_rank is not None
+        if has_ranked_cursor and (
+            not has_cursor
+            or not isinstance(cursor_pinned, bool)
+            or not isinstance(cursor_type_rank, int)
+            or isinstance(cursor_type_rank, bool)
+            or cursor_type_rank not in _SOURCE_RANKS.values()
+        ):
+            raise HistoryCursorError("History cursor rank is invalid.")
         if cursor_activity_at is not None and (
             cursor_activity_at.tzinfo is None or cursor_activity_at.utcoffset() is None
         ):
@@ -434,8 +476,22 @@ class PostgresHistoryReader:
                         raise HistoryCursorError(
                             "History cursor pivot is missing or ambiguous."
                         )
-                    pivot_pinned = bool(pivots[0]["pinned"])
-                    pivot_type_rank = int(pivots[0]["type_rank"])
+                    pivot = pivots[0]
+                    resolved_type_rank = int(pivot["type_rank"])
+                    if has_ranked_cursor:
+                        if cursor_type_rank != resolved_type_rank:
+                            raise HistoryCursorError(
+                                "History cursor pivot rank is invalid."
+                            )
+                        assert cursor_pinned is not None
+                        pivot_pinned = cursor_pinned
+                    else:
+                        if pivot.get("activity_at") != cursor_activity_at:
+                            raise HistoryCursorError(
+                                "History cursor pivot changed after it was issued."
+                            )
+                        pivot_pinned = bool(pivot["pinned"])
+                    pivot_type_rank = resolved_type_rank
 
                 candidate_params = {
                     "user_id": owner_id,

@@ -2845,6 +2845,8 @@ def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
         limit=21,
         cursor_activity_at=None,
         cursor_id=None,
+        cursor_pinned=None,
+        cursor_type_rank=None,
         deleted=False,
         archived=False,
     )
@@ -2911,6 +2913,8 @@ def test_history_supabase_can_request_archived_rows(mock_gateway):
         limit=21,
         cursor_activity_at=None,
         cursor_id=None,
+        cursor_pinned=None,
+        cursor_type_rank=None,
         deleted=False,
         archived=True,
     )
@@ -2955,9 +2959,80 @@ def test_history_supabase_middle_page_uses_cursor_pivot_outside_candidates(
         limit=3,
         cursor_activity_at=pivot_at,
         cursor_id=pivot_id,
+        cursor_pinned=None,
+        cursor_type_rank=None,
         deleted=False,
         archived=False,
     )
+
+
+def test_history_supabase_cursor_retains_original_pivot_rank(mock_gateway):
+    newest_at = datetime(2026, 7, 2, 12, 2, tzinfo=timezone.utc)
+    pivot_at = newest_at - timedelta(minutes=1)
+    sentinel_at = pivot_at - timedelta(minutes=1)
+    pivot_id = "22222222-2222-2222-2222-222222222222"
+    mock_gateway.list_history_rows.side_effect = [
+        {
+            "runs": [],
+            "conversations": [],
+            "strategies": [
+                {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "name": "Newest pinned strategy",
+                    "symbols": ["AAPL"],
+                    "pinned": True,
+                    "updated_at": newest_at.isoformat(),
+                },
+                {
+                    "id": pivot_id,
+                    "name": "Pinned page pivot",
+                    "symbols": ["MSFT"],
+                    "pinned": True,
+                    "updated_at": pivot_at.isoformat(),
+                },
+                {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "name": "Unpinned sentinel",
+                    "symbols": ["NVDA"],
+                    "pinned": False,
+                    "updated_at": sentinel_at.isoformat(),
+                },
+            ],
+            "collections": [],
+        },
+        {
+            "runs": [],
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+        },
+    ]
+
+    first_page = client.get(
+        "/api/v1/history?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    cursor = first_page.json()["next_cursor"]
+    assert cursor is not None
+
+    second_page = client.get(
+        "/api/v1/history",
+        params={"limit": 2, "cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert second_page.status_code == 200
+    assert mock_gateway.list_history_rows.call_args_list[1].kwargs == {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "limit": 3,
+        "cursor_activity_at": pivot_at,
+        "cursor_id": pivot_id,
+        "cursor_pinned": True,
+        "cursor_type_rank": 3,
+        "deleted": False,
+        "archived": False,
+    }
 
 
 def test_history_supabase_missing_or_ambiguous_pivot_uses_invalid_cursor_problem(

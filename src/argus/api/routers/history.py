@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from typing import cast
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -21,6 +22,40 @@ from argus.api.search_utils import search_type_rank
 from argus.domain.postgres_history_reader import HistoryCursorError
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
+
+_HISTORY_CURSOR_VERSION = "h1"
+
+
+def _decode_history_cursor(
+    cursor: str,
+    request: Request,
+) -> tuple[str, str, bool | None, int | None]:
+    timestamp: str
+    encoded_id: str
+    timestamp, encoded_id = decode_cursor(cursor, request)
+    prefix = f"{_HISTORY_CURSOR_VERSION}:"
+    if not encoded_id.startswith(prefix):
+        return timestamp, encoded_id, None, None
+
+    parts = encoded_id.split(":", 3)
+    if len(parts) != 4:
+        raise invalid_cursor_problem(request)
+    _, pinned_text, type_rank_text, item_id = parts
+    if pinned_text not in {"0", "1"} or not item_id:
+        raise invalid_cursor_problem(request)
+    try:
+        type_rank = int(type_rank_text)
+    except ValueError:
+        raise invalid_cursor_problem(request) from None
+    if type_rank not in {1, 2, 3, 4}:
+        raise invalid_cursor_problem(request)
+    return timestamp, item_id, pinned_text == "1", type_rank
+
+
+def _encode_history_cursor(item: HistoryItem) -> str:
+    type_rank = search_type_rank(item.type)
+    ranked_id = f"{_HISTORY_CURSOR_VERSION}:{int(item.pinned)}:{type_rank}:{item.id}"
+    return cast(str, encode_cursor(item.created_at.isoformat(), ranked_id))
 
 
 @router.get("/history", response_model=PaginatedHistory)
@@ -71,8 +106,15 @@ def history(
         )
     cursor_dt: datetime | None = None
     cursor_id: str | None = None
+    cursor_pinned: bool | None = None
+    cursor_type_rank: int | None = None
     if cursor:
-        cursor_created_at, cursor_id = decode_cursor(cursor, request)
+        (
+            cursor_created_at,
+            cursor_id,
+            cursor_pinned,
+            cursor_type_rank,
+        ) = _decode_history_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_created_at)
         except ValueError:
@@ -89,6 +131,8 @@ def history(
                 cursor_id=cursor_id,
                 archived=archived,
                 deleted=deleted,
+                cursor_pinned=cursor_pinned,
+                cursor_type_rank=cursor_type_rank,
             )
         except HistoryCursorError:
             raise invalid_cursor_problem(request) from None
@@ -279,7 +323,7 @@ def history(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
+        next_cursor = _encode_history_cursor(last)
     return PaginatedHistory(items=page_items, next_cursor=next_cursor)
 
 
