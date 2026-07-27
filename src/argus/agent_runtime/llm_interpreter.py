@@ -148,6 +148,7 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_cost_capability_clause,
+    has_execution_cost_candidate,
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
     future_performance_capability_clause,
@@ -2831,6 +2832,8 @@ def _optional_runtime_readiness_audit_blocker(
         draft
     ) and not _draft_has_supported_default_benchmark(draft):
         return "unprovenanced_benchmark"
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return "stated_run_field_fidelity"
     if _response_needs_stated_timeframe_fidelity_audit(response):
         return "stated_run_field_fidelity"
     if _response_has_current_message_date_range_reconciliation(
@@ -4026,6 +4029,7 @@ async def _audit_stated_run_field_fidelity(
         response=response,
         request=request,
     )
+    audit_response = response
     try:
         audit = await invoke_openrouter_json_schema(
             task="field_fidelity",
@@ -4034,25 +4038,15 @@ async def _audit_stated_run_field_fidelity(
             schema_name="StatedRunFieldFidelityAudit",
         )
     except Exception:
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = None
     if not isinstance(audit, StatedRunFieldFidelityAudit):
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = StatedRunFieldFidelityAudit()
+        audit_response = deterministic_repair or response
     repaired = _response_from_stated_run_field_fidelity_audit(
-        response=response,
+        response=audit_response,
         audit=audit,
         current_message=request.current_user_message,
+        prior_strategy=_current_artifact_strategy(request),
     )
     candidate_response = repaired or deterministic_repair or response
     capital_recheck = await _audit_stated_starting_capital_fidelity(
@@ -4139,6 +4133,10 @@ def _response_needs_stated_run_field_fidelity_audit(
         request=request,
     ):
         return True
+    draft = response.candidate_strategy_draft
+    current_message = request.current_user_message if request is not None else ""
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return True
     if (
         request is not None
         and _response_replays_prior_strategy_without_current_turn_update(
@@ -4147,8 +4145,6 @@ def _response_needs_stated_run_field_fidelity_audit(
         )
     ):
         return False
-    draft = response.candidate_strategy_draft
-    current_message = request.current_user_message if request is not None else ""
     requested_field = ""
     if request is not None:
         requested_field = _field_path_base(

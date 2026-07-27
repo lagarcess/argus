@@ -61,6 +61,9 @@ def _strategy_from_llm(
     current_user_message: str | None = None,
 ) -> StrategySummary:
     payload = draft.model_dump(mode="python")
+    validated_execution_cost_evidence = dict(
+        draft._validated_execution_cost_evidence
+    )
     field_provenance = payload.pop("field_provenance", {}) or {}
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
@@ -72,6 +75,7 @@ def _strategy_from_llm(
         evidence_spans = _ground_execution_cost_evidence_spans(
             evidence_spans,
             current_user_message=current_user_message,
+            validated_execution_cost_evidence=validated_execution_cost_evidence,
         )
         for field_name in ("fee_rate", "slippage"):
             field_provenance.pop(field_name, None)
@@ -162,6 +166,9 @@ def _strategy_from_llm(
     field_provenance = _owned_execution_cost_provenance(
         payload=payload,
         field_provenance=field_provenance,
+        evidence_spans=evidence_spans,
+        validated_execution_cost_evidence=validated_execution_cost_evidence,
+        require_validated_evidence=current_user_message is not None,
     )
     if field_provenance:
         payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
@@ -200,8 +207,6 @@ def _evidence_backed_field_provenance(
     evidence_backed_fields = {
         "cadence": "explicit_user",
         "comparison_baseline": "explicit_user",
-        "fee_rate": "explicit_user",
-        "slippage": "explicit_user",
         "timeframe": "explicit_user",
     }
     extra_parameters = payload.get("extra_parameters")
@@ -227,6 +232,9 @@ def _owned_execution_cost_provenance(
     *,
     payload: dict[str, Any],
     field_provenance: dict[str, Any],
+    evidence_spans: dict[str, str],
+    validated_execution_cost_evidence: dict[str, tuple[float, str]],
+    require_validated_evidence: bool,
 ) -> dict[str, Any]:
     updated = dict(field_provenance or {})
     extra_parameters = payload.get("extra_parameters")
@@ -235,6 +243,21 @@ def _owned_execution_cost_provenance(
             updated.pop(field_name, None)
         return updated
     for field_name in ("fee_rate", "slippage"):
+        if require_validated_evidence:
+            validated = validated_execution_cost_evidence.get(field_name)
+            span = evidence_spans.get(field_name)
+            value = extra_parameters.get(field_name)
+            if (
+                validated is not None
+                and len(validated) == 2
+                and value == validated[0]
+                and span == validated[1]
+            ):
+                updated[field_name] = "explicit_user"
+                continue
+            extra_parameters.pop(field_name, None)
+            updated.pop(field_name, None)
+            continue
         if (
             field_name in extra_parameters
             and updated.get(field_name) == "explicit_user"
@@ -286,12 +309,20 @@ def _ground_execution_cost_evidence_spans(
     evidence_spans: dict[str, str],
     *,
     current_user_message: str,
+    validated_execution_cost_evidence: dict[str, tuple[float, str]],
 ) -> dict[str, str]:
     grounded = dict(evidence_spans)
     source_text = str(current_user_message)
     for field_name in ("fee_rate", "slippage"):
         span = grounded.get(field_name)
-        if not span or span not in source_text:
+        validated = validated_execution_cost_evidence.get(field_name)
+        if (
+            not span
+            or span not in source_text
+            or validated is None
+            or len(validated) != 2
+            or span != validated[1]
+        ):
             grounded.pop(field_name, None)
     return grounded
 

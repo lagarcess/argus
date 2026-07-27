@@ -149,7 +149,7 @@ def test_unprovenanced_llm_costs_stay_idealized_at_canonical_boundary() -> None:
     assert "field_provenance" not in strategy.extra_parameters
 
 
-def test_evidence_backed_llm_costs_gain_explicit_provenance() -> None:
+def test_primary_llm_cost_spans_do_not_gain_explicit_provenance() -> None:
     message = (
         "Build a daily MSFT test and model a 10 bps fee and 5 bps slippage."
     )
@@ -172,16 +172,9 @@ def test_evidence_backed_llm_costs_gain_explicit_provenance() -> None:
         current_user_message=message,
     )
 
-    assert strategy.extra_parameters["fee_rate"] == 0.001
-    assert strategy.extra_parameters["slippage"] == 0.0005
-    assert strategy.extra_parameters["evidence_spans"] == {
-        "fee_rate": "10 bps fee",
-        "slippage": "5 bps slippage",
-    }
-    assert strategy.extra_parameters["field_provenance"] == {
-        "fee_rate": "explicit_user",
-        "slippage": "explicit_user",
-    }
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "evidence_spans" not in strategy.extra_parameters
 
 
 def test_model_declared_cost_provenance_without_spans_is_rejected() -> None:
@@ -240,7 +233,7 @@ def test_invented_cost_evidence_spans_are_rejected() -> None:
     assert "evidence_spans" not in strategy.extra_parameters
 
 
-def test_bounded_zero_cost_spans_preserve_intentional_clears() -> None:
+def test_primary_zero_cost_spans_do_not_own_a_clear_without_typed_audit() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
             strategy_type="buy_and_hold",
@@ -258,12 +251,9 @@ def test_bounded_zero_cost_spans_preserve_intentional_clears() -> None:
         current_user_message="Set a 0 bps fee and 0 bps slippage.",
     )
 
-    assert strategy.extra_parameters["fee_rate"] == 0.0
-    assert strategy.extra_parameters["slippage"] == 0.0
-    assert strategy.extra_parameters["field_provenance"] == {
-        "fee_rate": "explicit_user",
-        "slippage": "explicit_user",
-    }
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "field_provenance" not in strategy.extra_parameters
 
 
 def test_unprovenanced_zero_llm_costs_remain_canonical_defaults() -> None:

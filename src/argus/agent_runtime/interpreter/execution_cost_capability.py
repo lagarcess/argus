@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+
+
+def execution_costs_enabled() -> bool:
+    return _execution_realism_feature_enabled()
 
 
 def execution_cost_capability_clause() -> str:
@@ -9,7 +15,7 @@ def execution_cost_capability_clause() -> str:
     With the engine flag off this must stay byte-identical to the legacy
     sentence so flag-off interpretation cannot drift.
     """
-    if not _execution_realism_feature_enabled():
+    if not execution_costs_enabled():
         return (
             "No brokerage trading, shorting, mixed asset-class runs, "
             "custom scripting, or real slippage/fee realism.\n\n"
@@ -26,4 +32,10 @@ def execution_cost_capability_clause() -> str:
         "evidence_spans.slippage. Canonical explicit-user provenance is derived "
         "from those spans; never invent costs or evidence. Both costs default "
         "to zero when the user does not state them.\n\n"
+    )
+
+
+def has_execution_cost_candidate(extra_parameters: Mapping[str, object]) -> bool:
+    return execution_costs_enabled() and any(
+        field_name in extra_parameters for field_name in ("fee_rate", "slippage")
     )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -122,6 +122,10 @@ class LLMDateRangeIntent(BaseModel):
 
 
 class LLMStrategyDraft(BaseModel):
+    _validated_execution_cost_evidence: dict[str, tuple[float, str]] = PrivateAttr(
+        default_factory=dict
+    )
+
     raw_user_phrasing: str | None = None
     language: str | None = Field(
         default=None,
