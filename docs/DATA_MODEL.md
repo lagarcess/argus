@@ -429,7 +429,8 @@ Collections grouping related strategies. These serve as lightweight organization
 ### Notes
 - Collections do **not** perform aggregate portfolio simulations in Alpha.
 - They help users organize strategies by theme (e.g., "Tech Growth", "Crypto Dips").
-- **Asset Mixing**: Collections may contain both Equity and Crypto strategies, but they cannot be executed as a mixed-asset batch.
+- **Asset Mixing**: Collections may contain Equity, Crypto, and Currency Pair
+  strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
 # 11. collection_strategies

@@ -2,19 +2,20 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-26
+Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `b80d95a2`. The accepted post-promotion
+Current stable integration checkpoint: `c212107a`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
 baseline (PR #268), calendar-materiality classification (PR #267), chat-header
 title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
 truthful stale Run settlement (PR #277), and supported strategy-transition
-preservation (PR #278). This is an integration checkpoint, not a deployed or
-tester-exposed SHA.
+preservation (PR #278), plus the default-off grounded-discovery baseline
+(PR #276). This is an integration checkpoint, not a deployed or tester-exposed
+SHA.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -225,6 +226,13 @@ Do not reopen these as debt unless a new bug is reproduced:
   preserving assets, capital, dates, daily timeframe, benchmark, and modeled
   costs through confirmation, launch projection, and reload. It landed as
   `b80d95a2`.
+- Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
+  Explicit peer/category discovery has one typed route, bounded source-backed
+  Search, resolver-validated candidates for equity, crypto, and currency-pair
+  assets, persisted EN/ES rendering, honest flag-off recovery, and operational
+  cost evidence. Search remains default-off. Issue #244 stays open because one
+  comparison phrasing missed the typed route in the sanctioned eval; that gap
+  and an exact-SHA activated canary are required before tester exposure.
 
 ## P0 Reintegration Checkpoint
 
@@ -241,12 +249,13 @@ The clean reintegration strategy is now part of the process model:
 
 Codex should own or closely supervise this:
 
-1. **Finish the two remaining interim founder outcomes**
-   - Grounded discovery is already owned by PR #276. Do not create a duplicate
-     lane while that owner is unavailable.
-   - Full Omnisearch remains product-dependent on the accepted grounded
-     discovery contract. It may be discussed or inventoried, but its
-     implementation must not invent discovery truth.
+1. **Finish the remaining interim product outcome and activation gates**
+   - Grounded discovery has landed default-off at `c212107a`. Do not duplicate
+     its implementation. Keep #244 open for the accepted comparison-routing
+     limitation and the exact-SHA activation/canary gate.
+   - Full Omnisearch may now build against the accepted grounded-discovery
+     contract. Its owner must reconcile onto this checkpoint and must not
+     invent discovery truth or implicitly activate Search.
    - Always Progresses is delivered and now acts as the quality bar for these
      slices; it is not the next broad pillar to redispatch.
 

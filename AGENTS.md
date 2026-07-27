@@ -42,13 +42,15 @@ Before making code changes, agents must review these source-of-truth docs in thi
 - Brokerage integrations & real money trading
 - Social feeds & institutional tools
 - Advanced portfolio analytics
-- Mixed-asset backtests (Equity + Crypto in one run)
+- Mixed-asset backtests (Equity, Crypto, and Currency Pair in one run)
 - Native mobile apps (PWA/Mobile-web only)
 
 # ⚙️ Canonical Current Constraints
 
-- **Same-Asset Simulations Only**: Runs must be either 100% Equity or 100% Crypto.
-- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`.
+- **Same-Asset Simulations Only**: Runs must be 100% Equity, 100% Crypto, or
+  100% Currency Pair.
+- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`, Currency Pair ->
+  the tested pair.
 - **Logic**: Long-only, equal-weight multi-symbol runs.
 - **Limits**: Max 5 symbols per run.
 - **Localization**: Static UI must support English (`en`) and Spanish (`es-419`).

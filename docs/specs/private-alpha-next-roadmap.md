@@ -912,8 +912,18 @@ progress, durable ordinary-turn recovery, exact-once Run reconciliation,
 fact-preserving continuation, concrete trajectory adapters, production-parity
 browser journeys, one authorized real Run, reload-stable result truth, and
 independent review. Deployment and tester exposure remain separate release
-gates. The active interim roadmap now has two unfinished founder outcomes:
-**grounded discovery and suggestions** and **full Omnisearch capability**.
+gates.
+
+Interim founder-outcome checkpoint (2026-07-27): PR #276 delivered the
+default-off **grounded discovery and suggestions** baseline at candidate
+`cc8b5563`, which landed on `codex/private-alpha-next` as `c212107a`. The slice
+adds one typed discovery route, bounded source-backed Search,
+provider-resolved candidates for equity, crypto, and currency-pair assets,
+persisted EN/ES rendering, honest flag-off recovery, and operational cost
+evidence. Issue #244 remains open: one comparison phrasing missed the typed
+route in the sanctioned live eval, and exact-SHA activation/canary evidence is
+still required before tester exposure. Full Omnisearch is the remaining unbuilt
+founder outcome.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration

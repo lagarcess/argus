@@ -369,8 +369,10 @@ Alpha supports:
 Examples:
 - Equity: `AAPL` + `MSFT` + `NVDA`
 - Crypto: `BTC` + `ETH` + `SOL`
+- Currency pair: `EURUSD` or a same-class group such as `EURUSD` + `GBPUSD`
 
-Alpha does **NOT** support mixed equity + crypto simulations.
+Alpha does **NOT** support mixed-asset-class simulations. Equity, crypto, and
+currency-pair runs each remain within their own class.
 
 This ensures reliability and benchmark coherence.
 
@@ -494,6 +496,7 @@ Argus should avoid:
 Every result card must include a lightweight assumptions footer to maintain integrity. Benchmark comparisons are class-based:
 - **Equities** compare to **SPY**
 - **Crypto** compares to **BTC**
+- **Currency pairs** compare to the tested pair itself
 
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
 
