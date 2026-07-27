@@ -23,7 +23,7 @@ that Argus remembers, compares, and stays honest about staleness.
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#287 at `ea2b3f35`; new work must branch from the current remote
+#285 at `7b7920bb`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -36,7 +36,12 @@ preservation from PR #280, and chat next-move presentation from PR #281.
 Provider-free test isolation landed through PR #282, and PR #286 replaced the
 partial backend test list with the complete `tests/` directory gate. PR #287
 then delivered resolver-owned discovery selection identity and
-candidate/entity corroboration. This
+candidate/entity corroboration. PR #285 then pushed Conversations, Messages,
+History, and Omnisearch/Idea Ledger pagination and search bounds into Postgres
+without changing public cursors, ranking, ownership, or canonical artifact
+identity. Its accepted private-alpha boundary permits sparse/deep/final History
+Run pages to inspect more ordered rows; a maintained History read model remains
+deferred scale architecture rather than unfinished #232 work. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 

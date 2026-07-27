@@ -6,7 +6,7 @@ Last reconciled: 2026-07-27
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current integrated product checkpoint: PR #287 at `ea2b3f35`. New work must
+Current integrated product checkpoint: PR #285 at `7b7920bb`. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA; later docs-only reconciliation commits do not change
 product behavior. The accepted post-promotion
@@ -21,8 +21,11 @@ preservation (PR #278), plus the default-on grounded-discovery baseline
 (PR #279), followed by chat next-move presentation (PR #281). Provider-free
 backend test isolation landed through PR #282, and PR #286 made the complete
 `tests/` directory the backend CI gate. PR #287 then delivered resolver-owned
-discovery selection identity and candidate/entity corroboration. This is an
-integration checkpoint, not a deployed or tester-exposed SHA.
+discovery selection identity and candidate/entity corroboration. PR #285 then
+bounded Conversations, Messages, History, and Omnisearch/Idea Ledger reads at
+the Postgres boundary while preserving cursor, ranking, ownership, and artifact
+contracts. This is an integration checkpoint, not a deployed or
+tester-exposed SHA.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -279,6 +282,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   guard test prevents the workflow from returning to a curated file list.
   Issues #283 and #284 are closed. This changes verification coverage, not
   runtime behavior.
+- Bounded database pagination and search are complete at PR #285 / issue #232:
+  Conversations and Messages use stable keyset reads, completed-result
+  projection uses bounded batches, and History and Omnisearch/Idea Ledger
+  bound their source candidates while preserving public cursor compatibility,
+  ordering, ownership, ranking, exact ledger groups, and canonical artifacts.
+  It landed as `7b7920bb`. The founder-accepted sparse/deep/final History Run
+  scan exception remains documented: returned candidates and normal measured
+  distributions are bounded, while a maintained History read model is deferred
+  scale architecture. Client hydration, caching, and rendering remain #252.
 
 ## P0 Reintegration Checkpoint
 

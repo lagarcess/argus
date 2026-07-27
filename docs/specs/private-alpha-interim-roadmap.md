@@ -7,7 +7,7 @@ Original roadmap date: 2026-07-16
 Last reconciled: 2026-07-27
 
 Current integrated product checkpoint: `codex/private-alpha-next` containing
-PR #287 at `ea2b3f35`. New work must branch from the current remote integration
+PR #285 at `7b7920bb`. New work must branch from the current remote integration
 head rather than pinning this product SHA; later docs-only reconciliation
 commits do not change product behavior.
 
@@ -38,7 +38,12 @@ the complete backend `tests/` directory the required CI gate at `75e87206`.
 PR #287 then delivered resolver-owned discovery selection identity and
 candidate/entity corroboration at `ea2b3f35`. The two CI landings improve
 verification truth without changing product behavior; PR #287 changes the
-discovery selection and validation path.
+discovery selection and validation path. PR #285 then landed bounded Postgres
+pagination and search at `7b7920bb` for Conversations, Messages, History, and
+Omnisearch/Idea Ledger without changing public cursor, ranking, ownership, or
+artifact contracts. Issue #232 is complete. Its accepted sparse/deep/final
+History Run scan exception remains an explicit private-alpha boundary; #252
+continues to own client hydration, caching, and rendering.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical

@@ -1,6 +1,11 @@
 # Issue #232 Bounded Postgres Pagination Implementation Plan
 
-Status: **ACCEPTANCE GREEN — PUBLICATION PENDING**
+Status: **COMPLETE — LANDED AS PR #285 AT `7b7920bb`**
+
+This file is retained as historical execution and acceptance evidence. It is
+not an active dispatch plan. Issue #232 is complete; the accepted
+sparse/deep/final History Run boundary below remains deliberate private-alpha
+scope, and client hydration/caching/rendering remains owned by #252.
 
 > **For agentic workers:** every behavioral slice starts with a focused failing
 > regression, records the exact red, implements the smallest correction, proves
@@ -454,14 +459,18 @@ Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 - [x] Run production-parity authenticated browser/API QA with controlled
   fixtures and no provider-backed interpreter turns.
 - [x] Record exact runtime candidate SHA and privacy-safe evidence.
-- [ ] Push `codex/issue-232-bounded-pagination`.
-- [ ] Open a Draft PR targeting `codex/private-alpha-next`.
-- [ ] Wait for terminal CI.
-- [ ] Update issue #232 criterion by criterion; check only direct proof and
-  leave the issue open.
+- [x] Push `codex/issue-232-bounded-pagination`.
+- [x] Open PR #285 targeting `codex/private-alpha-next`.
+- [x] Wait for terminal exact-head PR CI.
+- [x] Update issue #232 criterion by criterion with direct proof.
+- [x] Founder-merge PR #285 into integration as `7b7920bb`.
+- [x] Confirm post-merge integration Local Smoke and CI, then close #232 with
+  the merge SHA.
 
-**Never:** merge, deploy, promote to `main`, close the issue, mutate hosted
-Supabase, or change unrelated flags.
+**Original worker boundary:** the implementation lane did not merge, deploy,
+promote to `main`, close the issue, mutate hosted Supabase, or change unrelated
+flags. The founder and integration release captain later completed merge and
+issue closure.
 
 ## Exact-head acceptance evidence
 
