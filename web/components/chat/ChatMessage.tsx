@@ -41,6 +41,9 @@ type ChatMessageProps = {
   onDecisionResumeHandled?: () => void;
 };
 
+const retryIconButtonClass =
+  "inline-flex items-center justify-center rounded-full text-black/60 transition-all duration-200 hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white";
+
 export default function ChatMessage({
   message,
   onAction,
@@ -433,7 +436,8 @@ export default function ChatMessage({
                 {retryAction && (
                   <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
                     <button
-                      className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
+                      type="button"
+                      className={`${retryIconButtonClass} p-1.5`}
                       aria-label={actionLabel(retryAction)}
                       onClick={() => onAction?.(retryAction)}
                     >
@@ -511,15 +515,17 @@ function UserTurnRecovery({
         </p>
       ) : null}
       {retryAction ? (
-        <button
-          type="button"
-          data-testid="user-turn-retry"
-          onClick={() => onAction?.(retryAction)}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/12 px-3 py-1.5 text-[13px] font-medium text-black/80 transition-colors hover:bg-black/5 dark:border-white/12 dark:text-white/80 dark:hover:bg-white/6"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {retryLabel}
-        </button>
+        <Tooltip content={retryLabel} side="top" delay={150}>
+          <button
+            type="button"
+            data-testid="user-turn-retry"
+            aria-label={retryLabel}
+            onClick={() => onAction?.(retryAction)}
+            className={`${retryIconButtonClass} min-h-11 min-w-11`}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
       ) : null}
     </div>
   );

@@ -50,6 +50,22 @@ describe("chat turn artifact UX", () => {
     ]);
   });
 
+  test("retry stays icon-owned by its message instead of duplicating as a composer chip", () => {
+    const retryAction = {
+      type: "retry_last_turn",
+      label: "Retry",
+      value: "Retry",
+    } satisfies ChatActionOption;
+    const followUpAction = {
+      id: "ask-follow-up",
+      label: "Ask follow-up",
+    } satisfies ChatActionOption;
+
+    expect(
+      visibleComposerResponseActions([retryAction, followUpAction]),
+    ).toEqual([followUpAction]);
+  });
+
   test("live unsupported-strategy alternatives stay once on their owning assistant", () => {
     const alternatives = [
       {
