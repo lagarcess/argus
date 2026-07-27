@@ -8,9 +8,13 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.supabase_gateway import ConversationCursorError, SupabaseGateway
 
 from supabase import create_client
+
+
+def _conversation_id(idx: int) -> str:
+    return f"00000000-0000-0000-0000-{idx:012d}"
 
 
 def _conversation_row(
@@ -21,7 +25,7 @@ def _conversation_row(
     updated_at: str = "2026-04-27T00:00:00+00:00",
 ) -> dict[str, object]:
     return {
-        "id": f"conv-{idx}",
+        "id": _conversation_id(idx),
         "title": f"Conversation {idx}",
         "title_source": "system_default",
         "language": "en",
@@ -131,7 +135,11 @@ def test_conversation_page_fetches_only_limit_plus_one() -> None:
 
     rows = gateway.list_conversations(user_id="user-1", limit=2)
 
-    assert [row.id for row in rows] == ["conv-0", "conv-1", "conv-2"]
+    assert [row.id for row in rows] == [
+        _conversation_id(0),
+        _conversation_id(1),
+        _conversation_id(2),
+    ]
     assert ("limit", (3,)) in client.queries[0].operations
     assert "range" not in _operation_names(client.queries[0])
 
@@ -166,15 +174,15 @@ def test_conversation_equal_timestamps_are_stable() -> None:
         user_id="user-1",
         limit=2,
         cursor_updated_at=timestamp,
-        cursor_id="conv-2",
+        cursor_id=_conversation_id(2),
     )
 
-    assert [row.id for row in rows] == ["conv-1", "conv-0"]
+    assert [row.id for row in rows] == [_conversation_id(1), _conversation_id(0)]
     keyset_filter = next(
         args[0] for name, args in client.queries[1].operations if name == "or_"
     )
     assert f"updated_at.eq.{timestamp.isoformat()}" in keyset_filter
-    assert "id.lt.conv-2" in keyset_filter
+    assert f"id.lt.{_conversation_id(2)}" in keyset_filter
 
 
 def test_conversation_soft_deleted_pivot_does_not_skip_or_duplicate() -> None:
@@ -196,10 +204,10 @@ def test_conversation_soft_deleted_pivot_does_not_skip_or_duplicate() -> None:
         user_id="user-1",
         limit=2,
         cursor_updated_at=timestamp,
-        cursor_id="conv-2",
+        cursor_id=_conversation_id(2),
     )
 
-    assert [row.id for row in rows] == ["conv-1", "conv-9"]
+    assert [row.id for row in rows] == [_conversation_id(1), _conversation_id(9)]
     assert ("is_", ("deleted_at", "null")) not in client.queries[0].operations
     assert ("is_", ("deleted_at", "null")) in client.queries[1].operations
     keyset_filter = next(
@@ -229,7 +237,21 @@ def test_conversation_foreign_or_missing_pivot_fails_closed(
             user_id="user-1",
             limit=2,
             cursor_updated_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
-            cursor_id="conv-2",
+            cursor_id=_conversation_id(2),
+        )
+
+
+def test_conversation_malformed_cursor_id_fails_before_postgrest() -> None:
+    client = MagicMock()
+    client.table.side_effect = AssertionError("PostgREST must not be called")
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(ConversationCursorError, match="conversation cursor"):
+        gateway.list_conversations(
+            user_id="user-1",
+            limit=2,
+            cursor_updated_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
+            cursor_id="missing-conversation",
         )
 
 
@@ -242,7 +264,7 @@ def test_conversation_owner_scope_is_present_in_every_query() -> None:
         user_id="user-1",
         limit=2,
         cursor_updated_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
-        cursor_id="conv-2",
+        cursor_id=_conversation_id(2),
     )
 
     assert len(client.queries) == 2

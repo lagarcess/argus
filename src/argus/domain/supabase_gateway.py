@@ -7,7 +7,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 
@@ -392,6 +392,16 @@ class SupabaseGateway(
     ) -> list[Conversation]:
         if (cursor_updated_at is None) != (cursor_id is None):
             raise ConversationCursorError("invalid conversation cursor pivot")
+
+        if cursor_id is not None:
+            try:
+                normalized_cursor_id = str(UUID(cursor_id))
+            except (AttributeError, TypeError, ValueError):
+                raise ConversationCursorError(
+                    "invalid conversation cursor pivot"
+                ) from None
+            if normalized_cursor_id != cursor_id:
+                raise ConversationCursorError("invalid conversation cursor pivot")
 
         cursor_pinned: bool | None = None
         canonical_cursor_id: str | None = None
