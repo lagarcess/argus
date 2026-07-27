@@ -401,10 +401,16 @@ class PostgresHistoryReader:
         has_cursor = cursor_activity_at is not None or cursor_id is not None
         if has_cursor and (cursor_activity_at is None or cursor_id is None):
             raise HistoryCursorError("History cursor is incomplete.")
+        if cursor_activity_at is not None and (
+            cursor_activity_at.tzinfo is None or cursor_activity_at.utcoffset() is None
+        ):
+            raise HistoryCursorError("History cursor timestamp is invalid.")
         try:
             pivot_id = UUID(cursor_id) if cursor_id is not None else None
         except (TypeError, ValueError) as exc:
             raise HistoryCursorError("History cursor id is invalid.") from exc
+        if pivot_id is not None and str(pivot_id) != cursor_id:
+            raise HistoryCursorError("History cursor id is invalid.")
 
         pivot_pinned = False
         pivot_type_rank = 0

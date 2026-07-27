@@ -156,6 +156,53 @@ def test_history_cursor_uses_one_pivot_query_and_one_candidate_query() -> None:
     }
 
 
+def test_history_cursor_rejects_timezone_naive_timestamp_before_pool_acquisition() -> (
+    None
+):
+    cursor_error, reader_type = _reader_types()
+    pool = _RecordingPool([])
+
+    with pytest.raises(cursor_error):
+        reader_type(pool).list_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=4,
+            archived=False,
+            deleted=False,
+            cursor_activity_at=datetime(2026, 7, 1),
+            cursor_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        )
+
+    assert pool.acquisition_timeouts == []
+    assert pool.cursor.executions == []
+
+
+@pytest.mark.parametrize(
+    "cursor_id",
+    [
+        "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+    ],
+)
+def test_history_cursor_rejects_noncanonical_uuid_before_pool_acquisition(
+    cursor_id: str,
+) -> None:
+    cursor_error, reader_type = _reader_types()
+    pool = _RecordingPool([])
+
+    with pytest.raises(cursor_error):
+        reader_type(pool).list_rows(
+            user_id="00000000-0000-0000-0000-000000000001",
+            limit=4,
+            archived=False,
+            deleted=False,
+            cursor_activity_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            cursor_id=cursor_id,
+        )
+
+    assert pool.acquisition_timeouts == []
+    assert pool.cursor.executions == []
+
+
 def _source_sql(sql: str, source: str, next_source: str) -> str:
     start = sql.index(f"{source}_candidates as (")
     end = sql.index(f"{next_source}_candidates as (", start)

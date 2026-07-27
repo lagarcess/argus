@@ -26,7 +26,10 @@ from argus.api.schemas import (
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.market_data.assets import ResolvedAsset
-from argus.domain.postgres_history_reader import HistoryCursorError
+from argus.domain.postgres_history_reader import (
+    HistoryCursorError,
+    PostgresHistoryReader,
+)
 from argus.domain.postgres_search_reader import SearchReadResult
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import (
@@ -2977,6 +2980,48 @@ def test_history_supabase_missing_or_ambiguous_pivot_uses_invalid_cursor_problem
     assert response.status_code == 400
     assert response.json()["code"] == "validation_error"
     assert response.json()["detail"] == "Invalid cursor."
+
+
+@pytest.mark.parametrize(
+    ("cursor_timestamp", "cursor_id"),
+    [
+        ("2026-07-27T12:00:00", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        (
+            "2026-07-27T12:00:00+00:00",
+            "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        ),
+        (
+            "2026-07-27T12:00:00+00:00",
+            "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+        ),
+    ],
+)
+def test_history_supabase_malformed_cursor_uses_invalid_cursor_problem_before_pool(
+    mock_gateway,
+    cursor_timestamp: str,
+    cursor_id: str,
+):
+    pool = MagicMock()
+    connection = pool.connection.return_value.__enter__.return_value
+    database_cursor = connection.cursor.return_value.__enter__.return_value
+    database_cursor.fetchall.side_effect = [
+        [{"source_type": "strategy", "pinned": False, "type_rank": 3}],
+        [],
+    ]
+    mock_gateway.list_history_rows.side_effect = PostgresHistoryReader(pool).list_rows
+
+    response = client.get(
+        "/api/v1/history",
+        params={
+            "cursor": encode_cursor(cursor_timestamp, cursor_id),
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["detail"] == "Invalid cursor."
+    pool.connection.assert_not_called()
 
 
 def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
