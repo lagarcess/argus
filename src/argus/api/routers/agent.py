@@ -75,7 +75,7 @@ from argus.api.chat.recovery import (
     failed_action_metadata_fallback_context,
     latest_result_fallback_context,
     mark_terminal_runtime_failure_checkpoint,
-    pending_strategy_metadata_fallback_context,
+    ordinary_turn_metadata_fallback_context,
     runtime_checkpoint_values,
 )
 from argus.api.chat.request_admission import (
@@ -597,34 +597,13 @@ async def chat_stream(
         if failed_fallback is not None:
             runtime_fallback = failed_fallback
     elif payload.action is None:
-        failed_fallback = failed_action_metadata_fallback_context(
+        ordinary_fallback = ordinary_turn_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            language=language,
         )
-        if failed_fallback is not None:
-            runtime_fallback = failed_fallback
-        else:
-            confirmation_fallback = confirmation_metadata_fallback_context(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                language=language,
-            )
-            if confirmation_fallback is not None:
-                runtime_fallback = confirmation_fallback
-            else:
-                pending_fallback = pending_strategy_metadata_fallback_context(
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
-                if pending_fallback is not None:
-                    runtime_fallback = pending_fallback
-                else:
-                    result_fallback = latest_result_fallback_context(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                    )
-                    if result_fallback is not None:
-                        runtime_fallback = result_fallback
+        if ordinary_fallback is not None:
+            runtime_fallback = ordinary_fallback
     lifecycle_hooks = request_admission.lifecycle_hooks()
     request_message_record = lifecycle_hooks.request_message
 

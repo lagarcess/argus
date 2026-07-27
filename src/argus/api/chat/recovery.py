@@ -683,6 +683,132 @@ def failed_action_metadata_fallback_context(
     return None
 
 
+def ordinary_turn_metadata_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+    language: str | None = None,
+) -> RuntimeFallbackContext | None:
+    primary_fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        language=language,
+    )
+    pending_fallback: RuntimeFallbackContext | None = None
+    result_fallback: RuntimeFallbackContext | None = None
+    if primary_fallback is None:
+        pending_fallback = pending_strategy_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+        primary_fallback = pending_fallback
+        if primary_fallback is None:
+            result_fallback = latest_result_fallback_context(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+            primary_fallback = result_fallback
+
+    failed_fallback = failed_action_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+    if _pending_fallback_belongs_to_failed_action(
+        pending_fallback=pending_fallback,
+        failed_fallback=failed_fallback,
+    ):
+        if result_fallback is None:
+            result_fallback = latest_result_fallback_context(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+        primary_fallback = result_fallback or pending_fallback
+    if primary_fallback is None:
+        return failed_fallback
+    if failed_fallback is None:
+        return primary_fallback
+
+    primary_snapshot = primary_fallback.latest_task_snapshot
+    failed_snapshot = failed_fallback.latest_task_snapshot
+    failed_reference = (
+        failed_snapshot.latest_failed_action_reference
+        if failed_snapshot is not None
+        else None
+    )
+    if primary_snapshot is None or failed_reference is None:
+        return primary_fallback
+
+    snapshot_references = list(primary_snapshot.artifact_references)
+    if not _artifact_references_include(snapshot_references, failed_reference):
+        snapshot_references.append(failed_reference)
+    context_references = list(
+        primary_fallback.artifact_references or primary_snapshot.artifact_references
+    )
+    if not _artifact_references_include(context_references, failed_reference):
+        context_references.append(failed_reference)
+    return RuntimeFallbackContext(
+        latest_task_snapshot=primary_snapshot.model_copy(
+            update={
+                "latest_failed_action_reference": failed_reference,
+                "artifact_references": snapshot_references,
+            },
+            deep=True,
+        ),
+        selected_thread_metadata=primary_fallback.selected_thread_metadata,
+        artifact_references=context_references,
+        confirmation_payload=primary_fallback.confirmation_payload,
+        confirmation_message_id=primary_fallback.confirmation_message_id,
+        recovery_message=primary_fallback.recovery_message,
+        recovery=primary_fallback.recovery,
+    )
+
+
+def _pending_fallback_belongs_to_failed_action(
+    *,
+    pending_fallback: RuntimeFallbackContext | None,
+    failed_fallback: RuntimeFallbackContext | None,
+) -> bool:
+    pending_metadata = (
+        pending_fallback.selected_thread_metadata
+        if pending_fallback is not None
+        else None
+    )
+    pending_snapshot = (
+        pending_fallback.latest_task_snapshot if pending_fallback is not None else None
+    )
+    failed_snapshot = (
+        failed_fallback.latest_task_snapshot if failed_fallback is not None else None
+    )
+    pending_strategy = (
+        pending_snapshot.pending_strategy_summary
+        if pending_snapshot is not None
+        else None
+    )
+    failed_pending_strategy = (
+        failed_snapshot.pending_strategy_summary if failed_snapshot is not None else None
+    )
+    return bool(
+        isinstance(pending_metadata, dict)
+        and pending_metadata.get("fallback_source") == "pending_strategy_metadata"
+        and pending_metadata.get("last_stage_outcome") == "execution_failed_recoverably"
+        and pending_strategy is not None
+        and failed_pending_strategy is not None
+        and failed_snapshot.latest_failed_action_reference is not None
+        and pending_strategy == failed_pending_strategy
+    )
+
+
+def _artifact_references_include(
+    references: list[ArtifactReference],
+    candidate: ArtifactReference,
+) -> bool:
+    return any(
+        reference.artifact_kind == candidate.artifact_kind
+        and reference.artifact_id == candidate.artifact_id
+        for reference in references
+    )
+
+
 def _metadata_supersedes_failed_action(metadata: dict[str, Any]) -> bool:
     pending_without_failed_action = bool(
         metadata.get("pending_strategy")

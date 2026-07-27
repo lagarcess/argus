@@ -5204,6 +5204,752 @@ def test_fact_answer_message_does_not_invalidate_active_confirmation() -> None:
     assert fallback.latest_task_snapshot.latest_backtest_result_reference is not None
 
 
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "Keep the current NVDA setup and tell me what is ready."),
+        ("es-419", "Conserva la configuracion actual de NVDA y dime que esta listo."),
+    ],
+)
+def test_issue_272_ordinary_turn_composes_owned_facts_after_failed_action(
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    message: str,
+) -> None:
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.recovery import (
+        failed_action_metadata_fallback_context,
+        ordinary_turn_metadata_fallback_context,
+    )
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "I kept the active setup.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    run_id = api_state.store.new_id()
+    completed_run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 14.2}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "timeframe": "1D",
+            "start_date": "2022-01-03",
+            "end_date": "2022-12-30",
+            "starting_capital": 8000,
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = completed_run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    confirmation_id = "issue-272-confirm-nvda"
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {**entry_rule, "direction": "bearish"}
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_above",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_below",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+    }
+    requested_range = {"start": "2023-01-01", "end": "2024-12-31"}
+    effective_range = {"start": "2023-01-03", "end": "2024-12-31"}
+    strategy = {
+        "requested_strategy_template": "moving_average_crossover",
+        "strategy_type": "signal_strategy",
+        "strategy_thesis": "Trade NVDA with a 50/200 SMA crossover.",
+        "asset_universe": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": requested_range,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 25000,
+        "comparison_baseline": "SPY",
+        "entry_logic": "50-day SMA crosses above 200-day SMA",
+        "exit_logic": "50-day SMA crosses below 200-day SMA",
+        "entry_rule": entry_rule,
+        "exit_rule": exit_rule,
+        "rule_spec": rule_spec,
+        "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    }
+    launch_payload = {
+        "strategy_type": "signal_strategy",
+        "symbol": "NVDA",
+        "symbols": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": effective_range,
+        "requested_date_range": requested_range,
+        "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "adjustment_reason": "calendar_alignment",
+            "requested_date_range": requested_range,
+            "effective_date_range": effective_range,
+            "observations_by_symbol": {"NVDA": 501, "SPY": 501},
+        },
+        "entry_rule": entry_rule,
+        "exit_rule": exit_rule,
+        "rule_spec": rule_spec,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 25000,
+        "position_size": None,
+        "cadence": None,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+        "language": language,
+    }
+    confirmation_payload = {
+        "confirmation_id": confirmation_id,
+        "artifact_id": confirmation_id,
+        "strategy": strategy,
+        "optional_parameters": {
+            "fees": {"value": 0.001, "source": "user"},
+            "slippage": {"value": 0.0005, "source": "user"},
+        },
+        "launch_payload": launch_payload,
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The NVDA crossover is ready.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+            "confirmation_card": {
+                "confirmation_id": confirmation_id,
+                "confirmation_state": "active",
+                "title": "NVDA moving average crossover",
+                "status": "ready_to_run",
+                "rows": [],
+                "actions": [
+                    {
+                        "type": "run_backtest",
+                        "payload": {"confirmation_id": confirmation_id},
+                    }
+                ],
+            },
+        },
+    )
+
+    failed_action_id = "issue-272-stale-failed-action"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="An older action failed and can be retried.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": failed_action_id,
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-02",
+                        "end": "2024-12-31",
+                    },
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    clear_openrouter_route_receipts()
+    runs_before_recovery = deepcopy(api_state.store.backtest_runs)
+    message_ids_before_recovery = [
+        stored_message.id
+        for stored_message in api_state.store.messages[conversation["id"]]
+    ]
+    jobs_before_recovery = deepcopy(api_state.store.backtest_jobs)
+    usage_before_recovery = deepcopy(api_state.store.usage_counters)
+    composed_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+
+    assert composed_context is not None
+    assert api_state.store.backtest_runs == runs_before_recovery
+    assert [
+        stored_message.id
+        for stored_message in api_state.store.messages[conversation["id"]]
+    ] == message_ids_before_recovery
+    assert api_state.store.backtest_jobs == jobs_before_recovery == {}
+    assert api_state.store.usage_counters == usage_before_recovery
+    assert get_openrouter_route_receipts() == []
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": language,
+        },
+    )
+
+    assert response.status_code == 200
+    assert api_state.store.backtest_runs == runs_before_recovery
+    assert len(api_state.store.backtest_runs) - len(runs_before_recovery) == 0
+    assert api_state.store.backtest_jobs == jobs_before_recovery == {}
+    usage_after_recovery = api_state.store.usage_counters
+    assert {
+        key: value
+        for key, value in usage_after_recovery.items()
+        if key[1] != "chat_messages"
+    } == {
+        key: value
+        for key, value in usage_before_recovery.items()
+        if key[1] != "chat_messages"
+    }
+    for window in ("hour", "day"):
+        chat_key = (user_id, "chat_messages", window)
+        chat_before = int(
+            (usage_before_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        chat_after = int(
+            (usage_after_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        assert chat_after - chat_before == 1
+
+        run_key = (user_id, "backtest_runs", window)
+        runs_before = int(
+            (usage_before_recovery.get(run_key) or {}).get("used_count") or 0
+        )
+        runs_after = int((usage_after_recovery.get(run_key) or {}).get("used_count") or 0)
+        assert runs_after - runs_before == 0
+    assert get_openrouter_route_receipts() == []
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.active_confirmation_reference is not None
+    assert snapshot.active_confirmation_reference.artifact_id == confirmation_id
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.asset_universe == ["NVDA"]
+    assert pending.capital_amount == 25000
+    assert pending.date_range == requested_range
+    assert pending.timeframe == "1D"
+    assert pending.comparison_baseline == "SPY"
+    assert pending.requested_strategy_template == "moving_average_crossover"
+    assert pending.strategy_type == "signal_strategy"
+    assert pending.entry_rule == entry_rule
+    assert pending.exit_rule == exit_rule
+    assert pending.rule_spec == rule_spec
+    assert pending.extra_parameters == strategy["extra_parameters"]
+    assert captured["fallback_confirmation_payload"] == confirmation_payload
+    assert (
+        captured["fallback_confirmation_payload"]["launch_payload"][
+            "requested_date_range"
+        ]
+        == requested_range
+    )
+    assert (
+        captured["fallback_confirmation_payload"]["launch_payload"]["date_range"]
+        == effective_range
+    )
+    result_reference = snapshot.latest_backtest_result_reference
+    assert result_reference is not None
+    assert result_reference.metadata["result_run_id"] == run_id
+    failed_reference = snapshot.latest_failed_action_reference
+    assert failed_reference is not None
+    assert failed_reference.artifact_id == failed_action_id
+    assert captured["fallback_selected_thread_metadata"]["fallback_source"] == (
+        "message_metadata"
+    )
+
+    reloaded_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+    assert reloaded_context is not None
+    reloaded_snapshot = reloaded_context.latest_task_snapshot
+    assert reloaded_snapshot is not None
+    assert reloaded_snapshot.active_confirmation_reference is not None
+    assert reloaded_snapshot.active_confirmation_reference.artifact_id == confirmation_id
+    assert reloaded_snapshot.pending_strategy_summary == pending
+    assert reloaded_snapshot.latest_backtest_result_reference is not None
+    assert (
+        reloaded_snapshot.latest_backtest_result_reference.metadata["result_run_id"]
+        == run_id
+    )
+    assert reloaded_snapshot.latest_failed_action_reference is not None
+    assert (
+        reloaded_snapshot.latest_failed_action_reference.artifact_id == failed_action_id
+    )
+    hydrated_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    hydrated_confirmation = next(
+        hydrated
+        for hydrated in hydrated_messages
+        if hydrated["metadata"].get("confirmation_card", {}).get("confirmation_id")
+        == confirmation_id
+    )
+    assert hydrated_confirmation["metadata"]["confirmation_payload"] == (
+        confirmation_payload
+    )
+
+    edited_confirmation_id = "issue-272-confirm-tsla"
+    edited_payload = deepcopy(confirmation_payload)
+    edited_payload["confirmation_id"] = edited_confirmation_id
+    edited_payload["artifact_id"] = edited_confirmation_id
+    edited_payload["strategy"]["asset_universe"] = ["TSLA"]
+    edited_payload["strategy"]["strategy_thesis"] = (
+        "Trade TSLA with a 50/200 SMA crossover."
+    )
+    edited_payload["launch_payload"]["symbol"] = "TSLA"
+    edited_payload["launch_payload"]["symbols"] = ["TSLA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The explicit TSLA edit is ready.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": edited_payload,
+            "confirmation_card": {
+                "confirmation_id": edited_confirmation_id,
+                "confirmation_state": "active",
+                "title": "TSLA moving average crossover",
+                "status": "ready_to_run",
+                "rows": [],
+                "actions": [
+                    {
+                        "type": "run_backtest",
+                        "payload": {"confirmation_id": edited_confirmation_id},
+                    }
+                ],
+            },
+        },
+    )
+
+    assert (
+        failed_action_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        is None
+    )
+    assert (
+        latest_active_confirmation_id(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        == edited_confirmation_id
+    )
+    superseding_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+    assert superseding_context is not None
+    superseding_snapshot = superseding_context.latest_task_snapshot
+    assert superseding_snapshot is not None
+    assert superseding_snapshot.pending_strategy_summary is not None
+    assert superseding_snapshot.pending_strategy_summary.asset_universe == ["TSLA"]
+    assert superseding_snapshot.active_confirmation_reference is not None
+    assert (
+        superseding_snapshot.active_confirmation_reference.artifact_id
+        == edited_confirmation_id
+    )
+    assert superseding_snapshot.latest_failed_action_reference is None
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_issue_272_recovered_draft_clarifies_only_the_missing_field(
+    language: str,
+) -> None:
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+    from argus.agent_runtime.state.models import RunState
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    pending_strategy = {
+        "strategy_type": "buy_and_hold",
+        "strategy_thesis": "Buy and hold NVDA.",
+        "asset_universe": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "comparison_baseline": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The prior action failed before the amount was supplied.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": pending_strategy,
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["sizing_amount"],
+                    "requested_fields": ["capital_amount"],
+                },
+            },
+            "failed_action": {
+                "artifact_id": "issue-272-incomplete-failed-action",
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["NVDA"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "invalid_request",
+                "error": "capital_amount_required",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert (
+        snapshot.pending_strategy_summary.model_dump(
+            exclude_none=True,
+            exclude_defaults=True,
+            exclude={"resolution_provenance"},
+        )
+        == pending_strategy
+    )
+    assert snapshot.latest_failed_action_reference is not None
+    assert recovered.selected_thread_metadata["requested_field"] == "capital_amount"
+
+    state = RunState.new(
+        current_user_message="Continue." if language == "en" else "Continua.",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.requested_field = recovered.selected_thread_metadata["requested_field"]
+    state.missing_required_fields = ["capital_amount"]
+    state.candidate_strategy_draft = snapshot.pending_strategy_summary
+
+    clarification = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language=language,
+    )
+
+    assert clarification.outcome == "await_user_reply"
+    assert clarification.patch["requested_field"] == "capital_amount"
+    assert clarification.patch["requested_fields"] == ["capital_amount"]
+    assert clarification.patch["response_intent"]["semantic_needs"] == ["sizing_amount"]
+
+
+def test_issue_272_failure_pending_does_not_displace_completed_result() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The later action failed before the draft was complete.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount", "date_range"],
+            },
+            "failed_action": {
+                "artifact_id": "issue-272-sparse-failed-action",
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["MSFT"],
+                    "timeframe": "1D",
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "invalid_request",
+                "error": "capital_amount_required",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is None
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert (
+        snapshot.latest_failed_action_reference.artifact_id
+        == "issue-272-sparse-failed-action"
+    )
+
+
+def test_issue_272_current_clarification_keeps_pending_primary_without_result_read(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.chat import recovery as recovery_module
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    failed_action_id = "issue-272-retained-aapl-failed-action"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="How much would you like to invest in NVDA?",
+        metadata={
+            "conversation_mode": "drafting",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold NVDA.",
+                    "asset_universe": ["NVDA"],
+                    "asset_class": "equity",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "comparison_baseline": "SPY",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["sizing_amount"],
+                    "requested_fields": ["capital_amount"],
+                },
+                "source_result": {
+                    "run_id": run_id,
+                    "strategy_id": None,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "source_result_run_id": run_id,
+            "failed_action": {
+                "artifact_id": failed_action_id,
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-02",
+                        "end": "2024-12-31",
+                    },
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    def _unexpected_result_lookup(**_kwargs: Any) -> None:
+        raise AssertionError(
+            "a current pending clarification must not query the result fallback"
+        )
+
+    monkeypatch.setattr(
+        recovery_module,
+        "latest_result_fallback_context",
+        _unexpected_result_lookup,
+    )
+
+    recovered = recovery_module.ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.asset_universe == ["NVDA"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert snapshot.latest_failed_action_reference.artifact_id == failed_action_id
+    assert recovered.selected_thread_metadata is not None
+    assert recovered.selected_thread_metadata["last_stage_outcome"] == "await_user_reply"
+    assert (
+        recovered.selected_thread_metadata["fallback_source"]
+        == "pending_strategy_metadata"
+    )
+    assert recovered.selected_thread_metadata["requested_field"] == "capital_amount"
+
+
 def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:
     from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
 

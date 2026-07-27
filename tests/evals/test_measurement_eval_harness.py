@@ -528,6 +528,93 @@ def test_issue_271_cases_are_on_the_live_measurement_surface() -> None:
         }
 
 
+def test_issue_272_cases_run_the_real_two_stage_measurement_topology(
+    monkeypatch: Any,
+) -> None:
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.domain.backtesting import coverage as coverage_module
+    from argus.domain.backtesting.coverage import (
+        CoverageDateRange,
+        PreparedMarketData,
+    )
+
+    cases = {case.id: case for case in load_eval_cases()}
+    issue_272_cases = [
+        cases["ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en"],
+        cases["ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es"],
+    ]
+    canonical_launch = issue_272_cases[0].confirmation_payload["launch_payload"]
+    canonical_coverage = canonical_launch["coverage_preflight"]
+    assert all(
+        case.confirmation_payload["launch_payload"]["coverage_preflight"]
+        == canonical_coverage
+        for case in issue_272_cases
+    )
+
+    def prepared_owned_coverage(_config: dict[str, Any]) -> PreparedMarketData:
+        return PreparedMarketData(
+            requested_date_range=CoverageDateRange.model_validate(
+                canonical_coverage["requested_date_range"]
+            ),
+            effective_date_range=CoverageDateRange.model_validate(
+                canonical_coverage["effective_date_range"]
+            ),
+            outcome=str(canonical_coverage["outcome"]),
+            adjustment_reason=canonical_coverage["adjustment_reason"],
+            dataset_id="issue-272-owned-confirmation-coverage",
+            bars_by_symbol={},
+            observations_by_symbol=dict(
+                canonical_coverage.get("observations_by_symbol") or {}
+            ),
+        )
+
+    class CapitalEditInterpreter:
+        async def ainvoke(self, request: Any) -> StructuredInterpretation:
+            snapshot = request.latest_task_snapshot
+            assert snapshot is not None
+            assert snapshot.active_confirmation_reference is not None
+            assert snapshot.latest_backtest_result_reference is not None
+            assert snapshot.latest_failed_action_reference is not None
+            assert snapshot.pending_strategy_summary is not None
+            edited = snapshot.pending_strategy_summary.model_copy(
+                update={"capital_amount": 30000},
+                deep=True,
+            )
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="Change only the active setup capital.",
+                candidate_strategy_draft=edited,
+                semantic_turn_act="refine_current_idea",
+                artifact_target="active_confirmation",
+                reason_codes=["artifact_assumption_edit_planned"],
+            )
+
+    monkeypatch.setattr(
+        harness,
+        "OpenRouterStructuredInterpreter",
+        lambda **_kwargs: CapitalEditInterpreter(),
+    )
+    monkeypatch.setattr(
+        coverage_module,
+        "prepare_market_data",
+        prepared_owned_coverage,
+    )
+
+    for case in issue_272_cases:
+        assert case.followup_prompt is None
+
+        result = harness.run_eval_case(case, run_prose_judge=False)
+
+        assert result["typed_outcome"]["stage_outcomes"] == [
+            "ready_for_confirmation",
+            "await_approval",
+        ]
+        assert result["failed_checks"] == []
+        assert result["status"] == "passed"
+
+
 def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> None:
     case = {
         case.id: case for case in load_eval_cases()
