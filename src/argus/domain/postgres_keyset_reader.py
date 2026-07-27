@@ -8,7 +8,13 @@ from uuid import UUID
 
 from psycopg.rows import dict_row
 
+from argus.api.chat.legacy_onboarding_markers import (
+    _LEGACY_GOAL_PREFIX,
+    _LEGACY_SKIP_MARKER,
+)
+
 _KEYSET_ACQUIRE_TIMEOUT_SECONDS = 2.0
+_LEGACY_GOAL_LIKE = _LEGACY_GOAL_PREFIX.replace("_", r"\_").replace("%", r"\%") + "%"
 
 _CONVERSATION_COLUMNS = """
 id,
@@ -83,8 +89,8 @@ where user_id = %s
   and (
       role <> 'user'
       or (
-          content <> '__ONBOARDING_SKIP__'
-          and content not like '\\_\\_ONBOARDING\\_GOAL\\_\\_:%%' escape '\\'
+          content <> %s
+          and content not like %s escape '\\'
       )
   ){cursor_predicate}
 order by created_at asc, id asc
@@ -202,7 +208,12 @@ class PostgresKeysetReader:
             _uuid(cursor_id, label="Message cursor id") if cursor_id is not None else None
         )
 
-        params: list[Any] = [owner_id, owned_conversation_id]
+        params: list[Any] = [
+            owner_id,
+            owned_conversation_id,
+            _LEGACY_SKIP_MARKER,
+            _LEGACY_GOAL_LIKE,
+        ]
         if has_cursor:
             params.extend((cursor_created_at, pivot_id))
         params.append(limit + 1)

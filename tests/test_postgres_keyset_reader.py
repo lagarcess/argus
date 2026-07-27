@@ -246,13 +246,15 @@ def test_message_page_uses_tuple_keyset_and_filters_retired_user_markers() -> No
     assert "where user_id = %s" in sql
     assert "and conversation_id = %s" in sql
     assert "role <> 'user'" in sql
-    assert "content <> '__ONBOARDING_SKIP__'" in sql
-    assert r"content not like '\_\_ONBOARDING\_GOAL\_\_:%%' escape '\'" in sql
+    assert "content <> %s" in sql
+    assert r"content not like %s escape '\'" in sql
     assert "(created_at, id) > (%s, %s)" in sql
     assert "order by created_at asc, id asc" in sql
     assert params == (
         UUID("30000000-0000-0000-0000-000000000001"),
         UUID("20000000-0000-0000-0000-000000000001"),
+        "__ONBOARDING_SKIP__",
+        r"\_\_ONBOARDING\_GOAL\_\_:%",
         cursor_at,
         UUID(cursor_id),
         3,
