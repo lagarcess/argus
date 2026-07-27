@@ -1,6 +1,6 @@
 # Issue #232 Bounded Postgres Pagination Implementation Plan
 
-Status: **ACTIVE**
+Status: **ACCEPTANCE GREEN — PUBLICATION PENDING**
 
 > **For agentic workers:** every behavioral slice starts with a focused failing
 > regression, records the exact red, implements the smallest correction, proves
@@ -328,9 +328,11 @@ meaning.
   migration chain/catalog/RLS.
 - [x] Compare small and large fixtures: query count and returned rows remain
   bounded.
-- [ ] Record database, artifact projection, serialization, and endpoint p50/p95
+- [x] Record database, artifact projection, serialization, and endpoint p50/p95
   separately. The seeded uncached message endpoint must be at or below 250 ms
-  p95.
+  p95. Exact-head Message p50/p95 total was 29.075/37.827 ms; database
+  26.010/34.487 ms; artifact projection 0.128/0.166 ms; serialization
+  0.081/0.093 ms.
 - [x] Commit
   `perf(postgres): add proven indexes for bounded history reads`.
 
@@ -433,8 +435,8 @@ History ordering/grouping/collection-count change.
 - [x] Request fresh artifact identity/hydration review.
 - [x] Request fresh QA/performance methodology review.
 - [x] Reproduce every actionable finding at candidate HEAD.
-- [ ] Apply only the smallest correction for confirmed reachable findings.
-- [ ] Re-review only the bounded delta.
+- [x] Apply only the smallest correction for confirmed reachable findings.
+- [x] Re-review only the bounded delta.
 
 Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 
@@ -442,14 +444,16 @@ Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 
 ### Task 10: Final integration, acceptance, and publication
 
-- [ ] Fetch `origin/codex/private-alpha-next` and merge it normally exactly
-  once; never rebase.
-- [ ] Rerun affected focused tests, real Postgres/RLS, migration reset, scale
+- [x] Fetch `origin/codex/private-alpha-next` and merge it normally; never
+  rebase. The first final merge incorporated `7b00e747`; a second normal
+  catch-up incorporated `059f8e82` after that relevant provider-free CI commit
+  landed during acceptance. No rebase occurred.
+- [x] Rerun affected focused tests, real Postgres/RLS, migration reset, scale
   benchmarks, Ruff/format/modularity, `git diff --check`, frontend hydration
   tests, and production build when types/hydration are affected.
-- [ ] Run production-parity authenticated browser/API QA with controlled
+- [x] Run production-parity authenticated browser/API QA with controlled
   fixtures and no provider-backed interpreter turns.
-- [ ] Record exact candidate SHA and privacy-safe evidence.
+- [x] Record exact runtime candidate SHA and privacy-safe evidence.
 - [ ] Push `codex/issue-232-bounded-pagination`.
 - [ ] Open a Draft PR targeting `codex/private-alpha-next`.
 - [ ] Wait for terminal CI.
@@ -458,3 +462,63 @@ Use both `superpowers:requesting-code-review` and `argus-review-contract`.
 
 **Never:** merge, deploy, promote to `main`, close the issue, mutate hosted
 Supabase, or change unrelated flags.
+
+## Exact-head acceptance evidence
+
+Verified runtime head:
+`9a5047c62dd9d98e2891a2c48b4d7b594ec6455f`.
+
+- Complete isolated migration reset from zero passed through
+  `20260727161406_add_history_state_page_indexes.sql`; catalog, explicit
+  rollback text, RLS, grants, and authenticated two-owner isolation passed.
+- Focused hermetic backend/CI: 251 passed, 2 expected database skips.
+- Real Postgres pagination/History/Search/index suite: 93 passed. It covers
+  first/middle/final/empty pages, equal timestamps, deletion between requests,
+  owner isolation, exact ranking, exact ledger counts, and plan/catalog checks.
+- Frontend hydration/Search compatibility: 188 passed. Production build and
+  TypeScript compilation passed.
+- Quality: Ruff passed; 18 candidate-owned formatted files passed the formatter;
+  the extracted readers/message helper passed mypy; modularity passed with
+  `supabase_gateway.py` at 1,920 lines versus its 2,113-line limit; diff check
+  passed. Whole-file formatter deviations that also exist on integration were
+  not rewritten as unrelated churn.
+- Search SQL construction is constant-shape: 160,346 rendered bytes and 73
+  normalizer occurrences for 1, 20, 100, 400, and 500 tokens. Before the fix,
+  one token rendered 147,705 bytes while 500 tokens rendered 18,000,346 bytes.
+  Arbitrary all-token matching, rank order, and exact ledger groups remain
+  covered by unit and real-Postgres tests.
+- The 12,000-row/source endpoint benchmark uses 20 sequential uncached samples
+  and records no transcript, raw owner id, token, credential, or provider call.
+  Conversations returned 21 rows with one query and 4.426 ms p95 total; History
+  returned 84 bounded source candidates with one query and 4.336 ms p95 total;
+  Messages returned 80 database rows with 11 fixed queries and 37.827 ms p95
+  total; Search returned 193 rows with 10 fixed queries and 3,860.752 ms p95
+  total for the deliberately all-matching `alpha` corpus. Every Search source
+  statement remains below the unchanged two-second statement timeout; selective
+  queries use the six plan-proven GIN indexes.
+- Dense History Run measurement returned the 21-row candidate-plus-sentinel
+  page after inspecting 85 Runs and 85 parents in 0.193 ms. The accepted sparse
+  first page inspected 2,101 Runs/parents and returned 21 candidates in
+  2.444 ms; its final page inspected 2,100 Runs and 2,099 parents, returned the
+  complete final 20 with no sentinel, and completed in 1.897 ms. This is the
+  accepted private-alpha exception, not a universal constant-work claim.
+- Authenticated exact-head API QA returned History 256/256 across 11 pages,
+  Search 448/448 across five pages, Messages 12,001/12,001 across 121 pages,
+  exact 16-by-four small-owner ledger counts, 50/50 canonical completed-result
+  hydrations, and clean two-owner isolation. Message p50/p95 was
+  66.998/81.555 ms.
+- Browser QA as a normal non-admin user visibly showed exact 3,000-by-four
+  ledger counts, ranked the expected all-token Idea first, rendered all 12,001
+  long-thread artifacts, switched to the one-item short thread, and recorded
+  zero console errors or warnings. Reload was exercised, but the artificial
+  12,001-item client hydration did not finish inside the fixed four-second
+  observation; no completion claim is made. Client render/caching work remains
+  separately owned by issue #252.
+- The final bounded database/security review approved
+  `52237f67..9a5047c6` with no candidate-owned correctness, ownership/RLS,
+  privacy, migration-safety, or data-loss finding. The QA rereview approved the
+  separate database/artifact-projection/serialization/total timing method.
+
+Maintaining Conversation state on Run rows or adding a maintained History read
+model remains a deferred scale-architecture option. It is not unfinished issue
+#232 work and is not implemented by this lane.
