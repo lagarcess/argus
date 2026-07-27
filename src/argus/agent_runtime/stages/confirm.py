@@ -947,6 +947,12 @@ def _strategy_cost_parameter(
     extra_parameters = strategy.get("extra_parameters")
     if not isinstance(extra_parameters, dict) or key not in extra_parameters:
         return False, None
+    field_provenance = extra_parameters.get("field_provenance")
+    if (
+        not isinstance(field_provenance, dict)
+        or field_provenance.get(key) != "explicit_user"
+    ):
+        return False, None
     return True, extra_parameters[key]
 
 

@@ -48,7 +48,6 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     normalize_date_range_candidate,
 )
-from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.rules import describe_rule_spec
 from argus.domain.indicators import (
     executable_indicator_spec,
@@ -60,17 +59,6 @@ from argus.nlp.natural_time import resolve_date_range_intent
 def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     payload = draft.model_dump(mode="python")
     field_provenance = payload.pop("field_provenance", {}) or {}
-    extra_parameters = payload.get("extra_parameters")
-    if _execution_realism_feature_enabled() and isinstance(extra_parameters, dict):
-        for field_name in ("fee_rate", "slippage"):
-            value = extra_parameters.get(field_name)
-            if (
-                field_name not in field_provenance
-                and isinstance(value, (int, float))
-                and not isinstance(value, bool)
-                and value > 0
-            ):
-                field_provenance[field_name] = "explicit_user"
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
     date_range_intent = _clean_date_range_intent_payload(
@@ -143,10 +131,6 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
             if starting_capital is not None:
                 payload["capital_amount"] = starting_capital
                 field_provenance["capital_amount"] = "starting_capital"
-    if field_provenance:
-        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
-            field_provenance
-        )
     if language:
         payload.setdefault("extra_parameters", {})["language"] = language
     if date_range_raw_text:
@@ -164,6 +148,10 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload=payload,
         field_provenance=field_provenance,
         evidence_spans=evidence_spans,
+    )
+    field_provenance = _owned_execution_cost_provenance(
+        payload=payload,
+        field_provenance=field_provenance,
     )
     if field_provenance:
         payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
@@ -202,16 +190,48 @@ def _evidence_backed_field_provenance(
     evidence_backed_fields = {
         "cadence": "explicit_user",
         "comparison_baseline": "explicit_user",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
         "timeframe": "explicit_user",
     }
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        extra_parameters = {}
     for field_name, source in evidence_backed_fields.items():
         if field_name in updated:
             continue
         if field_name not in evidence_spans:
             continue
-        if payload.get(field_name) in (None, "", [], {}):
+        field_value = (
+            extra_parameters.get(field_name)
+            if field_name in {"fee_rate", "slippage"}
+            else payload.get(field_name)
+        )
+        if field_value in (None, "", [], {}):
             continue
         updated[field_name] = source
+    return updated
+
+
+def _owned_execution_cost_provenance(
+    *,
+    payload: dict[str, Any],
+    field_provenance: dict[str, Any],
+) -> dict[str, Any]:
+    updated = dict(field_provenance or {})
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        for field_name in ("fee_rate", "slippage"):
+            updated.pop(field_name, None)
+        return updated
+    for field_name in ("fee_rate", "slippage"):
+        if (
+            field_name in extra_parameters
+            and updated.get(field_name) == "explicit_user"
+        ):
+            continue
+        extra_parameters.pop(field_name, None)
+        updated.pop(field_name, None)
     return updated
 
 

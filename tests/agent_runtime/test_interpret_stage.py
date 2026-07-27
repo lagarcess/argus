@@ -10496,10 +10496,13 @@ def test_cold_start_explicit_costs_flow_to_launch_payload_when_flag_on(
             asset_class="equity",
             date_range={"start": "2025-01-01", "end": "2025-12-31"},
             capital_amount=10000,
-            extra_parameters={"fee_rate": 0.001, "slippage": 0.0005},
-            field_provenance={
-                "fee_rate": "explicit_user",
-                "slippage": "explicit_user",
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+                "field_provenance": {
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                },
             },
         ),
         missing_required_fields=[],
@@ -10554,8 +10557,10 @@ def test_cold_start_explicit_costs_stay_inert_when_flag_off(
             asset_class="equity",
             date_range={"start": "2025-01-01", "end": "2025-12-31"},
             capital_amount=10000,
-            extra_parameters={"fee_rate": 0.001},
-            field_provenance={"fee_rate": "explicit_user"},
+            extra_parameters={
+                "fee_rate": 0.001,
+                "field_provenance": {"fee_rate": "explicit_user"},
+            },
         ),
         missing_required_fields=[],
         semantic_turn_act="new_idea",

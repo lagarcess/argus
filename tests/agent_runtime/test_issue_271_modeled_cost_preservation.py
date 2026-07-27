@@ -130,13 +130,36 @@ def _cost_strategy() -> StrategySummary:
     )
 
 
-def test_nonzero_llm_costs_gain_explicit_provenance_at_canonical_boundary() -> None:
+def test_unprovenanced_llm_costs_stay_idealized_at_canonical_boundary() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
             strategy_type="buy_and_hold",
             asset_universe=["MSFT"],
             date_range={"start": "2023-01-03", "end": "2024-12-31"},
             capital_amount=12000,
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+            },
+        )
+    )
+
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "field_provenance" not in strategy.extra_parameters
+
+
+def test_evidence_backed_llm_costs_gain_explicit_provenance() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            capital_amount=12000,
+            evidence_spans={
+                "fee_rate": "10 bps fee",
+                "slippage": "5 bps slippage",
+            },
             extra_parameters={
                 "fee_rate": 0.001,
                 "slippage": 0.0005,
@@ -152,7 +175,33 @@ def test_nonzero_llm_costs_gain_explicit_provenance_at_canonical_boundary() -> N
     }
 
 
-def test_default_zero_llm_costs_do_not_gain_explicit_provenance() -> None:
+def test_explicit_llm_cost_provenance_preserves_canonical_values() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            date_range={"start": "2023-01-03", "end": "2024-12-31"},
+            capital_amount=12000,
+            field_provenance={
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+            },
+        )
+    )
+
+    assert strategy.extra_parameters["fee_rate"] == 0.001
+    assert strategy.extra_parameters["slippage"] == 0.0005
+    assert strategy.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
+def test_unprovenanced_zero_llm_costs_remain_canonical_defaults() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
             strategy_type="buy_and_hold",
@@ -165,8 +214,8 @@ def test_default_zero_llm_costs_do_not_gain_explicit_provenance() -> None:
         )
     )
 
-    assert strategy.extra_parameters["fee_rate"] == 0.0
-    assert strategy.extra_parameters["slippage"] == 0.0
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
     assert "field_provenance" not in strategy.extra_parameters
 
 
@@ -186,6 +235,8 @@ def test_flag_off_llm_costs_do_not_gain_explicit_provenance(monkeypatch) -> None
     )
 
     assert "field_provenance" not in strategy.extra_parameters
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
 
 
 def _active_confirmation_snapshot(strategy: StrategySummary) -> TaskSnapshot:
@@ -435,6 +486,34 @@ def test_confirmation_launch_card_and_hydration_share_canonical_costs(
         "fee_rate": "explicit_user",
         "slippage": "explicit_user",
     }
+
+
+def test_confirmation_does_not_model_unprovenanced_strategy_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    strategy = _cost_strategy()
+    strategy.extra_parameters.pop("field_provenance")
+    state = RunState.new(
+        current_user_message="Test this idea.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = strategy
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "await_approval"
+    payload = result.patch["confirmation_payload"]
+    assert payload["optional_parameters"]["fees"]["value"] == 0.0
+    assert payload["optional_parameters"]["fees"]["source"] == "default"
+    assert payload["optional_parameters"]["slippage"]["value"] == 0.0
+    assert payload["optional_parameters"]["slippage"]["source"] == "default"
+    assert "_execution_realism" not in payload["launch_payload"]
+    assert "No fees" in payload["strategy"]["assumptions"]
+    assert "No slippage" in payload["strategy"]["assumptions"]
 
 
 def test_launch_projection_uses_exact_basis_points_for_decimal_costs(
