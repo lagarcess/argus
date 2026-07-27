@@ -356,8 +356,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(sendState).toContain("message.id !== assistantId");
     expect(retry).not.toContain("content.includes");
     expect(retry).not.toContain(".match(");
-    expect(chat).toContain("const actionLabel = (action: ChatActionOption) =>");
-    expect(chat).toContain("{actionLabel(action)}");
+    // Action labels localize where the actions now render: next-move rows own
+    // labelKey interpolation since the floating composer strip was removed.
+    expect(message).toContain("const actionLabel = (action: ChatActionOption) =>");
+    expect(message).toContain("{actionLabel(action)}");
     expect(chat).toContain("const actionDisplayLabel = useCallback");
     expect(chat).toContain(
       "content: action?.type ? actionDisplayLabel(action) : trimmed",
@@ -577,7 +579,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(ownership).toContain("isCardScopedAction");
     expect(chat).toContain('from "@/lib/chat-action-ownership"');
     expect(chat).toContain("hasActiveArtifactActionSet(messages)");
-    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
+    // Card-scoped actions never become conversational next-move rows; the row
+    // list is filtered per message and suppressed while a card owns actions.
+    expect(message).toContain("!actionHasCardScopedOwnership(action)");
+    expect(chat).toContain("!hasActiveArtifactActionSet(messages)");
     expect(chat).not.toContain("setInputActions(confirmation.actions ?? [])");
     expect(chat).not.toContain("visibleInputActions(inputActions).map");
     expect(chat).not.toContain('event.event === "confirmation"');
@@ -613,7 +618,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(css).toContain("animation: none;");
   });
 
-  test("composer hides artifact actions whenever any active card owns them", () => {
+  test("next moves hide whenever any active card owns the conversation's actions", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -630,10 +635,19 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(activeArtifactHelper).toContain("actionHasCardScopedOwnership");
     expect(activeArtifactHelper).not.toContain("latestAi");
-    expect(chat).toContain(
-      "const composerActions = hasActiveArtifactActionSet(messages)",
+
+    // The floating composer strip is gone. Its gating survives on the row list:
+    // no next moves mid-stream, mid-hydration, or while a card owns actions.
+    const gate = chat.slice(
+      chat.indexOf("const nextMovesEnabled ="),
+      chat.indexOf("const latestAssistantContent"),
     );
-    expect(chat).toContain("visibleComposerResponseActions(inputActions)");
+    expect(gate).toContain("!streamStatus");
+    expect(gate).toContain("!isStreamingResponse");
+    expect(gate).toContain("!isHydratingConversation");
+    expect(gate).toContain("!hasActiveArtifactActionSet(messages)");
+    expect(chat).toContain("nextMovesEnabled={nextMovesEnabled}");
+    expect(chat).not.toContain("const composerActions =");
   });
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
