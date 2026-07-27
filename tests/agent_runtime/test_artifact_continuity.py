@@ -19,6 +19,8 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable,
 )
@@ -602,6 +604,85 @@ def test_candidate_append_patch_preserves_anchor_setup() -> None:
     assert patched.capital_amount == 100000
     assert patched.timeframe == "1D"
     assert patched.comparison_baseline == "QQQ"
+
+
+def test_absolute_date_patch_discards_stale_date_intent_and_preserves_costs() -> None:
+    anchored = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold MSFT with modeled execution costs.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "2022-12-31"},
+        capital_amount=12000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+        extra_parameters={
+            "date_range_raw_text": "during 2022",
+            "date_range_intent": {"kind": "calendar_year", "year": 2022},
+            "evidence_spans": {"date_range": "during 2022"},
+            "language": "en",
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "date_range": "explicit_user",
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+    anchor = resolve_artifact_anchor(
+        snapshot=TaskSnapshot(
+            active_confirmation_reference=ArtifactReference(
+                artifact_kind="confirmation",
+                artifact_id="confirmation-date-edit",
+                artifact_status="active",
+                metadata={
+                    "confirmation_payload": {
+                        "strategy": anchored.model_dump(mode="python"),
+                    },
+                },
+            )
+        )
+    )
+
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=StrategySummary(
+            date_range={"start": "2023-02-01", "end": "2023-11-30"},
+            extra_parameters={
+                "field_provenance": {"date_range": "explicit_user"},
+            },
+        ),
+    )
+
+    assert patched is not None
+    assert patched.extra_parameters["language"] == "en"
+    assert patched.extra_parameters["fee_rate"] == 0.001
+    assert patched.extra_parameters["slippage"] == 0.0005
+    assert patched.extra_parameters["field_provenance"] == {
+        "date_range": "explicit_user",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert "date_range_raw_text" not in patched.extra_parameters
+    assert "date_range_intent" not in patched.extra_parameters
+    assert "date_range" not in patched.extra_parameters.get("evidence_spans", {})
+
+    state = RunState.new(
+        current_user_message="Use February through November 2023.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = patched
+    confirmation = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirmation.outcome == "await_approval"
+    assert confirmation.patch["confirmation_payload"]["strategy"]["date_range"] == {
+        "start": "2023-02-01",
+        "end": "2023-11-30",
+    }
 
 
 def test_patched_draft_rejects_asset_universe_without_operation() -> None:

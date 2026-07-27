@@ -261,6 +261,12 @@ def patched_draft_from_candidate(
         if _equivalent_strategy_value(field_name, candidate_value, anchored_value):
             continue
         patch_values[field_name] = candidate_value
+    if "date_range" in patch_values:
+        patch_values["extra_parameters"] = _merged_extra_parameters(
+            anchored=anchor.draft.extra_parameters,
+            candidate=candidate.extra_parameters,
+            discard_stale_date_metadata=True,
+        )
     operation = normalized_asset_universe_operation(
         _dict(candidate.extra_parameters).get("asset_universe_operation")
     )
@@ -278,6 +284,7 @@ def _merged_extra_parameters(
     *,
     anchored: Any,
     candidate: Any,
+    discard_stale_date_metadata: bool = False,
 ) -> dict[str, Any]:
     merged = _dict(anchored)
     incoming = _dict(candidate)
@@ -291,6 +298,18 @@ def _merged_extra_parameters(
             merged[key] = {**merged[key], **value}
             continue
         merged[key] = value
+    if discard_stale_date_metadata:
+        for key in ("date_range_intent", "date_range_raw_text"):
+            if key not in incoming:
+                merged.pop(key, None)
+        incoming_evidence = _dict(incoming.get("evidence_spans"))
+        if "date_range" not in incoming_evidence:
+            merged_evidence = _dict(merged.get("evidence_spans"))
+            merged_evidence.pop("date_range", None)
+            if merged_evidence:
+                merged["evidence_spans"] = merged_evidence
+            else:
+                merged.pop("evidence_spans", None)
     return merged
 
 
