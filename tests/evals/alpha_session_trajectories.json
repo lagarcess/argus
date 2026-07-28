@@ -201,17 +201,6 @@
       "locale": "en",
       "purpose": "Retain requested retail history while approving one provider-supported effective window.",
       "tags": ["retail", "requested_window", "effective_window"],
-      "expected_fail": {
-        "issue": "#251",
-        "reason": "Requested-versus-effective window truth is owned by issue 251.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_04:step:1", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:2", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:3", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:3", "prefix": "persistence:"},
-          {"step_id": "alpha_session_04:step:4", "prefix": "effective_window:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",

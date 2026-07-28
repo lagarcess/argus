@@ -410,9 +410,9 @@ class ConcreteTrajectoryRuntime:
         )
         assets.clear_asset_cache()
         self._provider_router.start()
-        self._provider_router.post(
-            "https://openrouter.ai/api/v1/chat/completions"
-        ).mock(side_effect=self._typed_provider_response)
+        self._provider_router.post("https://openrouter.ai/api/v1/chat/completions").mock(
+            side_effect=self._typed_provider_response
+        )
         clear_openrouter_route_receipts()
         self._client = TestClient(app)
         self._client.post("/api/v1/dev/reset")
@@ -518,6 +518,8 @@ class ConcreteTrajectoryRuntime:
             action_identity=action_identity,
             checkpoints=self._stream_checkpoints(
                 trajectory=trajectory,
+                state=state,
+                final=result.final,
                 artifact_identity=artifact_identity,
             ),
         )
@@ -582,6 +584,29 @@ class ConcreteTrajectoryRuntime:
             if trajectory.label == "alpha_session_06"
             else {}
         )
+        if trajectory.label == "alpha_session_04":
+            confirmation_alias = self._confirmation_alias(state=state)
+            approval_coverage = self._confirmation_coverage(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            reloaded_coverage = self._projected_confirmation_coverage(
+                state=state,
+                confirmation_alias=confirmation_alias,
+                messages=items,
+            )
+            job = self._job_for_confirmation(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            checkpoints["effective_window.reload_matches_approval"] = (
+                self._provider_adjusted_window(approval_coverage)
+                and self._same_coverage(approval_coverage, reloaded_coverage)
+                and self._same_coverage(
+                    approval_coverage,
+                    self._job_coverage(job),
+                )
+            )
         action_alias = self._persisted_action_alias(
             state=state,
             artifact_alias=artifact_alias,
@@ -770,7 +795,23 @@ class ConcreteTrajectoryRuntime:
         if trajectory.label == "alpha_session_03":
             return StepObservation(artifact_identity=artifact_alias)
         if trajectory.label == "alpha_session_04":
-            return StepObservation()
+            confirmation_alias = self._confirmation_alias(state=state)
+            coverage = self._confirmation_coverage(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            job = self._job_for_confirmation(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            durable = self._provider_adjusted_window(coverage) and self._same_coverage(
+                coverage,
+                self._job_coverage(job),
+            )
+            return StepObservation(
+                persistence_state=("requested_and_effective_window" if durable else None),
+                checkpoints={"effective_window.durable": durable},
+            )
         if trajectory.label in {"alpha_session_05", "alpha_session_06"}:
             execution_count = self._execution_count(state=state)
             checkpoints = (
@@ -827,8 +868,7 @@ class ConcreteTrajectoryRuntime:
             (
                 event["payload"]
                 for event in reversed(events)
-                if event.get("type") == "final"
-                and isinstance(event.get("payload"), dict)
+                if event.get("type") == "final" and isinstance(event.get("payload"), dict)
             ),
             {},
         )
@@ -916,7 +956,21 @@ class ConcreteTrajectoryRuntime:
                 state=state
             )
         elif trajectory.label == "alpha_session_04":
-            pass
+            approval_coverage = self._confirmation_coverage(
+                state=state,
+                confirmation_alias=alias,
+            )
+            job = self._job_for_confirmation(
+                state=state,
+                confirmation_alias=alias,
+            )
+            checkpoints["effective_window.execution_matches_approval"] = (
+                self._provider_adjusted_window(approval_coverage)
+                and self._same_coverage(
+                    approval_coverage,
+                    self._job_coverage(job),
+                )
+            )
         elif trajectory.label == "alpha_session_05":
             if is_retry:
                 checkpoints.update(
@@ -1088,10 +1142,7 @@ class ConcreteTrajectoryRuntime:
         artifact_identity, action_identity = self._persisted_artifact_identity(
             state=state
         )
-        if (
-            artifact_identity is None
-            or streamed_artifact_identity != artifact_identity
-        ):
+        if artifact_identity is None or streamed_artifact_identity != artifact_identity:
             raise AssertionError("retry terminal artifact is not durably persisted")
         retry_count = self._matching_retry_attempt_count(state=state)
         if retry_count <= before_retry_count:
@@ -1127,17 +1178,14 @@ class ConcreteTrajectoryRuntime:
         messages: list[dict[str, Any]],
     ) -> StepObservation:
         alias = next(
-            alias
-            for alias in state.raw_artifact_ids
-            if alias.endswith(":turn:1")
+            alias for alias in state.raw_artifact_ids if alias.endswith(":turn:1")
         )
         raw_turn_id = state.raw_artifact_ids[alias]
         projected = next(
             message
             for message in messages
             if isinstance(message.get("metadata"), dict)
-            and message["metadata"].get("recovery", {}).get("code")
-            == "turn_abandoned"
+            and message["metadata"].get("recovery", {}).get("code") == "turn_abandoned"
         )
         metadata = projected["metadata"]
         runtime_turn = metadata["agent_runtime_turn"]
@@ -1158,8 +1206,7 @@ class ConcreteTrajectoryRuntime:
                 "agent_runtime_turn.turn_id": alias,
                 "agent_runtime_turn.request_id": (
                     state.disconnected_request_id
-                    if runtime_turn["request_id"]
-                    == state.disconnected_raw_request_id
+                    if runtime_turn["request_id"] == state.disconnected_raw_request_id
                     else runtime_turn["request_id"]
                 ),
                 "agent_runtime_turn.status": runtime_turn["status"],
@@ -1240,8 +1287,7 @@ class ConcreteTrajectoryRuntime:
                     state.conversation_id,
                     [],
                 )
-                if message.id == state.disconnected_turn_id
-                and message.role == "user"
+                if message.id == state.disconnected_turn_id and message.role == "user"
             ),
             None,
         )
@@ -1282,10 +1328,7 @@ class ConcreteTrajectoryRuntime:
         rows = cls._matching_lifecycle_rows(state=state)
         if not any(row.get("turn_id") == state.disconnected_turn_id for row in rows):
             raise AssertionError("disconnected lifecycle identity is missing")
-        return sum(
-            row.get("turn_id") != state.disconnected_turn_id
-            for row in rows
-        )
+        return sum(row.get("turn_id") != state.disconnected_turn_id for row in rows)
 
     def _projected_retry_authority(
         self,
@@ -1388,17 +1431,227 @@ class ConcreteTrajectoryRuntime:
             return "needs_clarification"
         return str(outcome) if outcome else None
 
-    @staticmethod
     def _stream_checkpoints(
+        self,
         *,
         trajectory: AlphaTrajectory,
+        state: _TrajectoryState,
+        final: dict[str, Any],
         artifact_identity: str | None,
     ) -> dict[str, Any]:
+        if trajectory.label == "alpha_session_04":
+            confirmation = final.get("confirmation")
+            coverage = self._confirmation_coverage(
+                state=state,
+                confirmation_alias=artifact_identity,
+            )
+            requested = self._coverage_range(coverage, "requested_date_range")
+            return {
+                "effective_window.requested_start": (
+                    requested.get("start") if requested is not None else None
+                ),
+                "effective_window.source": (
+                    "provider_supported_common_window"
+                    if self._provider_adjusted_window(coverage)
+                    else None
+                ),
+                "effective_window.visible_before_approval": (
+                    self._provider_adjusted_window(coverage)
+                    and self._visible_period_adjustment_matches_coverage(
+                        confirmation=confirmation,
+                        coverage=coverage,
+                    )
+                ),
+            }
         if trajectory.label == "alpha_session_01" and artifact_identity:
             return {"stale_action.active_artifact": artifact_identity}
         if trajectory.label == "alpha_session_02":
             return {"terminal.response_language": trajectory.locale}
         return {}
+
+    @staticmethod
+    def _confirmation_alias(*, state: _TrajectoryState) -> str | None:
+        return next(
+            (alias for alias in state.raw_artifact_ids if ":confirmation:" in alias),
+            None,
+        )
+
+    @staticmethod
+    def _confirmation_metadata(
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+    ) -> dict[str, Any] | None:
+        raw_confirmation_id = state.raw_artifact_ids.get(confirmation_alias or "")
+        if not isinstance(raw_confirmation_id, str):
+            return None
+        message = next(
+            (
+                message
+                for message in api_state.store.messages.get(state.conversation_id, [])
+                if message.role == "assistant"
+                and message.metadata.get("confirmation_card", {}).get("confirmation_id")
+                == raw_confirmation_id
+            ),
+            None,
+        )
+        return message.metadata if message is not None else None
+
+    @classmethod
+    def _confirmation_coverage(
+        cls,
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+    ) -> dict[str, Any] | None:
+        return cls._coverage_from_metadata(
+            cls._confirmation_metadata(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+        )
+
+    @staticmethod
+    def _coverage_from_metadata(
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not isinstance(metadata, dict):
+            return None
+        payload = metadata.get("confirmation_payload")
+        if not isinstance(payload, dict):
+            return None
+        launch_payload = payload.get("launch_payload")
+        if not isinstance(launch_payload, dict):
+            return None
+        coverage = launch_payload.get("coverage_preflight")
+        return coverage if isinstance(coverage, dict) else None
+
+    @staticmethod
+    def _coverage_range(
+        coverage: dict[str, Any] | None,
+        key: str,
+    ) -> dict[str, Any] | None:
+        if not isinstance(coverage, dict):
+            return None
+        date_range = coverage.get(key)
+        if not isinstance(date_range, dict):
+            return None
+        start = date_range.get("start")
+        end = date_range.get("end")
+        if not (isinstance(start, str) and isinstance(end, str)):
+            return None
+        return date_range
+
+    @classmethod
+    def _provider_adjusted_window(cls, coverage: dict[str, Any] | None) -> bool:
+        requested = cls._coverage_range(coverage, "requested_date_range")
+        effective = cls._coverage_range(coverage, "effective_date_range")
+        return bool(
+            requested is not None
+            and effective is not None
+            and requested != effective
+            and coverage is not None
+            and coverage.get("outcome") == "adjusted_coverage"
+            and coverage.get("adjustment_reason") == "provider_coverage_adjustment"
+        )
+
+    @classmethod
+    def _same_coverage(
+        cls,
+        left: dict[str, Any] | None,
+        right: dict[str, Any] | None,
+    ) -> bool:
+        if not (
+            cls._provider_adjusted_window(left)
+            and cls._provider_adjusted_window(right)
+            and left is not None
+            and right is not None
+        ):
+            return False
+        return all(
+            left.get(key) == right.get(key)
+            for key in (
+                "requested_date_range",
+                "effective_date_range",
+                "outcome",
+                "adjustment_reason",
+            )
+        )
+
+    @classmethod
+    def _visible_period_adjustment_matches_coverage(
+        cls,
+        *,
+        confirmation: object,
+        coverage: dict[str, Any] | None,
+    ) -> bool:
+        if not isinstance(confirmation, dict):
+            return False
+        adjustment = confirmation.get("period_adjustment")
+        if not isinstance(adjustment, dict):
+            return False
+        return cls._coverage_range(coverage, "requested_date_range") == adjustment.get(
+            "requested_date_range"
+        ) and cls._coverage_range(coverage, "effective_date_range") == adjustment.get(
+            "effective_date_range"
+        )
+
+    @staticmethod
+    def _job_for_confirmation(
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+    ) -> dict[str, Any] | None:
+        raw_confirmation_id = state.raw_artifact_ids.get(confirmation_alias or "")
+        if not isinstance(raw_confirmation_id, str):
+            return None
+        return next(
+            (
+                job
+                for job in api_state.store.backtest_jobs.values()
+                if job.get("conversation_id") == state.conversation_id
+                and job.get("idempotency_key") == raw_confirmation_id
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _job_coverage(job: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not isinstance(job, dict):
+            return None
+        launch_payload = job.get("launch_payload")
+        if not isinstance(launch_payload, dict):
+            return None
+        request = launch_payload.get("request")
+        if not isinstance(request, dict):
+            return None
+        coverage = request.get("coverage_preflight")
+        return coverage if isinstance(coverage, dict) else None
+
+    @classmethod
+    def _projected_confirmation_coverage(
+        cls,
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+        messages: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        raw_confirmation_id = state.raw_artifact_ids.get(confirmation_alias or "")
+        if not isinstance(raw_confirmation_id, str):
+            return None
+        metadata = next(
+            (
+                message.get("metadata")
+                for message in messages
+                if isinstance(message.get("metadata"), dict)
+                and message["metadata"]
+                .get("confirmation_card", {})
+                .get("confirmation_id")
+                == raw_confirmation_id
+            ),
+            None,
+        )
+        return cls._coverage_from_metadata(metadata)
 
     @staticmethod
     def _persisted_fingerprint(execution_summary: dict[str, Any]) -> str:

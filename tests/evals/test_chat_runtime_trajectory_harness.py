@@ -31,7 +31,7 @@ ISSUE_LABELS = {
     "#230": "alpha_session_06",
     "#240": "alpha_session_07",
 }
-EXPECTED_UNRESOLVED_ISSUES = {"#239", "#241", "#251"}
+EXPECTED_UNRESOLVED_ISSUES = {"#239", "#241"}
 EXPECTED_OPERATIONS = {
     "stream",
     "action",
@@ -58,7 +58,7 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
         "alpha_session_01": "passed",
         "alpha_session_02": "expected_failed",
         "alpha_session_03": "expected_failed",
-        "alpha_session_04": "expected_failed",
+        "alpha_session_04": "passed",
         "alpha_session_05": "passed",
         "alpha_session_06": "passed",
         "alpha_session_07": "passed",
@@ -66,8 +66,59 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
     assert all(
         result.failed_checks
         for label, result in results.items()
-        if label in {"alpha_session_02", "alpha_session_03", "alpha_session_04"}
+        if label in {"alpha_session_02", "alpha_session_03"}
     )
+
+
+def test_concrete_effective_window_trajectory_passes_unmasked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#251")
+    assert trajectory.expected_fail is None
+
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        result = run_alpha_trajectory(
+            trajectory=trajectory,
+            adapters=runtime.adapters,
+        )
+
+    assert result.status == "passed", result.failed_checks
+    assert result.failed_checks == ()
+
+
+def test_concrete_effective_window_requires_durable_coverage_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#251")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:2]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        confirmation_alias = "alpha_session_04:confirmation:1"
+        raw_confirmation_id = state.raw_artifact_ids[confirmation_alias]
+        confirmation = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "assistant"
+            and message.metadata.get("confirmation_card", {}).get("confirmation_id")
+            == raw_confirmation_id
+        )
+        confirmation.metadata["confirmation_payload"]["launch_payload"].pop(
+            "coverage_preflight"
+        )
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.persistence_state is None
+    assert observation.checkpoints["effective_window.durable"] is False
 
 
 def test_concrete_reload_cannot_pass_from_cached_alias_when_persistence_is_empty(
@@ -158,12 +209,8 @@ def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
     with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
         runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
         state = runtime._state(trajectory)
-        raw_confirmation_id = state.raw_artifact_ids[
-            "alpha_session_05:confirmation:1"
-        ]
-        action = deepcopy(
-            trajectory.steps[1].request["submission"]["request"]["action"]
-        )
+        raw_confirmation_id = state.raw_artifact_ids["alpha_session_05:confirmation:1"]
+        action = deepcopy(trajectory.steps[1].request["submission"]["request"]["action"])
         action.update(
             label="Run backtest",
             presentation="confirmation",
@@ -205,10 +252,7 @@ def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
         assert len(run_actions_before) == 1
         assert api_state.store.backtest_jobs == {}
         assert api_state.store.backtest_job_reservations == {}
-        assert all(
-            key[1] != "backtest_runs"
-            for key in api_state.store.usage_counters
-        )
+        assert all(key[1] != "backtest_runs" for key in api_state.store.usage_counters)
 
         with monkeypatch.context() as lookup_patch:
             lookup_patch.setattr(
@@ -254,8 +298,7 @@ def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
             message
             for message in reload_response.json()["items"]
             if message["role"] == "user"
-            and message["metadata"].get("chat_action", {}).get("type")
-            == "run_backtest"
+            and message["metadata"].get("chat_action", {}).get("type") == "run_backtest"
         ]
         jobs = [
             job
@@ -263,9 +306,7 @@ def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
             if job.get("conversation_id") == state.conversation_id
         ]
 
-    assert [message.id for message in run_actions_after] == [
-        run_actions_before[0].id
-    ]
+    assert [message.id for message in run_actions_after] == [run_actions_before[0].id]
     assert [message["id"] for message in reloaded_run_actions] == [
         run_actions_before[0].id
     ]
@@ -353,9 +394,7 @@ def test_concrete_persistence_counts_injected_stale_job_owner_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     trajectory = next(
-        item
-        for item in load_alpha_trajectories()
-        if item.label == "alpha_session_01"
+        item for item in load_alpha_trajectories() if item.label == "alpha_session_01"
     )
     with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
         for step in trajectory.steps[:3]:
@@ -365,9 +404,7 @@ def test_concrete_persistence_counts_injected_stale_job_owner_evidence(
                 history=(),
             )
         state = runtime._state(trajectory)
-        old_confirmation = state.raw_artifact_ids[
-            "alpha_session_01:confirmation:1"
-        ]
+        old_confirmation = state.raw_artifact_ids["alpha_session_01:confirmation:1"]
         api_state.store.backtest_jobs["injected-stale-job"] = {
             "id": "injected-stale-job",
             "conversation_id": state.conversation_id,
@@ -719,10 +756,20 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
 
     data_window = _trajectory_for_issue("#251")
     assert "retail" in data_window.tags
-    assert any(
-        allowed_failure.prefix == "effective_window:"
-        for allowed_failure in data_window.expected_fail.allowed_failures
-    )
+    assert data_window.expected_fail is None
+    assert {
+        checkpoint
+        for step in data_window.steps
+        for checkpoint in step.expectation.checkpoints
+        if checkpoint.startswith("effective_window.")
+    } == {
+        "effective_window.requested_start",
+        "effective_window.source",
+        "effective_window.visible_before_approval",
+        "effective_window.execution_matches_approval",
+        "effective_window.durable",
+        "effective_window.reload_matches_approval",
+    }
 
     orphan_reconciliation = _trajectory_for_issue("#240")
     assert orphan_reconciliation.steps[0].request == {
@@ -971,21 +1018,18 @@ def test_trajectory_runner_dispatches_every_step_through_typed_adapters() -> Non
         for result, trajectory in zip(results, trajectories, strict=True)
     )
     assert {result.status for result in results} == {"passed", "unexpected_pass"}
-    assert sum(result.status == "passed" for result in results) == 4
-    assert sum(result.status == "unexpected_pass" for result in results) == 3
+    assert sum(result.status == "passed" for result in results) == 5
+    assert sum(result.status == "unexpected_pass" for result in results) == 2
     assert all(result.failed_checks == () for result in results)
 
 
 def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
-    trajectory = _trajectory_for_issue("#251")
+    trajectory = _trajectory_for_issue("#239")
     first_step = trajectory.steps[0]
     matching = _matching_observation(first_step)
     allowed_failure = replace(
         matching,
-        checkpoints={
-            **matching.checkpoints,
-            "effective_window.visible_before_approval": False,
-        },
+        visible_response_category="unexpected_response",
     )
 
     expected_failed = run_alpha_trajectory(
@@ -996,9 +1040,12 @@ def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
         ),
     )
     assert expected_failed.status == "expected_failed"
-    assert expected_failed.failed_checks[0].startswith("effective_window:")
+    assert expected_failed.failed_checks[0].startswith("visible_response:")
 
-    unrelated_failure = replace(allowed_failure, stage_outcome="needs_clarification")
+    unrelated_failure = replace(
+        allowed_failure,
+        raw_sse='event: final\ndata: {"type":"final","payload":{}}',
+    )
     failed = run_alpha_trajectory(
         trajectory=trajectory,
         adapters=_recording_adapters(
@@ -1007,16 +1054,16 @@ def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
         ),
     )
     assert failed.status == "failed"
-    assert any(check.startswith("stage_outcome:") for check in failed.failed_checks)
+    assert any(check.startswith("sse:") for check in failed.failed_checks)
 
 
 def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
-    trajectory = _trajectory_for_issue("#251")
+    trajectory = _trajectory_for_issue("#239")
     first_step = trajectory.steps[0]
     other_step = trajectory.steps[2]
     assert any(
         allowed_failure.step_id == first_step.step_id
-        and allowed_failure.prefix == "effective_window:"
+        and allowed_failure.prefix == "visible_response:"
         for allowed_failure in trajectory.expected_fail.allowed_failures
     )
 
@@ -1024,7 +1071,7 @@ def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
         other_step,
         expectation=replace(
             other_step.expectation,
-            artifact_identity="alpha_session_04:unexpected_identity_check",
+            checkpoints={"terminal.repeated_fingerprint_count": 1},
         ),
     )
     trajectory = replace(
@@ -1034,7 +1081,7 @@ def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
     matching = _matching_observation(other_step)
     same_family_wrong_step = replace(
         matching,
-        artifact_identity="alpha_session_04:wrong_identity",
+        checkpoints={"terminal.repeated_fingerprint_count": 0},
     )
     result = run_alpha_trajectory(
         trajectory=trajectory,
@@ -1044,7 +1091,7 @@ def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
     )
 
     assert result.status == "failed"
-    assert any(check.startswith("artifact_identity:") for check in result.failed_checks)
+    assert any(check.startswith("terminal:") for check in result.failed_checks)
 
 
 def test_runner_rejects_disconnect_after_terminal_for_same_submission() -> None:
@@ -1390,10 +1437,10 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
 
     assert stored == scorecard | {"generated_at": stored["generated_at"]}
     assert stored["totals"] == {
-        "passed": 4,
+        "passed": 5,
         "failed": 0,
         "expected_failed": 0,
-        "unexpected_pass": 3,
+        "unexpected_pass": 2,
     }
     assert {result["label"] for result in stored["results"]} == EXPECTED_ALPHA_LABELS
     assert all(
