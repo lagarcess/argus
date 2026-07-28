@@ -303,8 +303,9 @@ Do not reopen these as debt unless a new bug is reproduced:
   #262 established the shared coverage contract, PR #267 classified quiet
   calendar alignment versus material provider truncation, and PR #268
   preserved the resulting artifact through continued conversation and reload.
-  Promotion evidence belongs to #233; trajectory-ledger reconciliation belongs
-  to #243.
+  PR #297 completed the trajectory-ledger reconciliation as `09044231`,
+  removing stale #241/#251 masks while preserving #239's exact current
+  failures. Issue #243 is closed; promotion evidence remains solely with #233.
 - Hosted cost-ledger visibility is repaired and issue #246 is closed. The
   existing `20260702000001_add_cost_ledger_entries` migration was applied
   directly to the hosted Argus Supabase project with matching migration

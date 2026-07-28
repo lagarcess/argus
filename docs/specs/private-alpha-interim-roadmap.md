@@ -4,7 +4,7 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-27
+Last reconciled: 2026-07-28
 
 Latest integrated product checkpoint: PR #288 at `9f3453a3`. Later commits may
 reconcile roadmap and issue state without changing product behavior. New work
@@ -52,11 +52,12 @@ prior results remain immutable without duplicate compute.
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
 requested/effective period truth, calendar-materiality classification, and
-durable recovery. Promotion evidence remains with #233 and trajectory-ledger
-bookkeeping remains with #243. Issue #246 is also closed after the exact
-checked-in `20260702000001_add_cost_ledger_entries` migration was applied to
-the hosted Argus Supabase project and its append-only service-role contract was
-verified.
+durable recovery. PR #297 then reconciled the concrete trajectory ledger as
+`09044231`: the obsolete #241 and #251 masks are removed, #239 retains only its
+exact open-owner failures, and issue #243 is closed. Promotion evidence remains
+exclusively with #233. Issue #246 is also closed after the exact checked-in
+`20260702000001_add_cost_ledger_entries` migration was applied to the hosted
+Argus Supabase project and its append-only service-role contract was verified.
 
 PR #289 then landed the structural OpenAPI compatibility gate as `8a66f0ba`.
 Generated FastAPI structure remains the machine-readable authority; the checked
@@ -455,11 +456,12 @@ Completion evidence:
   `847c413b`, with byte-equivalent trees.
 
 This completion does not claim deployment or tester exposure. #228, #233, and
-#237 retain those release-owned gates. Narrow issue-specific follow-ups also
-remain open where their own acceptance exceeds this founder outcome, including
-#239's dedicated trajectory cleanup and #243's trajectory-ledger reconciliation.
-#251 is closed; promotion and evaluation bookkeeping must not reopen its
-completed product scope.
+#237 retain those release-owned gates. #239's exact dedicated trajectory
+failures remain open. PR #297 completed the separate trajectory-ledger
+reconciliation as `09044231`, removing stale #241/#251 ownership without
+weakening the remaining #239 mask; issue #243 is closed. #251 remains closed;
+promotion and evaluation bookkeeping must not reopen its completed product
+scope.
 
 ## Retained Product Decisions
 
@@ -514,7 +516,8 @@ the completed user-visible Usage slice.
   prose, evidence, reload, replay, and Omnisearch.
 - Founder-visible QA confirmed the product behavior in real conversation turns,
   and issue #251 is closed. Exact-SHA promotion/canary evidence remains #233
-  work. Seven-session expected-failure bookkeeping remains #243 work.
+  work. PR #297 completed the seven-session expected-failure bookkeeping at
+  `09044231`; issue #243 is closed.
 
 ### Cost-ledger visibility (#246 — complete)
 

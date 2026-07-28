@@ -939,6 +939,13 @@ browser journeys, one authorized real Run, reload-stable result truth, and
 independent review. Deployment and tester exposure remain separate release
 gates.
 
+Evaluation-ledger closure (2026-07-28): PR #297 landed as `09044231` and
+reconciled the concrete seven-session trajectory gate. The obsolete #241 and
+#251 expected-fail masks are removed after complete concrete passes; #239
+retains only its exact open-owner failures. Issue #243 is closed. The deployed
+exact-SHA browser canary remains solely owned by #233 and was not duplicated by
+this test-only landing.
+
 Interim founder-outcome checkpoint (2026-07-27): PR #276 delivered the
 default-on **grounded discovery and suggestions** baseline at candidate
 `cc8b5563`, which landed on `codex/private-alpha-next` as `c212107a`. The slice
