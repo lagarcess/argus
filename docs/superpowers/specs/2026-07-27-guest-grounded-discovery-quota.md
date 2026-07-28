@@ -376,6 +376,40 @@ than a guest-wide regression, which points at the interpreter rather than at a
 missing mention. Check the WMT turn for whether the mention reached the request
 before assuming the identity wiring is at fault.
 
+### 12.8 The exhausted path silently returns ungrounded suggestions — DECISION NEEDED
+
+With the allowance at 3/3, "which pharma stocks could I test?" did **not**
+return `discovery_limit_reached`. It returned JNJ, PFE and MRK as prose, from
+model memory, with no search, no sources, and no freshness date.
+
+**The meter never fired.** Zero allowance checks in the log; the turn was never
+classified `asset_discovery`, so it never reached the discovery composer. This
+is not a fallback behaving well — it is classification missing the intent and
+the turn landing in ordinary chat.
+
+That output is what the grounded discovery design §10 forbids outright: *"Never:
+a model-memory shortlist presented as current."* Nothing distinguishes it from
+a sourced answer, so a user learns that verified and remembered look identical.
+
+**Founder position (2026-07-27):** falling back to cheap LLM suggestion when the
+search budget is spent is acceptable — it costs less than a search and is still
+bounded by the message allowance.
+
+**The condition that makes it acceptable:** the ungrounded answer must *look*
+ungrounded. No sources line, and it says plainly that it comes from general
+knowledge rather than a current search. Otherwise the distinction that makes
+grounded discovery worth its cost is invisible, and §10 is violated in practice
+while appearing satisfied.
+
+**Open decision:** what a guest sees when the budget is gone — honest refusal
+(design as written), or visibly-unsourced help (founder preference). Today they
+get invisibly-unsourced help, which is neither.
+
+Note this also means the discovery limit is currently **unreachable through the
+UI**: classification has to route the turn to discovery for the meter to
+engage at all. Combined with 12.3, the allowance is far more theoretical than
+§5 assumes.
+
 ## 13. Documentation
 
 - Grounded discovery design §1: already marked superseded; point it here.
