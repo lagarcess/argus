@@ -24,6 +24,7 @@ from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
     StageResult,
 )
+from argus.agent_runtime.substage_events import emit_substage
 from argus.domain.discovery_search import (
     SearchResultPacket,
     SearchUnavailableError,
@@ -102,6 +103,9 @@ async def discovery_stage_result_if_applicable(
     try:
         provider = selection.search_provider_for_config(provider_id=config.provider_id)
         usage["search_attempted"] = True
+        # Emitted after provider construction: a not-configured provider never
+        # announces a search that will not happen.
+        emit_substage("discovery_search", detail=_search_subject(request))
         # Sync provider client: off the loop, or one search stalls every stream.
         packet = await asyncio.to_thread(
             provider.search,
@@ -145,6 +149,7 @@ async def discovery_stage_result_if_applicable(
             language=language,
             usage=usage,
         )
+    emit_substage("discovery_verify")
     validated, unverified, uncorroborated = validated_candidates(
         extraction,
         packet=packet,
@@ -310,6 +315,18 @@ def _model_knowledge_packet() -> SearchResultPacket:
         latency_ms=0,
         provider_id="model_knowledge",
     )
+
+
+def _search_subject(request: AssetDiscoveryRequest) -> str | None:
+    """Human subject for progress display: the typed interpretation's own
+    words in the turn language, never the machine query string."""
+    category = (request.category_description or "").strip()
+    if category:
+        return category
+    anchors = ", ".join(
+        symbol.strip().upper() for symbol in request.anchor_symbols if symbol.strip()
+    )
+    return anchors or None
 
 
 def _search_query(request: AssetDiscoveryRequest | None) -> str | None:
