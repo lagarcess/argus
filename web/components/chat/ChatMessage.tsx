@@ -233,9 +233,7 @@ export default function ChatMessage({
   const discoverySourcesLineText = (() => {
     if (isUser || !message.discovery) return "";
     const domains = discoverySourceDomains(message.discovery);
-    // Zero sources IS the ungrounded signal (spec §3.7): derived from the
-    // evidence, never asserted by a flag, so a remembered answer can never
-    // wear a researched one's clothes.
+    // Zero sources IS the ungrounded signal: derived, never asserted.
     if (domains.length === 0)
       return t("chat.discovery_results.unsourced_line", {
         defaultValue: "From general knowledge, not a current search",
@@ -412,14 +410,17 @@ export default function ChatMessage({
                   );
                 })}
                 {message.discovery.sources.length === 0 &&
-                message.discovery.can_request_search ? (
+                message.discovery.can_request_search &&
+                isLatest ? (
                   (() => {
                     const searchLabel = t(
                       "chat.discovery_results.search_current",
                       { defaultValue: "Search for current results" },
                     );
+                    // Restate the relationship: peer/comparison query_summary
+                    // is bare symbols, and "search for: AAPL" reads as a test.
                     const searchSendText = t(
-                      "chat.discovery_results.search_current_send",
+                      `chat.discovery_results.search_current_send_${message.discovery.relationship}`,
                       {
                         query: message.discovery.query_summary,
                         defaultValue:
@@ -431,11 +432,8 @@ export default function ChatMessage({
                         ariaLabel={searchLabel}
                         disabled={turnInFlight}
                         onClick={() =>
-                          // Typeless on purpose: the row is a typing shortcut,
-                          // and a typed option would be validated against the
-                          // latest turn's registered options and rejected as
-                          // stale. The sentence itself is the request; the
-                          // interpreter judges it like any user message.
+                          // Typeless: a typed option is validated against the
+                          // latest turn's options and rejected as stale.
                           onAction?.({
                             label: searchSendText,
                             value: searchSendText,

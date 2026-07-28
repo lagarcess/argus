@@ -1103,8 +1103,8 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
                 if persisted_text or lifecycle_hooks.turn_id is not None:
-                    # Scoped to discovery: other retryable recoveries keep
-                    # their existing completed-turn settlement semantics.
+                    # Discovery codes only; other retryable recoveries keep
+                    # completed-turn settlement.
                     retryable_recovery_code = (
                         str(recovery.get("code"))
                         if isinstance(recovery, dict)
@@ -1117,16 +1117,27 @@ async def chat_stream(
                         else None
                     )
                     if retryable_recovery_code is not None:
-                        # A retryable in-band recovery (a failed discovery
-                        # search) finalizes as a recoverable failure: the
-                        # lifecycle owns the durable retry affordance, and a
-                        # completed turn deliberately strips it.
+                        # Retryable discovery recovery: the lifecycle owns the
+                        # durable retry; completed turns strip it by design.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",
                             metadata=metadata,
                             failure_code=retryable_recovery_code,
                             retryable=True,
                         )
+                        durable_retry = (
+                            assistant_message.metadata.get("retry_last_turn")
+                            if isinstance(assistant_message.metadata, dict)
+                            else None
+                        )
+                        if isinstance(durable_retry, dict):
+                            # Live final event carries the message-shape retry;
+                            # the anchored shape renders only from hydration.
+                            runtime_result["retry_last_turn"] = {
+                                key: durable_retry[key]
+                                for key in ("message", "action")
+                                if key in durable_retry
+                            }
                     else:
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
@@ -1136,7 +1147,10 @@ async def chat_stream(
                                 account=turn_account,
                             ),
                         )
-                    if lifecycle_hooks.turn_id is not None:
+                    if (
+                        lifecycle_hooks.turn_id is not None
+                        and retryable_recovery_code is None
+                    ):
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
                 record_discovery_search_evidence(
