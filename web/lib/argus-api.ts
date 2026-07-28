@@ -776,11 +776,13 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   cursor?: string,
+  options: Readonly<{ signal?: AbortSignal }> = {},
 ) {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
+    { signal: options.signal },
   );
 }
 

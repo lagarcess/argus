@@ -39,6 +39,7 @@ type ChatMessageProps = {
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
+  onDecisionSaved?: () => void;
   onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
@@ -60,6 +61,7 @@ export default function ChatMessage({
   isGuest = false,
   canSaveDecision = true,
   onDecisionUnavailable,
+  onDecisionSaved,
   onRequestSearchUpgrade,
   resumeDecisionArtifactId,
   onDecisionResumeHandled,
@@ -314,6 +316,7 @@ export default function ChatMessage({
                 onAction={onAction}
                 canSaveDecision={canSaveDecision}
                 onDecisionUnavailable={onDecisionUnavailable}
+                onDecisionSaved={onDecisionSaved}
                 resumeDecisionArtifactId={resumeDecisionArtifactId}
                 onDecisionResumeHandled={onDecisionResumeHandled}
               />

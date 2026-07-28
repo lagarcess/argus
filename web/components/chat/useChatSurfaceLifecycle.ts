@@ -13,6 +13,8 @@ type UseChatSurfaceLifecycleInput = {
   resetToEmptyChatSurface: (conversationId?: string | null) => void;
   closeTransientSidebar: () => void;
   refreshHistory: () => void;
+  onConversationRemoved?: (conversationId: string) => void;
+  onAllConversationsDeleted?: () => void;
 };
 
 export function useChatSurfaceLifecycle({
@@ -21,6 +23,8 @@ export function useChatSurfaceLifecycle({
   resetToEmptyChatSurface,
   closeTransientSidebar,
   refreshHistory,
+  onConversationRemoved,
+  onAllConversationsDeleted,
 }: UseChatSurfaceLifecycleInput) {
   const startNewChat = useCallback(async () => {
     resetToEmptyChatSurface();
@@ -35,6 +39,7 @@ export function useChatSurfaceLifecycle({
 
   const handleConversationRemoved = useCallback(
     (removedConversationId: string) => {
+      onConversationRemoved?.(removedConversationId);
       setHistoryItems((current) =>
         current.filter(
           (item) =>
@@ -51,6 +56,7 @@ export function useChatSurfaceLifecycle({
     },
     [
       conversationId,
+      onConversationRemoved,
       refreshHistory,
       resetToEmptyChatSurface,
       setHistoryItems,
@@ -58,11 +64,13 @@ export function useChatSurfaceLifecycle({
   );
 
   const handleAllConversationsDeleted = useCallback(() => {
+    onAllConversationsDeleted?.();
     setHistoryItems([]);
     refreshHistory();
     if (conversationId !== null) resetToEmptyChatSurface();
   }, [
     conversationId,
+    onAllConversationsDeleted,
     refreshHistory,
     resetToEmptyChatSurface,
     setHistoryItems,

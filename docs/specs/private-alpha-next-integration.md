@@ -6,7 +6,7 @@ Last reconciled: 2026-07-28
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #298 at `ba0aa2f6`. Later commits may reconcile
+Latest product checkpoint: PR #299 at `f368febb`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -28,7 +28,8 @@ contracts. This is an integration checkpoint, not a deployed or
 tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
 after stale or failed actions without changing public artifact contracts.
 Later slices culminated in PR #298's visitor/day Guest settlement, honest
-discovery progress, and per-candidate source ownership.
+discovery progress, and per-candidate source ownership, followed by PR #299's
+instant and race-safe browser-session conversation switching.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -297,7 +298,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   It landed as `7b7920bb`. The founder-accepted sparse/deep/final History Run
   scan exception remains documented: returned candidates and normal measured
   distributions are bounded, while a maintained History read model is deferred
-  scale architecture. Client hydration, caching, and rendering remain #252.
+  scale architecture.
+- Browser-session transcript reuse and navigation race safety are complete at
+  PR #299 / issue #252. Fresh and stale conversations render immediately from
+  the bounded user-and-conversation cache; true cold misses replace the prior
+  transcript with a delayed truthful retrieval state; retired loads cannot
+  commit over the latest destination; and destination-owned failure/Retry,
+  scroll restoration, auth clearing, EN/es-419, keyboard, and reduced-motion
+  behavior passed exact-head browser QA. It landed as `f368febb`. Profiling did
+  not justify prefetch or virtualization, so neither was added.
 - Fact-preserving recovery is complete at PR #288 / issue #272: stale or
   failed actions restore the latest usable canonical confirmation or result
   anchor, preserve assets, capital, requested/effective dates, daily timeframe,
