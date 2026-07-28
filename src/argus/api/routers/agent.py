@@ -122,6 +122,7 @@ from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
 )
+from argus.domain.visitor_usage import visitor_key_for
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -699,6 +700,11 @@ async def chat_stream(
                 settle_usage=ordinary_turn_settlement(
                     is_run_backtest_turn=is_run_backtest_turn,
                     account=turn_account,
+                    visitor_key=(
+                        visitor_key_for(client_identity(request))
+                        if turn_account.kind == "guest"
+                        else None
+                    ),
                 ),
             )
             progress = "redirected" if stale_card_redirect else "clarification"
@@ -755,6 +761,11 @@ async def chat_stream(
                 allowance_limits=allowance_windows(
                     turn_account,
                     SIMULATION_USAGE_RESOURCE,
+                ),
+                visitor_key=(
+                    visitor_key_for(client_identity(request))
+                    if turn_account.kind == "guest"
+                    else None
                 ),
             )
         )
@@ -1145,6 +1156,11 @@ async def chat_stream(
                             settle_usage=ordinary_turn_settlement(
                                 is_run_backtest_turn=is_run_backtest_turn,
                                 account=turn_account,
+                                visitor_key=(
+                                    visitor_key_for(client_identity(request))
+                                    if turn_account.kind == "guest"
+                                    else None
+                                ),
                             ),
                         )
                     if (

@@ -16,6 +16,7 @@ from argus.api.dependencies import (
 from argus.api.guest_access import (
     AccountContext,
     account_context,
+    client_identity,
     public_account_access_enabled,
 )
 from argus.api.schemas import (
@@ -39,6 +40,11 @@ from argus.domain.usage_limits import (
     SIMULATION_ALLOWANCE_LIMITS,
     SIMULATION_USAGE_RESOURCE,
     read_memory_usage,
+)
+from argus.domain.visitor_usage import (
+    read_memory_visitor_used,
+    read_visitor_used,
+    visitor_key_for,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["profile"])
@@ -197,20 +203,48 @@ def get_me_usage(
         )
 
     def guest_allowance(resource: str, policy_limit: int) -> UsageAllowance:
-        if context.expires_at is None:
-            raise RuntimeError("Guest account context is missing its fixed expiry.")
-        guest_session = window(
-            resource,
-            "guest_session",
-            policy_limit,
-            fixed_period_end=context.expires_at,
+        """Visitor-keyed day window: a renewed workspace changes nothing."""
+        _, day_end = align_usage_period(now, "day")
+        used = 0
+        try:
+            if api_state.supabase_gateway is not None:
+                used = read_visitor_used(
+                    api_state.supabase_gateway.client,
+                    visitor_key=visitor_key_for(client_identity(request)),
+                    resource=resource,
+                    period="day",
+                    now=now,
+                )
+            else:
+                used = read_memory_visitor_used(
+                    api_state.store.visitor_usage_counters,
+                    visitor_key=visitor_key_for(client_identity(request)),
+                    resource=resource,
+                    period="day",
+                    now=now,
+                )
+        except Exception as exc:
+            # Fail closed and loudly: a silent zero would hand out allowance
+            # we cannot account for, and a dead counter must not look healthy.
+            logger.error(
+                "Visitor allowance read failed; treating window as exhausted",
+                error=str(exc),
+                resource=resource,
+                failure_classification="allowance_read_failed",
+            )
+            used = policy_limit
+        day = UsageWindow(
+            limit=policy_limit,
+            used=min(used, policy_limit),
+            remaining=max(policy_limit - used, 0),
+            period_end=day_end,
         )
         return UsageAllowance(
             hour=None,
-            day=None,
-            guest_session=guest_session,
-            available_now=guest_session.remaining > 0,
-            limiting_window="guest_session",
+            day=day,
+            guest_session=None,
+            available_now=day.remaining > 0,
+            limiting_window="day",
         )
 
     if context.kind == "guest":
