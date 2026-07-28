@@ -173,8 +173,12 @@ async def discovery_stage_result_if_applicable(
         request=request,
         candidates=validated,
         packet=packet,
-        unverified_names=unverified,
-        uncorroborated_names=uncorroborated,
+        unverified_names=_user_subject_drops(
+            unverified, request=request, current_user_message=current_user_message
+        ),
+        uncorroborated_names=_user_subject_drops(
+            uncorroborated, request=request, current_user_message=current_user_message
+        ),
         current_user_message=current_user_message,
         language=language,
     )
@@ -258,8 +262,12 @@ async def _model_knowledge_result(
         request=request,
         candidates=validated,
         packet=packet,
-        unverified_names=unverified,
-        uncorroborated_names=uncorroborated,
+        unverified_names=_user_subject_drops(
+            unverified, request=request, current_user_message=current_user_message
+        ),
+        uncorroborated_names=_user_subject_drops(
+            uncorroborated, request=request, current_user_message=current_user_message
+        ),
         current_user_message=current_user_message,
         language=language,
         grounded=False,
@@ -367,6 +375,37 @@ async def _recovery_result(
         decision=decision,
         stage_patch=stage_patch,
     )
+
+
+def _user_subject_drops(
+    names: list[str],
+    *,
+    request: AssetDiscoveryRequest,
+    current_user_message: str,
+) -> list[str]:
+    """Presentation gate: a dropped name is mentioned only when it is the
+    user's own subject (typed anchor, or named in their message). Internal
+    filtering stays silent; telemetry keeps the full lists."""
+    if not names:
+        return []
+    haystack = _alnum(current_user_message)
+    anchors = {_alnum(symbol) for symbol in request.anchor_symbols}
+    kept: list[str] = []
+    for name in names:
+        whole = _alnum(name)
+        first = _alnum(name.split()[0]) if name.split() else ""
+        if (
+            (whole and whole in haystack)
+            or (len(first) >= 3 and first in haystack)
+            or whole in anchors
+            or first in anchors
+        ):
+            kept.append(name)
+    return kept
+
+
+def _alnum(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
 
 
 def _drop_reason_facts(

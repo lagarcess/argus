@@ -11,9 +11,8 @@ type NextMoveRowProps = {
 
 /**
  * One conversational next move: a clarify option, a discovery candidate, or a
- * follow-up. Borderless at rest — the `↳` glyph carries the affordance, which
- * touch devices need because they never hover. The hover/press wash hugs the
- * text, while the hit area spans the full column and stays at least 44px tall.
+ * follow-up. Borderless at rest; hover brightens the arrow and title together
+ * (no box, no shadow). The hit area spans the full column at >=44px tall.
  *
  * `disabled` mirrors the composer's in-flight lock: the row stays readable
  * because it is evidence, but stops accepting taps while a turn is running.
@@ -34,20 +33,27 @@ export default function NextMoveRow({
     >
       <span
         aria-hidden="true"
-        className="mt-[9px] shrink-0 text-[13px] leading-[1.5] text-black/35 rtl:-scale-x-100 dark:text-white/35"
+        className={`mt-[9px] shrink-0 text-[13px] leading-[1.5] text-black/35 transition-colors rtl:-scale-x-100 dark:text-white/35 ${
+          disabled
+            ? ""
+            : "group-hover/next-move:text-black/80 group-active/next-move:text-black/80 dark:group-hover/next-move:text-white/80 dark:group-active/next-move:text-white/80"
+        }`}
       >
         ↳
       </span>
-      <span
-        className={`my-1 min-w-0 rounded-[9px] border border-transparent px-2 py-1 text-[14px] leading-[1.5] tracking-tight text-black/80 transition-colors [overflow-wrap:anywhere] dark:text-white/80 ${
-          disabled
-            ? ""
-            : "group-hover/next-move:border-black/12 group-hover/next-move:bg-black/5 group-active/next-move:border-black/12 group-active/next-move:bg-black/5 dark:group-hover/next-move:border-white/12 dark:group-hover/next-move:bg-white/6 dark:group-active/next-move:border-white/12 dark:group-active/next-move:bg-white/6"
-        }`}
-      >
+      <span className="min-w-0 py-2 text-[14px] leading-[1.5] tracking-tight text-black/80 [overflow-wrap:anywhere] dark:text-white/80">
         {children}
       </span>
     </button>
+  );
+}
+
+/** Row title; brightens with the arrow on hover so the row reads as one action. */
+export function NextMoveTitle({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-medium text-black/80 transition-colors group-hover/next-move:text-black group-active/next-move:text-black dark:text-white/85 dark:group-hover/next-move:text-white dark:group-active/next-move:text-white">
+      {children}
+    </span>
   );
 }
 

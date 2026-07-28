@@ -9,7 +9,7 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
-import NextMoveRow, { NextMoveDetail, NextMoveSeparator } from "./NextMoveRow";
+import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -364,7 +364,7 @@ export default function ChatMessage({
 
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
-              <div className="flex flex-col">
+              <div className="flex flex-col divide-y divide-black/8 dark:divide-white/8">
                 {message.discovery.candidates.map((candidate) => {
                   const sendText = t("chat.discovery_results.test_candidate", {
                     symbol: candidate.symbol,
@@ -391,9 +391,7 @@ export default function ChatMessage({
                         })
                       }
                     >
-                      <span className="font-medium text-black dark:text-white">
-                        {sendText}
-                      </span>
+                      <NextMoveTitle>{sendText}</NextMoveTitle>
                       {hasName ? (
                         <>
                           <NextMoveSeparator>·</NextMoveSeparator>
@@ -440,9 +438,7 @@ export default function ChatMessage({
                           })
                         }
                       >
-                        <span className="font-medium text-black dark:text-white">
-                          {searchLabel}
-                        </span>
+                        <NextMoveTitle>{searchLabel}</NextMoveTitle>
                       </NextMoveRow>
                     );
                   })()
@@ -479,13 +475,13 @@ export default function ChatMessage({
           ) : null}
 
           {showNextMoveRows && (
-            <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col">
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">
               {footerMessageActions.map((action) => (
                 <NextMoveRow
                   key={action.id ?? action.type ?? action.label}
                   onClick={() => onAction?.(action)}
                 >
-                  {actionLabel(action)}
+                  <NextMoveTitle>{actionLabel(action)}</NextMoveTitle>
                 </NextMoveRow>
               ))}
             </div>

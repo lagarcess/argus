@@ -397,6 +397,69 @@ class TestCheapVerifiedRows:
         assert "discovery" not in patch
 
 
+class TestDropDisclosures:
+    """Absences the user can see are explained; internal filtering is silent."""
+
+    def _captured_voice_kwargs(self, monkeypatch: pytest.MonkeyPatch) -> dict:
+        captured: dict = {}
+
+        async def _voice(**kwargs: Any) -> str:
+            captured.update(kwargs)
+            return "voiced"
+
+        monkeypatch.setattr(composer_module, "_voiced_discovery_response", _voice)
+        return captured
+
+    @pytest.mark.asyncio()
+    async def test_pipeline_only_drops_stay_silent(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        captured = self._captured_voice_kwargs(flag_on)
+        result = await _run(_decision())
+        assert result.patch["discovery"]["candidates"]
+        # "Fake Private Co" was never in the user's message; voicing must not
+        # hear about it. The sidecar keeps the full list for the contract.
+        assert captured["unverified_names"] == []
+        assert "Fake Private Co" in result.patch["discovery"]["unverified_names"]
+
+    @pytest.mark.asyncio()
+    async def test_a_drop_named_by_the_user_is_disclosed(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        captured = self._captured_voice_kwargs(flag_on)
+        await discovery_stage_result_if_applicable(
+            decision=_decision(),
+            current_user_message="Could I test Fake Private Co stocks?",
+            language="en",
+            discovery_allowance_available=True,
+        )
+        assert captured["unverified_names"] == ["Fake Private Co"]
+
+    @pytest.mark.asyncio()
+    async def test_zero_verified_recovery_keeps_the_full_explanation(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction(), known_assets={})
+        recovery_kwargs: dict = {}
+
+        async def _recovery_voice(**kwargs: Any) -> str | None:
+            recovery_kwargs.update(kwargs)
+            return None
+
+        flag_on.setattr(
+            composer_module, "_voiced_discovery_recovery", _recovery_voice
+        )
+        result = await _run(_decision())
+        assert result.patch["recovery"]["code"] == "discovery_no_verified_candidates"
+        # The drop explanation IS the answer when nothing verified.
+        assert recovery_kwargs["unverified_names"]
+
+
 class TestSearchDoesNotBlockTheEventLoop:
     @pytest.mark.asyncio()
     async def test_other_coroutines_run_while_a_search_is_in_flight(
