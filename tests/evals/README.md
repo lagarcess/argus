@@ -59,8 +59,8 @@ poetry run python -m tests.evals.search_provider_eval
 
 The report is written to
 `temp/issue-244-search-provider-evaluation.json`. It must recommend deferral
-until real provider evidence, issue #241 integration, and explicit founder
-activation exist. Its Perplexity-direct next-probe entry is an official-
+until real provider evidence and explicit founder activation exist. Its
+Perplexity-direct next-probe entry is an official-
 documentation-based hypothesis, not an empirical provider comparison or
 selection. Any public citation/context schema also remains behind its separate
 API-contract approval gate.
@@ -137,9 +137,9 @@ response category, stage outcome, artifact and action identity, persistence and
 reload state, typed recovery, route budgets, terminal fingerprints, stale
 actions, and orphan-turn reconciliation.
 
-Each trajectory currently carries one exact owning issue and a narrow set of
-step-scoped allowed failure masks. The approved #229 contract now owns the exact
-reliability vocabulary: `confirmation_id` is the Run `action_identity`, its
+Only unresolved trajectories carry one exact owning issue and a narrow set of
+step-scoped allowed failure masks. Passing trajectories stay unmasked. The
+approved #229 contract now owns the exact reliability vocabulary: `confirmation_id` is the Run `action_identity`, its
 `Idempotency-Key` must match, and ambiguous Run responses reconcile through the
 owner-scoped by-action lookup before a `404` may permit one exact replay. Ordinary
 turns project approved lifecycle states; an unreconciled stale turn becomes

@@ -142,56 +142,54 @@
       "locale": "en",
       "purpose": "Route an unavailable discovery request to honest typed recovery without inventing Search.",
       "tags": ["capability", "discovery", "search_paused"],
-      "expected_fail": {
-        "issue": "#241",
-        "reason": "Typed capability and discovery ownership must land before this route is authoritative.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_03:step:1", "prefix": "visible_response:"},
-          {"step_id": "alpha_session_03:step:1", "prefix": "capability_route:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "visible_response:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "stage_outcome:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "sse:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "terminal:"},
-          {"step_id": "alpha_session_03:step:2", "prefix": "capability_route:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
           "request": {"message": "Find a supported retail stock I can test with an RSI rule."},
           "expect": {
             "visible_response_category": "typed_recovery",
-            "stage_outcome": "needs_clarification",
+            "stage_outcome": "ready_to_respond",
             "canonical_sse": true,
-            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "recovery_code": "discovery_unavailable",
+            "route_budget": {"max_calls": 2, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true,
-            "checkpoints": {"capability_route": "discovery_unsupported"}
+            "checkpoints": {
+              "discovery.route_receipt_count": 2
+            }
           }
         },
         {
-          "operation": "action",
-          "request": {"type": "select_response_option", "option": "enter_known_symbol"},
+          "operation": "stream",
+          "request": {"message": "Test AAPL with an RSI rule for the last year."},
           "expect": {
-            "visible_response_category": "clarification",
-            "stage_outcome": "needs_clarification",
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
-            "artifact_identity": "alpha_session_03:draft:1",
+            "artifact_identity": "alpha_session_03:confirmation:1",
+            "action_identity": "alpha_session_03:confirmation:1",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true,
-            "checkpoints": {"capability_route": "request_asset_symbol"}
+            "checkpoints": {
+              "discovery.known_symbol_confirmation": true,
+              "discovery.route_receipt_count": 1
+            }
           }
         },
         {
           "operation": "persistence",
-          "request": {"scope": "clarification"},
+          "request": {"scope": "confirmation"},
           "expect": {
-            "artifact_identity": "alpha_session_03:draft:1"
+            "artifact_identity": "alpha_session_03:confirmation:1",
+            "action_identity": "alpha_session_03:confirmation:1"
           }
         },
         {
           "operation": "reload",
           "request": {"surface": "conversation"},
           "expect": {
-            "artifact_identity": "alpha_session_03:draft:1"
+            "artifact_identity": "alpha_session_03:confirmation:1",
+            "action_identity": "alpha_session_03:confirmation:1",
+            "reload_state": "alpha_session_03:confirmation:1"
           }
         }
       ]
@@ -201,17 +199,6 @@
       "locale": "en",
       "purpose": "Retain requested retail history while approving one provider-supported effective window.",
       "tags": ["retail", "requested_window", "effective_window"],
-      "expected_fail": {
-        "issue": "#251",
-        "reason": "Requested-versus-effective window truth is owned by issue 251.",
-        "allowed_failures": [
-          {"step_id": "alpha_session_04:step:1", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:2", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:3", "prefix": "effective_window:"},
-          {"step_id": "alpha_session_04:step:3", "prefix": "persistence:"},
-          {"step_id": "alpha_session_04:step:4", "prefix": "effective_window:"}
-        ]
-      },
       "steps": [
         {
           "operation": "stream",
@@ -247,7 +234,11 @@
             "artifact_identity": "alpha_session_04:job:1",
             "action_identity": "alpha_session_04:confirmation:1",
             "typed_terminal": true,
-            "checkpoints": {"effective_window.execution_matches_approval": true}
+            "checkpoints": {
+              "effective_window.execution_matches_approval": true,
+              "effective_window.completed_result_matches_approval": true,
+              "effective_window.result_surfaces_complete": true
+            }
           }
         },
         {
@@ -255,7 +246,10 @@
           "request": {"scope": "requested_and_effective_window"},
           "expect": {
             "persistence_state": "requested_and_effective_window",
-            "checkpoints": {"effective_window.durable": true}
+            "checkpoints": {
+              "effective_window.durable": true,
+              "effective_window.completed_result_durable": true
+            }
           }
         },
         {
@@ -264,7 +258,10 @@
           "expect": {
             "reload_state": "alpha_session_04:job:1",
             "artifact_identity": "alpha_session_04:job:1",
-            "checkpoints": {"effective_window.reload_matches_approval": true}
+            "checkpoints": {
+              "effective_window.reload_matches_approval": true,
+              "effective_window.completed_result_reloads": true
+            }
           }
         }
       ]
