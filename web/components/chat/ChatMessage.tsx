@@ -431,11 +431,14 @@ export default function ChatMessage({
                         ariaLabel={searchLabel}
                         disabled={turnInFlight}
                         onClick={() =>
+                          // Typeless on purpose: the row is a typing shortcut,
+                          // and a typed option would be validated against the
+                          // latest turn's registered options and rejected as
+                          // stale. The sentence itself is the request; the
+                          // interpreter judges it like any user message.
                           onAction?.({
-                            type: "select_response_option",
                             label: searchSendText,
                             value: searchSendText,
-                            payload: { discovery_search_request: true },
                           })
                         }
                       >
