@@ -652,7 +652,52 @@ env is destroyed.
   registered-only and §12.10 corrected it; the visitor metering is load-bearing
   and unchanged.
 
-## 13. Documentation to update on landing
+## 13. What this spec does not close on issue #244
+
+Finishing every item here does **not** finish grounded discovery. Three gates sit
+outside it, recorded so they are not mistaken for done.
+
+### 13.1 It has never run in production
+
+`render.yaml` contains **zero** `DISCOVERY` variables. No flag, no provider key,
+no global daily ceiling. Every proof so far — including all of PR #291 — was
+against a local stack.
+
+Outstanding: set the runtime variables, run the `visitor_usage_counters`
+migration on the hosted database, and activate the flag under the normal canary
+discipline. Founder activation is an explicit gate on #244 between provider
+evaluation and runtime.
+
+### 13.2 Spanish was never proven
+
+Acceptance criterion 9 on #244 and journey **J3** in
+`2026-07-25-grounded-discovery-search-v1-design.md` both require English **and**
+Spanish parity — equivalent capability, voice, and localized freshness
+formatting — through discovery into a supported backtest. Every live QA run to
+date was English.
+
+This spec adds Spanish surface area rather than reducing it: the unsourced
+marker (§3.7), the "Search for current results" row (§3.8), the retry row (§4.2),
+and the incomplete-rule copy (§5.2) all need `es-419` catalog entries and all
+need to be seen rendered.
+
+### 13.3 The issue's own language needs reconciling
+
+#244's no-touch list forbids *"model-memory candidate lists presented as current
+facts"*, and acceptance criterion 8 forbids falling back to *"uncited model
+memory"* on outage.
+
+The cheap path is model memory that is explicitly **not** presented as current —
+that is what §3.7's derived marker exists to guarantee — and outage behavior is
+unchanged by this spec: a failed search gets a retry row (§4.2), never cheap
+rows. Only an **exhausted allowance** falls through to the cheap path.
+
+Compatible in substance. But someone reading #244 when this lands will read it
+as a violation, so update the issue text in the same PR.
+
+---
+
+## 14. Documentation to update on landing
 
 - `docs/API_CONTRACT.md` — the sidecar's ungrounded case, and that zero sources
   is the marker's only source of truth.
