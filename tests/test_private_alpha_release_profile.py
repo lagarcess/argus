@@ -60,6 +60,10 @@ def test_guest_kill_switches_are_documented_on_without_opening_public_accounts()
     assert "ARGUS_GUEST_ACCESS_ENABLED=true" in backend_example
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false" in backend_example
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in backend_example
+    assert "ARGUS_VISITOR_KEY_SECRET=replace_with_a_unique_random_secret" in (
+        backend_example
+    )
+    assert "ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500" in backend_example
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in web_example
 
 

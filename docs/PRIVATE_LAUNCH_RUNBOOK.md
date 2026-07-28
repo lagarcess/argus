@@ -314,6 +314,7 @@ Product defaults:
 ARGUS_GUEST_ACCESS_ENABLED=true
 ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
 NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
+ARGUS_VISITOR_KEY_SECRET=<unique high-entropy environment secret>
 ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
 ```
 
@@ -330,10 +331,12 @@ the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
 anonymous-sign-in limits, Argus origin enforcement and per-IP attempt limits,
 no direct anonymous-role access to product tables, migrations applied through
 `20260727230000_add_visitor_usage_counters.sql`, and a founder-approved
-`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`. Without the public site key,
-non-loopback production preserves the auth landing rather than beginning an
-unusable Guest bootstrap. Do not mutate hosted Auth configuration as part of a
-code promotion.
+`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`. Generate a unique
+`ARGUS_VISITOR_KEY_SECRET` for each deployed environment so visitor identifiers
+remain opaque and cannot be correlated across environments. Without the public
+site key, non-loopback production preserves the auth landing rather than
+beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
+as part of a code promotion.
 
 Run guest cleanup first as a dry run:
 

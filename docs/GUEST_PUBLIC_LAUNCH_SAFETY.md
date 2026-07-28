@@ -168,6 +168,8 @@ boundary ineffective.
 
 - [ ] Apply migrations through
       `20260727230000_add_visitor_usage_counters.sql`.
+- [ ] Set a unique, high-entropy `ARGUS_VISITOR_KEY_SECRET` for this
+      environment; do not reuse a local or staging value.
 - [ ] Set and record `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`.
 - [ ] Confirm a renewed Guest workspace does not restore the visitor's two
       daily grounded searches.
