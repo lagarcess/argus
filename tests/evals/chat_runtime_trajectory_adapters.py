@@ -13,6 +13,7 @@ from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
+from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
@@ -223,21 +224,23 @@ class _DeterministicInterpreter:
         lowered = message.casefold()
         if "retail stock" in lowered:
             return StructuredInterpretation(
-                intent="backtest_execution",
-                task_relation="new_task",
-                requires_clarification=True,
-                user_goal_summary="The user needs a known supported symbol.",
-                candidate_strategy_draft=StrategySummary(
-                    raw_user_phrasing=message,
-                    strategy_type="rsi_threshold",
-                    asset_universe=[],
-                    timeframe="1D",
-                    date_range="last year",
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="The user wants retail candidates to test.",
+                asset_discovery=AssetDiscoveryRequest(
+                    relationship="category",
+                    category_description="retail stocks",
+                    asset_class_hint="equity",
+                    needs_current_facts=False,
                 ),
-                missing_required_fields=["asset_universe"],
-                assistant_response="Enter a known symbol.",
                 confidence=0.95,
-                semantic_turn_act="unsupported_request",
+                semantic_turn_act="asset_discovery",
+            )
+        if "aapl" in lowered and "rsi" in lowered:
+            return _DeterministicInterpreter._rsi_threshold(
+                request=request,
+                symbol="AAPL",
             )
         if "impulso" in lowered or lowered == "reintentar":
             return StructuredInterpretation(
@@ -334,6 +337,32 @@ class _DeterministicInterpreter:
             semantic_turn_act=semantic_turn_act,
         )
 
+    @staticmethod
+    def _rsi_threshold(
+        *,
+        request: InterpretationRequest,
+        symbol: str,
+    ) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary=f"The user wants to test {symbol} with RSI.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="rsi_threshold",
+                strategy_thesis=f"Test {symbol} with RSI.",
+                asset_universe=[symbol],
+                asset_class="equity",
+                timeframe="1D",
+                date_range="last year",
+                entry_logic="Buy when RSI drops below 30",
+                exit_logic="Sell when RSI rises above 55",
+            ),
+            confidence=0.95,
+            semantic_turn_act="new_idea",
+        )
+
 
 class ConcreteTrajectoryRuntime:
     """Exercise trajectory steps through production HTTP and memory owners."""
@@ -370,6 +399,8 @@ class ConcreteTrajectoryRuntime:
 
         self._monkeypatch.setattr(api_state, "supabase_gateway", None)
         self._monkeypatch.setenv("OPENROUTER_API_KEY", "trajectory-fixture-key")
+        self._monkeypatch.setenv("PERPLEXITY_API_KEY", "")
+        self._monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", "false")
         self._monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "true")
         self._monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "false")
         self._monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
@@ -436,7 +467,17 @@ class ConcreteTrajectoryRuntime:
         content = messages[-1].get("content")
         if not isinstance(content, str):
             raise AssertionError("trajectory provider received no typed content")
-        StructuredInterpretation.model_validate_json(content)
+        response_format = payload.get("response_format")
+        if (
+            isinstance(response_format, dict)
+            and response_format.get("type") == "json_schema"
+        ):
+            StructuredInterpretation.model_validate_json(content)
+        else:
+            content = (
+                "I cannot look up current candidates while discovery is disabled. "
+                "Name a symbol you already have in mind and I can test it."
+            )
         return httpx.Response(
             200,
             json={
@@ -516,6 +557,7 @@ class ConcreteTrajectoryRuntime:
             state=state,
             artifact_identity=artifact_identity,
             action_identity=action_identity,
+            recovery_code=self._recovery_code(result.final),
             checkpoints=self._stream_checkpoints(
                 trajectory=trajectory,
                 state=state,
@@ -626,8 +668,6 @@ class ConcreteTrajectoryRuntime:
         history: tuple[TrajectoryStepResult, ...],
     ) -> StepObservation:
         del history
-        if trajectory.label == "alpha_session_03":
-            return self._stream_response_option(trajectory=trajectory, step=step)
         return self._run_action(trajectory=trajectory, step=step, is_retry=False)
 
     def disconnect(
@@ -793,7 +833,10 @@ class ConcreteTrajectoryRuntime:
                 },
             )
         if trajectory.label == "alpha_session_03":
-            return StepObservation(artifact_identity=artifact_alias)
+            return StepObservation(
+                artifact_identity=artifact_alias,
+                action_identity=action_alias,
+            )
         if trajectory.label == "alpha_session_04":
             confirmation_alias = self._confirmation_alias(state=state)
             coverage = self._confirmation_coverage(
@@ -905,6 +948,13 @@ class ConcreteTrajectoryRuntime:
             stale_action_executions=stale_action_executions,
         )
 
+    @staticmethod
+    def _recovery_code(final: dict[str, Any]) -> str | None:
+        recovery = final.get("recovery")
+        if not isinstance(recovery, dict) or not recovery.get("code"):
+            return None
+        return str(recovery["code"])
+
     def _run_action(
         self,
         *,
@@ -941,12 +991,7 @@ class ConcreteTrajectoryRuntime:
             state.raw_artifact_ids[job_alias] = raw_job_id
         if is_retry:
             state.replay_count += 1
-        recovery = result.final.get("recovery")
-        recovery_code = (
-            str(recovery.get("code"))
-            if isinstance(recovery, dict) and recovery.get("code")
-            else None
-        )
+        recovery_code = self._recovery_code(result.final)
         artifact_identity, _ = self._persisted_artifact_identity(state=state)
         if recovery_code is not None:
             artifact_identity = None
@@ -995,64 +1040,6 @@ class ConcreteTrajectoryRuntime:
             stale_action_executions=self._execution_count(state=state)
             if recovery_code == "confirmation_action_stale_card"
             else 0,
-        )
-
-    def _stream_response_option(
-        self,
-        *,
-        trajectory: AlphaTrajectory,
-        step: TrajectoryStep,
-    ) -> StepObservation:
-        state = self._state(trajectory)
-        source = next(
-            message
-            for message in reversed(api_state.store.messages[state.conversation_id])
-            if message.role == "assistant"
-            and isinstance(message.metadata.get("clarification"), dict)
-        )
-        option_id = str(step.request["option"])
-        option = next(
-            (
-                option
-                for option in source.metadata["clarification"]["options"]
-                if option["id"] == option_id
-            ),
-            None,
-        )
-        if option is None:
-            artifact_alias = state.artifact_aliases.get(source.id)
-            return StepObservation(
-                artifact_identity=artifact_alias,
-                typed_terminal=False,
-                checkpoints={"capability_route": "missing_typed_option"},
-            )
-        result = self._submit_stream(
-            trajectory=trajectory,
-            step=step,
-            body={
-                "conversation_id": state.conversation_id,
-                "language": trajectory.locale,
-                "action": {
-                    "type": "select_response_option",
-                    "label": option["label"],
-                    "payload": {
-                        "source_assistant_id": source.id,
-                        "option_id": option_id,
-                        "replacement_values": option["replacement_values"],
-                    },
-                },
-            },
-        )
-        artifact_identity, action_identity = self._observe_artifact(
-            trajectory=trajectory,
-            state=state,
-            final=result.final,
-        )
-        return self._stream_observation(
-            result=result,
-            state=state,
-            artifact_identity=artifact_identity,
-            action_identity=action_identity,
         )
 
     def _retry_draft(
@@ -1467,6 +1454,36 @@ class ConcreteTrajectoryRuntime:
             return {"stale_action.active_artifact": artifact_identity}
         if trajectory.label == "alpha_session_02":
             return {"terminal.response_language": trajectory.locale}
+        if trajectory.label == "alpha_session_03":
+            latest_evidence = self._persisted_route_evidence.get(
+                state.conversation_id, []
+            )
+            receipt_count = (
+                len(latest_evidence[-1]["receipts"]) if latest_evidence else None
+            )
+            confirmation_metadata = self._confirmation_metadata(
+                state=state,
+                confirmation_alias=artifact_identity,
+            )
+            confirmation_payload = (
+                confirmation_metadata.get("confirmation_payload")
+                if isinstance(confirmation_metadata, dict)
+                else None
+            )
+            strategy = (
+                confirmation_payload.get("strategy")
+                if isinstance(confirmation_payload, dict)
+                else None
+            )
+            return {
+                "discovery.route_receipt_count": receipt_count,
+                "discovery.known_symbol_confirmation": bool(
+                    isinstance(strategy, dict)
+                    and strategy.get("strategy_type") == "indicator_threshold"
+                    and strategy.get("asset_universe") == ["AAPL"]
+                    and strategy.get("extra_parameters", {}).get("indicator") == "rsi"
+                ),
+            }
         return {}
 
     @staticmethod

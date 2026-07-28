@@ -25,13 +25,12 @@ EXPECTED_ALPHA_LABELS = {f"alpha_session_{index:02d}" for index in range(1, 8)}
 ISSUE_LABELS = {
     "#238": "alpha_session_01",
     "#239": "alpha_session_02",
-    "#241": "alpha_session_03",
     "#251": "alpha_session_04",
     "#242": "alpha_session_05",
     "#230": "alpha_session_06",
     "#240": "alpha_session_07",
 }
-EXPECTED_UNRESOLVED_ISSUES = {"#239", "#241"}
+EXPECTED_UNRESOLVED_ISSUES = {"#239"}
 EXPECTED_OPERATIONS = {
     "stream",
     "action",
@@ -57,7 +56,7 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
     assert {label: result.status for label, result in results.items()} == {
         "alpha_session_01": "passed",
         "alpha_session_02": "expected_failed",
-        "alpha_session_03": "expected_failed",
+        "alpha_session_03": "passed",
         "alpha_session_04": "passed",
         "alpha_session_05": "passed",
         "alpha_session_06": "passed",
@@ -66,7 +65,7 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
     assert all(
         result.failed_checks
         for label, result in results.items()
-        if label in {"alpha_session_02", "alpha_session_03"}
+        if label == "alpha_session_02"
     )
 
 
@@ -74,6 +73,22 @@ def test_concrete_effective_window_trajectory_passes_unmasked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     trajectory = _trajectory_for_issue("#251")
+    assert trajectory.expected_fail is None
+
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        result = run_alpha_trajectory(
+            trajectory=trajectory,
+            adapters=runtime.adapters,
+        )
+
+    assert result.status == "passed", result.failed_checks
+    assert result.failed_checks == ()
+
+
+def test_concrete_discovery_recovery_trajectory_passes_unmasked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_label("alpha_session_03")
     assert trajectory.expected_fail is None
 
     with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
@@ -678,6 +693,14 @@ def _trajectory_for_issue(issue: str) -> Any:
     )
 
 
+def _trajectory_for_label(label: str) -> Any:
+    return next(
+        trajectory
+        for trajectory in load_alpha_trajectories()
+        if trajectory.label == label
+    )
+
+
 def _run_action_envelopes(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, list):
         return [envelope for item in value for envelope in _run_action_envelopes(item)]
@@ -930,7 +953,7 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert "runtime_budget_exhausted" not in raw
     assert "asset_discovery_unavailable" not in raw
 
-    trajectories = [_trajectory_for_issue(issue) for issue in ("#239", "#241")]
+    trajectories = [_trajectory_for_issue("#239")]
     for trajectory in trajectories:
         for step in trajectory.steps:
             assert step.expectation.recovery_code is None
@@ -942,9 +965,10 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert budget_retry.expectation.visible_response_category == "typed_recovery"
     assert budget_retry.expectation.stage_outcome == "ready_to_respond"
 
-    discovery_recovery = _trajectory_for_issue("#241").steps[0]
+    discovery_recovery = _trajectory_for_label("alpha_session_03").steps[0]
     assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
-    assert discovery_recovery.expectation.stage_outcome == "needs_clarification"
+    assert discovery_recovery.expectation.stage_outcome == "ready_to_respond"
+    assert discovery_recovery.expectation.recovery_code == "discovery_unavailable"
 
     orphan_recovery = _trajectory_for_issue("#240").steps[3]
     assert orphan_recovery.expectation.reload_state == "abandoned"
@@ -1018,8 +1042,8 @@ def test_trajectory_runner_dispatches_every_step_through_typed_adapters() -> Non
         for result, trajectory in zip(results, trajectories, strict=True)
     )
     assert {result.status for result in results} == {"passed", "unexpected_pass"}
-    assert sum(result.status == "passed" for result in results) == 5
-    assert sum(result.status == "unexpected_pass" for result in results) == 2
+    assert sum(result.status == "passed" for result in results) == 6
+    assert sum(result.status == "unexpected_pass" for result in results) == 1
     assert all(result.failed_checks == () for result in results)
 
 
@@ -1437,10 +1461,10 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
 
     assert stored == scorecard | {"generated_at": stored["generated_at"]}
     assert stored["totals"] == {
-        "passed": 5,
+        "passed": 6,
         "failed": 0,
         "expected_failed": 0,
-        "unexpected_pass": 2,
+        "unexpected_pass": 1,
     }
     assert {result["label"] for result in stored["results"]} == EXPECTED_ALPHA_LABELS
     assert all(
