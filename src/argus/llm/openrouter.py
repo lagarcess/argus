@@ -19,6 +19,14 @@ from pydantic import BaseModel
 from argus.agent_runtime import turn_execution
 from argus.env import load_project_dotenv
 from argus.llm.openrouter_model_env import TIER_FALLBACK_ENV, TIER_PRIMARY_ENV
+from argus.llm.openrouter_tasks import (
+    OPENROUTER_PROFILES,
+    OPENROUTER_TASK_MODEL_TIERS,
+    OpenRouterModelTier,
+    OpenRouterProfile,
+    OpenRouterReasoningEffort,
+    OpenRouterTask,
+)
 from argus.llm.openrouter_usage import (
     merge_openrouter_token_usage,
     normalize_openrouter_token_usage,
@@ -29,37 +37,9 @@ from argus.llm.openrouter_usage import (
 
 load_project_dotenv()
 
-OpenRouterTask = Literal[
-    "interpretation",
-    "interpretation_repair",
-    "field_fidelity",
-    "capability_conflict",
-    "clarification",
-    "chat_composer",
-    "result_summary",
-    "result_breakdown",
-    "name_suggestion",
-    "discovery_extraction",
-    "discovery_voicing",
-    "discovery_model_knowledge",
-]
 _OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
-OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
-OpenRouterReasoningEffort = Literal[
-    "xhigh", "high", "medium", "low", "minimal", "none"
-]
 
 SchemaModelT = TypeVar("SchemaModelT", bound=BaseModel)
-
-
-@dataclass(frozen=True)
-class OpenRouterProfile:
-    task: OpenRouterTask
-    temperature: float
-    max_tokens: int
-    timeout_seconds: int = 12
-    max_retries: int = 1
-    reasoning_effort: OpenRouterReasoningEffort = "none"
 
 
 @dataclass(frozen=True)
@@ -106,77 +86,6 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 )
 
 
-OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
-    "interpretation": OpenRouterProfile(
-        "interpretation",
-        temperature=0,
-        max_tokens=3200,
-        # 3200 tokens + structured + reasoning needs more than the 12s default (its peers
-        # get 20-30s); proportionate bump so interpretation isn't the next timeout.
-        timeout_seconds=20,
-        reasoning_effort="medium",
-    ),
-    "interpretation_repair": OpenRouterProfile(
-        "interpretation_repair",
-        temperature=0,
-        max_tokens=2200,
-        timeout_seconds=20,
-    ),
-    "field_fidelity": OpenRouterProfile(
-        "field_fidelity",
-        temperature=0,
-        max_tokens=900,
-        timeout_seconds=20,
-    ),
-    "capability_conflict": OpenRouterProfile(
-        "capability_conflict",
-        temperature=0,
-        max_tokens=700,
-        timeout_seconds=15,
-        reasoning_effort="medium",
-    ),
-    "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
-    "chat_composer": OpenRouterProfile(
-        "chat_composer", temperature=0.2, max_tokens=1200, timeout_seconds=25
-    ),
-    "result_summary": OpenRouterProfile(
-        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=30
-    ),
-    "result_breakdown": OpenRouterProfile(
-        "result_breakdown",
-        temperature=0.2,
-        max_tokens=2400,
-        timeout_seconds=25,
-        max_retries=0,
-    ),
-    "name_suggestion": OpenRouterProfile(
-        "name_suggestion", temperature=0, max_tokens=400
-    ),
-    "discovery_extraction": OpenRouterProfile(
-        "discovery_extraction", temperature=0, max_tokens=1200, timeout_seconds=20
-    ),
-    "discovery_voicing": OpenRouterProfile(
-        "discovery_voicing", temperature=0.2, max_tokens=900, timeout_seconds=20
-    ),
-    "discovery_model_knowledge": OpenRouterProfile(
-        "discovery_model_knowledge", temperature=0, max_tokens=1200, timeout_seconds=20
-    ),
-}
-
-OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
-    "interpretation": "structured",
-    "interpretation_repair": "structured",
-    "field_fidelity": "structured",
-    "capability_conflict": "context",
-    "clarification": "chat",
-    "chat_composer": "chat",
-    "result_summary": "chat",
-    "result_breakdown": "context",
-    "name_suggestion": "utility",
-    "discovery_extraction": "structured",
-    "discovery_voicing": "chat",
-    "discovery_model_knowledge": "structured",
-}
 
 _TIER_PRIMARY_ENV = TIER_PRIMARY_ENV
 _TIER_FALLBACK_ENV = TIER_FALLBACK_ENV
