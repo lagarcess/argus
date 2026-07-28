@@ -112,6 +112,10 @@ class TestGlobalCeiling:
             seen.append(subject)
             return True
 
+        # Hermetic against ambient env: a worktree .env with supabase
+        # persistence would otherwise route the guest read to the real
+        # visitor table instead of the mocked memory path.
+        monkeypatch.setattr(discovery_evidence.api_state, "supabase_gateway", None)
         monkeypatch.setattr(discovery_evidence, "_subject_within_limits", _within)
         monkeypatch.setattr(
             discovery_evidence, "_global_ceiling_available", lambda *, now: True
