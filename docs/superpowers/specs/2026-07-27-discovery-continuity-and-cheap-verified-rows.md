@@ -253,6 +253,13 @@ Attach `metadata.retry_last_turn` on the `discovery_search_failed` recovery, the
 same shape other retryable recoveries use. Render it as a footer row under the
 user's run via `NextMoveRow`, consistent with §3.8.
 
+> **Build disposition (2026-07-27).** The metadata attach alone completes the
+> rail: the assistant footer already renders `retry_last_turn` as the same
+> retry affordance every other retryable turn uses (`ChatMessage.tsx`), and
+> `UserTurnRecovery` covers the user-side projection. No new row component was
+> built — a discovery failure should not look different from any other
+> retryable failure. Revisit only if live QA shows the affordance is missed.
+
 ### 4.3 Stop charging for failed searches
 
 `usage["search_attempted"]` is set to True **before** the provider call
@@ -269,6 +276,12 @@ timeouts, HTTP errors and malformed responses all charge the allowance.
 Do not wait on the provider's billing policy for errored requests. Whatever
 Perplexity bills us, charging a stranger for our own outage is wrong, and the
 global daily ceiling already bounds real spend.
+
+> **Refinement found in build (2026-07-27): the ceiling is exempt.** "The
+> ceiling bounds real spend" is only true if the ceiling counts every attempt —
+> failed provider calls can still be billed. So the global ceiling charges on
+> every attempt, and only the user's allowance forgives failures. One rule per
+> bound, each matching what that bound protects.
 
 A retry that succeeds charges normally. A retry that fails charges nothing.
 
