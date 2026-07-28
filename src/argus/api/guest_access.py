@@ -66,6 +66,23 @@ _current_account_context: ContextVar[AccountContext | None] = ContextVar(
 )
 
 
+def client_identity(request: Request) -> str:
+    """Best available identifier for the visitor behind a request.
+
+    Prefers the first `x-forwarded-for` hop so a proxied deployment sees the
+    caller rather than the proxy. Guest allowances are charged against this
+    instead of a user id, because a guest user id renews on a timer.
+    """
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        first_hop = forwarded_for.split(",", 1)[0].strip()
+        if first_hop:
+            return first_hop
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
 def guest_capabilities() -> AccountCapabilities:
     return AccountCapabilities(
         can_create_additional_conversation=False,
@@ -74,7 +91,9 @@ def guest_capabilities() -> AccountCapabilities:
         can_manage_account=False,
         can_use_omnisearch=True,
         can_search_current_workspace=True,
-        can_use_grounded_discovery=False,
+        # Both classes can discover; guests are metered, not blocked. Reporting
+        # False here told guests discovery was unavailable while it worked.
+        can_use_grounded_discovery=True,
         can_submit_feedback=True,
     )
 
@@ -87,7 +106,7 @@ def registered_capabilities() -> AccountCapabilities:
         can_manage_account=True,
         can_use_omnisearch=True,
         can_search_current_workspace=True,
-        can_use_grounded_discovery=False,
+        can_use_grounded_discovery=True,
         can_submit_feedback=True,
     )
 

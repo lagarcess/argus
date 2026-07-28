@@ -89,7 +89,7 @@ class TestValidatedCandidates:
                 _candidate("PANW", name="Palo Alto Networks"),
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity", "PANW": "equity"}),
@@ -112,7 +112,7 @@ class TestValidatedCandidates:
             ]
         )
         known = {s: "equity" for s in ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"]}
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver(known),
@@ -137,7 +137,7 @@ class TestValidatedCandidates:
                 ),
             ]
         )
-        validated, _ = validated_candidates(
+        validated, _, _ = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity"}),
@@ -153,7 +153,7 @@ class TestValidatedCandidates:
         extraction = DiscoveryExtraction(
             candidates=[_candidate("CRWD", sources=[0, 2, 7, -1])]
         )
-        validated, _ = validated_candidates(
+        validated, _, _ = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity"}),
@@ -167,7 +167,7 @@ class TestValidatedCandidates:
                 _candidate(f"ZZ{index}", name=f"Unknown {index}") for index in range(6)
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({}),
@@ -193,7 +193,7 @@ class TestValidatedCandidates:
                 _candidate("CRWD", name="CrowdStrike"),
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity"}),
@@ -210,7 +210,7 @@ class TestReviewHardening:
                 _candidate("CRWD", name="CrowdStrike", sources=[0]),
             ]
         )
-        validated, _ = validated_candidates(
+        validated, _, _ = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity"}),
@@ -219,6 +219,7 @@ class TestReviewHardening:
         assert validated[0].symbol == "CRWD"
         # The resolver owns the displayed identity even when it corroborates.
         assert validated[0].name == "CrowdStrike Holdings"
+
 
     def test_ticker_collision_with_an_unrelated_company_is_dropped(self) -> None:
         """A real ticker paired with a different company must not be selectable.
@@ -233,14 +234,17 @@ class TestReviewHardening:
                 _candidate("AAPL", name="CrowdStrike", sources=[0]),
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"AAPL": "equity"}),
             max_candidates=5,
         )
         assert validated == []
-        assert unverified == ["CrowdStrike"]
+        # Dropped as uncorroborated, not unverified: AAPL resolves fine, it is
+        # just not the company the sources named.
+        assert unverified == []
+        assert uncorroborated == ["CrowdStrike"]
 
     def test_exposure_vehicle_is_currently_dropped_known_limitation(self) -> None:
         """KNOWN LIMITATION: a crypto-exposure ETF does not survive today.
@@ -260,7 +264,7 @@ class TestReviewHardening:
                 _candidate("BTCM", name="Bitcoin", sources=[0]),
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver(
@@ -271,7 +275,10 @@ class TestReviewHardening:
             asset_class_hint="crypto",
         )
         assert validated == []
-        assert unverified == ["Bitcoin"]
+        # A Bitcoin trust is tradable; it simply could not be confirmed as the
+        # asset meant. Calling it unverified would be the false statement.
+        assert unverified == []
+        assert uncorroborated == ["Bitcoin"]
 
     def test_decorated_ticker_names_do_not_bypass_the_class_hint(self) -> None:
         """A decorated ticker still names no entity.
@@ -285,7 +292,7 @@ class TestReviewHardening:
             extraction = DiscoveryExtraction(
                 candidates=[_candidate("TRX", name=spelling, sources=[0])]
             )
-            validated, _ = validated_candidates(
+            validated, _, _ = validated_candidates(
                 extraction,
                 packet=_packet(),
                 resolve=_resolver(
@@ -305,7 +312,7 @@ class TestReviewHardening:
                 _candidate("TRX", sources=[0]),
             ]
         )
-        validated, _ = validated_candidates(
+        validated, _, _ = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"TRX": "equity"}),
@@ -322,7 +329,7 @@ class TestReviewHardening:
                 _candidate("CSCO", sources=[1]),
             ]
         )
-        validated, unverified = validated_candidates(
+        validated, unverified, uncorroborated = validated_candidates(
             extraction,
             packet=_packet(),
             resolve=_resolver({"CRWD": "equity", "PANW": "equity", "CSCO": "equity"}),

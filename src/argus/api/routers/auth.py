@@ -17,6 +17,7 @@ from argus.api.dependencies import (
 )
 from argus.api.guest_access import (
     account_context,
+    client_identity,
     guest_access_enabled,
     guest_account_context,
     permanent_account_access_allowed,
@@ -112,14 +113,7 @@ def _enforce_auth_attempt_limit(
 
 
 def _client_identity(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        first_hop = forwarded_for.split(",", 1)[0].strip()
-        if first_hop:
-            return first_hop
-    if request.client and request.client.host:
-        return request.client.host
-    return "unknown"
+    return client_identity(request)
 
 
 def _enforce_guest_attempt_limit(request: Request) -> None:

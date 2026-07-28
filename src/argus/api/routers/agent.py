@@ -104,7 +104,7 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
-from argus.api.guest_access import account_context
+from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
     latest_unresolved_terminal_runtime_failure_metadata,
     load_runtime_thread_history,
@@ -1117,6 +1117,8 @@ async def chat_stream(
                 record_discovery_search_evidence(
                     usage=discovery_usage_evidence,
                     user_id=user.id,
+                    is_guest=turn_account.kind == "guest",
+                    client_identity=client_identity(request),
                     conversation_id=conversation.id,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
@@ -1276,7 +1278,9 @@ async def chat_stream(
                     message=request_message,
                     recent_thread_history=recent_thread_history,
                     discovery_allowance_available=discovery_allowance_available(
-                        user.id
+                        user.id,
+                        is_guest=turn_account.kind == "guest",
+                        client_identity=client_identity(request),
                     ),
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance

@@ -138,7 +138,7 @@ async def discovery_stage_result_if_applicable(
             language=language,
             usage=usage,
         )
-    validated, unverified = validated_candidates(
+    validated, unverified, uncorroborated = validated_candidates(
         extraction,
         packet=packet,
         resolve=resolve_asset,
@@ -149,6 +149,7 @@ async def discovery_stage_result_if_applicable(
         extracted_count=len(extraction.candidates),
         validated_count=len(validated),
         unverified_count=len(unverified),
+        uncorroborated_count=len(uncorroborated),
     )
     if not validated:
         return await _recovery_result(
@@ -159,12 +160,14 @@ async def discovery_stage_result_if_applicable(
             language=language,
             usage=usage,
             unverified_names=unverified,
+            uncorroborated_names=uncorroborated,
         )
     voiced = await _voiced_discovery_response(
         request=request,
         candidates=validated,
         packet=packet,
         unverified_names=unverified,
+        uncorroborated_names=uncorroborated,
         current_user_message=current_user_message,
         language=language,
     )
@@ -182,7 +185,7 @@ async def discovery_stage_result_if_applicable(
         request=request,
         packet=packet,
         candidates=validated,
-        unverified_names=unverified,
+        unverified_names=unverified + uncorroborated,
     )
     logger.info(
         "Grounded discovery response composed",
@@ -191,6 +194,7 @@ async def discovery_stage_result_if_applicable(
         extracted_count=len(extraction.candidates),
         validated_count=len(validated),
         unverified_count=len(unverified),
+        uncorroborated_count=len(uncorroborated),
         search_latency_ms=packet.latency_ms,
     )
     return StageResult(
@@ -237,12 +241,14 @@ async def _recovery_result(
     language: str,
     usage: dict[str, Any] | None = None,
     unverified_names: list[str] | None = None,
+    uncorroborated_names: list[str] | None = None,
 ) -> StageResult:
     voiced = await _voiced_discovery_recovery(
         code=code,
         current_user_message=current_user_message,
         language=language,
         unverified_names=unverified_names or [],
+        uncorroborated_names=uncorroborated_names or [],
     )
     # The typed recovery object persists in both branches so codes such as a
     # retryable discovery_search_failed survive into metadata and analytics.
@@ -264,6 +270,35 @@ async def _recovery_result(
         decision=decision,
         stage_patch=stage_patch,
     )
+
+
+def _drop_reason_facts(
+    unverified_names: list[str],
+    uncorroborated_names: list[str],
+) -> str:
+    """State the true reason a name was dropped, not a convenient one.
+
+    "Not verifiable as tradable" is false for an asset that resolves fine but
+    does not correspond to what the sources named -- a Bitcoin trust is plainly
+    tradable. Conflating the two would have Argus explain a correct decision
+    with a wrong reason.
+    """
+    facts = ""
+    if unverified_names:
+        facts += (
+            " Names seen in sources but not verifiable as tradable: "
+            + ", ".join(unverified_names)
+            + ". You may mention them only as unverified."
+        )
+    if uncorroborated_names:
+        facts += (
+            " Names seen in sources that resolve to a real listing, but not one"
+            " you could confirm is the asset the user meant: "
+            + ", ".join(uncorroborated_names)
+            + ". Say only that you could not confirm the match; never say they"
+            " are untradable."
+        )
+    return facts
 
 
 _RECOVERY_VOICING_FACTS: dict[str, str] = {
@@ -296,17 +331,13 @@ async def _voiced_discovery_recovery(
     current_user_message: str,
     language: str,
     unverified_names: list[str],
+    uncorroborated_names: list[str] | None = None,
 ) -> str | None:
     message = current_user_message.strip()
     facts = _RECOVERY_VOICING_FACTS.get(code)
     if not message or facts is None:
         return None
-    if unverified_names:
-        facts += (
-            " Names seen in sources but not verifiable as tradable: "
-            + ", ".join(unverified_names)
-            + ". You may mention them only as unverified."
-        )
+    facts += _drop_reason_facts(unverified_names, uncorroborated_names or [])
     language_instruction = response_language_instruction(language)
     messages = [
         {
@@ -342,6 +373,7 @@ async def _voiced_discovery_response(
     candidates: list[ValidatedCandidate],
     packet: SearchResultPacket,
     unverified_names: list[str],
+    uncorroborated_names: list[str],
     current_user_message: str,
     language: str,
 ) -> str | None:
@@ -354,11 +386,9 @@ async def _voiced_discovery_response(
         f"Verified candidates (the complete allowed list):\n{candidate_lines}",
         f"Sources were retrieved on {freshness} from {len(packet.results)} pages.",
     ]
-    if unverified_names:
-        facts.append(
-            "Mentioned in sources but not verifiable as tradable: "
-            + ", ".join(unverified_names)
-        )
+    drops = _drop_reason_facts(unverified_names, uncorroborated_names)
+    if drops:
+        facts.append(drops.strip())
     language_instruction = response_language_instruction(language)
     messages = [
         {

@@ -6,7 +6,7 @@
 | PR | Scope | State |
 | --- | --- | --- |
 | **PR 1** — Slices A + C | Every UI change, zero runtime change | ✅ **Merged** — [#281](https://github.com/lagarcess/argus/pull/281), reconciled with integration (guest #279, costs #280) before merge |
-| **PR 2** — Slice D | Discovery selection carries resolved identity | ✅ **Merged** — [#287](https://github.com/lagarcess/argus/pull/287) as `ea2b3f35`; identity delivered and live-proven; chosen-state marker cut |
+| **PR 2** — Slice D | Discovery selection carries resolved identity | ✅ **Complete** — identity delivered and live-proven; chosen-state marker cut |
 | **PR 3** — Slice B | Live progress lines | Not started; blocked on three backend prerequisites in §4 |
 
 **Delivered in PR 1 beyond the original slice definition,** found during implementation and browser QA:
@@ -35,9 +35,7 @@ lane as general interpreter work owed to typed input too.
 **Still open in the lane:** Slice B only. Plus the guest grounded-discovery
 allowance, which is its own spec
 (`2026-07-27-guest-grounded-discovery-quota.md`).
-**Owner:** Slice B is the only remaining lane and must start from the current
-`codex/private-alpha-next` checkpoint. Guest grounded-discovery allowance stays
-in its own spec.
+**Owner:** Follow-up lane after PR #276 merges (branch from `codex/private-alpha-next`; if #276's merge is held, stack a child branch on `claude/grounded-discovery-release-9cc859` and review against it as parent).
 **Parent context:** Grounded Discovery Search v1 (issue #244, PR #276), founder UI-taste review of 2026-07-26.
 **Scope class:** Small full-slice polish lane. Frontend presentation + one additive runtime event surface. No API-contract breaks, no new tables, no new flags, no new provider calls. One recorded product contract does change: outbound source links (Slice C).
 

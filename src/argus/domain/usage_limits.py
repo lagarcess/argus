@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -27,6 +28,40 @@ GUEST_MESSAGE_ALLOWANCE = 10
 GUEST_SIMULATION_ALLOWANCE = 1
 GUEST_FEEDBACK_ALLOWANCE = 5
 GUEST_CONVERSATION_ALLOWANCE = 1
+# A taste of the premium, plus one in reserve. One search would be enough to
+# show what grounded discovery is, except a provider failure would then be a
+# stranger's entire impression of Argus. The second exists for that, not for
+# exploration -- cheap verified suggestions carry ordinary asks.
+GUEST_DISCOVERY_ALLOWANCE = 2
+
+# Deliberately a plain day window, not the guest_session window the other guest
+# allowances use. guest_session anchors to the workspace expiry, which moves
+# every time a workspace renews -- it would reset the allowance this limit
+# exists to hold. Paired with a visitor-scoped counter subject, a day window
+# survives renewal.
+GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_DISCOVERY_ALLOWANCE)
+]
+
+# Circuit breaker, not a budget: the only bound that holds when someone rotates
+# identity faster than any per-visitor limit can see. Sized so no honest day
+# reaches it. Env-overridable because a circuit breaker is worth nothing if
+# resetting it needs a deploy.
+_GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT = 500
+# Also a uuid: usage_counters.user_id is uuid-typed, so the global bucket
+# needs a storable subject like every other counter row.
+GLOBAL_DISCOVERY_CEILING_SUBJECT = "00000000-0000-4000-8000-000000000d15"
+
+
+def global_discovery_daily_ceiling() -> int:
+    raw = os.getenv("ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING", "").strip()
+    if not raw:
+        return _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
+    return parsed if parsed > 0 else _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
 
 _REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
     MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,

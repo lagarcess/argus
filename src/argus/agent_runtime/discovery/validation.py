@@ -60,7 +60,7 @@ def validated_candidates(
     resolve: Callable[..., Any],
     max_candidates: int,
     asset_class_hint: str | None = None,
-) -> tuple[list[ValidatedCandidate], list[str]]:
+) -> tuple[list[ValidatedCandidate], list[str], list[str]]:
     """Independently verify every extracted candidate before it can act.
 
     The resolver is the hard gate: a name the provider catalog cannot resolve
@@ -69,7 +69,12 @@ def validated_candidates(
     """
 
     validated: list[ValidatedCandidate] = []
+    # Two different truths. `unverified` is "we could not confirm this is a
+    # tradable asset". `uncorroborated` is "this resolves to something real,
+    # but not to what the sources named" -- saying it is not tradable would be
+    # false, since a Bitcoin trust plainly is.
     unverified: list[str] = []
+    uncorroborated: list[str] = []
     seen_symbols: set[str] = set()
     result_count = len(packet.results)
     for candidate in extraction.candidates:
@@ -113,7 +118,7 @@ def validated_candidates(
                 resolved_class=str(asset_class),
                 asset_class_hint=asset_class_hint,
             )
-            _note_unverified(unverified, display_name or symbol_guess)
+            _note_unverified(uncorroborated, display_name or symbol_guess)
             continue
         canonical = str(canonical_symbol).upper()
         if canonical in seen_symbols:
@@ -145,7 +150,7 @@ def validated_candidates(
         )
         if len(validated) >= max_candidates:
             break
-    return validated, unverified
+    return validated, unverified, uncorroborated
 
 
 def _note_unverified(unverified: list[str], name: str) -> None:
