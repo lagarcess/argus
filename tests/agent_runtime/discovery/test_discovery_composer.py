@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -319,6 +320,42 @@ class TestFlagOnPipeline:
         result = await _run(_decision(act="result_followup"))
         assert result is None
         assert provider.calls == []
+
+
+class TestSearchDoesNotBlockTheEventLoop:
+    @pytest.mark.asyncio()
+    async def test_other_coroutines_run_while_a_search_is_in_flight(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        """Spec §8: the provider client is synchronous, so an un-offloaded call
+        freezes the loop and one discovery search stalls every other stream on
+        the worker. Prove the loop keeps scheduling during the call."""
+        import time
+
+        class _BlockingProvider(_FakeProvider):
+            def search(self, query: str, **kwargs: Any) -> SearchResultPacket:
+                time.sleep(0.05)
+                return super().search(query, **kwargs)
+
+        provider = _BlockingProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+
+        ticks = 0
+
+        async def _tick() -> None:
+            nonlocal ticks
+            while True:
+                ticks += 1
+                await asyncio.sleep(0.001)
+
+        ticker = asyncio.create_task(_tick())
+        try:
+            result = await _run(_decision())
+        finally:
+            ticker.cancel()
+        assert result.patch["discovery"]["candidates"]
+        # A blocked loop yields zero ticks across the 50ms search.
+        assert ticks >= 5
 
 
 class TestRetryAffordance:

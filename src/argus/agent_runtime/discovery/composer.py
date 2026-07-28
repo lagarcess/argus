@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from urllib.parse import urlparse
 
@@ -98,7 +99,10 @@ async def discovery_stage_result_if_applicable(
     try:
         provider = selection.search_provider_for_config(provider_id=config.provider_id)
         usage["search_attempted"] = True
-        packet = provider.search(
+        # The provider client is synchronous; run it off the event loop so one
+        # search never stalls every other in-flight stream on this worker.
+        packet = await asyncio.to_thread(
+            provider.search,
             query,
             max_results=5,
             timeout_seconds=config.timeout_seconds,
