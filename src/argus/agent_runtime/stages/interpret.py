@@ -3123,6 +3123,12 @@ def _strategy_with_validated_benchmark_symbol(
         return updated, ["benchmark_symbol_provider_validated"]
     updated = strategy.model_copy(deep=True)
     updated.comparison_baseline = None
+    if resolution is not None and resolution.status == "unsupported":
+        # The user named this leg; keep its provenance so the unsupported
+        # constraint reports the true blocker instead of hiding it.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
     return updated, ["invalid_benchmark_symbol_cleared"]
 
 
