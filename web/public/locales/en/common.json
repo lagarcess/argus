@@ -340,8 +340,6 @@
     },
     "discovery_results": {
       "test_candidate": "Backtest {{symbol}}",
-      "sources_line": "Sources: {{domains}} · as of {{date}}",
-      "sources_line_undated": "Sources: {{domains}}",
       "unsourced_line": "From general knowledge, not a current search",
       "search_current": "Search for current results",
       "search_current_send_category": "Search current sources for: {{query}}",

@@ -57,4 +57,14 @@ describe("per-row citation chips (§9.5)", () => {
   test("closing the drawer clears the anchor for the next open", () => {
     expect(chatMessage).toContain("setAnchorSourceIndex(null);");
   });
+
+  test("the grounded footer is the count button alone: chips carry domains", () => {
+    // No respelled domain list and no as-of date — the search date is not
+    // the articles' date; the drawer shows each source's own date.
+    expect(chatMessage).not.toContain("sources_line");
+    expect(chatMessage).not.toContain("discoverySourceDomains");
+    expect(chatMessage).not.toContain("discoveryFreshnessDate");
+    expect(chatMessage).toContain("chat.discovery_results.unsourced_line");
+    expect(chatMessage).toContain("chat.discovery_results.sources_panel_open");
+  });
 });

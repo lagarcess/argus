@@ -23,10 +23,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
-import {
-  discoveryFreshnessDate,
-  discoverySourceDomains,
-} from "@/lib/chat-discovery-sidecar";
+
 
 type ChatMessageProps = {
   message: Message;
@@ -235,26 +232,18 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
-  const discoverySourcesLineText = (() => {
-    if (isUser || !message.discovery) return "";
-    const domains = discoverySourceDomains(message.discovery);
-    // Zero sources IS the ungrounded signal: derived, never asserted.
-    if (domains.length === 0)
-      return t("chat.discovery_results.unsourced_line", {
-        defaultValue: "From general knowledge, not a current search",
-      });
-    const date = discoveryFreshnessDate(message.discovery, i18n.language);
-    return date
-      ? t("chat.discovery_results.sources_line", {
-          domains: domains.join(", "),
-          date,
-          defaultValue: "Sources: {{domains}} · as of {{date}}",
-        })
-      : t("chat.discovery_results.sources_line_undated", {
-          domains: domains.join(", "),
-          defaultValue: "Sources: {{domains}}",
+  // Grounded rows wear per-row chips and the drawer owns the full list, so
+  // the footer never respells domains. Zero sources IS the ungrounded
+  // signal: derived, never asserted. No as-of date — the search date is not
+  // the articles' date; each source shows its own date in the drawer.
+  const discoverySourcesLineText =
+    isUser ||
+    !message.discovery ||
+    message.discovery.sources.length > 0
+      ? ""
+      : t("chat.discovery_results.unsourced_line", {
+          defaultValue: "From general knowledge, not a current search",
         });
-  })();
   // Localized heading chrome for latest-result fact answers, driven by the
   // typed fact key. Unknown keys render no heading.
   const factHeadingLabel = message.resultFactHeadingKey
@@ -495,11 +484,14 @@ export default function ChatMessage({
                   </button>
                 </div>
               ) : null}
-              {discoverySourcesLineText ? (
+              {discoverySourcesLineText ||
+              message.discovery.sources.length > 0 ? (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
-                  <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
-                    {discoverySourcesLineText}
-                  </p>
+                  {discoverySourcesLineText ? (
+                    <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
+                      {discoverySourcesLineText}
+                    </p>
+                  ) : null}
                   {message.discovery.sources.length > 0 ? (
                     <button
                       type="button"

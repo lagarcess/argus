@@ -340,8 +340,6 @@
     },
     "discovery_results": {
       "test_candidate": "Simular {{symbol}}",
-      "sources_line": "Fuentes: {{domains}} · al {{date}}",
-      "sources_line_undated": "Fuentes: {{domains}}",
       "unsourced_line": "De conocimiento general, no de una búsqueda actual",
       "search_current": "Buscar resultados actuales",
       "search_current_send_category": "Busca en fuentes actuales: {{query}}",
