@@ -367,11 +367,16 @@ def _looks_like_internal_code(value: str) -> bool:
     # lowercase snake_case token is an internal reason code and must never
     # render in prose. Uppercase underscore tokens (BTC_USDT, BRK_B) are
     # user-typed symbols and stay quotable.
-    return (
+    if (
         "_" in value
         and value == value.lower()
         and not any(character.isspace() for character in value)
-    )
+    ):
+        return True
+    # Sentence punctuation marks an explanation, not a name -- observed live
+    # as "Argus can't run The requested assumption change needs
+    # clarification. directly yet." A subject never ends in a period.
+    return value.rstrip().endswith(".") or ". " in value
 
 
 def _fallback_option_label(option: dict[str, Any]) -> str | None:

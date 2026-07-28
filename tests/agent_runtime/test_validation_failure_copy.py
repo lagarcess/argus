@@ -76,6 +76,24 @@ def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> 
     )
 
 
+def test_explanation_sentence_never_renders_as_subject() -> None:
+    """Observed live: "Argus can't run The requested assumption change needs
+    clarification. directly yet." An explanation sentence is internal text,
+    not a name; sentence punctuation disqualifies a subject."""
+
+    prose = _unsupported_recovery_fallback(
+        language="en",
+        response_intent=_response_intent_with_raw_value(
+            "The requested assumption change needs clarification."
+        ),
+        strategy=StrategySummary(asset_universe=["NVDA"]),
+    )
+
+    assert prose is not None
+    assert "needs clarification" not in prose
+    assert "that rule" in prose
+
+
 def test_uppercase_underscore_symbol_still_renders_as_subject() -> None:
     """User-typed pair symbols such as BTC_USDT are their own words, not
     internal reason codes, and must keep rendering in the clarifier prose."""

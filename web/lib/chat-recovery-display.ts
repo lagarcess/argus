@@ -688,11 +688,16 @@ function unsupportedRawValue(
 }
 
 function looksLikeInternalCode(value: string): boolean {
-  return (
+  if (
     value.includes("_") &&
     value === value.toLowerCase() &&
     !/\s/.test(value)
-  );
+  ) {
+    return true;
+  }
+  // Sentence punctuation marks an explanation, not a name -- a subject never
+  // ends in a period. Mirrors the backend filter.
+  return value.trimEnd().endsWith(".") || value.includes(". ");
 }
 
 function canonicalJson(value: unknown): string {
