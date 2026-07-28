@@ -779,6 +779,19 @@ tests.
   of killing the backend, but the recovery path should not hard-blank.
   Guest-lane robustness note.
 
+**Founder polish round 2 (2026-07-28, built as `3a682db9`):**
+
+- **Silent drops.** Macro pattern adopted: *explain absences the user can see;
+  never narrate internal filtering.* Voicing mentions a dropped name only when
+  it is the user's own subject (typed anchor or named in their message), or
+  when zero candidates verified (the drop is then the answer). Sidecar and
+  telemetry keep full lists. Witnessed: Samsung/Lenovo/HP dropped silently
+  behind a successful Apple-peers answer.
+- **Row language unified on the subtle variant:** borderless at rest, hover
+  brightens arrow + title together (no box, no shadow), hairline separators,
+  shared `NextMoveTitle` across candidates, follow-ups, and the search
+  escalation. Full-row >=44px hit area unchanged.
+
 **Founder snapshot dispositions (2026-07-28):**
 
 1. Redundant disclosures in the cheap reply — **fixed** (voicing rewrite).
