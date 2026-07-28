@@ -33,6 +33,7 @@ function transcript(conversationId: ConversationId, index = 0) {
 
 type FixtureOptions = {
   delaysMs?: Partial<Record<ConversationId, number | number[]>>;
+  decisionResultConversation?: ConversationId;
   failingAttempts?: Partial<Record<ConversationId, number[]>>;
   failureStatuses?: Partial<Record<ConversationId, number>>;
   language?: "en" | "es-419";
@@ -42,6 +43,8 @@ type FixtureOptions = {
 };
 
 type FixtureState = {
+  decisionRequestCount: number;
+  decisionState: "watching" | null;
   messageRequestCounts: Record<ConversationId, number>;
   messageResponseCounts: Record<ConversationId, number>;
   unexpectedRequests: string[];
@@ -108,12 +111,49 @@ function message(
   };
 }
 
+function resultMessage(
+  conversationId: ConversationId,
+  decisionState: "watching" | null,
+) {
+  return {
+    ...message(conversationId),
+    metadata: {
+      latest_run_id: `run-${conversationId}`,
+      result_conversation_id: conversationId,
+      result_run_id: `run-${conversationId}`,
+      result_card: {
+        actions: [],
+        asset_class: "equity",
+        assumptions: ["Long only"],
+        benchmark_note: "AAPL finished 1.2 points ahead of SPY.",
+        date_range: {
+          display: "Jul 28, 2025 to Jul 28, 2026",
+          end: "2026-07-28",
+          start: "2025-07-28",
+        },
+        decision_state: decisionState,
+        evidence_artifact_id: `evidence-${conversationId}`,
+        rows: [
+          { key: "ending_value", label: "Ending value", value: "$11,200" },
+          { key: "total_return_pct", label: "Total return", value: "12.0%" },
+        ],
+        status_label: "Simulation complete",
+        strategy_label: "Buy and hold",
+        symbols: ["AAPL"],
+        title: "AAPL buy and hold",
+      },
+    },
+  };
+}
+
 async function installConversationFixture(
   page: Page,
   options: FixtureOptions = {},
 ): Promise<FixtureState> {
   const language = options.language ?? "en";
   const state: FixtureState = {
+    decisionRequestCount: 0,
+    decisionState: null,
     messageRequestCounts: Object.fromEntries(
       CONVERSATION_IDS.map((conversationId) => [conversationId, 0]),
     ) as Record<ConversationId, number>,
@@ -168,6 +208,51 @@ async function installConversationFixture(
         public_account_access_enabled: false,
       });
     }
+    const decisionMatch = url.pathname.match(
+      /\/api\/v1\/evidence-artifacts\/(evidence-conversation-[a-j])\/decision$/,
+    );
+    if (decisionMatch && request.method() === "POST") {
+      const payload = request.postDataJSON() as {
+        decision_state?: string;
+        note?: string | null;
+      };
+      if (payload.decision_state !== "watching") {
+        state.unexpectedRequests.push(
+          `${request.method()} ${url.pathname} invalid-decision-state`,
+        );
+        return json(route, { detail: "Unexpected decision state" }, 422);
+      }
+      state.decisionRequestCount += 1;
+      state.decisionState = "watching";
+      const evidenceArtifactId = decisionMatch[1];
+      return json(route, {
+        decision: {
+          id: "decision-issue-252",
+          idea_id: "idea-issue-252",
+          idea_version_id: "idea-version-issue-252",
+          evidence_artifact_id: evidenceArtifactId,
+          source_conversation_id: options.decisionResultConversation,
+          decision_state: state.decisionState,
+          note: payload.note ?? null,
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        },
+        evidence_artifact: {
+          id: evidenceArtifactId,
+          idea_id: "idea-issue-252",
+          idea_version_id: "idea-version-issue-252",
+          source_conversation_id: options.decisionResultConversation,
+          source_run_id: `run-${options.decisionResultConversation}`,
+          artifact_type: "backtest",
+          lifecycle: "active",
+          title: "AAPL buy and hold",
+          digest: "issue-252-decision",
+          payload: {},
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        },
+      });
+    }
     if (url.pathname.endsWith("/api/v1/history")) {
       return json(route, {
         items: CONVERSATION_IDS.map(historyItem),
@@ -197,14 +282,18 @@ async function installConversationFixture(
       }
       const messageCount = options.messageCounts?.[conversationId] ?? 1;
       return json(route, {
-        items: Array.from({ length: messageCount }, (_, index) =>
-          message(conversationId, index, {
-            attempt,
-            bodyLength: options.messageBodyLengths?.[conversationId],
-            versioned:
-              options.versionedResponses?.includes(conversationId) ?? false,
-          }),
-        ),
+        items:
+          options.decisionResultConversation === conversationId
+            ? [resultMessage(conversationId, state.decisionState)]
+            : Array.from({ length: messageCount }, (_, index) =>
+                message(conversationId, index, {
+                  attempt,
+                  bodyLength: options.messageBodyLengths?.[conversationId],
+                  versioned:
+                    options.versionedResponses?.includes(conversationId) ??
+                    false,
+                }),
+              ),
         next_cursor: null,
       });
     }
@@ -378,6 +467,46 @@ test("fresh A to B to A switching is immediate and performs no duplicate GET", a
     "false",
   );
   expect(fixture.messageRequestCounts["conversation-a"]).toBe(1);
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
+test("a saved decision evicts only its owning fresh transcript", async ({
+  page,
+}) => {
+  const fixture = await installConversationFixture(page, {
+    decisionResultConversation: "conversation-a",
+  });
+  await page.goto("/chat?conversation=conversation-a");
+  await expect(transcriptText(page, "conversation-a")).toBeVisible();
+  await openConversation(page, "conversation-b");
+  await expect(transcriptText(page, "conversation-b")).toBeVisible();
+  await openConversation(page, "conversation-a");
+  await expect(transcriptText(page, "conversation-a")).toBeVisible();
+  expect(fixture.messageRequestCounts["conversation-a"]).toBe(1);
+  expect(fixture.messageRequestCounts["conversation-b"]).toBe(1);
+
+  await page.getByRole("button", { name: "Add decision" }).click();
+  await page.getByRole("button", { name: "Watching", exact: true }).click();
+  await page.getByRole("button", { name: "Save decision" }).click();
+  await expect(
+    page.getByText("Decision: Watching", { exact: true }),
+  ).toBeVisible();
+  expect(fixture.decisionRequestCount).toBe(1);
+
+  await openConversation(page, "conversation-b");
+  await expect(transcriptText(page, "conversation-b")).toBeVisible();
+  expect(fixture.messageRequestCounts["conversation-b"]).toBe(1);
+  await openConversation(page, "conversation-a");
+  await expect(transcriptText(page, "conversation-a")).toBeVisible();
+
+  await expect(
+    page.getByText("Decision: Watching", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add decision" }),
+  ).toHaveCount(0);
+  expect(fixture.messageRequestCounts["conversation-a"]).toBe(2);
+  expect(fixture.messageRequestCounts["conversation-b"]).toBe(1);
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 

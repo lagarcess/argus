@@ -361,4 +361,68 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
   });
 
+  test("successful durable result actions invalidate the owning transcript cache", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const message = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
+    const card = readFileSync(
+      join(root, "components/chat/StrategyResultCard.tsx"),
+      "utf-8",
+    );
+    const cache = readFileSync(
+      join(root, "lib/chat-transcript-session-cache.ts"),
+      "utf-8",
+    );
+    const decisionSuccessStart = card.indexOf(
+      "const response = await createEvidenceDecision",
+    );
+    const decisionSuccessEnd = card.indexOf(
+      "} catch",
+      decisionSuccessStart,
+    );
+    const decisionSuccess = card.slice(
+      decisionSuccessStart,
+      decisionSuccessEnd,
+    );
+    const saveActionStart = chat.indexOf(
+      "const handleSaveStrategyAction = async",
+    );
+    const saveActionEnd = chat.indexOf(
+      "const handleLogout = async",
+      saveActionStart,
+    );
+    const saveAction = chat.slice(saveActionStart, saveActionEnd);
+    const savedStrategyStart = saveAction.indexOf("if (savedStrategyId)");
+    const savedStrategyEnd = saveAction.indexOf(
+      "} else if",
+      savedStrategyStart,
+    );
+    const savedStrategySuccess = saveAction.slice(
+      savedStrategyStart,
+      savedStrategyEnd,
+    );
+
+    expect(decisionSuccessStart).toBeGreaterThan(-1);
+    expect(decisionSuccessEnd).toBeGreaterThan(decisionSuccessStart);
+    expect(decisionSuccess).toContain(
+      "setSavedDecisionState(response.decision.decision_state)",
+    );
+    expect(decisionSuccess).toContain("onDecisionSaved?.()");
+    expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
+      decisionSuccess.indexOf("onDecisionSaved?.()"),
+    );
+    expect(message).toContain("onDecisionSaved?: () => void");
+    expect(message).toContain("onDecisionSaved={onDecisionSaved}");
+    expect(chat).toContain("onDecisionSaved={() =>");
+    expect(savedStrategySuccess).toContain("invalidateTranscriptForMutation(");
+    expect(savedStrategySuccess).toContain("targetConversationId");
+    expect(savedStrategySuccess).toContain('"durable_result_action"');
+    expect(cache).toContain('| "durable_result_action"');
+  });
+
 });

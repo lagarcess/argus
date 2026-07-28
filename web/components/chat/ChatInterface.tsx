@@ -1838,6 +1838,7 @@ export default function ChatInterface() {
                   savedStrategyId,
                 ),
               );
+              invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
               showToast(t("chat.saved"));
             } else if (event.data.assistant_response) {
               showToast(event.data.assistant_response);
@@ -2486,6 +2487,7 @@ export default function ChatInterface() {
                           isGuest={isGuest}
                           canSaveDecision={canSaveDecision}
                           onDecisionUnavailable={requestGuestDecision}
+                          onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
                           onRequestSearchUpgrade={requestGuestSearchUpgrade}
                           resumeDecisionArtifactId={
                             msg.id === resumeDecisionMessageId
