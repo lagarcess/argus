@@ -1,6 +1,6 @@
 # Discovery continuity and cheap verified rows
 
-Status: ready to build
+Status: PR A landed via #295 at `8f17a45e`; PR B and promotion remain
 Parent branch: `codex/private-alpha-next`
 Supersedes the open work in `2026-07-27-guest-grounded-discovery-quota.md` §9
 and §12, and carries in Slice B from
@@ -971,13 +971,14 @@ a violation, so update the issue text in the same PR.
 
 ### 14.3 Closure checklist for #244
 
-Everything except the last line is inside this spec.
+PR #295 completed PR A (items 1–6 and 9). PR B owns items 7–8.
 
-- [ ] Items 1–9 landed (§3–§11)
-- [ ] Both-language journeys proven live, J1 and J2 (§11.4) — closes acceptance 9
-- [ ] J2 post-result carry-forward watched, not assumed (§11.5)
-- [ ] Real-PostgreSQL proof for anything touching a counter (§12.1)
-- [ ] #244 text reconciled with the cheap path (§14.2)
+- [x] PR A items 1–6 and 9 landed (§3–§11) through PR #295
+- [ ] PR B items 7–8: honest live progress plus Guest identity/lifetime
+- [x] Both-language journeys proven live, J1 and J2 (§11.4) — closes acceptance 9
+- [x] J2 post-result carry-forward watched, not assumed (§11.5)
+- [x] Real-PostgreSQL proof for anything touching a counter (§12.1)
+- [x] #244 text reconciled with the cheap path (§14.2)
 - [ ] **Promotion — founder, out of scope here (§14.1)**
 
 ---

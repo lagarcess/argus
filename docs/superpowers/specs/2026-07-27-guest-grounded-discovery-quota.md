@@ -1,6 +1,9 @@
 # Guest Grounded Discovery: Meter the Cost, Gate the Value
 
-**Status:** FOUNDER-DIRECTED — direction approved 2026-07-27; implementation not started.
+**Status:** HISTORICAL FINDINGS — superseded by
+`2026-07-27-discovery-continuity-and-cheap-verified-rows.md`; the visitor/global
+allowance landed in PR #291 and the cheap verified/Search-exception pass landed
+in PR #295.
 **Owning issue:** [#244](https://github.com/lagarcess/argus/issues/244), consuming the guest surface from #279.
 **Scope class:** Small backend slice. One allowance row, one identity key, one spend ceiling, two truth fixes. No new mechanism.
 **Base:** `codex/private-alpha-next` at `ea2b3f35` or later.

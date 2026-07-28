@@ -332,6 +332,13 @@ Do not reopen these as debt unless a new bug is reproduced:
   `visitor_usage_counters` migration is integrated but still requires
   application to each hosted target during promotion. Issue #244 remains open
   for the broader discovery activation and accepted follow-up register.
+- Discovery continuity PR #295 is integrated at `8f17a45e`. Resolver-verified
+  candidate rows are now the default path; paid Search is reserved for
+  explicit requests or current-fact needs. Typed retry and fair charging,
+  async provider offload, incomplete-rule copy, and EN/es-419 J1/J2 continuity
+  are proven. This is the completed first pass, not promotion: honest live
+  progress plus Guest identity/lifetime remain in the second pass, and the
+  hosted migration/configuration/canary gates remain open.
 
 ## P0 Reintegration Checkpoint
 
@@ -349,10 +356,11 @@ The clean reintegration strategy is now part of the process model:
 Codex should own or closely supervise this:
 
 1. **Finish the remaining interim product outcome and activation gates**
-   - Grounded discovery has landed at `c212107a` and now defaults on. Do not
-     duplicate its implementation. Keep #244 open for the accepted
-     comparison-routing limitation, Render configuration, and the exact-SHA
-     canary gate.
+   - Grounded discovery now includes the PR #295 continuity pass at
+     `8f17a45e`. Do not rebuild the cheap verified rows or Search-exception
+     policy. The next discovery implementation is the second pass: honest live
+     progress plus Guest identity/lifetime. Keep #244 open through that pass
+     and the hosted migration, Render configuration, and exact-SHA canary.
    - Full Omnisearch may now build against the accepted grounded-discovery
      contract. Its owner must reconcile onto this checkpoint and must not
      invent discovery truth or implicitly activate Search.

@@ -23,7 +23,7 @@ that Argus remembers, compares, and stays honest about staleness.
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#291 at `f1e65dde`; new work must branch from the current remote
+#295 at `8f17a45e`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -48,8 +48,12 @@ genuinely absent facts still receive one targeted clarification. This
 checkpoint also contains PR #289's structural OpenAPI compatibility gate, PR
 #290's request-size and correlated RFC 9457 failure boundary, and PR #291's
 visitor-owned Guest discovery allowance plus global daily attempted-search
-ceiling. The PR #291 migration remains a later hosted promotion operation; its
-internal integration merge did not deploy or expose Guest traffic. This
+ceiling. PR #295 then made resolver-verified candidate rows the default
+discovery path and reserved paid Search for explicit requests or current-fact
+needs, with typed retry, fair charging, async provider offload, and live
+EN/es-419 continuity proof. The PR #291 migration remains a later hosted
+promotion operation; these internal integration merges did not deploy or
+expose Guest traffic. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -952,8 +956,14 @@ in a sources panel without re-querying. PR #287 then landed Slice D as
 normal mention channel, durable Retry preserves it, and candidate validation
 rejects unrelated ticker collisions. The chosen-state marker was cut, and
 broader assumption carry-forward remains general interpreter work rather than
-discovery debt. Honest live progress (Slice B) and guest discovery allowance
-remain. Full Omnisearch is the remaining unbuilt founder outcome.
+discovery debt. PR #291 then landed the visitor-owned Guest allowance at
+`f1e65dde`. PR #295 landed as `8f17a45e` and completed the first continuity
+pass: resolver-verified candidate rows are the cheap default, Search is the
+explicit/current-facts exception, failure and charging remain typed, provider
+work is offloaded, and J1/J2 continuity passed live in English and Spanish.
+Honest live progress plus Guest identity/lifetime remain in the second pass,
+and promotion remains a separate gate. Full Omnisearch is the remaining
+unbuilt founder outcome.
 
 Integration-verification checkpoint (2026-07-27): PR #282 landed as
 `059f8e82` and made the ordinary backend test environment provider-free by
