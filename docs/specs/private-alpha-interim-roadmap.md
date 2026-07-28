@@ -6,7 +6,7 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-28
 
-Latest integrated product checkpoint: PR #298 at `ba0aa2f6`. Later commits may
+Latest integrated product checkpoint: PR #299 at `f368febb`. Later commits may
 reconcile roadmap and issue state without changing product behavior. New work
 must branch from the current remote integration head rather than pinning this
 product SHA.
@@ -42,10 +42,9 @@ discovery selection and validation path. PR #285 then landed bounded Postgres
 pagination and search at `7b7920bb` for Conversations, Messages, History, and
 Omnisearch/Idea Ledger without changing public cursor, ranking, ownership, or
 artifact contracts. Issue #232 is complete. Its accepted sparse/deep/final
-History Run scan exception remains an explicit private-alpha boundary; #252
-continues to own client hydration, caching, and rendering. PR #288 then landed
-canonical fact-preserving recovery at `9f3453a3`: stale or failed actions
-restore the latest usable artifact anchor, already-owned facts are not
+History Run scan exception remains an explicit private-alpha boundary. PR #288
+then landed canonical fact-preserving recovery at `9f3453a3`: stale or failed
+actions restore the latest usable artifact anchor, already-owned facts are not
 re-requested, genuinely absent facts receive one targeted clarification, and
 prior results remain immutable without duplicate compute.
 PR #298 later completed the Grounded Discovery/Guest second pass at `ba0aa2f6`:
@@ -54,6 +53,13 @@ verification progress are truthful runtime events, and each discovery row owns
 its citation action. Issue #293 closed with no-defect evidence after a real
 guest session crossed the one-hour JWT boundary without losing its conversation
 or workspace.
+PR #299 then completed issue #252 as `f368febb`: conversation selection and URL
+identity update immediately, fresh and stale transcripts render from the
+bounded browser-session cache, cold misses use one delayed truthful retrieval
+surface, retired requests cannot overwrite the newest destination, and
+destination-owned Retry, scroll, auth clearing, localization, and accessibility
+survive the exact-head browser matrix. No durable browser storage, prefetch,
+virtualization, backend contract, or provider path was added.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
