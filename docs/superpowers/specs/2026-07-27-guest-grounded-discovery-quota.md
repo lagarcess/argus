@@ -270,6 +270,12 @@ wrong candidate.
 - **Guest expiry is fixed at 10 minutes from creation, not sliding.** A guest
   reading a backtest result can lose the workspace mid-thought. Guest-lane
   territory.
+
+  > **Corrected 2026-07-27: wrong object.** The workspace lives **7 days**, set
+  > by a database constraint and trigger
+  > (`20260724101324_add_guest_workspaces.sql:76,104`). The 10 minutes belongs to
+  > the handoff token (`20260724211312_guest_workspace_handoffs.sql:86`). See
+  > `2026-07-27-discovery-continuity-and-cheap-verified-rows.md` §10.1.
 - **`discovery_allowance_available` fails closed into
   `discovery_limit_reached`**, telling a user they are out of searches when the
   counter merely could not be read. Pre-existing; recorded on #244.
@@ -314,6 +320,11 @@ issue states a cause rather than a symptom.
 
 ### 12.1 Identity fix appears absent on the guest path — HIGHEST PRIORITY
 
+> **Root cause corrected 2026-07-27.** The title below is wrong. Identity
+> arrived fine — the trailing "for WMT" proves the asset resolved. The cause is
+> the incomplete-rule copy path in `clarification_contract.py:210`. See
+> `2026-07-27-discovery-continuity-and-cheap-verified-rows.md` §5.
+
 Tapping a discovery candidate as a guest answered *"Argus can't run Backtest WMT
 directly yet for WMT"* — the chip text read as a strategy name. That is the
 **exact defect Slice D fixed** and merged as `ea2b3f35`, verified at the time
@@ -351,6 +362,11 @@ either. **Needs the provider's billing policy for errored requests**, then the
 typed failure reason can decide whether to charge.
 
 ### 12.5 A retryable failure offers no way to retry
+
+> **Root cause corrected 2026-07-27.** The retry rail exists end to end. The gap
+> is only that the discovery failure never attaches `metadata.retry_last_turn`,
+> which is what the frontend renders from. See
+> `2026-07-27-discovery-continuity-and-cheap-verified-rows.md` §4.
 
 `discovery_search_failed` carries `retryable=True`, and nothing renders for it —
 the user must retype the question. The signal already exists; the affordance
