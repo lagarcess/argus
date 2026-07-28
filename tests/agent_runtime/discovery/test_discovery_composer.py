@@ -321,6 +321,50 @@ class TestFlagOnPipeline:
         assert provider.calls == []
 
 
+class TestRetryAffordance:
+    """Spec §4: retryable=True must render an affordance, not just persist a
+    flag. The frontend retry rail reads metadata.retry_last_turn."""
+
+    @pytest.mark.asyncio()
+    async def test_retryable_failure_carries_retry_last_turn(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision())
+        assert result.patch["retry_last_turn"] == {
+            "message": "What cybersecurity stocks could I test?"
+        }
+
+    @pytest.mark.asyncio()
+    async def test_voiced_retryable_failure_also_carries_retry_last_turn(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+
+        async def _voiced_recovery(**kwargs: Any) -> str | None:
+            return "I could not reach current sources just now; ask again soon."
+
+        flag_on.setattr(composer_module, "_voiced_discovery_recovery", _voiced_recovery)
+        result = await _run(_decision())
+        assert result.patch["retry_last_turn"] == {
+            "message": "What cybersecurity stocks could I test?"
+        }
+
+    @pytest.mark.asyncio()
+    async def test_non_retryable_recoveries_offer_no_retry(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction(), known_assets={})
+        no_verified = await _run(_decision())
+        assert "retry_last_turn" not in no_verified.patch
+
+        limited = await _run(_decision(), allowance=False)
+        assert "retry_last_turn" not in limited.patch
+
+
 class TestVoicedRecoveryMetadata:
     @pytest.mark.asyncio()
     async def test_voiced_recovery_keeps_typed_code_with_llm_generated_source(

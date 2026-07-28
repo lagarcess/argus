@@ -258,11 +258,18 @@ def record_discovery_search_evidence(
 
     if not isinstance(usage, dict) or usage.get("search_attempted") is not True:
         return
-    _charge_discovery_attempt(
-        user_id=user_id,
-        is_guest=is_guest,
-        client_identity=client_identity,
-    )
+    # Two bounds, two rules. The global ceiling counts every attempt because it
+    # bounds provider spend and a failed call can still be billed. The user's
+    # allowance is charged only for a usable result: a timeout, HTTP error, or
+    # extraction/voicing failure is our outage, not the user's spend -- at a
+    # guest allowance of two, one provider blip must not cost half of it.
+    _charge_global_ceiling()
+    if usage.get("fallback_code") is None:
+        _charge_discovery_attempt(
+            user_id=user_id,
+            is_guest=is_guest,
+            client_identity=client_identity,
+        )
     _append_research_ledger_row(
         usage=usage,
         user_id=user_id,
@@ -278,9 +285,8 @@ def _charge_discovery_attempt(
     is_guest: bool = False,
     client_identity: str | None = None,
 ) -> None:
-    # Charge both bounds the read consulted, or the ceiling never advances and
-    # the per-subject allowance would be the only real limit.
-    _charge_global_ceiling()
+    # The per-subject allowance only; the global ceiling is charged by the
+    # caller on every attempt, usable or not.
     subject = discovery_counter_subject(
         user_id=user_id, is_guest=is_guest, client_identity=client_identity
     )

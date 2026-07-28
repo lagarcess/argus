@@ -127,6 +127,67 @@ class TestGlobalCeiling:
         assert "203.0.113.7" not in seen[0]
 
 
+class TestChargeRule:
+    """Spec §4.3: two bounds, two rules. The global ceiling counts every
+    attempt because failed provider calls can still be billed; the user's
+    allowance is charged only for a usable result."""
+
+    def _record(
+        self, monkeypatch: pytest.MonkeyPatch, usage: dict
+    ) -> tuple[list[str], list[str]]:
+        ceiling_calls: list[str] = []
+        subject_calls: list[str] = []
+        monkeypatch.setattr(
+            discovery_evidence,
+            "_charge_global_ceiling",
+            lambda: ceiling_calls.append("ceiling"),
+        )
+        monkeypatch.setattr(
+            discovery_evidence,
+            "_charge_discovery_attempt",
+            lambda **kwargs: subject_calls.append(kwargs["user_id"]),
+        )
+        monkeypatch.setattr(
+            discovery_evidence,
+            "_append_research_ledger_row",
+            lambda **kwargs: None,
+        )
+        discovery_evidence.record_discovery_search_evidence(
+            usage=usage,
+            user_id="user-1",
+            conversation_id=None,
+            message_id=None,
+            request_id=None,
+        )
+        return ceiling_calls, subject_calls
+
+    def test_a_usable_result_charges_both_bounds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ceiling, subject = self._record(
+            monkeypatch, {"search_attempted": True, "result_count": 5}
+        )
+        assert ceiling == ["ceiling"]
+        assert subject == ["user-1"]
+
+    def test_a_failed_attempt_charges_the_ceiling_but_not_the_user(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ceiling, subject = self._record(
+            monkeypatch,
+            {"search_attempted": True, "fallback_code": "search_timeout"},
+        )
+        assert ceiling == ["ceiling"]
+        assert subject == []
+
+    def test_no_attempt_charges_nothing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ceiling, subject = self._record(monkeypatch, {"search_attempted": False})
+        assert ceiling == []
+        assert subject == []
+
+
 class TestCeilingIsConfigurable:
     def test_the_ceiling_can_be_reset_without_a_deploy(
         self, monkeypatch: pytest.MonkeyPatch

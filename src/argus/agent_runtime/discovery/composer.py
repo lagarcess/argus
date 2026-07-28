@@ -14,6 +14,7 @@ from argus.agent_runtime.discovery.validation import validated_candidates
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
     recovery_message,
+    retry_last_turn_stage_patch,
 )
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.stages.interpret_types import (
@@ -263,6 +264,12 @@ async def _recovery_result(
             "retryable": retryable,
             "prompt_source": "llm_generated",
         }
+    if retryable:
+        # retryable=True must render an affordance, not just persist a flag:
+        # the frontend retry rail reads metadata.retry_last_turn.
+        retry_last_turn = retry_last_turn_stage_patch(current_user_message)
+        if retry_last_turn is not None:
+            stage_patch.update(retry_last_turn)
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(
