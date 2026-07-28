@@ -1559,8 +1559,9 @@ server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
 (`can_search_current_workspace`) from broader Grounded Discovery
-(`can_use_grounded_discovery`). `can_use_omnisearch` may remain true for the
-former while the latter is false.
+(`can_use_grounded_discovery`). Both guest and registered accounts report the
+latter as true. Guest discovery is metered separately at two searches per
+visitor per day; capability truth does not imply remaining allowance.
 
 All guest mutation failures use the existing Problem Details, request-ID,
 same-origin, secure-cookie, and idempotency conventions.
@@ -3027,9 +3028,10 @@ For guests, this endpoint is current-workspace search, not Grounded Discovery:
 results are restricted to the one owned temporary conversation and its
 conversation-linked chat, run/backtest, Idea, EvidenceArtifact, and Decision
 records. Strategy and Collection destinations, ledger groups, other owners,
-and provider/model/runtime metadata are excluded. The client uses
-`can_use_grounded_discovery=false` to render one honest unavailable state for
-the broader pillar while keeping current-workspace search functional.
+and provider/model/runtime metadata are excluded. Grounded Discovery remains a
+separate chat capability and reports `can_use_grounded_discovery=true` for both
+account classes; its backend allowance and typed limit recovery do not alter
+the `/search` contract.
 
 **Query Params:**
 - `q`

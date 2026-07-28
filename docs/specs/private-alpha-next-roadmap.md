@@ -23,7 +23,7 @@ that Argus remembers, compares, and stays honest about staleness.
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#288 at `9f3453a3`; new work must branch from the current remote
+#291 at `f1e65dde`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -45,6 +45,11 @@ deferred scale architecture rather than unfinished #232 work. PR #288 then
 completed fact-preserving recovery: stale or failed actions restore the latest
 usable canonical artifact anchor instead of rebuilding an empty idea, while
 genuinely absent facts still receive one targeted clarification. This
+checkpoint also contains PR #289's structural OpenAPI compatibility gate, PR
+#290's request-size and correlated RFC 9457 failure boundary, and PR #291's
+visitor-owned Guest discovery allowance plus global daily attempted-search
+ceiling. The PR #291 migration remains a later hosted promotion operation; its
+internal integration merge did not deploy or expose Guest traffic. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 

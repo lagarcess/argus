@@ -325,6 +325,13 @@ Do not reopen these as debt unless a new bug is reproduced:
   with one header/body/log request id. Rejection isolation, exact-boundary
   acceptance, canonical SSE stability, OpenAPI regeneration, and structural
   compatibility are directly tested. PR and post-merge CI passed.
+- Guest grounded-discovery metering is integrated from PR #291 at `f1e65dde`.
+  Guests receive two searches per visitor per day, renewing a temporary
+  workspace does not reset the allowance, and a configurable global daily
+  ceiling bounds total attempted Search spend. The additive
+  `visitor_usage_counters` migration is integrated but still requires
+  application to each hosted target during promotion. Issue #244 remains open
+  for the broader discovery activation and accepted follow-up register.
 
 ## P0 Reintegration Checkpoint
 
@@ -402,11 +409,14 @@ Migration order is fixed:
 13. `20260726002158_respect_permanent_conversation_ownership.sql`
 14. `20260726014754_isolate_poisoned_guest_orphans.sql`
 15. `20260726185021_harden_guest_lifecycle_ownership.sql`
+16. `20260727230000_add_visitor_usage_counters.sql`
 
 The earlier message-settlement and atomic-backtest-admission migrations remain
 prerequisites and must retain their existing order. Integration must reset a
 fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
-promotion.
+promotion. The final migration adds an opaque, visitor-owned daily discovery
+counter and global attempted-search bucket; it must be present before Guest
+grounded discovery is exposed.
 
 The conversion contract has two owners:
 
@@ -426,13 +436,15 @@ The server guest flag is the creation gate: disabling it stops new anonymous
 sessions while existing verified guests drain to conversion, fixed expiry, or
 transactional cleanup.
 
-Always Progresses, Grounded Discovery, modeled-cost preservation, and Guest are
-reconciled at the integration checkpoint. Before promotion to `main` or public
-traffic, complete `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`: branch-deployed
-exact-SHA canary, hosted anonymous Auth and server-validated Turnstile,
-trusted-origin/rate-limit verification, hard provider budget, scheduled cleanup
-ownership, first-traffic monitoring, release manifest, and founder
-traffic/cost approval.
+Always Progresses, Grounded Discovery, modeled-cost preservation, Guest, and
+visitor-owned Guest discovery metering are reconciled at the integration
+checkpoint. Before promotion to `main` or public traffic, apply migrations
+through `20260727230000`, configure
+`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`, and complete
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`: branch-deployed exact-SHA canary, hosted
+anonymous Auth and server-validated Turnstile, trusted-origin/rate-limit
+verification, hard provider budget, scheduled cleanup ownership, first-traffic
+monitoring, release manifest, and founder traffic/cost approval.
 
 ## Historical Evidence Retention
 

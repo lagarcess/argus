@@ -5,8 +5,10 @@ Status: deferred public-exposure gate
 Last reviewed: 2026-07-27
 
 Integration checkpoint: Guest implementation landed through PR #279 at
-`53e812e936f10cfa778bfce5ef7e5da54204fedd`. None of the unchecked items below
-was implied complete by that internal integration merge.
+`53e812e936f10cfa778bfce5ef7e5da54204fedd`; visitor-owned grounded-discovery
+metering landed through PR #291 at `f1e65ddeeb2ae1728a45182133e536c7c32030ca`.
+None of the unchecked items below was implied complete by either internal
+integration merge.
 
 This checklist applies when Argus is being prepared for an internet-facing
 Guest canary or production exposure. It is **not** a prerequisite for merging
@@ -27,17 +29,21 @@ remain separate decisions:
 experience, simplify the anonymous-identity promise, keep early monitoring
 manual, and automate only after real traffic establishes the need.
 
-**Why:** Guest allowances are attached to an anonymous Supabase Auth UUID, not
-to a provably unique human. Without a bot challenge and velocity controls, an
-automated client can repeatedly mint new UUIDs and receive fresh allowances.
-That creates a direct provider-cost, database-growth, and capacity risk when
-Argus opens to the public internet.
+**Why:** Most Guest allowances are attached to an anonymous Supabase Auth UUID,
+not to a provably unique human. Grounded discovery is the narrow exception: its
+two-search daily allowance is keyed to an opaque visitor digest and survives
+workspace renewal, while a global daily attempted-search ceiling bounds total
+discovery spend. Bot challenge, velocity controls, and a hard provider limit
+remain necessary because a determined caller can rotate network identity and
+because messages and simulations still reset with a new Guest UUID.
 
 **Disposition:**
 
 - Keep free Cloudflare Turnstile at anonymous Guest bootstrap.
 - Keep existing server-owned allowances, idempotency, RLS, expiry, cleanup,
   and global backpressure.
+- Keep visitor-owned discovery metering and configure its global attempted-
+  search ceiling.
 - Add a hard provider spending limit before public exposure.
 - Keep launch monitoring manual until traffic makes automation worthwhile.
 - Defer human deduplication, device fingerprinting, enterprise bot products,
@@ -103,6 +109,8 @@ message, refinement, feedback submission, or simulation.
 - Bounded request bodies and typed server-side capability enforcement.
 - Complete-graph cleanup with converted/permanent-account protection.
 - A hard provider-key spending limit for the public environment.
+- The visitor-owned discovery allowance, bounded retention, and global daily
+  attempted-search circuit breaker.
 - Guest presentation and server kill switches with the preserved auth landing.
 - Metadata-only monitoring for identity volume, usage, cost, capacity, and
   cleanup health.
@@ -158,6 +166,13 @@ boundary ineffective.
 
 ### 3. Budget and capacity fuse
 
+- [ ] Apply migrations through
+      `20260727230000_add_visitor_usage_counters.sql`.
+- [ ] Set and record `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`.
+- [ ] Confirm a renewed Guest workspace does not restore the visitor's two
+      daily grounded searches.
+- [ ] Confirm the global ceiling stops further discovery with zero provider
+      calls.
 - [ ] Use a dedicated provider key or public-environment key with a hard USD
       spending limit.
 - [ ] Record the maximum acceptable unattended daily loss: `$________`.

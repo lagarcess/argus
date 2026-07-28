@@ -1055,13 +1055,16 @@ Tracks resource consumption for quotas and limits.
 - **Period**: `hour`, `day`, `guest_session`
 
 ### Discovery Search Accounting
-- `discovery_searches` counts grounded-discovery Search attempts (10/hour,
-  25/day defaults from `ARGUS_DISCOVERY_HOURLY_LIMIT` /
-  `ARGUS_DISCOVERY_DAILY_LIMIT`). Availability is read before the turn runs;
-  the charge settles best-effort after the terminal assistant message commits,
-  only when a Search call was actually attempted. This is an operational abuse
-  guard with truthful attempt accounting, not billing truth; failed settlement
-  never breaks the user turn.
+- For registered accounts, `discovery_searches` counts grounded-discovery
+  Search attempts in `usage_counters` (10/hour, 25/day defaults from
+  `ARGUS_DISCOVERY_HOURLY_LIMIT` / `ARGUS_DISCOVERY_DAILY_LIMIT`).
+- Guest discovery uses `visitor_usage_counters` instead. A guest workspace
+  receives a fresh `user_id` when renewed, so an account-owned counter would
+  incorrectly reset the allowance.
+- Availability is read before the turn runs; the charge settles best-effort
+  after the terminal assistant message commits, only when a Search call was
+  actually attempted. This is an operational abuse guard with truthful attempt
+  accounting, not billing truth; failed settlement never breaks the user turn.
 
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
@@ -1070,6 +1073,45 @@ Tracks resource consumption for quotas and limits.
   assistant terminals, one unique simulation admission, and five feedback
   submissions over the identity lifetime.
 - Registered users continue to use the existing UTC hour/day accounting.
+
+---
+
+## 14.1 visitor_usage_counters
+
+Tracks discovery allowances for callers who do not have a durable account.
+This is intentionally separate from `usage_counters`, whose `user_id` is a
+foreign key to `profiles.id`.
+
+### Fields
+- `visitor_key`: `text` (opaque keyed digest; never a raw address)
+- `resource`: `text` (`discovery_searches`)
+- `period`: `text` (`day`)
+- `period_start`: `timestamptz`
+- `period_end`: `timestamptz`
+- `used_count`: `integer` (Default: `0`)
+- `limit_count`: `integer`
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Constraints, access, and retention
+- **Primary key**:
+  `(visitor_key, resource, period, period_start)`
+- **Window lookup index**:
+  `(visitor_key, resource, period_end)`
+- RLS is enabled with no policies. Only `service_role` has table access and may
+  execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
+- Expired rows are disposable operational data and must be removed through the
+  bounded purge function.
+
+### Discovery policy
+- A guest receives two grounded searches per visitor per day. Renewing the
+  temporary workspace does not reset that allowance.
+- The same table holds the global attempted-search bucket. Its daily ceiling is
+  configured by `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING` and defaults to `500`
+  when the value is blank or invalid.
+- If counter truth cannot be read, admission currently fails closed into the
+  existing `discovery_limit_reached` recovery. Issue #244 retains that
+  user-facing truth limitation for follow-up.
 
 ---
 

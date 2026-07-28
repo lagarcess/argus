@@ -314,6 +314,7 @@ Product defaults:
 ARGUS_GUEST_ACCESS_ENABLED=true
 ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
 NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
+ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
 ```
 
 Guest access is part of the normal product shape. The two Guest flags are
@@ -327,10 +328,12 @@ Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
 `NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY` present in the web build, provider
 anonymous-sign-in limits, Argus origin enforcement and per-IP attempt limits,
-and no direct anonymous-role access to product tables. Without the public site
-key, non-loopback production preserves the auth landing rather than beginning
-an unusable Guest bootstrap. Do not mutate hosted Auth configuration as part
-of a code promotion.
+no direct anonymous-role access to product tables, migrations applied through
+`20260727230000_add_visitor_usage_counters.sql`, and a founder-approved
+`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`. Without the public site key,
+non-loopback production preserves the auth landing rather than beginning an
+unusable Guest bootstrap. Do not mutate hosted Auth configuration as part of a
+code promotion.
 
 Run guest cleanup first as a dry run:
 

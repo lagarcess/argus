@@ -157,8 +157,10 @@ identity. A **global daily cap on attempted discovery searches** can, and it is
 the only control that makes worst-case cost a number you chose rather than a
 number someone else picks.
 
-- Counted on the same `cost_ledger_entries` / usage machinery already recording
-  every attempted search.
+- Counted through the same discovery-attempt settlement boundary already
+  recording every attempted search. Registered identities remain in
+  `usage_counters`; visitor and global buckets use the dedicated
+  `visitor_usage_counters` table described in §4.2.
 - When exhausted, discovery returns the existing typed
   `discovery_limit_reached` recovery with **zero provider calls** — no new
   failure mode, no new copy.
@@ -173,7 +175,10 @@ number someone else picks.
   tier is another row.
 - **One counter, one settlement path, one recovery message** shared by both
   classes.
-- **No new table, no migration, no parallel guest code.**
+- **One narrow visitor counter, not a parallel quota system.**
+  `usage_counters.user_id` is UUID/FK-bound to `profiles`, so it cannot store a
+  visitor. The additive `visitor_usage_counters` table mirrors the same window
+  and settlement semantics with an opaque text subject and bounded retention.
 - **Backend-owned.** A frontend bypass obtains nothing.
 - **Two independent bounds.** Per-visitor shapes behavior; global caps cost.
   Neither depends on the other holding.
@@ -477,7 +482,8 @@ more now than it did at three.
 ## 13. Documentation
 
 - Grounded discovery design §1: already marked superseded; point it here.
-- `docs/DATA_MODEL.md`: `discovery_searches` resolves per account class, and the
-  guest counter keys on client identity.
+- `docs/DATA_MODEL.md`: `discovery_searches` resolves per account class, the
+  guest counter keys on client identity, and `visitor_usage_counters` owns
+  visitor/global windows and retention.
 - `docs/API_CONTRACT.md`: the capability's corrected value.
 - Issue #244 register: replace the guest line with this slice.
