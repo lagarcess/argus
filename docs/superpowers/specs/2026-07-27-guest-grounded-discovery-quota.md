@@ -298,7 +298,62 @@ wrong candidate.
 10. A candidate dropped for failing corroboration is described as one Argus
     could not confirm, never as one that is not tradable.
 
-## 12. Documentation
+## 12. Found during live guest QA (2026-07-27) — not fixed here
+
+Recorded from a real guest session against a local Supabase stack. None block
+this slice; all need their own investigation before issues are written, so the
+issue states a cause rather than a symptom.
+
+### 12.1 Identity fix appears absent on the guest path — HIGHEST PRIORITY
+
+Tapping a discovery candidate as a guest answered *"Argus can't run Backtest WMT
+directly yet for WMT"* — the chip text read as a strategy name. That is the
+**exact defect Slice D fixed** and merged as `ea2b3f35`, verified at the time
+going from that message to "What date window should I use for UNP?".
+
+So either the resolver identity is not reaching the interpreter on the guest
+path, or something guest-specific drops it. Guest and registered share one chat
+runtime, so a genuine second brain is unlikely — but this was not confirmed.
+**Investigate before filing:** does `discoveryCandidateMention` fire for a guest,
+does the mention survive to the request body, and does mention provenance
+survive guest admission?
+
+### 12.2 Confirmation card rendered on a discovery ask
+
+A discovery question returned a confirmation card alongside the candidate rows.
+Discovery still ran and still charged. Check whether this is already a
+registered open issue before opening another.
+
+### 12.3 The message allowance binds before the discovery allowance
+
+A guest gets 10 messages and 3 discovery searches. Each discovery ask plus its
+follow-ups consumes messages, so the founder hit `message_limit` before
+exhausting the searches. **The discovery allowance may be effectively
+unreachable**, which makes the number in §5 partly theoretical. Worth measuring
+against real guest sessions before tuning it.
+
+### 12.4 Failed searches are charged, and may cost us nothing
+
+`search_attempted` is set before the provider call and cleared only for
+`not_configured`, so timeouts, HTTP errors, and malformed responses all charge
+the allowance. A timeout or HTTP error was likely never billed by the provider;
+a malformed response probably was. The recorded `cost_usd` is a flat documented
+constant rather than a billed amount read back, so the ledger cannot settle it
+either. **Needs the provider's billing policy for errored requests**, then the
+typed failure reason can decide whether to charge.
+
+### 12.5 A retryable failure offers no way to retry
+
+`discovery_search_failed` carries `retryable=True`, and nothing renders for it —
+the user must retype the question. The signal already exists; the affordance
+does not. A retry should not consume an allowance, given 12.4.
+
+Together 12.4 and 12.5 are one story: a provider outage currently costs the
+guest a search *and* makes them retype. That is the founder's argument for why
+the allowance is 3 rather than 1 — a single search plus a flaky provider means a
+stranger's whole impression of Argus is "it is broken".
+
+## 13. Documentation
 
 - Grounded discovery design §1: already marked superseded; point it here.
 - `docs/DATA_MODEL.md`: `discovery_searches` resolves per account class, and the
