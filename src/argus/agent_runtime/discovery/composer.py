@@ -150,12 +150,16 @@ async def discovery_stage_result_if_applicable(
             usage=usage,
         )
     emit_substage("discovery_verify")
-    validated, unverified, uncorroborated = validated_candidates(
-        extraction,
-        packet=packet,
-        resolve=resolve_asset,
-        max_candidates=config.max_candidates,
-        asset_class_hint=request.asset_class_hint,
+    # Resolver lookups block like the provider search does: off the loop, or
+    # the verify line above cannot flush until validation already finished.
+    validated, unverified, uncorroborated = await asyncio.to_thread(
+        lambda: validated_candidates(
+            extraction,
+            packet=packet,
+            resolve=resolve_asset,
+            max_candidates=config.max_candidates,
+            asset_class_hint=request.asset_class_hint,
+        )
     )
     usage.update(
         extracted_count=len(extraction.candidates),
