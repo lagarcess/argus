@@ -1105,9 +1105,7 @@ def _response_from_stated_run_field_fidelity_audit(
             draft.date_range = date_range
             changed = True
     if audit.comparison_baseline:
-        # Keep the user's casing: supported symbols are canonicalized at
-        # validation, and an unsupported name is disclosed in their words.
-        baseline = str(audit.comparison_baseline).strip()
+        baseline = str(audit.comparison_baseline).strip().upper()
         if baseline:
             if draft.comparison_baseline != baseline:
                 draft.comparison_baseline = baseline
