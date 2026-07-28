@@ -1066,8 +1066,11 @@ export default function ChatInterface() {
       const canApplyOwnedUpdate = canApplyOwnedStreamUpdate();
       if (event.event === "stage_start") {
         if (!canApplyVisibleUpdate) return;
+        const stageKey = `chat.status.${event.data.stage}`;
+        const detail = event.data.detail;
         setStreamStatus(
-          t(`chat.status.${event.data.stage}`) || t("chat.status.preparing"),
+          (detail ? t(`${stageKey}_detail`, { detail }) || t(stageKey) : t(stageKey)) ||
+            t("chat.status.preparing"),
         );
       }
       if (event.event === "token") {

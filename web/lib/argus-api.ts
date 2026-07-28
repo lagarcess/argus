@@ -320,7 +320,7 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
-  | { event: "stage_start"; data: { stage: string } }
+  | { event: "stage_start"; data: { stage: string; detail?: string } }
   | { event: "stage_outcome"; data: { outcome: string } }
   | { event: "final"; data: ChatFinalPayload }
   | {
@@ -1135,7 +1135,12 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
   if (type === "stage_start") {
     return {
       event: "stage_start",
-      data: { stage: String(payload.stage ?? "") },
+      data: {
+        stage: String(payload.stage ?? ""),
+        ...(typeof payload.detail === "string" && payload.detail
+          ? { detail: payload.detail }
+          : {}),
+      },
     };
   }
   if (type === "stage_outcome") {

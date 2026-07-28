@@ -614,7 +614,10 @@
       "preparing": "Preparando resultados",
       "intent_run_backtest": "Diseñando tu estrategia...",
       "intent_education": "Pensando...",
-      "intent_unsupported_request": "Pensando..."
+      "intent_unsupported_request": "Pensando...",
+      "discovery_search": "Buscando en la web...",
+      "discovery_search_detail": "Buscando en la web — {{detail}}",
+      "discovery_verify": "Verificando candidatos en los mercados disponibles..."
     },
     "confirmation": {
       "asset_count": "{{count}} activos",

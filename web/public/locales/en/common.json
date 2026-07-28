@@ -614,7 +614,10 @@
       "preparing": "Preparing results",
       "intent_run_backtest": "Designing your strategy...",
       "intent_education": "Thinking...",
-      "intent_unsupported_request": "Thinking..."
+      "intent_unsupported_request": "Thinking...",
+      "discovery_search": "Searching the web...",
+      "discovery_search_detail": "Searching the web — {{detail}}",
+      "discovery_verify": "Verifying candidates against supported markets..."
     },
     "confirmation": {
       "asset_count": "{{count}} assets",
