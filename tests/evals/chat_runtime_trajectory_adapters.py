@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -15,11 +15,13 @@ from argus.agent_runtime.stages.interpret import (
 )
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.main import app
 from argus.domain import backtest_admission
+from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.store import utcnow
 from argus.llm.openrouter import (
     clear_openrouter_route_receipts,
@@ -68,6 +70,10 @@ class _TransportCut(BaseException):
 
 
 class _MemoryBacktestGateway:
+    def __init__(self) -> None:
+        self.route_receipts: list[dict[str, Any]] = []
+        self.cost_ledger_entries: list[dict[str, Any]] = []
+
     def get_or_create_mock_user(self):
         return api_state.store.get_or_create_dev_user()
 
@@ -182,6 +188,138 @@ class _MemoryBacktestGateway:
         job["execution_metadata"] = merged
         return dict(job)
 
+    def fetch_job(self, job_id: str) -> dict[str, Any] | None:
+        job = api_state.store.backtest_jobs.get(job_id)
+        return dict(job) if job is not None else None
+
+    def mark_backtest_job_running(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+        started_at: str | None = None,
+    ) -> dict[str, Any]:
+        job = self._owned_job(user_id=user_id, job_id=job_id)
+        job.update(
+            {
+                "status": "running",
+                "started_at": started_at,
+                "attempts": int(job.get("attempts") or 0) + 1,
+                "result_run_id": None,
+                "finished_at": None,
+                "failure_code": None,
+                "failure_detail": None,
+                "retryable": False,
+                "execution_metadata": dict(execution_metadata),
+            }
+        )
+        return dict(job)
+
+    def finalize_backtest_completion(self, *, finalization: Any) -> Any:
+        return MemoryBacktestFinalizationGateway(
+            api_state.store
+        ).finalize_backtest_completion(finalization=finalization)
+
+    def link_backtest_job_result(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        result_run_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+        mark_succeeded: bool = False,
+    ) -> dict[str, Any]:
+        job = self._owned_job(user_id=user_id, job_id=job_id)
+        if not mark_succeeded:
+            raise AssertionError(
+                "completed trajectory result must mark its job succeeded"
+            )
+        job.update(
+            {
+                "status": "succeeded",
+                "result_run_id": result_run_id,
+                "failure_code": None,
+                "failure_detail": None,
+                "retryable": False,
+                "finished_at": utcnow().isoformat(),
+                "execution_metadata": self._merged_execution_metadata(
+                    job,
+                    execution_metadata,
+                ),
+            }
+        )
+        return dict(job)
+
+    def mark_backtest_job_failed(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        failure_code: str,
+        failure_detail: str,
+        retryable: bool,
+        execution_metadata: dict[str, Any] | None = None,
+        finished_at: str | None = None,
+    ) -> dict[str, Any]:
+        job = self._owned_job(user_id=user_id, job_id=job_id)
+        job.update(
+            {
+                "status": "failed",
+                "failure_code": failure_code,
+                "failure_detail": failure_detail,
+                "retryable": retryable,
+                "finished_at": finished_at or utcnow().isoformat(),
+                "execution_metadata": self._merged_execution_metadata(
+                    job,
+                    execution_metadata,
+                ),
+            }
+        )
+        return dict(job)
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, Any],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        stored = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "run_id": run_id,
+            "message_id": message_id,
+            "metadata": dict(metadata or {}),
+            "receipt": dict(receipt),
+        }
+        self.route_receipts.append(stored)
+        return dict(stored)
+
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        stored = dict(entry)
+        self.cost_ledger_entries.append(stored)
+        return stored
+
+    @staticmethod
+    def _owned_job(*, user_id: str, job_id: str) -> dict[str, Any]:
+        job = api_state.store.backtest_jobs.get(job_id)
+        if job is None or job.get("user_id") != user_id:
+            raise AssertionError("trajectory worker received an unknown backtest job")
+        return job
+
+    @staticmethod
+    def _merged_execution_metadata(
+        job: dict[str, Any],
+        patch: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        merged = dict(job.get("execution_metadata") or {})
+        merged.update(patch or {})
+        return merged
+
 
 class _DeterministicDispatcher:
     def dispatch(self, *, job_id: str, nonce: str) -> dict[str, Any]:
@@ -270,6 +408,7 @@ class _DeterministicInterpreter:
                 date_range={"start": "2020-01-01", "end": "2026-01-01"},
                 capital_amount=500,
                 cadence="monthly",
+                strategy_type="dca_accumulation",
             )
         if "use nvda instead" in lowered:
             return _DeterministicInterpreter._buy_and_hold(
@@ -313,6 +452,7 @@ class _DeterministicInterpreter:
         date_range: str | dict[str, Any] = "last year",
         capital_amount: float = 10_000,
         cadence: str | None = None,
+        strategy_type: str = "buy_and_hold",
         task_relation: str = "new_task",
         semantic_turn_act: str = "new_idea",
     ) -> StructuredInterpretation:
@@ -324,7 +464,7 @@ class _DeterministicInterpreter:
             user_goal_summary=f"The user wants to test {symbol}.",
             candidate_strategy_draft=StrategySummary(
                 raw_user_phrasing=request.current_user_message,
-                strategy_type="buy_and_hold",
+                strategy_type=strategy_type,
                 strategy_thesis=f"Buy and hold {symbol}.",
                 asset_universe=[symbol],
                 asset_class=asset_class,
@@ -428,12 +568,25 @@ class ConcreteTrajectoryRuntime:
             ("equity", "Maplebear Inc.", "CART"),
         )
         synthetic_ohlcv = provider._synthetic_ohlcv
+        synthetic_fixtures: dict[str, Any] = {}
 
         def trajectory_market_data(**kwargs: Any):
-            frame = synthetic_ohlcv(**kwargs)
-            if str(kwargs.get("symbol") or "").upper() == "CART":
-                return frame.loc[frame.index >= "2021-01-04"]
-            return frame
+            symbol = str(kwargs.get("symbol") or "").upper()
+            fixture = synthetic_fixtures.get(symbol)
+            if fixture is None:
+                fixture = synthetic_ohlcv(
+                    symbol=symbol,
+                    start_date=date(2020, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    timeframe=str(kwargs["timeframe"]),
+                )
+                if symbol == "CART":
+                    fixture = fixture.loc[fixture.index >= "2021-01-04"]
+                synthetic_fixtures[symbol] = fixture
+            return fixture.loc[
+                (fixture.index >= str(kwargs["start_date"]))
+                & (fixture.index <= str(kwargs["end_date"]))
+            ].copy()
 
         self._monkeypatch.setattr(
             provider,
@@ -650,6 +803,13 @@ class ConcreteTrajectoryRuntime:
                     self._job_coverage(job),
                 )
             )
+            checkpoints["effective_window.completed_result_reloads"] = (
+                self._reloaded_result_matches_approval(
+                    state=state,
+                    confirmation_alias=confirmation_alias,
+                    reloaded_run=self._reloaded_backtest_run(job=job),
+                )
+            )
         action_alias = self._persisted_action_alias(
             state=state,
             artifact_alias=artifact_alias,
@@ -852,9 +1012,22 @@ class ConcreteTrajectoryRuntime:
                 coverage,
                 self._job_coverage(job),
             )
+            completed_result_durable = self._completed_result_matches_approval(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
             return StepObservation(
-                persistence_state=("requested_and_effective_window" if durable else None),
-                checkpoints={"effective_window.durable": durable},
+                persistence_state=(
+                    "requested_and_effective_window"
+                    if durable and completed_result_durable
+                    else None
+                ),
+                checkpoints={
+                    "effective_window.durable": durable,
+                    "effective_window.completed_result_durable": (
+                        completed_result_durable
+                    ),
+                },
             )
         if trajectory.label in {"alpha_session_05", "alpha_session_06"}:
             execution_count = self._execution_count(state=state)
@@ -1010,11 +1183,29 @@ class ConcreteTrajectoryRuntime:
                 state=state,
                 confirmation_alias=alias,
             )
+            completion = self._complete_effective_window_job(job=job)
+            job = self._job_for_confirmation(
+                state=state,
+                confirmation_alias=alias,
+            )
             checkpoints["effective_window.execution_matches_approval"] = (
                 self._provider_adjusted_window(approval_coverage)
                 and self._same_coverage(
                     approval_coverage,
                     self._job_coverage(job),
+                )
+            )
+            checkpoints["effective_window.completed_result_matches_approval"] = (
+                completion.get("status") == "succeeded"
+                and self._completed_result_matches_approval(
+                    state=state,
+                    confirmation_alias=alias,
+                )
+            )
+            checkpoints["effective_window.result_surfaces_complete"] = (
+                self._completed_result_surfaces_are_canonical(
+                    state=state,
+                    confirmation_alias=alias,
                 )
             )
         elif trajectory.label == "alpha_session_05":
@@ -1584,6 +1775,10 @@ class ConcreteTrajectoryRuntime:
             and cls._provider_adjusted_window(right)
             and left is not None
             and right is not None
+            and isinstance(left.get("preflight_id"), str)
+            and left["preflight_id"]
+            and isinstance(right.get("preflight_id"), str)
+            and right["preflight_id"]
         ):
             return False
         return all(
@@ -1593,6 +1788,7 @@ class ConcreteTrajectoryRuntime:
                 "effective_date_range",
                 "outcome",
                 "adjustment_reason",
+                "preflight_id",
             )
         )
 
@@ -1645,6 +1841,235 @@ class ConcreteTrajectoryRuntime:
             return None
         coverage = request.get("coverage_preflight")
         return coverage if isinstance(coverage, dict) else None
+
+    def _complete_effective_window_job(
+        self,
+        *,
+        job: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        raw_job_id = job.get("id") if isinstance(job, dict) else None
+        if not isinstance(raw_job_id, str) or not raw_job_id:
+            return {}
+        from workflows.backtest_job import run_backtest_job
+
+        with self._monkeypatch.context() as completion_env:
+            completion_env.setenv("OPENROUTER_API_KEY", "")
+            result = run_backtest_job(
+                self._backtest_gateway,
+                job_id=raw_job_id,
+                backtest_tool=RealBacktestTool(),
+            )
+        return result
+
+    @classmethod
+    def _completed_result_matches_approval(
+        cls,
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+    ) -> bool:
+        approval_coverage = cls._confirmation_coverage(
+            state=state,
+            confirmation_alias=confirmation_alias,
+        )
+        job = cls._job_for_confirmation(
+            state=state,
+            confirmation_alias=confirmation_alias,
+        )
+        run = cls._run_for_job(job)
+        return bool(
+            isinstance(job, dict)
+            and job.get("status") == "succeeded"
+            and isinstance(job.get("result_run_id"), str)
+            and cls._run_value(run, "id") == job.get("result_run_id")
+            and cls._same_executed_coverage(
+                approval_coverage,
+                cls._run_coverage(run),
+            )
+        )
+
+    @classmethod
+    def _completed_result_surfaces_are_canonical(
+        cls,
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+    ) -> bool:
+        job = cls._job_for_confirmation(
+            state=state,
+            confirmation_alias=confirmation_alias,
+        )
+        run = cls._run_for_job(job)
+        run_id = cls._run_value(run, "id")
+        evidence = [
+            artifact
+            for artifact in api_state.store.evidence_artifacts.values()
+            if artifact.source_run_id == run_id
+        ]
+        return bool(
+            cls._completed_result_matches_approval(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            and cls._has_result_surfaces(run)
+            and cls._has_deterministic_result_readout(job)
+            and isinstance(run_id, str)
+            and len(evidence) == 1
+            and cls._evidence_matches_run(evidence[0], run=run)
+        )
+
+    def _reloaded_backtest_run(
+        self, *, job: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        raw_run_id = job.get("result_run_id") if isinstance(job, dict) else None
+        if not isinstance(raw_run_id, str) or not raw_run_id:
+            return None
+        response = self._http.get(f"/api/v1/backtests/{raw_run_id}")
+        if response.status_code != 200:
+            return None
+        payload = response.json()
+        run = payload.get("run")
+        return run if isinstance(run, dict) else None
+
+    @classmethod
+    def _reloaded_result_matches_approval(
+        cls,
+        *,
+        state: _TrajectoryState,
+        confirmation_alias: str | None,
+        reloaded_run: dict[str, Any] | None,
+    ) -> bool:
+        job = cls._job_for_confirmation(
+            state=state,
+            confirmation_alias=confirmation_alias,
+        )
+        durable_run = cls._run_for_job(job)
+        return bool(
+            cls._completed_result_surfaces_are_canonical(
+                state=state,
+                confirmation_alias=confirmation_alias,
+            )
+            and cls._has_result_surfaces(reloaded_run)
+            and cls._run_value(reloaded_run, "id") == cls._run_value(durable_run, "id")
+            and all(
+                cls._run_value(reloaded_run, field) == cls._run_value(durable_run, field)
+                for field in (
+                    "status",
+                    "metrics",
+                    "config_snapshot",
+                    "conversation_result_card",
+                    "chart",
+                )
+            )
+        )
+
+    @staticmethod
+    def _run_for_job(job: dict[str, Any] | None) -> object | None:
+        raw_run_id = job.get("result_run_id") if isinstance(job, dict) else None
+        return (
+            api_state.store.backtest_runs.get(raw_run_id)
+            if isinstance(raw_run_id, str)
+            else None
+        )
+
+    @staticmethod
+    def _run_value(run: object | None, field: str) -> Any:
+        if isinstance(run, dict):
+            return run.get(field)
+        return getattr(run, field, None)
+
+    @classmethod
+    def _run_coverage(cls, run: object | None) -> dict[str, Any] | None:
+        config = cls._run_value(run, "config_snapshot")
+        coverage = config.get("data_coverage") if isinstance(config, dict) else None
+        return coverage if isinstance(coverage, dict) else None
+
+    @classmethod
+    def _same_executed_coverage(
+        cls,
+        approval: dict[str, Any] | None,
+        executed: dict[str, Any] | None,
+    ) -> bool:
+        preflight_id = (
+            approval.get("preflight_id") if isinstance(approval, dict) else None
+        )
+        dataset_id = executed.get("dataset_id") if isinstance(executed, dict) else None
+        return bool(
+            isinstance(preflight_id, str)
+            and preflight_id
+            and isinstance(dataset_id, str)
+            and dataset_id
+            and cls._provider_adjusted_window(approval)
+            and cls._provider_adjusted_window(executed)
+            and preflight_id == dataset_id
+            and all(
+                approval.get(key) == executed.get(key)
+                for key in (
+                    "requested_date_range",
+                    "effective_date_range",
+                    "outcome",
+                    "adjustment_reason",
+                )
+            )
+        )
+
+    @classmethod
+    def _has_result_surfaces(cls, run: object | None) -> bool:
+        metrics = cls._run_value(run, "metrics")
+        chart = cls._run_value(run, "chart")
+        card = cls._run_value(run, "conversation_result_card")
+        return bool(
+            cls._run_value(run, "status") == "completed"
+            and isinstance(metrics, dict)
+            and isinstance(metrics.get("aggregate"), dict)
+            and isinstance(chart, dict)
+            and isinstance(chart.get("series"), list)
+            and chart["series"]
+            and isinstance(card, dict)
+            and isinstance(card.get("title"), str)
+            and card["title"].strip()
+            and isinstance(card.get("status_label"), str)
+            and card["status_label"].strip()
+            and isinstance(card.get("rows"), list)
+            and card["rows"]
+        )
+
+    @staticmethod
+    def _has_deterministic_result_readout(job: dict[str, Any] | None) -> bool:
+        metadata = job.get("execution_metadata") if isinstance(job, dict) else None
+        workflow = (
+            metadata.get("workflow_backtest") if isinstance(metadata, dict) else None
+        )
+        result_readout = (
+            workflow.get("result_readout") if isinstance(workflow, dict) else None
+        )
+        return bool(
+            isinstance(result_readout, str)
+            and result_readout.strip()
+            and workflow.get("result_readout_source") == "deterministic_fallback"
+            and workflow.get("result_readout_fallback_used") is True
+        )
+
+    @classmethod
+    def _evidence_matches_run(cls, evidence: object, *, run: object | None) -> bool:
+        payload = getattr(evidence, "payload", None)
+        card = cls._run_value(run, "conversation_result_card")
+        chart = cls._run_value(run, "chart")
+        run_id = cls._run_value(run, "id")
+        if not (
+            getattr(evidence, "source_run_id", None) == run_id
+            and isinstance(payload, dict)
+            and isinstance(card, dict)
+            and isinstance(chart, dict)
+            and isinstance(payload.get("result_card"), dict)
+            and isinstance(payload.get("chart_summary"), dict)
+        ):
+            return False
+        return (
+            payload.get("metrics") == cls._run_value(run, "metrics")
+            and payload["result_card"].get("title") == card.get("title")
+            and payload["chart_summary"].get("points") == len(chart.get("series") or [])
+        )
 
     @classmethod
     def _projected_confirmation_coverage(

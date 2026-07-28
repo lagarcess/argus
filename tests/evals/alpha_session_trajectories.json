@@ -234,7 +234,11 @@
             "artifact_identity": "alpha_session_04:job:1",
             "action_identity": "alpha_session_04:confirmation:1",
             "typed_terminal": true,
-            "checkpoints": {"effective_window.execution_matches_approval": true}
+            "checkpoints": {
+              "effective_window.execution_matches_approval": true,
+              "effective_window.completed_result_matches_approval": true,
+              "effective_window.result_surfaces_complete": true
+            }
           }
         },
         {
@@ -242,7 +246,10 @@
           "request": {"scope": "requested_and_effective_window"},
           "expect": {
             "persistence_state": "requested_and_effective_window",
-            "checkpoints": {"effective_window.durable": true}
+            "checkpoints": {
+              "effective_window.durable": true,
+              "effective_window.completed_result_durable": true
+            }
           }
         },
         {
@@ -251,7 +258,10 @@
           "expect": {
             "reload_state": "alpha_session_04:job:1",
             "artifact_identity": "alpha_session_04:job:1",
-            "checkpoints": {"effective_window.reload_matches_approval": true}
+            "checkpoints": {
+              "effective_window.reload_matches_approval": true,
+              "effective_window.completed_result_reloads": true
+            }
           }
         }
       ]

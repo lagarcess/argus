@@ -136,6 +136,80 @@ def test_concrete_effective_window_requires_durable_coverage_provenance(
     assert observation.checkpoints["effective_window.durable"] is False
 
 
+def test_concrete_effective_window_rejects_mismatched_preflight_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#251")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        for step in trajectory.steps[:2]:
+            runtime.adapters.for_operation(step.operation)(
+                trajectory=trajectory,
+                step=step,
+                history=(),
+            )
+        state = runtime._state(trajectory)
+        job = runtime._job_for_confirmation(
+            state=state,
+            confirmation_alias="alpha_session_04:confirmation:1",
+        )
+        assert job is not None
+        job["launch_payload"]["request"]["coverage_preflight"]["preflight_id"] = (
+            "different-prepared-dataset"
+        )
+
+        observation = runtime.persistence(
+            trajectory=trajectory,
+            step=trajectory.steps[2],
+            history=(),
+        )
+
+    assert observation.persistence_state is None
+    assert observation.checkpoints["effective_window.durable"] is False
+
+
+def test_concrete_effective_window_completion_rejects_mismatched_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trajectory = _trajectory_for_issue("#251")
+    with ConcreteTrajectoryRuntime(monkeypatch=monkeypatch) as runtime:
+        runtime.stream(trajectory=trajectory, step=trajectory.steps[0], history=())
+        state = runtime._state(trajectory)
+        confirmation_alias = "alpha_session_04:confirmation:1"
+        raw_confirmation_id = state.raw_artifact_ids[confirmation_alias]
+        confirmation = next(
+            message
+            for message in api_state.store.messages[state.conversation_id]
+            if message.role == "assistant"
+            and message.metadata.get("confirmation_card", {}).get("confirmation_id")
+            == raw_confirmation_id
+        )
+        confirmation.metadata["confirmation_payload"]["launch_payload"][
+            "coverage_preflight"
+        ]["preflight_id"] = "different-prepared-dataset"
+
+        observation = runtime.action(
+            trajectory=trajectory,
+            step=trajectory.steps[1],
+            history=(),
+        )
+        job = runtime._job_for_confirmation(
+            state=state,
+            confirmation_alias=confirmation_alias,
+        )
+        assert job is not None
+        assert job["status"] == "failed"
+        assert job["failure_code"] == "approved_data_window_unavailable"
+        assert job["result_run_id"] is None
+        assert runtime._run_for_job(job) is None
+        assert api_state.store.evidence_artifacts == {}
+
+    assert (
+        observation.checkpoints["effective_window.completed_result_matches_approval"]
+        is False
+    )
+    assert observation.checkpoints["effective_window.result_surfaces_complete"] is False
+
+
 def test_concrete_reload_cannot_pass_from_cached_alias_when_persistence_is_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -790,8 +864,12 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
         "effective_window.source",
         "effective_window.visible_before_approval",
         "effective_window.execution_matches_approval",
+        "effective_window.completed_result_matches_approval",
+        "effective_window.result_surfaces_complete",
         "effective_window.durable",
+        "effective_window.completed_result_durable",
         "effective_window.reload_matches_approval",
+        "effective_window.completed_result_reloads",
     }
 
     orphan_reconciliation = _trajectory_for_issue("#240")
