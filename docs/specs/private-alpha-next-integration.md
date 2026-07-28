@@ -316,8 +316,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   the checked artifact is reproducibly generated, and CI enforces normalized
   public path/method, parameter, request/response schema, required-field, enum,
   exclusion, and server-prefix compatibility. Both PR and post-merge CI passed.
-  Issue #235 is now unblocked and must branch from the current remote
-  integration head.
+  PR #290 then landed the compatible request-size and correlated RFC 9457
+  failure boundary as `b073b1a0`; issue #235 is closed.
+- Chat request and correlated-failure ownership is complete at PR #290 /
+  `b073b1a0`. Declared and chunked bodies enforce the same early ingress
+  ceiling; typed field/list/depth/serialized-size limits fail before expensive
+  work; unexpected exceptions preserve CORS and return sanitized RFC 9457 JSON
+  with one header/body/log request id. Rejection isolation, exact-boundary
+  acceptance, canonical SSE stability, OpenAPI regeneration, and structural
+  compatibility are directly tested. PR and post-merge CI passed.
 
 ## P0 Reintegration Checkpoint
 
@@ -359,13 +366,7 @@ Codex should own or closely supervise this:
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
-3. **Advance the unblocked API-boundary lane**
-   - #234 landed through PR #289 at `8a66f0ba` and is closed.
-   - #235 may now implement the already-approved request-size and correlated
-     RFC 9457 failure boundary. Start from the current remote integration head;
-     do not reopen OpenAPI authority or expand its allowlist.
-
-4. **Evidence-aware idea loop source thesis**
+3. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring remain design/reference material until the
      active roadmap starts a bounded slice.

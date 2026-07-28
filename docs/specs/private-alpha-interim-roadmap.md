@@ -62,8 +62,9 @@ PR #289 then landed the structural OpenAPI compatibility gate as `8a66f0ba`.
 Generated FastAPI structure remains the machine-readable authority; the checked
 artifact is regenerated from that authority and CI compares normalized paths,
 methods, parameters, request/response schemas, required fields, and enums with
-only the three approved internal/dev exclusions. Issue #234 is closed. Issue
-#235 is now unblocked and must start from the current remote integration head.
+only the three approved internal/dev exclusions. Issue #234 is closed. PR #290
+then landed the approved request-size and correlated RFC 9457 failure boundary
+as `b073b1a0`; issue #235 is also closed.
 
 Frozen archaeological reference: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`. It is retained for exact historical
@@ -543,9 +544,25 @@ the completed user-visible Usage slice.
   enum drift, and overly broad exclusions.
 - The only excluded operations are the named health, readiness, and local-dev
   reset surfaces; the SSE response-body normalization remains narrowly scoped.
-- Both PR CI and post-merge integration CI passed. Issue #235's request-bound
-  and correlated-failure lane is now unblocked and starts from the current
-  remote integration head.
+- Both PR CI and post-merge integration CI passed. PR #290 subsequently landed
+  the compatible request and failure boundary without reopening this authority.
+
+### Chat request and correlated failure boundary (#235 — complete)
+
+- PR #290 landed as `b073b1a0` and closes issue #235.
+- Declared and streamed/chunked bodies above the approved ingress ceiling fail
+  with 413 before request dependencies or expensive work.
+- Typed field, list, nesting, and serialized-payload limits fail with the
+  approved 422 contract while exact-boundary valid requests remain accepted.
+- Rejection tripwires prove zero quota, persistence, gateway, provider,
+  interpreter, or runtime work on every bounded failure path.
+- Unexpected exceptions return sanitized RFC 9457 JSON with one correlation id
+  shared by the response header, response body, and server log; CORS remains
+  intact.
+- Canonical SSE and typed recovery behavior remain unchanged. The regenerated
+  OpenAPI artifact and #234 structural compatibility gate pass.
+- Both PR CI and post-merge integration CI passed. No paid eval, provider-backed
+  browser journey, schema migration, deployment, or hosted mutation was needed.
 
 ## Historical Planning Archive
 
