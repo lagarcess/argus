@@ -18,12 +18,12 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-27
+## Active Post-Promotion Pointer — 2026-07-28
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#295 at `8f17a45e`; new work must branch from the current remote
+#298 at `ba0aa2f6`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -51,9 +51,11 @@ visitor-owned Guest discovery allowance plus global daily attempted-search
 ceiling. PR #295 then made resolver-verified candidate rows the default
 discovery path and reserved paid Search for explicit requests or current-fact
 needs, with typed retry, fair charging, async provider offload, and live
-EN/es-419 continuity proof. The PR #291 migration remains a later hosted
-promotion operation; these internal integration merges did not deploy or
-expose Guest traffic. This
+EN/es-419 continuity proof. PR #298 then completed the second pass with
+visitor/day Guest message and simulation settlement, truthful Search and
+verification progress, and one source-owned citation action per discovery row.
+The PR #291 and PR #298 migrations remain later hosted promotion operations;
+these internal integration merges did not deploy or expose Guest traffic. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
 
@@ -968,9 +970,13 @@ discovery debt. PR #291 then landed the visitor-owned Guest allowance at
 pass: resolver-verified candidate rows are the cheap default, Search is the
 explicit/current-facts exception, failure and charging remain typed, provider
 work is offloaded, and J1/J2 continuity passed live in English and Spanish.
-Honest live progress plus Guest identity/lifetime remain in the second pass,
-and promotion remains a separate gate. Full Omnisearch is the remaining
-unbuilt founder outcome.
+PR #298 landed as `ba0aa2f6` and completed the second pass: Search and
+verification progress are truthful runtime events, each candidate owns its
+source citation, and Guest message/simulation allowances survive session
+renewal through visitor/day settlement. Promotion remains a separate gate.
+Issue #244 stays open for the accepted comparison/exposure follow-ups plus
+hosted migration, configuration, and exact-SHA canary proof. Full Omnisearch
+is the remaining unbuilt founder outcome.
 
 Integration-verification checkpoint (2026-07-27): PR #282 landed as
 `059f8e82` and made the ordinary backend test environment provider-free by
@@ -1083,8 +1089,10 @@ Quick take, Explain, Try next, and recovery presentation ownership. See
   1–3 implement verified anonymous identity, fixed temporary
   workspace policy, lifetime allowances, cleanup, guest shell, conversion, and
   owner-scoped capability gates. Block 4 adds the approved privacy-safe funnel
-  through the existing observability envelope. The integrated code is not a
-  public-ready or deployed release.
+  through the existing observability envelope. PR #298 then landed as
+  `ba0aa2f6`, re-keying Guest message and simulation limits to a privacy-safe
+  visitor/day identity so renewing the temporary session cannot reset them.
+  The integrated code is not a public-ready or deployed release.
 - Guest is now an accepted part of the normal product shape:
   `ARGUS_GUEST_ACCESS_ENABLED=true` and
   `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill

@@ -2,11 +2,11 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-27
+Last reconciled: 2026-07-28
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #288 at `9f3453a3`. Later commits may reconcile
+Latest product checkpoint: PR #298 at `ba0aa2f6`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -27,6 +27,8 @@ the Postgres boundary while preserving cursor, ranking, ownership, and artifact
 contracts. This is an integration checkpoint, not a deployed or
 tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
 after stale or failed actions without changing public artifact contracts.
+Later slices culminated in PR #298's visitor/day Guest settlement, honest
+discovery progress, and per-candidate source ownership.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -274,7 +276,10 @@ Do not reopen these as debt unless a new bug is reproduced:
   exact-once settlement, one simulation, conversion/claim, cleanup, Guest
   shell, capability gates, and privacy-safe funnel evidence. Guest defaults on
   with explicit-off rollback; public-account access remains separately off.
-  Hosted configuration, canary, and public traffic remain later release gates.
+  Issue #293 is closed with no-defect evidence after one real guest session
+  crossed the one-hour JWT boundary without losing its conversation or
+  workspace. Hosted configuration, canary, and public traffic remain later
+  release gates.
 - Backend verification is provider-free by default after PR #282 at
   `059f8e82`: root test fixtures force synthetic market data and keep provider
   credentials explicitly empty so dotenv cannot silently restore them. Both
@@ -337,9 +342,13 @@ Do not reopen these as debt unless a new bug is reproduced:
   candidate rows are now the default path; paid Search is reserved for
   explicit requests or current-fact needs. Typed retry and fair charging,
   async provider offload, incomplete-rule copy, and EN/es-419 J1/J2 continuity
-  are proven. This is the completed first pass, not promotion: honest live
-  progress plus Guest identity/lifetime remain in the second pass, and the
-  hosted migration/configuration/canary gates remain open.
+  are proven.
+- Discovery and Guest continuity PR #298 is integrated at `ba0aa2f6`.
+  Search and verification emit truthful live progress, each discovery row owns
+  its citation action, and Guest message/simulation limits settle against a
+  privacy-safe visitor/day identity across temporary-session renewal. This
+  completes the planned second pass, not promotion: hosted migrations,
+  configuration, and exact-SHA canary gates remain open.
 
 ## P0 Reintegration Checkpoint
 
@@ -358,10 +367,11 @@ Codex should own or closely supervise this:
 
 1. **Finish the remaining interim product outcome and activation gates**
    - Grounded discovery now includes the PR #295 continuity pass at
-     `8f17a45e`. Do not rebuild the cheap verified rows or Search-exception
-     policy. The next discovery implementation is the second pass: honest live
-     progress plus Guest identity/lifetime. Keep #244 open through that pass
-     and the hosted migration, Render configuration, and exact-SHA canary.
+     `8f17a45e` and PR #298's second pass at `ba0aa2f6`. Do not rebuild the
+     cheap verified rows, Search-exception policy, live progress, citation
+     ownership, or visitor/day Guest settlement. Keep #244 open for its
+     accepted comparison/exposure follow-ups and the hosted migrations, Render
+     configuration, and exact-SHA canary.
    - Full Omnisearch may now build against the accepted grounded-discovery
      contract. Its owner must reconcile onto this checkpoint and must not
      invent discovery truth or implicitly activate Search.
@@ -419,13 +429,15 @@ Migration order is fixed:
 14. `20260726014754_isolate_poisoned_guest_orphans.sql`
 15. `20260726185021_harden_guest_lifecycle_ownership.sql`
 16. `20260727230000_add_visitor_usage_counters.sql`
+17. `20260728120000_visitor_keyed_guest_settlement.sql`
 
 The earlier message-settlement and atomic-backtest-admission migrations remain
 prerequisites and must retain their existing order. Integration must reset a
 fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
-promotion. The final migration adds an opaque, visitor-owned daily discovery
-counter and global attempted-search bucket; it must be present before Guest
-grounded discovery is exposed.
+promotion. Migration 16 adds an opaque, visitor-owned daily discovery counter
+and global attempted-search bucket. Migration 17 re-keys Guest message and
+simulation settlement to the same privacy-safe visitor/day boundary. Both must
+be present before Guest grounded discovery is exposed.
 
 The conversion contract has two owners:
 
@@ -448,7 +460,7 @@ transactional cleanup.
 Always Progresses, Grounded Discovery, modeled-cost preservation, Guest, and
 visitor-owned Guest discovery metering are reconciled at the integration
 checkpoint. Before promotion to `main` or public traffic, apply migrations
-through `20260727230000`, configure
+through `20260728120000`, configure
 `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`, and complete
 `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`: branch-deployed exact-SHA canary, hosted
 anonymous Auth and server-validated Turnstile, trusted-origin/rate-limit
