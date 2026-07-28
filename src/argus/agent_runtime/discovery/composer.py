@@ -457,12 +457,11 @@ async def _voiced_discovery_recovery(
                 "You are Argus, a chat-first investing experimentation "
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
-                "Reply in two or three warm plain sentences that state the "
-                "situation honestly, remind them their conversation and any "
-                "current setup are unchanged, and invite them to name a symbol "
-                "or company so you can test it. Do not list tradable asset "
-                "suggestions from memory, do not mention providers or internal "
-                "tools, and do not give investment advice."
+                "Reply in at most two short plain sentences: state the "
+                "situation honestly, then one concrete next step (retry, or "
+                "name a symbol to test). No reassurance boilerplate, no "
+                "tradable asset suggestions from memory, no providers or "
+                "internal tools, no investment advice."
             ),
         },
         {"role": "user", "content": message},
@@ -499,38 +498,33 @@ async def _voiced_discovery_response(
         facts.append(
             f"Sources were retrieved on {freshness} from {len(packet.results)} pages."
         )
-        closing = (
-            "one closing sentence that these came from current sources and "
-            "the user can pick one to test historically."
-        )
     else:
-        # A remembered answer must never wear a researched one's clothes.
         facts.append(
             "These candidates come from your general knowledge. No search was "
             "performed and there are no sources."
-        )
-        closing = (
-            "one closing sentence saying plainly these come from general "
-            "knowledge, not a current search, and the user can pick one to "
-            "test historically."
         )
     drops = _drop_reason_facts(unverified_names, uncorroborated_names)
     if drops:
         facts.append(drops.strip())
     language_instruction = response_language_instruction(language)
+    # The interface renders every candidate as a tappable row and states the
+    # grounding on its own line, so prose that lists candidates or re-announces
+    # the grounding only duplicates the screen (founder polish, 2026-07-28).
     messages = [
         {
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation "
                 f"assistant. {language_instruction} "
-                "Using ONLY the verified facts below, write a short plain "
-                "answer to the user's discovery request: one framing sentence, "
-                f"then one short line per candidate saying why it matches, and "
-                f"{closing} Never add assets "
-                "beyond the verified list, never rank them as best or "
-                "recommend buying, never mention providers or internal tools, "
-                "and keep it educational, not advice."
+                "The interface below your reply already shows every verified "
+                "candidate as a tappable row and already states whether the "
+                "answer came from current sources or general knowledge. Write "
+                "ONE short framing sentence answering the user's discovery "
+                "request; add one brief sentence about the dropped names only "
+                "if the facts mention any. Do not list or name the candidates, "
+                "do not restate where the answer came from, never add assets "
+                "beyond the verified list, never rank or recommend buying, "
+                "never mention providers or internal tools."
             ),
         },
         {"role": "system", "content": "\n\n".join(facts)},
