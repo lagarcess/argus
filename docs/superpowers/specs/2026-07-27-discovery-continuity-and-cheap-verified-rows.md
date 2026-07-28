@@ -759,13 +759,24 @@ env is destroyed.
 
 ## 13. Out of scope
 
-- Tuning any guest **discovery** allowance number (§7). The message and
-  simulation numbers are a live decision inside §10.2 and must be stated there.
-- The stray confirmation card on a discovery ask — cosmetic, no confirmed cause
-  (§10.4).
-- Sliding guest expiry, unless §10.1's verification shows something real. The
-  workspace lives 7 days by database constraint; the 10-minute figure in the
-  source spec is the handoff token.
+Each exclusion below is tracked as its own issue, so nothing here can drift.
+
+- Tuning any guest **discovery** allowance number (§7) — issue #294, blocked on
+  promotion by nature. The message and simulation numbers are a live decision
+  inside §10.2 and must be stated there.
+- The stray confirmation card on a discovery ask — issue #292, cosmetic, no
+  confirmed cause (§10.4). Deliberately deferred until PR A lands, because it
+  lives in the composer/routing code PR A rewrites.
+- Sliding guest expiry — issue #293, unless its verification shows something
+  real. The workspace lives 7 days by database constraint; the 10-minute figure
+  in the source spec is the handoff token.
+- Quick take / Explain / Try next surface ownership — #249. Two interplay notes:
+  #249's runtime slice serializes behind PR A (`result_followups.py`, one-owner
+  rule, its own text already says so), and after item 1 both "what should I try
+  next?" and cheap discovery are unmetered LLM answers — the boundary between
+  them is the typed act alone, never cost or wording. Item 1 also fixes the
+  failure #249 polices: a typed discovery outcome being replaced by generic
+  prose.
 - Removing guest search. It stays at 2. The previous spec's §12.9 proposed
   registered-only and §12.10 corrected it; the visitor metering is load-bearing
   and unchanged.
