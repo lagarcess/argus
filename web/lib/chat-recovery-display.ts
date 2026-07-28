@@ -750,6 +750,14 @@ function simplificationOptionKey(
   values: Record<string, unknown> | null | undefined,
   reasonCode?: string,
 ): string | null {
+  // The unsupported-symbol option is advisory — it carries no replacement
+  // payload to key on, so the reason code is its localizable identity.
+  if (
+    reasonCode === "unsupported_symbol" &&
+    (!values || Object.keys(values).length === 0)
+  ) {
+    return "supported_symbol";
+  }
   if (!values) {
     return null;
   }

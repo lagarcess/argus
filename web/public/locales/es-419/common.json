@@ -333,7 +333,8 @@
       "rsi_threshold": "Usar una regla RSI compatible",
       "buy_and_hold": "Comparar con comprar y mantener",
       "moving_average_crossover": "Usar un cruce de medias móviles compatible",
-      "historical_period": "Probarlo en un período histórico"
+      "historical_period": "Probarlo en un período histórico",
+      "supported_symbol": "Usar un símbolo de acción o cripto compatible"
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
