@@ -1103,10 +1103,17 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
                 if persisted_text or lifecycle_hooks.turn_id is not None:
+                    # Scoped to discovery: other retryable recoveries keep
+                    # their existing completed-turn settlement semantics.
                     retryable_recovery_code = (
-                        str(recovery.get("code") or "recoverable_failure")
+                        str(recovery.get("code"))
                         if isinstance(recovery, dict)
                         and recovery.get("retryable") is True
+                        and recovery.get("code")
+                        in {
+                            "discovery_search_failed",
+                            "discovery_suggestions_unavailable",
+                        }
                         else None
                     )
                     if retryable_recovery_code is not None:

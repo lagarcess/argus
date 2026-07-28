@@ -113,11 +113,9 @@ def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
     assert "ARGUS_LOCAL_SUPABASE_ANON_KEY" in joined_steps
     assert "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY" in joined_steps
     assert "tests/evals/test_chat_runtime_trajectory_harness.py" in joined_steps
-    assert "tests/test_allowance_accounting_postgres.py" in joined_steps
-    assert "tests/test_chat_turn_lifecycle_postgres.py" in joined_steps
-    assert "tests/test_guest_cleanup_postgres.py" in joined_steps
-    assert "tests/test_guest_handoff_postgres.py" in joined_steps
-    assert "tests/test_guest_workspace_postgres.py" in joined_steps
+    # Glob, not a hand-list: a new _postgres proof must be gated without
+    # editing the workflow. The hand-list was how uncovered tables shipped.
+    assert "tests/test_*_postgres.py" in joined_steps
     assert "tests/test_guest_auth_local_supabase.py" in joined_steps
     assert "scripts/qa/assert_pytest_gate.py" in joined_steps
     assert guest_job["env"]["OPENROUTER_API_KEY"] == ""
