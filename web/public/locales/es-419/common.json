@@ -282,9 +282,10 @@
       },
       "discovery_unavailable": "Todavía no puedo buscar candidatos respaldados por fuentes actuales, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
       "discovery_search_failed": "No pude completar la búsqueda respaldada por fuentes en este momento, y no voy a adivinar nombres de memoria. Todo en este chat sigue igual; intenta de nuevo en un momento o dime un símbolo y puedo probarlo.",
-      "discovery_no_verified_candidates": "Encontré fuentes, pero no pude verificar ninguna coincidencia operable para esa búsqueda. Dime un símbolo o una empresa que tengas en mente y puedo probarla; todo en este chat sigue igual.",
+      "discovery_no_verified_candidates": "No pude verificar ninguna coincidencia operable para esa búsqueda. Dime un símbolo o una empresa que tengas en mente y puedo probarla; todo en este chat sigue igual.",
       "discovery_limit_reached": "Ya usaste todas las búsquedas fundamentadas disponibles por ahora. El límite se reinicia según su calendario; mientras tanto, dime un símbolo que tengas en mente y puedo probarlo.",
-      "discovery_target_missing": "Dime qué buscar: una categoría como acciones de ciberseguridad, o una empresa para encontrar pares, y te traigo candidatos verificados."
+      "discovery_target_missing": "Dime qué buscar: una categoría como acciones de ciberseguridad, o una empresa para encontrar pares, y te traigo candidatos verificados.",
+      "discovery_suggestions_unavailable": "No pude preparar sugerencias en este momento. Todo en este chat sigue igual; intenta de nuevo en un momento o dime un símbolo y puedo probarlo."
     },
     "clarification": {
       "period": "¿Qué periodo quieres usar?",
@@ -341,6 +342,9 @@
       "test_candidate": "Simular {{symbol}}",
       "sources_line": "Fuentes: {{domains}} · al {{date}}",
       "sources_line_undated": "Fuentes: {{domains}}",
+      "unsourced_line": "De conocimiento general, no de una búsqueda actual",
+      "search_current": "Buscar resultados actuales",
+      "search_current_send": "Busca en fuentes actuales: {{query}}",
       "sources_panel_open_one": "{{count}} fuente ›",
       "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",

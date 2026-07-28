@@ -84,6 +84,7 @@ export function discoverySidecarFromMetadata(
     )
       .filter((name): name is string => typeof name === "string" && name.trim() !== "")
       .slice(0, MAX_UNVERIFIED),
+    can_request_search: record.can_request_search === true,
   };
 }
 

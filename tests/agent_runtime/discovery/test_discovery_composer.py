@@ -40,7 +40,10 @@ def _decision(
     relationship: str = "category",
     category_description: str | None = "cybersecurity stocks",
     anchor_symbols: list[str] | None = None,
+    needs_current_facts: bool = True,
 ) -> InterpretDecision:
+    """needs_current_facts defaults True here so the search-path tests keep
+    exercising the grounded pipeline; the cheap path has its own class."""
     return InterpretDecision(
         intent="conversation_followup",
         task_relation="continue",
@@ -59,6 +62,7 @@ def _decision(
                 category_description=category_description,
                 anchor_symbols=anchor_symbols or [],
                 asset_class_hint="equity",
+                needs_current_facts=needs_current_facts,
             )
             if act == "asset_discovery"
             else None
@@ -166,6 +170,11 @@ def _wire(
     monkeypatch.setattr(
         composer_module, "_voiced_discovery_recovery", _fake_recovery_voice
     )
+
+    async def _fake_name_candidates(**kwargs: Any) -> DiscoveryExtraction | None:
+        return extraction
+
+    monkeypatch.setattr(composer_module, "name_candidates", _fake_name_candidates)
     assets = known_assets if known_assets is not None else {"CRWD": "equity"}
 
     def _resolve(symbol: str, **_: Any) -> _Asset:
@@ -290,15 +299,15 @@ class TestFlagOnPipeline:
         assert "discovery" not in patch
 
     @pytest.mark.asyncio()
-    async def test_allowance_exhausted_blocks_before_any_search(
+    async def test_allowance_exhausted_never_reaches_the_provider(
         self, flag_on: pytest.MonkeyPatch
     ) -> None:
         provider = _FakeProvider(_packet())
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision(), allowance=False)
-        patch = result.patch
-        assert patch["recovery"]["code"] == "discovery_limit_reached"
         assert provider.calls == []
+        # Spec §3.5: exhausted falls through to cheap rows, not a dead end.
+        assert result.patch["discovery"]["candidates"]
 
     @pytest.mark.asyncio()
     async def test_target_missing_yields_typed_ask(
@@ -320,6 +329,75 @@ class TestFlagOnPipeline:
         result = await _run(_decision(act="result_followup"))
         assert result is None
         assert provider.calls == []
+
+
+class TestCheapVerifiedRows:
+    """Spec §3: cheap verified rows are the default; search is the exception."""
+
+    @pytest.mark.asyncio()
+    async def test_stable_ask_defaults_to_model_knowledge(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision(needs_current_facts=False))
+        patch = result.patch
+        assert provider.calls == []
+        sidecar = patch["discovery"]
+        assert sidecar["sources"] == []
+        assert sidecar["can_request_search"] is True
+        assert [item["symbol"] for item in sidecar["candidates"]] == ["CRWD"]
+        # No search attempt: nothing to charge, nothing to ledger.
+        assert "discovery_usage" not in patch
+
+    @pytest.mark.asyncio()
+    async def test_exhausted_fall_through_hides_the_search_escalation(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision(), allowance=False)
+        sidecar = result.patch["discovery"]
+        assert sidecar["sources"] == []
+        # An affordance that cannot fire is worse than none (spec §3.8).
+        assert sidecar["can_request_search"] is False
+
+    @pytest.mark.asyncio()
+    async def test_grounded_sidecar_never_offers_the_escalation_row(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision())
+        sidecar = result.patch["discovery"]
+        assert len(sidecar["sources"]) > 0
+        assert "can_request_search" not in sidecar
+
+    @pytest.mark.asyncio()
+    async def test_cheap_failure_is_retryable_with_the_affordance(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=None)
+        result = await _run(_decision(needs_current_facts=False))
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_suggestions_unavailable"
+        assert patch["recovery"]["retryable"] is True
+        assert patch["retry_last_turn"] == {
+            "message": "What cybersecurity stocks could I test?"
+        }
+        assert provider.calls == []
+
+    @pytest.mark.asyncio()
+    async def test_cheap_path_still_verifies_every_name(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction(), known_assets={})
+        result = await _run(_decision(needs_current_facts=False))
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_no_verified_candidates"
+        assert "discovery" not in patch
 
 
 class TestSearchDoesNotBlockTheEventLoop:
@@ -396,10 +474,8 @@ class TestRetryAffordance:
         provider = _FakeProvider(_packet())
         _wire(flag_on, provider=provider, extraction=_extraction(), known_assets={})
         no_verified = await _run(_decision())
+        assert no_verified.patch["recovery"]["retryable"] is False
         assert "retry_last_turn" not in no_verified.patch
-
-        limited = await _run(_decision(), allowance=False)
-        assert "retry_last_turn" not in limited.patch
 
 
 class TestVoicedRecoveryMetadata:

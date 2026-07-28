@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -11,6 +12,7 @@ from argus.agent_runtime.discovery.contracts import (
     ValidatedCandidate,
 )
 from argus.agent_runtime.discovery.extraction import extract_candidates
+from argus.agent_runtime.discovery.model_knowledge import name_candidates
 from argus.agent_runtime.discovery.validation import validated_candidates
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
@@ -77,14 +79,6 @@ async def discovery_stage_result_if_applicable(
             current_user_message=current_user_message,
             language=language,
         )
-    if not discovery_allowance_available:
-        return await _recovery_result(
-            decision=decision,
-            code="discovery_limit_reached",
-            retryable=False,
-            current_user_message=current_user_message,
-            language=language,
-        )
     request = decision.asset_discovery
     query = _search_query(request)
     if request is None or not query:
@@ -94,6 +88,18 @@ async def discovery_stage_result_if_applicable(
             retryable=False,
             current_user_message=current_user_message,
             language=language,
+        )
+    # Cheap verified rows are the default; a search runs only when the answer
+    # needs current facts and allowance remains. An exhausted allowance falls
+    # through to cheap rows -- visibly unsourced -- instead of a dead end.
+    if not request.needs_current_facts or not discovery_allowance_available:
+        return await _model_knowledge_result(
+            decision=decision,
+            request=request,
+            max_candidates=config.max_candidates,
+            current_user_message=current_user_message,
+            language=language,
+            can_request_search=discovery_allowance_available,
         )
     usage: dict[str, Any] = {"search_attempted": False}
     try:
@@ -213,6 +219,100 @@ async def discovery_stage_result_if_applicable(
     )
 
 
+async def _model_knowledge_result(
+    *,
+    decision: InterpretDecision,
+    request: AssetDiscoveryRequest,
+    max_candidates: int,
+    current_user_message: str,
+    language: str,
+    can_request_search: bool,
+) -> StageResult:
+    """Cheap verified rows: model knowledge in, resolver-verified rows out.
+
+    Same spine as the grounded path -- LLM proposes, resolve_asset() decides,
+    voicing speaks only verified facts -- minus the provider call, the charge,
+    and the sources. Zero sources in the sidecar is what marks the answer
+    ungrounded; nothing asserts it separately.
+    """
+    extraction = await name_candidates(request=request, language=language)
+    if extraction is None:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_suggestions_unavailable",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+        )
+    packet = _model_knowledge_packet()
+    validated, unverified, uncorroborated = validated_candidates(
+        extraction,
+        packet=packet,
+        resolve=resolve_asset,
+        max_candidates=max_candidates,
+        asset_class_hint=request.asset_class_hint,
+        require_source_evidence=False,
+    )
+    if not validated:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_no_verified_candidates",
+            retryable=False,
+            current_user_message=current_user_message,
+            language=language,
+            unverified_names=unverified,
+            uncorroborated_names=uncorroborated,
+        )
+    voiced = await _voiced_discovery_response(
+        request=request,
+        candidates=validated,
+        packet=packet,
+        unverified_names=unverified,
+        uncorroborated_names=uncorroborated,
+        current_user_message=current_user_message,
+        language=language,
+        grounded=False,
+    )
+    if not voiced:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_suggestions_unavailable",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+        )
+    sidecar = _discovery_sidecar(
+        request=request,
+        packet=packet,
+        candidates=validated,
+        unverified_names=unverified + uncorroborated,
+        can_request_search=can_request_search,
+    )
+    logger.info(
+        "Model-knowledge discovery response composed",
+        relationship=request.relationship,
+        extracted_count=len(extraction.candidates),
+        validated_count=len(validated),
+        unverified_count=len(unverified),
+        uncorroborated_count=len(uncorroborated),
+        can_request_search=can_request_search,
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": voiced, "discovery": sidecar},
+    )
+
+
+def _model_knowledge_packet() -> SearchResultPacket:
+    return SearchResultPacket(
+        results=(),
+        retrieved_at=datetime.now(timezone.utc),
+        latency_ms=0,
+        provider_id="model_knowledge",
+    )
+
+
 def _search_query(request: AssetDiscoveryRequest | None) -> str | None:
     """Deterministic machine query for the Search provider; never user prose."""
     if request is None:
@@ -322,8 +422,12 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
         "from memory. The user can simply ask again in a moment."
     ),
     "discovery_no_verified_candidates": (
-        "Sources came back, but no candidate could be verified as a tradable "
-        "asset, so there is nothing safe to offer."
+        "No candidate could be verified as a tradable asset, so there is "
+        "nothing safe to offer."
+    ),
+    "discovery_suggestions_unavailable": (
+        "Putting together suggestions failed temporarily. You will not guess "
+        "names inline. The user can simply ask again in a moment."
     ),
     "discovery_limit_reached": (
         "The user has used all grounded lookups available for now; the "
@@ -387,16 +491,33 @@ async def _voiced_discovery_response(
     uncorroborated_names: list[str],
     current_user_message: str,
     language: str,
+    grounded: bool = True,
 ) -> str | None:
     candidate_lines = "\n".join(
         f"- {item.symbol} ({item.name}, {item.asset_class}): {item.reason_text}"
         for item in candidates
     )
-    freshness = packet.retrieved_at.date().isoformat()
-    facts = [
-        f"Verified candidates (the complete allowed list):\n{candidate_lines}",
-        f"Sources were retrieved on {freshness} from {len(packet.results)} pages.",
-    ]
+    facts = [f"Verified candidates (the complete allowed list):\n{candidate_lines}"]
+    if grounded:
+        freshness = packet.retrieved_at.date().isoformat()
+        facts.append(
+            f"Sources were retrieved on {freshness} from {len(packet.results)} pages."
+        )
+        closing = (
+            "one closing sentence that these came from current sources and "
+            "the user can pick one to test historically."
+        )
+    else:
+        # A remembered answer must never wear a researched one's clothes.
+        facts.append(
+            "These candidates come from your general knowledge. No search was "
+            "performed and there are no sources."
+        )
+        closing = (
+            "one closing sentence saying plainly these come from general "
+            "knowledge, not a current search, and the user can pick one to "
+            "test historically."
+        )
     drops = _drop_reason_facts(unverified_names, uncorroborated_names)
     if drops:
         facts.append(drops.strip())
@@ -409,9 +530,8 @@ async def _voiced_discovery_response(
                 f"assistant. {language_instruction} "
                 "Using ONLY the verified facts below, write a short plain "
                 "answer to the user's discovery request: one framing sentence, "
-                "then one short line per candidate saying why it matches, and "
-                "one closing sentence that these came from current sources and "
-                "the user can pick one to test historically. Never add assets "
+                f"then one short line per candidate saying why it matches, and "
+                f"{closing} Never add assets "
                 "beyond the verified list, never rank them as best or "
                 "recommend buying, never mention providers or internal tools, "
                 "and keep it educational, not advice."
@@ -437,13 +557,22 @@ def _discovery_sidecar(
     packet: SearchResultPacket,
     candidates: list[ValidatedCandidate],
     unverified_names: list[str],
+    can_request_search: bool | None = None,
 ) -> dict[str, Any]:
     query_summary = (
         request.category_description
         or ", ".join(request.anchor_symbols)
         or request.relationship
     )
+    # Additive and backend-owned: the frontend may offer "search current
+    # results" only when this is true, so the row can never outlive allowance.
+    escalation = (
+        {"can_request_search": can_request_search}
+        if can_request_search is not None
+        else {}
+    )
     return {
+        **escalation,
         "schema_version": DISCOVERY_SIDECAR_SCHEMA_VERSION,
         "kind": "asset_discovery",
         "relationship": request.relationship,

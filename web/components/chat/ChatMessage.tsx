@@ -233,7 +233,13 @@ export default function ChatMessage({
   const discoverySourcesLineText = (() => {
     if (isUser || !message.discovery) return "";
     const domains = discoverySourceDomains(message.discovery);
-    if (domains.length === 0) return "";
+    // Zero sources IS the ungrounded signal (spec §3.7): derived from the
+    // evidence, never asserted by a flag, so a remembered answer can never
+    // wear a researched one's clothes.
+    if (domains.length === 0)
+      return t("chat.discovery_results.unsourced_line", {
+        defaultValue: "From general knowledge, not a current search",
+      });
     const date = discoveryFreshnessDate(message.discovery, i18n.language);
     return date
       ? t("chat.discovery_results.sources_line", {
@@ -405,6 +411,41 @@ export default function ChatMessage({
                     </NextMoveRow>
                   );
                 })}
+                {message.discovery.sources.length === 0 &&
+                message.discovery.can_request_search ? (
+                  (() => {
+                    const searchLabel = t(
+                      "chat.discovery_results.search_current",
+                      { defaultValue: "Search for current results" },
+                    );
+                    const searchSendText = t(
+                      "chat.discovery_results.search_current_send",
+                      {
+                        query: message.discovery.query_summary,
+                        defaultValue:
+                          "Search current sources for: {{query}}",
+                      },
+                    );
+                    return (
+                      <NextMoveRow
+                        ariaLabel={searchLabel}
+                        disabled={turnInFlight}
+                        onClick={() =>
+                          onAction?.({
+                            type: "select_response_option",
+                            label: searchSendText,
+                            value: searchSendText,
+                            payload: { discovery_search_request: true },
+                          })
+                        }
+                      >
+                        <span className="font-medium text-black dark:text-white">
+                          {searchLabel}
+                        </span>
+                      </NextMoveRow>
+                    );
+                  })()
+                ) : null}
               </div>
               {discoverySourcesLineText ? (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
