@@ -29,12 +29,17 @@ const es = JSON.parse(
 );
 
 describe("next-move row anatomy", () => {
-  test("rest state is borderless and the wash only appears on hover or press", () => {
-    expect(row).toContain("border-transparent");
-    expect(row).toContain("group-hover/next-move:border-black/12");
-    expect(row).toContain("group-active/next-move:border-black/12");
-    expect(row).toContain("group-hover/next-move:bg-black/5");
-    expect(row).toContain("group-active/next-move:bg-black/5");
+  test("rest state is boxless and hover brightens the arrow and title together", () => {
+    // No wash, no box, no shadow: hover is color emphasis only.
+    expect(row).not.toContain("bg-black/5");
+    expect(row).not.toContain("border-transparent");
+    expect(row).not.toContain("shadow-");
+    // The arrow participates in hover so the row reads as one action.
+    expect(row).toContain("group-hover/next-move:text-black/80");
+    expect(row).toContain("group-active/next-move:text-black/80");
+    // Titles brighten with the arrow via the shared NextMoveTitle.
+    expect(row).toContain("export function NextMoveTitle");
+    expect(row).toContain("group-hover/next-move:text-black ");
   });
 
   test("hit area spans the column and stays tappable regardless of the visible box", () => {
