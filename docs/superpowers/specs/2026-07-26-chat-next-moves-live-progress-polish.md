@@ -1,13 +1,14 @@
 # Chat Polish: Stacked Next-Move Rows + Honest Live Progress
 
-**Status:** FOUNDER-DIRECTED FOLLOW-UP — direction approved 2026-07-26; row anatomy, resolved-group rule, and sources-drawer promotion approved 2026-07-27. Slices A, C, and D delivered; Slice B remains.
+**Status:** COMPLETE — direction approved 2026-07-26; Slices A/C landed in
+PR #281, Slice D in PR #287, and Slice B in PR #298.
 **Shape:** three PRs, in order.
 
 | PR | Scope | State |
 | --- | --- | --- |
 | **PR 1** — Slices A + C | Every UI change, zero runtime change | ✅ **Merged** — [#281](https://github.com/lagarcess/argus/pull/281), reconciled with integration (guest #279, costs #280) before merge |
 | **PR 2** — Slice D | Discovery selection carries resolved identity | ✅ **Complete** — identity delivered and live-proven; chosen-state marker cut |
-| **PR 3** — Slice B | Live progress lines | Not started; blocked on three backend prerequisites in §4 |
+| **PR 3** — Slice B | Live progress lines | ✅ **Merged** — [#298](https://github.com/lagarcess/argus/pull/298), with truthful Search/verification events and safe unknown-stage fallback |
 
 **Delivered in PR 1 beyond the original slice definition,** found during implementation and browser QA:
 
@@ -32,10 +33,10 @@ and now answers "What date window should I use for UNP?". The chosen-state
 marker was cut (§2 table) and carry-forward on switch was deferred out of the
 lane as general interpreter work owed to typed input too.
 
-**Still open in the lane:** Slice B only. Plus the guest grounded-discovery
-allowance, which is its own spec
-(`2026-07-27-guest-grounded-discovery-quota.md`).
-**Owner:** Follow-up lane after PR #276 merges (branch from `codex/private-alpha-next`; if #276's merge is held, stack a child branch on `claude/grounded-discovery-release-9cc859` and review against it as parent).
+**Still open in the lane:** None. Hosted migration/configuration/canary work
+remains in issue #244 and the release runbooks; it is not unfinished polish.
+**Owner:** Historical execution record. Do not redispatch without a new
+reproduced defect.
 **Parent context:** Grounded Discovery Search v1 (issue #244, PR #276), founder UI-taste review of 2026-07-26.
 **Scope class:** Small full-slice polish lane. Frontend presentation + one additive runtime event surface. No API-contract breaks, no new tables, no new flags, no new provider calls. One recorded product contract does change: outbound source links (Slice C).
 
@@ -270,10 +271,10 @@ validation is required — assert it rather than re-implement it.
 
 ## 4. Slice B — Honest live progress for discovery (runtime event + frontend)
 
-**Ships separately from Slices A and C.** Slice A/C are frontend-only and can
-land as one PR. Slice B is blocked on three unresolved backend facts, verified
-against integration `f66238a5` on 2026-07-27, none of which were known when
-this spec was written:
+**Delivered by PR #298 at integration merge `ba0aa2f6`.** Search and
+verification now emit distinct runtime events, provider work is offloaded, and
+unknown stages fall back to a neutral label. The pre-implementation constraints
+below are retained as design history:
 
 1. **There is no channel for emitting a sub-stage event.** `stage_start` is
    synthesized in `runtime.py` from LangGraph `on_chain_start` events, filtered
