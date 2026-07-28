@@ -102,6 +102,14 @@ Needs:
 
 Users should understand assumptions, limits, and outcomes. Results are presented with honest context (e.g., explicit assumptions footers on all cards).
 
+Discovery answers follow the same rule: every suggested asset is
+resolver-verified and tappable, and the answer always states its grounding.
+The default path answers from model knowledge and is plainly marked "from
+general knowledge, not a current search"; a source-backed search runs only
+when the answer needs current facts (or the user asks), and then shows its
+sources and freshness date. A remembered answer and a researched one must
+never look alike.
+
 ## Chat First
 
 Conversation is the primary interface.

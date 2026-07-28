@@ -447,6 +447,12 @@ voice preferred, deterministic i18n fallback):
 
 - Never: a model-memory shortlist presented as current, silent empty response,
   erased draft/result context, or provider-name leakage.
+  > **Reconciled 2026-07-28** (`2026-07-27-discovery-continuity-and-cheap-verified-rows.md`):
+  > a model-knowledge shortlist is now the *default* discovery answer — and it
+  > satisfies this rule by being visibly unsourced rather than by not existing.
+  > Zero sources in the sidecar is the derived marker; an exhausted allowance
+  > falls through to this path instead of `discovery_limit_reached`.
+  
 - Timeout: one provider attempt bounded by
   `ARGUS_DISCOVERY_SEARCH_TIMEOUT_SECONDS` (default 8s), inside the existing
   turn-wide deadline. The turn still terminates with a useful response.

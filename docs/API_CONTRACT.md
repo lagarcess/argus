@@ -2109,7 +2109,22 @@ actions and to ordinary user text.
 An explicit peer/category asset-discovery turn (typed
 `asset_discovery` interpretation) returns an ordinary assistant response whose
 final payload and persisted assistant-message metadata may include an additive
-`discovery` sidecar. The runtime Search path is enabled by default.
+`discovery` sidecar. Two producers emit the same sidecar contract:
+
+- **Model-knowledge (default):** the interpreter judged the answer stable
+  (`needs_current_facts=false`) or the caller's search allowance is exhausted.
+  Candidates come from model knowledge, individually verified by provider
+  asset resolution. `sources` is empty and `retrieved_at` is composition time.
+- **Grounded search:** the interpreter judged the answer needs current facts,
+  or the user explicitly asked to search, and allowance remains. Candidates
+  are extracted from provider results and carry `source_indices`.
+
+`sources.length == 0` **is** the ungrounded signal: clients derive the
+"general knowledge, not a current search" marker from it and must not rely on
+any separate flag. A grounded search that yields no usable sources is
+correctly marked ungrounded by the same rule.
+
+The runtime Search path is enabled by default.
 `ARGUS_GROUNDED_DISCOVERY_ENABLED=false` is the emergency kill switch; with
 the flag off, discovery turns return typed honest recovery and make zero
 Search-provider calls.
@@ -2139,10 +2154,17 @@ Search-provider calls.
         "source_indices": [0]
       }
     ],
-    "unverified_names": ["ExamplePrivateCo"]
+    "unverified_names": ["ExamplePrivateCo"],
+    "can_request_search": true
   }
 }
 ```
+
+`can_request_search` is optional, backend-owned, and emitted only on
+model-knowledge responses: `true` means the caller still has search allowance,
+so clients may render a "search for current results" escalation that sends a
+plain natural-language turn (no typed action). Absent or `false`, no
+escalation renders — an affordance that cannot fire must not exist.
 
 Contract rules:
 
@@ -2159,16 +2181,24 @@ Contract rules:
   metadata) through the ordinary interpretation, clarification, and
   confirmation lifecycle. Discovery never auto-runs a backtest.
 - Clients render source `domain` plus locale-formatted dates from the ISO
-  fields; `url` is stored provenance and is not rendered as an outbound link
-  in private alpha.
+  fields; the sources drawer renders `url` as an outbound link
+  (`target="_blank"`, `rel="noopener noreferrer"`), with the domain always
+  visible from the href.
 - Discovery turns never mutate pending drafts, active confirmations, or the
   latest result; reload hydrates the response and this sidecar from persisted
   message metadata without re-querying any provider.
 - Typed discovery recovery uses the standard `recovery` object with codes
   `discovery_unavailable`, `discovery_search_failed` (retryable),
-  `discovery_no_verified_candidates`, `discovery_limit_reached`, and
-  `discovery_target_missing`. Direct backtests and ordinary follow-ups make
-  zero Search calls.
+  `discovery_no_verified_candidates`, `discovery_suggestions_unavailable`
+  (retryable; the model-knowledge path failed), `discovery_limit_reached`
+  (retained; an exhausted allowance now falls through to the model-knowledge
+  path instead of this recovery), and `discovery_target_missing`. Direct
+  backtests and ordinary follow-ups make zero Search calls.
+- A retryable discovery recovery finalizes its chat turn as
+  `recoverable_failed` with a durable `retry_last_turn` anchored to the
+  persisted user request, and does not settle the message allowance.
+- Charging: the per-subject search allowance settles only for usable results
+  (no `fallback_code`); the global daily ceiling counts every attempt.
 
 **Retry semantics:**
 - `retry_last_turn` replays a specific failed user message and may include
