@@ -253,12 +253,15 @@ Attach `metadata.retry_last_turn` on the `discovery_search_failed` recovery, the
 same shape other retryable recoveries use. Render it as a footer row under the
 user's run via `NextMoveRow`, consistent with §3.8.
 
-> **Build disposition (2026-07-27).** The metadata attach alone completes the
-> rail: the assistant footer already renders `retry_last_turn` as the same
-> retry affordance every other retryable turn uses (`ChatMessage.tsx`), and
-> `UserTurnRecovery` covers the user-side projection. No new row component was
-> built — a discovery failure should not look different from any other
-> retryable failure. Revisit only if live QA shows the affordance is missed.
+> **Build disposition (superseded 2026-07-28).** The stage-patch attach never
+> reached metadata: `WorkflowState` declares no `retry_last_turn` channel, so
+> the graph dropped it silently, and `complete()` strips the key from
+> completed turns by design. The lifecycle already owns this contract —
+> retryable discovery failures now finalize via `recoverable_failure()`, which
+> anchors the durable retry to the persisted user request, marks the turn
+> `recoverable_failed`, and does not settle the message allowance (our outage,
+> not the user's spend). Witnessed live: "Reintentar" rendering from persisted
+> metadata and replaying the ask. No new row component; the standard rail.
 
 ### 4.3 Stop charging for failed searches
 
@@ -701,6 +704,100 @@ spine and is out of this spec's scope to redesign.
 Screenshots or transcripts in both languages for every surface in §11.2. A
 passing catalog-key-parity check is not acceptance. Neither is a translation
 nobody looked at.
+
+---
+
+## 11b. Live QA record (2026-07-28, local Supabase, both languages)
+
+Everything below was watched on a real guest stack (real Perplexity, real
+OpenRouter, real Alpaca resolution, real Postgres counters), not asserted from
+tests.
+
+**Witnessed working:**
+
+- Cheap verified rows, EN and ES: resolver-verified tappable rows, honest
+  dropped-names sentence, "From general knowledge, not a current search" /
+  "De conocimiento general, no de una búsqueda actual" marker, zero provider
+  calls in the log.
+- Escalation row shown only while allowance remains, in both languages; tap
+  sends the localized sentence as plain text and routes to a grounded search.
+- Grounded search success (ES): five resolver-verified rows from real
+  Perplexity results, Spanish reason text, "Fuentes: … · al 28 jul 2026"
+  line, "5 fuentes ›" drawer with localized dates.
+- Charging: the real `visitor_usage_counters` row advanced only on usable
+  results (2/2 exact); failed searches charged the global ceiling but never
+  the visitor; the visitor allowance survived two workspace renewals.
+- Exhausted fall-through: with 2/2 spent, a discovery ask returned cheap rows
+  with `can_request_search: false` — escalation hidden, marker shown, no dead
+  end and no fake outage message.
+- Failed search: honest voiced recovery in the user's language, turn
+  finalized `recoverable_failed`, durable retry anchored to the request,
+  "Reintentar" rendered and replayed on tap.
+- Item 3 live: tapping a row lands on "Got it — PFE (Pfizer) against SPY.
+  What date range…" — identity known, no capability-limit claim.
+- Item 4 (founder's runtime fix) verified: "this year so far" advanced to a
+  ready confirmation. No conflict menu.
+- J2 post-result carry-forward, EN and ES: after an AAPL vs SPY result,
+  tapping a peer row produced "Ready to test buy-and-hold for MSFT over
+  July 28, 2025 – July 27, 2026" — window, strategy, and benchmark carried,
+  only the asset changed. First time this journey was ever run.
+
+**Defects found live and fixed in this PR** (each also a commit):
+
+- `discovery_model_knowledge` was never registered in the LLM task registry —
+  every cheap turn failed with a KeyError. Unit tests stub the call; only a
+  real invocation consults the registry.
+- The escalation row sent a typed `select_response_option`, which admission
+  validates against the latest turn's registered options — rejected as stale.
+  It now sends plain text; the sentence is the request.
+- `retry_last_turn` never survived the graph (no state channel) — replaced by
+  the `recoverable_failure()` lifecycle rail (see §4.2 disposition).
+- An internal explanation sentence rendered as the unsupported-copy subject
+  ("Argus can't run The requested assumption change needs clarification.
+  directly yet."). Sentence punctuation now disqualifies a subject.
+- Discovery voicing silently swallowed failures; now logged with
+  classification.
+- Voiced prose duplicated the rows and the marker (founder snapshot); voicing
+  is now one framing sentence plus optional drops.
+
+**Observed, recorded, NOT fixed here:**
+
+- **Discovery ask during a pending confirmation is preempted** by an
+  artifact-continuity corridor and answers "I can't search live sources…" — a
+  false capability claim. Same family as issue #292; the corridor, not
+  discovery, owns the turn. Needs its own slice.
+- **One Spanish phrasing repeatedly failed interpretation** ("¿qué acciones de
+  energía solar hay ahora?") with schema validation errors from both tier
+  models under full conversation context; the bare schema call succeeds. The
+  system degraded honestly (recovery + retry). Interpreter-robustness item,
+  not discovery.
+- **Confirmation summary mixes languages** ("Ready to test buy-and-hold for
+  MSFT over 28 de julio de 2025…") — backend-composed summary line is
+  English-framed with localized dates. Pre-existing composition behavior.
+- **A stale auth cookie can blank the app** into an RSC redirect loop
+  (backend-side session gone, client loops `/` ↔ `/chat`). Local-QA artifact
+  of killing the backend, but the recovery path should not hard-blank.
+  Guest-lane robustness note.
+
+**Founder snapshot dispositions (2026-07-28):**
+
+1. Redundant disclosures in the cheap reply — **fixed** (voicing rewrite).
+2. "Action no longer attached" on the escalation tap — **fixed** (plain-text
+   send).
+3. Wordy failure voicing — **fixed** (two-sentence cap).
+4. Retry appends a duplicate turn instead of replacing in place, and the
+   failure copy says "type again" — **recorded**. SOTA (ChatGPT, Claude) is
+   in-place regeneration: replace the failed assistant message, no new user
+   bubble. The rail already supports replacement (`replacementAssistantId`)
+   when no request-message anchor exists; unifying on in-place replacement is
+   retry-rail work (#249-adjacent), not discovery. Message allowance is
+   already NOT charged for retryable failures after this PR, so the quota
+   half of the concern is resolved.
+5. Exhausted-search presentation — after this PR the exhausted path shows
+   cheap rows with the escalation hidden, so it cannot read as an outage.
+   Whether exhaustion should ALSO surface the sign-in conversion prompt
+   ("bigger allowance with an account") is an **open product question**
+   recorded for the conversion-gate family; nothing kicks in today.
 
 ---
 
