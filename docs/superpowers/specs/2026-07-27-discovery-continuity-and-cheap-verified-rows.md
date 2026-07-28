@@ -646,17 +646,44 @@ Same trap in `unverified_names` copy and in the query summary.
 From `2026-07-25-grounded-discovery-search-v1-design.md` §1.1, which defines J1,
 J2 and J3. Run each in both languages against a real stack:
 
-1. **Standalone category discovery** — "¿Qué acciones de ciberseguridad puedo
-   probar?" → verified rows → tap one → the asset is known and never re-asked →
-   date window question → confirmation. This is #244 acceptance criterion 9 and
-   the only one that closes it.
-2. **Cheap path marked ungrounded** — a Spanish ask with no currency need returns
+1. **J1 — standalone category discovery** — "¿Qué acciones de ciberseguridad
+   puedo probar?" → verified rows → tap one → the asset is known and never
+   re-asked → date window question → confirmation.
+2. **J2 — post-result peer discovery.** See §11.5; this one is not a translation
+   pass, it is unproven behavior in both languages.
+3. **Cheap path marked ungrounded** — a Spanish ask with no currency need returns
    rows with the Spanish unsourced marker and a Spanish "search for current
    results" row.
-3. **Failed search** — Spanish retry row renders, reads naturally, and works.
-4. **Exhausted allowance** — the fall-through to cheap rows is honest in Spanish.
+4. **Failed search** — Spanish retry row renders, reads naturally, and works.
+5. **Exhausted allowance** — the fall-through to cheap rows is honest in Spanish.
 
-### 11.5 Acceptance
+Together J1 and J2 in both languages are #244 acceptance criterion 9.
+
+### 11.5 J2 has never been run, and no slice ever promised it
+
+Criterion 1 on #244 covers "standalone **and post-result** peer/category
+prompts". The standalone half is proven. The post-result half is not, and the
+next-moves spec says so explicitly:
+
+> "Post-result / post-draft selection: the selected asset keeps the
+> resolver-owned identity. Any broader carry-forward of capital, dates,
+> timeframe, benchmark, cadence, or strategy follows the general
+> artifact-continuity contract and **is not promised by Slice D**."
+
+So the behavior is *assumed* to work because artifact continuity exists. Nobody
+has watched it.
+
+**Run it, in both languages:** produce an NVDA result → "find companies similar
+to Nvidia" → the response appears beside the result **without erasing it** → tap
+AMD → the confirmation carries forward capital, date window, timeframe,
+benchmark and strategy from the anchored setup, with only the asset changed.
+
+**If carry-forward does not happen**, that is a finding, not a task to
+improvise. Record it here with what actually carried and what did not, and raise
+it before writing a fix — the artifact-continuity contract is the interpret/edit
+spine and is out of this spec's scope to redesign.
+
+### 11.6 Acceptance
 
 Screenshots or transcripts in both languages for every surface in §11.2. A
 passing catalog-key-parity check is not acceptance. Neither is a translation
@@ -786,7 +813,8 @@ a violation, so update the issue text in the same PR.
 Everything except the last line is inside this spec.
 
 - [ ] Items 1–9 landed (§3–§11)
-- [ ] Both-language journeys proven live, J1/J2/J3 (§11.4) — closes acceptance 9
+- [ ] Both-language journeys proven live, J1 and J2 (§11.4) — closes acceptance 9
+- [ ] J2 post-result carry-forward watched, not assumed (§11.5)
 - [ ] Real-PostgreSQL proof for anything touching a counter (§12.1)
 - [ ] #244 text reconciled with the cheap path (§14.2)
 - [ ] **Promotion — founder, out of scope here (§14.1)**
