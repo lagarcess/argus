@@ -410,6 +410,41 @@ UI**: classification has to route the turn to discovery for the meter to
 engage at all. Combined with 12.3, the allowance is far more theoretical than
 §5 assumes.
 
+### 12.9 DIRECTION CHANGE — cheap verified rows for everyone, search for accounts
+
+Founder-agreed 2026-07-27, after seeing both behaviors side by side.
+
+**The insight:** what moves a guest toward value is a **tappable verified row**,
+not a search. "Which pharma stocks could I test?" was answered as well by the
+brain as by a search — currency bought nothing. "Which stocks IPO'd in the last
+two months?" cannot be answered without one.
+
+**New shape:**
+
+| Path | Who | Cost | Output |
+| --- | --- | --- | --- |
+| Cheap suggestion | Everyone, default | one LLM call | brain names candidates, `resolve_asset()` validates, rendered as tappable rows, no sources, plainly unsourced |
+| Grounded search | Registered | metered search | rows + sources + freshness date |
+
+Discovery search becomes the **registered upgrade**, gated at genuine value.
+Guests still reach the aha — a verified asset, one tap, a real backtest.
+
+**What this does to this PR:** shrinks it substantially. Visitor metering, the
+global ceiling, and the free-identity problem exist because unauthenticated
+visitors spend metered money. If search is registered-only, most of that
+machinery is unnecessary — registered users are already metered by `user_id`,
+which works and has no foreign-key problem.
+
+**Keep regardless:** the capability truth fix (§6), the dropped-candidate copy
+fix (§7), and the two-output honesty rule — a sourced answer and a remembered
+one must never look alike.
+
+**Open work this creates:**
+1. Build cheap verified suggestions: brain names -> resolver validates -> rows.
+2. Make ungrounded answers visibly ungrounded.
+3. Decide whether any guest search survives at all, or none.
+4. Re-scope this PR against the answer; its review comments may go stale.
+
 ## 13. Documentation
 
 - Grounded discovery design §1: already marked superseded; point it here.
