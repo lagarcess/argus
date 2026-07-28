@@ -351,7 +351,9 @@
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
       "sources_panel_note": "Argus read these while answering. Not recommended reading.",
-      "sources_panel_close": "Close sources"
+      "sources_panel_close": "Close sources",
+      "allowance_banner": "Grounded search allowance used",
+      "allowance_banner_cta": "Sign in for more searches"
     },
     "result_breakdown": {
       "aria_label": "Result breakdown",
@@ -1047,7 +1049,8 @@
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",
       "new_conversation_create": "Create an account to keep this conversation and start another.",
-      "keep_history": "Sign in to keep this conversation and start another."
+      "keep_history": "Sign in to keep this conversation and start another.",
+      "discovery_searches": "Sign in for more grounded searches with sources."
     },
     "new_conversation": {
       "title": "Start a new conversation?",

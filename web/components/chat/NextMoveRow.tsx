@@ -11,8 +11,9 @@ type NextMoveRowProps = {
 
 /**
  * One conversational next move: a clarify option, a discovery candidate, or a
- * follow-up. Borderless at rest; hover brightens the arrow and title together
- * (no box, no shadow). The hit area spans the full column at >=44px tall.
+ * follow-up. Borderless at rest; hover tints the arrow and title together with
+ * muted teal (#5ba897, --rui-color-teal) -- no box, no shadow. The hit area
+ * spans the full column at >=44px tall.
  *
  * `disabled` mirrors the composer's in-flight lock: the row stays readable
  * because it is evidence, but stops accepting taps while a turn is running.
@@ -36,7 +37,7 @@ export default function NextMoveRow({
         className={`mt-[9px] shrink-0 text-[13px] leading-[1.5] text-black/35 transition-colors rtl:-scale-x-100 dark:text-white/35 ${
           disabled
             ? ""
-            : "group-hover/next-move:text-black/80 group-active/next-move:text-black/80 dark:group-hover/next-move:text-white/80 dark:group-active/next-move:text-white/80"
+            : "group-hover/next-move:text-[#5ba897] group-active/next-move:text-[#5ba897] dark:group-hover/next-move:text-[#5ba897] dark:group-active/next-move:text-[#5ba897]"
         }`}
       >
         ↳
@@ -51,7 +52,7 @@ export default function NextMoveRow({
 /** Row title; brightens with the arrow on hover so the row reads as one action. */
 export function NextMoveTitle({ children }: { children: ReactNode }) {
   return (
-    <span className="font-medium text-black/80 transition-colors group-hover/next-move:text-black group-active/next-move:text-black dark:text-white/85 dark:group-hover/next-move:text-white dark:group-active/next-move:text-white">
+    <span className="font-medium text-black/80 transition-colors group-hover/next-move:text-[#5ba897] group-active/next-move:text-[#5ba897] dark:text-white/85 dark:group-hover/next-move:text-[#5ba897] dark:group-active/next-move:text-[#5ba897]">
       {children}
     </span>
   );

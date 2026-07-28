@@ -875,6 +875,7 @@ export default function ChatInterface() {
     canUseGroundedDiscovery,
     requestGuestDecision,
     requestGuestFeedback,
+    requestGuestSearchUpgrade,
     requestGuestSignIn,
     requestNewChat,
     requestOmnisearch,
@@ -2197,6 +2198,7 @@ export default function ChatInterface() {
                           isGuest={isGuest}
                           canSaveDecision={canSaveDecision}
                           onDecisionUnavailable={requestGuestDecision}
+                          onRequestSearchUpgrade={requestGuestSearchUpgrade}
                           resumeDecisionArtifactId={
                             msg.id === resumeDecisionMessageId
                               ? resumeDecisionArtifactId

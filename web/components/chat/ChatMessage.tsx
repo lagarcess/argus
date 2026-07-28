@@ -41,6 +41,7 @@ type ChatMessageProps = {
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
+  onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
 };
@@ -61,6 +62,7 @@ export default function ChatMessage({
   isGuest = false,
   canSaveDecision = true,
   onDecisionUnavailable,
+  onRequestSearchUpgrade,
   resumeDecisionArtifactId,
   onDecisionResumeHandled,
 }: ChatMessageProps) {
@@ -444,6 +446,30 @@ export default function ChatMessage({
                   })()
                 ) : null}
               </div>
+              {isGuest &&
+              isLatest &&
+              message.discovery.sources.length === 0 &&
+              message.discovery.can_request_search === false &&
+              onRequestSearchUpgrade ? (
+                // Upsell on appetite, never on apology: this renders only on
+                // the honest exhausted answer, where the hidden search row sat.
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-[14px] border border-[#5ba897]/25 bg-[#5ba897]/[0.08] px-3 py-2.5">
+                  <p className="min-w-0 text-[13px] leading-[1.45] text-[#3f6658] dark:text-[#9fccbd]">
+                    {t("chat.discovery_results.allowance_banner", {
+                      defaultValue: "Grounded search allowance used",
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onRequestSearchUpgrade}
+                    className="shrink-0 rounded-full border border-[#5ba897]/40 px-3 py-1.5 text-[13px] font-medium text-[#3f6658] transition-colors hover:bg-[#5ba897]/15 dark:text-[#b4d5c8] dark:hover:bg-[#5ba897]/20"
+                  >
+                    {t("chat.discovery_results.allowance_banner_cta", {
+                      defaultValue: "Sign in for more searches",
+                    })}
+                  </button>
+                </div>
+              ) : null}
               {discoverySourcesLineText ? (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
                   <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">

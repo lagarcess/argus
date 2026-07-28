@@ -253,9 +253,15 @@ export function useGuestExperience({
     resumeDecisionArtifactId,
   );
 
+  const requestGuestSearchUpgrade = useCallback(
+    () => conversion.requestConversion("discovery_searches", null),
+    [conversion],
+  )
+
   return {
     ...shell,
     admitSend,
+    requestGuestSearchUpgrade,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
     clearResumeDecision,

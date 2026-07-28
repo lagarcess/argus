@@ -351,7 +351,9 @@
       "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",
       "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
-      "sources_panel_close": "Cerrar fuentes"
+      "sources_panel_close": "Cerrar fuentes",
+      "allowance_banner": "Cupo de búsqueda con fuentes agotado",
+      "allowance_banner_cta": "Inicia sesión para más búsquedas"
     },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",
@@ -1047,7 +1049,8 @@
       "save_decision": "Inicia sesión para guardar esta decisión.",
       "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
       "new_conversation_create": "Crea una cuenta para conservar esta conversación y comenzar otra.",
-      "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra."
+      "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra.",
+      "discovery_searches": "Inicia sesión para más búsquedas con fuentes."
     },
     "new_conversation": {
       "title": "¿Quieres iniciar otra conversación?",

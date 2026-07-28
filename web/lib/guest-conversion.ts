@@ -8,7 +8,8 @@ export type GuestConversionReason =
   | "message_limit"
   | "save_decision"
   | "new_conversation"
-  | "keep_history";
+  | "keep_history"
+  | "discovery_searches";
 
 export type GuestConversionMode = "login" | "signup";
 

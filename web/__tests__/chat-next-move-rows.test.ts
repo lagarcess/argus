@@ -34,12 +34,10 @@ describe("next-move row anatomy", () => {
     expect(row).not.toContain("bg-black/5");
     expect(row).not.toContain("border-transparent");
     expect(row).not.toContain("shadow-");
-    // The arrow participates in hover so the row reads as one action.
-    expect(row).toContain("group-hover/next-move:text-black/80");
-    expect(row).toContain("group-active/next-move:text-black/80");
-    // Titles brighten with the arrow via the shared NextMoveTitle.
+    // Arrow and title tint together with the palette teal token, both themes.
+    expect(row).toContain("group-hover/next-move:text-[#5ba897]");
+    expect(row).toContain("group-active/next-move:text-[#5ba897]");
     expect(row).toContain("export function NextMoveTitle");
-    expect(row).toContain("group-hover/next-move:text-black ");
   });
 
   test("hit area spans the column and stays tappable regardless of the visible box", () => {

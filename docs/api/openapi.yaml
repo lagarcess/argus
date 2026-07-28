@@ -2263,6 +2263,7 @@ components:
             - save_decision
             - new_conversation
             - keep_history
+            - discovery_searches
           - type: 'null'
         terminal_outcome:
           type: string
@@ -2348,6 +2349,7 @@ components:
           - save_decision
           - new_conversation
           - keep_history
+          - discovery_searches
         conversation_id:
           type: string
           maxLength: 128
