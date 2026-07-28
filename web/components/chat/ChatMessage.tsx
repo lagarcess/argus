@@ -232,10 +232,8 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
-  // Grounded rows wear per-row chips and the drawer owns the full list, so
-  // the footer never respells domains. Zero sources IS the ungrounded
-  // signal: derived, never asserted. No as-of date — the search date is not
-  // the articles' date; each source shows its own date in the drawer.
+  // Chips carry domains and the drawer owns the list; zero sources is the
+  // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
   const discoverySourcesLineText =
     isUser ||
     !message.discovery ||
@@ -406,9 +404,8 @@ export default function ChatMessage({
                         </>
                       ) : null}
                       {chipSource ? (
-                        // Pointer shortcut into the drawer; a plain span keeps
-                        // the row button's DOM legal, and the "N sources ›"
-                        // button stays the keyboard path to the same drawer.
+                        // Plain span: interactive content is invalid inside
+                        // the row button; the sources button is the keyboard path.
                         <span
                           onClick={(event) => {
                             event.stopPropagation();

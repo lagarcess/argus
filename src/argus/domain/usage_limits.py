@@ -43,8 +43,8 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_DISCOVERY_ALLOWANCE)
 ]
 
-# Founder decision 2026-07-28: guest messages and simulations follow the
-# visitor per day, like discovery, so a fresh session grants nothing new.
+# Guest allowances follow the visitor per day; a fresh session grants
+# nothing new. Decision record: docs/PRODUCT.md (guest access).
 GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_MESSAGE_ALLOWANCE)
 ]

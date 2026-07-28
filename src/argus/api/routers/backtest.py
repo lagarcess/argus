@@ -436,9 +436,8 @@ def _admit_direct_run(
         decision = str(outcome.get("decision") or "")
         job = outcome.get("job") if isinstance(outcome.get("job"), dict) else None
         if account.kind == "guest" and decision == "admitted":
-            # The reservation stays workspace-keyed for replay identity; the
-            # visitor row is the cross-renewal bound. Best-effort by design:
-            # the admission check above is the enforcement point.
+            # Workspace reservation owns replay identity; the visitor row
+            # is the cross-renewal bound (best-effort past admission).
             try:
                 settle_visitor_usage(
                     gateway.client,

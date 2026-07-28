@@ -103,8 +103,7 @@ async def discovery_stage_result_if_applicable(
     try:
         provider = selection.search_provider_for_config(provider_id=config.provider_id)
         usage["search_attempted"] = True
-        # Emitted after provider construction: a not-configured provider never
-        # announces a search that will not happen.
+        # Never announce a search that will not happen.
         emit_substage("discovery_search", detail=_search_subject(request))
         # Sync provider client: off the loop, or one search stalls every stream.
         packet = await asyncio.to_thread(
@@ -150,8 +149,7 @@ async def discovery_stage_result_if_applicable(
             usage=usage,
         )
     emit_substage("discovery_verify")
-    # Resolver lookups block like the provider search does: off the loop, or
-    # the verify line above cannot flush until validation already finished.
+    # Sync resolver lookups: off the loop, or the verify line above stalls.
     validated, unverified, uncorroborated = await asyncio.to_thread(
         lambda: validated_candidates(
             extraction,

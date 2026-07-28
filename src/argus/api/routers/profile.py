@@ -224,8 +224,8 @@ def get_me_usage(
                     now=now,
                 )
         except Exception as exc:
-            # Fail closed and loudly: a silent zero would hand out allowance
-            # we cannot account for, and a dead counter must not look healthy.
+            # Fail closed and loudly: a silent zero would hand out
+            # unaccounted allowance.
             logger.error(
                 "Visitor allowance read failed; treating window as exhausted",
                 error=str(exc),

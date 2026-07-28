@@ -243,6 +243,16 @@ _Design targets below are intentional for this system; if implementation keeps T
   keep separators as their own nodes so locales can restyle them, allow wrapping
   in scripts without spaces, and let content grow the row rather than fixing its
   height.
+- **Grounded rows wear their evidence; the drawer owns the rest** (decision
+  2026-07-28). Each grounded discovery row carries one muted domain chip — its
+  first corroborating source — after the reason text; tapping it opens the
+  sources drawer anchored to that source. The footer under grounded rows is the
+  `N sources ›` entry point alone: never a respelled domain list, and never an
+  "as of" date, because the search date is not the articles' date — each source
+  shows its own date in the drawer, which also keeps sole ownership of outbound
+  URLs. Cheap answers carry no chips and show the from-general-knowledge marker
+  line instead; zero sources **is** the ungrounded signal, derived, never
+  asserted.
 
 ### When next moves are live
 
