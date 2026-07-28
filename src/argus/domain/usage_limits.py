@@ -43,6 +43,15 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_DISCOVERY_ALLOWANCE)
 ]
 
+# Founder decision 2026-07-28: guest messages and simulations follow the
+# visitor per day, like discovery, so a fresh session grants nothing new.
+GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_MESSAGE_ALLOWANCE)
+]
+GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_SIMULATION_ALLOWANCE)
+]
+
 # Circuit breaker, not a budget: the only bound that holds when someone rotates
 # identity faster than any per-visitor limit can see. Sized so no honest day
 # reaches it. Env-overridable because a circuit breaker is worth nothing if
@@ -107,15 +116,24 @@ def allowance_windows(
 
 def message_usage_settlement(
     account: AccountContext | None = None,
+    *,
+    visitor_key: str | None = None,
 ) -> dict[str, Any]:
-    """One message unit settled with a durable terminal product outcome."""
+    """One message unit settled with a durable terminal product outcome.
+
+    Guests settle against the visitor (day window), not the workspace: a
+    fresh session must not mint a fresh allowance."""
     if account is not None and account.kind == "guest":
-        limits: Any = allowance_windows(account, MESSAGE_USAGE_RESOURCE)
-    else:
-        limits = list(MESSAGE_ALLOWANCE_LIMITS)
+        from argus.domain.visitor_usage import visitor_key_for
+
+        return {
+            "resource": MESSAGE_USAGE_RESOURCE,
+            "limits": list(GUEST_MESSAGE_VISITOR_LIMITS),
+            "visitor_key": visitor_key or visitor_key_for(None),
+        }
     return {
         "resource": MESSAGE_USAGE_RESOURCE,
-        "limits": limits,
+        "limits": list(MESSAGE_ALLOWANCE_LIMITS),
     }
 
 

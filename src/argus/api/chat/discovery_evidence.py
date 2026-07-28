@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -19,10 +16,16 @@ from argus.domain.usage_limits import (
     read_memory_usage,
     settle_memory_usage,
 )
+from argus.domain.visitor_usage import (
+    settle_visitor_usage,
+    visitor_key_for,
+    visitor_within_limits,
+)
+from argus.domain.visitor_usage import (
+    visitor_digest as _shared_visitor_digest,
+)
 
 DISCOVERY_USAGE_RESOURCE = "discovery_searches"
-# Namespaced so a visitor key can never be mistaken for an account id.
-_GUEST_SUBJECT_PREFIX = "visitor:"
 # The global ceiling is charged against the same non-account table as visitors.
 # usage_counters.user_id is a foreign key to profiles, so a synthetic global
 # subject there fails to insert, the failure is swallowed as telemetry, and the
@@ -31,10 +34,7 @@ GLOBAL_CEILING_KEY = "global:discovery"
 
 
 def _visitor_digest(identity: str) -> str:
-    """Keyed digest, never the raw value: the counter tells visitors apart
-    without retaining addresses, and keying defeats brute-forcing IPv4."""
-    secret = os.getenv("ARGUS_VISITOR_KEY_SECRET", "argus-visitor-key").encode()
-    return hmac.new(secret, identity.encode(), hashlib.sha256).hexdigest()[:32]
+    return _shared_visitor_digest(identity)
 
 
 def discovery_usage_limits(*, is_guest: bool = False) -> list[tuple[str, int]]:
@@ -56,11 +56,7 @@ def discovery_counter_subject(
 
     if not is_guest:
         return user_id
-    identity = (client_identity or "").strip() or "unknown"
-    return f"{_GUEST_SUBJECT_PREFIX}{_visitor_digest(identity)}"
-
-
-VISITOR_USAGE_TABLE = "visitor_usage_counters"
+    return visitor_key_for(client_identity)
 
 
 def _visitor_within_limits(
@@ -71,47 +67,22 @@ def _visitor_within_limits(
 ) -> bool:
     """Visitor allowances live outside usage_counters: its user_id FKs to
     profiles, and a visitor has no profile."""
-    client = api_state.supabase_gateway.client
-    for period, limit_count in limits:
-        start, _ = align_usage_period(now, period)
-        rows = (
-            client.table(VISITOR_USAGE_TABLE)
-            .select("used_count")
-            .eq("visitor_key", visitor_key)
-            .eq("resource", DISCOVERY_USAGE_RESOURCE)
-            .eq("period", period)
-            .eq("period_start", start.isoformat())
-            .limit(1)
-            .execute()
-            .data
-        )
-        used = int(rows[0].get("used_count", 0)) if rows else 0
-        if used >= limit_count:
-            return False
-    return True
+    return visitor_within_limits(
+        api_state.supabase_gateway.client,
+        visitor_key=visitor_key,
+        resource=DISCOVERY_USAGE_RESOURCE,
+        limits=limits,
+        now=now,
+    )
 
 
 def _charge_visitor(*, visitor_key: str, limits: list[tuple[str, int]]) -> None:
-    now = datetime.now(timezone.utc)
-    windows = []
-    for period, limit_count in limits:
-        start, end = align_usage_period(now, period)
-        windows.append(
-            {
-                "period": period,
-                "limit": limit_count,
-                "period_start": start.isoformat(),
-                "period_end": end.isoformat(),
-            }
-        )
-    api_state.supabase_gateway.client.rpc(
-        "settle_visitor_usage",
-        {
-            "p_visitor_key": visitor_key,
-            "p_resource": DISCOVERY_USAGE_RESOURCE,
-            "p_windows": windows,
-        },
-    ).execute()
+    settle_visitor_usage(
+        api_state.supabase_gateway.client,
+        visitor_key=visitor_key,
+        resource=DISCOVERY_USAGE_RESOURCE,
+        limits=limits,
+    )
 
 
 def _global_ceiling_available(*, now: datetime) -> bool:
