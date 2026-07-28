@@ -9,7 +9,7 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
-import NextMoveRow, { NextMoveDetail, NextMoveSeparator } from "./NextMoveRow";
+import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -41,6 +41,7 @@ type ChatMessageProps = {
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
+  onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
 };
@@ -61,6 +62,7 @@ export default function ChatMessage({
   isGuest = false,
   canSaveDecision = true,
   onDecisionUnavailable,
+  onRequestSearchUpgrade,
   resumeDecisionArtifactId,
   onDecisionResumeHandled,
 }: ChatMessageProps) {
@@ -233,7 +235,11 @@ export default function ChatMessage({
   const discoverySourcesLineText = (() => {
     if (isUser || !message.discovery) return "";
     const domains = discoverySourceDomains(message.discovery);
-    if (domains.length === 0) return "";
+    // Zero sources IS the ungrounded signal: derived, never asserted.
+    if (domains.length === 0)
+      return t("chat.discovery_results.unsourced_line", {
+        defaultValue: "From general knowledge, not a current search",
+      });
     const date = discoveryFreshnessDate(message.discovery, i18n.language);
     return date
       ? t("chat.discovery_results.sources_line", {
@@ -360,7 +366,7 @@ export default function ChatMessage({
 
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
-              <div className="flex flex-col">
+              <div className="flex flex-col divide-y divide-black/8 dark:divide-white/8">
                 {message.discovery.candidates.map((candidate) => {
                   const sendText = t("chat.discovery_results.test_candidate", {
                     symbol: candidate.symbol,
@@ -387,9 +393,7 @@ export default function ChatMessage({
                         })
                       }
                     >
-                      <span className="font-medium text-black dark:text-white">
-                        {sendText}
-                      </span>
+                      <NextMoveTitle>{sendText}</NextMoveTitle>
                       {hasName ? (
                         <>
                           <NextMoveSeparator>·</NextMoveSeparator>
@@ -405,7 +409,67 @@ export default function ChatMessage({
                     </NextMoveRow>
                   );
                 })}
+                {message.discovery.sources.length === 0 &&
+                message.discovery.can_request_search &&
+                isLatest ? (
+                  (() => {
+                    const searchLabel = t(
+                      "chat.discovery_results.search_current",
+                      { defaultValue: "Search for current results" },
+                    );
+                    // Restate the relationship: peer/comparison query_summary
+                    // is bare symbols, and "search for: AAPL" reads as a test.
+                    const searchSendText = t(
+                      `chat.discovery_results.search_current_send_${message.discovery.relationship}`,
+                      {
+                        query: message.discovery.query_summary,
+                        defaultValue:
+                          "Search current sources for: {{query}}",
+                      },
+                    );
+                    return (
+                      <NextMoveRow
+                        ariaLabel={searchLabel}
+                        disabled={turnInFlight}
+                        onClick={() =>
+                          // Typeless: a typed option is validated against the
+                          // latest turn's options and rejected as stale.
+                          onAction?.({
+                            label: searchSendText,
+                            value: searchSendText,
+                          })
+                        }
+                      >
+                        <NextMoveTitle>{searchLabel}</NextMoveTitle>
+                      </NextMoveRow>
+                    );
+                  })()
+                ) : null}
               </div>
+              {isGuest &&
+              isLatest &&
+              message.discovery.sources.length === 0 &&
+              message.discovery.can_request_search === false &&
+              onRequestSearchUpgrade ? (
+                // Upsell on appetite, never on apology: this renders only on
+                // the honest exhausted answer, where the hidden search row sat.
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-[14px] border border-[#5ba897]/25 bg-[#5ba897]/[0.08] px-3 py-2.5">
+                  <p className="min-w-0 text-[13px] leading-[1.45] text-[#3f6658] dark:text-[#9fccbd]">
+                    {t("chat.discovery_results.allowance_banner", {
+                      defaultValue: "Grounded search allowance used",
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onRequestSearchUpgrade}
+                    className="shrink-0 rounded-full border border-[#5ba897]/40 px-3 py-1.5 text-[13px] font-medium text-[#3f6658] transition-colors hover:bg-[#5ba897]/15 dark:text-[#b4d5c8] dark:hover:bg-[#5ba897]/20"
+                  >
+                    {t("chat.discovery_results.allowance_banner_cta", {
+                      defaultValue: "Sign in for more searches",
+                    })}
+                  </button>
+                </div>
+              ) : null}
               {discoverySourcesLineText ? (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
                   <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
@@ -437,13 +501,13 @@ export default function ChatMessage({
           ) : null}
 
           {showNextMoveRows && (
-            <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col">
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">
               {footerMessageActions.map((action) => (
                 <NextMoveRow
                   key={action.id ?? action.type ?? action.label}
                   onClick={() => onAction?.(action)}
                 >
-                  {actionLabel(action)}
+                  <NextMoveTitle>{actionLabel(action)}</NextMoveTitle>
                 </NextMoveRow>
               ))}
             </div>

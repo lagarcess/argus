@@ -60,12 +60,17 @@ def validated_candidates(
     resolve: Callable[..., Any],
     max_candidates: int,
     asset_class_hint: str | None = None,
+    require_source_evidence: bool = True,
 ) -> tuple[list[ValidatedCandidate], list[str], list[str]]:
     """Independently verify every extracted candidate before it can act.
 
     The resolver is the hard gate: a name the provider catalog cannot resolve
     never becomes selectable, no matter what the sources or the extraction
     model claimed about it.
+
+    require_source_evidence=False is for the model-knowledge path, which has
+    no sources by construction; the resolver and corroboration gates apply
+    identically on both paths.
     """
 
     validated: list[ValidatedCandidate] = []
@@ -130,7 +135,7 @@ def validated_candidates(
         )
         # Grounded means source-backed: a resolvable ticker with no surviving
         # source evidence must not become selectable.
-        if not valid_source_indices:
+        if require_source_evidence and not valid_source_indices:
             _note_unverified(unverified, display_name or symbol_guess)
             continue
         seen_symbols.add(canonical)

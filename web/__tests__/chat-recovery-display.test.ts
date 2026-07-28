@@ -284,10 +284,50 @@ describe("chat recovery display", () => {
 
     const text = recoveryDisplayText(display, tFromCatalog(esCatalog));
 
+    // No category means no rule was recognized: ask for the rule instead of
+    // claiming a capability limit (spec §5).
     expect(text).toBe(
-      "Argus todavía no puede ejecutar esa regla directamente para NVDA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      "¿Qué regla quieres probar para NVDA? ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
     );
     expect(text).not.toContain("invalid_chronological_date_range");
+  });
+
+  test("uncategorized constraint asks for the rule, never names the raw text", () => {
+    const display = recoveryDisplayFromMetadata({
+      response_intent: {
+        kind: "unsupported_recovery",
+        facts: {
+          strategy: {
+            asset_universe: ["WMT"],
+          },
+          unsupported_constraints: [
+            {
+              raw_value: "Backtest WMT",
+            },
+          ],
+        },
+        options: [
+          {
+            replacement_values: {
+              simplify_logic: "rsi_only",
+            },
+          },
+          {
+            replacement_values: {
+              strategy_type: "buy_and_hold",
+            },
+          },
+        ],
+      },
+    });
+
+    const text = recoveryDisplayText(display, tFromCatalog(enCatalog));
+
+    expect(text).toBe(
+      "What rule should I test for WMT? Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
+    );
+    expect(text).not.toContain("Backtest WMT");
+    expect(text).not.toContain("can't run");
   });
 
   test("renders unsupported recovery from typed clarification sidecars", () => {

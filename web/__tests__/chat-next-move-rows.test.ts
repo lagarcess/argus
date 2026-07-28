@@ -29,12 +29,15 @@ const es = JSON.parse(
 );
 
 describe("next-move row anatomy", () => {
-  test("rest state is borderless and the wash only appears on hover or press", () => {
-    expect(row).toContain("border-transparent");
-    expect(row).toContain("group-hover/next-move:border-black/12");
-    expect(row).toContain("group-active/next-move:border-black/12");
-    expect(row).toContain("group-hover/next-move:bg-black/5");
-    expect(row).toContain("group-active/next-move:bg-black/5");
+  test("rest state is boxless and hover brightens the arrow and title together", () => {
+    // No wash, no box, no shadow: hover is color emphasis only.
+    expect(row).not.toContain("bg-black/5");
+    expect(row).not.toContain("border-transparent");
+    expect(row).not.toContain("shadow-");
+    // Arrow and title tint together with the palette teal token, both themes.
+    expect(row).toContain("group-hover/next-move:text-[#5ba897]");
+    expect(row).toContain("group-active/next-move:text-[#5ba897]");
+    expect(row).toContain("export function NextMoveTitle");
   });
 
   test("hit area spans the column and stays tappable regardless of the visible box", () => {

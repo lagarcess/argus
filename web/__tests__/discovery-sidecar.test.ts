@@ -89,6 +89,24 @@ describe("discoverySidecarFromMetadata", () => {
     expect(sidecar?.sources).toHaveLength(5);
   });
 
+  test("can_request_search parses only an explicit backend true", () => {
+    const granted = discoverySidecarFromMetadata({
+      discovery: { ...validSidecar(), sources: [], can_request_search: true },
+    });
+    expect(granted?.can_request_search).toBe(true);
+
+    const absent = discoverySidecarFromMetadata({
+      discovery: validSidecar(),
+    });
+    expect(absent?.can_request_search).toBe(false);
+
+    // A truthy non-boolean is not backend truth.
+    const forged = discoverySidecarFromMetadata({
+      discovery: { ...validSidecar(), can_request_search: "yes" },
+    });
+    expect(forged?.can_request_search).toBe(false);
+  });
+
   test("rejects unknown kinds and relationships", () => {
     const wrongKind = { ...validSidecar(), kind: "news_feed" };
     expect(discoverySidecarFromMetadata({ discovery: wrongKind })).toBeNull();

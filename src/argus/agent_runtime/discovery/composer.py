@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -10,6 +12,7 @@ from argus.agent_runtime.discovery.contracts import (
     ValidatedCandidate,
 )
 from argus.agent_runtime.discovery.extraction import extract_candidates
+from argus.agent_runtime.discovery.model_knowledge import name_candidates
 from argus.agent_runtime.discovery.validation import validated_candidates
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
@@ -75,14 +78,6 @@ async def discovery_stage_result_if_applicable(
             current_user_message=current_user_message,
             language=language,
         )
-    if not discovery_allowance_available:
-        return await _recovery_result(
-            decision=decision,
-            code="discovery_limit_reached",
-            retryable=False,
-            current_user_message=current_user_message,
-            language=language,
-        )
     request = decision.asset_discovery
     query = _search_query(request)
     if request is None or not query:
@@ -93,11 +88,23 @@ async def discovery_stage_result_if_applicable(
             current_user_message=current_user_message,
             language=language,
         )
+    # Cheap rows are the default; exhausted allowance falls through here too.
+    if not request.needs_current_facts or not discovery_allowance_available:
+        return await _model_knowledge_result(
+            decision=decision,
+            request=request,
+            max_candidates=config.max_candidates,
+            current_user_message=current_user_message,
+            language=language,
+            can_request_search=discovery_allowance_available,
+        )
     usage: dict[str, Any] = {"search_attempted": False}
     try:
         provider = selection.search_provider_for_config(provider_id=config.provider_id)
         usage["search_attempted"] = True
-        packet = provider.search(
+        # Sync provider client: off the loop, or one search stalls every stream.
+        packet = await asyncio.to_thread(
+            provider.search,
             query,
             max_results=5,
             timeout_seconds=config.timeout_seconds,
@@ -166,8 +173,12 @@ async def discovery_stage_result_if_applicable(
         request=request,
         candidates=validated,
         packet=packet,
-        unverified_names=unverified,
-        uncorroborated_names=uncorroborated,
+        unverified_names=_user_subject_drops(
+            unverified, request=request, current_user_message=current_user_message
+        ),
+        uncorroborated_names=_user_subject_drops(
+            uncorroborated, request=request, current_user_message=current_user_message
+        ),
         current_user_message=current_user_message,
         language=language,
     )
@@ -205,6 +216,99 @@ async def discovery_stage_result_if_applicable(
             "discovery": sidecar,
             "discovery_usage": usage,
         },
+    )
+
+
+async def _model_knowledge_result(
+    *,
+    decision: InterpretDecision,
+    request: AssetDiscoveryRequest,
+    max_candidates: int,
+    current_user_message: str,
+    language: str,
+    can_request_search: bool,
+) -> StageResult:
+    """Model knowledge in, resolver-verified rows out; zero sources in the
+    sidecar is the ungrounded marker (derived, never asserted)."""
+    extraction = await name_candidates(request=request, language=language)
+    if extraction is None:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_suggestions_unavailable",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+        )
+    packet = _model_knowledge_packet()
+    validated, unverified, uncorroborated = validated_candidates(
+        extraction,
+        packet=packet,
+        resolve=resolve_asset,
+        max_candidates=max_candidates,
+        asset_class_hint=request.asset_class_hint,
+        require_source_evidence=False,
+    )
+    if not validated:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_no_verified_candidates",
+            retryable=False,
+            current_user_message=current_user_message,
+            language=language,
+            unverified_names=unverified,
+            uncorroborated_names=uncorroborated,
+        )
+    voiced = await _voiced_discovery_response(
+        request=request,
+        candidates=validated,
+        packet=packet,
+        unverified_names=_user_subject_drops(
+            unverified, request=request, current_user_message=current_user_message
+        ),
+        uncorroborated_names=_user_subject_drops(
+            uncorroborated, request=request, current_user_message=current_user_message
+        ),
+        current_user_message=current_user_message,
+        language=language,
+        grounded=False,
+    )
+    if not voiced:
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_suggestions_unavailable",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+        )
+    sidecar = _discovery_sidecar(
+        request=request,
+        packet=packet,
+        candidates=validated,
+        unverified_names=unverified + uncorroborated,
+        can_request_search=can_request_search,
+    )
+    logger.info(
+        "Model-knowledge discovery response composed",
+        relationship=request.relationship,
+        extracted_count=len(extraction.candidates),
+        validated_count=len(validated),
+        unverified_count=len(unverified),
+        uncorroborated_count=len(uncorroborated),
+        can_request_search=can_request_search,
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": voiced, "discovery": sidecar},
+    )
+
+
+def _model_knowledge_packet() -> SearchResultPacket:
+    return SearchResultPacket(
+        results=(),
+        retrieved_at=datetime.now(timezone.utc),
+        latency_ms=0,
+        provider_id="model_knowledge",
     )
 
 
@@ -263,6 +367,7 @@ async def _recovery_result(
             "retryable": retryable,
             "prompt_source": "llm_generated",
         }
+    # retryable=True is the whole signal; the API layer owns the durable retry.
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(
@@ -270,6 +375,37 @@ async def _recovery_result(
         decision=decision,
         stage_patch=stage_patch,
     )
+
+
+def _user_subject_drops(
+    names: list[str],
+    *,
+    request: AssetDiscoveryRequest,
+    current_user_message: str,
+) -> list[str]:
+    """Presentation gate: a dropped name is mentioned only when it is the
+    user's own subject (typed anchor, or named in their message). Internal
+    filtering stays silent; telemetry keeps the full lists."""
+    if not names:
+        return []
+    haystack = _alnum(current_user_message)
+    anchors = {_alnum(symbol) for symbol in request.anchor_symbols}
+    kept: list[str] = []
+    for name in names:
+        whole = _alnum(name)
+        first = _alnum(name.split()[0]) if name.split() else ""
+        if (
+            (whole and whole in haystack)
+            or (len(first) >= 3 and first in haystack)
+            or whole in anchors
+            or first in anchors
+        ):
+            kept.append(name)
+    return kept
+
+
+def _alnum(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
 
 
 def _drop_reason_facts(
@@ -311,8 +447,12 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
         "from memory. The user can simply ask again in a moment."
     ),
     "discovery_no_verified_candidates": (
-        "Sources came back, but no candidate could be verified as a tradable "
-        "asset, so there is nothing safe to offer."
+        "No candidate could be verified as a tradable asset, so there is "
+        "nothing safe to offer."
+    ),
+    "discovery_suggestions_unavailable": (
+        "Putting together suggestions failed temporarily. You will not guess "
+        "names inline. The user can simply ask again in a moment."
     ),
     "discovery_limit_reached": (
         "The user has used all grounded lookups available for now; the "
@@ -346,12 +486,11 @@ async def _voiced_discovery_recovery(
                 "You are Argus, a chat-first investing experimentation "
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
-                "Reply in two or three warm plain sentences that state the "
-                "situation honestly, remind them their conversation and any "
-                "current setup are unchanged, and invite them to name a symbol "
-                "or company so you can test it. Do not list tradable asset "
-                "suggestions from memory, do not mention providers or internal "
-                "tools, and do not give investment advice."
+                "Reply in at most two short plain sentences: state the "
+                "situation honestly, then one concrete next step (retry, or "
+                "name a symbol to test). No reassurance boilerplate, no "
+                "tradable asset suggestions from memory, no providers or "
+                "internal tools, no investment advice."
             ),
         },
         {"role": "user", "content": message},
@@ -376,34 +515,44 @@ async def _voiced_discovery_response(
     uncorroborated_names: list[str],
     current_user_message: str,
     language: str,
+    grounded: bool = True,
 ) -> str | None:
     candidate_lines = "\n".join(
         f"- {item.symbol} ({item.name}, {item.asset_class}): {item.reason_text}"
         for item in candidates
     )
-    freshness = packet.retrieved_at.date().isoformat()
-    facts = [
-        f"Verified candidates (the complete allowed list):\n{candidate_lines}",
-        f"Sources were retrieved on {freshness} from {len(packet.results)} pages.",
-    ]
+    facts = [f"Verified candidates (the complete allowed list):\n{candidate_lines}"]
+    if grounded:
+        freshness = packet.retrieved_at.date().isoformat()
+        facts.append(
+            f"Sources were retrieved on {freshness} from {len(packet.results)} pages."
+        )
+    else:
+        facts.append(
+            "These candidates come from your general knowledge. No search was "
+            "performed and there are no sources."
+        )
     drops = _drop_reason_facts(unverified_names, uncorroborated_names)
     if drops:
         facts.append(drops.strip())
     language_instruction = response_language_instruction(language)
+    # Rows and the marker line own candidates and grounding; prose must not
+    # duplicate the screen.
     messages = [
         {
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation "
                 f"assistant. {language_instruction} "
-                "Using ONLY the verified facts below, write a short plain "
-                "answer to the user's discovery request: one framing sentence, "
-                "then one short line per candidate saying why it matches, and "
-                "one closing sentence that these came from current sources and "
-                "the user can pick one to test historically. Never add assets "
-                "beyond the verified list, never rank them as best or "
-                "recommend buying, never mention providers or internal tools, "
-                "and keep it educational, not advice."
+                "The interface below your reply already shows every verified "
+                "candidate as a tappable row and already states whether the "
+                "answer came from current sources or general knowledge. Write "
+                "ONE short framing sentence answering the user's discovery "
+                "request; add one brief sentence about the dropped names only "
+                "if the facts mention any. Do not list or name the candidates, "
+                "do not restate where the answer came from, never add assets "
+                "beyond the verified list, never rank or recommend buying, "
+                "never mention providers or internal tools."
             ),
         },
         {"role": "system", "content": "\n\n".join(facts)},
@@ -414,7 +563,14 @@ async def _voiced_discovery_response(
             task="discovery_voicing",
             messages=messages,
         )
-    except Exception:
+    except Exception as exc:
+        # Unlogged, a dead voicing model looks like a transient blip.
+        logger.warning(
+            "Discovery voicing call failed",
+            error=str(exc),
+            grounded=grounded,
+            failure_classification="discovery_voicing_unavailable",
+        )
         return None
     cleaned = str(response or "").strip()
     return cleaned or None
@@ -426,13 +582,21 @@ def _discovery_sidecar(
     packet: SearchResultPacket,
     candidates: list[ValidatedCandidate],
     unverified_names: list[str],
+    can_request_search: bool | None = None,
 ) -> dict[str, Any]:
     query_summary = (
         request.category_description
         or ", ".join(request.anchor_symbols)
         or request.relationship
     )
+    # Backend-owned: the escalation row renders only while this is true.
+    escalation = (
+        {"can_request_search": can_request_search}
+        if can_request_search is not None
+        else {}
+    )
     return {
+        **escalation,
         "schema_version": DISCOVERY_SIDECAR_SCHEMA_VERSION,
         "kind": "asset_discovery",
         "relationship": request.relationship,

@@ -282,9 +282,10 @@
       },
       "discovery_unavailable": "I cannot look up current source-backed candidates yet, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
       "discovery_search_failed": "I could not complete a source-backed lookup just now, and I will not guess names from memory. Everything in this chat is unchanged; ask again in a moment or name a symbol and I can test it.",
-      "discovery_no_verified_candidates": "I found sources but could not verify any tradable match for that request. Name a symbol or company you have in mind and I can test it; everything in this chat is unchanged.",
+      "discovery_no_verified_candidates": "I could not verify any tradable match for that request. Name a symbol or company you have in mind and I can test it; everything in this chat is unchanged.",
       "discovery_limit_reached": "You have used all the grounded lookups available for now. The allowance resets on a schedule; meanwhile, name a symbol you already have in mind and I can test it.",
-      "discovery_target_missing": "Tell me what to look for: a category like cybersecurity stocks, or a company to find peers of, and I can bring back verified candidates."
+      "discovery_target_missing": "Tell me what to look for: a category like cybersecurity stocks, or a company to find peers of, and I can bring back verified candidates.",
+      "discovery_suggestions_unavailable": "I couldn't put together suggestions just now. Everything in this chat is unchanged; try again in a moment or name a symbol and I can test it."
     },
     "clarification": {
       "period": "What date window should I use?",
@@ -307,6 +308,8 @@
       "unsupported_recovery_for_asset": "Argus can't run that rule directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value": "Argus can't run {{rawValue}} directly yet. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value_for_asset": "Argus can't run {{rawValue}} directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_incomplete": "What rule should I test? Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_incomplete_for_asset": "What rule should I test for {{symbol}}? Which supported direction should I use: {{options}}?",
       "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
       "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
       "timeframe_actions": {
@@ -339,11 +342,18 @@
       "test_candidate": "Backtest {{symbol}}",
       "sources_line": "Sources: {{domains}} · as of {{date}}",
       "sources_line_undated": "Sources: {{domains}}",
+      "unsourced_line": "From general knowledge, not a current search",
+      "search_current": "Search for current results",
+      "search_current_send_category": "Search current sources for: {{query}}",
+      "search_current_send_peer": "Search current sources for companies similar to {{query}}",
+      "search_current_send_comparison": "Search current sources for assets comparable to {{query}}",
       "sources_panel_open_one": "{{count}} source ›",
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
       "sources_panel_note": "Argus read these while answering. Not recommended reading.",
-      "sources_panel_close": "Close sources"
+      "sources_panel_close": "Close sources",
+      "allowance_banner": "Grounded search allowance used",
+      "allowance_banner_cta": "Sign in for more searches"
     },
     "result_breakdown": {
       "aria_label": "Result breakdown",
@@ -1039,7 +1049,8 @@
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",
       "new_conversation_create": "Create an account to keep this conversation and start another.",
-      "keep_history": "Sign in to keep this conversation and start another."
+      "keep_history": "Sign in to keep this conversation and start another.",
+      "discovery_searches": "Sign in for more grounded searches with sources."
     },
     "new_conversation": {
       "title": "Start a new conversation?",

@@ -169,13 +169,20 @@ export function recoveryDisplayText(
     }
     const symbol = display.values.symbol;
     const rawValue = display.values.rawValue;
-    const key = rawValue
+    const reasonCode = display.values.reasonCode;
+    // No category: nothing was recognized as a rule, so ask for one.
+    const ruleMissing = !reasonCode || reasonCode === "unsupported_constraint";
+    const key = ruleMissing
       ? symbol
-        ? "chat.clarification.unsupported_recovery_with_raw_value_for_asset"
-        : "chat.clarification.unsupported_recovery_with_raw_value"
-      : symbol
-        ? "chat.clarification.unsupported_recovery_for_asset"
-        : "chat.clarification.unsupported_recovery";
+        ? "chat.clarification.unsupported_recovery_incomplete_for_asset"
+        : "chat.clarification.unsupported_recovery_incomplete"
+      : rawValue
+        ? symbol
+          ? "chat.clarification.unsupported_recovery_with_raw_value_for_asset"
+          : "chat.clarification.unsupported_recovery_with_raw_value"
+        : symbol
+          ? "chat.clarification.unsupported_recovery_for_asset"
+          : "chat.clarification.unsupported_recovery";
     return t(key, {
       rawValue,
       symbol,
@@ -680,11 +687,15 @@ function unsupportedRawValue(
 }
 
 function looksLikeInternalCode(value: string): boolean {
-  return (
+  if (
     value.includes("_") &&
     value === value.toLowerCase() &&
     !/\s/.test(value)
-  );
+  ) {
+    return true;
+  }
+  // Sentence punctuation marks an explanation, not a name (mirrors backend).
+  return value.trimEnd().endsWith(".") || value.includes(". ");
 }
 
 function canonicalJson(value: unknown): string {

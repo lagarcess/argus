@@ -37,6 +37,7 @@ RecoveryMessageCode = Literal[
     "discovery_no_verified_candidates",
     "discovery_limit_reached",
     "discovery_target_missing",
+    "discovery_suggestions_unavailable",
 ]
 
 
@@ -171,9 +172,14 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "again in a moment or name a symbol and I can test it."
     ),
     "discovery_no_verified_candidates": (
-        "I found sources but could not verify any tradable match for that "
-        "request. Name a symbol or company you have in mind and I can test it; "
-        "everything in this chat is unchanged."
+        "I could not verify any tradable match for that request. Name a "
+        "symbol or company you have in mind and I can test it; everything in "
+        "this chat is unchanged."
+    ),
+    "discovery_suggestions_unavailable": (
+        "I could not put together suggestions just now. Everything in this "
+        "chat is unchanged; ask again in a moment or name a symbol and I can "
+        "test it."
     ),
     "discovery_limit_reached": (
         "You have used all the grounded lookups available for now. The "

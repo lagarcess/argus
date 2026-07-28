@@ -920,6 +920,8 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
         conversation_id = conversation.id
         user_message_id = str(uuid4())
         assistant_message_id = str(uuid4())
+        # Bulk inserts share one transaction now(); tie-broken order is luck.
+        seeded_at = datetime.now(timezone.utc)
         gateway.client.table("messages").insert(
             [
                 {
@@ -928,6 +930,7 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
                     "user_id": source_user_id,
                     "role": "user",
                     "content": "One guest message",
+                    "created_at": seeded_at.isoformat(),
                 },
                 {
                     "id": assistant_message_id,
@@ -935,6 +938,7 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
                     "user_id": source_user_id,
                     "role": "assistant",
                     "content": "One durable response",
+                    "created_at": (seeded_at + timedelta(seconds=1)).isoformat(),
                 },
             ]
         ).execute()

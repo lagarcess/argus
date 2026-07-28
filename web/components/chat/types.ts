@@ -280,4 +280,7 @@ export type DiscoverySidecar = {
   sources: DiscoverySource[];
   candidates: DiscoveryCandidate[];
   unverified_names: string[];
+  /** Backend-owned: the "search current results" escalation may render only
+   * when true, so the row can never outlive the allowance. */
+  can_request_search?: boolean;
 };

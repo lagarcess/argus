@@ -717,6 +717,7 @@ GuestConversionReason = Literal[
     "save_decision",
     "new_conversation",
     "keep_history",
+    "discovery_searches",
 ]
 
 

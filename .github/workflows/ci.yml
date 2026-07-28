@@ -137,14 +137,12 @@ jobs:
             tests/test_guest_observability.py \
             -q --no-cov
 
-      - name: Run required real-PostgreSQL guest matrix
+      # Glob-level so a new _postgres proof is gated without editing this
+      # workflow; a hand-maintained list is how uncovered tables ship green.
+      - name: Run required real-PostgreSQL matrix
         run: |
           poetry run pytest \
-            tests/test_allowance_accounting_postgres.py \
-            tests/test_chat_turn_lifecycle_postgres.py \
-            tests/test_guest_cleanup_postgres.py \
-            tests/test_guest_handoff_postgres.py \
-            tests/test_guest_workspace_postgres.py \
+            tests/test_*_postgres.py \
             --junitxml=temp/guest-postgres-junit.xml \
             -q --no-cov
           poetry run python scripts/qa/assert_pytest_gate.py \

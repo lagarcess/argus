@@ -70,6 +70,7 @@ GuestFunnelConversionReason = Literal[
     "save_decision",
     "new_conversation",
     "keep_history",
+    "discovery_searches",
 ]
 
 GUEST_FUNNEL_EVENT_MAP: dict[

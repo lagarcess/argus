@@ -173,7 +173,8 @@ def _unsupported_recovery_fallback(
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
     _ = language
-    if _unsupported_reason_code(response_intent) == "future_performance":
+    reason_code = _unsupported_reason_code(response_intent)
+    if reason_code == "future_performance":
         options = _option_labels(response_intent)
         offer = (
             f" Which direction should I take: {_join_options(options)}?"
@@ -184,7 +185,7 @@ def _unsupported_recovery_fallback(
             "I cannot predict future performance. I can test how the same idea "
             f"performed over a historical period instead.{offer}"
         )
-    if _unsupported_reason_code(response_intent) == "unsupported_time_granularity":
+    if reason_code == "unsupported_time_granularity":
         raw_value = _unsupported_raw_value(response_intent)
         if raw_value:
             return (
@@ -199,12 +200,16 @@ def _unsupported_recovery_fallback(
     symbol = _primary_symbol(strategy)
     joined_options = _join_options(options)
     symbol_suffix = f" for {symbol}" if symbol else ""
-    # No unsupported reason code means "the rule is incomplete", so the copy
-    # states the capability boundary instead of judging the rule's contents.
-    if _unsupported_reason_code(response_intent) == "sentiment_news_rule":
+    if reason_code == "sentiment_news_rule":
         return (
             f"Argus can't test news or sentiment as an execution rule yet"
             f"{symbol_suffix}. "
+            f"Which supported direction should I use: {joined_options}?"
+        )
+    # No category: nothing was recognized as a rule, so ask for one.
+    if reason_code == "unsupported_constraint":
+        return (
+            f"What rule should I test{symbol_suffix}? "
             f"Which supported direction should I use: {joined_options}?"
         )
     subject = raw_value or "that rule"
@@ -361,11 +366,14 @@ def _looks_like_internal_code(value: str) -> bool:
     # lowercase snake_case token is an internal reason code and must never
     # render in prose. Uppercase underscore tokens (BTC_USDT, BRK_B) are
     # user-typed symbols and stay quotable.
-    return (
+    if (
         "_" in value
         and value == value.lower()
         and not any(character.isspace() for character in value)
-    )
+    ):
+        return True
+    # Sentence punctuation marks an explanation, not a name.
+    return value.rstrip().endswith(".") or ". " in value
 
 
 def _fallback_option_label(option: dict[str, Any]) -> str | None:
