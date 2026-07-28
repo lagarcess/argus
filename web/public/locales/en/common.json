@@ -666,7 +666,8 @@
         "cancel": "Cancel",
         "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
-      }
+      },
+      "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     }
   },
   "strategies": {

@@ -23,6 +23,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
+import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
 
 
 type ChatMessageProps = {
@@ -252,6 +253,10 @@ export default function ChatMessage({
     (key, options) => t(key, options),
     i18n.resolvedLanguage ?? i18n.language ?? "en",
   );
+  const confirmationBenchmarkLeadIn = confirmationBenchmarkAdjustmentText(
+    message.confirmation?.benchmark_adjustment,
+    (key, options) => t(key, options),
+  );
 
   if (isUser && message.kind === "action") {
     return (
@@ -332,6 +337,11 @@ export default function ChatMessage({
               {confirmationPeriodLeadIn ? (
                 <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
                   {confirmationPeriodLeadIn}
+                </p>
+              ) : null}
+              {confirmationBenchmarkLeadIn ? (
+                <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+                  {confirmationBenchmarkLeadIn}
                 </p>
               ) : null}
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />

@@ -883,3 +883,72 @@ def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
 
     assert card is not None
     assert card["capabilities"] == {"execution_costs_editable": True}
+
+
+def test_confirmation_card_discloses_reconciled_benchmark() -> None:
+    """Issue #296: a named comparison target our provider cannot run proceeds
+    with the default benchmark and the swap pinned on the card."""
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+                    "capital_amount": 1000,
+                    "comparison_baseline": "SPY",
+                    "resolution_provenance": [
+                        {
+                            "field": "comparison_baseline",
+                            "raw_text": "SAMSUNG",
+                            "source": "llm_extraction",
+                            "candidate_kind": "asset",
+                            "resolution_status": "ambiguous",
+                        }
+                    ],
+                },
+                "optional_parameters": {},
+                "launch_payload": {},
+            },
+        },
+        confirmation_id="conf-296",
+        conversation_id="conv-296",
+        language="es-419",
+    )
+
+    assert card is not None
+    assert card["benchmark_adjustment"] == {
+        "code": "comparison_target_unsupported",
+        "requested_target": "SAMSUNG",
+        "effective_benchmark": "SPY",
+    }
+
+
+def test_confirmation_card_has_no_benchmark_note_without_a_cleared_leg() -> None:
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "comparison_baseline": "SPY",
+                },
+                "optional_parameters": {},
+                "launch_payload": {},
+            },
+        },
+        confirmation_id="conf-297",
+        conversation_id="conv-297",
+        language="en",
+    )
+
+    assert card is not None
+    assert "benchmark_adjustment" not in card

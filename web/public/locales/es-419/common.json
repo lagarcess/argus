@@ -666,7 +666,8 @@
         "cancel": "Cancelar",
         "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
         "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
-      }
+      },
+      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     }
   },
   "strategies": {
