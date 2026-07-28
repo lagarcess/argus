@@ -26,5 +26,9 @@ DISCOVERY_ACT_GUIDANCE = (
     "Ordinary 'what should I try next?' follow-ups stay result_followup "
     "with next_experiment; questions about what Argus supports stay "
     "educational_question; a direct request to test a named asset is "
-    "never asset_discovery. "
+    "never asset_discovery. A pending confirmation or draft does not "
+    "change this classification: 'what companies similar to X could I "
+    "try?' is asset_discovery even while a run is waiting for approval — "
+    "never answer it as an edit to the pending run, and never claim "
+    "Argus cannot find similar assets. "
 )

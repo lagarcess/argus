@@ -217,3 +217,57 @@ class TestNonDiscoveryTurnsStayOut:
         result = _run(message="Backtest AAPL for last year", response=response)
         assert constructed == []
         assert result.outcome != "end_run"
+
+
+class TestDiscoveryDuringPendingConfirmation:
+    """Issue #292: carried confirmation state never rides a discovery turn."""
+
+    def test_public_payload_of_a_discovery_turn_carries_no_confirmation(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what companies similar to Apple could I try?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Here are candidates.",
+            "discovery": {"kind": "asset_discovery", "candidates": []},
+        }
+
+        serialized = _public_result(result)
+
+        assert "discovery" in serialized
+        assert "confirmation_payload" not in serialized
+
+    def test_non_discovery_turn_keeps_the_confirmation_backfill(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what assumptions are you using?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Standard assumptions.",
+        }
+
+        serialized = _public_result(result)
+
+        assert "confirmation_payload" in serialized

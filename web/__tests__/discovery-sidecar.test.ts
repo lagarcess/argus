@@ -155,6 +155,33 @@ describe("hydrateMessagesFromApi discovery attach", () => {
     expect(messages[0]?.discovery ?? null).toBeNull();
   });
 
+  test("a message carrying both keys keeps its discovery rows (#292)", () => {
+    const items = [
+      {
+        ...base,
+        id: "m5",
+        role: "assistant",
+        content: "Here is what I verified.",
+        metadata: {
+          discovery: validSidecar(),
+          confirmation_card: {
+            confirmation_id: "c-stale",
+            confirmation_state: "active",
+            title: "AAPL buy and hold",
+            summary: "Ready.",
+            rows: [],
+            actions: [],
+          },
+        },
+      },
+    ] as unknown as ApiMessage[];
+    const { messages } = hydrateMessagesFromApi(items);
+    expect(messages[0]?.kind).not.toBe("strategy_confirmation");
+    expect(messages[0]?.discovery?.candidates.map((c) => c.symbol)).toEqual([
+      "CRWD",
+    ]);
+  });
+
   test("user messages never hydrate discovery", () => {
     const items = [
       {

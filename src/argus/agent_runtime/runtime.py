@@ -369,8 +369,11 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
     if run_state is not None:
         if (
             "confirmation_payload" not in serialized
+            and "discovery" not in serialized
             and getattr(run_state, "confirmation_payload", None) is not None
         ):
+            # A discovery turn answers who exists; carried confirmation state
+            # stays thread-internal and never rides its public payload.
             serialized["confirmation_payload"] = _serialize_public_value(
                 "confirmation_payload",
                 run_state.confirmation_payload,

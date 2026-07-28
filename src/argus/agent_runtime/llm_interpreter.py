@@ -15,6 +15,9 @@ from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
+from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
+    BENCHMARK_LANGUAGE_GUIDANCE,
+)
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -801,23 +804,8 @@ class OpenRouterStructuredInterpreter:
             "currency pairs are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. "
             + execution_cost_capability_clause()
-            + "Benchmark language matters in any user language: when a symbol is "
-            "framed as a benchmark, reference, comparison target, or market "
-            "baseline, put it in comparison_baseline instead of asset_universe. "
-            "A one-asset buy/hold request with a separate benchmark is executable "
-            "as the primary asset plus comparison_baseline; do not call this an "
-            "unsupported direct comparison. Do not add benchmark symbols to "
-            "asset_universe unless the user explicitly says to buy, hold, or test "
-            "both as traded assets. Examples: AAPL against SPY, AAPL with SPY "
-            "as the benchmark, and AAPL con SPY como referencia all mean "
-            "asset_universe=['AAPL'] and comparison_baseline='SPY'. "
-            "Carry the user's named comparison target into comparison_baseline "
-            "verbatim even when it is not a known or supported symbol; never "
-            "silently substitute a default benchmark for a target the user "
-            "named — downstream validation owns reporting unsupported targets. "
-            "Set field_provenance.comparison_baseline="
-            "'explicit_user' only when the current user message explicitly names "
-            "the comparison or benchmark. When the user gives exact start/end dates, "
+            + BENCHMARK_LANGUAGE_GUIDANCE
+            + "When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
             f"The current runtime date is {date.today().isoformat()}; if the user "
