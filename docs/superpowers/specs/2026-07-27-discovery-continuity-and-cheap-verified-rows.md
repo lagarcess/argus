@@ -496,6 +496,26 @@ the interpret stage runs. Full behavior and non-goals are in the next-moves spec
 Item 6 must land first. Without it both progress lines arrive together when the
 search returns, which is precisely the dishonesty the slice exists to remove.
 
+### 9.5 Search value visibility — per-row citations (founder-approved 2026-07-28)
+
+Grounded rows should wear their evidence. Every grounded candidate already
+carries `source_indices` into the sidecar, so no backend change is needed:
+
+- Each grounded candidate row renders a small domain chip after the reason
+  text — the domain of its first source (`sources[source_indices[0]].domain`),
+  muted, non-competing with the title.
+- Tapping the chip opens the existing sources drawer anchored to that source.
+  No new outbound-link surface; the drawer keeps ownership of URLs.
+- Cheap rows have no indices and render no chips — one more visible
+  difference between a researched answer and a remembered one, on top of the
+  marker line.
+- Bounds: one chip per row (first corroborating source); the drawer shows the
+  rest. No per-claim prose citations — the rows are the claims here.
+
+Acceptance: a grounded EN/ES response shows per-row domain chips opening the
+drawer at the right source; cheap responses show none; screenshots both
+themes.
+
 ---
 
 ## 10. Item 8 — guest identity and lifetime
@@ -808,9 +828,16 @@ tests.
    half of the concern is resolved.
 5. Exhausted-search presentation — after this PR the exhausted path shows
    cheap rows with the escalation hidden, so it cannot read as an outage.
-   Whether exhaustion should ALSO surface the sign-in conversion prompt
-   ("bigger allowance with an account") is an **open product question**
-   recorded for the conversion-gate family; nothing kicks in today.
+   **Resolved 2026-07-28 (landed in this PR, `a200536e`):** the founder chose
+   the appetite-gate. Doctrine: *upsell on appetite, never on apology* —
+   transient failures keep plain retry; the guest exhausted answer carries a
+   quiet teal banner where the hidden escalation row sat, opening the
+   standard conversion modal with a typed `discovery_searches` reason
+   (frontend union + backend schema/funnel literals + OpenAPI artifact).
+   Registered users at their daily cap get nothing (no gate to offer,
+   deliberate). Also landed: rows tint arrow+title with the palette teal
+   (`#5ba897`) on hover in both themes — monochrome brightening was
+   imperceptible in light mode.
 
 ---
 
