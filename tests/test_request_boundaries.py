@@ -202,6 +202,29 @@ def test_chunked_oversize_chat_request_is_rejected_before_owner_work(
     assert forbid_expensive_chat_owners == []
 
 
+def test_parser_recursion_limit_is_a_validation_error_before_owner_work(
+    forbid_expensive_chat_owners: list[str],
+) -> None:
+    nested_arrays = b"[" * 1_000 + b"0" + b"]" * 1_000
+    body = (
+        b'{"conversation_id":"conversation-1","message":"x",'
+        b'"action":{"type":"show_breakdown","label":"Show breakdown",'
+        b'"payload":{"deep":' + nested_arrays + b"}}}"
+    )
+
+    status, headers, response_body, _ = _asgi_post(
+        [body],
+        headers={"X-Request-Id": "parser-recursion-limit"},
+    )
+
+    assert status == 422
+    payload = json.loads(response_body)
+    assert payload["code"] == "validation_error"
+    assert payload["request_id"] == "parser-recursion-limit"
+    assert headers["x-request-id"] == "parser-recursion-limit"
+    assert forbid_expensive_chat_owners == []
+
+
 @pytest.mark.parametrize(
     ("name", "payload"),
     [

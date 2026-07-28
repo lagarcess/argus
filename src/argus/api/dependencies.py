@@ -131,6 +131,14 @@ def _declared_content_length(scope: Scope) -> int | None:
 def _chat_stream_validation_errors(body: bytes) -> list[dict[str, Any]] | None:
     try:
         payload = json.loads(body)
+    except RecursionError:
+        return [
+            {
+                "type": "value_error",
+                "loc": ["body"],
+                "msg": "Value error, request_body_nesting_exceeded",
+            }
+        ]
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
     try:
