@@ -760,7 +760,10 @@ async def _stage_result_from_interpretation(
             )
         )
         strategy, validated_benchmark_reason_codes = (
-            _strategy_with_validated_benchmark_symbol(strategy)
+            _strategy_with_validated_benchmark_symbol(
+                strategy,
+                current_message=state.current_user_message,
+            )
         )
         strategy, default_benchmark_reason_codes = _strategy_with_default_benchmark(
             strategy
@@ -3091,8 +3094,22 @@ def _strategy_with_benchmark_owner_asset_repair(
     return updated, ["current_message_asset_grounding_repaired"]
 
 
+def _user_spelling_of(value: str, message: str) -> str | None:
+    """The message's own casing of an exactly-matching typed token."""
+    lowered = value.casefold()
+    if not lowered:
+        return None
+    for token in message.split():
+        cleaned = token.strip(".,;:!?()\"'")
+        if cleaned.casefold() == lowered:
+            return cleaned
+    return None
+
+
 def _strategy_with_validated_benchmark_symbol(
     strategy: StrategySummary,
+    *,
+    current_message: str = "",
 ) -> tuple[StrategySummary, list[str]]:
     benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
@@ -3130,9 +3147,15 @@ def _strategy_with_validated_benchmark_symbol(
     updated.comparison_baseline = None
     if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
         # The user named this leg and no clarification will run for it; keep
-        # its provenance so the constraint reports the true blocker.
+        # its provenance wearing the user's own spelling of the typed value
+        # so the card discloses the swap in their words.
+        stated = str(strategy.comparison_baseline or "").strip()
+        display = _user_spelling_of(stated, current_message) or stated
+        provenance = resolution.provenance
+        if display and display.upper() == str(provenance.raw_text or "").upper():
+            provenance = provenance.model_copy(update={"raw_text": display})
         updated.resolution_provenance = _dedupe_resolution_provenance(
-            [*updated.resolution_provenance, resolution.provenance]
+            [*updated.resolution_provenance, provenance]
         )
     return updated, ["invalid_benchmark_symbol_cleared"]
 
