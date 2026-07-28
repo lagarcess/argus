@@ -6,8 +6,12 @@
 -- allowance resets on a timer -- the hole this table closes.
 --
 -- The subject here is deliberately opaque text, not a uuid and not a foreign
--- key: it identifies a caller we have no account for. Rows are disposable and
--- expire with their window.
+-- key: it identifies a caller we have no account for.
+--
+-- visitor_key holds a keyed digest, never a raw address. The counter needs to
+-- tell visitors apart, not to name them, and a raw IP in a primary key would be
+-- a durable record of who visited. Rows are disposable and are deleted once
+-- their window has passed.
 
 create table if not exists public.visitor_usage_counters (
   visitor_key text not null,
@@ -35,7 +39,7 @@ alter table public.visitor_usage_counters enable row level security;
 -- visitor allowances. Enabling RLS without policies is the deny-all default.
 
 revoke all on table public.visitor_usage_counters from public, anon, authenticated;
-grant select, insert, update on table public.visitor_usage_counters to service_role;
+grant select, insert, update, delete on table public.visitor_usage_counters to service_role;
 
 
 -- One settlement charge for a visitor, mirroring the account-scoped path.
@@ -95,4 +99,29 @@ $$;
 revoke all on function public.settle_visitor_usage(text, text, jsonb)
   from public, anon, authenticated;
 grant execute on function public.settle_visitor_usage(text, text, jsonb)
+  to service_role;
+
+
+-- Bounded retention. Nothing here is worth keeping past its window, and a
+-- counter table with no cleanup path becomes an accidental visitor log.
+create or replace function public.purge_expired_visitor_usage(
+  p_before timestamptz default now()
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted integer;
+begin
+  delete from public.visitor_usage_counters where period_end <= p_before;
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
+revoke all on function public.purge_expired_visitor_usage(timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.purge_expired_visitor_usage(timestamptz)
   to service_role;

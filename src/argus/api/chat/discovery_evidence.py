@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -20,6 +23,23 @@ from argus.domain.usage_limits import (
 DISCOVERY_USAGE_RESOURCE = "discovery_searches"
 # Namespaced so a visitor key can never be mistaken for an account id.
 _GUEST_SUBJECT_PREFIX = "visitor:"
+# The global ceiling is charged against the same non-account table as visitors.
+# usage_counters.user_id is a foreign key to profiles, so a synthetic global
+# subject there fails to insert, the failure is swallowed as telemetry, and the
+# ceiling silently never trips.
+GLOBAL_CEILING_KEY = "global:discovery"
+
+
+def _visitor_digest(identity: str) -> str:
+    """Keyed digest of a visitor identifier, never the raw value.
+
+    The counter only needs to tell visitors apart, not to name them. A raw IP
+    in a primary key is a durable record of who visited; a keyed digest carries
+    the same signal without retaining the address. Keyed rather than plain
+    because an IPv4 space is small enough to brute-force a bare hash.
+    """
+    secret = os.getenv("ARGUS_VISITOR_KEY_SECRET", "argus-visitor-key").encode()
+    return hmac.new(secret, identity.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def discovery_usage_limits(*, is_guest: bool = False) -> list[tuple[str, int]]:
@@ -49,7 +69,7 @@ def discovery_counter_subject(
     if not is_guest:
         return user_id
     identity = (client_identity or "").strip() or "unknown"
-    return f"{_GUEST_SUBJECT_PREFIX}{identity}"
+    return f"{_GUEST_SUBJECT_PREFIX}{_visitor_digest(identity)}"
 
 
 VISITOR_USAGE_TABLE = "visitor_usage_counters"
@@ -110,6 +130,34 @@ def _charge_visitor(*, visitor_key: str, limits: list[tuple[str, int]]) -> None:
     ).execute()
 
 
+def _global_ceiling_available(*, now: datetime) -> bool:
+    """The ceiling is charged where a non-account subject can actually persist."""
+    limits = [("day", global_discovery_daily_ceiling())]
+    if api_state.supabase_gateway is not None:
+        return _visitor_within_limits(
+            visitor_key=GLOBAL_CEILING_KEY, limits=limits, now=now
+        )
+    return _subject_within_limits(
+        subject=GLOBAL_DISCOVERY_CEILING_SUBJECT, limits=limits, now=now
+    )
+
+
+def _charge_global_ceiling() -> None:
+    limits = [("day", global_discovery_daily_ceiling())]
+    try:
+        if api_state.supabase_gateway is not None:
+            _charge_visitor(visitor_key=GLOBAL_CEILING_KEY, limits=limits)
+            return
+    except Exception as exc:
+        logger.warning(
+            "Global discovery ceiling settlement failed",
+            error=str(exc),
+            failure_classification="telemetry_only",
+        )
+        return
+    _charge_subject(subject=GLOBAL_DISCOVERY_CEILING_SUBJECT, limits=limits)
+
+
 def _subject_within_limits(
     *,
     subject: str,
@@ -168,11 +216,7 @@ def discovery_allowance_available(
         return True
     now = datetime.now(timezone.utc)
     try:
-        if not _subject_within_limits(
-            subject=GLOBAL_DISCOVERY_CEILING_SUBJECT,
-            limits=[("day", global_discovery_daily_ceiling())],
-            now=now,
-        ):
+        if not _global_ceiling_available(now=now):
             logger.warning(
                 "Grounded discovery stopped by the global daily ceiling",
                 ceiling=global_discovery_daily_ceiling(),
@@ -236,10 +280,7 @@ def _charge_discovery_attempt(
 ) -> None:
     # Charge both bounds the read consulted, or the ceiling never advances and
     # the per-subject allowance would be the only real limit.
-    _charge_subject(
-        subject=GLOBAL_DISCOVERY_CEILING_SUBJECT,
-        limits=[("day", global_discovery_daily_ceiling())],
-    )
+    _charge_global_ceiling()
     subject = discovery_counter_subject(
         user_id=user_id, is_guest=is_guest, client_identity=client_identity
     )

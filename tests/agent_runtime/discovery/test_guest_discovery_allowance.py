@@ -73,9 +73,10 @@ class TestCounterSubject:
         subject = discovery_counter_subject(
             user_id="guest-1", is_guest=True, client_identity=identity
         )
-        assert subject.endswith("unknown")
         assert subject != "guest-1"
         assert subject.startswith("visitor:")
+        # The identifier itself is never stored, even the placeholder.
+        assert "unknown" not in subject
 
 
 class TestGlobalCeiling:
@@ -90,14 +91,17 @@ class TestGlobalCeiling:
             return subject != GLOBAL_DISCOVERY_CEILING_SUBJECT
 
         monkeypatch.setattr(discovery_evidence, "_subject_within_limits", _within)
+        monkeypatch.setattr(
+            discovery_evidence, "_global_ceiling_available", lambda *, now: False
+        )
         assert (
             discovery_evidence.discovery_allowance_available(
                 "user-1", is_guest=False, client_identity="203.0.113.7"
             )
             is False
         )
-        # Checked first, and the per-subject read never happens once it trips.
-        assert seen == [GLOBAL_DISCOVERY_CEILING_SUBJECT]
+        # The per-subject read never happens once the ceiling trips.
+        assert seen == []
 
     def test_within_the_ceiling_the_per_subject_allowance_decides(
         self, monkeypatch: pytest.MonkeyPatch
@@ -109,14 +113,18 @@ class TestGlobalCeiling:
             return True
 
         monkeypatch.setattr(discovery_evidence, "_subject_within_limits", _within)
+        monkeypatch.setattr(
+            discovery_evidence, "_global_ceiling_available", lambda *, now: True
+        )
         assert (
             discovery_evidence.discovery_allowance_available(
                 "guest-1", is_guest=True, client_identity="203.0.113.7"
             )
             is True
         )
-        assert seen[0] == GLOBAL_DISCOVERY_CEILING_SUBJECT
-        assert seen[1].endswith("203.0.113.7")
+        assert seen[0].startswith("visitor:")
+        # A raw address is never the stored key.
+        assert "203.0.113.7" not in seen[0]
 
 
 class TestCeilingIsConfigurable:
