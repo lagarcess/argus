@@ -17,7 +17,6 @@ from argus.agent_runtime.discovery.validation import validated_candidates
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
     recovery_message,
-    retry_last_turn_stage_patch,
 )
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.stages.interpret_types import (
@@ -368,12 +367,9 @@ async def _recovery_result(
             "retryable": retryable,
             "prompt_source": "llm_generated",
         }
-    if retryable:
-        # retryable=True must render an affordance, not just persist a flag:
-        # the frontend retry rail reads metadata.retry_last_turn.
-        retry_last_turn = retry_last_turn_stage_patch(current_user_message)
-        if retry_last_turn is not None:
-            stage_patch.update(retry_last_turn)
+    # retryable=True is the whole signal: the API layer anchors the durable
+    # retry affordance to the persisted user request when it sees it. The
+    # graph state deliberately carries no retry_last_turn channel.
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(
@@ -545,7 +541,15 @@ async def _voiced_discovery_response(
             task="discovery_voicing",
             messages=messages,
         )
-    except Exception:
+    except Exception as exc:
+        # A silent None here surfaces as a retryable recovery; without the log
+        # a dead voicing model is indistinguishable from a transient blip.
+        logger.warning(
+            "Discovery voicing call failed",
+            error=str(exc),
+            grounded=grounded,
+            failure_classification="discovery_voicing_unavailable",
+        )
         return None
     cleaned = str(response or "").strip()
     return cleaned or None

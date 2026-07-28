@@ -1103,14 +1103,32 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
                 if persisted_text or lifecycle_hooks.turn_id is not None:
-                    assistant_message = lifecycle_hooks.complete(
-                        content=persisted_text or "",
-                        metadata=metadata,
-                        settle_usage=ordinary_turn_settlement(
-                            is_run_backtest_turn=is_run_backtest_turn,
-                            account=turn_account,
-                        ),
+                    retryable_recovery_code = (
+                        str(recovery.get("code") or "recoverable_failure")
+                        if isinstance(recovery, dict)
+                        and recovery.get("retryable") is True
+                        else None
                     )
+                    if retryable_recovery_code is not None:
+                        # A retryable in-band recovery (a failed discovery
+                        # search) finalizes as a recoverable failure: the
+                        # lifecycle owns the durable retry affordance, and a
+                        # completed turn deliberately strips it.
+                        assistant_message = lifecycle_hooks.recoverable_failure(
+                            content=persisted_text or "",
+                            metadata=metadata,
+                            failure_code=retryable_recovery_code,
+                            retryable=True,
+                        )
+                    else:
+                        assistant_message = lifecycle_hooks.complete(
+                            content=persisted_text or "",
+                            metadata=metadata,
+                            settle_usage=ordinary_turn_settlement(
+                                is_run_backtest_turn=is_run_backtest_turn,
+                                account=turn_account,
+                            ),
+                        )
                     if lifecycle_hooks.turn_id is not None:
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id

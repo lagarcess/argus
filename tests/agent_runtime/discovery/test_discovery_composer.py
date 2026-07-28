@@ -383,9 +383,6 @@ class TestCheapVerifiedRows:
         patch = result.patch
         assert patch["recovery"]["code"] == "discovery_suggestions_unavailable"
         assert patch["recovery"]["retryable"] is True
-        assert patch["retry_last_turn"] == {
-            "message": "What cybersecurity stocks could I test?"
-        }
         assert provider.calls == []
 
     @pytest.mark.asyncio()
@@ -437,22 +434,22 @@ class TestSearchDoesNotBlockTheEventLoop:
 
 
 class TestRetryAffordance:
-    """Spec §4: retryable=True must render an affordance, not just persist a
-    flag. The frontend retry rail reads metadata.retry_last_turn."""
+    """Spec §4: retryable on the typed recovery is the whole signal. The API
+    layer anchors the durable retry affordance to the persisted user request;
+    the graph state deliberately carries no retry_last_turn channel."""
 
     @pytest.mark.asyncio()
-    async def test_retryable_failure_carries_retry_last_turn(
+    async def test_retryable_failure_flags_retryable_without_payload_key(
         self, flag_on: pytest.MonkeyPatch
     ) -> None:
         provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision())
-        assert result.patch["retry_last_turn"] == {
-            "message": "What cybersecurity stocks could I test?"
-        }
+        assert result.patch["recovery"]["retryable"] is True
+        assert "retry_last_turn" not in result.patch
 
     @pytest.mark.asyncio()
-    async def test_voiced_retryable_failure_also_carries_retry_last_turn(
+    async def test_voiced_retryable_failure_keeps_the_flag(
         self, flag_on: pytest.MonkeyPatch
     ) -> None:
         provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
@@ -463,9 +460,7 @@ class TestRetryAffordance:
 
         flag_on.setattr(composer_module, "_voiced_discovery_recovery", _voiced_recovery)
         result = await _run(_decision())
-        assert result.patch["retry_last_turn"] == {
-            "message": "What cybersecurity stocks could I test?"
-        }
+        assert result.patch["recovery"]["retryable"] is True
 
     @pytest.mark.asyncio()
     async def test_non_retryable_recoveries_offer_no_retry(
