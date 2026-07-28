@@ -16,6 +16,9 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    // Missing keys resolve to "" (falsy), so `t(dynamicKey) || t(fallback)`
+    // actually falls back instead of rendering the raw key.
+    parseMissingKeyHandler: () => '',
     backend: {
       loadPath: '/locales/{{lng}}/{{ns}}.json',
     },

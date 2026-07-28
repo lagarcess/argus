@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from loguru import logger
@@ -18,6 +19,11 @@ from argus.api.guest_observability import (
     guest_session_allowance_present,
 )
 from argus.domain.backtest_admission import CHAT_RUN_SCOPE, validate_idempotency_key
+from argus.domain.usage_limits import (
+    GUEST_SIMULATION_VISITOR_LIMITS,
+    SIMULATION_USAGE_RESOURCE,
+)
+from argus.domain.visitor_usage import settle_visitor_usage, visitor_within_limits
 
 BACKPRESSURE_RECONCILE_SCAN_LIMIT = 16
 
@@ -56,6 +62,33 @@ def admit_durable_chat_job(
         "payload_hash": payload_digest,
     }
 
+    visitor_key = getattr(context, "visitor_key", None)
+    if visitor_key:
+        # Replay resolves before allowance: a retry of an admitted run must
+        # return its existing job, never a conversion wall.
+        existing_reservation = gateway.get_backtest_job_reservation(
+            user_id=context.user_id,
+            operation_scope=CHAT_RUN_SCOPE,
+            idempotency_key=idempotency_key,
+        )
+        if existing_reservation is None and not visitor_within_limits(
+            gateway.client,
+            visitor_key=visitor_key,
+            resource=SIMULATION_USAGE_RESOURCE,
+            limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
+            now=datetime.now(timezone.utc),
+        ):
+            emit_verified_guest_funnel_event(
+                "guest_limit_reached",
+                user_id=context.user_id,
+                conversation_id=context.conversation_id,
+                surface="backtest",
+                capability_category="simulation",
+                conversion_reason="second_simulation",
+                terminal_outcome="limit_reached",
+            )
+            return ChatAdmissionResult(decision="conversion_required")
+
     for attempt in (1, 2):
         outcome = gateway.admit_backtest_job(
             user_id=context.user_id,
@@ -74,6 +107,21 @@ def admit_durable_chat_job(
         decision = str(outcome.get("decision") or "")
         if decision in ("admitted", "replay"):
             job = outcome.get("job")
+            if decision == "admitted" and visitor_key:
+                # Best-effort: the check above is the enforcement point.
+                try:
+                    settle_visitor_usage(
+                        gateway.client,
+                        visitor_key=visitor_key,
+                        resource=SIMULATION_USAGE_RESOURCE,
+                        limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Visitor simulation settlement failed",
+                        error=str(exc),
+                        failure_classification="telemetry_only",
+                    )
             if decision == "admitted" and guest_session_allowance_present(
                 context.allowance_limits
             ):

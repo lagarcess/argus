@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -267,7 +267,7 @@ def test_terminal_finalization_uses_service_only_atomic_rpc() -> None:
     ]
 
 
-def test_terminal_finalization_serializes_guest_lifetime_window() -> None:
+def test_terminal_finalization_serializes_guest_visitor_window() -> None:
     user_id = _id()
     conversation_id = _id()
     turn_id = _id()
@@ -289,7 +289,8 @@ def test_terminal_finalization_serializes_guest_lifetime_window() -> None:
             user_id=user_id,
             expires_at=expires_at,
             capabilities=guest_capabilities(),
-        )
+        ),
+        visitor_key="visitor:serialization-proof",
     )
 
     persisted = gateway.finalize_chat_turn(
@@ -306,13 +307,12 @@ def test_terminal_finalization_serializes_guest_lifetime_window() -> None:
 
     assert persisted == assistant
     assert client.rpc.call_args.args[1]["p_usage_limits"] == [
-        {
-            "period": "guest_session",
-            "limit": 10,
-            "period_start": (expires_at - timedelta(days=7)).isoformat(),
-            "period_end": expires_at.isoformat(),
-        }
+        {"period": "day", "limit": 10}
     ]
+    assert (
+        client.rpc.call_args.args[1]["p_visitor_key"]
+        == "visitor:serialization-proof"
+    )
 
 
 def test_response_option_retry_sends_only_the_persisted_request_identity() -> None:

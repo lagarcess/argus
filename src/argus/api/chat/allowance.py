@@ -7,6 +7,7 @@ simulation allowance at admission and skip message accounting.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Request
@@ -14,16 +15,17 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import dev_memory_fallback_enabled, problem
-from argus.api.guest_access import AccountContext, account_context
+from argus.api.guest_access import AccountContext, account_context, client_identity
 from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.schemas import User
 from argus.domain.usage_limits import (
+    GUEST_MESSAGE_VISITOR_LIMITS,
     MESSAGE_ALLOWANCE_LIMITS,
     MESSAGE_USAGE_RESOURCE,
     QuotaExceededError,
-    allowance_windows,
     message_usage_settlement,
 )
+from argus.domain.visitor_usage import visitor_key_for, visitor_within_limits
 
 
 def check_message_allowance(request: Request, user: User) -> None:
@@ -33,11 +35,17 @@ def check_message_allowance(request: Request, user: User) -> None:
     try:
         context = account_context(request)
         if context.kind == "guest":
-            api_state.supabase_gateway.check_allowance_windows(
-                user_id=user.id,
+            # Visitor-keyed: a renewed workspace must not refresh the window.
+            if not visitor_within_limits(
+                api_state.supabase_gateway.client,
+                visitor_key=visitor_key_for(client_identity(request)),
                 resource=MESSAGE_USAGE_RESOURCE,
-                windows=allowance_windows(context, MESSAGE_USAGE_RESOURCE),
-            )
+                limits=list(GUEST_MESSAGE_VISITOR_LIMITS),
+                now=datetime.now(timezone.utc),
+            ):
+                raise QuotaExceededError(
+                    "Quota exceeded for chat_messages (day)"
+                )
         else:
             api_state.supabase_gateway.check_usage_limits(
                 user_id=user.id,
@@ -78,5 +86,8 @@ def ordinary_turn_settlement(
     *,
     is_run_backtest_turn: bool,
     account: AccountContext,
+    visitor_key: str | None = None,
 ) -> dict[str, Any] | None:
-    return None if is_run_backtest_turn else message_usage_settlement(account)
+    if is_run_backtest_turn:
+        return None
+    return message_usage_settlement(account, visitor_key=visitor_key)

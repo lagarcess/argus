@@ -176,6 +176,11 @@ class ChatTurnLifecycleGatewayMixin:
                     if settle_usage is not None
                     else None
                 ),
+                "p_visitor_key": (
+                    settle_usage.get("visitor_key")
+                    if settle_usage is not None
+                    else None
+                ),
             },
         ).execute()
         rows = _data_rows(result)

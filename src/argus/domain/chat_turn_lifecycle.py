@@ -10,6 +10,7 @@ from argus.api.chat.previews import accepted_user_message_preview, plain_text_pr
 from argus.api.schemas import Message
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.usage_limits import settle_memory_usage
+from argus.domain.visitor_usage import settle_memory_visitor_usage
 
 TurnStatus = Literal[
     "accepted",
@@ -448,7 +449,14 @@ class MemoryChatTurnLifecycleGateway:
                     if item.id != appended.id
                 ]
                 raise ValueError("Chat-turn finalization conflict.")
-            if settle_usage is not None:
+            if settle_usage is not None and settle_usage.get("visitor_key"):
+                settle_memory_visitor_usage(
+                    self.store.visitor_usage_counters,
+                    visitor_key=settle_usage["visitor_key"],
+                    resource=settle_usage["resource"],
+                    limits=settle_usage["limits"],
+                )
+            elif settle_usage is not None:
                 settle_memory_usage(
                     self.store.usage_counters,
                     user_id=user_id,

@@ -23,10 +23,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
-import {
-  discoveryFreshnessDate,
-  discoverySourceDomains,
-} from "@/lib/chat-discovery-sidecar";
+
 
 type ChatMessageProps = {
   message: Message;
@@ -71,6 +68,9 @@ export default function ChatMessage({
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [anchorSourceIndex, setAnchorSourceIndex] = useState<number | null>(
+    null,
+  );
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
   const optionsRef = useRef<HTMLDivElement>(null);
   const selectedFeedbackClass =
@@ -232,26 +232,16 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
-  const discoverySourcesLineText = (() => {
-    if (isUser || !message.discovery) return "";
-    const domains = discoverySourceDomains(message.discovery);
-    // Zero sources IS the ungrounded signal: derived, never asserted.
-    if (domains.length === 0)
-      return t("chat.discovery_results.unsourced_line", {
-        defaultValue: "From general knowledge, not a current search",
-      });
-    const date = discoveryFreshnessDate(message.discovery, i18n.language);
-    return date
-      ? t("chat.discovery_results.sources_line", {
-          domains: domains.join(", "),
-          date,
-          defaultValue: "Sources: {{domains}} · as of {{date}}",
-        })
-      : t("chat.discovery_results.sources_line_undated", {
-          domains: domains.join(", "),
-          defaultValue: "Sources: {{domains}}",
+  // Chips carry domains and the drawer owns the list; zero sources is the
+  // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
+  const discoverySourcesLineText =
+    isUser ||
+    !message.discovery ||
+    message.discovery.sources.length > 0
+      ? ""
+      : t("chat.discovery_results.unsourced_line", {
+          defaultValue: "From general knowledge, not a current search",
         });
-  })();
   // Localized heading chrome for latest-result fact answers, driven by the
   // typed fact key. Unknown keys render no heading.
   const factHeadingLabel = message.resultFactHeadingKey
@@ -374,6 +364,13 @@ export default function ChatMessage({
                   });
                   const hasName =
                     Boolean(candidate.name) && candidate.name !== candidate.symbol;
+                  // One chip per row: the first corroborating source. Cheap
+                  // rows carry no indices, so they stay chipless by shape.
+                  const chipIndex = candidate.source_indices?.[0];
+                  const chipSource =
+                    chipIndex === undefined
+                      ? undefined
+                      : message.discovery?.sources[chipIndex];
                   return (
                     <NextMoveRow
                       key={candidate.symbol}
@@ -405,6 +402,20 @@ export default function ChatMessage({
                           <NextMoveSeparator>—</NextMoveSeparator>
                           <NextMoveDetail>{candidate.reason_text}</NextMoveDetail>
                         </>
+                      ) : null}
+                      {chipSource ? (
+                        // Plain span: interactive content is invalid inside
+                        // the row button; the sources button is the keyboard path.
+                        <span
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setAnchorSourceIndex(chipIndex ?? null);
+                            setShowSources(true);
+                          }}
+                          className="ms-1.5 inline-flex translate-y-[-1px] cursor-pointer items-center rounded-full border border-black/10 px-1.5 py-px align-middle text-[11px] leading-[1.4] text-black/45 transition-colors hover:border-black/25 hover:text-black/70 dark:border-white/12 dark:text-white/45 dark:hover:border-white/30 dark:hover:text-white/75"
+                        >
+                          {chipSource.domain}
+                        </span>
                       ) : null}
                     </NextMoveRow>
                   );
@@ -470,11 +481,14 @@ export default function ChatMessage({
                   </button>
                 </div>
               ) : null}
-              {discoverySourcesLineText ? (
+              {discoverySourcesLineText ||
+              message.discovery.sources.length > 0 ? (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-black/8 pt-2 dark:border-white/8">
-                  <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
-                    {discoverySourcesLineText}
-                  </p>
+                  {discoverySourcesLineText ? (
+                    <p className="min-w-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
+                      {discoverySourcesLineText}
+                    </p>
+                  ) : null}
                   {message.discovery.sources.length > 0 ? (
                     <button
                       type="button"
@@ -495,8 +509,12 @@ export default function ChatMessage({
 
           {message.discovery && showSources ? (
             <DiscoverySourcesPanel
-              onClose={() => setShowSources(false)}
+              onClose={() => {
+                setShowSources(false);
+                setAnchorSourceIndex(null);
+              }}
               sidecar={message.discovery}
+              anchorIndex={anchorSourceIndex}
             />
           ) : null}
 

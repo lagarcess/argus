@@ -117,23 +117,3 @@ export function discoveryCandidateMention(
     insert_text: symbol,
   };
 }
-
-/** Locale-formatted "as of" label from the sidecar's ISO timestamps. */
-export function discoveryFreshnessDate(
-  sidecar: DiscoverySidecar,
-  locale: string,
-): string {
-  const raw = sidecar.retrieved_at;
-  const parsed = raw ? new Date(raw) : null;
-  if (!parsed || Number.isNaN(parsed.getTime())) return "";
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(parsed);
-}
-
-/** Compact unique source-domain list for the plain-text sources line. */
-export function discoverySourceDomains(sidecar: DiscoverySidecar): string[] {
-  const domains: string[] = [];
-  for (const source of sidecar.sources) {
-    if (!domains.includes(source.domain)) domains.push(source.domain);
-  }
-  return domains;
-}

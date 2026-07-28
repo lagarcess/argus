@@ -49,6 +49,7 @@ class BacktestJobShadowContext:
     request_id: str | None = None
     chat_action: dict[str, Any] | None = None
     allowance_limits: list[dict[str, object]] | None = None
+    visitor_key: str | None = None
     created_job_id: str | None = None
     workflow_dispatch_started: bool = False
     workflow_task_run_id: str | None = None

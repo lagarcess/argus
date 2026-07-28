@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -60,6 +61,34 @@ def _conversation(conversation_id: str = "conv-1") -> Conversation:
         created_at=now,
         updated_at=now,
     )
+
+
+class _FakeVisitorClient:
+    """Chainable stub for visitor_usage_counters reads, routed by resource."""
+
+    def __init__(self, used_by_resource: dict[str, int]) -> None:
+        self._used = used_by_resource
+        self._resource: str | None = None
+
+    def table(self, name: str) -> "_FakeVisitorClient":
+        assert name == "visitor_usage_counters"
+        return self
+
+    def select(self, *_args: Any) -> "_FakeVisitorClient":
+        return self
+
+    def eq(self, column: str, value: Any) -> "_FakeVisitorClient":
+        if column == "resource":
+            self._resource = str(value)
+        return self
+
+    def limit(self, *_args: Any) -> "_FakeVisitorClient":
+        return self
+
+    def execute(self) -> Any:
+        used = self._used.get(self._resource or "", 0)
+        rows = [{"used_count": used}] if used else []
+        return SimpleNamespace(data=rows)
 
 
 @pytest.fixture
@@ -691,29 +720,12 @@ def test_guest_me_usage_returns_only_fixed_session_truth(
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
-    workspace = _configure_guest_account(mock_gateway)
+    _configure_guest_account(mock_gateway)
 
-    def _list(**kwargs: Any) -> list[dict[str, Any]]:
-        assert kwargs["period"] == "guest_session"
-        assert kwargs["period_start"] == workspace.created_at
-        return [
-            _usage_row(
-                "chat_messages",
-                "guest_session",
-                8,
-                10,
-                workspace.expires_at.isoformat(),
-            ),
-            _usage_row(
-                "backtest_runs",
-                "guest_session",
-                1,
-                1,
-                workspace.expires_at.isoformat(),
-            ),
-        ]
-
-    mock_gateway.list_current_usage_counters.side_effect = _list
+    # Visitor-keyed day windows: the workspace no longer owns guest truth.
+    mock_gateway.client = _FakeVisitorClient(
+        {"chat_messages": 8, "backtest_runs": 1}
+    )
 
     response = client.get(
         "/api/v1/me/usage", headers={"Authorization": "Bearer guest-token"}
@@ -721,30 +733,23 @@ def test_guest_me_usage_returns_only_fixed_session_truth(
 
     assert response.status_code == 200
     allowances = response.json()["allowances"]
-    assert allowances["messages"] == {
-        "hour": None,
-        "day": None,
-        "guest_session": {
-            "limit": 10,
-            "used": 8,
-            "remaining": 2,
-            "period_end": workspace.expires_at.isoformat().replace("+00:00", "Z"),
-        },
-        "available_now": True,
-        "limiting_window": "guest_session",
+    messages = allowances["messages"]
+    assert messages["hour"] is None
+    assert messages["guest_session"] is None
+    assert messages["limiting_window"] == "day"
+    assert messages["day"]["limit"] == 10
+    assert messages["day"]["used"] == 8
+    assert messages["day"]["remaining"] == 2
+    assert messages["available_now"] is True
+    backtests = allowances["backtests"]
+    assert backtests["day"] == {
+        "limit": 1,
+        "used": 1,
+        "remaining": 0,
+        "period_end": backtests["day"]["period_end"],
     }
-    assert allowances["backtests"] == {
-        "hour": None,
-        "day": None,
-        "guest_session": {
-            "limit": 1,
-            "used": 1,
-            "remaining": 0,
-            "period_end": workspace.expires_at.isoformat().replace("+00:00", "Z"),
-        },
-        "available_now": False,
-        "limiting_window": "guest_session",
-    }
+    assert backtests["available_now"] is False
+    assert backtests["limiting_window"] == "day"
 
 
 # ---------------------------------------------------------------------------
@@ -1107,16 +1112,14 @@ def test_guest_direct_exhaustion_requires_conversion_before_provider_access(
     mock_gateway,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from argus.domain.supabase_gateway import QuotaExceededError
 
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     _configure_guest_account(mock_gateway)
-    mock_gateway.check_allowance_windows.side_effect = QuotaExceededError(
-        "Quota exceeded for backtest_runs (guest_session)"
-    )
+    # The visitor already spent today's single run; renewal must not help.
+    mock_gateway.client = _FakeVisitorClient({"backtest_runs": 1})
 
     with patch("argus.api.backtest_service.prepare_run_from_payload") as prepare_run:
         response = client.post(

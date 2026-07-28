@@ -340,8 +340,6 @@
     },
     "discovery_results": {
       "test_candidate": "Backtest {{symbol}}",
-      "sources_line": "Sources: {{domains}} · as of {{date}}",
-      "sources_line_undated": "Sources: {{domains}}",
       "unsourced_line": "From general knowledge, not a current search",
       "search_current": "Search for current results",
       "search_current_send_category": "Search current sources for: {{query}}",
@@ -614,7 +612,10 @@
       "preparing": "Preparing results",
       "intent_run_backtest": "Designing your strategy...",
       "intent_education": "Thinking...",
-      "intent_unsupported_request": "Thinking..."
+      "intent_unsupported_request": "Thinking...",
+      "discovery_search": "Searching the web...",
+      "discovery_search_detail": "Searching the web — {{detail}}",
+      "discovery_verify": "Verifying candidates against supported markets..."
     },
     "confirmation": {
       "asset_count": "{{count}} assets",

@@ -63,6 +63,9 @@ class AlphaStore:
     decision_note_owners: dict[str, str] = field(default_factory=dict)
     idempotency: dict[tuple[str, str, str], Any] = field(default_factory=dict)
     feedback: list[dict[str, Any]] = field(default_factory=list)
+    visitor_usage_counters: dict[tuple[str, str, str], dict[str, Any]] = field(
+        default_factory=dict
+    )
     usage_counters: dict[tuple[str, str, str], dict[str, Any]] = field(
         default_factory=dict
     )
@@ -101,6 +104,7 @@ class AlphaStore:
         self.idempotency.clear()
         self.feedback.clear()
         self.usage_counters.clear()
+        self.visitor_usage_counters.clear()
         self.backtest_jobs.clear()
         self.backtest_job_reservations.clear()
 

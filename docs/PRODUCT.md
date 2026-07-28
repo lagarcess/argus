@@ -558,9 +558,18 @@ login remain allowlist-gated, the guest surface offers **Sign in**, and
 unlisted guests cannot create permanent accounts. Existing admin and developer
 roles remain unchanged.
 
-Each guest identity receives seven fixed days, one conversation, ten useful
-assistant terminals, one unique simulation, and five feedback submissions.
-Activity never extends the expiry. The current landing implementation and its
+Two clocks govern a guest, and they are deliberately distinct. The
+**workspace** lives seven fixed days with one conversation: that is how long
+the temporary chat survives and the window to claim it to an account.
+Activity never extends the expiry. **Allowances** follow the visitor, not the
+workspace (decision 2026-07-28): ten useful assistant terminals and one
+unique simulation per visitor per day, resetting at UTC midnight, plus five
+feedback submissions. A fresh session mints a fresh workspace but never a
+fresh allowance — the counter keys on a keyed digest of the caller, so the
+renewal loophole stays closed while a curious guest gets a new daily budget
+inside the same chat. Simulations keep a workspace-keyed reservation as
+replay identity; the visitor charge beside it is best-effort past admission,
+and settlement enforces the cap. The current landing implementation and its
 centered auth modal remain intact for configuration rollback and later
 conversion work.
 

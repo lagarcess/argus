@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  discoveryFreshnessDate,
-  discoverySidecarFromMetadata,
-  discoverySourceDomains,
-} from "@/lib/chat-discovery-sidecar";
+import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
 import { hydrateMessagesFromApi } from "@/components/chat/ChatInterface";
 import type { ApiMessage } from "@/lib/chat-message-hydration";
 
@@ -112,23 +108,6 @@ describe("discoverySidecarFromMetadata", () => {
     expect(discoverySidecarFromMetadata({ discovery: wrongKind })).toBeNull();
     const wrongRel = { ...validSidecar(), relationship: "ranking" };
     expect(discoverySidecarFromMetadata({ discovery: wrongRel })).toBeNull();
-  });
-});
-
-describe("discovery display helpers", () => {
-  test("freshness date formats per locale from ISO", () => {
-    const sidecar = discoverySidecarFromMetadata({ discovery: validSidecar() });
-    expect(sidecar).not.toBeNull();
-    if (!sidecar) return;
-    expect(discoveryFreshnessDate(sidecar, "en-US")).toContain("2026");
-    expect(discoveryFreshnessDate(sidecar, "es-419")).toContain("2026");
-  });
-
-  test("source domains dedupe in order", () => {
-    const sidecar = discoverySidecarFromMetadata({ discovery: validSidecar() });
-    expect(sidecar ? discoverySourceDomains(sidecar) : []).toEqual([
-      "example.com",
-    ]);
   });
 });
 

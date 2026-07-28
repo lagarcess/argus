@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import (
@@ -10,7 +12,7 @@ from argus.api.chat.backtest_jobs import (
     should_fail_stale_job_without_task_run,
 )
 from argus.api.dependencies import current_user, problem
-from argus.api.guest_access import account_context
+from argus.api.guest_access import account_context, client_identity
 from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
@@ -28,9 +30,15 @@ from argus.domain.backtest_finalization import (
 )
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.domain.usage_limits import (
+    GUEST_SIMULATION_VISITOR_LIMITS,
     SIMULATION_ALLOWANCE_LIMITS,
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
+)
+from argus.domain.visitor_usage import (
+    settle_visitor_usage,
+    visitor_key_for,
+    visitor_within_limits,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
@@ -150,11 +158,17 @@ def run_backtest(
         account = account_context(request)
         try:
             if account.kind == "guest":
-                api_state.supabase_gateway.check_allowance_windows(
-                    user_id=user.id,
+                # Visitor-keyed: a renewed workspace grants no fresh run.
+                if not visitor_within_limits(
+                    api_state.supabase_gateway.client,
+                    visitor_key=visitor_key_for(client_identity(request)),
                     resource=SIMULATION_USAGE_RESOURCE,
-                    windows=allowance_windows(account, SIMULATION_USAGE_RESOURCE),
-                )
+                    limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
+                    now=datetime.now(timezone.utc),
+                ):
+                    raise QuotaExceededError(
+                        "Quota exceeded for backtest_runs (day)"
+                    )
             else:
                 api_state.supabase_gateway.check_usage_limits(
                     user_id=user.id,
@@ -421,6 +435,22 @@ def _admit_direct_run(
         )
         decision = str(outcome.get("decision") or "")
         job = outcome.get("job") if isinstance(outcome.get("job"), dict) else None
+        if account.kind == "guest" and decision == "admitted":
+            # Workspace reservation owns replay identity; the visitor row
+            # is the cross-renewal bound (best-effort past admission).
+            try:
+                settle_visitor_usage(
+                    gateway.client,
+                    visitor_key=visitor_key_for(client_identity(request)),
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Visitor simulation settlement failed",
+                    error=str(exc),
+                    failure_classification="telemetry_only",
+                )
     else:
         memory_outcome = backtest_admission.admit_backtest_job_memory(
             api_state.store,

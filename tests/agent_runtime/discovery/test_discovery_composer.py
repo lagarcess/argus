@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
+from argus.agent_runtime import substage_events
 from argus.agent_runtime.discovery import composer as composer_module
 from argus.agent_runtime.discovery.composer import (
     discovery_stage_result_if_applicable,
@@ -568,3 +569,116 @@ class TestVoicedRecoveryMetadata:
         assert patch["recovery"]["code"] == "discovery_search_failed"
         assert patch["recovery"]["retryable"] is True
         assert patch["recovery"].get("prompt_source") is None
+
+
+class TestSubStageProgressEvents:
+    """§9 Slice B: progress events fire only when the work actually happens."""
+
+    def _drain(self, queue) -> list[dict[str, str]]:
+        events: list[dict[str, str]] = []
+        while not queue.empty():
+            kind, payload = queue.get_nowait()
+            assert kind == "substage"
+            events.append(payload)
+        return events
+
+    async def _run_with_channel(self, decision, *, allowance: bool = True):
+        queue: asyncio.Queue = asyncio.Queue()
+        token = substage_events.bind_substage_channel(queue)
+        try:
+            result = await _run(decision, allowance=allowance)
+        finally:
+            substage_events.close_substage_channel(token)
+        return result, self._drain(queue)
+
+    @pytest.mark.asyncio()
+    async def test_grounded_path_emits_search_then_verify(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result, events = await self._run_with_channel(_decision())
+        assert result.outcome == "ready_to_respond"
+        assert events == [
+            {"stage": "discovery_search", "detail": "cybersecurity stocks"},
+            {"stage": "discovery_verify"},
+        ]
+
+    @pytest.mark.asyncio()
+    async def test_search_detail_prefers_category_then_anchor_symbols(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        _, events = await self._run_with_channel(
+            _decision(
+                relationship="peer",
+                category_description=None,
+                anchor_symbols=["crwd", "panw"],
+            )
+        )
+        assert events[0] == {
+            "stage": "discovery_search",
+            "detail": "CRWD, PANW",
+        }
+
+    @pytest.mark.asyncio()
+    async def test_search_detail_is_the_interpretations_own_language(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        _, events = await self._run_with_channel(
+            _decision(category_description="acciones de ciberseguridad")
+        )
+        assert events[0]["detail"] == "acciones de ciberseguridad"
+
+    @pytest.mark.asyncio()
+    async def test_flag_off_emits_no_events(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", "false")
+        _, events = await self._run_with_channel(_decision())
+        assert events == []
+
+    @pytest.mark.asyncio()
+    async def test_exhausted_allowance_emits_no_events(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        _, events = await self._run_with_channel(_decision(), allowance=False)
+        assert events == []
+
+    @pytest.mark.asyncio()
+    async def test_cheap_default_path_emits_no_events(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        _, events = await self._run_with_channel(
+            _decision(needs_current_facts=False)
+        )
+        assert events == []
+
+    @pytest.mark.asyncio()
+    async def test_not_configured_provider_emits_no_events(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        def _raise(**kwargs: Any):
+            raise SearchUnavailableError(reason="not_configured")
+
+        flag_on.setattr(
+            selection_module, "search_provider_for_config", _raise, raising=True
+        )
+        _, events = await self._run_with_channel(_decision())
+        assert events == []
+
+    @pytest.mark.asyncio()
+    async def test_search_failure_after_start_leaves_no_verify_event(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        _, events = await self._run_with_channel(_decision())
+        assert [event["stage"] for event in events] == ["discovery_search"]

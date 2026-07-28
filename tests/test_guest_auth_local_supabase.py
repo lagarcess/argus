@@ -25,6 +25,7 @@ from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from argus.domain.usage_limits import message_usage_settlement
+from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
 
@@ -127,7 +128,7 @@ def test_real_anonymous_identity_survives_reload(
             gateway.delete_auth_user(user_id)
 
 
-def test_real_guest_terminal_message_settles_fixed_lifetime_window(
+def test_real_guest_terminal_message_settles_visitor_day_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     auth_router.reset_auth_attempt_limiter_for_tests()
@@ -190,13 +191,15 @@ def test_real_guest_terminal_message_settles_fixed_lifetime_window(
                 },
                 created_at=utcnow(),
             )
+            visitor_key = f"visitor-test:{turn_id[:8]}"
             settlement = message_usage_settlement(
                 AccountContext(
                     kind="guest",
                     user_id=user_id,
                     expires_at=workspace.expires_at,
                     capabilities=guest_capabilities(),
-                )
+                ),
+                visitor_key=visitor_key,
             )
 
             first = gateway.finalize_chat_turn(
@@ -222,10 +225,18 @@ def test_real_guest_terminal_message_settles_fixed_lifetime_window(
                 settle_usage=settlement,
             )
 
-            counters = (
+            account_counters = (
                 gateway.client.table("usage_counters")
-                .select("period,period_start,period_end,used_count,limit_count")
+                .select("period,used_count")
                 .eq("user_id", user_id)
+                .eq("resource", "chat_messages")
+                .execute()
+                .data
+            )
+            visitor_counters = (
+                gateway.client.table("visitor_usage_counters")
+                .select("period,used_count,limit_count")
+                .eq("visitor_key", visitor_key)
                 .eq("resource", "chat_messages")
                 .execute()
                 .data
@@ -244,25 +255,12 @@ def test_real_guest_terminal_message_settles_fixed_lifetime_window(
                 "status": "completed",
                 "assistant_message_id": assistant.id,
             }
-            assert len(counters) == 1
-            counter = counters[0]
-            assert (
-                _parse_postgrest_utc_timestamp(counter["period_start"])
-                == workspace.created_at
-            )
-            assert (
-                _parse_postgrest_utc_timestamp(counter["period_end"])
-                == workspace.expires_at
-            )
-            assert {
-                "period": counter["period"],
-                "used_count": counter["used_count"],
-                "limit_count": counter["limit_count"],
-            } == {
-                "period": "guest_session",
-                "used_count": 1,
-                "limit_count": 10,
-            }
+            # The unit lands on the visitor, not the renewable workspace, and
+            # the replayed finalization above must not have charged it twice.
+            assert account_counters == []
+            assert visitor_counters == [
+                {"period": "day", "used_count": 1, "limit_count": 10}
+            ]
     finally:
         if user_id:
             with suppress(Exception):
@@ -291,6 +289,12 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
     monkeypatch.setenv("ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT", "1000000")
     gateway = _gateway()
     user_id: str | None = None
+
+    # Visitor counters outlive guest accounts by design; on a reused local
+    # database the TestClient identity accumulates, so start from zero.
+    gateway.client.table("visitor_usage_counters").delete().eq(
+        "visitor_key", visitor_key_for("testclient")
+    ).execute()
 
     base_launch_payload = {
         "strategy_type": "buy_and_hold",
@@ -442,18 +446,30 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
                 .execute()
                 .data
             )
+            visitor_rows = (
+                gateway.client.table("visitor_usage_counters")
+                .select("resource,period,used_count")
+                .eq("visitor_key", visitor_key_for("testclient"))
+                .eq("resource", "backtest_runs")
+                .eq("period", "day")
+                .execute()
+                .data
+            )
             usage = client.get("/api/v1/me/usage")
             assert usage.status_code == 200
-            guest_window = usage.json()["allowances"]["backtests"]["guest_session"]
+            day_window = usage.json()["allowances"]["backtests"]["day"]
 
             assert len(runs) == 1
+            # The workspace-keyed reservation still owns replay identity; the
+            # visitor row is the cross-renewal bound the day window reads.
             assert {
                 "jobs": len(jobs),
                 "counters": counters,
+                "visitor_used": [row["used_count"] for row in visitor_rows],
                 "usage": {
-                    "used": guest_window["used"],
-                    "remaining": guest_window["remaining"],
-                    "limit": guest_window["limit"],
+                    "used": day_window["used"],
+                    "remaining": day_window["remaining"],
+                    "limit": day_window["limit"],
                 },
             } == {
                 "jobs": 1,
@@ -465,6 +481,7 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
                         "limit_count": 1,
                     }
                 ],
+                "visitor_used": [1],
                 "usage": {"used": 1, "remaining": 0, "limit": 1},
             }
     finally:

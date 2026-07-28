@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
@@ -18,6 +19,10 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
     dedupe_resolution_provenance_items,
+)
+from argus.agent_runtime.substage_events import (
+    bind_substage_channel,
+    close_substage_channel,
 )
 from argus.agent_runtime.turn_execution import (
     record_exit_progress,
@@ -115,39 +120,75 @@ async def stream_agent_turn_events(
     seen_stage_outcomes: set[str] = set()
     logger.debug("Agent runtime stream started", thread_id=thread_id)
 
-    async for event in workflow.astream_events(
-        initial_state,
-        config=config,
-        version="v2",
-    ):
-        kind = event.get("event")
-        node_name = _event_node_name(event)
-        if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
-            if node_name not in seen_stage_starts:
-                seen_stage_starts.add(node_name)
+    # Sub-stage events (work inside a node) merge with LangGraph's stream
+    # through one queue, so they reach the client while the node still runs.
+    queue: asyncio.Queue[Any] = asyncio.Queue()
+
+    async def _pump_workflow_events() -> None:
+        # Bound inside this task: stages run in its context tree, and the
+        # binding cannot outlive the turn.
+        channel_token = bind_substage_channel(queue)
+        try:
+            async for event in workflow.astream_events(
+                initial_state,
+                config=config,
+                version="v2",
+            ):
+                queue.put_nowait(("langgraph", event))
+        except BaseException as exc:
+            queue.put_nowait(("error", exc))
+            return
+        finally:
+            close_substage_channel(channel_token)
+        queue.put_nowait(("done", None))
+
+    pump = asyncio.create_task(_pump_workflow_events())
+    try:
+        while True:
+            item_kind, item = await queue.get()
+            if item_kind == "done":
+                break
+            if item_kind == "error":
+                raise item
+            if item_kind == "substage":
                 logger.debug(
-                    "Agent runtime stage started",
+                    "Agent runtime sub-stage started",
                     thread_id=thread_id,
-                    stage=node_name,
+                    stage=item.get("stage"),
                 )
-                yield {"type": "stage_start", "stage": node_name}
-            continue
-        if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
-            content = _chunk_content(event.get("data", {}).get("chunk"))
-            if content:
-                yield {"type": "token", "content": content}
-            continue
-        if kind == "on_chain_end" and node_name in WORKFLOW_NODE_NAMES:
-            outcome = _stage_outcome_from_event(event)
-            if outcome is not None and outcome not in seen_stage_outcomes:
-                seen_stage_outcomes.add(outcome)
-                logger.debug(
-                    "Agent runtime stage outcome",
-                    thread_id=thread_id,
-                    stage=node_name,
-                    outcome=outcome,
-                )
-                yield {"type": "stage_outcome", "outcome": outcome}
+                yield {"type": "stage_start", **item}
+                continue
+            event = item
+            kind = event.get("event")
+            node_name = _event_node_name(event)
+            if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
+                if node_name not in seen_stage_starts:
+                    seen_stage_starts.add(node_name)
+                    logger.debug(
+                        "Agent runtime stage started",
+                        thread_id=thread_id,
+                        stage=node_name,
+                    )
+                    yield {"type": "stage_start", "stage": node_name}
+                continue
+            if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
+                content = _chunk_content(event.get("data", {}).get("chunk"))
+                if content:
+                    yield {"type": "token", "content": content}
+                continue
+            if kind == "on_chain_end" and node_name in WORKFLOW_NODE_NAMES:
+                outcome = _stage_outcome_from_event(event)
+                if outcome is not None and outcome not in seen_stage_outcomes:
+                    seen_stage_outcomes.add(outcome)
+                    logger.debug(
+                        "Agent runtime stage outcome",
+                        thread_id=thread_id,
+                        stage=node_name,
+                        outcome=outcome,
+                    )
+                    yield {"type": "stage_outcome", "outcome": outcome}
+    finally:
+        pump.cancel()
 
     logger.debug("Agent runtime final state fetch started", thread_id=thread_id)
     final_state = await _final_workflow_state(workflow=workflow, config=config)

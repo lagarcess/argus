@@ -15,10 +15,10 @@ export type RegisteredUsageAllowance = {
 
 export type GuestUsageAllowance = {
   hour: null;
-  day: null;
-  guest_session: UsageWindow;
+  day: UsageWindow;
+  guest_session: null;
   available_now: boolean;
-  limiting_window: "guest_session";
+  limiting_window: "day";
 };
 
 export type UsageAllowance = RegisteredUsageAllowance | GuestUsageAllowance;
