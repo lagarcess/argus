@@ -21,8 +21,13 @@ written from symptoms and turned out to be wrong on inspection:
 
 ## 1. What this is
 
-Eight items across two PRs. Four are defects with confirmed root causes, two are
-new capability, one is infrastructure, one is measurement that needs no code.
+Nine items across two PRs. Four are defects with confirmed root causes, two are
+new capability, one is infrastructure, one is measurement that needs no code, and
+one — language parity — binds every other item.
+
+**Where this lands:** when all nine are done, grounded discovery is
+code-complete and promotion is the only work remaining (§14). That is the point
+of the scope; do not defer pieces into a follow-up lane.
 
 **PR A — the discovery pass.** One story: discovery answers become actionable
 and honest.
@@ -35,7 +40,8 @@ and honest.
 | 4 | Answering the pending question routed to change-conflict | defect | §6 |
 | 5 | Guest allowance measurement | none — already instrumented | §7 |
 | 6 | Offload the blocking provider search | defect | §8 |
-| — | CI gate globs `tests/*_postgres.py` | gate | §11.2 |
+| 9 | Language parity — English and Spanish, binds items 1–8 | required | §11 |
+| — | CI gate globs `tests/*_postgres.py` | gate | §12.2 |
 
 Items 2, 3, 4 and 6 are independent and can land in any order. Item 1 is the
 largest and should land last, because item 3 changes copy on a path item 1
@@ -79,6 +85,10 @@ either way.
 - No regex, no keyword lists, no hardcoded language gates before LLM
   interpretation. The currency judgment is a field on the interpreter's typed
   output, not a phrase match.
+- **English and Spanish parity is a build requirement, not a follow-up.** No item
+  in this spec is done in one language (§11). Founder decision 2026-07-27, moved
+  in from the closure gates so that promotion is the only work left when these
+  PRs land.
 
 ---
 
@@ -582,9 +592,81 @@ changes guest allowance identity.
 
 ---
 
-## 11. Testing and gates
+## 11. Item 9 — language parity, English and Spanish
 
-### 11.1 The rule that this pass exists partly to establish
+**This is a build item, not a closure gate.** It was recorded as something to do
+later; the founder moved it into the build on 2026-07-27 so that when these PRs
+land, the only remaining work on grounded discovery is promotion.
+
+An item is not done in one language. Both, or not done.
+
+### 11.1 What parity means here
+
+Argus is language-agnostic by design — no phrase gates, no keyword routing, one
+runtime spine that interprets before it branches. Parity is therefore not a
+translation chore bolted on at the end; it is the property that proves the spine
+actually works, and a surface that only renders in English is evidence the spine
+was bypassed somewhere.
+
+Supported languages are English and `es-419`. CI already enforces key parity
+between the catalogs — that check passing is necessary and nowhere near
+sufficient, because a key can exist and still render wrong or read like a machine
+translated it.
+
+### 11.2 Every surface this spec adds ships in both
+
+| Surface | Section |
+| --- | --- |
+| Unsourced marker copy | §3.7 |
+| "Search for current results" row | §3.8 |
+| Retry row on a failed search | §4.2 |
+| Incomplete-rule copy — "What rule should I test for {symbol}?" | §5.2 |
+| Whatever §6's diagnostic produces | §6 |
+| Sub-stage progress labels | §9.2 |
+
+Catalogs: `web/public/locales/en/common.json` and
+`web/public/locales/es-419/common.json`. Backend-composed copy follows the
+existing `is_spanish` convention already used in
+`artifacts/continuity.py` and `clarification_contract.py`.
+
+### 11.3 The cheap path has a language trap the grounded path does not
+
+The cheap path asks an LLM to name candidates and produces `reason_text` for each
+row — **user-visible prose generated at runtime**, not a catalog string.
+
+A Spanish discovery ask must produce Spanish reason text. The grounded path
+already voices in the user's language; §3.6 step 3 reuses that voicing step
+specifically so this is inherited rather than reinvented. Do not let the cheap
+path assemble its own prose.
+
+Same trap in `unverified_names` copy and in the query summary.
+
+### 11.4 Journeys to prove live
+
+From `2026-07-25-grounded-discovery-search-v1-design.md` §1.1, which defines J1,
+J2 and J3. Run each in both languages against a real stack:
+
+1. **Standalone category discovery** — "¿Qué acciones de ciberseguridad puedo
+   probar?" → verified rows → tap one → the asset is known and never re-asked →
+   date window question → confirmation. This is #244 acceptance criterion 9 and
+   the only one that closes it.
+2. **Cheap path marked ungrounded** — a Spanish ask with no currency need returns
+   rows with the Spanish unsourced marker and a Spanish "search for current
+   results" row.
+3. **Failed search** — Spanish retry row renders, reads naturally, and works.
+4. **Exhausted allowance** — the fall-through to cheap rows is honest in Spanish.
+
+### 11.5 Acceptance
+
+Screenshots or transcripts in both languages for every surface in §11.2. A
+passing catalog-key-parity check is not acceptance. Neither is a translation
+nobody looked at.
+
+---
+
+## 12. Testing and gates
+
+### 12.1 The rule that this pass exists partly to establish
 
 Anything touching a usage counter needs a test that charges **real PostgreSQL**,
 not the in-memory store. Two foreign-key defects shipped green in the previous
@@ -594,7 +676,7 @@ permanently dead meter looks exactly like a healthy one.
 
 Item 2 changes charging behavior. It needs a real-Postgres test.
 
-### 11.2 CI has the machinery; one list is hand-maintained
+### 12.2 CI has the machinery; one list is hand-maintained
 
 `guest-release-gates` (`.github/workflows/ci.yml`) starts a real Supabase and
 runs a Postgres matrix, and `scripts/qa/assert_pytest_gate.py` **fails the build
@@ -611,7 +693,7 @@ from five files to ten and makes the job slower. **Founder-approved
 prevented, and a hand-maintained list is how the two foreign-key defects
 reached main.
 
-### 11.3 Per-item acceptance
+### 12.3 Per-item acceptance
 
 1. **Cheap rows** — "which pharma stocks could I test?" as a guest returns
    tappable validated rows, zero sources, visible unsourced marker, and a
@@ -625,8 +707,17 @@ reached main.
 4. **Pending need** — answering the asked question advances the idea. Diagnostic
    written into §6.3 before the fix.
 5. **Measurement** — none.
+6. **Async offload** — a second chat stream keeps producing tokens while a
+   discovery search is in flight. Two concurrent live turns, not a unit test.
+7. **Slice B** — two progress lines arrive separately, and an older frontend
+   receiving an unknown stage shows the neutral label rather than the raw key.
+8. **Guest identity** — a fresh guest workspace does not reset the message or
+   simulation allowance. Real PostgreSQL.
+9. **Language parity** — every surface in §11.2 evidenced in both languages, and
+   the J1/J2/J3 journeys run in both (§11.4). **No item counts as accepted in
+   one language.**
 
-### 11.4 Browser QA is required
+### 12.4 Browser QA is required
 
 Every defect in the previous lane passed unit tests and died live: the source
 dates a day early, the identity drop, the tap targets, both foreign keys. Run a
@@ -639,7 +730,7 @@ env is destroyed.
 
 ---
 
-## 12. Out of scope
+## 13. Out of scope
 
 - Tuning any guest **discovery** allowance number (§7). The message and
   simulation numbers are a live decision inside §10.2 and must be stated there.
@@ -652,52 +743,57 @@ env is destroyed.
   registered-only and §12.10 corrected it; the visitor metering is load-bearing
   and unchanged.
 
-## 13. What this spec does not close on issue #244
+## 14. The one thing left after this: promotion
 
-Finishing every item here does **not** finish grounded discovery. Three gates sit
-outside it, recorded so they are not mistaken for done.
+**When every item here lands, grounded discovery is code-complete.** Promotion is
+the only remaining work, and it is **out of scope for whoever builds this spec** —
+it belongs to a promotion run with the founder.
 
-### 13.1 It has never run in production
+Spanish parity used to sit here as a closure gate. It is now item 9 (§11), inside
+the build, precisely so this section stays short.
+
+### 14.1 What promotion covers, and why it is not yours
 
 `render.yaml` contains **zero** `DISCOVERY` variables. No flag, no provider key,
-no global daily ceiling. Every proof so far — including all of PR #291 — was
+no global daily ceiling. Every proof to date — including all of PR #291 — was
 against a local stack.
 
-Outstanding: set the runtime variables, run the `visitor_usage_counters`
-migration on the hosted database, and activate the flag under the normal canary
+Promotion means: set the runtime variables, run the `visitor_usage_counters`
+migration on the hosted database, activate the flag under the normal canary
 discipline. Founder activation is an explicit gate on #244 between provider
-evaluation and runtime.
+evaluation and runtime, and it is not something an implementing agent can or
+should do.
 
-### 13.2 Spanish was never proven
+**Do not** add `DISCOVERY` variables to `render.yaml` as part of these PRs, and
+do not treat a local proof as a production one.
 
-Acceptance criterion 9 on #244 and journey **J3** in
-`2026-07-25-grounded-discovery-search-v1-design.md` both require English **and**
-Spanish parity — equivalent capability, voice, and localized freshness
-formatting — through discovery into a supported backtest. Every live QA run to
-date was English.
-
-This spec adds Spanish surface area rather than reducing it: the unsourced
-marker (§3.7), the "Search for current results" row (§3.8), the retry row (§4.2),
-and the incomplete-rule copy (§5.2) all need `es-419` catalog entries and all
-need to be seen rendered.
-
-### 13.3 The issue's own language needs reconciling
+### 14.2 One issue edit that does belong in these PRs
 
 #244's no-touch list forbids *"model-memory candidate lists presented as current
 facts"*, and acceptance criterion 8 forbids falling back to *"uncited model
 memory"* on outage.
 
 The cheap path is model memory that is explicitly **not** presented as current —
-that is what §3.7's derived marker exists to guarantee — and outage behavior is
-unchanged by this spec: a failed search gets a retry row (§4.2), never cheap
-rows. Only an **exhausted allowance** falls through to the cheap path.
+that is what §3.7's derived marker guarantees — and outage behavior is unchanged
+by this spec: a failed search gets a retry row (§4.2), never cheap rows. Only an
+**exhausted allowance** falls through to the cheap path.
 
-Compatible in substance. But someone reading #244 when this lands will read it
-as a violation, so update the issue text in the same PR.
+Compatible in substance. But someone reading #244 when this lands will read it as
+a violation, so update the issue text in the same PR.
+
+### 14.3 Closure checklist for #244
+
+Everything except the last line is inside this spec.
+
+- [ ] Items 1–9 landed (§3–§11)
+- [ ] Both-language journeys proven live, J1/J2/J3 (§11.4) — closes acceptance 9
+- [ ] Real-PostgreSQL proof for anything touching a counter (§12.1)
+- [ ] #244 text reconciled with the cheap path (§14.2)
+- [ ] **Promotion — founder, out of scope here (§14.1)**
 
 ---
 
-## 14. Documentation to update on landing
+## 15. Documentation to update on landing
 
 - `docs/API_CONTRACT.md` — the sidecar's ungrounded case, and that zero sources
   is the marker's only source of truth.
