@@ -231,9 +231,77 @@ grant execute on function public.finalize_chat_turn(
   text, text, boolean, text, jsonb, text
 ) to service_role;
 
--- Truth fix: the prior comment justified this table with a false ten-minute
--- workspace lifetime. The real reason stands without it.
 comment on table public.visitor_usage_counters is
   'Allowances for callers with no durable account. Not FK-bound: the subject '
   'is a visitor, not a profile. A fresh guest session mints a new user_id, '
   'so account-keyed guest allowances reset with it; visitor keys do not.';
+
+-- Entry reads can race at the boundary; the settle transaction is the
+-- last enforcer and holds the counter at its cap.
+create or replace function public.settle_visitor_usage(
+  p_visitor_key text,
+  p_resource text,
+  p_windows jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_window record;
+  v_used integer;
+  v_results jsonb := '[]'::jsonb;
+begin
+  if p_visitor_key is null or length(trim(p_visitor_key)) = 0 then
+    raise exception 'visitor key is required';
+  end if;
+
+  for v_window in
+    select
+      (item->>'period')::text as window_period,
+      (item->>'limit')::integer as limit_count,
+      (item->>'period_start')::timestamptz as period_start,
+      (item->>'period_end')::timestamptz as period_end
+    from jsonb_array_elements(p_windows) as item
+  loop
+    if v_window.limit_count < 1 then
+      raise exception 'visitor allowance exhausted'
+        using errcode = 'P0001';
+    end if;
+
+    insert into public.visitor_usage_counters (
+      visitor_key, resource, period, period_start, period_end,
+      used_count, limit_count
+    ) values (
+      p_visitor_key, p_resource, v_window.window_period,
+      v_window.period_start, v_window.period_end, 1, v_window.limit_count
+    )
+    on conflict (visitor_key, resource, period, period_start)
+    do update set
+      used_count = public.visitor_usage_counters.used_count + 1,
+      limit_count = excluded.limit_count,
+      updated_at = now()
+    where public.visitor_usage_counters.used_count < excluded.limit_count
+    returning used_count into v_used;
+
+    if v_used is null then
+      raise exception 'visitor allowance exhausted'
+        using errcode = 'P0001';
+    end if;
+
+    v_results := v_results || jsonb_build_object(
+      'period', v_window.window_period,
+      'used_count', v_used,
+      'limit_count', v_window.limit_count
+    );
+  end loop;
+
+  return jsonb_build_object('settled', true, 'windows', v_results);
+end;
+$$;
+
+revoke all on function public.settle_visitor_usage(text, text, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.settle_visitor_usage(text, text, jsonb)
+  to service_role;

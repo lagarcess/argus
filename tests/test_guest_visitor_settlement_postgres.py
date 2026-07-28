@@ -196,3 +196,42 @@ def test_account_settlement_without_visitor_key_is_unchanged(owner) -> None:
         )
         with connection.cursor() as cursor:
             assert _account_used(cursor, owner["user_id"]) == 1
+
+
+def test_settlement_enforces_the_cap_when_entry_reads_raced(owner) -> None:
+    """Two turns can both pass the entry read at the boundary; the settle
+    transaction is the last enforcer and must hold the counter at its cap."""
+    visitor_key = f"visitor:{secrets.token_hex(16)}"
+    with _connect() as connection:
+        for _ in range(10):
+            turn_id, request_id, message_id = (
+                str(uuid.uuid4()),
+                f"req-{secrets.token_hex(6)}",
+                str(uuid.uuid4()),
+            )
+            _accept(connection, owner, turn_id=turn_id, request_id=request_id)
+            _finalize(
+                connection,
+                owner,
+                turn_id=turn_id,
+                request_id=request_id,
+                message_id=message_id,
+                visitor_key=visitor_key,
+            )
+        turn_id, request_id, message_id = (
+            str(uuid.uuid4()),
+            f"req-{secrets.token_hex(6)}",
+            str(uuid.uuid4()),
+        )
+        _accept(connection, owner, turn_id=turn_id, request_id=request_id)
+        with pytest.raises(psycopg.Error, match="visitor allowance exhausted"):
+            _finalize(
+                connection,
+                owner,
+                turn_id=turn_id,
+                request_id=request_id,
+                message_id=message_id,
+                visitor_key=visitor_key,
+            )
+        with connection.cursor() as cursor:
+            assert _visitor_used(cursor, visitor_key) == 10
