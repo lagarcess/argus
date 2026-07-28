@@ -169,13 +169,21 @@ export function recoveryDisplayText(
     }
     const symbol = display.values.symbol;
     const rawValue = display.values.rawValue;
-    const key = rawValue
+    const reasonCode = display.values.reasonCode;
+    // No category means no rule was recognized at all -- the raw text is a
+    // subject ("Backtest WMT"), not a capability boundary. Ask for the rule.
+    const ruleMissing = !reasonCode || reasonCode === "unsupported_constraint";
+    const key = ruleMissing
       ? symbol
-        ? "chat.clarification.unsupported_recovery_with_raw_value_for_asset"
-        : "chat.clarification.unsupported_recovery_with_raw_value"
-      : symbol
-        ? "chat.clarification.unsupported_recovery_for_asset"
-        : "chat.clarification.unsupported_recovery";
+        ? "chat.clarification.unsupported_recovery_incomplete_for_asset"
+        : "chat.clarification.unsupported_recovery_incomplete"
+      : rawValue
+        ? symbol
+          ? "chat.clarification.unsupported_recovery_with_raw_value_for_asset"
+          : "chat.clarification.unsupported_recovery_with_raw_value"
+        : symbol
+          ? "chat.clarification.unsupported_recovery_for_asset"
+          : "chat.clarification.unsupported_recovery";
     return t(key, {
       rawValue,
       symbol,

@@ -54,6 +54,28 @@ def test_user_phrase_raw_value_still_renders_as_subject() -> None:
     assert "MACD golden cross" in prose
 
 
+def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> None:
+    """Spec §5 (issue observed as "Argus can't run Backtest WMT directly yet
+    for WMT"): a constraint with no category means no rule was recognized, so
+    the prose must ask what to test instead of naming the raw text as an
+    unsupported capability."""
+
+    intent = _response_intent_with_raw_value("Backtest WMT")
+    for constraint in intent["facts"]["unsupported_constraints"]:
+        del constraint["category"]
+
+    prose = _unsupported_recovery_fallback(
+        language="en",
+        response_intent=intent,
+        strategy=StrategySummary(asset_universe=["WMT"]),
+    )
+
+    assert prose == (
+        "What rule should I test for WMT? Which supported direction should I "
+        "use: Adjust the strategy rule or Adjust the date range?"
+    )
+
+
 def test_uppercase_underscore_symbol_still_renders_as_subject() -> None:
     """User-typed pair symbols such as BTC_USDT are their own words, not
     internal reason codes, and must keep rendering in the clarifier prose."""
