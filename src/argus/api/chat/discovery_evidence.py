@@ -31,13 +31,8 @@ GLOBAL_CEILING_KEY = "global:discovery"
 
 
 def _visitor_digest(identity: str) -> str:
-    """Keyed digest of a visitor identifier, never the raw value.
-
-    The counter only needs to tell visitors apart, not to name them. A raw IP
-    in a primary key is a durable record of who visited; a keyed digest carries
-    the same signal without retaining the address. Keyed rather than plain
-    because an IPv4 space is small enough to brute-force a bare hash.
-    """
+    """Keyed digest, never the raw value: the counter tells visitors apart
+    without retaining addresses, and keying defeats brute-forcing IPv4."""
     secret = os.getenv("ARGUS_VISITOR_KEY_SECRET", "argus-visitor-key").encode()
     return hmac.new(secret, identity.encode(), hashlib.sha256).hexdigest()[:32]
 
@@ -55,16 +50,9 @@ def discovery_counter_subject(
     is_guest: bool,
     client_identity: str | None,
 ) -> str:
-    """Who the discovery allowance is charged against.
-
-    A registered account is a durable identity, so it is its own subject. A
-    guest workspace is not: it lives ten minutes and renewal mints a fresh
-    user_id, so charging a guest by user_id hands out a new allowance on a
-    timer. Guests are charged against the visitor instead.
-
-    Fails closed to a single shared bucket when the client identity is
-    unavailable, because an unmetered allowance is the worse failure.
-    """
+    """Registered accounts are their own subject; a guest workspace is not --
+    renewal mints a fresh user_id, so guests are charged against the visitor.
+    Fails closed to one shared bucket when the client identity is missing."""
 
     if not is_guest:
         return user_id
@@ -81,12 +69,8 @@ def _visitor_within_limits(
     limits: list[tuple[str, int]],
     now: datetime,
 ) -> bool:
-    """Visitor allowances live outside usage_counters.
-
-    usage_counters.user_id is a foreign key to profiles, so it can only express
-    an account-owned allowance. A visitor has no account, and keying a guest by
-    its workspace user_id would reset the allowance every renewal.
-    """
+    """Visitor allowances live outside usage_counters: its user_id FKs to
+    profiles, and a visitor has no profile."""
     client = api_state.supabase_gateway.client
     for period, limit_count in limits:
         start, _ = align_usage_period(now, period)
@@ -258,11 +242,8 @@ def record_discovery_search_evidence(
 
     if not isinstance(usage, dict) or usage.get("search_attempted") is not True:
         return
-    # Two bounds, two rules. The global ceiling counts every attempt because it
-    # bounds provider spend and a failed call can still be billed. The user's
-    # allowance is charged only for a usable result: a timeout, HTTP error, or
-    # extraction/voicing failure is our outage, not the user's spend -- at a
-    # guest allowance of two, one provider blip must not cost half of it.
+    # The ceiling counts every attempt (failed calls can still be billed);
+    # the user's allowance charges only for usable results.
     _charge_global_ceiling()
     if usage.get("fallback_code") is None:
         _charge_discovery_attempt(

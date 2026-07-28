@@ -170,8 +170,7 @@ export function recoveryDisplayText(
     const symbol = display.values.symbol;
     const rawValue = display.values.rawValue;
     const reasonCode = display.values.reasonCode;
-    // No category means no rule was recognized at all -- the raw text is a
-    // subject ("Backtest WMT"), not a capability boundary. Ask for the rule.
+    // No category: nothing was recognized as a rule, so ask for one.
     const ruleMissing = !reasonCode || reasonCode === "unsupported_constraint";
     const key = ruleMissing
       ? symbol
@@ -695,8 +694,7 @@ function looksLikeInternalCode(value: string): boolean {
   ) {
     return true;
   }
-  // Sentence punctuation marks an explanation, not a name -- a subject never
-  // ends in a period. Mirrors the backend filter.
+  // Sentence punctuation marks an explanation, not a name (mirrors backend).
   return value.trimEnd().endsWith(".") || value.includes(". ");
 }
 

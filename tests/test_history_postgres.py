@@ -256,10 +256,8 @@ def history_plan_scale_rows():
                         row_count,
                     ),
                 )
-            # Whole-database analyze: the plan shape depends on statistics for
-            # every relation the candidate query touches, not only the five
-            # seeded here, and a fresh cluster has none. Per-table analyze
-            # left the plans unstable on freshly reset databases.
+            # Whole-database analyze: the query touches relations beyond the
+            # seeded five, and a fresh cluster has no stats for them.
             cursor.execute("analyze")
     try:
         yield {
@@ -1196,11 +1194,8 @@ def test_history_run_and_chat_plans_are_page_bounded_at_64_and_12k(
 ) -> None:
     plans: list[dict[str, Any]] = []
     with _connect() as connection, connection.cursor() as cursor:
-        # At fixture scale a sequential scan over a compact freshly-seeded
-        # table is cost-competitive with the index path, so the planner's
-        # choice flips with table bloat between runs. The product claim is
-        # that the bounded index path exists and stays bounded as volume
-        # grows; pin the session to index paths so that is what is measured.
+        # At fixture scale seq-vs-index is a cost coin flip; measure the
+        # bounded index path, which is the product claim.
         cursor.execute("set enable_seqscan = off")
         for owner_key, position in (
             ("small_owner_id", 32),
@@ -1277,8 +1272,7 @@ def test_history_state_partition_plans_stay_bounded_as_volume_grows(
     owner_id = history_plan_scale_rows[f"{scale_label}_owner_id"]
     source_limit = 21
     with psycopg.connect(DSN) as connection, connection.cursor() as cursor:
-        # Same reasoning as the page-bounded test above: measure the bounded
-        # index path, not the seq-vs-index cost coin flip at fixture scale.
+        # Measure the bounded index path, not the fixture-scale cost coin flip.
         cursor.execute("set enable_seqscan = off")
         cursor.execute(
             """

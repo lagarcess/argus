@@ -12,12 +12,10 @@ async def name_candidates(
     request: AssetDiscoveryRequest,
     language: str,
 ) -> DiscoveryExtraction | None:
-    """Name candidates from model knowledge; the resolver still owns truth.
+    """Name candidates from model knowledge; resolve_asset() still owns truth.
 
-    Same deterministic spine as the grounded path: the LLM only proposes
-    names from the typed request, and every name must pass resolve_asset()
-    before it can render. What this path cannot offer is currency -- the
-    caller marks the output as unsourced.
+    Same spine as the grounded path, minus currency: the caller marks the
+    output as unsourced.
     """
     target = _target_description(request)
     messages = [
@@ -39,8 +37,7 @@ async def name_candidates(
         },
         {"role": "user", "content": f"Request: {target}"},
     ]
-    # A raise here would escape the discovery stage into generic runtime
-    # failure; the composer maps None to a typed retryable recovery instead.
+    # None maps to a typed retryable recovery; a raise would escape the stage.
     try:
         return await invoke_openrouter_json_schema(
             task="discovery_model_knowledge",

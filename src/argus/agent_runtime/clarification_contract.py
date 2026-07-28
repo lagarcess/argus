@@ -206,8 +206,7 @@ def _unsupported_recovery_fallback(
             f"{symbol_suffix}. "
             f"Which supported direction should I use: {joined_options}?"
         )
-    # No category means no rule was recognized at all -- the raw text is a
-    # subject ("Backtest WMT"), not a capability boundary. Ask for the rule.
+    # No category: nothing was recognized as a rule, so ask for one.
     if reason_code == "unsupported_constraint":
         return (
             f"What rule should I test{symbol_suffix}? "
@@ -373,9 +372,7 @@ def _looks_like_internal_code(value: str) -> bool:
         and not any(character.isspace() for character in value)
     ):
         return True
-    # Sentence punctuation marks an explanation, not a name -- observed live
-    # as "Argus can't run The requested assumption change needs
-    # clarification. directly yet." A subject never ends in a period.
+    # Sentence punctuation marks an explanation, not a name.
     return value.rstrip().endswith(".") or ". " in value
 
 

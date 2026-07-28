@@ -89,16 +89,9 @@ export function discoverySidecarFromMetadata(
 }
 
 /**
- * The asset identity for a tapped discovery candidate, as a mention.
- *
- * The candidate already passed `resolve_asset()` before it was allowed to
- * render, so re-deriving it from the four words of chip text throws away work
- * Argus already did — and gets it wrong, since "Backtest UNP" can read as a
- * strategy name. A mention is the channel `@ticker` already uses to say which
- * asset is meant, so identity travels without inventing a contract.
- *
- * This carries identity, never a prepared action: the turn still re-enters
- * interpretation and still requires confirmation before anything runs.
+ * The tapped candidate's resolver-owned identity as a mention -- the channel
+ * `@ticker` already uses. Identity only, never a prepared action: the turn
+ * still re-enters interpretation and confirmation.
  */
 export function discoveryCandidateMention(
   action: ChatActionOption,

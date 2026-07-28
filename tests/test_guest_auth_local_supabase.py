@@ -920,8 +920,7 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
         conversation_id = conversation.id
         user_message_id = str(uuid4())
         assistant_message_id = str(uuid4())
-        # Distinct created_at values: a bulk insert shares one transaction
-        # now(), and ordering two tied rows by created_at alone is luck.
+        # Bulk inserts share one transaction now(); tie-broken order is luck.
         seeded_at = datetime.now(timezone.utc)
         gateway.client.table("messages").insert(
             [

@@ -88,9 +88,7 @@ async def discovery_stage_result_if_applicable(
             current_user_message=current_user_message,
             language=language,
         )
-    # Cheap verified rows are the default; a search runs only when the answer
-    # needs current facts and allowance remains. An exhausted allowance falls
-    # through to cheap rows -- visibly unsourced -- instead of a dead end.
+    # Cheap rows are the default; exhausted allowance falls through here too.
     if not request.needs_current_facts or not discovery_allowance_available:
         return await _model_knowledge_result(
             decision=decision,
@@ -104,8 +102,7 @@ async def discovery_stage_result_if_applicable(
     try:
         provider = selection.search_provider_for_config(provider_id=config.provider_id)
         usage["search_attempted"] = True
-        # The provider client is synchronous; run it off the event loop so one
-        # search never stalls every other in-flight stream on this worker.
+        # Sync provider client: off the loop, or one search stalls every stream.
         packet = await asyncio.to_thread(
             provider.search,
             query,
@@ -227,13 +224,8 @@ async def _model_knowledge_result(
     language: str,
     can_request_search: bool,
 ) -> StageResult:
-    """Cheap verified rows: model knowledge in, resolver-verified rows out.
-
-    Same spine as the grounded path -- LLM proposes, resolve_asset() decides,
-    voicing speaks only verified facts -- minus the provider call, the charge,
-    and the sources. Zero sources in the sidecar is what marks the answer
-    ungrounded; nothing asserts it separately.
-    """
+    """Model knowledge in, resolver-verified rows out; zero sources in the
+    sidecar is the ungrounded marker (derived, never asserted)."""
     extraction = await name_candidates(request=request, language=language)
     if extraction is None:
         return await _recovery_result(
@@ -367,9 +359,7 @@ async def _recovery_result(
             "retryable": retryable,
             "prompt_source": "llm_generated",
         }
-    # retryable=True is the whole signal: the API layer anchors the durable
-    # retry affordance to the persisted user request when it sees it. The
-    # graph state deliberately carries no retry_last_turn channel.
+    # retryable=True is the whole signal; the API layer owns the durable retry.
     if usage is not None:
         stage_patch["discovery_usage"] = usage
     return StageResult(
@@ -507,9 +497,8 @@ async def _voiced_discovery_response(
     if drops:
         facts.append(drops.strip())
     language_instruction = response_language_instruction(language)
-    # The interface renders every candidate as a tappable row and states the
-    # grounding on its own line, so prose that lists candidates or re-announces
-    # the grounding only duplicates the screen (founder polish, 2026-07-28).
+    # Rows and the marker line own candidates and grounding; prose must not
+    # duplicate the screen.
     messages = [
         {
             "role": "system",
@@ -536,8 +525,7 @@ async def _voiced_discovery_response(
             messages=messages,
         )
     except Exception as exc:
-        # A silent None here surfaces as a retryable recovery; without the log
-        # a dead voicing model is indistinguishable from a transient blip.
+        # Unlogged, a dead voicing model looks like a transient blip.
         logger.warning(
             "Discovery voicing call failed",
             error=str(exc),
@@ -562,8 +550,7 @@ def _discovery_sidecar(
         or ", ".join(request.anchor_symbols)
         or request.relationship
     )
-    # Additive and backend-owned: the frontend may offer "search current
-    # results" only when this is true, so the row can never outlive allowance.
+    # Backend-owned: the escalation row renders only while this is true.
     escalation = (
         {"can_request_search": can_request_search}
         if can_request_search is not None
