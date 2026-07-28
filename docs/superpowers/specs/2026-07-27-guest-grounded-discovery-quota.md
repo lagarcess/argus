@@ -194,12 +194,15 @@ number someone else picks.
 
 ### The numbers
 
-**Three grounded searches per visitor per day.** One proves the value, but a
-single search is a poor sample of a product whose whole promise is *asking
-Argus things*. Three lets a guest try a category, a peer question, and a
-second idea after seeing a result — which is when discovery does its funnel
-work. It stays well under the registered allowance of 10/hour, so committing to
-an account always buys more than rotating guest sessions does.
+**Two grounded searches per visitor per day** (founder decision 2026-07-27). A guest should learn how premium Argus
+is, so one search earns its cost. The second exists only because a provider
+failure on the first would make "Argus is broken" a stranger's entire
+impression — not for exploration, which cheap verified suggestions now carry
+(§12.9). If the first search fails, the right fix is to find out why and repair
+it, not to buy insurance with more searches.
+
+Well under the registered allowance of 10/hour, so an account always buys
+meaningfully more than rotating guest sessions.
 
 **Global ceiling:** a daily attempted-search cap set from measured normal
 volume once the surface has real traffic. Until then, a deliberately
@@ -444,6 +447,32 @@ one must never look alike.
 2. Make ungrounded answers visibly ungrounded.
 3. Decide whether any guest search survives at all, or none.
 4. Re-scope this PR against the answer; its review comments may go stale.
+
+### 12.10 VERDICT — this slice stands, at two searches
+
+**Correction to §12.9:** that section said this PR shrinks substantially. That
+assumed search became registered-only. The founder kept **two** guest searches,
+so unauthenticated visitors still spend metered money, the free-identity
+problem still exists, and the visitor metering remains load-bearing. **Only the
+number changed.** The cheap-suggestions path is additive future work, not a
+replacement for this machinery.
+
+**Merge disposition: ready**, with the allowance at 2.
+
+Proven live against a real guest session on local Supabase: the allowance holds,
+a renewed workspace does not reset it, the global ceiling stops discovery with
+zero provider calls, and the exhausted path returns the honest limit message
+("I'd love to help with recent IPOs, but I've used up my current lookup
+allowance"), observed on an IPO question — precisely the ask a search is for.
+
+**Not blocking, all outside this slice:** §12.1 (intermittent identity parse),
+§12.2 (confirmation card), §12.6 (pending-need answer rejected). These live in
+the conversation spine; the metering behaved correctly on every turn.
+
+**Blocking nothing but worth doing before tester exposure:** §12.4 and §12.5 —
+a provider failure currently costs a guest one of two searches *and* makes them
+retype. At an allowance of two that is half their premium taste, so it matters
+more now than it did at three.
 
 ## 13. Documentation
 

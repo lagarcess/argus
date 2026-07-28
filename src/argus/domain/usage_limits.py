@@ -28,10 +28,11 @@ GUEST_MESSAGE_ALLOWANCE = 10
 GUEST_SIMULATION_ALLOWANCE = 1
 GUEST_FEEDBACK_ALLOWANCE = 5
 GUEST_CONVERSATION_ALLOWANCE = 1
-# Enough for a category ask, a peer ask, and a follow-up after seeing a result,
-# which is where discovery does its funnel work. Below the registered hourly
-# allowance so an account always buys more than rotating guest sessions.
-GUEST_DISCOVERY_ALLOWANCE = 3
+# A taste of the premium, plus one in reserve. One search would be enough to
+# show what grounded discovery is, except a provider failure would then be a
+# stranger's entire impression of Argus. The second exists for that, not for
+# exploration -- cheap verified suggestions carry ordinary asks.
+GUEST_DISCOVERY_ALLOWANCE = 2
 
 # Deliberately a plain day window, not the guest_session window the other guest
 # allowances use. guest_session anchors to the workspace expiry, which moves
