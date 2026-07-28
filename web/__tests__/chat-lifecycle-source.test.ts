@@ -5,17 +5,90 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 
 describe("chat archive/delete lifecycle source contract", () => {
-  test("chat switching keeps prior messages visible until hydration completes", () => {
+  test("chat switching routes cold misses through the bounded transcript cache", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
-    const beforeCatch = loadConversation.slice(0, loadConversation.indexOf("} catch (error)"));
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    expect(loadConversation).toContain('setStreamStatus(t("common.loading"))');
-    expect(beforeCatch).not.toContain("setMessages([])");
-    expect(beforeCatch).not.toContain("setInputActions([])");
+    expect(chat).toContain("new TranscriptSessionCache<Message[]>()");
+    expect(loadConversation).toContain("navigateConversationTranscript(convId)");
+    expect(loadConversation).not.toContain('setStreamStatus(t("common.loading"))');
+    expect(chat).toContain('phase === "loading"');
+    expect(chat).toContain("setMessages([])");
+    expect(chat).toContain("COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS");
+    expect(chat).toContain("loadAllConversationMessagePages(");
+    expect(chat).toContain("{ signal }");
+  });
+
+  test("conversation retrieval is transcript-owned accessible and localized", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const retrieval = readFileSync(
+      join(root, "components/chat/ConversationRetrievalState.tsx"),
+      "utf-8",
+    );
+    const announcement = retrieval.slice(
+      retrieval.indexOf("export function ConversationRetrievalAnnouncement"),
+      retrieval.indexOf("export default function ConversationRetrievalState"),
+    );
+    const visibleRetrievalState = retrieval.slice(
+      retrieval.indexOf("export default function ConversationRetrievalState"),
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(chat).toContain('data-testid="conversation-transcript-region"');
+    expect(chat).toContain('data-conversation-id={conversationId ?? undefined}');
+    expect(chat).toContain('role="region"');
+    expect(chat).toContain('aria-label={t("common.conversation", "Conversation")}');
+    expect(chat).toContain("aria-busy={isHydratingConversation}");
+    expect(announcement).toContain(
+      'data-testid="conversation-retrieval-announcement"',
+    );
+    expect(announcement).toContain('className="sr-only"');
+    expect(announcement).toContain('role="status"');
+    expect(announcement).toContain('aria-live="polite"');
+    expect(visibleRetrievalState).toContain(
+      'data-testid="conversation-retrieval-state"',
+    );
+    expect(visibleRetrievalState).toContain('aria-hidden="true"');
+    expect(visibleRetrievalState).not.toContain('role="status"');
+    expect(visibleRetrievalState).not.toContain('aria-live="polite"');
+    expect(retrieval).toContain("motion-reduce:animate-none");
+    expect(en.chat.opening_conversation).toBe("Opening conversation…");
+    expect(es.chat.opening_conversation).toBe("Abriendo la conversación…");
+    expect(en.chat.error_open_conversation).toBe(
+      "Couldn’t open this conversation.",
+    );
+    expect(es.chat.error_open_conversation).toBe(
+      "No se pudo abrir esta conversación.",
+    );
+  });
+
+  test("transcript cache lifecycle clears auth and evicts only transcript mutations", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const lifecycle = readFileSync(
+      join(root, "components/chat/useChatSurfaceLifecycle.ts"),
+      "utf-8",
+    );
+    const polling = readFileSync(
+      join(root, "lib/chat-run-reconciliation.ts"),
+      "utf-8",
+    );
+
+    expect(chat).toContain("clearAuthenticatedState()");
+    expect(chat).toContain('"message_send"');
+    expect(chat).toContain('"retry"');
+    expect(lifecycle).toContain("onConversationRemoved");
+    expect(lifecycle).toContain("onAllConversationsDeleted");
+    expect(chat).toContain('"conversation_delete"');
+    expect(polling).toContain("onDurableCompletion");
+    expect(chat).toContain('"durable_job_completion"');
   });
 
   test("active archive and delete navigate away from the removed chat", () => {
@@ -32,6 +105,8 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sidebar).toContain("item.id === itemConversationId ? item : { ...item, id: itemConversationId }");
     expect(sidebar).toContain('aria-current={isActiveConversation ? "page" : undefined}');
     expect(sidebar).toContain('data-active-conversation={isActiveConversation ? "true" : undefined}');
+    expect(sidebar).toContain('e.key === " "');
+    expect(sidebar).toContain("focus-visible:ring-2");
     expect(sidebar).toContain("onConversationRemoved?.(id)");
     expect(sidebar).toContain("onConversationRemoved?.(pendingDeleteId)");
     expect(palette).toContain("onConversationRemoved?.(item.conversationId)");
@@ -58,8 +133,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(initBlock).not.toContain("await createConversation(resolvedLanguage)");
     expect(initBlock).not.toContain("readActiveConversationIdFromUrl() ?? readActiveConversationId()");
     expect(initBlock).toContain("resetToEmptyChatSurface");
-    expect(initBlock).toContain("hydrated.messages.length === 0");
-    expect(initBlock).toContain("clear empty persisted conversations from the active route");
+    expect(initBlock).toContain("navigateConversationTranscript");
+    expect(initBlock).toContain("bootstrap: true");
+    expect(chat).toContain("if (snapshot.length === 0)");
     expect(chat).toContain('import { useRouter } from "next/navigation";');
     expect(chat).toContain("const router = useRouter();");
     expect(chat).toContain("router.replace(clearedRoute, { scroll: false });");
@@ -67,17 +143,23 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(removedBlock).not.toContain("startNewChat()");
   });
 
-  test("missing recent conversations are pruned after a failed load", () => {
+  test("a missing bootstrap conversation is pruned without removing an interactive failure", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
-    const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
-    const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
+    const navigationStart = chat.indexOf(
+      "async function navigateConversationTranscript(",
+    );
+    const navigationEnd = chat.indexOf(
+      "// ── Init conversation",
+      navigationStart,
+    );
+    const navigation = chat.slice(navigationStart, navigationEnd);
 
     expect(chat).toContain("function isMissingConversationLoadError(error: unknown)");
-    expect(loadConversation).toContain("catch (error)");
-    expect(loadConversation).toContain("isMissingConversationLoadError(error)");
-    expect(loadConversation).toContain("setHistoryItems((prev) =>");
-    expect(loadConversation).toContain("!historyItemBelongsToConversation(item, convId)");
+    expect(navigation).toContain("options.bootstrap &&");
+    expect(navigation).toContain("isMissingConversationLoadError(state.error)");
+    expect(navigation).toContain("setHistoryItems((current) =>");
+    expect(navigation).toContain("!historyItemBelongsToConversation(");
+    expect(navigation).toContain("targetConversationId");
   });
 
   test("restoring archived or deleted chats refreshes visible history", () => {

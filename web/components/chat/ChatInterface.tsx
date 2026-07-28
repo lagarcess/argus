@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowDown,
   Plus,
@@ -120,6 +127,11 @@ import {
   attentionAfterTurnSettled,
 } from "@/lib/chat-attention-state";
 import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
+import {
+  TranscriptSessionCache,
+  type TranscriptMutation,
+  type TranscriptNavigationState,
+} from "@/lib/chat-transcript-session-cache";
 import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import SettingsView from "../views/SettingsView";
@@ -128,6 +140,9 @@ import ChatHeaderMenu from "./ChatHeaderMenu";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
+import ConversationRetrievalState, {
+  ConversationRetrievalAnnouncement,
+} from "./ConversationRetrievalState";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import {
   type ChatActionOption,
@@ -170,6 +185,7 @@ type SendOptions = {
   bypassGuestGate?: boolean;
 };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
+const COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS = 150;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
 function readActiveConversationRouteState(): ActiveConversationRouteState {
@@ -307,6 +323,11 @@ export default function ChatInterface() {
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  const [showConversationRetrievalState, setShowConversationRetrievalState] =
+    useState(false);
+  const [failedConversationId, setFailedConversationId] = useState<
+    string | null
+  >(null);
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
   const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
@@ -333,6 +354,17 @@ export default function ChatInterface() {
   const ordinaryTransportReconciliationAbortRef =
     useRef<AbortController | null>(null);
   const currentViewRef = useRef<View>("chat");
+  const [transcriptSessionCache] = useState(
+    () => new TranscriptSessionCache<Message[]>(),
+  );
+  const coldRetrievalTimerRef = useRef<number | null>(null);
+  const coldRetrievalConversationIdRef = useRef<string | null>(null);
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const readyTranscriptConversationIdRef = useRef<string | null>(null);
+  const pendingScrollRestoreRef = useRef<{
+    conversationId: string;
+    scrollTop: number | null;
+  } | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
     (targetConversationId?: string | null) =>
@@ -352,7 +384,39 @@ export default function ChatInterface() {
       }),
     [],
   );
-  useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages);
+  const invalidateTranscriptForMutation = useCallback(
+    (targetConversationId: string, mutation: TranscriptMutation) => {
+      const userId = account?.user.id;
+      if (!userId) return;
+      transcriptSessionCache.invalidateForMutation({
+        userId,
+        conversationId: targetConversationId,
+        mutation,
+      });
+      if (
+        readyTranscriptConversationIdRef.current === targetConversationId &&
+        mutation !== "conversation_rename"
+      ) {
+        readyTranscriptConversationIdRef.current = null;
+      }
+    },
+    [account?.user.id, transcriptSessionCache],
+  );
+  const handleDurableJobCompletion = useCallback(
+    (targetConversationId: string) => {
+      invalidateTranscriptForMutation(
+        targetConversationId,
+        "durable_job_completion",
+      );
+    },
+    [invalidateTranscriptForMutation],
+  );
+  useBacktestJobPolling(
+    messages,
+    canApplyConversationOwnedUpdate,
+    setMessages,
+    handleDurableJobCompletion,
+  );
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -418,6 +482,24 @@ export default function ChatInterface() {
     [cancelOrdinaryTransportReconciliation],
   );
 
+  const clearColdTranscriptRetrieval = useCallback(() => {
+    if (coldRetrievalTimerRef.current !== null) {
+      window.clearTimeout(coldRetrievalTimerRef.current);
+      coldRetrievalTimerRef.current = null;
+    }
+    coldRetrievalConversationIdRef.current = null;
+    setShowConversationRetrievalState(false);
+  }, []);
+
+  const cancelTranscriptNavigation = useCallback(() => {
+    transcriptSessionCache.cancelActiveNavigation();
+    clearColdTranscriptRetrieval();
+    pendingScrollRestoreRef.current = null;
+    readyTranscriptConversationIdRef.current = null;
+    setFailedConversationId(null);
+    setIsHydratingConversation(false);
+  }, [clearColdTranscriptRetrieval, transcriptSessionCache]);
+
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
     currentViewRef.current = currentView;
@@ -428,6 +510,7 @@ export default function ChatInterface() {
 
   const resetToEmptyChatSurface = useCallback(
     (nextConversationId: string | null = null) => {
+      cancelTranscriptNavigation();
       retireActiveStreamForNavigation(nextConversationId);
       if (nextConversationId) {
         rememberActiveConversationId(nextConversationId);
@@ -448,8 +531,26 @@ export default function ChatInterface() {
       setHeaderRenameValue("");
       setCurrentView("chat");
     },
-    [retireActiveStreamForNavigation, router],
+    [cancelTranscriptNavigation, retireActiveStreamForNavigation, router],
   );
+
+  useLayoutEffect(() => {
+    const nextUserId = account?.user.id ?? null;
+    const previousUserId = authenticatedUserIdRef.current;
+    if (
+      previousUserId !== null &&
+      nextUserId !== null &&
+      previousUserId !== nextUserId
+    ) {
+      transcriptSessionCache.clearAuthenticatedState();
+      resetToEmptyChatSurface();
+    }
+    authenticatedUserIdRef.current = nextUserId;
+  }, [
+    account?.user.id,
+    resetToEmptyChatSurface,
+    transcriptSessionCache,
+  ]);
 
   const mergeHistoryItems = (
     existing: HistoryItem[],
@@ -560,8 +661,12 @@ export default function ChatInterface() {
       }
       postTurnHistoryRefreshTimersRef.current = [];
       cancelOrdinaryTransportReconciliation();
+      transcriptSessionCache.clearAuthenticatedState();
+      if (coldRetrievalTimerRef.current !== null) {
+        window.clearTimeout(coldRetrievalTimerRef.current);
+      }
     },
-    [cancelOrdinaryTransportReconciliation],
+    [cancelOrdinaryTransportReconciliation, transcriptSessionCache],
   );
 
   useEffect(() => {
@@ -614,6 +719,155 @@ export default function ChatInterface() {
     );
   }, [sidebarMode]);
 
+  function rememberCurrentConversationScroll(): void {
+    const currentConversationId = readyTranscriptConversationIdRef.current;
+    const userId = account?.user.id;
+    const container = scrollContainerRef.current;
+    if (!currentConversationId || !userId || !container) return;
+    transcriptSessionCache.rememberScroll({
+      userId,
+      conversationId: currentConversationId,
+      scrollTop: container.scrollTop,
+    });
+  }
+
+  function stageTranscriptSnapshot(
+    targetConversationId: string,
+    userId: string,
+    snapshot: Message[],
+    scrollTopOverride?: number | null,
+  ): void {
+    clearColdTranscriptRetrieval();
+    setFailedConversationId(null);
+    setIsHydratingConversation(false);
+    if (snapshot.length === 0) {
+      resetToEmptyChatSurface();
+      return;
+    }
+    readyTranscriptConversationIdRef.current = targetConversationId;
+    const scrollTop =
+      scrollTopOverride === undefined
+        ? transcriptSessionCache.readScroll({
+            userId,
+            conversationId: targetConversationId,
+          })
+        : scrollTopOverride;
+    pendingScrollRestoreRef.current = {
+      conversationId: targetConversationId,
+      scrollTop,
+    };
+    shouldAutoScrollRef.current = scrollTop === null;
+    setMessages(snapshot);
+  }
+
+  function beginColdTranscriptRetrieval(targetConversationId: string): void {
+    clearColdTranscriptRetrieval();
+    readyTranscriptConversationIdRef.current = null;
+    pendingScrollRestoreRef.current = null;
+    setFailedConversationId(null);
+    setMessages([]);
+    setIsHydratingConversation(true);
+    coldRetrievalConversationIdRef.current = targetConversationId;
+    coldRetrievalTimerRef.current = window.setTimeout(() => {
+      if (
+        coldRetrievalConversationIdRef.current === targetConversationId &&
+        activeConversationIdRef.current === targetConversationId &&
+        currentViewRef.current === "chat"
+      ) {
+        setShowConversationRetrievalState(true);
+      }
+    }, COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS);
+  }
+
+  async function navigateConversationTranscript(
+    targetConversationId: string,
+    userId: string = account?.user.id ?? "",
+    options: Readonly<{ bootstrap?: boolean }> = {},
+  ): Promise<void> {
+    if (!userId) return;
+    rememberCurrentConversationScroll();
+    retireActiveStreamForNavigation(targetConversationId);
+    rememberActiveConversationId(targetConversationId);
+    activeConversationIdRef.current = targetConversationId;
+    currentViewRef.current = "chat";
+    setConversationId(targetConversationId);
+    setCurrentView("chat");
+    setStreamStatus(null);
+    setShowChatOptions(false);
+
+    let renderedStaleSnapshot = false;
+    const handle = transcriptSessionCache.navigate({
+      userId,
+      conversationId: targetConversationId,
+      load: async (signal) => {
+        const items = await loadAllConversationMessagePages(
+          targetConversationId,
+          undefined,
+          { signal },
+        );
+        return hydrateMessagesFromApi(items).messages;
+      },
+      onState: (state: TranscriptNavigationState<Message[]>) => {
+        if (state.phase === "loading") {
+          beginColdTranscriptRetrieval(targetConversationId);
+          return;
+        }
+        if (state.phase === "refreshing") {
+          renderedStaleSnapshot = true;
+          stageTranscriptSnapshot(
+            targetConversationId,
+            userId,
+            state.snapshot,
+          );
+          return;
+        }
+        if (state.phase === "ready") {
+          const currentScrollTop =
+            renderedStaleSnapshot &&
+            readyTranscriptConversationIdRef.current === targetConversationId
+              ? (scrollContainerRef.current?.scrollTop ?? null)
+              : undefined;
+          stageTranscriptSnapshot(
+            targetConversationId,
+            userId,
+            state.snapshot,
+            currentScrollTop,
+          );
+          return;
+        }
+
+        clearColdTranscriptRetrieval();
+        setIsHydratingConversation(false);
+        if (state.snapshot !== null) {
+          readyTranscriptConversationIdRef.current = targetConversationId;
+          setMessages(state.snapshot);
+          return;
+        }
+        readyTranscriptConversationIdRef.current = null;
+        pendingScrollRestoreRef.current = null;
+        setMessages([]);
+        if (
+          options.bootstrap &&
+          isMissingConversationLoadError(state.error)
+        ) {
+          setHistoryItems((current) =>
+            current.filter(
+              (item) =>
+                !historyItemBelongsToConversation(
+                  item,
+                  targetConversationId,
+                ),
+            ),
+          );
+          resetToEmptyChatSurface();
+          return;
+        }
+        setFailedConversationId(targetConversationId);
+      },
+    });
+    await handle.completion;
+  }
+
   // ── Init conversation ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -656,47 +910,15 @@ export default function ChatInterface() {
           activeConversationId = items[0]?.id ?? null;
         }
         if (activeConversationId) {
-          try {
-            const items =
-              await loadAllConversationMessagePages(activeConversationId);
-            if (cancelled || hasAcceptedUserInputRef.current) return;
-            const hydrated = hydrateMessagesFromApi(items);
-            if (hydrated.messages.length === 0) {
-              // clear empty persisted conversations from the active route.
-              resetToEmptyChatSurface();
-              return;
-            }
-            rememberActiveConversationId(activeConversationId);
-            setConversationId(activeConversationId);
-            setMessages(hydrated.messages);
-            setIsHydratingConversation(false);
-            return;
-          } catch (error) {
-            if (cancelled) return;
-            if (isMissingConversationLoadError(error)) {
-              setHistoryItems((prev) =>
-                prev.filter(
-                  (item) =>
-                    !historyItemBelongsToConversation(
-                      item,
-                      activeConversationId,
-                    ),
-                ),
-              );
-              resetToEmptyChatSurface();
-              return;
-            }
-            rememberActiveConversationId(activeConversationId);
-            setConversationId(activeConversationId);
-            setMessages([
-              conversationLoadFailureMessage(
-                activeConversationId,
-                t("chat.error_load"),
-              ),
-            ]);
-            setIsHydratingConversation(false);
+          const userId = meResponse?.user.id;
+          if (!userId) {
+            resetToEmptyChatSurface();
             return;
           }
+          await navigateConversationTranscript(activeConversationId, userId, {
+            bootstrap: true,
+          });
+          return;
         }
 
         if (cancelled || hasAcceptedUserInputRef.current) return;
@@ -717,20 +939,34 @@ export default function ChatInterface() {
     })();
     return () => {
       cancelled = true;
+      transcriptSessionCache.cancelActiveNavigation();
     };
     // Bootstraps the active conversation once; re-running on i18n updates would create noisy chat reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateScrollPositionState = () => {
+  const updateScrollPositionState = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    const activeTranscriptId = readyTranscriptConversationIdRef.current;
+    const userId = account?.user.id;
+    if (
+      activeTranscriptId &&
+      userId &&
+      activeTranscriptId === activeConversationIdRef.current
+    ) {
+      transcriptSessionCache.rememberScroll({
+        userId,
+        conversationId: activeTranscriptId,
+        scrollTop: container.scrollTop,
+      });
+    }
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
     shouldAutoScrollRef.current = isNearBottom;
     setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  };
+  }, [account?.user.id, transcriptSessionCache]);
 
   const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
     bottomRef.current?.scrollIntoView({ behavior });
@@ -738,53 +974,40 @@ export default function ChatInterface() {
     setShowJumpToLatest(false);
   };
 
+  useLayoutEffect(() => {
+    const pending = pendingScrollRestoreRef.current;
+    const container = scrollContainerRef.current;
+    if (
+      !pending ||
+      !container ||
+      pending.conversationId !== conversationId ||
+      pending.conversationId !== activeConversationIdRef.current
+    ) {
+      return;
+    }
+    container.scrollTop = pending.scrollTop ?? container.scrollHeight;
+    pendingScrollRestoreRef.current = null;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
+    shouldAutoScrollRef.current =
+      pending.scrollTop === null ? true : isNearBottom;
+    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
+  }, [conversationId, messages]);
+
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
       scrollToLatest("smooth");
     } else {
       updateScrollPositionState();
     }
-  }, [messages.length, streamStatus]);
+  }, [messages.length, streamStatus, updateScrollPositionState]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
   const loadConversation = async (convId: string) => {
-    retireActiveStreamForNavigation(convId);
-    closeTransientSidebar();
     closeChatOptions();
-    setCurrentView("chat");
-    rememberActiveConversationId(convId);
-    setConversationId(convId);
-    setStreamStatus(t("common.loading"));
-    setIsHydratingConversation(true);
-    try {
-      const items = await loadAllConversationMessagePages(convId);
-      const hydrated = hydrateMessagesFromApi(items);
-      if (hydrated.messages.length === 0) {
-        // Keep empty persisted conversations from the active route.
-        resetToEmptyChatSurface();
-        return;
-      }
-      setMessages(hydrated.messages);
-    } catch (error) {
-      if (isMissingConversationLoadError(error)) {
-        setHistoryItems((prev) =>
-          prev.filter(
-            (item) => !historyItemBelongsToConversation(item, convId),
-          ),
-        );
-        resetToEmptyChatSurface();
-        showToast(t("chat.error_load"));
-        return;
-      }
-      setMessages([
-        conversationLoadFailureMessage(convId, t("chat.error_load")),
-      ]);
-      showToast(t("chat.error_load"));
-    } finally {
-      setStreamStatus(null);
-      setIsHydratingConversation(false);
-    }
+    await navigateConversationTranscript(convId);
   };
 
   const loadConversationForRun = async (
@@ -813,6 +1036,8 @@ export default function ChatInterface() {
       return;
     }
     if (strategiesEnabled && item.type === "strategy") {
+      rememberCurrentConversationScroll();
+      cancelTranscriptNavigation();
       setCurrentView("strategies");
       closeTransientSidebar();
       return;
@@ -838,6 +1063,17 @@ export default function ChatInterface() {
     resetToEmptyChatSurface,
     closeTransientSidebar,
     refreshHistory,
+    onConversationRemoved: (removedConversationId) => {
+      invalidateTranscriptForMutation(
+        removedConversationId,
+        "conversation_delete",
+      );
+    },
+    onAllConversationsDeleted: () => {
+      transcriptSessionCache.clearAuthenticatedState();
+      readyTranscriptConversationIdRef.current = null;
+      pendingScrollRestoreRef.current = null;
+    },
   });
 
   const guestExperience = useGuestExperience({
@@ -985,6 +1221,13 @@ export default function ChatInterface() {
     }
 
     if (!targetConversationId) return false;
+    const transcriptMutation: TranscriptMutation =
+      action?.type === "retry_last_turn"
+        ? "retry"
+        : isFailedActionRetry(action)
+          ? "recovery"
+          : "message_send";
+    invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1637,6 +1880,7 @@ export default function ChatInterface() {
         );
         return;
       }
+      transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
       setHistoryItems([]);
       setHistoryNextCursor(null);
@@ -1660,6 +1904,7 @@ export default function ChatInterface() {
       action,
     });
     if (!targetConversationId || isStreamingResponse) return;
+    invalidateTranscriptForMutation(targetConversationId, "message_send");
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
       setConversationId(targetConversationId);
@@ -1824,6 +2069,10 @@ export default function ChatInterface() {
     setIsSavingHeaderRename(true);
     try {
       await patchConversation(conversationId, { title: nextTitle });
+      invalidateTranscriptForMutation(
+        conversationId,
+        "conversation_rename",
+      );
       refreshHistory();
       showToast(t("common.save"));
       closeChatOptions();
@@ -1900,6 +2149,12 @@ export default function ChatInterface() {
     messages.length === 0
       ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
       : t("chat.followup_placeholder", "Ask a follow-up...");
+  const showEmptyChatSurface =
+    conversationId === null && messages.length === 0;
+  const conversationComposerUnavailable =
+    isStreamingResponse ||
+    isHydratingConversation ||
+    failedConversationId === conversationId;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1930,6 +2185,10 @@ export default function ChatInterface() {
           closeTransientSidebar();
         }}
         onNavigate={(view) => {
+          if (view !== "chat") {
+            rememberCurrentConversationScroll();
+            cancelTranscriptNavigation();
+          }
           setCurrentView(view);
           closeTransientSidebar();
         }}
@@ -2008,7 +2267,8 @@ export default function ChatInterface() {
           <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-4 px-4 pointer-events-none md:px-8">
             {/* Title (left-aligned; truncates before the action cluster) */}
             <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
-              {currentView === "chat" && messages.length > 0 && (
+              {currentView === "chat" &&
+                (conversationId !== null || messages.length > 0) && (
                 <ChatHeaderTitle
                   conversationId={conversationId}
                   title={headerConversationTitle}
@@ -2062,14 +2322,15 @@ export default function ChatInterface() {
         {/* ── Chat view ── */}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
-            {messages.length === 0 ? (
+            {showEmptyChatSurface ? (
               <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
                 <EmptyChatHeading isGuest={isGuest} />
 
                 <div className="w-full max-w-2xl">
                   <ChatInput
+                    key="new-conversation"
                     onSend={handleSend}
-                    disabled={isStreamingResponse}
+                    disabled={isStreamingResponse || isHydratingConversation}
                     placeholder={chatInputPlaceholder}
                     onToast={showToast}
                   />
@@ -2156,13 +2417,37 @@ export default function ChatInterface() {
               <>
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
 
+                {showConversationRetrievalState &&
+                  isHydratingConversation && (
+                    <ConversationRetrievalAnnouncement />
+                  )}
+
                 {/* Messages */}
                 <div
+                  data-testid="conversation-transcript-region"
+                  data-conversation-id={conversationId ?? undefined}
                   ref={scrollContainerRef}
                   onScroll={updateScrollPositionState}
+                  role="region"
+                  aria-label={t("common.conversation", "Conversation")}
+                  aria-busy={isHydratingConversation}
                   className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
                 >
                   <div className="space-y-8">
+                    {showConversationRetrievalState &&
+                      isHydratingConversation && (
+                        <ConversationRetrievalState state="loading" />
+                      )}
+                    {failedConversationId === conversationId && (
+                      <ConversationRetrievalState
+                        state="error"
+                        onRetry={() => {
+                          if (failedConversationId) {
+                            void loadConversation(failedConversationId);
+                          }
+                        }}
+                      />
+                    )}
                     {messages.map((msg, index) => {
                       const latestAiIndex = messages.findLastIndex(
                         (m) => m.role === "ai",
@@ -2239,8 +2524,9 @@ export default function ChatInterface() {
                       </div>
                     )}
                     <ChatInput
+                      key={conversationId ?? "unowned-transcript"}
                       onSend={handleSend}
-                      disabled={isStreamingResponse || isHydratingConversation}
+                      disabled={conversationComposerUnavailable}
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
                     />

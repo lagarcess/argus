@@ -543,11 +543,15 @@ export default function ChatSidebar({
                               }
                             }}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter" && renamingId !== item.id) {
+                              if (
+                                (e.key === "Enter" || e.key === " ") &&
+                                renamingId !== item.id
+                              ) {
+                                e.preventDefault();
                                 onOpenItem(item);
                               }
                             }}
-                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 ${
+                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-1 dark:hover:bg-white/5 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-[#141517] ${
                               isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
