@@ -64,9 +64,14 @@ def admit_durable_chat_job(
 
     visitor_key = getattr(context, "visitor_key", None)
     if visitor_key:
-        # Visitor-keyed bound: a renewed workspace grants no fresh run. The
-        # workspace-keyed reservation below still owns replay identity.
-        if not visitor_within_limits(
+        # Replay resolves before allowance: a retry of an admitted run must
+        # return its existing job, never a conversion wall.
+        existing_reservation = gateway.get_backtest_job_reservation(
+            user_id=context.user_id,
+            operation_scope=CHAT_RUN_SCOPE,
+            idempotency_key=idempotency_key,
+        )
+        if existing_reservation is None and not visitor_within_limits(
             gateway.client,
             visitor_key=visitor_key,
             resource=SIMULATION_USAGE_RESOURCE,
