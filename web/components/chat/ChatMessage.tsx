@@ -71,6 +71,9 @@ export default function ChatMessage({
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [anchorSourceIndex, setAnchorSourceIndex] = useState<number | null>(
+    null,
+  );
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
   const optionsRef = useRef<HTMLDivElement>(null);
   const selectedFeedbackClass =
@@ -374,6 +377,13 @@ export default function ChatMessage({
                   });
                   const hasName =
                     Boolean(candidate.name) && candidate.name !== candidate.symbol;
+                  // One chip per row: the first corroborating source. Cheap
+                  // rows carry no indices, so they stay chipless by shape.
+                  const chipIndex = candidate.source_indices?.[0];
+                  const chipSource =
+                    chipIndex === undefined
+                      ? undefined
+                      : message.discovery?.sources[chipIndex];
                   return (
                     <NextMoveRow
                       key={candidate.symbol}
@@ -405,6 +415,21 @@ export default function ChatMessage({
                           <NextMoveSeparator>—</NextMoveSeparator>
                           <NextMoveDetail>{candidate.reason_text}</NextMoveDetail>
                         </>
+                      ) : null}
+                      {chipSource ? (
+                        // Pointer shortcut into the drawer; a plain span keeps
+                        // the row button's DOM legal, and the "N sources ›"
+                        // button stays the keyboard path to the same drawer.
+                        <span
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setAnchorSourceIndex(chipIndex ?? null);
+                            setShowSources(true);
+                          }}
+                          className="ms-1.5 inline-flex translate-y-[-1px] cursor-pointer items-center rounded-full border border-black/10 px-1.5 py-px align-middle text-[11px] leading-[1.4] text-black/45 transition-colors hover:border-black/25 hover:text-black/70 dark:border-white/12 dark:text-white/45 dark:hover:border-white/30 dark:hover:text-white/75"
+                        >
+                          {chipSource.domain}
+                        </span>
                       ) : null}
                     </NextMoveRow>
                   );
@@ -495,8 +520,12 @@ export default function ChatMessage({
 
           {message.discovery && showSources ? (
             <DiscoverySourcesPanel
-              onClose={() => setShowSources(false)}
+              onClose={() => {
+                setShowSources(false);
+                setAnchorSourceIndex(null);
+              }}
               sidecar={message.discovery}
+              anchorIndex={anchorSourceIndex}
             />
           ) : null}
 

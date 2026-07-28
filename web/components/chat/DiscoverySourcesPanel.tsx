@@ -8,6 +8,8 @@ import type { DiscoverySidecar } from "./types";
 type DiscoverySourcesPanelProps = {
   onClose: () => void;
   sidecar: DiscoverySidecar;
+  /** Opens scrolled to this source, so a row chip lands on its evidence. */
+  anchorIndex?: number | null;
 };
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,6 +41,7 @@ export function formattedSourceDate(
 export default function DiscoverySourcesPanel({
   onClose,
   sidecar,
+  anchorIndex = null,
 }: DiscoverySourcesPanelProps) {
   const { t, i18n } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -48,6 +51,11 @@ export default function DiscoverySourcesPanel({
     restoreFocusRef.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     panel?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    if (anchorIndex !== null) {
+      panel
+        ?.querySelector(`[data-source-index="${anchorIndex}"]`)
+        ?.scrollIntoView({ block: "start" });
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -76,7 +84,7 @@ export default function DiscoverySourcesPanel({
       document.removeEventListener("keydown", handleKeyDown, true);
       restoreFocusRef.current?.focus?.();
     };
-  }, [onClose]);
+  }, [onClose, anchorIndex]);
 
   const title = t("chat.discovery_results.sources_panel_title", {
     defaultValue: "Sources Argus read",
@@ -122,12 +130,17 @@ export default function DiscoverySourcesPanel({
         </div>
 
         <ul className="flex-1 overflow-y-auto px-4 py-2">
-          {sidecar.sources.map((source) => {
+          {sidecar.sources.map((source, index) => {
             const date = formattedSourceDate(source.source_date, i18n.language);
             return (
               <li
                 key={source.url}
-                className="border-b border-black/6 py-3 last:border-b-0 dark:border-white/6"
+                data-source-index={index}
+                className={`border-b border-black/6 py-3 last:border-b-0 dark:border-white/6 ${
+                  index === anchorIndex
+                    ? "-mx-2 rounded-lg bg-[#5ba897]/[0.08] px-2"
+                    : ""
+                }`}
               >
                 <a
                   href={source.url}
