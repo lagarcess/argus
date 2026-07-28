@@ -353,6 +353,29 @@ guest a search *and* makes them retype. That is the founder's argument for why
 the allowance is 3 rather than 1 — a single search plus a flaky provider means a
 stranger's whole impression of Argus is "it is broken".
 
+### 12.6 A correct pending-need answer was rejected as an idea change
+
+Argus asked *"What date window should I use for JNJ?"*, the guest answered
+*"this year so far"*, and Argus replied *"I could not resolve that choice
+without changing your current idea"* with Provide missing detail / Keep idea
+unchanged / Cancel.
+
+The interpreter was right: `semantic_turn_act=answer_pending_need` with
+`reason_codes=['date_range_answered']`. A **deterministic guard downstream**
+then rejected it and offered a change-conflict menu. Answering the exact
+question asked should never route to conflict resolution.
+
+Interpret/edit spine, not this slice. Related to the #271 protected-edit work.
+
+### 12.7 12.1 is intermittent, not systematic
+
+The same session that produced 12.6 also produced *"What date window should I
+use for JNJ?"* — the asset known, never re-asked. That is Slice D working
+correctly **on the guest path**. So 12.1 (the WMT parse) is intermittent rather
+than a guest-wide regression, which points at the interpreter rather than at a
+missing mention. Check the WMT turn for whether the mention reached the request
+before assuming the identity wiring is at fault.
+
 ## 13. Documentation
 
 - Grounded discovery design §1: already marked superseded; point it here.
