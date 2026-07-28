@@ -271,3 +271,34 @@ class TestDiscoveryDuringPendingConfirmation:
         serialized = _public_result(result)
 
         assert "confirmation_payload" in serialized
+
+
+def test_strategy_repair_never_runs_on_a_typed_discovery_act() -> None:
+    """Issue #292: the focused strategy repair rebuilt a draft for a
+    discovery ask (whose draft is empty by contract) and demoted the act,
+    capturing the turn into the confirmation corridor."""
+    from argus.agent_runtime.llm_interpreter import (
+        LLMInterpretationResponse,
+        _strategy_extraction_repair_is_allowed,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="find similar companies",
+        semantic_turn_act="asset_discovery",
+        asset_discovery=AssetDiscoveryRequest(
+            relationship="peer",
+            category_description=None,
+            anchor_symbols=["AAPL"],
+            asset_class_hint="equity",
+        ),
+    )
+    request = InterpretationRequest(
+        current_user_message="¿Qué empresas parecidas a Apple podría probar?",
+        user=UserState(user_id="u1"),
+    )
+
+    assert _strategy_extraction_repair_is_allowed(response, request=request) is False
