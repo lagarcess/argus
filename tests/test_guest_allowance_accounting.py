@@ -69,12 +69,14 @@ def test_registered_allowance_windows_remain_hour_and_day() -> None:
     ]
 
 
-def test_terminal_message_settlement_uses_the_account_policy_window() -> None:
+def test_terminal_message_settlement_keys_guests_on_the_visitor() -> None:
     settlement = message_usage_settlement(_guest_context())
 
     assert settlement["resource"] == "chat_messages"
-    assert settlement["limits"][0]["period"] == "guest_session"
-    assert settlement["limits"][0]["limit"] == 10
+    assert settlement["limits"] == [("day", 10)]
+    # No caller-supplied key still yields a visitor key: the shared
+    # fail-closed bucket, never a workspace-fresh allowance.
+    assert settlement["visitor_key"].startswith("visitor:")
 
 
 def test_backtest_gateway_passes_guest_window_to_existing_atomic_owner() -> None:

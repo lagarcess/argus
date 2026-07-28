@@ -16,7 +16,7 @@ from argus.api.main import app
 from argus.api.routers import analytics as analytics_router
 from argus.api.schemas import GuestFunnelClientEventRequest, OnboardingState, User
 from argus.domain.guest_workspaces import GuestWorkspace
-from argus.domain.usage_limits import MESSAGE_USAGE_RESOURCE, QuotaExceededError
+from argus.domain.usage_limits import MESSAGE_USAGE_RESOURCE
 from argus.observability import sanitize_observability_attributes
 from argus.observability.guest_funnel import (
     GUEST_FUNNEL_EVENT_MAP,
@@ -431,9 +431,27 @@ def test_guest_message_limit_emits_from_authoritative_precheck() -> None:
     request.state.request_id = "request-1"
     account = _guest_context()
     gateway = Mock()
-    gateway.check_allowance_windows.side_effect = QuotaExceededError(
-        "guest_session allowance exhausted"
-    )
+
+    class _ExhaustedVisitorClient:
+        def table(self, name):
+            assert name == "visitor_usage_counters"
+            return self
+
+        def select(self, *_args):
+            return self
+
+        def eq(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def execute(self):
+            from types import SimpleNamespace
+
+            return SimpleNamespace(data=[{"used_count": 10}])
+
+    gateway.client = _ExhaustedVisitorClient()
 
     with (
         patch("argus.api.chat.allowance.api_state.supabase_gateway", gateway),
