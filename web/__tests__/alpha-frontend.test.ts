@@ -1012,7 +1012,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("if (isStreamingResponse) return false;");
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
-    expect(chat).toContain("disabled={isStreamingResponse}");
+    expect(chat).toContain(
+      "disabled={isStreamingResponse || isHydratingConversation}",
+    );
+    expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
     expect(chat).toContain("setIsStreamingResponse(false);");
@@ -1241,7 +1244,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
     expect(chat).not.toContain("readActiveConversationId()");
     expect(chat).toContain(
-      "loadAllConversationMessagePages(activeConversationId",
+      "await navigateConversationTranscript(activeConversationId, userId, {",
+    );
+    expect(chat).toContain(
+      "loadAllConversationMessagePages(\n          targetConversationId,",
     );
     expect(chat).toContain(
       "const routeState = readActiveConversationRouteState();",

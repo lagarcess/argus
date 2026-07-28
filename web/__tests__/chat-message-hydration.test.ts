@@ -532,6 +532,27 @@ describe("chat message hydration", () => {
     });
   });
 
+  test("passes one abort signal through every transcript page request", async () => {
+    const controller = new AbortController();
+    const observedSignals: Array<AbortSignal | undefined> = [];
+
+    await loadAllConversationMessagePages(
+      "conversation-1",
+      async (_conversationId, _limit, cursor, options) => {
+        observedSignals.push(options?.signal);
+        return cursor
+          ? { items: [], next_cursor: null }
+          : { items: [], next_cursor: "cursor-2" };
+      },
+      { signal: controller.signal },
+    );
+
+    expect(observedSignals).toEqual([
+      controller.signal,
+      controller.signal,
+    ]);
+  });
+
   test("stays unknown when more than one new lifecycle turn appears", async () => {
     const items = ["one", "two"].map((suffix) =>
       apiMessage({

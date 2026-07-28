@@ -9,9 +9,10 @@
  * - A new-key miss emits `snapshot: null`; it never reuses another
  *   conversation's visible content. A stale same-key refresh keeps the last
  *   successful snapshot visible.
- * - Message send, retry, recovery, durable job completion, and delete evict
- *   only the owning transcript and scroll state. Rename preserves the entry
- *   because conversation titles are not part of the transcript snapshot.
+ * - Message send, retry, recovery, durable job completion, durable result
+ *   actions, and delete evict only the owning transcript and scroll state.
+ *   Rename preserves the entry because conversation titles are not part of
+ *   the transcript snapshot.
  * - Logout or authenticated-user change aborts pending loads and clears every
  *   transcript and scroll entry.
  * - Abort reduces wasted work, while the monotonic navigation generation is
@@ -41,6 +42,7 @@ export type TranscriptMutation =
   | "retry"
   | "recovery"
   | "durable_job_completion"
+  | "durable_result_action"
   | "conversation_rename"
   | "conversation_delete";
 

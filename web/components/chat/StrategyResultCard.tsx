@@ -37,6 +37,7 @@ type StrategyResultCardProps = {
   appearance?: "light" | "dark";
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
+  onDecisionSaved?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
 };
@@ -55,6 +56,7 @@ export default function StrategyResultCard({
   appearance,
   canSaveDecision = true,
   onDecisionUnavailable,
+  onDecisionSaved,
   resumeDecisionArtifactId,
   onDecisionResumeHandled,
   onAction,
@@ -338,6 +340,7 @@ export default function StrategyResultCard({
                     },
                   );
                   setSavedDecisionState(response.decision.decision_state);
+                  onDecisionSaved?.();
                   setDecisionNote("");
                   setIsDecisionOpen(false);
                 } catch {

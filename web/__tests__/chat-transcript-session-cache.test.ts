@@ -503,6 +503,7 @@ describe("chat transcript session cache", () => {
       "retry",
       "recovery",
       "durable_job_completion",
+      "durable_result_action",
       "conversation_delete",
     ];
 

@@ -191,6 +191,7 @@ export function useBacktestJobPolling(
   messages: Message[],
   ownsConversation: (conversationId?: string | null) => boolean,
   setMessages: Dispatch<SetStateAction<Message[]>>,
+  onDurableCompletion?: (conversationId: string) => void,
 ): void {
   const pendingBacktestJobKey = useMemo(
     () => pendingBacktestJobIds(messages).join("|"),
@@ -223,6 +224,9 @@ export function useBacktestJobPolling(
           response.job.status === "queued" ||
           response.job.status === "running" ||
           (response.job.status === "succeeded" && !response.run);
+        if (!shouldContinue) {
+          onDurableCompletion?.(response.job.conversation_id);
+        }
         if (shouldContinue && attempt < 45) {
           timers.push(
             window.setTimeout(() => void pollJob(jobId, attempt + 1), 2000),
@@ -246,7 +250,7 @@ export function useBacktestJobPolling(
       cancelled = true;
       timers.forEach(window.clearTimeout);
     };
-  }, [applyResponse, pendingBacktestJobKey]);
+  }, [applyResponse, onDurableCompletion, pendingBacktestJobKey]);
 }
 
 function errorStatus(error: unknown): number | null {
