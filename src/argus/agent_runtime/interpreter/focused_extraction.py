@@ -312,12 +312,9 @@ def strategy_extraction_repair_is_allowed(
 ) -> bool:
     if response.task_relation == "refine":
         return False
-    if (
-        response.semantic_turn_act == "asset_discovery"
-        and response.asset_discovery is not None
-    ):
-        # A typed discovery ask has no strategy to extract; a repair pass
-        # rebuilding a draft would demote the act and capture the turn.
+    if response.semantic_turn_act == "asset_discovery":
+        # A typed discovery ask has no strategy to extract — payload or not;
+        # the deterministic missing-target recovery owns the partial shape.
         return False
     if response.semantic_turn_act == "retry_failed_action":
         return not has_failed_action_launch_payload(request)

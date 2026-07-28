@@ -248,6 +248,33 @@ class TestDiscoveryDuringPendingConfirmation:
         assert "discovery" in serialized
         assert "confirmation_payload" not in serialized
 
+    def test_discovery_recovery_turn_carries_no_confirmation_either(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what companies similar to Apple could I try?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        # Recovery paths emit no discovery sidecar; the typed act on the
+        # run state is what marks the turn.
+        run_state.semantic_turn_act = "asset_discovery"
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Discovery is unavailable right now.",
+        }
+
+        serialized = _public_result(result)
+
+        assert "confirmation_payload" not in serialized
+
     def test_non_discovery_turn_keeps_the_confirmation_backfill(self) -> None:
         from argus.agent_runtime.runtime import _public_result
         from argus.agent_runtime.state.models import ConfirmationPayload
@@ -302,3 +329,8 @@ def test_strategy_repair_never_runs_on_a_typed_discovery_act() -> None:
     )
 
     assert _strategy_extraction_repair_is_allowed(response, request=request) is False
+
+    payloadless = response.model_copy(update={"asset_discovery": None})
+    assert (
+        _strategy_extraction_repair_is_allowed(payloadless, request=request) is False
+    )
