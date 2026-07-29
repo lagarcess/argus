@@ -117,6 +117,23 @@ class CanonicalMemoryStore(Protocol):
 
     def list_records(self, owner: RegisteredMemoryOwner) -> tuple[MemoryRecord, ...]: ...
 
+    def get_record(
+        self, owner: RegisteredMemoryOwner, record_id: str
+    ) -> MemoryRecord | None: ...
+
+    def set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool: ...
+
+    def get_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> str | None: ...
+
 
 class InMemoryCanonicalMemoryStore:
     """Deterministic stand-in for future canonical persistence."""
@@ -127,6 +144,7 @@ class InMemoryCanonicalMemoryStore:
         self._settings: dict[str, MemoryConsentSettings] = {}
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
         self._records: dict[str, dict[str, MemoryRecord]] = {}
+        self._provider_refs: dict[str, dict[str, str]] = {}
         self._proactive_prompts: dict[tuple[str, MemoryCategory], datetime] = {}
         self._declines: dict[tuple[str, MemoryCategory], datetime] = {}
 
@@ -399,3 +417,31 @@ class InMemoryCanonicalMemoryStore:
     def list_records(self, owner: RegisteredMemoryOwner) -> tuple[MemoryRecord, ...]:
         with self._lock:
             return tuple(self._records.get(owner.owner_id, {}).values())
+
+    def get_record(
+        self, owner: RegisteredMemoryOwner, record_id: str
+    ) -> MemoryRecord | None:
+        with self._lock:
+            return self._records.get(owner.owner_id, {}).get(record_id)
+
+    def set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool:
+        if not provider_ref:
+            raise ValueError("provider ref must not be empty")
+        with self._lock:
+            if record_id not in self._records.get(owner.owner_id, {}):
+                return False
+            self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
+            return True
+
+    def get_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> str | None:
+        with self._lock:
+            return self._provider_refs.get(owner.owner_id, {}).get(record_id)

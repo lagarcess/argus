@@ -12,10 +12,12 @@ from argus.memory.contracts import (
     MemoryProposalTrigger,
     MemoryProvenance,
     MemorySourceKind,
+    MemoryUsePurpose,
     SavedDecisionSource,
     SensitivityAssessment,
     SensitivityStatus,
 )
+from argus.memory.provider import MemoryRetrievalProvider
 from argus.memory.service import (
     Clock,
     IdFactory,
@@ -85,6 +87,7 @@ def _exploding_service() -> MemoryService:
         clock=cast(Clock, exploding),
         id_factory=cast(IdFactory, exploding),
         store=cast(CanonicalMemoryStore, exploding),
+        provider=cast(MemoryRetrievalProvider, exploding),
     )
 
 
@@ -118,6 +121,14 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
             context=MemoryOperationContext.ORDINARY,
         ),
         lambda: service.decline(subject, "candidate-1"),
+        lambda: service.inspect(subject),
+        lambda: service.retrieve(
+            subject,
+            "",
+            MemoryUsePurpose.REVISIT_SAVED_DECISION,
+            limit=11,
+        ),
+        lambda: service.explain(subject, "record-1"),
     )
 
     for call in calls:

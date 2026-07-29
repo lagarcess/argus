@@ -41,6 +41,20 @@ class MemoryOperationContext(str, Enum):
     RESTRICTED_FINANCIAL = "restricted_financial"
 
 
+class MemoryUsePurpose(str, Enum):
+    """Closed purposes that cannot change canonical investing behavior."""
+
+    REVISIT_SAVED_DECISION = "revisit_saved_decision"
+    COMPARE_SAVED_DECISIONS = "compare_saved_decisions"
+    EXPLAIN_PRIOR_DECISION = "explain_prior_decision"
+    INSPECT_MEMORY = "inspect_memory"
+
+
+class MemorySelectionReason(str, Enum):
+    PROVIDER_RANKED = "provider_ranked"
+    CANONICAL_TOKEN_MATCH = "canonical_token_match"
+
+
 class SensitivityStatus(str, Enum):
     UNASSESSED = "unassessed"
     CLEAR = "clear"
@@ -185,6 +199,36 @@ class MemoryRecord(BaseModel):
         if self.provenance_refs[0] != self.provenance:
             raise ValueError("primary provenance must lead provenance refs")
         return self
+
+
+class RetrievedMemory(BaseModel):
+    """Canonical memory selected for one bounded, allowed use."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    record: MemoryRecord
+    selection_reason: MemorySelectionReason
+    score: float = Field(ge=0, allow_inf_nan=False)
+    provenance: tuple[MemorySourceRef, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_canonical_provenance(self) -> "RetrievedMemory":
+        if self.provenance != self.record.provenance_refs:
+            raise ValueError("retrieval provenance must come from the canonical record")
+        return self
+
+
+class MemoryExplanation(BaseModel):
+    """Inspectable proof of where and how a canonical memory was confirmed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    record_id: str = Field(min_length=1)
+    category: MemoryCategory
+    provenance: tuple[MemorySourceRef, ...] = Field(min_length=1)
+    consent_receipt_id: str = Field(min_length=1)
+    consent_schema_version: MemoryConsentSchemaVersion
+    confirmed_at: datetime
 
 
 class ProposalResult(BaseModel):
