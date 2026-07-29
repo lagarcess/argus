@@ -136,8 +136,7 @@ Create:
 - `tests/memory/test_postgres_store_controls.py`
 - `tests/memory/test_postgres_store_provider_reconciliation.py`
 - `tests/memory/test_postgres_guest_isolation.py`
-- one CLI-generated
-  `supabase/migrations/*_add_personalization_memory_persistence.sql`
+- `supabase/migrations/20260729225600_add_personalization_memory_persistence.sql`
 
 Port from the accepted Codex checkpoint:
 
@@ -244,8 +243,8 @@ fix(memory): record exact scoped consent evidence
 
 **Files:**
 
-- Create: CLI-generated
-  `supabase/migrations/*_add_personalization_memory_persistence.sql`
+- Create:
+  `supabase/migrations/20260729225600_add_personalization_memory_persistence.sql`
 - Modify: `docs/DATA_MODEL.md`
 - Create: `tests/memory/test_postgres_guest_isolation.py`
 
