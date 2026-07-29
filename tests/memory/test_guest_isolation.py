@@ -8,6 +8,7 @@ import pytest
 from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryCategory,
+    MemoryEdit,
     MemoryOperationContext,
     MemoryProposalTrigger,
     MemoryProvenance,
@@ -129,6 +130,12 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
             limit=11,
         ),
         lambda: service.explain(subject, "record-1"),
+        lambda: service.edit(
+            subject,
+            "",
+            MemoryEdit(label="Never inspect this", sensitivity=_clear_sensitivity()),
+        ),
+        lambda: service.delete(subject, ""),
     )
 
     for call in calls:

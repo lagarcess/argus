@@ -7,19 +7,13 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from argus.memory.contracts import MemoryRecord
+from argus.memory.contracts import MemoryRecord, ProviderReconciliationStatus
 from argus.memory.subject import RegisteredMemoryOwner
 
 
 class ProviderSearchStatus(str, Enum):
     ANSWERED = "answered"
     UNAVAILABLE = "unavailable"
-
-
-class ProviderReconciliationStatus(str, Enum):
-    SYNCHRONIZED = "synchronized"
-    NOT_APPLICABLE = "not_applicable"
-    RECONCILIATION_REQUIRED = "reconciliation_required"
 
 
 class ProviderHit(BaseModel):

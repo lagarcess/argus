@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from threading import RLock
+from threading import Condition, RLock
 from typing import Protocol
 
 from argus.memory.contracts import (
@@ -26,6 +26,25 @@ class ProposalHistorySnapshot:
 
     last_proactive_prompt_at: datetime | None
     last_declined_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalRecordMutation:
+    """One owner-scoped canonical mutation and its prior derivative pointer."""
+
+    before: MemoryRecord
+    after: MemoryRecord | None
+    provider_ref: str | None
+    reconciliation_generation: int | None = None
+    cleanup_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCleanupTarget:
+    """Inspectable derivative cleanup work retained after canonical mutation."""
+
+    record_id: str
+    provider_ref: str
 
 
 class CanonicalMemoryStore(Protocol):
@@ -121,6 +140,21 @@ class CanonicalMemoryStore(Protocol):
         self, owner: RegisteredMemoryOwner, record_id: str
     ) -> MemoryRecord | None: ...
 
+    def edit_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        value: str | None,
+        label: str | None,
+    ) -> CanonicalRecordMutation | None: ...
+
+    def delete_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> CanonicalRecordMutation | None: ...
+
     def set_provider_ref(
         self,
         owner: RegisteredMemoryOwner,
@@ -134,17 +168,72 @@ class CanonicalMemoryStore(Protocol):
         record_id: str,
     ) -> str | None: ...
 
+    def compare_and_set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        expected_record: MemoryRecord,
+        expected_provider_ref: str | None,
+        reconciliation_generation: int,
+        provider_ref: str,
+    ) -> bool: ...
+
+    def finish_record_reconciliation(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> bool: ...
+
+    def wait_for_reconciliation_turn(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> bool: ...
+
+    def inflight_reconciliation_generations(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> tuple[int, ...]: ...
+
+    def track_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> None: ...
+
+    def resolve_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool: ...
+
+    def list_provider_cleanup_targets(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str | None = None,
+    ) -> tuple[ProviderCleanupTarget, ...]: ...
+
 
 class InMemoryCanonicalMemoryStore:
     """Deterministic stand-in for future canonical persistence."""
 
     def __init__(self) -> None:
         self._lock = RLock()
+        self._reconciliation_condition = Condition(self._lock)
         self._candidates: dict[str, dict[str, MemoryCandidate]] = {}
         self._settings: dict[str, MemoryConsentSettings] = {}
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
         self._records: dict[str, dict[str, MemoryRecord]] = {}
         self._provider_refs: dict[str, dict[str, str]] = {}
+        self._cleanup_targets: dict[tuple[str, str], set[str]] = {}
+        self._reconciliation_generations: dict[tuple[str, str], int] = {}
+        self._inflight_reconciliations: dict[tuple[str, str], set[int]] = {}
         self._proactive_prompts: dict[tuple[str, MemoryCategory], datetime] = {}
         self._declines: dict[tuple[str, MemoryCategory], datetime] = {}
 
@@ -424,6 +513,91 @@ class InMemoryCanonicalMemoryStore:
         with self._lock:
             return self._records.get(owner.owner_id, {}).get(record_id)
 
+    def edit_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        value: str | None,
+        label: str | None,
+    ) -> CanonicalRecordMutation | None:
+        with self._reconciliation_condition:
+            records = self._records.get(owner.owner_id, {})
+            current = records.get(record_id)
+            if current is None:
+                return None
+            updated = MemoryRecord.model_validate(
+                {
+                    field_name: (
+                        value
+                        if field_name == "value" and value is not None
+                        else label
+                        if field_name == "label" and label is not None
+                        else getattr(current, field_name)
+                    )
+                    for field_name in MemoryRecord.model_fields
+                }
+            )
+            if updated == current:
+                raise ValueError("memory edit must change value or label")
+            records[record_id] = updated
+            reconciliation_key = (owner.owner_id, record_id)
+            reconciliation_generation = (
+                self._reconciliation_generations.get(reconciliation_key, 0) + 1
+            )
+            self._reconciliation_generations[reconciliation_key] = (
+                reconciliation_generation
+            )
+            self._inflight_reconciliations.setdefault(
+                reconciliation_key,
+                set(),
+            ).add(reconciliation_generation)
+            return CanonicalRecordMutation(
+                before=current,
+                after=updated,
+                provider_ref=self._provider_refs.get(owner.owner_id, {}).get(record_id),
+                reconciliation_generation=reconciliation_generation,
+            )
+
+    def delete_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> CanonicalRecordMutation | None:
+        with self._reconciliation_condition:
+            reconciliation_key = (owner.owner_id, record_id)
+            self._reconciliation_condition.wait_for(
+                lambda: not self._inflight_reconciliations.get(reconciliation_key)
+            )
+            records = self._records.get(owner.owner_id, {})
+            current = records.get(record_id)
+            if current is None:
+                return None
+            provider_refs = self._provider_refs.get(owner.owner_id, {})
+            provider_ref = provider_refs.get(record_id)
+            cleanup_refs = set(self._cleanup_targets.get(reconciliation_key, set()))
+            if provider_ref is not None:
+                cleanup_refs.add(provider_ref)
+            if cleanup_refs:
+                self._cleanup_targets[reconciliation_key] = cleanup_refs
+
+            updated_records = dict(records)
+            del updated_records[record_id]
+            updated_provider_refs = dict(provider_refs)
+            updated_provider_refs.pop(record_id, None)
+
+            self._records[owner.owner_id] = updated_records
+            if updated_provider_refs:
+                self._provider_refs[owner.owner_id] = updated_provider_refs
+            else:
+                self._provider_refs.pop(owner.owner_id, None)
+            return CanonicalRecordMutation(
+                before=current,
+                after=None,
+                provider_ref=provider_ref,
+                cleanup_refs=tuple(sorted(cleanup_refs)),
+            )
+
     def set_provider_ref(
         self,
         owner: RegisteredMemoryOwner,
@@ -445,3 +619,144 @@ class InMemoryCanonicalMemoryStore:
     ) -> str | None:
         with self._lock:
             return self._provider_refs.get(owner.owner_id, {}).get(record_id)
+
+    def compare_and_set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        expected_record: MemoryRecord,
+        expected_provider_ref: str | None,
+        reconciliation_generation: int,
+        provider_ref: str,
+    ) -> bool:
+        if not provider_ref:
+            raise ValueError("provider ref must not be empty")
+        with self._lock:
+            current_record = self._records.get(owner.owner_id, {}).get(record_id)
+            current_provider_ref = self._provider_refs.get(owner.owner_id, {}).get(
+                record_id
+            )
+            reconciliation_key = (owner.owner_id, record_id)
+            if (
+                current_record != expected_record
+                or current_provider_ref != expected_provider_ref
+                or reconciliation_generation
+                not in self._inflight_reconciliations.get(reconciliation_key, set())
+            ):
+                return False
+            targets = self._cleanup_targets.get(reconciliation_key)
+            if targets is not None:
+                targets.discard(provider_ref)
+                if not targets:
+                    self._cleanup_targets.pop(reconciliation_key, None)
+            if current_provider_ref is not None and current_provider_ref != provider_ref:
+                self._cleanup_targets.setdefault(reconciliation_key, set()).add(
+                    current_provider_ref
+                )
+            self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
+            return True
+
+    def finish_record_reconciliation(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> bool:
+        with self._reconciliation_condition:
+            reconciliation_key = (owner.owner_id, record_id)
+            inflight = self._inflight_reconciliations.get(reconciliation_key)
+            if inflight is None or reconciliation_generation not in inflight:
+                return False
+            inflight.remove(reconciliation_generation)
+            if not inflight:
+                self._inflight_reconciliations.pop(reconciliation_key, None)
+            self._reconciliation_condition.notify_all()
+            return True
+
+    def wait_for_reconciliation_turn(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> bool:
+        with self._reconciliation_condition:
+            reconciliation_key = (owner.owner_id, record_id)
+
+            def _is_turn_or_finished() -> bool:
+                inflight = self._inflight_reconciliations.get(reconciliation_key)
+                return (
+                    inflight is None
+                    or reconciliation_generation not in inflight
+                    or reconciliation_generation == min(inflight)
+                )
+
+            self._reconciliation_condition.wait_for(_is_turn_or_finished)
+            return reconciliation_generation in self._inflight_reconciliations.get(
+                reconciliation_key,
+                set(),
+            )
+
+    def inflight_reconciliation_generations(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> tuple[int, ...]:
+        with self._lock:
+            return tuple(
+                sorted(
+                    self._inflight_reconciliations.get(
+                        (owner.owner_id, record_id),
+                        set(),
+                    )
+                )
+            )
+
+    def track_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> None:
+        if not provider_ref:
+            raise ValueError("provider ref must not be empty")
+        with self._lock:
+            self._cleanup_targets.setdefault(
+                (owner.owner_id, record_id),
+                set(),
+            ).add(provider_ref)
+
+    def resolve_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool:
+        with self._lock:
+            key = (owner.owner_id, record_id)
+            targets = self._cleanup_targets.get(key)
+            if targets is None or provider_ref not in targets:
+                return False
+            targets.remove(provider_ref)
+            if not targets:
+                self._cleanup_targets.pop(key, None)
+            return True
+
+    def list_provider_cleanup_targets(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str | None = None,
+    ) -> tuple[ProviderCleanupTarget, ...]:
+        with self._lock:
+            return tuple(
+                ProviderCleanupTarget(
+                    record_id=target_record_id,
+                    provider_ref=provider_ref,
+                )
+                for (owner_id, target_record_id), provider_refs in sorted(
+                    self._cleanup_targets.items()
+                )
+                if owner_id == owner.owner_id
+                and (record_id is None or target_record_id == record_id)
+                for provider_ref in sorted(provider_refs)
+            )

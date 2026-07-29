@@ -273,3 +273,11 @@ def test_unavailable_search_result_cannot_smuggle_hits() -> None:
             status=ProviderSearchStatus.UNAVAILABLE,
             hits=(ProviderHit(record_id="smuggled", score=1.0),),
         )
+
+
+def test_provider_reconciliation_models_reject_unknown_statuses() -> None:
+    """Catches untyped provider outcomes being treated as successful cleanup."""
+    with pytest.raises(ValueError):
+        ProviderCleanupResult(status="maybe")  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        ProviderProjectionResult(status="maybe")  # type: ignore[arg-type]

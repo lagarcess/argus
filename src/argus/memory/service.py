@@ -16,6 +16,8 @@ from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryCategory,
     MemoryConsentSettings,
+    MemoryControlResult,
+    MemoryEdit,
     MemoryExplanation,
     MemoryOperationContext,
     MemoryProposalTrigger,
@@ -23,19 +25,26 @@ from argus.memory.contracts import (
     MemorySelectionReason,
     MemoryUsePurpose,
     ProposalResult,
+    ProviderReconciliationStatus,
     RetrievedMemory,
     SavedDecisionSource,
     SensitivityAssessment,
+    SensitivityStatus,
 )
 from argus.memory.policy import RESTRICTED_CONTEXTS, MemoryPolicy
 from argus.memory.provider import (
     MemoryRetrievalProvider,
     NoOpMemoryProvider,
-    ProviderReconciliationStatus,
+    ProviderCleanupResult,
+    ProviderProjectionResult,
     ProviderSearchResult,
     ProviderSearchStatus,
 )
-from argus.memory.store import CanonicalMemoryStore, ProposalHistorySnapshot
+from argus.memory.store import (
+    CanonicalMemoryStore,
+    CanonicalRecordMutation,
+    ProposalHistorySnapshot,
+)
 from argus.memory.subject import (
     MemorySubject,
     PersonalizationMemoryUnavailable,
@@ -301,6 +310,70 @@ class MemoryService:
             confirmed_at=record.consent_receipt.confirmed_at,
         )
 
+    def edit(
+        self,
+        subject: MemorySubject,
+        record_id: str,
+        edit: MemoryEdit,
+    ) -> MemoryControlResult:
+        owner = require_registered(subject)
+        self._validate_record_id(record_id)
+        self._validate_edit_sensitivity(edit.sensitivity)
+        mutation = self._store.edit_record(
+            owner,
+            record_id,
+            value=edit.value,
+            label=edit.label,
+        )
+        if mutation is None:
+            return MemoryControlResult(
+                changed=False,
+                provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+            )
+        assert mutation.after is not None
+        return MemoryControlResult(
+            changed=True,
+            record=mutation.after,
+            provider_status=self._reconcile_edit(owner, mutation),
+        )
+
+    def delete(
+        self,
+        subject: MemorySubject,
+        record_id: str,
+    ) -> MemoryControlResult:
+        owner = require_registered(subject)
+        self._validate_record_id(record_id)
+        mutation = self._store.delete_record(owner, record_id)
+        if mutation is None:
+            return MemoryControlResult(
+                changed=False,
+                provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+            )
+        if not mutation.cleanup_refs:
+            provider_status = ProviderReconciliationStatus.NOT_APPLICABLE
+        else:
+            cleanup_statuses = tuple(
+                self._cleanup_provider_target(
+                    owner,
+                    record_id,
+                    provider_ref,
+                )
+                for provider_ref in mutation.cleanup_refs
+            )
+            provider_status = (
+                ProviderReconciliationStatus.SYNCHRONIZED
+                if all(
+                    status is ProviderReconciliationStatus.SYNCHRONIZED
+                    for status in cleanup_statuses
+                )
+                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            )
+        return MemoryControlResult(
+            changed=True,
+            provider_status=provider_status,
+        )
+
     def _propose(
         self,
         owner: RegisteredMemoryOwner,
@@ -386,6 +459,161 @@ class MemoryService:
             raise PersonalizationMemoryUnavailable(
                 "Personalization memory is not available."
             )
+
+    @staticmethod
+    def _validate_record_id(record_id: str) -> None:
+        if not record_id.strip():
+            raise ValueError("record id must not be blank")
+
+    @staticmethod
+    def _validate_edit_sensitivity(
+        sensitivity: SensitivityAssessment,
+    ) -> None:
+        if sensitivity.status is not SensitivityStatus.CLEAR or sensitivity.flags:
+            raise ValueError("memory edits require a current clear sensitivity result")
+
+    def _reconcile_edit(
+        self,
+        owner: RegisteredMemoryOwner,
+        mutation: CanonicalRecordMutation,
+    ) -> ProviderReconciliationStatus:
+        updated = mutation.after
+        assert updated is not None
+        reconciliation_generation = mutation.reconciliation_generation
+        assert reconciliation_generation is not None
+        try:
+            has_reconciliation_turn = self._store.wait_for_reconciliation_turn(
+                owner,
+                updated.id,
+                reconciliation_generation,
+            )
+            status = (
+                self._reconcile_edit_generation(
+                    owner,
+                    mutation,
+                    updated,
+                    reconciliation_generation,
+                )
+                if has_reconciliation_turn
+                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            )
+        finally:
+            reconciliation_finished = self._store.finish_record_reconciliation(
+                owner,
+                updated.id,
+                reconciliation_generation,
+            )
+        if not reconciliation_finished:
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        return status
+
+    def _reconcile_edit_generation(
+        self,
+        owner: RegisteredMemoryOwner,
+        mutation: CanonicalRecordMutation,
+        updated: MemoryRecord,
+        reconciliation_generation: int,
+    ) -> ProviderReconciliationStatus:
+        try:
+            projection = ProviderProjectionResult.model_validate(
+                self._provider.project(owner, updated)
+            )
+        except Exception:
+            if mutation.provider_ref is not None:
+                self._store.track_provider_cleanup_target(
+                    owner,
+                    updated.id,
+                    mutation.provider_ref,
+                )
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+
+        if projection.status is not ProviderReconciliationStatus.SYNCHRONIZED:
+            if (
+                projection.status is ProviderReconciliationStatus.NOT_APPLICABLE
+                and mutation.provider_ref is None
+            ):
+                return self._status_with_pending_cleanup(
+                    owner,
+                    updated.id,
+                    ProviderReconciliationStatus.NOT_APPLICABLE,
+                )
+            if mutation.provider_ref is not None:
+                self._store.track_provider_cleanup_target(
+                    owner,
+                    updated.id,
+                    mutation.provider_ref,
+                )
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        assert projection.provider_ref is not None
+        ref_committed = self._store.compare_and_set_provider_ref(
+            owner,
+            updated.id,
+            expected_record=updated,
+            expected_provider_ref=mutation.provider_ref,
+            reconciliation_generation=reconciliation_generation,
+            provider_ref=projection.provider_ref,
+        )
+        if not ref_committed:
+            self._store.track_provider_cleanup_target(
+                owner,
+                updated.id,
+                projection.provider_ref,
+            )
+            self._cleanup_provider_target(
+                owner,
+                updated.id,
+                projection.provider_ref,
+            )
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        if (
+            mutation.provider_ref is not None
+            and mutation.provider_ref != projection.provider_ref
+        ):
+            cleanup_status = self._cleanup_provider_target(
+                owner,
+                updated.id,
+                mutation.provider_ref,
+            )
+            if cleanup_status is not ProviderReconciliationStatus.SYNCHRONIZED:
+                return cleanup_status
+        return self._status_with_pending_cleanup(
+            owner,
+            updated.id,
+            ProviderReconciliationStatus.SYNCHRONIZED,
+        )
+
+    def _status_with_pending_cleanup(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        settled_status: ProviderReconciliationStatus,
+    ) -> ProviderReconciliationStatus:
+        if self._store.list_provider_cleanup_targets(owner, record_id):
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        return settled_status
+
+    def _cleanup_provider_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> ProviderReconciliationStatus:
+        try:
+            cleanup = ProviderCleanupResult.model_validate(
+                self._provider.delete(owner, provider_ref)
+            )
+        except Exception:
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        if cleanup.status is ProviderReconciliationStatus.SYNCHRONIZED:
+            resolved = self._store.resolve_provider_cleanup_target(
+                owner,
+                record_id,
+                provider_ref,
+            )
+            if not resolved:
+                return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            return ProviderReconciliationStatus.SYNCHRONIZED
+        return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
 
     def _search_provider(
         self,

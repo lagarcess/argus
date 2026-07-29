@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MemoryConsentSchemaVersion = Literal["argus.memory-consent/v1"]
 MEMORY_CONSENT_SCHEMA_VERSION: MemoryConsentSchemaVersion = "argus.memory-consent/v1"
@@ -53,6 +53,12 @@ class MemoryUsePurpose(str, Enum):
 class MemorySelectionReason(str, Enum):
     PROVIDER_RANKED = "provider_ranked"
     CANONICAL_TOKEN_MATCH = "canonical_token_match"
+
+
+class ProviderReconciliationStatus(str, Enum):
+    SYNCHRONIZED = "synchronized"
+    NOT_APPLICABLE = "not_applicable"
+    RECONCILIATION_REQUIRED = "reconciliation_required"
 
 
 class SensitivityStatus(str, Enum):
@@ -229,6 +235,45 @@ class MemoryExplanation(BaseModel):
     consent_receipt_id: str = Field(min_length=1)
     consent_schema_version: MemoryConsentSchemaVersion
     confirmed_at: datetime
+
+
+class MemoryEdit(BaseModel):
+    """Narrow user control that cannot replace canonical identity or evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: str | None = Field(default=None, min_length=1)
+    label: str | None = Field(default=None, min_length=1, max_length=120)
+    sensitivity: SensitivityAssessment
+
+    @field_validator("value", "label")
+    @classmethod
+    def _reject_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("memory edit fields must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def _require_change(self) -> "MemoryEdit":
+        if self.value is None and self.label is None:
+            raise ValueError("edit requires a value or label change")
+        return self
+
+
+class MemoryControlResult(BaseModel):
+    """Canonical control result with truthful derivative reconciliation state."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    changed: bool
+    record: MemoryRecord | None = None
+    provider_status: ProviderReconciliationStatus
+
+    @model_validator(mode="after")
+    def _validate_unchanged_shape(self) -> "MemoryControlResult":
+        if not self.changed and self.record is not None:
+            raise ValueError("unchanged controls cannot return a record")
+        return self
 
 
 class ProposalResult(BaseModel):
