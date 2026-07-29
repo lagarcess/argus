@@ -979,7 +979,7 @@ export default function ChatCommandPalette({
           </div>
 
           {layoutMode === "expanded" && (
-            <div className="flex max-h-[42%] w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:p-6">
+            <div className="flex max-h-[42%] w-full shrink-0 flex-col overflow-y-auto bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:overflow-visible md:p-6">
               {selectedPreview ? (
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
@@ -1017,7 +1017,12 @@ export default function ChatCommandPalette({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70">
+                  <div
+                    className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
+                    tabIndex={0}
+                    role="region"
+                    aria-label={t("command_palette.preview", "Preview")}
+                  >
                     <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
                       {t("command_palette.preview", "Preview")}
                     </p>
@@ -1028,9 +1033,17 @@ export default function ChatCommandPalette({
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-black/30 dark:text-white/30">
                               {t(field.labelKey, field.labelFallback)}
                             </p>
-                            <p className="mt-1 text-[13px] leading-relaxed text-black/60 dark:text-white/60">
-                              {field.value}
-                            </p>
+                            {field.id === "note" ? (
+                              // The user's exact words, kept verbatim and
+                              // visually theirs.
+                              <p className="mt-1 whitespace-pre-line border-l-2 border-black/15 pl-3 text-[13px] italic leading-relaxed text-black/70 dark:border-white/20 dark:text-white/70">
+                                {field.value}
+                              </p>
+                            ) : (
+                              <p className="mt-1 text-[13px] leading-relaxed text-black/60 dark:text-white/60">
+                                {field.value}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1048,13 +1061,26 @@ export default function ChatCommandPalette({
                     type="button"
                     onClick={() => openSourceConversation(selectedPreview)}
                     disabled={!selectedPreview.conversationId}
-                    className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                    title={
+                      selectedPreview.conversationId
+                        ? undefined
+                        : t(
+                            "command_palette.no_source_conversation",
+                            "No source conversation",
+                          )
+                    }
+                    className="mt-auto flex shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
                   >
                     <span>
-                      {t(
-                        commandPaletteOpenLabelKey(selectedPreview),
-                        commandPaletteOpenFallback(selectedPreview),
-                      )}
+                      {selectedPreview.conversationId
+                        ? t(
+                            commandPaletteOpenLabelKey(selectedPreview),
+                            commandPaletteOpenFallback(selectedPreview),
+                          )
+                        : t(
+                            "command_palette.no_source_conversation",
+                            "No source conversation",
+                          )}
                     </span>
                     <ChevronRight className="h-4 w-4" />
                   </button>

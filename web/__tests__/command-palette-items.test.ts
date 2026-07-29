@@ -150,10 +150,36 @@ describe("command palette items", () => {
       activation: "open_conversation",
     });
     expect(display?.snippet).not.toContain("promising raw fallback");
+    // Decision recall is decision-first (issue #253): the pill carries the
+    // actual decision, not the generic "Decided" lifecycle.
     expect(commandPaletteStatusLabelKey(display!)).toBe(
-      "command_palette.status.decided",
+      "chat.result_card.decision_states.promising",
     );
-    expect(commandPaletteStatusFallback(display!)).toBe("Decided");
+    expect(commandPaletteStatusFallback(display!)).toBe("Promising");
+  });
+
+  test("decision snippet leads with the exact note when one exists", () => {
+    const item: SearchItem = {
+      type: "decision",
+      id: "decision-2",
+      title: "AAPL evidence",
+      matched_text: "Track it. · AAPL beat SPY in this window.",
+      updated_at: "2026-06-19T00:00:00.000Z",
+      conversation_id: "conversation-1",
+      lifecycle: "decided",
+      preview: {
+        digest: "AAPL beat SPY in this window.",
+        note: "Track it.",
+        decision_state: "watching",
+      },
+    };
+
+    const display = commandPaletteItemFromSearch(item, {
+      decisionStateLabel: (state) => (state === "watching" ? "Watching" : state),
+    });
+
+    expect(display?.snippet).toBe("Watching · Track it.");
+    expect(display?.decisionState).toBe("watching");
   });
 
   test("builds rich artifact preview fields without raw internals", () => {
@@ -171,6 +197,7 @@ describe("command palette items", () => {
         symbols: ["AAPL"],
         benchmark_symbol: "SPY",
         decision_state: "promising",
+        note: "Solid winner, revisit after earnings.",
         metrics_summary: {
           total_return_pct: 12.34,
           delta_vs_benchmark_pct: 4.56,
@@ -194,18 +221,25 @@ describe("command palette items", () => {
         state === "promising" ? "Promising" : state,
     });
 
+    // Decision-first recall order (issue #253): state, the exact note, what
+    // happened, then the bounded setup facts.
     expect(fields.map((field) => field.id)).toEqual([
-      "quick_take",
-      "digest",
+      "decision",
+      "note",
+      "what_happened",
       "assets",
       "benchmark",
-      "decision",
       "metrics",
       "assumptions",
-      "breakdown",
     ]);
     expect(fields.find((field) => field.id === "decision")?.value).toBe(
       "Promising",
+    );
+    expect(fields.find((field) => field.id === "note")?.value).toBe(
+      "Solid winner, revisit after earnings.",
+    );
+    expect(fields.find((field) => field.id === "what_happened")?.value).toBe(
+      "AAPL beat SPY.",
     );
     expect(fields.find((field) => field.id === "metrics")?.value).toBe(
       "Total return 12.3% · Against benchmark 4.6%",

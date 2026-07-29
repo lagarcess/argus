@@ -941,7 +941,9 @@
       "digest": "Resumen",
       "metrics": "Métricas",
       "preview": "Vista previa",
-      "quick_take": "Lectura rápida"
+      "quick_take": "Lectura rápida",
+      "note": "Tu nota",
+      "what_happened": "Qué pasó"
     },
     "conversation_count_one": "{{count}} conversación",
     "conversation_count_other": "{{count}} conversaciones",
@@ -956,7 +958,8 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
+    },
+    "no_source_conversation": "Sin conversación de origen"
   },
   "auth": {
     "login": {

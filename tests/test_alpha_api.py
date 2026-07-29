@@ -1950,6 +1950,14 @@ def test_search_returns_typed_p1_artifacts() -> None:
     assert "I tested that idea with TSLA." in decision["matched_text"]
     assert "backtest versus" not in decision["matched_text"]
     assert "watching" not in decision["matched_text"]
+    # Decision recall (issue #253): the exact note is its own verbatim field
+    # and the digest is the artifact's alone — never the note·digest concat.
+    assert decision["preview"]["note"] == "Track it."
+    assert not decision["preview"]["digest"].startswith("Track it.")
+    assert decision["preview"]["quick_take"] == "I tested that idea with TSLA."
+    assert decision["preview"]["symbols"] == ["TSLA"]
+    assert decision["preview"]["benchmark_symbol"] == "SPY"
+    assert decision["preview"]["metrics_summary"] == {"total_return_pct": 12.5}
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

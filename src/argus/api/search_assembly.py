@@ -7,6 +7,7 @@ from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import DecisionState, SearchItem, User
 from argus.api.search_utils import score_search_item
 from argus.domain.evidence import (
+    decision_recall_preview,
     evidence_preview_from_artifact,
     evidence_preview_from_payload,
 )
@@ -359,10 +360,13 @@ def _scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchI
                 updated_at=decision.updated_at,
                 conversation_id=decision.source_conversation_id,
                 lifecycle="decided",
-                preview={
-                    "digest": matched_text,
-                    "decision_state": decision.decision_state,
-                },
+                preview=decision_recall_preview(
+                    decision_state=decision.decision_state,
+                    note=decision.note,
+                    artifact_title=artifact.title,
+                    artifact_digest=artifact.digest,
+                    artifact_payload=artifact.payload,
+                ),
             )
             scored_items.append(
                 (
@@ -470,6 +474,7 @@ def _scored_decision_row(*, row: dict[str, object], query: str) -> ScoredSearchI
         note=row.get("note"),
         artifact_digest=row.get("artifact_digest"),
     )
+    artifact_payload = row.get("artifact_payload")
     item = SearchItem(
         type="decision",
         id=str(row["id"]),
@@ -478,10 +483,15 @@ def _scored_decision_row(*, row: dict[str, object], query: str) -> ScoredSearchI
         updated_at=row["updated_at"],
         conversation_id=row.get("source_conversation_id"),
         lifecycle="decided",
-        preview={
-            "digest": matched_text,
-            "decision_state": row.get("decision_state"),
-        },
+        preview=decision_recall_preview(
+            decision_state=row.get("decision_state"),
+            note=row.get("note"),
+            artifact_title=row.get("artifact_title"),
+            artifact_digest=row.get("artifact_digest"),
+            artifact_payload=(
+                artifact_payload if isinstance(artifact_payload, dict) else None
+            ),
+        ),
     )
     return (
         score_search_item(

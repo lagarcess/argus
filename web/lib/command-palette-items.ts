@@ -63,6 +63,12 @@ export function commandPaletteItemFromSearch(
     item.type === "chat"
       ? (item.conversation_id ?? item.id)
       : (item.conversation_id ?? null);
+  // Decision rows carry their state inside the typed preview; recall is
+  // decision-first, so the state must reach the display item either way.
+  const previewDecisionState =
+    typeof item.preview?.decision_state === "string"
+      ? item.preview.decision_state
+      : null;
   return {
     id: item.id,
     type: item.type,
@@ -72,7 +78,7 @@ export function commandPaletteItemFromSearch(
     updatedAt: item.updated_at,
     source: "search",
     lifecycle: item.lifecycle ?? null,
-    decisionState: item.decision_state ?? null,
+    decisionState: item.decision_state ?? previewDecisionState,
     preview: safeCommandPalettePreview(item.preview),
     canManageConversation: item.type === "chat" && Boolean(conversationId),
     activation: "open_conversation",
@@ -139,9 +145,9 @@ export function commandPaletteTypeFallback(type: SearchItem["type"]) {
 }
 
 export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
-  // Idea Ledger: a decided idea shows its decision (Promising/Rejected/...) as the
-  // status pill, which is more useful than the generic "Decided" lifecycle.
-  if (item.type === "idea" && item.decisionState) {
+  // Idea Ledger and decision recall: the actual decision (Promising/
+  // Rejected/...) is the status pill, not the generic "Decided" lifecycle.
+  if ((item.type === "idea" || item.type === "decision") && item.decisionState) {
     return `chat.result_card.decision_states.${item.decisionState}`;
   }
   const status = commandPaletteStatusId(item);
@@ -149,7 +155,7 @@ export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
 }
 
 export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
-  if (item.type === "idea" && item.decisionState) {
+  if ((item.type === "idea" || item.type === "decision") && item.decisionState) {
     return commandPaletteDecisionStateFallback(item.decisionState);
   }
   switch (commandPaletteStatusId(item)) {
@@ -229,27 +235,48 @@ export function commandPalettePreviewFields(
 
   const quickTake = safePreviewString(preview.quick_take);
   const digest = safePreviewString(preview.digest);
-  addField("quick_take", "Quick take", quickTake);
-  if (digest && digest !== quickTake) {
-    addField("digest", "Digest", digest);
-  }
-
   const symbols = safePreviewStringList(preview.symbols);
-  addField("assets", "Assets", symbols.join(", ") || null);
-  addField("benchmark", "Benchmark", safePreviewString(preview.benchmark_symbol));
+  const assumptions = safePreviewStringList(preview.assumptions);
 
   if (item.type === "decision") {
+    // Decision recall is decision-first (issue #253): state, the user's
+    // exact note, what happened, then the bounded setup facts.
     const state = safePreviewString(preview.decision_state);
     const label = state
       ? (copy.decisionStateLabel?.(state) ??
         commandPaletteDecisionStateFallback(state))
       : null;
     addField("decision", "Decision", label);
+    addField("note", "Your note", safePreviewString(preview.note));
+    addField("what_happened", "What happened", quickTake ?? digest);
+    addField("assets", "Assets", symbols.join(", ") || null);
+    addField(
+      "benchmark",
+      "Benchmark",
+      safePreviewString(preview.benchmark_symbol),
+    );
+    addField(
+      "metrics",
+      "Metrics",
+      metricsSummaryText(preview.metrics_summary, copy),
+    );
+    addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
+    if (fields.length === 0) {
+      addField("preview", "Preview", item.snippet || null);
+    }
+    return fields;
   }
+
+  addField("quick_take", "Quick take", quickTake);
+  if (digest && digest !== quickTake) {
+    addField("digest", "Digest", digest);
+  }
+
+  addField("assets", "Assets", symbols.join(", ") || null);
+  addField("benchmark", "Benchmark", safePreviewString(preview.benchmark_symbol));
 
   addField("metrics", "Metrics", metricsSummaryText(preview.metrics_summary, copy));
 
-  const assumptions = safePreviewStringList(preview.assumptions);
   addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
 
   addField("breakdown", "Breakdown", breakdownPreviewText(preview.breakdown));
@@ -287,8 +314,12 @@ function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
       ? (copy.decisionStateLabel?.(state) ??
         commandPaletteDecisionStateFallback(state))
       : null;
+    // The exact note owns the row's identity; the digest is only the
+    // fallback when no note was stored.
+    const note =
+      typeof item.preview?.note === "string" ? item.preview.note.trim() : "";
     const digestText = typeof digest === "string" ? digest.trim() : "";
-    return [stateLabel, digestText].filter(Boolean).join(" · ");
+    return [stateLabel, note || digestText].filter(Boolean).join(" · ");
   }
   if (typeof quickTake === "string" && quickTake.trim()) {
     return quickTake;
