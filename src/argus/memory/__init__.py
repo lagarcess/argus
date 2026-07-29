@@ -36,6 +36,7 @@ from argus.memory.conversion import (
     plan_guest_conversion,
 )
 from argus.memory.policy import MemoryPolicy, PolicyDecision, PolicyOutcome
+from argus.memory.postgres_store import PostgresCanonicalMemoryStore
 from argus.memory.provider import (
     MemoryRetrievalProvider,
     NoOpMemoryProvider,
@@ -111,6 +112,7 @@ __all__ = [
     "PolicyDecision",
     "PolicyOutcome",
     "PolicyReasonCode",
+    "PostgresCanonicalMemoryStore",
     "ProposalResult",
     "ProviderCleanupResult",
     "ProviderCallReceipt",
