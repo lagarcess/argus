@@ -335,7 +335,8 @@
       "rsi_threshold": "Use a supported RSI threshold rule",
       "buy_and_hold": "Compare with buy and hold",
       "moving_average_crossover": "Use a supported moving-average crossover",
-      "historical_period": "Test it over a historical period"
+      "historical_period": "Test it over a historical period",
+      "supported_symbol": "Use a supported stock or crypto symbol"
     },
     "result_readout": {
       "quick_take": "Quick take"
@@ -667,7 +668,8 @@
         "cancel": "Cancel",
         "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
-      }
+      },
+      "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     }
   },
   "strategies": {

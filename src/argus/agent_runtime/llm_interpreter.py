@@ -15,6 +15,12 @@ from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
+from argus.agent_runtime.interpreter.discovery_act_guard import (
+    preserve_typed_discovery_act,
+)
+from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
+    BENCHMARK_LANGUAGE_GUIDANCE,
+)
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -138,6 +144,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
     _response_needs_launch_field_fidelity_repair,
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
+    strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
     _comparison_baseline_provenance,
     _focused_artifact_edit_messages,
@@ -801,19 +808,8 @@ class OpenRouterStructuredInterpreter:
             "currency pairs are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. "
             + execution_cost_capability_clause()
-            + "Benchmark language matters in any user language: when a symbol is "
-            "framed as a benchmark, reference, comparison target, or market "
-            "baseline, put it in comparison_baseline instead of asset_universe. "
-            "A one-asset buy/hold request with a separate benchmark is executable "
-            "as the primary asset plus comparison_baseline; do not call this an "
-            "unsupported direct comparison. Do not add benchmark symbols to "
-            "asset_universe unless the user explicitly says to buy, hold, or test "
-            "both as traded assets. Examples: AAPL against SPY, AAPL with SPY "
-            "as the benchmark, and AAPL con SPY como referencia all mean "
-            "asset_universe=['AAPL'] and comparison_baseline='SPY'. "
-            "Set field_provenance.comparison_baseline="
-            "'explicit_user' only when the current user message explicitly names "
-            "the comparison or benchmark. When the user gives exact start/end dates, "
+            + BENCHMARK_LANGUAGE_GUIDANCE
+            + "When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
             f"The current runtime date is {date.today().isoformat()}; if the user "
@@ -2180,6 +2176,28 @@ async def _pending_response_option_selected_response(
 
 
 async def _response_ready_for_runtime(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
+) -> LLMInterpretationResponse:
+    primary_act_typed = response.semantic_turn_act == "asset_discovery"
+    primary_discovery = response.asset_discovery if primary_act_typed else None
+    audited = await _audited_response_ready_for_runtime(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+        asset_resolution_context=asset_resolution_context,
+    )
+    return preserve_typed_discovery_act(
+        primary_act_typed=primary_act_typed,
+        primary_discovery=primary_discovery,
+        audited=audited,
+    )
+
+
+async def _audited_response_ready_for_runtime(
     *,
     response: LLMInterpretationResponse,
     preferred_model: str,
@@ -4688,45 +4706,18 @@ def _strategy_extraction_repair_is_allowed(
     *,
     request: InterpretationRequest,
 ) -> bool:
-    if response.task_relation == "refine":
-        return False
-    if response.semantic_turn_act == "retry_failed_action":
-        return not _request_has_failed_action_launch_payload(request)
-    if response.semantic_turn_act == "unsupported_request":
-        if _noncanonical_strategy_text_needs_focused_schema_repair(
-            response=response,
-            request=request,
-        ):
-            return True
-        if response.intent not in {
-            "unsupported_or_out_of_scope",
-            "beginner_guidance",
-            "conversation_followup",
-        }:
-            return False
-        if not response.unsupported_constraints:
-            return True
-        if not any(
-            item.category == "unsupported_strategy_logic"
-            for item in response.unsupported_constraints
-        ):
-            return False
-        if _request_has_active_strategy_context(
-            request
-        ) and not _request_current_turn_has_material_execution_evidence(request):
-            return False
-        return bool(
-            response.candidate_strategy_draft.raw_user_phrasing
-            or response.candidate_strategy_draft.strategy_thesis
-            or request.current_user_message.strip()
-        )
-    if response.semantic_turn_act == "answer_pending_need":
-        return _request_current_turn_has_material_execution_evidence(request)
-    return response.semantic_turn_act not in {
-        "refine_current_idea",
-        "approval",
-        "result_followup",
-    }
+    return strategy_extraction_repair_is_allowed(
+        response,
+        request=request,
+        has_failed_action_launch_payload=_request_has_failed_action_launch_payload,
+        noncanonical_text_needs_repair=(
+            _noncanonical_strategy_text_needs_focused_schema_repair
+        ),
+        has_active_strategy_context=_request_has_active_strategy_context,
+        current_turn_has_material_execution_evidence=(
+            _request_current_turn_has_material_execution_evidence
+        ),
+    )
 
 
 async def _focused_strategy_repair_after_candidate_failures(

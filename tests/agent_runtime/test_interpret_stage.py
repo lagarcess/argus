@@ -10578,3 +10578,153 @@ def test_cold_start_explicit_costs_stay_inert_when_flag_off(
     assert confirm_result.outcome == "await_approval"
     launch_payload = confirm_result.patch["confirmation_payload"]["launch_payload"]
     assert "_execution_realism" not in launch_payload
+
+
+def test_failed_benchmark_leg_keeps_unsupported_provenance(monkeypatch) -> None:
+    """Issue #296: the cleared baseline keeps provenance for the card disclosure."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    samsung_provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="SAMSUNG",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="unsupported",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="unsupported",
+            raw_text="SAMSUNG",
+            asset=None,
+            candidates=(),
+            provenance=samsung_provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SAMSUNG",
+    )
+    updated, reason_codes = (
+        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    )
+
+    assert updated.comparison_baseline is None
+    assert "invalid_benchmark_symbol_cleared" in reason_codes
+    assert any(
+        item.raw_text == "SAMSUNG" and item.resolution_status == "unsupported"
+        for item in updated.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    # The leg never blocks: the confirmation card owns disclosing the swap.
+    constraints = _unsupported_constraints_from_resolution(
+        updated.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_ambiguous_benchmark_leg_is_disclosed_not_silently_cleared(
+    monkeypatch,
+) -> None:
+    """Issue #296: 'Samsung' matches unrelated fund names; the cleared leg
+    keeps provenance so the confirmation card discloses the swap."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="SAMSUNG",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="ambiguous",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="ambiguous",
+            raw_text="SAMSUNG",
+            asset=None,
+            candidates=(),
+            provenance=provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SAMSUNG",
+    )
+    updated, reason_codes = (
+        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    )
+
+    assert updated.comparison_baseline is None
+    assert "invalid_benchmark_symbol_cleared" in reason_codes
+    assert any(
+        item.raw_text == "SAMSUNG" and item.resolution_status == "ambiguous"
+        for item in updated.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    constraints = _unsupported_constraints_from_resolution(
+        updated.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_ambiguous_traded_assets_still_clarify_not_constrain() -> None:
+    """The ambiguous-benchmark disclosure is scoped: universe legs keep the
+    clarification path."""
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    constraints = _unsupported_constraints_from_resolution(
+        [
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="APPLE",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="ambiguous",
+            )
+        ],
+        contract=_Contract(),
+    )
+    assert constraints == []

@@ -217,3 +217,120 @@ class TestNonDiscoveryTurnsStayOut:
         result = _run(message="Backtest AAPL for last year", response=response)
         assert constructed == []
         assert result.outcome != "end_run"
+
+
+class TestDiscoveryDuringPendingConfirmation:
+    """Issue #292: carried confirmation state never rides a discovery turn."""
+
+    def test_public_payload_of_a_discovery_turn_carries_no_confirmation(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what companies similar to Apple could I try?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Here are candidates.",
+            "discovery": {"kind": "asset_discovery", "candidates": []},
+        }
+
+        serialized = _public_result(result)
+
+        assert "discovery" in serialized
+        assert "confirmation_payload" not in serialized
+
+    def test_discovery_recovery_turn_carries_no_confirmation_either(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what companies similar to Apple could I try?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        # Recovery paths emit no discovery sidecar; the typed act on the
+        # run state is what marks the turn.
+        run_state.semantic_turn_act = "asset_discovery"
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Discovery is unavailable right now.",
+        }
+
+        serialized = _public_result(result)
+
+        assert "confirmation_payload" not in serialized
+
+    def test_non_discovery_turn_keeps_the_confirmation_backfill(self) -> None:
+        from argus.agent_runtime.runtime import _public_result
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        run_state = RunState.new(
+            current_user_message="what assumptions are you using?",
+            recent_thread_history=[],
+        )
+        run_state.confirmation_payload = ConfirmationPayload(
+            strategy=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+        )
+        result = {
+            "run_state": run_state,
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Standard assumptions.",
+        }
+
+        serialized = _public_result(result)
+
+        assert "confirmation_payload" in serialized
+
+
+def test_strategy_repair_never_runs_on_a_typed_discovery_act() -> None:
+    """Issue #292: the focused strategy repair rebuilt a draft for a
+    discovery ask (whose draft is empty by contract) and demoted the act,
+    capturing the turn into the confirmation corridor."""
+    from argus.agent_runtime.llm_interpreter import (
+        LLMInterpretationResponse,
+        _strategy_extraction_repair_is_allowed,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="find similar companies",
+        semantic_turn_act="asset_discovery",
+        asset_discovery=AssetDiscoveryRequest(
+            relationship="peer",
+            category_description=None,
+            anchor_symbols=["AAPL"],
+            asset_class_hint="equity",
+        ),
+    )
+    request = InterpretationRequest(
+        current_user_message="¿Qué empresas parecidas a Apple podría probar?",
+        user=UserState(user_id="u1"),
+    )
+
+    assert _strategy_extraction_repair_is_allowed(response, request=request) is False
+
+    payloadless = response.model_copy(update={"asset_discovery": None})
+    assert (
+        _strategy_extraction_repair_is_allowed(payloadless, request=request) is False
+    )

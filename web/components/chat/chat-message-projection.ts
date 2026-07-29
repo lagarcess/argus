@@ -305,7 +305,10 @@ export function hydrateMessagesFromApi(
       if (
         message.role !== "user" &&
         confirmation &&
-        Array.isArray(confirmation.rows)
+        Array.isArray(confirmation.rows) &&
+        // A discovery answer owns its message: if confirmation chrome ever
+        // co-arrives, the rows the user asked for must not silently drop.
+        !discoverySidecarFromMetadata(metadata)
       ) {
         return {
           id: message.id,

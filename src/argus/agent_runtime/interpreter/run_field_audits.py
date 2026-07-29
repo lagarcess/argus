@@ -1033,7 +1033,10 @@ def _stated_run_field_fidelity_messages(
                 "comparison target, that asset belongs in comparison_baseline. "
                 "If the draft has a default benchmark but the current "
                 "message states a different comparison asset, return the user-stated "
-                "comparison asset. "
+                "comparison asset, even a company name with no known symbol — "
+                "'compare AAPL with Samsung' or 'comparar AAPL con Samsung' "
+                "states comparison_baseline='Samsung' — return it verbatim, "
+                "never dropped; validation owns support decisions. "
                 + EXECUTION_COST_FIDELITY_INSTRUCTIONS
                 + "Return only JSON matching the schema."
             ),

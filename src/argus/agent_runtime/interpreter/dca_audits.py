@@ -38,6 +38,7 @@ def _response_needs_strategy_family_continuity_audit(
         return False
     if response.semantic_turn_act in {
         "approval",
+        "asset_discovery",
         "refine_current_idea",
         "result_followup",
         "retry_failed_action",
