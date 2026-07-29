@@ -160,3 +160,30 @@ probe); a prebaked row's tap submits that payload into the normal
 confirmation lifecycle instead of a conversational ask. Rows without a
 prebake keep the conversational path. No new public action type without
 the contract gate — reuse the existing confirmation/launch contract.
+
+## 9. Future work — parked by founder decision (2026-07-29)
+
+Stage 0 ships complete with #304, including §8. The following layers are
+explicitly parked ("let's wait") and reactivate in their own lanes:
+
+1. **Stage 1 — telemetry ordering.** The events it needs are live from
+   the #304 merge onward: `next_experiments_offered` (impressions) and
+   `next_experiment_selected` (kind + position) flow through
+   `capture_product_event` into the same PostHog stream as every other
+   product event — no new tooling. Activation criterion: enough
+   accepted-tap volume in PostHog to reorder against; Stage 1 only
+   reorders within the deterministic candidate set.
+2. **Stage 2 — LLM selector.** Contract ratified in §3 and unchanged:
+   the model may **choose and phrase, never mint** — it selects among
+   id-constrained, deterministically grounded candidate rows and words
+   them; it cannot invent an experiment or a symbol. Rides the same
+   sidecar.
+3. **Dynamic peer candidates.** The §8 similar-asset prebake reads a
+   curated static peer map (default-benchmark precedent). Widening to
+   "any suitable asset in class" is a candidate-generation change, not
+   a selector change: discovery machinery (#253 omnisearch, parked #244
+   exposure lane) can propose peers dynamically, but every candidate
+   still passes the same grounding gate (resolver + runnable family +
+   bars coverage) before it may appear on a row. Stage 2 then chooses
+   and phrases among those grounded candidates — the two layers compose
+   without loosening the never-mint rule.
