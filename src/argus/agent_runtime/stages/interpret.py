@@ -2810,7 +2810,8 @@ async def _latest_result_followup_when_interpreter_unavailable(
         decision=decision,
         stage_patch={
             "assistant_response": response,
-            "response_intent": result_followup_response_intent("general"),
+            # Failure prose never wears result chrome; the recovery patch
+            # owns this message's presentation.
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",
@@ -2818,7 +2819,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
                     retryable=True,
                 )
                 if used_recovery
-                else {}
+                else {"response_intent": result_followup_response_intent("general")}
             ),
         },
     )
@@ -2877,7 +2878,8 @@ async def _latest_result_followup_recovery_if_applicable(
     stage_patch: dict[str, Any] = {
         "assistant_response": response,
     }
-    if not (save_requested and not _strategies_enabled()):
+    # Failure prose never wears result chrome; the recovery patch owns it.
+    if not (save_requested and not _strategies_enabled()) and not used_recovery:
         stage_patch["response_intent"] = result_followup_response_intent(focus)
     if used_recovery:
         stage_patch.update(

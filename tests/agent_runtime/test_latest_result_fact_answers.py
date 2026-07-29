@@ -1370,3 +1370,135 @@ def test_render_appends_runtime_pinned_facts_instead_of_rejecting() -> None:
         )
         is None
     )
+
+
+@pytest.mark.asyncio
+async def test_recovery_followup_never_wears_result_chrome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue #249 / AP-STRESS-05: a failed composition ships the generic
+    recovery message without result_followup_chrome, so the frontend never
+    renders failure prose under Try next / What happened headings."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(response=None)
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    async def no_edit_plan(**kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        no_edit_plan,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked what to try next.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="next_experiment",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-249-recovery-no-chrome",
+        message="what should I try next?",
+        fallback_latest_task_snapshot=_snapshot(),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+    )
+
+    assert "latest_result_followup_unavailable" in str(result)
+    assert "result_followup_chrome" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_successful_followup_still_wears_result_chrome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The chrome stays owned by real fact answers: a composed response keeps
+    its typed heading intent."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(
+        response="Change the date range or test the same setup on a peer asset."
+    )
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked what to try next.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="next_experiment",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-249-success-keeps-chrome",
+        message="what should I try next?",
+        fallback_latest_task_snapshot=_snapshot(),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+    )
+
+    assert "latest_result_followup_unavailable" not in str(result)
+    assert "result_followup_chrome" in str(result)
