@@ -128,3 +128,35 @@ retry placement). The lane presents both before locking.
   generic suggestions. Compatibility work, not discovery ownership.
 - Stop for a contract gate if implementation requires any new public
   action, option, or recovery shape (#249's standing rule).
+
+## 8. Founder lightbulb — prebaked rows (added mid-lane, 2026-07-29)
+
+Captured verbatim-in-substance from the founder during live QA; this is
+the next evolution of Stage 0, to build in this lane or its immediate
+follow-up:
+
+1. **Prebaked concrete rows.** The why-suffix pattern on row one sparked
+   it: "Test the same setup on a similar asset" should carry its own
+   affordance — a concrete, pre-resolved similar asset appended to the
+   row (e.g. "· MSFT"). Tapping it asks nothing: Argus answers with the
+   next **confirmation card directly**, because the row was prebaked
+   through the full grounding chain before being offered — asset
+   resolved in the catalog, runnable for the family, bars-coverage
+   verified (#303 probe). "Is that our vision being realized?" — yes:
+   this is guaranteed-runnable made literal.
+2. **Spacing:** TRY NEXT needs a little more breathing room from the
+   Quick take block.
+3. **Swap the RSI row for DCA.** The RSI-threshold row is deterministic
+   filler; replace it with the more common next experiment — recurrent
+   buys / DCA — phrased smoothly, and **prebaked with the previous
+   run's compatible assumptions and parameters** (same asset, dates,
+   capital; only the strategy changes), so the tap again lands on a
+   ready confirmation card.
+
+Implementation shape: extend the sidecar row contract with an optional
+prebaked launch payload (asset/params filled from the completed run +
+deterministic peer selection validated through resolver + coverage
+probe); a prebaked row's tap submits that payload into the normal
+confirmation lifecycle instead of a conversational ask. Rows without a
+prebake keep the conversational path. No new public action type without
+the contract gate — reuse the existing confirmation/launch contract.
