@@ -1094,13 +1094,9 @@ async def artifact_followup_stage_result_if_applicable(
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": response,
-            # Failure prose never wears result chrome; the recovery patch
-            # owns this message's presentation.
-            **(
-                {}
-                if used_recovery
-                else {"response_intent": result_followup_response_intent(focus)}
-            ),
+            **({} if used_recovery else {
+                "response_intent": result_followup_response_intent(focus)
+            }),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",

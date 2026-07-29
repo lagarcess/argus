@@ -6,6 +6,7 @@ import {
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
@@ -297,6 +298,8 @@ export function hydrateMessagesFromApi(
             actions,
           },
           actions,
+          nextExperiments:
+            nextExperimentRowsFromMetadata(metadata) ?? undefined,
           savedStrategyId,
         };
       }

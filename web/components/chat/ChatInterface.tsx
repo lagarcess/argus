@@ -90,6 +90,7 @@ import {
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
@@ -1359,6 +1360,9 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalAssistantRecoveryCode = retryableAssistantRecoveryCode(
+          finalPayload.recovery,
+        );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
@@ -1467,6 +1471,7 @@ export default function ChatInterface() {
                   finalText,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
+                  assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   contentPresentation:
                     action?.type === "show_breakdown"
@@ -1484,6 +1489,7 @@ export default function ChatInterface() {
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
+                assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 contentPresentation:
                   action?.type === "show_breakdown"

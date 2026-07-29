@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from argus.agent_runtime.next_experiments import next_experiments_sidecar
 from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
@@ -176,7 +177,10 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         )
         return StageResult(
             outcome="ready_to_respond",
-            stage_patch={"assistant_response": response},
+            stage_patch=_with_next_experiments(
+                {"assistant_response": response},
+                result_facts=result_facts,
+            ),
         )
     benchmark_symbol = _benchmark_contract(
         strategy=strategy,
@@ -199,8 +203,44 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
 
     return StageResult(
         outcome="ready_to_respond",
-        stage_patch={"assistant_response": response},
+        stage_patch=_with_next_experiments(
+            {"assistant_response": response},
+            result_facts=result_facts,
+            total_return=total_return,
+            benchmark_return=benchmark_return,
+            max_drawdown=_max_drawdown_metric(result_payload),
+        ),
     )
+
+
+def _with_next_experiments(
+    patch: dict[str, Any],
+    *,
+    result_facts: dict[str, Any],
+    total_return: float | None = None,
+    benchmark_return: float | None = None,
+    max_drawdown: float | None = None,
+) -> dict[str, Any]:
+    sidecar = next_experiments_sidecar(
+        result_facts,
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        max_drawdown=max_drawdown,
+    )
+    if sidecar is None:
+        return patch
+    return {**patch, "next_experiments": sidecar}
+
+
+def _max_drawdown_metric(result_payload: dict[str, Any]) -> float | None:
+    metrics = result_payload.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    for key in ("max_drawdown_pct", "max_drawdown"):
+        value = metrics.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
 
 
 async def explain_stage_async(*, state: RunState, language: str = "en") -> StageResult:

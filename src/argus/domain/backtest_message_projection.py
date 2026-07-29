@@ -96,6 +96,9 @@ def hydrate_completed_backtest_job_messages(
             }
         )
         readout = _result_readout(job)
+        next_experiments = _job_next_experiments(job)
+        if next_experiments is not None:
+            next_metadata["next_experiments"] = next_experiments
         projected.append(
             message.model_copy(
                 update={
@@ -279,6 +282,17 @@ def _is_completed_run_for_message(
 
 def _public_backtest_job(job: dict[str, Any]) -> dict[str, Any]:
     return {key: job.get(key) for key in _PUBLIC_BACKTEST_JOB_KEYS if key in job}
+
+
+def _job_next_experiments(job: dict[str, Any]) -> dict[str, Any] | None:
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        return None
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        return None
+    next_experiments = workflow_metadata.get("next_experiments")
+    return next_experiments if isinstance(next_experiments, dict) else None
 
 
 def _result_readout(job: dict[str, Any]) -> str | None:

@@ -11,6 +11,7 @@ import {
   coverageRecoveryActionsFromMetadata,
   noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  retryableAssistantRecoveryCode,
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
@@ -375,6 +376,9 @@ export function hydrateTextMessageFromApi(
       ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    assistantRecoveryCode: isAssistant
+      ? retryableAssistantRecoveryCode(metadata.recovery)
+      : null,
   };
 }
 

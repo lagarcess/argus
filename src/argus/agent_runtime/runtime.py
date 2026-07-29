@@ -359,6 +359,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "retry_last_turn",
         "recovery",
         "discovery",
+        "next_experiments",
     }
     serialized = {
         key: _serialize_public_value(key, value)

@@ -803,6 +803,9 @@ def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, Any]:
     failure_mode = workflow_metadata.get("result_readout_failure_mode")
     if isinstance(failure_mode, str) and failure_mode.strip():
         metadata["result_readout_failure_mode"] = failure_mode.strip()
+    next_experiments = workflow_metadata.get("next_experiments")
+    if isinstance(next_experiments, dict):
+        metadata["next_experiments"] = next_experiments
     return metadata
 
 

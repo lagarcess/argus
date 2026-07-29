@@ -995,6 +995,7 @@ async def chat_stream(
                     "response_intent",
                     "clarification",
                     "discovery",
+                    "next_experiments",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:

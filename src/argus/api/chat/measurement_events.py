@@ -93,6 +93,24 @@ def emit_runtime_measurement_events(
             },
         )
 
+    next_experiments = metadata.get("next_experiments")
+    if isinstance(next_experiments, dict):
+        rows = next_experiments.get("rows")
+        kinds = [
+            str(row.get("kind"))
+            for row in rows
+            if isinstance(row, dict) and row.get("kind")
+        ] if isinstance(rows, list) else []
+        if kinds:
+            # Stage-1 ordering consumes these impressions; acceptance rides
+            # the persisted select_response_option turns.
+            capture_product_event(
+                "next_experiments_offered",
+                user_id=user_id,
+                conversation_id=conversation_id,
+                attributes={"kinds": kinds, "row_count": len(kinds)},
+            )
+
     comparison_started = runtime_result.get("comparison_started")
     if not isinstance(comparison_started, dict):
         return

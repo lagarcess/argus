@@ -10,6 +10,7 @@ import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
+import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -356,6 +357,23 @@ export default function ChatMessage({
               content={displayContent}
               label={t("chat.result_breakdown.label", "Breakdown")}
             />
+          ) : !isUser && message.assistantRecoveryCode ? (
+            // Infrastructure failure is visibly a failure: no result chrome,
+            // no normal-answer bubble (issue #249).
+            <div
+              role="status"
+              className="flex w-full max-w-[min(100%,660px)] items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]"
+            >
+              <MessageSquareWarning
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {displayContent}
+                </ReactMarkdown>
+              </div>
+            </div>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               {factHeadingLabel && (
@@ -530,6 +548,48 @@ export default function ChatMessage({
               anchorIndex={anchorSourceIndex}
             />
           ) : null}
+
+          {shouldShowAssistantFooter &&
+            Boolean(isLatest) &&
+            nextMovesEnabled &&
+            message.kind === "strategy_result" &&
+            (message.nextExperiments?.length ?? 0) > 0 && (
+              <section
+                aria-label={t("chat.next_experiments.section", "Try next")}
+                className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col"
+              >
+                <div className="argus-result-section-label">
+                  {t("chat.next_experiments.section", "Try next")}
+                </div>
+                <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
+                  {(message.nextExperiments ?? []).map((row) => {
+                    const rowLabel = t(row.labelKey, row.label);
+                    const whyText = row.why
+                      ? t(`chat.next_experiments.why.${row.why.code}`, {
+                          defaultValue: "",
+                          ...row.why.params,
+                        })
+                      : "";
+                    return (
+                      <NextMoveRow
+                        key={row.kind}
+                        ariaLabel={rowLabel}
+                        disabled={turnInFlight}
+                        onClick={() => onAction?.(nextExperimentAction(row))}
+                      >
+                        <NextMoveTitle>{rowLabel}</NextMoveTitle>
+                        {whyText ? (
+                          <>
+                            <NextMoveSeparator>·</NextMoveSeparator>
+                            <NextMoveDetail>{whyText}</NextMoveDetail>
+                          </>
+                        ) : null}
+                      </NextMoveRow>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
           {showNextMoveRows && (
             <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">
