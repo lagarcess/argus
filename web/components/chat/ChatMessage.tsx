@@ -679,7 +679,7 @@ function ResultReadout({
   label: string;
 }) {
   return (
-    <section aria-label="Result readout">
+    <section aria-label={label}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-readout prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
