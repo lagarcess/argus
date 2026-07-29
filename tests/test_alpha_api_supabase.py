@@ -2554,6 +2554,13 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
                 "evidence_artifact_id": "artifact-1",
                 "artifact_title": "AAPL MSFT evidence run",
                 "artifact_digest": "AAPL MSFT beat SPY in the test window.",
+                "artifact_payload": {
+                    "quick_take": "AAPL and MSFT beat SPY.",
+                    "provenance": {
+                        "symbols": ["AAPL", "MSFT"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
                 "source_conversation_id": "conversation-1",
                 "updated_at": now.isoformat(),
             }
@@ -2591,6 +2598,59 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
         "Worth revisiting. · AAPL MSFT beat SPY in the test window."
     )
     assert "promising" not in decision["matched_text"]
+    # Decision recall (issue #253): verbatim note, artifact-only digest, and
+    # the linked evidence facts projected from the hydrated payload.
+    assert decision["preview"]["note"] == "Worth revisiting."
+    assert decision["preview"]["digest"] == (
+        "AAPL MSFT beat SPY in the test window."
+    )
+    assert decision["preview"]["quick_take"] == "AAPL and MSFT beat SPY."
+    assert decision["preview"]["symbols"] == ["AAPL", "MSFT"]
+    assert decision["preview"]["benchmark_symbol"] == "SPY"
+
+
+def test_search_supabase_decision_without_payload_keeps_honest_fallback(
+    mock_gateway,
+):
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [],
+        "decisions": [
+            {
+                "id": "decision-2",
+                "decision_state": "rejected",
+                "note": "Too volatile for me.",
+                "evidence_artifact_id": "artifact-2",
+                "artifact_title": "NVDA momentum test",
+                "artifact_digest": "NVDA lost to SPY in the window.",
+                "source_conversation_id": "conversation-2",
+                "updated_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=nvda&limit=20",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    decision = next(
+        item for item in response.json()["items"] if item["type"] == "decision"
+    )
+    preview = decision["preview"]
+    assert preview["note"] == "Too volatile for me."
+    assert preview["decision_state"] == "rejected"
+    assert preview["digest"] == "NVDA lost to SPY in the window."
+    # No payload means no invented facts: nothing beyond the stored truth.
+    assert "quick_take" not in preview
+    assert "metrics_summary" not in preview
+    assert "symbols" not in preview
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(

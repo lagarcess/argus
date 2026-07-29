@@ -580,6 +580,13 @@ def test_search_preserves_short_mixed_tokens_and_cross_artifact_decision_text(
     assert [str(row["id"]) for row in bridged.rows["decisions"]] == [
         str(identities["decision"])
     ]
+    # Decision recall hydration (issue #253): the reader attaches the linked
+    # evidence facts, including the canonical payload, to the decision row.
+    decision_row = bridged.rows["decisions"][0]
+    assert decision_row["note"] == "localtoken"
+    assert decision_row["artifact_title"] == "Evidence title"
+    assert decision_row["artifact_digest"] == "evidencetoken"
+    assert "artifact_payload" in decision_row
 
 
 @pytest.mark.parametrize("query", ["\x00needle\x00", "nee\x00dle"])

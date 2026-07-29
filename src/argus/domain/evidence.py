@@ -145,6 +145,30 @@ def evidence_preview_from_artifact(artifact: EvidenceArtifact) -> dict[str, Any]
     )
 
 
+def decision_recall_preview(
+    *,
+    decision_state: object,
+    note: object,
+    artifact_title: object,
+    artifact_digest: object,
+    artifact_payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Decision-first recall from existing canonical facts: the exact note is
+    its own verbatim field, never concatenated with the evidence digest."""
+    preview = evidence_preview_from_payload(
+        digest=artifact_digest,
+        title=artifact_title,
+        payload=artifact_payload,
+    )
+    state = _safe_text(decision_state)
+    if state is not None:
+        preview["decision_state"] = state
+    note_text = _safe_text(note)
+    if note_text is not None:
+        preview["note"] = note_text
+    return preview
+
+
 def evidence_preview_from_payload(
     *,
     digest: object,

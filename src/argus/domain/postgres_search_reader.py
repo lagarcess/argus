@@ -1055,7 +1055,7 @@ def _idea_browse_sql(
 
 
 _DECISION_EVIDENCE_SQL = """
-select id, title, digest
+select id, title, digest, payload
 from public.evidence_artifacts
 where user_id = %(user_id)s::uuid
   and id = any(%(artifact_ids)s::uuid[])
@@ -1331,6 +1331,7 @@ def _hydrate_decision_evidence(
         artifact = artifacts.get(str(decision.get("evidence_artifact_id"))) or {}
         decision["artifact_title"] = artifact.get("title")
         decision["artifact_digest"] = artifact.get("digest")
+        decision["artifact_payload"] = artifact.get("payload")
 
 
 def _hydrate_idea_decisions(

@@ -3144,6 +3144,27 @@ the `/search` contract.
         },
         "quick_take": "AAPL and MSFT beat SPY in this historical test."
       }
+    },
+    {
+      "type": "decision",
+      "id": "uuid",
+      "title": "AAPL, MSFT Buy and Hold",
+      "matched_text": "Track it. · AAPL and MSFT were tested against SPY.",
+      "updated_at": "timestamp",
+      "conversation_id": "uuid",
+      "lifecycle": "decided",
+      "preview": {
+        "decision_state": "watching",
+        "note": "Track it.",
+        "digest": "AAPL and MSFT were tested against SPY.",
+        "symbols": ["AAPL", "MSFT"],
+        "benchmark_symbol": "SPY",
+        "assumptions": ["Benchmark: SPY", "No fees"],
+        "metrics_summary": {
+          "total_return_pct": 12.5
+        },
+        "quick_take": "AAPL and MSFT beat SPY in this historical test."
+      }
     }
   ],
   "next_cursor": null,
@@ -3165,6 +3186,17 @@ the `/search` contract.
 - `idea`
 - `evidence`
 - `decision`
+
+**Decision preview (recall) fields:** a `decision` item's `preview` carries the
+decision-first recall projection assembled from existing canonical facts:
+`decision_state`, `note` (the user's stored note, verbatim — never
+concatenated with the digest), `digest` (the linked evidence artifact's own
+digest), and, when the evidence payload has them, the same bounded fields as
+an `evidence` preview (`quick_take`, `symbols`, `benchmark_symbol`,
+`assumptions`, `metrics_summary`). Absent facts are omitted rather than
+invented; `matched_text` keeps the legacy note·digest match display. No field
+ever includes `*_id` keys, and assembling the preview makes zero LLM or
+provider calls.
 
 **Ranking Logic:**
 Results are ranked by:
