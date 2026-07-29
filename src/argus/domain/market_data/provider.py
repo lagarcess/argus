@@ -195,8 +195,12 @@ def _crypto_client() -> CryptoHistoricalDataClient:
 
 
 def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
-    if df is None or df.empty:
+    if df is None:
         raise ValueError("market_data_unavailable")
+    if df.empty:
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
 
     if isinstance(df.index, pd.MultiIndex):
         df = df.reset_index(level=0, drop=True)
