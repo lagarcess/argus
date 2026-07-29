@@ -13,6 +13,7 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _normalized_symbol,
 )
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
+    BENCHMARK_DISCLOSURE_STATUSES,
     default_benchmark_for_asset_class,
 )
 from argus.agent_runtime.state.models import ResolutionProvenance, StrategySummary
@@ -87,18 +88,21 @@ def _provenance_with_coverage_clearing(
     benchmark: str,
     asset_class: str,
 ) -> list[ResolutionProvenance]:
-    """Replace the leg's resolved entry in place: the dedupe key ignores
-    status, so an appended copy would be dropped in its favor."""
+    """Replace the leg's resolved entry in place (the dedupe key ignores
+    status) and retire prior disclosures — the card must describe exactly
+    this reconciliation, never an earlier one."""
     remaining: list[ResolutionProvenance] = []
     base: ResolutionProvenance | None = None
     for item in provenance:
-        if (
-            base is None
-            and item.field == "comparison_baseline"
-            and (item.canonical_symbol or "").strip().upper() == benchmark
-        ):
-            base = item
-            continue
+        if item.field == "comparison_baseline":
+            if (
+                base is None
+                and (item.canonical_symbol or "").strip().upper() == benchmark
+            ):
+                base = item
+                continue
+            if item.resolution_status in BENCHMARK_DISCLOSURE_STATUSES:
+                continue
         remaining.append(item)
     if base is None:
         base = ResolutionProvenance(

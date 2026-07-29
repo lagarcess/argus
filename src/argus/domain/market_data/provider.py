@@ -160,7 +160,11 @@ def _fetch_kraken_ohlcv(
         raise ValueError("market_data_unavailable")
     pair_key = next((key for key in result if key != "last"), None)
     rows = result.get(pair_key) if pair_key else None
-    if not isinstance(rows, list) or not rows:
+    if rows is None or rows == []:
+        # Kraken answered without data for the pair — a statement about the
+        # symbol, not a transport failure.
+        raise ValueError("market_data_empty")
+    if not isinstance(rows, list):
         raise ValueError("market_data_unavailable")
 
     frame = pd.DataFrame(

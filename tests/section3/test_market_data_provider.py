@@ -554,3 +554,21 @@ def test_fetch_kraken_ohlcv_rejects_windows_over_720_candles() -> None:
             end_date=date(2025, 1, 1),
             timeframe="1D",
         )
+
+
+def test_kraken_empty_ohlc_rows_classify_as_market_data_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        provider,
+        "_kraken_public_get",
+        lambda path, params=None: {"result": {"XXBTZUSD": [], "last": 0}},
+    )
+
+    with pytest.raises(ValueError, match="market_data_empty"):
+        provider._fetch_kraken_ohlcv(
+            symbol="BTC/USD",
+            timeframe="1D",
+            start_date=date(2023, 1, 3),
+            end_date=date(2023, 1, 31),
+        )

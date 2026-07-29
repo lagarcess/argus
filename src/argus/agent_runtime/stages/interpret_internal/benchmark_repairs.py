@@ -12,7 +12,7 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _normalized_symbol,
     _strategy_field_provenance,
 )
-from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.state.models import ResolutionProvenance, StrategySummary
 from argus.domain.backtesting.config import (
     AssetClass as BacktestAssetClass,
 )
@@ -151,3 +151,23 @@ def _strategy_uses_safe_default_benchmark(
         symbols=strategy.asset_universe,
     )
     return default_benchmark_value == benchmark
+
+
+# Statuses whose comparison_baseline provenance the confirmation card
+# renders as a reconciliation disclosure.
+BENCHMARK_DISCLOSURE_STATUSES = frozenset(
+    {"unsupported", "ambiguous", "unavailable_for_requested_run"}
+)
+
+
+def provenance_without_benchmark_disclosures(
+    provenance: list["ResolutionProvenance"],
+) -> list["ResolutionProvenance"]:
+    return [
+        item
+        for item in provenance
+        if not (
+            item.field == "comparison_baseline"
+            and item.resolution_status in BENCHMARK_DISCLOSURE_STATUSES
+        )
+    ]

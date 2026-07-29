@@ -211,3 +211,32 @@ def test_serialization_keeps_the_probe_status_over_the_resolved_entry() -> None:
         if item["field"] == "comparison_baseline"
     ]
     assert statuses == ["unavailable_for_requested_run"]
+
+
+def test_probe_clearing_replaces_prior_disclosure_entries() -> None:
+    """PR #303 review: a fresh reconciliation retires older disclosures so
+    the card can never narrate an earlier swap."""
+    stale = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="SAMSUNG",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="unsupported",
+    )
+    strategy = _strategy()
+    strategy = strategy.model_copy(deep=True)
+    strategy.resolution_provenance = [stale, *strategy.resolution_provenance]
+
+    updated, reason_codes = strategy_with_benchmark_price_coverage(
+        strategy,
+        fetch_ohlcv_func=lambda **kwargs: _bars(0),
+    )
+
+    assert reason_codes == ["benchmark_without_price_coverage_cleared"]
+    entries = [
+        item
+        for item in updated.resolution_provenance
+        if item.field == "comparison_baseline"
+    ]
+    assert [item.raw_text for item in entries] == ["NINTENDO"]
+    assert entries[0].resolution_status == "unavailable_for_requested_run"
