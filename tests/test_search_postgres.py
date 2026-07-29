@@ -1,4 +1,4 @@
-"""Real-Postgres proofs for bounded, parity-preserving Omnisearch reads."""
+"""Disposable-Postgres proofs for conversation-shaped Omnisearch reads."""
 
 from __future__ import annotations
 
@@ -125,6 +125,8 @@ def _insert_conversation(
     title: str,
     preview: str = "",
     pinned: bool = False,
+    archived: bool = False,
+    deleted: bool = False,
     conversation_id: UUID | None = None,
 ) -> UUID:
     conversation_id = conversation_id or uuid4()
@@ -132,81 +134,23 @@ def _insert_conversation(
         """
         insert into public.conversations (
             id, user_id, title, title_source, language, pinned, archived,
-            last_message_preview, created_at, updated_at
+            last_message_preview, deleted_at, created_at, updated_at
         )
-        values (%s, %s, %s, 'ai_generated', 'en', %s, false, %s, %s, %s)
+        values (%s, %s, %s, 'ai_generated', 'en', %s, %s, %s, %s, %s, %s)
         """,
         (
             conversation_id,
             user_id,
             title,
             pinned,
+            archived,
             preview,
+            timestamp if deleted else None,
             timestamp,
             timestamp,
         ),
     )
     return conversation_id
-
-
-def _insert_strategy(
-    cursor: Any,
-    *,
-    user_id: UUID,
-    timestamp: datetime,
-    name: str,
-    symbols: list[str] | None = None,
-    pinned: bool = False,
-    strategy_id: UUID | None = None,
-    conversation_id: UUID | None = None,
-) -> UUID:
-    strategy_id = strategy_id or uuid4()
-    cursor.execute(
-        """
-        insert into public.strategies (
-            id, user_id, conversation_id, name, name_source, template,
-            asset_class, symbols, parameters, metrics_preferences,
-            benchmark_symbol, pinned, created_at, updated_at
-        )
-        values (
-            %s, %s, %s, %s, 'ai_generated', 'buy_hold', 'equity', %s,
-            '{}'::jsonb, array['total_return_pct'], 'SPY', %s, %s, %s
-        )
-        """,
-        (
-            strategy_id,
-            user_id,
-            conversation_id,
-            name,
-            symbols or ["AAPL"],
-            pinned,
-            timestamp,
-            timestamp,
-        ),
-    )
-    return strategy_id
-
-
-def _insert_collection(
-    cursor: Any,
-    *,
-    user_id: UUID,
-    timestamp: datetime,
-    name: str,
-    pinned: bool = False,
-    collection_id: UUID | None = None,
-) -> UUID:
-    collection_id = collection_id or uuid4()
-    cursor.execute(
-        """
-        insert into public.collections (
-            id, user_id, name, name_source, pinned, created_at, updated_at
-        )
-        values (%s, %s, %s, 'ai_generated', %s, %s, %s)
-        """,
-        (collection_id, user_id, name, pinned, timestamp, timestamp),
-    )
-    return collection_id
 
 
 def _insert_run(
@@ -215,17 +159,16 @@ def _insert_run(
     user_id: UUID,
     timestamp: datetime,
     title: str,
-    conversation_id: UUID | None = None,
+    conversation_id: UUID,
     symbols: list[str] | None = None,
     status: str = "completed",
     run_id: UUID | None = None,
-    strategy_label: str | None = None,
+    template: str = "buy_and_hold",
+    start_date: str = "2025-01-01",
+    end_date: str = "2025-12-31",
 ) -> UUID:
     run_id = run_id or uuid4()
     run_symbols = symbols or ["AAPL"]
-    result_card = {"title": title, "symbols": run_symbols}
-    if strategy_label is not None:
-        result_card["strategy_label"] = strategy_label
     cursor.execute(
         """
         insert into public.backtest_runs (
@@ -235,7 +178,7 @@ def _insert_run(
         )
         values (
             %s, %s, %s, %s, 'equity', %s, 'equal_weight', 'SPY',
-            '{}'::jsonb, '{}'::jsonb, %s, %s, %s
+            %s, '{}'::jsonb, %s, %s, %s
         )
         """,
         (
@@ -244,7 +187,14 @@ def _insert_run(
             conversation_id,
             status,
             run_symbols,
-            Jsonb(result_card),
+            Jsonb(
+                {
+                    "template": template,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                }
+            ),
+            Jsonb({"title": title, "symbols": run_symbols}),
             timestamp,
             timestamp,
         ),
@@ -259,20 +209,16 @@ def _insert_idea_spine(
     timestamp: datetime,
     title: str,
     summary: str,
-    conversation_id: UUID | None = None,
+    conversation_id: UUID,
     decision_state: str = "promising",
-    idea_id: UUID | None = None,
-    version_id: UUID | None = None,
-    evidence_id: UUID | None = None,
-    decision_id: UUID | None = None,
-    evidence_symbols: list[str] | None = None,
+    decision_note: str | None = None,
+    source_run_id: UUID | None = None,
     evidence_digest: str | None = None,
-    evidence_title: str | None = None,
 ) -> dict[str, UUID]:
-    idea_id = idea_id or uuid4()
-    version_id = version_id or uuid4()
-    evidence_id = evidence_id or uuid4()
-    decision_id = decision_id or uuid4()
+    idea_id = uuid4()
+    version_id = uuid4()
+    evidence_id = uuid4()
+    decision_id = uuid4()
     cursor.execute(
         """
         insert into public.ideas (
@@ -313,11 +259,12 @@ def _insert_idea_spine(
         """
         insert into public.evidence_artifacts (
             id, user_id, idea_id, idea_version_id, source_conversation_id,
-            artifact_type, lifecycle, title, digest, payload, created_at,
-            updated_at
+            source_run_id, artifact_type, lifecycle, title, digest, payload,
+            created_at, updated_at
         )
         values (
-            %s, %s, %s, %s, %s, 'backtest', 'decided', %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, 'backtest', 'decided', %s, %s,
+            %s, %s, %s
         )
         """,
         (
@@ -326,13 +273,14 @@ def _insert_idea_spine(
             idea_id,
             version_id,
             conversation_id,
-            evidence_title if evidence_title is not None else f"{title} evidence",
-            evidence_digest if evidence_digest is not None else f"{summary} evidence",
+            source_run_id,
+            f"{title} evidence",
+            evidence_digest or f"{summary} evidence",
             Jsonb(
                 {
-                    "result_card": {"symbols": evidence_symbols or ["AAPL"]},
+                    "quick_take": evidence_digest or summary,
                     "provenance": {
-                        "symbols": evidence_symbols or ["AAPL"],
+                        "symbols": ["AAPL"],
                         "benchmark_symbol": "SPY",
                     },
                 }
@@ -357,7 +305,7 @@ def _insert_idea_spine(
             evidence_id,
             conversation_id,
             decision_state,
-            f"{summary} decision",
+            decision_note or f"{summary} decision",
             timestamp,
             timestamp,
         ),
@@ -423,170 +371,139 @@ def test_sql_normalizer_matches_python_for_unicode_and_random_text() -> None:
         assert cursor.fetchone()[0] == 0
 
 
-def test_search_each_source_returns_at_most_limit_plus_one_candidates(
+def test_search_groups_all_matching_layers_into_one_conversation(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 27, 12, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
-        for offset in range(6):
-            item_at = timestamp - timedelta(seconds=offset)
-            conversation_id = _insert_conversation(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"Needle chat {offset}",
-                preview="Needle",
-            )
-            _insert_strategy(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                name=f"Needle strategy {offset}",
-            )
-            _insert_collection(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                name=f"Needle collection {offset}",
-            )
-            _insert_run(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"Needle run {offset}",
-                conversation_id=conversation_id,
-            )
-            _insert_idea_spine(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"Needle idea {offset}",
-                summary=f"Needle summary {offset}",
-                conversation_id=conversation_id,
-            )
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Needle conversation",
+            preview="Needle preview",
+        )
+        _insert_run(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Needle run",
+            conversation_id=conversation_id,
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Needle idea",
+            summary="Needle evidence",
+            conversation_id=conversation_id,
+        )
 
     reader, pool = _reader()
-    public_limit = 3
     result = reader.search_rows(
         user_id=str(owner_id),
         query="needle",
-        source_limit=public_limit + 1,
+        source_limit=4,
     )
+    ranked = _ranked(result.rows, "needle")
 
-    assert {source: len(rows) for source, rows in result.rows.items()} == {
-        "conversations": 4,
-        "strategies": 4,
-        "collections": 4,
-        "runs": 4,
-        "ideas": 4,
-        "evidence": 4,
-        "decisions": 4,
-    }
-    assert all(len(rows) <= public_limit + 1 for rows in result.rows.values())
-    assert pool.tracker["query_count"] == 9
-    assert pool.tracker["row_counts"] == [4] * 9
+    assert [item.id for _, item in ranked] == [str(conversation_id)]
+    assert ranked[0][1].conversation_id == str(conversation_id)
+    assert result.rows["strategies"] == []
+    assert result.rows["collections"] == []
+    assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
 
 
-def test_search_preserves_all_token_matching_and_rank_buckets(
+def test_search_title_match_returns_title_with_unrelated_preview(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 12, 15, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Needle conversation",
+            preview="Review again later",
+        )
+
+    reader, pool = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=4,
+    )
+    ranked = _ranked(result.rows, "needle")
+
+    assert [item.id for _, item in ranked] == [str(conversation_id)]
+    assert ranked[0][1].matched_text == "Needle conversation"
+    assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
+
+
+def test_search_preview_match_returns_preview_with_unrelated_title(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 12, 30, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Review again later",
+            preview="Needle preview",
+        )
+
+    reader, pool = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=4,
+    )
+    ranked = _ranked(result.rows, "needle")
+
+    assert [item.id for _, item in ranked] == [str(conversation_id)]
+    assert ranked[0][1].matched_text == "Needle preview"
+    assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
+
+
+def test_search_matches_all_tokens_across_decision_and_evidence_text(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
     now = datetime(2026, 7, 27, 13, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
-        _insert_conversation(
+        conversation_id = _insert_conversation(
             cursor,
             user_id=owner_id,
             timestamp=now,
-            title="Alpha",
-            preview="Beta",
+            title="Ordinary research",
         )
-        _insert_collection(
+        _insert_idea_spine(
             cursor,
             user_id=owner_id,
-            timestamp=now - timedelta(minutes=1),
-            name="Alpha Beta",
+            timestamp=now,
+            title="Ordinary idea",
+            summary="Ordinary summary",
+            conversation_id=conversation_id,
+            decision_note="localtoken",
+            evidence_digest="evidencetoken",
         )
 
     reader, _ = _reader()
     result = reader.search_rows(
         user_id=str(owner_id),
-        query="alpha beta",
+        query="localtoken evidencetoken",
         source_limit=3,
     )
-    ranked = _ranked(result.rows, "alpha beta")
 
-    assert [item.type for _, item in ranked] == ["collection", "chat"]
-
-
-def test_search_preserves_short_mixed_tokens_and_cross_artifact_decision_text(
-    search_identities,
-) -> None:
-    owner_id = search_identities["owner"]
-    other_id = search_identities["other"]
-    now = datetime(2026, 7, 27, 13, 5, tzinfo=timezone.utc)
-    with _connect() as connection, connection.cursor() as cursor:
-        expected_chat = _insert_conversation(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Alpha x thesis",
-        )
-        _insert_conversation(
-            cursor,
-            user_id=owner_id,
-            timestamp=now - timedelta(seconds=1),
-            title="Alpha y thesis",
-        )
-        _insert_conversation(
-            cursor,
-            user_id=other_id,
-            timestamp=now + timedelta(seconds=1),
-            title="Alpha x foreign",
-        )
-        identities = _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Decision bridge",
-            summary="Ordinary summary",
-            evidence_title="Evidence title",
-            evidence_digest="evidencetoken",
-        )
-        cursor.execute(
-            "update public.decision_notes set note = 'localtoken' where id = %s",
-            (identities["decision"],),
-        )
-
-    reader, _ = _reader()
-    mixed = reader.search_rows(
-        user_id=str(owner_id),
-        query="alpha x",
-        source_limit=5,
-    )
-    short = reader.search_rows(
-        user_id=str(owner_id),
-        query="x",
-        source_limit=5,
-    )
-    bridged = reader.search_rows(
-        user_id=str(owner_id),
-        query="localtoken evidencetoken",
-        source_limit=5,
-    )
-
-    assert [str(row["id"]) for row in mixed.rows["conversations"]] == [str(expected_chat)]
-    assert [str(row["id"]) for row in short.rows["conversations"]] == [str(expected_chat)]
-    assert [str(row["id"]) for row in bridged.rows["decisions"]] == [
-        str(identities["decision"])
+    assert [item.id for _, item in _ranked(result.rows, "localtoken evidencetoken")] == [
+        str(conversation_id)
     ]
-    # Decision recall hydration (issue #253): the reader attaches the linked
-    # evidence facts, including the canonical payload, to the decision row.
-    decision_row = bridged.rows["decisions"][0]
-    assert decision_row["note"] == "localtoken"
-    assert decision_row["artifact_title"] == "Evidence title"
-    assert decision_row["artifact_digest"] == "evidencetoken"
-    assert "artifact_payload" in decision_row
+    assert result.rows["decisions"][0]["note"] == "localtoken"
+    assert result.rows["decisions"][0]["artifact_digest"] == "evidencetoken"
 
 
 @pytest.mark.parametrize("query", ["\x00needle\x00", "nee\x00dle"])
@@ -595,12 +512,12 @@ def test_search_nul_query_preserves_normalized_matching(
     query: str,
 ) -> None:
     owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 13, 15, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 27, 13, 15, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
         expected = _insert_conversation(
             cursor,
             user_id=owner_id,
-            timestamp=timestamp,
+            timestamp=now,
             title="Needle thesis",
         )
 
@@ -611,180 +528,53 @@ def test_search_nul_query_preserves_normalized_matching(
         source_limit=2,
     )
 
-    assert [str(row["id"]) for row in result.rows["conversations"]] == [str(expected)]
+    assert [item.id for _, item in _ranked(result.rows, query)] == [str(expected)]
 
 
-def test_search_score_projection_uses_title_when_optional_preview_text_is_empty(
-    search_identities,
-) -> None:
-    owner_id = search_identities["owner"]
-    now = datetime(2026, 7, 27, 13, 30, tzinfo=timezone.utc)
-    with _connect() as connection, connection.cursor() as cursor:
-        expected = _insert_conversation(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Higher id needle thesis",
-            preview="",
-            conversation_id=UUID("00000000-0000-0000-0000-000000000099"),
-        )
-        _insert_conversation(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Lower id needle thesis",
-            preview="needle",
-            conversation_id=UUID("00000000-0000-0000-0000-000000000001"),
-        )
-        _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Higher id needle idea",
-            summary="",
-            idea_id=UUID("00000000-0000-0000-0000-000000000099"),
-            evidence_id=UUID("00000000-0000-0000-0000-000000000099"),
-            evidence_digest="",
-        )
-        _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Lower id needle idea",
-            summary="needle",
-            idea_id=UUID("00000000-0000-0000-0000-000000000001"),
-            evidence_id=UUID("00000000-0000-0000-0000-000000000001"),
-            evidence_digest="needle",
-        )
-        cursor.execute(
-            "update public.ideas set updated_at = %s where id = any(%s::uuid[])",
-            (
-                now,
-                [
-                    UUID("00000000-0000-0000-0000-000000000099"),
-                    UUID("00000000-0000-0000-0000-000000000001"),
-                ],
-            ),
-        )
-        expected_run = _insert_run(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="",
-            strategy_label="Backtest run",
-            run_id=UUID("00000000-0000-0000-0000-000000000010"),
-        )
-        _insert_run(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Plain title",
-            strategy_label="Backtest run",
-            run_id=UUID("00000000-0000-0000-0000-000000000090"),
-        )
-        expected_decision = _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Decision source one",
-            summary="",
-            evidence_title="",
-            evidence_digest="Target",
-            decision_id=UUID("00000000-0000-0000-0000-000000000010"),
-        )["decision"]
-        _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now,
-            title="Decision source two",
-            summary="",
-            evidence_title="Plain evidence",
-            evidence_digest="Target",
-            decision_id=UUID("00000000-0000-0000-0000-000000000090"),
-        )
-
-    reader, _ = _reader()
-    result = reader.search_rows(
-        user_id=str(owner_id),
-        query="needle",
-        source_limit=1,
-    )
-
-    assert [str(row["id"]) for row in result.rows["conversations"]] == [str(expected)]
-    assert [str(row["id"]) for row in result.rows["ideas"]] == [str(expected)]
-    assert [str(row["id"]) for row in result.rows["evidence"]] == [str(expected)]
-
-    run_result = reader.search_rows(
-        user_id=str(owner_id),
-        query="backtest run",
-        source_limit=1,
-    )
-    assert [str(row["id"]) for row in run_result.rows["runs"]] == [str(expected_run)]
-
-    decision_result = reader.search_rows(
-        user_id=str(owner_id),
-        query="target",
-        source_limit=1,
-    )
-    assert [str(row["id"]) for row in decision_result.rows["decisions"]] == [
-        str(expected_decision)
-    ]
-
-
-def test_old_pinned_exact_title_and_exact_symbol_beat_newer_plain_matches(
+def test_object_layer_precedes_recency_after_pinned_exact_and_symbol(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
     now = datetime(2026, 7, 27, 14, tzinfo=timezone.utc)
-    old = now - timedelta(days=30)
     with _connect() as connection, connection.cursor() as cursor:
-        _insert_conversation(
+        object_conversation = _insert_conversation(
             cursor,
             user_id=owner_id,
-            timestamp=old,
-            title="Pinned AAPL notes",
-            preview="AAPL",
-            pinned=True,
-        )
-        _insert_collection(
-            cursor,
-            user_id=owner_id,
-            timestamp=old,
-            name="AAPL",
-        )
-        _insert_strategy(
-            cursor,
-            user_id=owner_id,
-            timestamp=old,
-            name="Old symbol strategy",
-            symbols=["AAPL"],
+            timestamp=now - timedelta(days=2),
+            title="Older research",
         )
         _insert_idea_spine(
             cursor,
             user_id=owner_id,
+            timestamp=now - timedelta(days=1),
+            title="Gold evidence",
+            summary="Gold evidence",
+            conversation_id=object_conversation,
+        )
+        recent_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
             timestamp=now,
-            title="Newer AAPL evidence idea",
-            summary="AAPL plain match",
-            evidence_symbols=["MSFT"],
+            title="Gold allocation conversation",
         )
 
     reader, _ = _reader()
     ranked = _ranked(
         reader.search_rows(
             user_id=str(owner_id),
-            query="aapl",
-            source_limit=10,
+            query="gold",
+            source_limit=5,
         ).rows,
-        "aapl",
+        "gold",
     )
-    ordered_types = [item.type for _, item in ranked]
 
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
-    assert ordered_types.index("collection") < ordered_types.index("evidence")
-    assert ordered_types.index("strategy") < ordered_types.index("evidence")
+    assert [item.id for _, item in ranked] == [
+        str(object_conversation),
+        str(recent_conversation),
+    ]
 
 
-def test_search_first_middle_final_equal_timestamp_deletion_and_empty_pages(
+def test_conversation_cursor_pages_after_evidence_winner_without_gaps(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
@@ -792,22 +582,28 @@ def test_search_first_middle_final_equal_timestamp_deletion_and_empty_pages(
     inserted: set[str] = set()
     with _connect() as connection, connection.cursor() as cursor:
         for offset in range(7):
-            inserted.add(
-                str(
-                    _insert_strategy(
-                        cursor,
-                        user_id=owner_id,
-                        timestamp=timestamp,
-                        name=f"Needle strategy {offset}",
-                    )
-                )
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp,
+                title=f"Research {offset}",
+            )
+            inserted.add(str(conversation_id))
+            _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp,
+                title=f"Evidence source {offset}",
+                summary="Needle evidence",
+                evidence_digest="Needle evidence",
+                conversation_id=conversation_id,
             )
 
     reader, _ = _reader()
     seen: list[str] = []
     cursor_at = None
     cursor_id = None
-    for page_number, expected_count in enumerate((3, 3, 1, 0)):
+    for expected_count in (3, 3, 1, 0):
         result = reader.search_rows(
             user_id=str(owner_id),
             query="needle",
@@ -821,18 +617,71 @@ def test_search_first_middle_final_equal_timestamp_deletion_and_empty_pages(
         if page:
             cursor_at = page[-1][1].updated_at
             cursor_id = page[-1][1].id
-        if page_number == 0:
-            with _connect() as connection, connection.cursor() as cursor:
-                cursor.execute(
-                    "delete from public.strategies where id = %s",
-                    (seen[0],),
-                )
 
     assert len(seen) == len(set(seen))
     assert set(seen) == inserted
 
 
-def test_search_cursor_pivot_preserves_existing_query_specific_behavior(
+def test_message_activity_cursor_from_page_one_is_accepted_on_page_two(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    boundary_at = datetime(2026, 7, 27, 15, 30, tzinfo=timezone.utc)
+    message_at = boundary_at + timedelta(hours=1)
+    following_at = boundary_at - timedelta(hours=1)
+    with _connect() as connection, connection.cursor() as cursor:
+        boundary_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=boundary_at,
+            title="Needle boundary conversation",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=boundary_conversation,
+            timestamp=message_at,
+            role="assistant",
+            content="Durable clarification without a preview update.",
+        )
+        following_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=following_at,
+            title="Needle following conversation",
+        )
+        cursor.execute(
+            "select updated_at from public.conversations where id = %s",
+            (boundary_conversation,),
+        )
+        assert cursor.fetchone()[0] == boundary_at
+
+    reader, _ = _reader()
+    first_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=2,
+    )
+    first_page = _ranked(first_result.rows, "needle")[:1]
+
+    assert [item.id for _, item in first_page] == [str(boundary_conversation)]
+    cursor_item = first_page[0][1]
+    assert cursor_item.updated_at == message_at
+
+    second_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=2,
+        cursor_updated_at=cursor_item.updated_at,
+        cursor_id=cursor_item.id,
+    )
+
+    assert [item.id for _, item in _ranked(second_result.rows, "needle")] == [
+        str(following_conversation)
+    ]
+
+
+def test_cursor_pivot_rejects_foreign_or_query_mismatched_conversation(
     search_identities,
 ) -> None:
     reader, _ = _reader()
@@ -840,25 +689,24 @@ def test_search_cursor_pivot_preserves_existing_query_specific_behavior(
     owner_id = search_identities["owner"]
     other_id = search_identities["other"]
     timestamp = datetime(2026, 7, 27, 16, tzinfo=timezone.utc)
-    pivot_id = UUID("f0000000-0000-0000-0000-000000000001")
-    foreign_id = UUID("e0000000-0000-0000-0000-000000000001")
     with _connect() as connection, connection.cursor() as cursor:
-        _insert_strategy(
+        owner_conversation = _insert_conversation(
             cursor,
             user_id=owner_id,
             timestamp=timestamp,
-            name="Alpha pivot",
-            strategy_id=pivot_id,
+            title="Alpha pivot",
         )
-        _insert_strategy(
+        foreign_conversation = _insert_conversation(
             cursor,
             user_id=other_id,
             timestamp=timestamp,
-            name="Alpha foreign",
-            strategy_id=foreign_id,
+            title="Alpha foreign",
         )
 
-    for query, item_id in (("beta", pivot_id), ("alpha", foreign_id)):
+    for query, item_id in (
+        ("beta", owner_conversation),
+        ("alpha", foreign_conversation),
+    ):
         with pytest.raises(cursor_error):
             reader.search_rows(
                 user_id=str(owner_id),
@@ -869,7 +717,7 @@ def test_search_cursor_pivot_preserves_existing_query_specific_behavior(
             )
 
 
-def test_search_guest_scope_is_applied_before_candidate_limit(
+def test_guest_scope_and_deleted_filter_apply_before_conversation_limit(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
@@ -880,30 +728,34 @@ def test_search_guest_scope_is_applied_before_candidate_limit(
             cursor,
             user_id=owner_id,
             timestamp=timestamp - timedelta(days=1),
-            title="Needle workspace",
+            title="Workspace research",
+            archived=True,
             conversation_id=workspace_id,
         )
-        for offset in range(5):
-            other_conversation = _insert_conversation(
-                cursor,
-                user_id=owner_id,
-                timestamp=timestamp + timedelta(minutes=offset),
-                title=f"Needle outside {offset}",
-            )
-            _insert_run(
-                cursor,
-                user_id=owner_id,
-                timestamp=timestamp + timedelta(minutes=offset),
-                title=f"Needle outside run {offset}",
-                conversation_id=other_conversation,
-            )
-        expected_run = _insert_run(
+        _insert_idea_spine(
             cursor,
             user_id=owner_id,
             timestamp=timestamp - timedelta(days=1),
-            title="Needle workspace run",
+            title="Workspace idea",
+            summary="Needle workspace evidence",
             conversation_id=workspace_id,
         )
+        for offset in range(6):
+            deleted_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp + timedelta(minutes=offset),
+                title=f"Deleted research {offset}",
+                deleted=True,
+            )
+            _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp + timedelta(minutes=offset),
+                title=f"Deleted idea {offset}",
+                summary="Needle deleted evidence",
+                conversation_id=deleted_id,
+            )
 
     reader, _ = _reader()
     result = reader.search_rows(
@@ -914,229 +766,123 @@ def test_search_guest_scope_is_applied_before_candidate_limit(
         guest_conversation_id=str(workspace_id),
     )
 
-    assert [str(row["id"]) for row in result.rows["conversations"]] == [str(workspace_id)]
-    assert [str(row["id"]) for row in result.rows["runs"]] == [str(expected_run)]
-    assert result.rows["strategies"] == []
-    assert result.rows["collections"] == []
+    assert [item.id for _, item in _ranked(result.rows, "needle")] == [
+        str(workspace_id)
+    ]
 
 
-def test_completed_runs_and_all_artifact_identities_are_preserved(
+def test_full_lineage_aggregates_survive_more_than_five_children(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 18, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 27, 18, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
-        completed_id = _insert_run(
+        conversation_id = _insert_conversation(
             cursor,
             user_id=owner_id,
-            timestamp=timestamp,
-            title="Needle completed",
+            timestamp=now - timedelta(days=10),
+            title="Long-running research",
         )
-        failed_id = _insert_run(
+        run_ids: list[UUID] = []
+        for offset in range(7):
+            run_ids.append(
+                _insert_run(
+                    cursor,
+                    user_id=owner_id,
+                    timestamp=now - timedelta(days=7 - offset),
+                    title=f"Run {offset}",
+                    conversation_id=conversation_id,
+                    symbols=[f"S{offset}", "AAPL"],
+                    start_date=f"20{19 + offset}-01-01",
+                    end_date=f"20{19 + offset}-12-31",
+                )
+            )
+        _insert_idea_spine(
             cursor,
             user_id=owner_id,
-            timestamp=timestamp,
-            title="Needle failed",
-            status="failed",
-        )
-        identities = _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=timestamp,
-            title="Needle identity",
-            summary="Needle identity summary",
-        )
-
-    reader, _ = _reader()
-    rows = reader.search_rows(
-        user_id=str(owner_id),
-        query="needle",
-        source_limit=10,
-    ).rows
-
-    assert {str(row["id"]) for row in rows["runs"]} == {str(completed_id)}
-    assert str(failed_id) not in {str(row["id"]) for row in rows["runs"]}
-    assert {str(row["id"]) for row in rows["ideas"]} == {str(identities["idea"])}
-    assert {str(row["id"]) for row in rows["evidence"]} == {str(identities["evidence"])}
-    assert {str(row["id"]) for row in rows["decisions"]} == {str(identities["decision"])}
-
-
-def test_latest_decision_equal_timestamp_tie_uses_id_deterministically(
-    search_identities,
-) -> None:
-    owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 19, tzinfo=timezone.utc)
-    idea_id = uuid4()
-    with _connect() as connection, connection.cursor() as cursor:
-        first = _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=timestamp,
-            title="Needle tie",
-            summary="Needle tie summary",
+            timestamp=now + timedelta(minutes=1),
+            title="Judged oldest run",
+            summary="Anchor decision",
+            decision_note="Anchor decision",
+            conversation_id=conversation_id,
+            source_run_id=run_ids[0],
             decision_state="watching",
-            idea_id=idea_id,
-            decision_id=UUID("10000000-0000-0000-0000-000000000001"),
         )
-        second_version = uuid4()
-        second_evidence = uuid4()
-        second_decision = UUID("f0000000-0000-0000-0000-000000000001")
-        cursor.execute(
-            """
-            insert into public.idea_versions (
-                id, user_id, idea_id, version_number, canonical_spec,
-                strategy_snapshot, title, summary, lifecycle, created_at
-            )
-            values (
-                %s, %s, %s, 2, '{}'::jsonb, '{}'::jsonb, 'Needle tie v2',
-                'Needle tie v2', 'decided', %s
-            )
-            """,
-            (second_version, owner_id, idea_id, timestamp),
-        )
-        cursor.execute(
-            """
-            insert into public.evidence_artifacts (
-                id, user_id, idea_id, idea_version_id, title, digest, payload,
-                lifecycle, created_at, updated_at
-            )
-            values (
-                %s, %s, %s, %s, 'Needle tie evidence 2',
-                'Needle tie digest 2', '{}'::jsonb, 'decided', %s, %s
-            )
-            """,
-            (
-                second_evidence,
-                owner_id,
-                idea_id,
-                second_version,
-                timestamp,
-                timestamp,
-            ),
-        )
-        cursor.execute(
-            """
-            insert into public.decision_notes (
-                id, user_id, idea_id, idea_version_id, evidence_artifact_id,
-                decision_state, note, created_at, updated_at
-            )
-            values (%s, %s, %s, %s, %s, 'rejected', 'higher id', %s, %s)
-            """,
-            (
-                second_decision,
-                owner_id,
-                idea_id,
-                second_version,
-                second_evidence,
-                timestamp,
-                timestamp,
-            ),
-        )
-        assert first["decision"] != second_decision
 
     reader, _ = _reader()
     result = reader.search_rows(
         user_id=str(owner_id),
-        query="needle",
-        source_limit=5,
+        query="anchor",
+        source_limit=2,
     )
+    item = _ranked(result.rows, "anchor")[0][1]
 
-    assert result.rows["ideas"][0]["decision_state"] == "rejected"
+    assert item.dossier.tested.run_count == 7
+    assert str(item.dossier.tested.start_date) == "2019-01-01"
+    assert str(item.dossier.tested.end_date) == "2025-12-31"
+    assert item.decision_states == ("watching",)
+    assert item.dossier.decision is not None
+    assert item.dossier.decision.run_label == "Run 0"
+    assert item.dossier.outcome is not None
+    assert item.dossier.outcome.run_label == "Run 6"
 
 
-def test_ledger_groups_are_exact_and_not_candidate_or_decision_filter_relative(
+def test_ledger_counts_distinct_conversations_across_all_match_layers(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 20, tzinfo=timezone.utc)
-    states = ["promising", "promising", "watching", "rejected", "promising"]
+    now = datetime(2026, 7, 27, 19, tzinfo=timezone.utc)
     with _connect() as connection, connection.cursor() as cursor:
-        for offset, state in enumerate(states):
+        promising_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Promising research",
+        )
+        for offset in range(2):
             _insert_idea_spine(
                 cursor,
                 user_id=owner_id,
-                timestamp=timestamp - timedelta(seconds=offset),
-                title=f"Needle ledger {offset}",
-                summary=f"Needle ledger summary {offset}",
-                decision_state=state,
+                timestamp=now + timedelta(seconds=offset),
+                title=f"Promising idea {offset}",
+                summary="Needle evidence",
+                conversation_id=promising_conversation,
+                decision_state="promising",
             )
+        watching_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Watching research",
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Watching idea",
+            summary="Needle evidence",
+            conversation_id=watching_conversation,
+            decision_state="watching",
+        )
 
     reader, _ = _reader()
     result = reader.search_rows(
         user_id=str(owner_id),
         query="needle",
-        source_limit=2,
+        source_limit=4,
         decision_state="promising",
         include_ledger_groups=True,
     )
 
-    assert len(result.rows["ideas"]) == 2
-    assert all(row["decision_state"] == "promising" for row in result.rows["ideas"])
+    assert [item.id for _, item in _ranked(result.rows, "needle")] == [
+        str(promising_conversation)
+    ]
     assert result.ledger_counts == {
-        "promising": 3,
+        "promising": 1,
         "watching": 1,
-        "rejected": 1,
+        "rejected": 0,
         "revisit_later": 0,
     }
-
-
-def test_filtered_idea_ledger_pages_keep_cursor_order_and_exact_counts(
-    search_identities,
-) -> None:
-    owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc)
-    inserted: set[str] = set()
-    with _connect() as connection, connection.cursor() as cursor:
-        for offset in range(7):
-            inserted.add(
-                str(
-                    _insert_idea_spine(
-                        cursor,
-                        user_id=owner_id,
-                        timestamp=timestamp,
-                        title=f"Ledger idea {offset}",
-                        summary=f"Ledger summary {offset}",
-                        decision_state="promising",
-                    )["idea"]
-                )
-            )
-
-    reader, _ = _reader()
-    seen: list[str] = []
-    cursor_at = None
-    cursor_id = None
-    for expected_count in (3, 3, 1, 0):
-        result = reader.search_rows(
-            user_id=str(owner_id),
-            query="",
-            source_limit=4,
-            cursor_updated_at=cursor_at,
-            cursor_id=cursor_id,
-            decision_state="promising",
-            include_ledger_groups=True,
-        )
-        page = result.rows["ideas"][:3]
-        assert len(page) == expected_count
-        assert result.ledger_counts == {
-            "promising": 7,
-            "watching": 0,
-            "rejected": 0,
-            "revisit_later": 0,
-        }
-        seen.extend(str(row["id"]) for row in page)
-        if page:
-            raw_cursor_at = str(page[-1]["updated_at"])
-            try:
-                cursor_at = datetime.fromisoformat(raw_cursor_at)
-            except ValueError:
-                cursor_at = datetime.strptime(
-                    raw_cursor_at,
-                    "%Y-%m-%dT%H:%M:%S.%f%z",
-                )
-            cursor_id = str(page[-1]["id"])
-
-    assert len(seen) == len(set(seen))
-    assert set(seen) == inserted
 
 
 @pytest.mark.parametrize("initial_volume,larger_volume", [(40, 400)])
@@ -1146,26 +892,26 @@ def test_search_query_and_row_budget_are_constant_as_volume_grows(
     larger_volume: int,
 ) -> None:
     owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 21, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 7, 27, 20, tzinfo=timezone.utc)
 
-    def insert_strategies(start: int, stop: int) -> None:
+    def insert_conversations(start: int, stop: int) -> None:
         with _connect() as connection, connection.cursor() as cursor:
             for offset in range(start, stop):
-                _insert_strategy(
+                _insert_conversation(
                     cursor,
                     user_id=owner_id,
                     timestamp=timestamp - timedelta(seconds=offset),
-                    name=f"Needle scale {offset}",
+                    title=f"Needle scale {offset}",
                 )
 
-    insert_strategies(0, initial_volume)
+    insert_conversations(0, initial_volume)
     first_reader, first_pool = _reader()
     first = first_reader.search_rows(
         user_id=str(owner_id),
         query="needle",
         source_limit=6,
     )
-    insert_strategies(initial_volume, larger_volume)
+    insert_conversations(initial_volume, larger_volume)
     larger_reader, larger_pool = _reader()
     larger = larger_reader.search_rows(
         user_id=str(owner_id),
@@ -1173,112 +919,8 @@ def test_search_query_and_row_budget_are_constant_as_volume_grows(
         source_limit=6,
     )
 
-    assert len(first.rows["strategies"]) == len(larger.rows["strategies"]) == 6
-    expected_budget = {
-        "query_count": 7,
-        "row_counts": [0, 6, 0, 0, 0, 0, 0],
-    }
+    assert len(first.rows["conversations"]) == 6
+    assert len(larger.rows["conversations"]) == 6
+    expected_budget = {"query_count": 2, "row_counts": [6, 6]}
     assert first_pool.tracker == expected_budget
     assert larger_pool.tracker == expected_budget
-
-
-def test_search_candidate_plan_keeps_a_limit_inside_each_source(
-    search_identities,
-) -> None:
-    from argus.domain.postgres_search_reader import (
-        _LATE_SOURCES,
-        _late_source_sql,
-    )
-
-    owner_id = search_identities["owner"]
-    timestamp = datetime(2026, 7, 27, 22, tzinfo=timezone.utc)
-    with _connect() as connection, connection.cursor() as cursor:
-        cursor.execute("set local enable_seqscan = off")
-        for offset in range(40):
-            item_at = timestamp - timedelta(seconds=offset)
-            label = "Needle" if offset == 0 else "Haystack"
-            conversation_id = _insert_conversation(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"{label} conversation {offset}",
-            )
-            _insert_strategy(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                name=f"{label} strategy {offset}",
-            )
-            _insert_collection(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                name=f"{label} collection {offset}",
-            )
-            _insert_run(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"{label} run {offset}",
-                conversation_id=conversation_id,
-            )
-            _insert_idea_spine(
-                cursor,
-                user_id=owner_id,
-                timestamp=item_at,
-                title=f"{label} idea {offset}",
-                summary=f"{label} summary {offset}",
-                conversation_id=conversation_id,
-            )
-
-        params = {
-            "user_id": owner_id,
-            "normalized_query": "needle",
-            "symbol_query": "needle",
-            "token_patterns": ["%needle%"],
-            "anchor_pattern": "%needle%",
-            "source_limit": 6,
-            "has_cursor": False,
-            "cursor_pinned_rank": 0,
-            "cursor_exact_rank": 0,
-            "cursor_symbol_rank": 0,
-            "cursor_type_rank": 0,
-            "cursor_updated_at": None,
-            "cursor_text_rank": 0,
-            "cursor_id": None,
-            "decision_state": None,
-            "ledger_browse": False,
-            "ideas_only": False,
-            "guest_scope": False,
-            "guest_conversation_id": None,
-            "pivot_only": False,
-            "pivot_id": None,
-        }
-        explained_sources = []
-        for source in _LATE_SOURCES:
-            cursor.execute(
-                sql.SQL("explain (analyze, buffers, format json) {}").format(
-                    _late_source_sql(
-                        source,
-                        has_anchor=True,
-                        has_cursor=False,
-                    )
-                ),
-                params,
-            )
-            explained_sources.append(cursor.fetchone()[0][0])
-
-    def plan_nodes(plan: dict[str, Any]):
-        yield plan
-        for child in plan.get("Plans", []):
-            yield from plan_nodes(child)
-
-    for explained in explained_sources:
-        plan = explained["Plan"]
-        nodes = list(plan_nodes(plan))
-        limits = [node for node in nodes if node["Node Type"] == "Limit"]
-
-        assert limits
-        assert all(node["Actual Rows"] <= 6 for node in limits)
-        assert plan["Actual Rows"] <= 6
-        assert explained["Execution Time"] < 2_000

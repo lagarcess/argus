@@ -932,6 +932,27 @@
       "total_return_pct": "Total return",
       "volatility_pct": "Volatility"
     },
+    "dossier_values": {
+      "decision_on": "{{state}} · on {{run}}",
+      "run_count_one": "{{count}} run",
+      "run_count_other": "{{count}} runs",
+      "strategy_families": {
+        "buy_and_hold": "Buy and hold",
+        "buy_hold": "Buy and hold",
+        "buy_the_dip": "Buy the dip",
+        "dca": "Recurring buys",
+        "dca_accumulation": "Recurring buys",
+        "moving_average_crossover": "Moving-average crossover",
+        "rsi_mean_reversion": "RSI threshold",
+        "unknown": "Strategy"
+      },
+      "nudges": {
+        "stale_result": "Result may need a refresh",
+        "suggestion_untaken": "Suggested next step",
+        "undecided": "No decision yet",
+        "unknown": "Next step saved"
+      }
+    },
     "preview_fields": {
       "assets": "Assets",
       "assumptions": "Assumptions",
@@ -939,10 +960,13 @@
       "breakdown": "Breakdown",
       "decision": "Decision",
       "digest": "Digest",
+      "left_off": "Where you left off",
       "metrics": "Metrics",
+      "outcome": "How it went",
       "preview": "Preview",
       "quick_take": "Quick take",
       "note": "Your note",
+      "tested": "What you tested",
       "what_happened": "What happened"
     },
     "conversation_count_one": "{{count}} conversation",
@@ -952,6 +976,7 @@
     "type": {
       "backtest": "Backtest",
       "chat": "Conversation",
+      "conversation": "Conversation",
       "collection": "Collection",
       "decision": "Decision",
       "evidence": "Evidence",

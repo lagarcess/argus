@@ -2567,19 +2567,141 @@ components:
             - system
           - type: 'null'
       type: object
+    SearchDossier:
+      properties:
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        tested:
+          $ref: '#/components/schemas/SearchDossierTested'
+        outcome:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierOutcome'
+          - type: 'null'
+        left_off:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierLeftOff'
+          - type: 'null'
+      type: object
+      required:
+      - tested
+    SearchDossierDecision:
+      properties:
+        state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+      type: object
+      required:
+      - state
+    SearchDossierLeftOff:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        nudge:
+          anyOf:
+          - type: string
+            enum:
+            - undecided
+            - suggestion_untaken
+            - stale_result
+          - type: 'null'
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchDossierMetric:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        value:
+          anyOf:
+          - type: string
+          - type: integer
+          - type: number
+      type: object
+      required:
+      - name
+      - value
+    SearchDossierOutcome:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        benchmark_symbol:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        quick_take:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        metrics:
+          items:
+            $ref: '#/components/schemas/SearchDossierMetric'
+          type: array
+          maxItems: 4
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchDossierTested:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        strategy_families:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        run_count:
+          type: integer
+          minimum: 0.0
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      type: object
+      required:
+      - run_count
     SearchItem:
       properties:
         type:
           type: string
-          enum:
-          - chat
-          - strategy
-          - collection
-          - run
-          - backtest
-          - evidence
-          - decision
-          - idea
+          const: conversation
         id:
           type: string
         title:
@@ -2590,34 +2712,19 @@ components:
           type: string
           format: date-time
         conversation_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-        lifecycle:
-          anyOf:
-          - type: string
-            enum:
-            - captured
-            - reviewed
-            - saved
-            - decided
-            - archived
-            - discarded
-          - type: 'null'
-        decision_state:
-          anyOf:
-          - type: string
+          type: string
+        dossier:
+          $ref: '#/components/schemas/SearchDossier'
+        decision_states:
+          items:
+            type: string
             enum:
             - watching
             - promising
             - rejected
             - revisit_later
-          - type: 'null'
-        preview:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
+          type: array
+          default: []
       type: object
       required:
       - type
@@ -2625,6 +2732,8 @@ components:
       - title
       - matched_text
       - updated_at
+      - conversation_id
+      - dossier
     SearchLedgerGroup:
       properties:
         decision_state:

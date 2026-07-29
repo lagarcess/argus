@@ -507,25 +507,64 @@ class PaginatedHistory(BaseModel):
     next_cursor: str | None = None
 
 
+class SearchDossierDecision(BaseModel):
+    state: DecisionState
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str | None = Field(default=None, max_length=160)
+
+
+class SearchDossierTested(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+    strategy_families: list[str] = Field(default_factory=list, max_length=5)
+    run_count: int = Field(ge=0)
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class SearchDossierMetric(BaseModel):
+    name: str = Field(max_length=80)
+    value: str | int | float
+
+
+class SearchDossierOutcome(BaseModel):
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    benchmark_symbol: str | None = Field(default=None, max_length=24)
+    quick_take: str | None = Field(default=None, max_length=500)
+    metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
+
+
+SearchDossierNudge = Literal[
+    "undecided",
+    "suggestion_untaken",
+    "stale_result",
+]
+
+
+class SearchDossierLeftOff(BaseModel):
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    nudge: SearchDossierNudge | None = None
+
+
+class SearchDossier(BaseModel):
+    decision: SearchDossierDecision | None = None
+    tested: SearchDossierTested
+    outcome: SearchDossierOutcome | None = None
+    left_off: SearchDossierLeftOff | None = None
+
+
 class SearchItem(BaseModel):
-    type: Literal[
-        "chat",
-        "strategy",
-        "collection",
-        "run",
-        "backtest",
-        "evidence",
-        "decision",
-        "idea",
-    ]
+    type: Literal["conversation"]
     id: str
     title: str
     matched_text: str
     updated_at: datetime
-    conversation_id: str | None = None
-    lifecycle: ArtifactLifecycle | None = None
-    decision_state: DecisionState | None = None
-    preview: dict[str, Any] | None = None
+    conversation_id: str
+    dossier: SearchDossier
+    # Bounded conversation aggregate used for decision filters and counts.
+    # The dossier separately carries the latest decision.
+    decision_states: tuple[DecisionState, ...] = ()
 
 
 class SearchLedgerGroup(BaseModel):

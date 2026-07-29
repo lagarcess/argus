@@ -91,6 +91,19 @@ function formatRelativeDate(
   }).format(date);
 }
 
+function formatDossierDate(value: string, locale: string) {
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value,
+  );
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function dateGroup(value: string, t: ReturnType<typeof useTranslation>["t"]) {
   const date = new Date(value);
   const now = new Date();
@@ -213,6 +226,47 @@ export default function ChatCommandPalette({
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dossierCopy = useMemo(
+    () => ({
+      decisionStateLabel: (state: string) =>
+        t(
+          `chat.result_card.decision_states.${state}`,
+          commandPaletteDecisionStateFallback(state),
+        ),
+      decisionAttribution: (state: string, run: string) =>
+        t("command_palette.dossier_values.decision_on", {
+          state,
+          run,
+          defaultValue: `${state} · on ${run}`,
+        }),
+      runCountLabel: (count: number) =>
+        t("command_palette.dossier_values.run_count", {
+          count,
+          defaultValue: `${count} ${count === 1 ? "run" : "runs"}`,
+        }),
+      strategyFamilyLabel: (family: string) =>
+        t(
+          `command_palette.dossier_values.strategy_families.${family}`,
+          t(
+            "command_palette.dossier_values.strategy_families.unknown",
+            "Strategy",
+          ),
+        ),
+      dateLabel: (value: string) =>
+        formatDossierDate(
+          value,
+          i18n.resolvedLanguage ?? i18n.language ?? "en",
+        ),
+      nudgeLabel: (nudge: string) =>
+        t(
+          `command_palette.dossier_values.nudges.${nudge}`,
+          t("command_palette.dossier_values.nudges.unknown", "Next step saved"),
+        ),
+      metricLabel: (id: string, fallback: string) =>
+        t(`command_palette.metric_labels.${id}`, fallback),
+    }),
+    [i18n.language, i18n.resolvedLanguage, t],
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -318,15 +372,7 @@ export default function ChatCommandPalette({
   const displayItems = useMemo(() => {
     const items = isResultMode
       ? searchResults.map((item) =>
-          commandPaletteItemFromSearch(item, {
-            decisionStateLabel: (state) =>
-              t(
-                `chat.result_card.decision_states.${state}`,
-                commandPaletteDecisionStateFallback(state),
-              ),
-            metricLabel: (id, fallback) =>
-              t(`command_palette.metric_labels.${id}`, fallback),
-          }),
+          commandPaletteItemFromSearch(item, dossierCopy),
         )
       : recentItems.map(commandPaletteItemFromHistory);
     return items
@@ -341,7 +387,7 @@ export default function ChatCommandPalette({
     isResultMode,
     recentItems,
     searchResults,
-    t,
+    dossierCopy,
   ]);
   const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
@@ -365,17 +411,9 @@ export default function ChatCommandPalette({
   const selectedPreviewFields = useMemo(
     () =>
       selectedPreview
-        ? commandPalettePreviewFields(selectedPreview, {
-            decisionStateLabel: (state) =>
-              t(
-                `chat.result_card.decision_states.${state}`,
-                commandPaletteDecisionStateFallback(state),
-              ),
-            metricLabel: (id, fallback) =>
-              t(`command_palette.metric_labels.${id}`, fallback),
-          })
+        ? commandPalettePreviewFields(selectedPreview, dossierCopy)
         : [],
-    [selectedPreview, t],
+    [dossierCopy, selectedPreview],
   );
   const selectedPreviewStatusLabelKey = selectedPreview
     ? commandPaletteStatusLabelKey(selectedPreview)
@@ -758,7 +796,7 @@ export default function ChatCommandPalette({
                     ) : (
                     group.items.map((item) => {
                       const isCurrent =
-                        item.type === "chat" &&
+                        (item.type === "chat" || item.type === "conversation") &&
                         activeConversationId === item.conversationId;
                       const isEditing = editingId === item.conversationId;
                       const statusLabelKey = commandPaletteStatusLabelKey(item);
@@ -984,7 +1022,8 @@ export default function ChatCommandPalette({
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
-                      {selectedPreview.type === "chat" &&
+                      {(selectedPreview.type === "chat" ||
+                        selectedPreview.type === "conversation") &&
                         activeConversationId === selectedPreview.conversationId && (
                           <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
                             {t("common.current", "Current")}

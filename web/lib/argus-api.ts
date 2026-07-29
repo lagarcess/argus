@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
+import type { SearchConversationItem } from "./search-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -284,25 +285,7 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchItem = {
-  type:
-    | "chat"
-    | "strategy"
-    | "collection"
-    | "run"
-    | "backtest"
-    | "evidence"
-    | "decision"
-    | "idea";
-  id: string;
-  title: string;
-  matched_text: string;
-  updated_at: string;
-  conversation_id?: string | null;
-  lifecycle?: ArtifactLifecycle | null;
-  decision_state?: DecisionState | null;
-  preview?: Record<string, unknown> | null;
-};
+export type SearchItem = SearchConversationItem<DecisionState>;
 
 export type SearchLedgerGroup = {
   decision_state: DecisionState;

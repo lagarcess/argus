@@ -48,10 +48,6 @@ def search(
 ) -> PaginatedSearch:
     context = account_context(request)
     query = q.strip().lower()
-    # An empty query is allowed when filtering by decision_state (browse the
-    # ledger, e.g. "show my promising ideas"); otherwise it returns nothing.
-    if not query and decision_state is None and not include_ledger_groups:
-        return PaginatedSearch(items=[], next_cursor=None)
 
     cursor_dt: datetime | None = None
     cursor_id: str | None = None
@@ -109,12 +105,7 @@ def search(
             pair
             for pair in scored_items
             if workspace_conversation_id is not None
-            and pair[1].type
-            in {"chat", "run", "backtest", "idea", "evidence", "decision"}
-            and (
-                (pair[1].type == "chat" and pair[1].id == workspace_conversation_id)
-                or pair[1].conversation_id == workspace_conversation_id
-            )
+            and pair[1].conversation_id == workspace_conversation_id
         ]
 
     scored_items.sort(
@@ -136,17 +127,10 @@ def search(
         else None
     )
     if decision_state is not None:
-        # Idea Ledger: narrow recall to ideas carrying the requested decision_state.
         scored_items = [
             pair
             for pair in scored_items
-            if pair[1].type == "idea" and pair[1].decision_state == decision_state
-        ]
-    elif include_ledger_groups and not query:
-        scored_items = [
-            pair
-            for pair in scored_items
-            if pair[1].type == "idea" and pair[1].decision_state is not None
+            if decision_state in pair[1].decision_states
         ]
     filtered = scored_items
     if cursor and search_read is None:
@@ -213,9 +197,8 @@ def _ledger_groups_from_items(
 ) -> list[SearchLedgerGroup]:
     counts: dict[DecisionState, int] = {state: 0 for state in LEDGER_DECISION_STATE_ORDER}
     for _, item in scored_items:
-        if item.type != "idea" or item.decision_state not in counts:
-            continue
-        counts[item.decision_state] += 1
+        for state in item.decision_states:
+            counts[state] += 1
     return [
         SearchLedgerGroup(decision_state=state, count=counts[state])
         for state in LEDGER_DECISION_STATE_ORDER

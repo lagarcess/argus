@@ -932,6 +932,27 @@
       "total_return_pct": "Rendimiento total",
       "volatility_pct": "Volatilidad"
     },
+    "dossier_values": {
+      "decision_on": "{{state}} · en {{run}}",
+      "run_count_one": "{{count}} ejecución",
+      "run_count_other": "{{count}} ejecuciones",
+      "strategy_families": {
+        "buy_and_hold": "Comprar y mantener",
+        "buy_hold": "Comprar y mantener",
+        "buy_the_dip": "Comprar en caídas",
+        "dca": "Compras periódicas",
+        "dca_accumulation": "Compras periódicas",
+        "moving_average_crossover": "Cruce de medias móviles",
+        "rsi_mean_reversion": "Umbral RSI",
+        "unknown": "Estrategia"
+      },
+      "nudges": {
+        "stale_result": "El resultado podría necesitar actualización",
+        "suggestion_untaken": "Siguiente paso sugerido",
+        "undecided": "Sin decisión",
+        "unknown": "Siguiente paso guardado"
+      }
+    },
     "preview_fields": {
       "assets": "Activos",
       "assumptions": "Supuestos",
@@ -939,10 +960,13 @@
       "breakdown": "Desglose",
       "decision": "Decisión",
       "digest": "Resumen",
+      "left_off": "Dónde lo dejaste",
       "metrics": "Métricas",
+      "outcome": "Cómo salió",
       "preview": "Vista previa",
       "quick_take": "Lectura rápida",
       "note": "Tu nota",
+      "tested": "Lo que probaste",
       "what_happened": "Qué pasó"
     },
     "conversation_count_one": "{{count}} conversación",
@@ -952,6 +976,7 @@
     "type": {
       "backtest": "Backtest",
       "chat": "Conversación",
+      "conversation": "Conversación",
       "collection": "Colección",
       "decision": "Decisión",
       "evidence": "Evidencia",

@@ -1334,7 +1334,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("group.count === 0");
     expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
     expect(palette).toContain("setPreviewItem(null)");
-    expect(adapter).toContain("command_palette.open_source_conversation");
+    expect(adapter).toContain("command_palette.open_conversation");
+    expect(adapter).toContain('type: "chat" | "conversation"');
+    expect(adapter).toContain("item.dossier");
     expect(adapter).toContain('activation: "open_conversation"');
     expect(adapter).toContain("export function commandPaletteStatusLabelKey");
     expect(adapter).toContain("export function commandPaletteStatusFallback");
@@ -2056,4 +2058,3 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).not.toContain("[argus-api] Fetching");
   });
 });
-

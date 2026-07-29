@@ -1,16 +1,21 @@
-import type { HistoryItem, SearchItem, SearchLedgerGroup } from "./argus-api";
+import type {
+  DecisionState,
+  HistoryItem,
+  SearchItem,
+  SearchLedgerGroup,
+} from "./argus-api";
 
 export type CommandPaletteDisplayItem = {
   id: string;
-  type: SearchItem["type"];
+  type: "chat" | "conversation";
   conversationId: string | null;
   title: string;
   snippet: string;
   updatedAt: string;
   source: "recent" | "search";
-  lifecycle?: string | null;
-  decisionState?: string | null;
-  preview?: Record<string, unknown> | null;
+  decisionState: DecisionState | null;
+  decisionStates: DecisionState[];
+  dossier: SearchItem["dossier"] | null;
   canManageConversation: boolean;
   activation: "open_conversation";
 };
@@ -31,6 +36,11 @@ export type CommandPaletteLedgerDisplayGroup = {
 
 export type CommandPaletteItemCopy = {
   decisionStateLabel?: (state: string) => string;
+  decisionAttribution?: (state: string, run: string) => string;
+  runCountLabel?: (count: number) => string;
+  strategyFamilyLabel?: (family: string) => string;
+  dateLabel?: (value: string) => string;
+  nudgeLabel?: (nudge: string) => string;
   metricLabel?: (id: string, fallback: string) => string;
 };
 
@@ -46,9 +56,9 @@ export function commandPaletteItemFromHistory(
     snippet: item.subtitle ?? "",
     updatedAt: item.created_at,
     source: "recent",
-    lifecycle: null,
     decisionState: null,
-    preview: null,
+    decisionStates: [],
+    dossier: null,
     canManageConversation: true,
     activation: "open_conversation",
   };
@@ -57,30 +67,20 @@ export function commandPaletteItemFromHistory(
 export function commandPaletteItemFromSearch(
   item: SearchItem,
   copy: CommandPaletteItemCopy = {},
-): CommandPaletteDisplayItem | null {
-  if (!commandPaletteSupportsSearchType(item.type)) return null;
-  const conversationId =
-    item.type === "chat"
-      ? (item.conversation_id ?? item.id)
-      : (item.conversation_id ?? null);
-  // Decision rows carry their state inside the typed preview; recall is
-  // decision-first, so the state must reach the display item either way.
-  const previewDecisionState =
-    typeof item.preview?.decision_state === "string"
-      ? item.preview.decision_state
-      : null;
+): CommandPaletteDisplayItem {
+  void copy;
   return {
     id: item.id,
-    type: item.type,
-    conversationId,
+    type: "conversation",
+    conversationId: item.conversation_id,
     title: item.title,
-    snippet: commandPaletteSnippet(item, copy),
+    snippet: item.matched_text,
     updatedAt: item.updated_at,
     source: "search",
-    lifecycle: item.lifecycle ?? null,
-    decisionState: item.decision_state ?? previewDecisionState,
-    preview: safeCommandPalettePreview(item.preview),
-    canManageConversation: item.type === "chat" && Boolean(conversationId),
+    decisionState: item.dossier.decision?.state ?? null,
+    decisionStates: item.decision_states,
+    dossier: item.dossier,
+    canManageConversation: true,
     activation: "open_conversation",
   };
 }
@@ -111,91 +111,51 @@ export function commandPaletteGroupsByLedgerState(
     id: `ledger:${group.decision_state}`,
     decisionState: group.decision_state,
     count: group.count,
-    items: items.filter(
-      (item) =>
-        item.type === "idea" && item.decisionState === group.decision_state,
+    items: items.filter((item) =>
+      item.decisionStates.includes(group.decision_state),
     ),
   }));
 }
 
-export function commandPaletteTypeLabelKey(type: SearchItem["type"]) {
+export function commandPaletteTypeLabelKey(type: CommandPaletteDisplayItem["type"]) {
   return `command_palette.type.${type}`;
 }
 
-export function commandPaletteTypeFallback(type: SearchItem["type"]) {
-  switch (type) {
-    case "backtest":
-      return "Backtest";
-    case "collection":
-      return "Collection";
-    case "decision":
-      return "Decision";
-    case "evidence":
-      return "Evidence";
-    case "idea":
-      return "Idea";
-    case "run":
-      return "Run";
-    case "strategy":
-      return "Strategy";
-    case "chat":
-    default:
-      return "Conversation";
-  }
+export function commandPaletteTypeFallback(
+  type: CommandPaletteDisplayItem["type"],
+) {
+  void type;
+  return "Conversation";
 }
 
 export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
-  // Idea Ledger and decision recall: the actual decision (Promising/
-  // Rejected/...) is the status pill, not the generic "Decided" lifecycle.
-  if ((item.type === "idea" || item.type === "decision") && item.decisionState) {
-    return `chat.result_card.decision_states.${item.decisionState}`;
-  }
-  const status = commandPaletteStatusId(item);
-  return status ? `command_palette.status.${status}` : null;
+  return item.decisionState
+    ? `chat.result_card.decision_states.${item.decisionState}`
+    : null;
 }
 
 export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
-  if ((item.type === "idea" || item.type === "decision") && item.decisionState) {
-    return commandPaletteDecisionStateFallback(item.decisionState);
-  }
-  switch (commandPaletteStatusId(item)) {
-    case "archived":
-      return "Archived";
-    case "captured":
-      return "Captured";
-    case "decided":
-      return "Decided";
-    case "discarded":
-      return "Discarded";
-    case "reviewed":
-      return "Reviewed";
-    case "saved":
-      return "Saved";
-    default:
-      return null;
-  }
+  return item.decisionState
+    ? commandPaletteDecisionStateFallback(item.decisionState)
+    : null;
 }
 
-export function commandPaletteOpenLabelKey(item: CommandPaletteDisplayItem) {
-  return item.type === "chat"
-    ? "command_palette.open_conversation"
-    : "command_palette.open_source_conversation";
+export function commandPaletteOpenLabelKey(
+  item: CommandPaletteDisplayItem,
+) {
+  void item;
+  return "command_palette.open_conversation";
 }
 
-export function commandPaletteOpenFallback(item: CommandPaletteDisplayItem) {
-  return item.type === "chat"
-    ? "Open conversation"
-    : "Open source conversation";
+export function commandPaletteOpenFallback(
+  item: CommandPaletteDisplayItem,
+) {
+  void item;
+  return "Open conversation";
 }
 
-export function commandPaletteSupportsSearchType(type: SearchItem["type"]) {
-  return (
-    type === "chat" ||
-    type === "backtest" ||
-    type === "decision" ||
-    type === "evidence" ||
-    type === "idea"
-  );
+export function commandPaletteSupportsSearchType(type: string) {
+  return type === "conversation";
 }
 
 export function commandPaletteDecisionStateFallback(state: string) {
@@ -217,193 +177,132 @@ export function commandPalettePreviewFields(
   item: CommandPaletteDisplayItem,
   copy: CommandPaletteItemCopy = {},
 ): CommandPalettePreviewField[] {
-  const preview = item.preview ?? {};
+  const dossier = item.dossier;
+  if (!dossier) return [];
   const fields: CommandPalettePreviewField[] = [];
-  const addField = (
-    id: string,
-    labelFallback: string,
-    value: string | null,
-  ) => {
+  const add = (id: string, fallback: string, value: string | null) => {
     if (!value) return;
     fields.push({
       id,
       labelKey: `command_palette.preview_fields.${id}`,
-      labelFallback,
+      labelFallback: fallback,
       value,
     });
   };
 
-  const quickTake = safePreviewString(preview.quick_take);
-  const digest = safePreviewString(preview.digest);
-  const symbols = safePreviewStringList(preview.symbols);
-  const assumptions = safePreviewStringList(preview.assumptions);
-
-  if (item.type === "decision") {
-    // Decision recall is decision-first (issue #253): state, the user's
-    // exact note, what happened, then the bounded setup facts.
-    const state = safePreviewString(preview.decision_state);
-    const label = state
-      ? (copy.decisionStateLabel?.(state) ??
-        commandPaletteDecisionStateFallback(state))
-      : null;
-    addField("decision", "Decision", label);
-    addField("note", "Your note", safePreviewString(preview.note));
-    addField("what_happened", "What happened", quickTake ?? digest);
-    addField("assets", "Assets", symbols.join(", ") || null);
-    addField(
-      "benchmark",
-      "Benchmark",
-      safePreviewString(preview.benchmark_symbol),
+  if (dossier.decision) {
+    const state =
+      copy.decisionStateLabel?.(dossier.decision.state) ??
+      commandPaletteDecisionStateFallback(dossier.decision.state);
+    add(
+      "decision",
+      "Decision",
+      dossier.decision.run_label
+        ? copy.decisionAttribution?.(state, dossier.decision.run_label) ??
+          `${state} · on ${dossier.decision.run_label}`
+        : state,
     );
-    addField(
-      "metrics",
-      "Metrics",
-      metricsSummaryText(preview.metrics_summary, copy),
-    );
-    addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
-    if (fields.length === 0) {
-      addField("preview", "Preview", item.snippet || null);
-    }
-    return fields;
+    // Do not trim or normalize: this is the user's exact stored note.
+    add("note", "Your note", dossier.decision.note);
   }
 
-  addField("quick_take", "Quick take", quickTake);
-  if (digest && digest !== quickTake) {
-    addField("digest", "Digest", digest);
+  const tested = dossier.tested;
+  const testedParts = [
+    tested.symbols.join(", ") || null,
+    tested.strategy_families
+      .map(
+        (family) =>
+          copy.strategyFamilyLabel?.(family) ?? strategyFamilyFallback(family),
+      )
+      .join(", ") || null,
+    copy.runCountLabel?.(tested.run_count) ??
+      `${tested.run_count} ${tested.run_count === 1 ? "run" : "runs"}`,
+    tested.start_date && tested.end_date
+      ? `${copy.dateLabel?.(tested.start_date) ?? tested.start_date}–${
+          copy.dateLabel?.(tested.end_date) ?? tested.end_date
+        }`
+      : tested.start_date || tested.end_date
+        ? copy.dateLabel?.(tested.start_date ?? tested.end_date ?? "") ??
+          tested.start_date ??
+          tested.end_date
+        : null,
+  ].filter((value): value is string => Boolean(value));
+  add("tested", "What you tested", testedParts.join(" · "));
+
+  if (dossier.outcome) {
+    const outcomeParts = [
+      dossier.outcome.quick_take,
+      metricsText(dossier.outcome.metrics, copy),
+    ].filter((value): value is string => Boolean(value));
+    add("outcome", "How it went", outcomeParts.join(" · "));
   }
 
-  addField("assets", "Assets", symbols.join(", ") || null);
-  addField("benchmark", "Benchmark", safePreviewString(preview.benchmark_symbol));
-
-  addField("metrics", "Metrics", metricsSummaryText(preview.metrics_summary, copy));
-
-  addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
-
-  addField("breakdown", "Breakdown", breakdownPreviewText(preview.breakdown));
-
-  if (fields.length === 0) {
-    addField("preview", "Preview", item.snippet || null);
+  if (dossier.left_off) {
+    add(
+      "left_off",
+      "Where you left off",
+      [
+        dossier.left_off.run_label,
+        copy.dateLabel?.(dossier.left_off.completed_at) ??
+          dossier.left_off.completed_at.slice(0, 10),
+        dossier.left_off.nudge
+          ? copy.nudgeLabel?.(dossier.left_off.nudge) ??
+            nudgeFallback(dossier.left_off.nudge)
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
   }
   return fields;
 }
 
-function commandPaletteStatusId(item: CommandPaletteDisplayItem) {
-  const lifecycle = safePreviewString(item.lifecycle);
-  switch (lifecycle) {
-    case "archived":
-    case "captured":
-    case "decided":
-    case "discarded":
-    case "reviewed":
-    case "saved":
-      return lifecycle;
-    default:
-      return null;
-  }
+function strategyFamilyFallback(family: string) {
+  const labels: Record<string, string> = {
+    buy_and_hold: "Buy and hold",
+    buy_hold: "Buy and hold",
+    buy_the_dip: "Buy the dip",
+    dca: "Recurring buys",
+    dca_accumulation: "Recurring buys",
+    moving_average_crossover: "Moving-average crossover",
+    rsi_mean_reversion: "RSI threshold",
+  };
+  return labels[family] ?? "Strategy";
 }
 
-function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
-  const digest = item.preview?.digest;
-  const quickTake = item.preview?.quick_take;
-  if (item.type === "decision") {
-    const state =
-      typeof item.preview?.decision_state === "string"
-        ? item.preview.decision_state
-        : null;
-    const stateLabel = state
-      ? (copy.decisionStateLabel?.(state) ??
-        commandPaletteDecisionStateFallback(state))
-      : null;
-    // The exact note owns the row's identity; the digest is only the
-    // fallback when no note was stored.
-    const note =
-      typeof item.preview?.note === "string" ? item.preview.note.trim() : "";
-    const digestText = typeof digest === "string" ? digest.trim() : "";
-    return [stateLabel, note || digestText].filter(Boolean).join(" · ");
-  }
-  if (typeof quickTake === "string" && quickTake.trim()) {
-    return quickTake;
-  }
-  if (typeof digest === "string" && digest.trim()) {
-    return digest;
-  }
-  return item.matched_text ?? "";
+function nudgeFallback(nudge: string) {
+  const labels: Record<string, string> = {
+    stale_result: "Result may need a refresh",
+    suggestion_untaken: "Suggested next step",
+    undecided: "No decision yet",
+  };
+  return labels[nudge] ?? "Next step saved";
 }
 
-function safeCommandPalettePreview(
-  preview: Record<string, unknown> | null | undefined,
+function metricsText(
+  metrics: Array<{ name: string; value: string | number }>,
+  copy: CommandPaletteItemCopy,
 ) {
-  if (!preview) return null;
-  const safe: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(preview)) {
-    if (key.endsWith("_id")) continue;
-    if (key === "context_packets" || key === "actions") continue;
-    safe[key] = value;
-  }
-  return safe;
-}
-
-function safePreviewString(value: unknown) {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed || null;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  return null;
-}
-
-function safePreviewStringList(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
-    const text = safePreviewString(item);
-    return text ? [text] : [];
-  });
-}
-
-function metricsSummaryText(value: unknown, copy: CommandPaletteItemCopy) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const summary = value as Record<string, unknown>;
-  const fields: Array<[string, string]> = [
-    ["total_return_pct", "Total return"],
-    ["benchmark_return_pct", "Benchmark return"],
-    ["delta_vs_benchmark_pct", "Against benchmark"],
-    ["excess_return_pct", "Against benchmark"],
-    ["max_drawdown_pct", "Worst drop"],
-    ["volatility_pct", "Volatility"],
-    ["sharpe_ratio", "Sharpe"],
-  ];
-  const parts = fields.flatMap(([key, label]) => {
-    const raw = summary[key];
-    const formatted = formatMetricValue(key, raw);
-    const displayLabel = copy.metricLabel?.(key, label) ?? label;
-    return formatted ? [`${displayLabel} ${formatted}`] : [];
-  });
-  return parts.join(" · ") || null;
-}
-
-function formatMetricValue(key: string, value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    if (key.endsWith("_pct")) return `${value.toFixed(1)}%`;
-    return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  }
-  const text = safePreviewString(value);
-  if (!text) return null;
-  if (key.endsWith("_pct") && !text.includes("%")) return `${text}%`;
-  return text;
-}
-
-function breakdownPreviewText(value: unknown) {
-  const direct = safePreviewString(value);
-  if (direct) return direct;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const breakdown = value as Record<string, unknown>;
-  const parts = [
-    safePreviewString(breakdown.summary),
-    safePreviewString(breakdown.what_this_means),
-    safePreviewString(breakdown.what_it_means),
-    safePreviewStringList(breakdown.sections).join(" · ") || null,
-  ].filter((part): part is string => Boolean(part));
-  return parts.join(" · ") || null;
+  if (!Array.isArray(metrics)) return null;
+  const labels: Record<string, string> = {
+    benchmark_return_pct: "Benchmark return",
+    delta_vs_benchmark_pct: "Against benchmark",
+    excess_return_pct: "Against benchmark",
+    max_drawdown_pct: "Worst drop",
+    sharpe_ratio: "Sharpe",
+    total_return_pct: "Total return",
+    volatility_pct: "Volatility",
+  };
+  return metrics
+    .map(({ name, value }) => {
+      const label = copy.metricLabel?.(name, labels[name] ?? name) ??
+        labels[name] ??
+        name;
+      const rendered =
+        typeof value === "number" && name.endsWith("_pct")
+          ? `${value.toFixed(1)}%`
+          : String(value);
+      return `${label} ${rendered}`;
+    })
+    .join(" · ");
 }

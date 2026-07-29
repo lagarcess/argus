@@ -2388,11 +2388,10 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["items"]) == 2
-    assert payload["next_cursor"] is not None
-    assert {item["type"] for item in payload["items"]}.issubset(
-        {"chat", "strategy", "collection", "run"}
-    )
+    assert [(item["type"], item["id"]) for item in payload["items"]] == [
+        ("conversation", "chat-1")
+    ]
+    assert payload["next_cursor"] is None
 
 
 def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
@@ -2574,39 +2573,16 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert {item["type"] for item in items} == {
-        "backtest",
-        "idea",
-        "evidence",
-        "decision",
+    assert len(items) == 1
+    item = items[0]
+    assert item["type"] == "conversation"
+    assert item["id"] == item["conversation_id"] == "conversation-1"
+    assert item["dossier"]["decision"] == {
+        "state": "promising",
+        "note": "Worth revisiting.",
+        "run_label": None,
     }
-    evidence = next(item for item in items if item["type"] == "evidence")
-    assert evidence["preview"] == {
-        "digest": "AAPL MSFT beat SPY in the test window.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
-    }
-    assert "context_packets" not in evidence["preview"]
-    assert not any(key.endswith("_id") for key in evidence["preview"])
-    idea = next(item for item in items if item["type"] == "idea")
-    assert idea["preview"]["digest"] == "Test AAPL and MSFT against SPY."
-    assert not any(key.endswith("_id") for key in idea["preview"])
-    decision = next(item for item in items if item["type"] == "decision")
-    assert decision["preview"]["decision_state"] == "promising"
-    assert not any(key.endswith("_id") for key in decision["preview"])
-    assert decision["matched_text"] == (
-        "Worth revisiting. · AAPL MSFT beat SPY in the test window."
-    )
-    assert "promising" not in decision["matched_text"]
-    # Decision recall (issue #253): verbatim note, artifact-only digest, and
-    # the linked evidence facts projected from the hydrated payload.
-    assert decision["preview"]["note"] == "Worth revisiting."
-    assert decision["preview"]["digest"] == (
-        "AAPL MSFT beat SPY in the test window."
-    )
-    assert decision["preview"]["quick_take"] == "AAPL and MSFT beat SPY."
-    assert decision["preview"]["symbols"] == ["AAPL", "MSFT"]
-    assert decision["preview"]["benchmark_symbol"] == "SPY"
+    assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
 
 
 def test_search_supabase_decision_without_payload_keeps_honest_fallback(
@@ -2640,17 +2616,14 @@ def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     )
 
     assert response.status_code == 200
-    decision = next(
-        item for item in response.json()["items"] if item["type"] == "decision"
-    )
-    preview = decision["preview"]
-    assert preview["note"] == "Too volatile for me."
-    assert preview["decision_state"] == "rejected"
-    assert preview["digest"] == "NVDA lost to SPY in the window."
-    # No payload means no invented facts: nothing beyond the stored truth.
-    assert "quick_take" not in preview
-    assert "metrics_summary" not in preview
-    assert "symbols" not in preview
+    item = response.json()["items"][0]
+    assert item["type"] == "conversation"
+    assert item["dossier"]["decision"] == {
+        "state": "rejected",
+        "note": "Too volatile for me.",
+        "run_label": None,
+    }
+    assert item["dossier"]["outcome"] is None
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(
@@ -2734,10 +2707,9 @@ def test_search_supabase_orders_p1_artifacts_before_source_conversation(
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    chat_index = ordered_types.index("chat")
-    for artifact_type in ("backtest", "evidence", "idea", "decision"):
-        assert ordered_types.index(artifact_type) < chat_index
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
@@ -2783,8 +2755,9 @@ def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts(
@@ -2832,8 +2805,9 @@ def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifact(
@@ -2882,8 +2856,9 @@ def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifac
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("strategy") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):

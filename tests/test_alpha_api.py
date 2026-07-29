@@ -218,6 +218,31 @@ def _client() -> TestClient:
     return client
 
 
+def _store_search_conversation(
+    *,
+    user_id: str,
+    conversation_id: str,
+    title: str,
+    updated_at: Any,
+    archived: bool = False,
+    deleted_at: Any = None,
+) -> None:
+    conversation = Conversation(
+        id=conversation_id,
+        title=title,
+        title_source="user_renamed",
+        pinned=False,
+        archived=archived,
+        deleted_at=deleted_at,
+        created_at=updated_at,
+        updated_at=updated_at,
+        last_message_preview=None,
+        language="en",
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+
+
 def test_me_returns_contract_user_profile() -> None:
     client = _client()
 
@@ -1161,41 +1186,21 @@ def test_messages_cursor_pagination_is_stable() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
-def test_search_supports_cursor_and_mixed_types() -> None:
+def test_search_supports_cursor_after_grouping_by_conversation() -> None:
     client = _client()
-    conversation = client.post(
-        "/api/v1/conversations", json={"title": "Tesla alpha chat"}
-    ).json()["conversation"]
-    client.post(
-        "/api/v1/strategies",
-        json={
-            "name": "Tesla strategy",
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-            "parameters": {},
-        },
-    )
-    client.post("/api/v1/collections", json={"name": "Tesla collection"})
-    run = client.post(
-        "/api/v1/backtests/run",
-        headers={"Idempotency-Key": "search-mixed-types-run"},
-        json={
-            "conversation_id": conversation["id"],
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-        },
-    )
-    assert run.status_code == 200
+    conversation_ids = [
+        client.post(
+            "/api/v1/conversations", json={"title": f"Tesla alpha chat {index}"}
+        ).json()["conversation"]["id"]
+        for index in range(3)
+    ]
 
     first_page = client.get("/api/v1/search?q=tesla&limit=2")
     assert first_page.status_code == 200
     payload = first_page.json()
     assert payload["items"]
     assert payload["next_cursor"] is not None
-    result_types = {item["type"] for item in payload["items"]}
-    assert result_types.issubset({"chat", "strategy", "collection", "run"})
+    assert {item["type"] for item in payload["items"]} == {"conversation"}
 
     second_page = client.get(
         f"/api/v1/search?q=tesla&limit=2&cursor={payload['next_cursor']}"
@@ -1205,6 +1210,9 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     first_ids = {(item["type"], item["id"]) for item in payload["items"]}
     second_ids = {(item["type"], item["id"]) for item in second_payload["items"]}
     assert first_ids.isdisjoint(second_ids)
+    assert {item["id"] for item in payload["items"] + second_payload["items"]} == set(
+        conversation_ids
+    )
 
 
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
@@ -1218,9 +1226,8 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     response = client.get("/api/v1/search", params={"q": "tesla chat"})
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [item["id"] for item in items if item["type"] == "chat"] == [
-        conversation["id"]
-    ]
+    assert [item["id"] for item in items] == [conversation["id"]]
+    assert {item["type"] for item in items} == {"conversation"}
 
 
 def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
@@ -1255,7 +1262,7 @@ def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
                 "query_present": True,
                 "decision_state_filter_present": False,
                 "result_count": 1,
-                "returned_types": ["chat"],
+                    "returned_types": ["conversation"],
                 "has_more": False,
                 "source": "memory",
             },
@@ -1263,7 +1270,7 @@ def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
     ]
 
 
-def test_search_orders_p1_artifacts_before_source_conversation() -> None:
+def test_search_collapses_p1_artifacts_into_source_conversation() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
     now = utcnow()
@@ -1362,10 +1369,11 @@ def test_search_orders_p1_artifacts_before_source_conversation() -> None:
     response = client.get("/api/v1/search?q=evidence&limit=10")
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    chat_index = ordered_types.index("chat")
-    for artifact_type in ("backtest", "evidence", "idea", "decision"):
-        assert ordered_types.index(artifact_type) < chat_index
+    items = response.json()["items"]
+    assert [(item["type"], item["id"]) for item in items] == [
+        ("conversation", conversation.id)
+    ]
+    assert items[0]["dossier"]["decision"]["state"] == "promising"
 
 
 def test_search_idea_result_carries_latest_decision_state() -> None:
@@ -1406,6 +1414,20 @@ def test_search_idea_result_carries_latest_decision_state() -> None:
     )
     api_state.store.ideas[idea.id] = idea
     api_state.store.idea_owners[idea.id] = user_id
+    conversation = Conversation(
+        id="conversation-ledger-status",
+        title="NVDA momentum ledger",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+        last_message_preview=None,
+        language="en",
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
     for decision in (older_decision, latest_decision):
         api_state.store.decision_notes[decision.id] = decision
         api_state.store.decision_note_owners[decision.id] = user_id
@@ -1413,9 +1435,10 @@ def test_search_idea_result_carries_latest_decision_state() -> None:
     response = client.get("/api/v1/search?q=ledger&limit=10")
 
     assert response.status_code == 200
-    idea_items = [item for item in response.json()["items"] if item["type"] == "idea"]
-    assert idea_items, "expected the saved idea in search results"
-    assert idea_items[0]["decision_state"] == "promising"
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["type"] == "conversation"
+    assert items[0]["decision_states"] == ["promising", "watching"]
 
 
 def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
@@ -1467,6 +1490,12 @@ def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
     for idea in (promising_idea, rejected_idea):
         api_state.store.ideas[idea.id] = idea
         api_state.store.idea_owners[idea.id] = user_id
+        _store_search_conversation(
+            user_id=user_id,
+            conversation_id=idea.source_conversation_id or "",
+            title=idea.title,
+            updated_at=now,
+        )
     for decision in (promising_decision, rejected_decision):
         api_state.store.decision_notes[decision.id] = decision
         api_state.store.decision_note_owners[decision.id] = user_id
@@ -1475,12 +1504,11 @@ def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert items, "expected the promising idea"
-    assert all(item["type"] == "idea" for item in items)
-    assert all(item["decision_state"] == "promising" for item in items)
-    returned_ids = {item["id"] for item in items}
-    assert promising_idea.id in returned_ids
-    assert rejected_idea.id not in returned_ids
+    assert [item["id"] for item in items] == [
+        promising_idea.source_conversation_id
+    ]
+    assert items[0]["type"] == "conversation"
+    assert items[0]["decision_states"] == ["promising"]
 
 
 def test_search_ledger_groups_are_backend_ordered_and_counted() -> None:
@@ -1557,6 +1585,12 @@ def test_search_ledger_groups_are_backend_ordered_and_counted() -> None:
     for idea in ideas:
         api_state.store.ideas[idea.id] = idea
         api_state.store.idea_owners[idea.id] = user_id
+        _store_search_conversation(
+            user_id=user_id,
+            conversation_id=idea.source_conversation_id or "",
+            title=idea.title,
+            updated_at=idea.updated_at,
+        )
     for decision in decisions:
         api_state.store.decision_notes[decision.id] = decision
         api_state.store.decision_note_owners[decision.id] = user_id
@@ -1571,8 +1605,10 @@ def test_search_ledger_groups_are_backend_ordered_and_counted() -> None:
         {"decision_state": "rejected", "count": 0},
         {"decision_state": "revisit_later", "count": 0},
     ]
-    assert {item["id"] for item in payload["items"]} == {idea.id for idea in ideas}
-    assert all(item["type"] == "idea" for item in payload["items"])
+    assert {item["id"] for item in payload["items"]} == {
+        idea.source_conversation_id for idea in ideas
+    }
+    assert all(item["type"] == "conversation" for item in payload["items"])
 
 
 def test_search_decision_state_filter_keeps_unfiltered_ledger_groups() -> None:
@@ -1624,6 +1660,12 @@ def test_search_decision_state_filter_keeps_unfiltered_ledger_groups() -> None:
     for idea in (promising_idea, watching_idea):
         api_state.store.ideas[idea.id] = idea
         api_state.store.idea_owners[idea.id] = user_id
+        _store_search_conversation(
+            user_id=user_id,
+            conversation_id=idea.source_conversation_id or "",
+            title=idea.title,
+            updated_at=idea.updated_at,
+        )
     for decision in (promising_decision, watching_decision):
         api_state.store.decision_notes[decision.id] = decision
         api_state.store.decision_note_owners[decision.id] = user_id
@@ -1634,7 +1676,9 @@ def test_search_decision_state_filter_keeps_unfiltered_ledger_groups() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert [item["id"] for item in payload["items"]] == [promising_idea.id]
+    assert [item["id"] for item in payload["items"]] == [
+        promising_idea.source_conversation_id
+    ]
     assert payload["ledger_groups"] == [
         {"decision_state": "promising", "count": 1},
         {"decision_state": "watching", "count": 1},
@@ -1681,8 +1725,9 @@ def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:
     response = client.get("/api/v1/search?q=aapl&limit=10")
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", conversation.id)
+    ]
 
 
 def test_search_preserves_exact_chat_above_lower_relevance_p1_artifacts() -> None:
@@ -1723,8 +1768,66 @@ def test_search_preserves_exact_chat_above_lower_relevance_p1_artifacts() -> Non
     response = client.get("/api/v1/search?q=aapl&limit=10")
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", conversation.id)
+    ]
+
+
+def test_search_orders_matching_object_layer_before_recency() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    artifact_conversation = Conversation(
+        id="conversation-object-layer-search-order",
+        title="Older research conversation",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(days=2),
+        updated_at=now - timedelta(days=2),
+        last_message_preview="Research notes",
+        language="en",
+    )
+    recent_conversation = Conversation(
+        id="conversation-recent-search-order",
+        title="Gold allocation conversation",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+        last_message_preview="Recent allocation notes",
+        language="en",
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-object-layer-search-order",
+        idea_id="idea-object-layer-search-order",
+        idea_version_id="version-object-layer-search-order",
+        source_conversation_id=artifact_conversation.id,
+        source_run_id="run-object-layer-search-order",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="Gold evidence review",
+        digest="Gold evidence from the completed test.",
+        payload={},
+        created_at=now - timedelta(days=1),
+        updated_at=now - timedelta(days=1),
+    )
+    for conversation in (artifact_conversation, recent_conversation):
+        api_state.store.conversations[conversation.id] = conversation
+        api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+    response = client.get("/api/v1/search?q=gold&limit=10")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [
+        artifact_conversation.id,
+        recent_conversation.id,
+    ]
 
 
 def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
@@ -1784,6 +1887,40 @@ def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
     assert response.json()["items"] == []
 
 
+def test_search_empty_query_includes_archived_recents_and_excludes_deleted() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="conversation-archived-recent",
+        title="Archived gold idea",
+        updated_at=now,
+        archived=True,
+    )
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="conversation-active-older",
+        title="Active gold idea",
+        updated_at=now - timedelta(minutes=1),
+    )
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="conversation-deleted-newest",
+        title="Deleted gold idea",
+        updated_at=now + timedelta(minutes=1),
+        deleted_at=now,
+    )
+
+    response = client.get("/api/v1/search?q=&limit=20")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [
+        "conversation-archived-recent",
+        "conversation-active-older",
+    ]
+
+
 def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
@@ -1839,10 +1976,12 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
     )
     recalled = client.get("/api/v1/search?q=Worth%20revisiting&limit=20")
     assert recalled.status_code == 200
-    recalled_decision = next(
-        item for item in recalled.json()["items"] if item["type"] == "decision"
-    )
-    assert recalled_decision["matched_text"].startswith("Worth revisiting.")
+    assert len(recalled.json()["items"]) == 1
+    recalled_conversation = recalled.json()["items"][0]
+    assert recalled_conversation["type"] == "conversation"
+    assert recalled_conversation["id"] == conversation["id"]
+    assert recalled_conversation["matched_text"].startswith("Worth revisiting.")
+    assert recalled_conversation["dossier"]["decision"]["note"] == "Worth revisiting."
 
 
 def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:
@@ -1904,7 +2043,7 @@ def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
     assert "decision_state" in str(body["context"]["errors"])
 
 
-def test_search_returns_typed_p1_artifacts() -> None:
+def test_search_projects_one_typed_conversation_dossier() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
@@ -1922,42 +2061,190 @@ def test_search_returns_typed_p1_artifacts() -> None:
     ]
     client.post(
         f"/api/v1/evidence-artifacts/{artifact_id}/decision",
-        json={"decision_state": "watching", "note": "Track it."},
+        json={
+            "decision_state": "watching",
+            "note": "Track it.\nReview risk before the next run.",
+        },
     )
 
     payload = client.get("/api/v1/search?q=TSLA&limit=20").json()
 
-    types = {item["type"] for item in payload["items"]}
-    assert {"chat", "backtest", "evidence", "idea", "decision"}.issubset(types)
-    evidence = next(item for item in payload["items"] if item["type"] == "evidence")
-    assert evidence["conversation_id"] == conversation["id"]
-    assert evidence["preview"]["digest"]
-    assert evidence["preview"]["quick_take"] == "I tested that idea with TSLA."
-    assert evidence["preview"]["assumptions"] == ["Starting capital: $10,000."]
-    assert evidence["preview"]["metrics_summary"] == {"total_return_pct": 12.5}
-    assert evidence["preview"]["symbols"] == ["TSLA"]
-    assert evidence["preview"]["benchmark_symbol"] == "SPY"
-    assert "context_packets" not in evidence["preview"]
-    assert not any(key.endswith("_id") for key in evidence["preview"])
-    idea = next(item for item in payload["items"] if item["type"] == "idea")
-    assert idea["conversation_id"] == conversation["id"]
-    assert idea["preview"]["digest"]
-    assert not any(key.endswith("_id") for key in idea["preview"])
-    decision = next(item for item in payload["items"] if item["type"] == "decision")
-    assert decision["preview"]["decision_state"] == "watching"
-    assert not any(key.endswith("_id") for key in decision["preview"])
-    assert decision["matched_text"].startswith("Track it.")
-    assert "I tested that idea with TSLA." in decision["matched_text"]
-    assert "backtest versus" not in decision["matched_text"]
-    assert "watching" not in decision["matched_text"]
-    # Decision recall (issue #253): the exact note is its own verbatim field
-    # and the digest is the artifact's alone — never the note·digest concat.
-    assert decision["preview"]["note"] == "Track it."
-    assert not decision["preview"]["digest"].startswith("Track it.")
-    assert decision["preview"]["quick_take"] == "I tested that idea with TSLA."
-    assert decision["preview"]["symbols"] == ["TSLA"]
-    assert decision["preview"]["benchmark_symbol"] == "SPY"
-    assert decision["preview"]["metrics_summary"] == {"total_return_pct": 12.5}
+    assert len(payload["items"]) == 1
+    item = payload["items"][0]
+    assert item["type"] == "conversation"
+    assert item["id"] == conversation["id"]
+    assert item["conversation_id"] == conversation["id"]
+    assert "preview" not in item
+
+    dossier = item["dossier"]
+    assert list(dossier) == ["decision", "tested", "outcome", "left_off"]
+    assert dossier["decision"] == {
+        "state": "watching",
+        "note": "Track it.\nReview risk before the next run.",
+        "run_label": None,
+    }
+    assert dossier["tested"]["symbols"] == ["TSLA"]
+    assert dossier["tested"]["strategy_families"] == ["rsi_mean_reversion"]
+    assert dossier["tested"]["run_count"] == 1
+    assert dossier["outcome"]["run_label"]
+    assert dossier["outcome"]["benchmark_symbol"] == "SPY"
+    assert dossier["outcome"]["quick_take"] == "I tested that idea with TSLA."
+    assert dossier["outcome"]["metrics"] == [
+        {"name": "total_return_pct", "value": 12.5}
+    ]
+    assert dossier["left_off"]["run_label"] == dossier["outcome"]["run_label"]
+    assert dossier["left_off"]["completed_at"]
+    assert dossier["left_off"]["nudge"] is None
+
+
+def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    now = utcnow()
+    conversation_id = "bounded-metric-priority"
+    run_id = "bounded-metric-priority-run"
+    projected = project_conversation_recall(
+        conversation={
+            "id": conversation_id,
+            "title": "Bounded metric priority",
+            "updated_at": now,
+        },
+        runs=[
+            {
+                "id": run_id,
+                "conversation_id": conversation_id,
+                "status": "completed",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "conversation_result_card": {"title": "GLD outcome"},
+                "created_at": now,
+            }
+        ],
+        ideas=[],
+        evidence=[
+            {
+                "id": "bounded-metric-priority-evidence",
+                "source_conversation_id": conversation_id,
+                "source_run_id": run_id,
+                "payload": {
+                    "metrics": {
+                        "aggregate": {
+                            "performance": {
+                                "total_return_pct": 12.5,
+                                "benchmark_return_pct": 8.0,
+                                "delta_vs_benchmark_pct": 4.5,
+                                "max_drawdown_pct": -6.0,
+                                "sharpe_ratio": 1.2,
+                            }
+                        }
+                    }
+                },
+                "created_at": now,
+            }
+        ],
+        decisions=[],
+        query="",
+    )
+
+    assert projected is not None
+    outcome = projected[1].dossier.outcome
+    assert outcome is not None
+    assert [metric.name for metric in outcome.metrics] == [
+        "total_return_pct",
+        "benchmark_return_pct",
+        "delta_vs_benchmark_pct",
+        "max_drawdown_pct",
+    ]
+
+
+def test_search_dossier_marks_a_decided_old_result_stale() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    now = utcnow()
+    completed_at = now - timedelta(days=120)
+    conversation_id = "stale-decided-result"
+    run_id = "stale-decided-result-run"
+    artifact_id = "stale-decided-result-evidence"
+    projected = project_conversation_recall(
+        conversation={
+            "id": conversation_id,
+            "title": "Stale decided result",
+            "updated_at": now,
+        },
+        runs=[
+            {
+                "id": run_id,
+                "conversation_id": conversation_id,
+                "status": "completed",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "conversation_result_card": {"title": "Old GLD outcome"},
+                "created_at": completed_at,
+            }
+        ],
+        ideas=[],
+        evidence=[
+            {
+                "id": artifact_id,
+                "source_conversation_id": conversation_id,
+                "source_run_id": run_id,
+                "created_at": completed_at,
+            }
+        ],
+        decisions=[
+            {
+                "id": "stale-decided-result-decision",
+                "source_conversation_id": conversation_id,
+                "evidence_artifact_id": artifact_id,
+                "decision_state": "watching",
+                "created_at": completed_at,
+            }
+        ],
+        query="",
+    )
+
+    assert projected is not None
+    left_off = projected[1].dossier.left_off
+    assert left_off is not None
+    assert left_off.nudge == "stale_result"
+
+
+def test_search_decision_names_judged_run_when_latest_run_is_different() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    first_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "dossier-first-run"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest AAPL from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    first = _final_payload(first_response.text)["run"]
+    artifact_id = first["conversation_result_card"]["evidence_artifact_id"]
+    client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "watching", "note": "Anchor this older run."},
+    )
+    second_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "dossier-second-run"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    second = _final_payload(second_response.text)["run"]
+
+    response = client.get("/api/v1/search?q=anchor&limit=20")
+
+    assert response.status_code == 200
+    dossier = response.json()["items"][0]["dossier"]
+    assert dossier["decision"]["run_label"] == first["conversation_result_card"]["title"]
+    assert dossier["outcome"]["run_label"] == second["conversation_result_card"]["title"]
+    assert dossier["left_off"]["nudge"] == "undecided"
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

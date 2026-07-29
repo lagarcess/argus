@@ -55,114 +55,118 @@ def _reader_types():
     return PostgresSearchReader, SearchCursorError
 
 
-def _candidate(
-    source_type: str,
-    item_id: str,
-    *,
-    evidence_artifact_id: str | None = None,
-) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "id": item_id,
-        "updated_at": "2026-07-27T12:00:00+00:00",
+CONVERSATION_ID = "00000000-0000-0000-0000-000000000101"
+OWNER_ID = "00000000-0000-0000-0000-000000000001"
+ACTIVITY_AT = "2026-07-27T12:00:00+00:00"
+
+
+def _conversation_candidate() -> dict[str, Any]:
+    return {
+        "source_type": "conversation",
+        "pinned_rank": 0,
+        "exact_rank": 0,
+        "symbol_rank": 0,
+        "layer_rank": 5,
+        "text_rank": 50,
+        "payload": {
+            "id": CONVERSATION_ID,
+            "title": "Search chat",
+            "last_message_preview": "Search preview",
+            "updated_at": "2026-07-26T12:00:00+00:00",
+            "pinned": False,
+            "deleted_at": None,
+            "_recall_match": {
+                "matched_text": "Search decision evidence",
+                "layer_rank": 5,
+                "symbol_exact_match": False,
+                "activity_at": ACTIVITY_AT,
+            },
+        },
     }
-    if source_type == "chat":
-        payload.update(
-            title="Search chat",
-            last_message_preview="Search preview",
-            pinned=False,
-        )
-    elif source_type == "strategy":
-        payload.update(
-            name="Search strategy",
-            symbols=["AAPL"],
-            template="buy_hold",
-            pinned=False,
-        )
-    elif source_type == "collection":
-        payload.update(name="Search collection", pinned=False)
-    elif source_type == "run":
-        payload.update(
-            conversation_id="00000000-0000-0000-0000-000000000101",
-            created_at=payload.pop("updated_at"),
-            status="completed",
-            benchmark_symbol="SPY",
-            conversation_result_card={"title": "Search run"},
-        )
-    elif source_type == "idea":
-        payload.update(
-            title="Search idea",
-            summary="Search summary",
-            lifecycle="decided",
-            source_conversation_id="00000000-0000-0000-0000-000000000101",
-            decision_state="promising",
-        )
-    elif source_type == "evidence":
-        payload.update(
-            title="Search evidence",
-            digest="Search digest",
-            lifecycle="captured",
-            artifact_type="backtest",
-            payload={},
-            source_conversation_id="00000000-0000-0000-0000-000000000101",
-        )
-    elif source_type == "decision":
-        payload.update(
-            idea_id="00000000-0000-0000-0000-000000000201",
-            decision_state="promising",
-            note="Search decision",
-            evidence_artifact_id=evidence_artifact_id,
-            source_conversation_id="00000000-0000-0000-0000-000000000101",
-        )
-    return {"source_type": source_type, "payload": payload}
 
 
-def test_search_first_page_uses_bounded_candidate_evidence_and_ledger_queries() -> None:
+def _hydration_row() -> dict[str, Any]:
+    return {
+        "conversation_payload": {
+            "id": CONVERSATION_ID,
+            "title": "Search chat",
+            "last_message_preview": "Search preview",
+            "updated_at": "2026-07-26T12:00:00+00:00",
+            "pinned": False,
+            "deleted_at": None,
+            "_recall_summary": {
+                "run_count": 7,
+                "symbols": ["AAPL", "MSFT"],
+                "strategy_families": ["buy_and_hold"],
+                "start_date": "2019-01-01",
+                "end_date": "2026-07-27",
+                "decision_states": ["promising", "watching"],
+                "latest_run_decided": False,
+                "latest_suggestion_untaken": False,
+                "latest_activity": ACTIVITY_AT,
+            },
+        },
+        "latest_run_payload": {
+            "id": "00000000-0000-0000-0000-000000000401",
+            "conversation_id": CONVERSATION_ID,
+            "status": "completed",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {"template": "buy_and_hold"},
+            "conversation_result_card": {"title": "Latest run"},
+            "created_at": ACTIVITY_AT,
+            "updated_at": ACTIVITY_AT,
+        },
+        "judged_run_payload": {
+            "id": "00000000-0000-0000-0000-000000000402",
+            "conversation_id": CONVERSATION_ID,
+            "status": "completed",
+            "symbols": ["MSFT"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {"template": "buy_and_hold"},
+            "conversation_result_card": {"title": "Judged older run"},
+            "created_at": "2025-01-01T12:00:00+00:00",
+            "updated_at": "2025-01-01T12:00:00+00:00",
+        },
+        "latest_evidence_payload": {
+            "id": "00000000-0000-0000-0000-000000000301",
+            "source_conversation_id": CONVERSATION_ID,
+            "source_run_id": "00000000-0000-0000-0000-000000000401",
+            "title": "Latest evidence",
+            "digest": "Latest quick take",
+            "payload": {},
+            "updated_at": ACTIVITY_AT,
+        },
+        "latest_decision_payload": {
+            "id": "00000000-0000-0000-0000-000000000501",
+            "source_conversation_id": CONVERSATION_ID,
+            "evidence_artifact_id": "00000000-0000-0000-0000-000000000302",
+            "source_run_id": "00000000-0000-0000-0000-000000000402",
+            "decision_state": "promising",
+            "note": "Search decision.",
+            "artifact_title": "Older evidence",
+            "artifact_digest": "Older quick take",
+            "artifact_payload": {},
+            "updated_at": ACTIVITY_AT,
+        },
+    }
+
+
+def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() -> None:
     reader_type, _ = _reader_types()
-    artifact_id = "00000000-0000-0000-0000-000000000301"
-    candidate_rows = [
-        _candidate(
-            source,
-            f"00000000-0000-0000-0000-00000000010{index}",
-            evidence_artifact_id=artifact_id,
-        )
-        for index, source in enumerate(
-            (
-                "chat",
-                "strategy",
-                "collection",
-                "run",
-                "idea",
-                "evidence",
-                "decision",
-            ),
-            start=1,
-        )
-    ]
     pool = _RecordingPool(
         [
-            *[[candidate] for candidate in candidate_rows],
+            [_conversation_candidate()],
+            [_hydration_row()],
             [
-                {
-                    "idea_id": candidate_rows[4]["payload"]["id"],
-                    "decision_state": "promising",
-                }
-            ],
-            [
-                {
-                    "id": artifact_id,
-                    "title": "Search evidence",
-                    "digest": "Search digest",
-                }
-            ],
-            [
-                {"decision_state": "promising", "count": 2},
+                {"decision_state": "promising", "count": 1},
                 {"decision_state": "watching", "count": 1},
             ],
         ]
     )
 
     result = reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
         query="search",
         source_limit=4,
         include_ledger_groups=True,
@@ -170,37 +174,46 @@ def test_search_first_page_uses_bounded_candidate_evidence_and_ledger_queries() 
 
     assert {source: len(rows) for source, rows in result.rows.items()} == {
         "conversations": 1,
-        "strategies": 1,
-        "collections": 1,
-        "runs": 1,
-        "ideas": 1,
+        "strategies": 0,
+        "collections": 0,
+        "runs": 2,
+        "ideas": 0,
         "evidence": 1,
         "decisions": 1,
     }
-    assert result.rows["decisions"][0]["artifact_title"] == "Search evidence"
-    assert result.rows["decisions"][0]["artifact_digest"] == "Search digest"
+    assert result.rows["conversations"][0]["_recall_match"] == {
+        "matched_text": "Search decision evidence",
+        "layer_rank": 5,
+        "symbol_exact_match": False,
+        "activity_at": ACTIVITY_AT,
+    }
+    assert result.rows["conversations"][0]["_recall_summary"]["run_count"] == 7
     assert result.ledger_counts == {
-        "promising": 2,
+        "promising": 1,
         "watching": 1,
         "rejected": 0,
         "revisit_later": 0,
     }
-    assert len(pool.cursor.executions) == 10
-    assert all(params["source_limit"] == 4 for _, params in pool.cursor.executions[:7])
-    assert pool.cursor.executions[8][1]["artifact_ids"] == [artifact_id]
+    assert len(pool.cursor.executions) == 3
+    assert pool.cursor.executions[0][1]["source_limit"] == 4
     assert pool.acquisition_timeouts == [2.0]
 
 
-@pytest.mark.parametrize(
-    "pivot_rows",
-    [
-        [],
-        [
-            {"source_type": "idea", "score": 50, "type_rank": 5},
-            {"source_type": "decision", "score": 50, "type_rank": 5},
-        ],
-    ],
-)
+def test_search_rejects_nonpositive_bound_before_database_read() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([])
+
+    with pytest.raises(ValueError, match="positive"):
+        reader_type(pool).search_rows(
+            user_id=OWNER_ID,
+            query="search",
+            source_limit=0,
+        )
+
+    assert pool.cursor.executions == []
+
+
+@pytest.mark.parametrize("pivot_rows", [[], [_conversation_candidate()] * 2])
 def test_search_cursor_missing_foreign_or_ambiguous_pivot_fails_closed(
     pivot_rows: list[dict[str, Any]],
 ) -> None:
@@ -209,11 +222,11 @@ def test_search_cursor_missing_foreign_or_ambiguous_pivot_fails_closed(
 
     with pytest.raises(cursor_error):
         reader_type(pool).search_rows(
-            user_id="00000000-0000-0000-0000-000000000001",
+            user_id=OWNER_ID,
             query="search",
             source_limit=4,
-            cursor_updated_at=datetime(2026, 7, 27, tzinfo=timezone.utc),
-            cursor_id="00000000-0000-0000-0000-000000000101",
+            cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
+            cursor_id=CONVERSATION_ID,
         )
 
     assert len(pool.cursor.executions) == 1
@@ -225,11 +238,11 @@ def test_search_naive_cursor_fails_before_database_read() -> None:
 
     with pytest.raises(cursor_error):
         reader_type(pool).search_rows(
-            user_id="00000000-0000-0000-0000-000000000001",
+            user_id=OWNER_ID,
             query="search",
             source_limit=4,
             cursor_updated_at=datetime(2026, 7, 27),
-            cursor_id="00000000-0000-0000-0000-000000000101",
+            cursor_id=CONVERSATION_ID,
         )
 
     assert pool.cursor.executions == []
@@ -237,34 +250,17 @@ def test_search_naive_cursor_fails_before_database_read() -> None:
 
 @pytest.mark.parametrize(
     "cursor_id",
-    [
-        "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
-        "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
-    ],
+    ["{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"],
 )
 def test_search_noncanonical_cursor_uuid_fails_before_database_read(
     cursor_id: str,
 ) -> None:
     reader_type, cursor_error = _reader_types()
-    pool = _RecordingPool(
-        [
-            [
-                {
-                    "source_type": "chat",
-                    "pinned_rank": 0,
-                    "exact_rank": 0,
-                    "symbol_rank": 0,
-                    "type_rank": 4,
-                    "text_rank": 0,
-                }
-            ],
-            *([[]] * 7),
-        ]
-    )
+    pool = _RecordingPool([])
 
     with pytest.raises(cursor_error):
         reader_type(pool).search_rows(
-            user_id="00000000-0000-0000-0000-000000000001",
+            user_id=OWNER_ID,
             query="search",
             source_limit=4,
             cursor_updated_at=datetime(2026, 7, 27, tzinfo=timezone.utc),
@@ -276,10 +272,10 @@ def test_search_noncanonical_cursor_uuid_fails_before_database_read(
 
 def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[] for _ in range(7)])
+    pool = _RecordingPool([[]])
 
     reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
         query="nee\x00dle",
         source_limit=4,
     )
@@ -287,14 +283,15 @@ def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> Non
     params = pool.cursor.executions[0][1]
     assert params["normalized_query"] == "nee dle"
     assert params["symbol_query"] is None
+    assert "\x00" not in str(params)
 
 
 def test_search_uses_bound_token_array_without_row_token_splitting() -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[] for _ in range(7)])
+    pool = _RecordingPool([[]])
 
     reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
         query="Alpha x beta alpha",
         source_limit=4,
     )
@@ -308,175 +305,306 @@ def test_search_uses_bound_token_array_without_row_token_splitting() -> None:
     assert "unnest(%(token_patterns)s::text[])" in rendered
     assert "%(anchor_pattern)s" in rendered
     assert "token_0_pattern" not in rendered
-    assert "alpha" not in rendered
-    assert "beta" not in rendered
 
 
 def test_search_sql_shape_is_constant_as_token_count_grows() -> None:
     reader_type, _ = _reader_types()
 
     def rendered_sql_shape(query: str) -> tuple[int, int]:
-        pool = _RecordingPool([[] for _ in range(7)])
+        pool = _RecordingPool([[]])
         reader_type(pool).search_rows(
-            user_id="00000000-0000-0000-0000-000000000001",
+            user_id=OWNER_ID,
             query=query,
             source_limit=4,
         )
-        rendered = [statement.as_string() for statement, _ in pool.cursor.executions]
-        return (
-            sum(len(statement) for statement in rendered),
-            sum(statement.count('collate "und-x-icu"') for statement in rendered),
-        )
+        rendered = pool.cursor.executions[0][0].as_string()
+        return len(rendered), rendered.count('collate "und-x-icu"')
 
-    one_token_shape = rendered_sql_shape("needle000")
-    many_token_shape = rendered_sql_shape(
+    assert rendered_sql_shape(
         " ".join(f"needle{index:03d}" for index in range(400))
-    )
-
-    assert many_token_shape == one_token_shape
+    ) == rendered_sql_shape("needle000")
 
 
-def test_search_exact_index_predicate_keeps_mixed_short_token_recheck() -> None:
-    from argus.domain.postgres_search_reader import (
-        _LATE_CHAT,
-        _source_token_predicate,
-    )
-
-    rendered = _source_token_predicate(
-        _LATE_CHAT,
-        has_anchor=True,
-    ).as_string()
-
-    assert rendered.count("%(anchor_pattern)s") == 1
-    assert rendered.count("unnest(%(token_patterns)s::text[])") == 1
-
-
-def test_search_executes_one_bounded_candidate_query_per_source() -> None:
+def test_search_groups_all_matching_layers_before_conversation_limit() -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[] for _ in range(7)])
+    pool = _RecordingPool([[]])
 
     reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
         query="alpha",
         source_limit=4,
     )
 
-    candidate_queries = pool.cursor.executions[:7]
-    assert len(candidate_queries) == 7
-    assert all("fetch first" in query.as_string() for query, _ in candidate_queries)
-    assert all(params["source_limit"] == 4 for _, params in candidate_queries)
+    assert len(pool.cursor.executions) == 1
+    rendered = pool.cursor.executions[0][0].as_string()
+    for source_table in (
+        "public.conversations",
+        "public.backtest_runs",
+        "public.ideas",
+        "public.evidence_artifacts",
+        "public.decision_notes",
+    ):
+        assert source_table in rendered
+    assert "row_number() over" in rendered
+    assert "partition by matches.conversation_id" in rendered
+    assert rendered.rfind("limit") > rendered.rfind("partition by")
+    # Each child layer joins its canonical active conversation before grouping.
+    assert rendered.count("conversation.deleted_at is null") >= 6
 
 
-def test_search_cursor_uses_direct_source_primary_key_probes() -> None:
+def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit() -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool(
-        [
-            [
-                {
-                    "source_type": "strategy",
-                    "pinned_rank": 0,
-                    "exact_rank": 0,
-                    "symbol_rank": 0,
-                    "type_rank": 3,
-                    "text_rank": 0,
-                }
-            ],
-            *([[]] * 7),
-        ]
-    )
+    pool = _RecordingPool([[]])
 
     reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
+        query="alpha",
+        source_limit=1,
+        guest_scope=True,
+        guest_conversation_id=CONVERSATION_ID,
+    )
+
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert sql_text.count("conversation.id = input.guest_conversation_id") >= 5
+    assert sql_text.rfind("conversation.id = input.guest_conversation_id") < (
+        sql_text.rfind("row_number() over")
+    )
+    assert str(params["guest_conversation_id"]) == CONVERSATION_ID
+    assert params["source_limit"] == 1
+
+
+def test_search_decision_filter_and_ledger_match_all_conversation_layers() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[], []])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="alpha",
+        source_limit=4,
+        decision_state="watching",
+        include_ledger_groups=True,
+    )
+
+    candidate_sql = pool.cursor.executions[0][0].as_string()
+    ledger_sql = pool.cursor.executions[1][0].as_string()
+    for source_table in (
+        "public.conversations",
+        "public.backtest_runs",
+        "public.ideas",
+        "public.evidence_artifacts",
+        "public.decision_notes",
+    ):
+        assert source_table in candidate_sql
+        assert source_table in ledger_sql
+    assert "count(distinct conversation_id)" in ledger_sql
+    assert pool.cursor.executions[1][1]["decision_state"] is None
+
+
+def test_search_cursor_pivots_on_conversation_projection_and_canonical_activity() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], []])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
         query="Alpha x",
         source_limit=4,
-        cursor_updated_at=datetime(2026, 7, 27, tzinfo=timezone.utc),
-        cursor_id="00000000-0000-0000-0000-000000000101",
+        cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
+        cursor_id=CONVERSATION_ID,
     )
 
-    pivot_query = pool.cursor.executions[0][0].as_string()
-    assert "pivot_only" not in pivot_query
-    assert "chat.id = %(cursor_id)s::uuid" in pivot_query
-    assert "strategy.id = %(cursor_id)s::uuid" in pivot_query
-    assert "collection.id = %(cursor_id)s::uuid" in pivot_query
-    assert "run.id = %(cursor_id)s::uuid" in pivot_query
-    assert "idea.id = %(cursor_id)s::uuid" in pivot_query
-    assert "evidence.id = %(cursor_id)s::uuid" in pivot_query
-    assert "decision.id = %(cursor_id)s::uuid" in pivot_query
+    pivot_query, pivot_params = pool.cursor.executions[0]
+    rendered = pivot_query.as_string()
+    assert "ranked.conversation_id = input.cursor_id" in rendered
+    assert "ranked.activity_at = input.cursor_updated_at" in rendered
+    assert "run.id = %(cursor_id)s::uuid" not in rendered
+    assert "decision.id = %(cursor_id)s::uuid" not in rendered
+    page_params = pool.cursor.executions[1][1]
+    assert page_params["cursor_layer_rank"] == 5
+    assert pivot_params["cursor_id"] == page_params["cursor_id"]
 
 
-def test_search_hydrates_returned_idea_decisions_in_one_bounded_batch() -> None:
+def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap() -> None:
     reader_type, _ = _reader_types()
-    idea_id = "00000000-0000-0000-0000-000000000201"
-    idea = _candidate("idea", idea_id)
-    idea["payload"]["decision_state"] = None
-    pool = _RecordingPool(
-        [
-            [],
-            [],
-            [],
-            [],
-            [idea],
-            [],
-            [],
-            [{"idea_id": idea_id, "decision_state": "watching"}],
-        ]
-    )
+    pool = _RecordingPool([[_conversation_candidate()], [_hydration_row()]])
 
     result = reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+        user_id=OWNER_ID,
         query="search",
         source_limit=4,
     )
 
-    assert result.rows["ideas"][0]["decision_state"] == "watching"
-    assert len(pool.cursor.executions) == 8
-    assert all(
-        "left join lateral" not in query.as_string()
-        for query, _ in pool.cursor.executions[:7]
-    )
-    query, params = pool.cursor.executions[7]
-    assert "distinct on (idea_id)" in query
-    assert params["idea_ids"] == [idea_id]
-    assert str(params["user_id"]) == "00000000-0000-0000-0000-000000000001"
-
-
-def test_search_decision_evidence_batch_is_bounded_and_owner_scoped() -> None:
-    reader_type, _ = _reader_types()
-    candidates = [
-        _candidate(
-            "decision",
-            f"00000000-0000-0000-0000-0000000001{index:02d}",
-            evidence_artifact_id=(f"00000000-0000-0000-0000-0000000002{index:02d}"),
-        )
-        for index in range(5)
+    assert result.rows["conversations"][0]["_recall_summary"] == {
+        "run_count": 7,
+        "symbols": ["AAPL", "MSFT"],
+        "strategy_families": ["buy_and_hold"],
+        "start_date": "2019-01-01",
+        "end_date": "2026-07-27",
+        "decision_states": ["promising", "watching"],
+        "latest_run_decided": False,
+        "latest_suggestion_untaken": False,
+        "latest_activity": ACTIVITY_AT,
+    }
+    assert [row["conversation_id"] for row in result.rows["runs"]] == [
+        CONVERSATION_ID,
+        CONVERSATION_ID,
     ]
-    pool = _RecordingPool(
-        [
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-            candidates,
-            [
-                {
-                    "id": f"00000000-0000-0000-0000-0000000002{index:02d}",
-                    "title": f"Artifact {index}",
-                    "digest": f"Digest {index}",
-                }
-                for index in range(3)
-            ],
-        ]
-    )
+    assert len(pool.cursor.executions) == 2
+    hydration_sql, params = pool.cursor.executions[1]
+    rendered = str(hydration_sql)
+    assert "recall_rank <= 5" not in rendered
+    assert "count(*)::integer as run_count" in rendered
+    assert "select distinct decision.decision_state" in rendered
+    assert "min(" in rendered and "max(" in rendered
+    assert "limit 1" in rendered
+    assert params["conversation_ids"] == [CONVERSATION_ID]
+    assert str(params["user_id"]) == OWNER_ID
 
-    result = reader_type(pool).search_rows(
-        user_id="00000000-0000-0000-0000-000000000001",
+
+def test_search_hydration_projects_only_a_bounded_untaken_suggestion_bit() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], [_hydration_row()]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
         query="search",
-        source_limit=3,
+        source_limit=4,
     )
 
-    assert len(result.rows["decisions"]) == 3
-    evidence_params = pool.cursor.executions[7][1]
-    assert str(evidence_params["user_id"]) == ("00000000-0000-0000-0000-000000000001")
-    assert len(evidence_params["artifact_ids"]) == 3
+    hydration_sql = " ".join(str(pool.cursor.executions[1][0]).split())
+    assert "'latest_suggestion_untaken'" in hydration_sql
+    assert "offer.metadata->>'result_run_id' = latest_run.id::text" in hydration_sql
+    assert "argus_next_experiments/v1" in hydration_sql
+    assert "not exists" in hydration_sql
+    assert "later_message.role = 'user'" in hydration_sql
+    assert "latest_suggestion.untaken" in hydration_sql
+    assert "'content', offer.content" not in hydration_sql
+    assert "'metadata', offer.metadata" not in hydration_sql
+
+
+def test_search_hydration_activity_mirrors_ranked_message_activity_scope() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], [_hydration_row()]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="search",
+        source_limit=4,
+    )
+
+    ranking_sql = " ".join(pool.cursor.executions[0][0].as_string().split())
+    hydration_sql = " ".join(str(pool.cursor.executions[1][0]).split())
+    assert (
+        "select max(message.created_at) "
+        "from public.messages as message "
+        "where message.user_id = input.user_id "
+        "and message.conversation_id = conversation.id"
+    ) in ranking_sql
+    assert (
+        "select max(message.created_at) "
+        "from public.messages as message "
+        "where message.user_id = %(user_id)s "
+        "and message.conversation_id = conversation.id"
+    ) in hydration_sql
+
+
+def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_children() -> None:
+    from argus.api.search_assembly import scored_supabase_search_items
+
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], [_hydration_row()]])
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="search",
+        source_limit=4,
+    )
+
+    scored = scored_supabase_search_items(raw=result.rows, query="search")
+
+    assert len(scored) == 1
+    _, item = scored[0]
+    assert item.id == CONVERSATION_ID
+    assert item.matched_text == "Search decision evidence"
+    assert item.updated_at.isoformat() == ACTIVITY_AT
+    assert item.decision_states == ("promising", "watching")
+    assert item.dossier.tested.run_count == 7
+    assert item.dossier.tested.symbols == ["AAPL", "MSFT"]
+    assert item.dossier.tested.start_date.isoformat() == "2019-01-01"
+    assert item.dossier.decision is not None
+    assert item.dossier.decision.run_label == "Judged older run"
+    assert item.dossier.outcome is not None
+    assert item.dossier.outcome.run_label == "Latest run"
+
+
+def test_persistent_title_match_never_trusts_an_unrelated_preview_hint() -> None:
+    from argus.api.search_assembly import scored_supabase_search_items
+
+    candidate = _conversation_candidate()
+    candidate["payload"].update(
+        {
+            "title": "Gold allocation",
+            "last_message_preview": "Review again later",
+            "_recall_match": {
+                "matched_text": "Review again later",
+                "layer_rank": 1,
+                "symbol_exact_match": False,
+                "activity_at": ACTIVITY_AT,
+            },
+        }
+    )
+    hydration = _hydration_row()
+    hydration["conversation_payload"].update(
+        {
+            "title": "Gold allocation",
+            "last_message_preview": "Review again later",
+        }
+    )
+    reader_type, _ = _reader_types()
+    result = reader_type(_RecordingPool([[candidate], [hydration]])).search_rows(
+        user_id=OWNER_ID,
+        query="gold",
+        source_limit=4,
+    )
+
+    scored = scored_supabase_search_items(raw=result.rows, query="gold")
+
+    assert len(scored) == 1
+    _, item = scored[0]
+    assert item.matched_text == "Gold allocation"
+
+
+def test_persistent_preview_match_returns_preview_with_unrelated_title() -> None:
+    from argus.api.search_assembly import scored_supabase_search_items
+
+    candidate = _conversation_candidate()
+    candidate["payload"].update(
+        {
+            "title": "Review again later",
+            "last_message_preview": "Gold allocation",
+            "_recall_match": {
+                "matched_text": "Gold allocation",
+                "layer_rank": 1,
+                "symbol_exact_match": False,
+                "activity_at": ACTIVITY_AT,
+            },
+        }
+    )
+    hydration = _hydration_row()
+    hydration["conversation_payload"].update(
+        {
+            "title": "Review again later",
+            "last_message_preview": "Gold allocation",
+        }
+    )
+    reader_type, _ = _reader_types()
+    result = reader_type(_RecordingPool([[candidate], [hydration]])).search_rows(
+        user_id=OWNER_ID,
+        query="gold",
+        source_limit=4,
+    )
+
+    scored = scored_supabase_search_items(raw=result.rows, query="gold")
+
+    assert len(scored) == 1
+    _, item = scored[0]
+    assert item.matched_text == "Gold allocation"

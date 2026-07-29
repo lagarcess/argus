@@ -3092,12 +3092,13 @@ sign-in path for keeping history.
 
 ## `GET /search`
 
-Global omni-search across conversations and typed recall objects.
+Deterministic omni-search over a conversation-shaped memory read model. Each
+conversation appears at most once; its runs, ideas, evidence, and decisions
+feed the dossier and never become separate rows.
 
 For guests, this endpoint is current-workspace search, not Grounded Discovery:
 results are restricted to the one owned temporary conversation and its
-conversation-linked chat, run/backtest, Idea, EvidenceArtifact, and Decision
-records. Strategy and Collection destinations, ledger groups, other owners,
+conversation-linked canonical records. Ledger groups, other owners,
 and provider/model/runtime metadata are excluded. Grounded Discovery remains a
 separate chat capability and reports `can_use_grounded_discovery=true` for both
 account classes; its backend allowance and typed limit recovery do not alter
@@ -3107,63 +3108,51 @@ the `/search` contract.
 - `q`
 - `limit`
 - `cursor`
-- `decision_state`: optional Idea Ledger browse filter. Valid values:
+- `decision_state`: optional conversation decision filter. It returns
+  conversations holding that state. Valid values:
   `watching`, `promising`, `rejected`, `revisit_later`.
 - `include_ledger_groups`: optional boolean. When true, the response includes
-  backend-owned Idea Ledger decision-state groups and counts.
+  backend-owned conversation decision-state groups and exact counts.
 
 **Response:**
 ```json
 {
   "items": [
     {
-      "type": "chat",
+      "type": "conversation",
       "id": "uuid",
-      "title": "Tesla Dip Strategy",
-      "matched_text": "...",
+      "title": "Gold pullback ideas",
+      "matched_text": "Hold through earnings.",
       "updated_at": "timestamp",
       "conversation_id": "uuid",
-      "lifecycle": null,
-      "preview": null
-    },
-    {
-      "type": "evidence",
-      "id": "uuid",
-      "title": "AAPL, MSFT Buy and Hold",
-      "matched_text": "AAPL and MSFT were tested against SPY.",
-      "updated_at": "timestamp",
-      "conversation_id": "uuid",
-      "lifecycle": "captured",
-      "preview": {
-        "digest": "AAPL and MSFT were tested against SPY.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
-        "assumptions": ["Benchmark: SPY", "No fees"],
-        "metrics_summary": {
-          "total_return_pct": 12.5
+      "decision_states": ["watching"],
+      "dossier": {
+        "decision": {
+          "state": "watching",
+          "note": "Hold through earnings.\nReview risk first.",
+          "run_label": "Monthly GLD buys"
         },
-        "quick_take": "AAPL and MSFT beat SPY in this historical test."
-      }
-    },
-    {
-      "type": "decision",
-      "id": "uuid",
-      "title": "AAPL, MSFT Buy and Hold",
-      "matched_text": "Track it. · AAPL and MSFT were tested against SPY.",
-      "updated_at": "timestamp",
-      "conversation_id": "uuid",
-      "lifecycle": "decided",
-      "preview": {
-        "decision_state": "watching",
-        "note": "Track it.",
-        "digest": "AAPL and MSFT were tested against SPY.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
-        "assumptions": ["Benchmark: SPY", "No fees"],
-        "metrics_summary": {
-          "total_return_pct": 12.5
+        "tested": {
+          "symbols": ["GLD"],
+          "strategy_families": ["dca", "rsi_mean_reversion"],
+          "run_count": 2,
+          "start_date": "2025-01-01",
+          "end_date": "2026-07-29"
         },
-        "quick_take": "AAPL and MSFT beat SPY in this historical test."
+        "outcome": {
+          "run_label": "Weekly GLD pullback",
+          "completed_at": "timestamp",
+          "benchmark_symbol": "SPY",
+          "quick_take": "GLD held up better than SPY.",
+          "metrics": [
+            { "name": "total_return_pct", "value": 8.4 }
+          ]
+        },
+        "left_off": {
+          "run_label": "Weekly GLD pullback",
+          "completed_at": "timestamp",
+          "nudge": "undecided"
+        }
       }
     }
   ],
@@ -3177,57 +3166,41 @@ the `/search` contract.
 }
 ```
 
-`type` enum:
-- `chat`
-- `strategy`
-- `collection`
-- `run`
-- `backtest`
-- `idea`
-- `evidence`
-- `decision`
+`type` has one value: `conversation`. `id` and `conversation_id` are always the
+same canonical conversation id.
 
-**Decision preview (recall) fields:** a `decision` item's `preview` carries the
-decision-first recall projection assembled from existing canonical facts:
-`decision_state`, `note` (the user's stored note, verbatim — never
-concatenated with the digest), `digest` (the linked evidence artifact's own
-digest), and, when the evidence payload has them, the same bounded fields as
-an `evidence` preview (`quick_take`, `symbols`, `benchmark_symbol`,
-`assumptions`, `metrics_summary`). Absent facts are omitted rather than
-invented; `matched_text` keeps the legacy note·digest match display. No field
-ever includes `*_id` keys, and assembling the preview makes zero LLM or
-provider calls.
+`dossier` always has the fixed reading order `decision`, `tested`, `outcome`,
+`left_off`. Optional sections are `null` when stored truth is absent. Lists are
+bounded to five symbols, five strategy families, and four typed metrics. A
+decision note is the user's exact bounded note with internal newlines
+preserved. `run_label` is present on the decision when multiple runs make its
+target otherwise ambiguous. `left_off.nudge` is null or one of `undecided`,
+`suggestion_untaken`, `stale_result`; the backend never invents a nudge.
 
 **Ranking Logic:**
 Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
 2. **Exact Match**: Full title/name match.
-3. **Symbol Match**: Match against symbols in strategies/backtests.
-4. **P1 Artifact Priority**: Backtest, Evidence, Decision, and Idea results
-   rank ahead of source conversation wrappers within the same relevance tier.
-5. **Recency**: Sorted by `updated_at` within same relevance and type tier.
-6. **Basic Text Relevance**: Keyword matching in metadata.
+3. **Symbol Match**: Match against symbols in backtests.
+4. **Object Priority**: Decision/evidence/idea/run matches beat conversation
+   wrapper text for the same conversation.
+5. **Recency**: Sorted by latest canonical activity.
+6. **Basic Text Relevance**: Exact and prefix-oriented metadata matching.
 
 **Search Scope:**
 Search is limited to:
 - Titles and Names
 - Symbols
 - Last message preview (Conversations)
-- Collection names
-- Strategy template labels (e.g. "RSI Mean Reversion")
-- P1 evidence digests, idea summaries, decision state/note text, and sanitized
-  preview metadata.
+- Backtest symbols and strategy families
+- Evidence digests, idea summaries, and decision state/note text.
 
 *Note: Alpha search does not perform deep indexing of full message bodies or complex template parameters.*
 
-P1 previews must be sanitized owner-only summaries. They must not expose raw
+The dossier is an owner-scoped, bounded projection. It never exposes raw
 context packets, route receipts, provider/model metadata, retry payloads,
-conversation transcripts, private memory, internal source-run ids, or internal
-artifact implementation fields. Object identity and product type are carried by
-the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
-is reserved for grounded display context such as digest, symbols, benchmark,
-assumptions, compact metrics summaries, quick take, and breakdown context when
-available.
+conversation transcripts, internal source-run ids, or artifact ids. Search and
+dossier assembly make zero LLM or market-data provider calls.
 
 When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
 Idea Ledger group order and counts. Empty groups must be returned with
@@ -3235,9 +3208,8 @@ Idea Ledger group order and counts. Empty groups must be returned with
 Clients localize the stable `decision_state` enum for display, but must keep the
 enum value from the backend attached to filters, pills, and grouped rows.
 
-For typed P1 objects, Omnisearch treats artifacts as first-class results and
-the source conversation as provenance. Evidence-like objects do not expose chat
-owner actions such as rename, archive, or delete.
+Empty `q` returns recents-first conversation rows. Archived conversations remain
+eligible and soft-deleted conversations are excluded before ranking and limits.
 
 *Future semantic retrieval may extend this endpoint.*
 
