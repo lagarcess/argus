@@ -133,3 +133,107 @@ def test_rows_never_reoffer_what_the_conversation_already_asked() -> None:
     assert "change_date_range" not in kinds
     assert "same_setup_peer_asset" not in kinds
     assert kinds
+
+
+def test_previously_offered_kinds_are_spent_even_if_ignored() -> None:
+    sidecar = next_experiments_sidecar(
+        _BUY_AND_HOLD_FACTS,
+        previously_offered_kinds=["change_date_range", "supported_rsi_threshold"],
+    )
+
+    assert sidecar is not None
+    kinds = [row["kind"] for row in sidecar["rows"]]
+    assert "change_date_range" not in kinds
+    assert "supported_rsi_threshold" not in kinds
+    assert kinds
+
+
+def test_acceptance_detection_matches_offered_labels_in_both_languages() -> None:
+    from argus.agent_runtime.next_experiments import (
+        detect_next_experiment_acceptance,
+        offered_kinds_from_thread_metadata,
+    )
+
+    thread_metadata = {
+        "next_experiments_offered_kinds": [
+            "same_setup_peer_asset",
+            "change_date_range",
+        ]
+    }
+    assert offered_kinds_from_thread_metadata(thread_metadata) == [
+        "same_setup_peer_asset",
+        "change_date_range",
+    ]
+    assert detect_next_experiment_acceptance(
+        "  Test a different date range ", thread_metadata
+    ) == {"kind": "change_date_range", "position": 1}
+    assert detect_next_experiment_acceptance(
+        "Probar el mismo enfoque en un activo similar", thread_metadata
+    ) == {"kind": "same_setup_peer_asset", "position": 0}
+    # A label that was never offered is not an acceptance.
+    assert (
+        detect_next_experiment_acceptance(
+            "Compare with buy and hold", thread_metadata
+        )
+        is None
+    )
+    assert detect_next_experiment_acceptance("Test AAPL", thread_metadata) is None
+    assert detect_next_experiment_acceptance("Test a different date range", None) is None
+
+
+def test_thread_metadata_carries_the_offered_kinds() -> None:
+    from argus.agent_runtime.graph.workflow import (
+        WorkflowStageOutcome,
+        _build_thread_metadata,
+    )
+
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    metadata = _build_thread_metadata(
+        workflow_state={
+            "run_state": state,
+            "next_experiments": {
+                "version": NEXT_EXPERIMENTS_VERSION,
+                "rows": [
+                    {"kind": "change_date_range", "label": "x", "label_key": "k"},
+                    {"kind": "compare_buy_and_hold", "label": "y", "label_key": "k2"},
+                ],
+            },
+        },
+        run_state=state,
+        stage_outcome=WorkflowStageOutcome.END_RUN,
+    )
+
+    assert metadata["next_experiments_offered_kinds"] == [
+        "change_date_range",
+        "compare_buy_and_hold",
+    ]
+
+
+def test_deep_drawdown_reads_the_canonical_nested_metrics() -> None:
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="concise",
+        effective_verbosity="low",
+        effective_expertise_mode="advanced",
+    )
+    state.confirmation_payload = {
+        "strategy": {"strategy_thesis": "Buy Tesla on pullbacks"},
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {
+            "total_return": 0.30,
+            "benchmark_return": 0.10,
+            "metrics": {
+                "aggregate": {"performance": {"max_drawdown_pct": -24.5}}
+            },
+        }
+    }
+
+    result = explain_stage(state=state)
+
+    sidecar = result.patch["next_experiments"]
+    assert sidecar["rows"][0]["why"] == {
+        "code": "deep_drawdown",
+        "params": {"drawdown": -24.5},
+    }

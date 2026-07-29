@@ -181,6 +181,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
                 {"assistant_response": response},
                 result_facts=result_facts,
                 recent_user_messages=_recent_user_messages(state),
+                previously_offered_kinds=state.prior_next_experiment_kinds,
             ),
         )
     benchmark_symbol = _benchmark_contract(
@@ -211,6 +212,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             benchmark_return=benchmark_return,
             max_drawdown=_max_drawdown_metric(result_payload),
             recent_user_messages=_recent_user_messages(state),
+            previously_offered_kinds=state.prior_next_experiment_kinds,
         ),
     )
 
@@ -223,6 +225,7 @@ def _with_next_experiments(
     benchmark_return: float | None = None,
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
+    previously_offered_kinds: list[str] | None = None,
 ) -> dict[str, Any]:
     sidecar = next_experiments_sidecar(
         result_facts,
@@ -230,6 +233,7 @@ def _with_next_experiments(
         benchmark_return=benchmark_return,
         max_drawdown=max_drawdown,
         recent_user_messages=recent_user_messages,
+        previously_offered_kinds=previously_offered_kinds,
     )
     if sidecar is None:
         return patch
@@ -250,6 +254,14 @@ def _max_drawdown_metric(result_payload: dict[str, Any]) -> float | None:
     metrics = result_payload.get("metrics")
     if not isinstance(metrics, dict):
         return None
+    # Canonical engine shape first; flat keys are the legacy fallback.
+    nested: Any = metrics
+    for key in ("aggregate", "performance"):
+        nested = nested.get(key) if isinstance(nested, dict) else None
+    if isinstance(nested, dict):
+        value = nested.get("max_drawdown_pct")
+        if isinstance(value, (int, float)):
+            return float(value)
     for key in ("max_drawdown_pct", "max_drawdown"):
         value = metrics.get(key)
         if isinstance(value, (int, float)):

@@ -671,6 +671,15 @@ def _build_thread_metadata(
         "latest_task_type": run_state.intent,
         "last_stage_outcome": stage_outcome_value,
     }
+    offered = workflow_state.get("next_experiments")
+    if isinstance(offered, dict):
+        kinds = [
+            str(row.get("kind"))
+            for row in offered.get("rows") or []
+            if isinstance(row, dict) and row.get("kind")
+        ]
+        if kinds:
+            metadata["next_experiments_offered_kinds"] = kinds
     requested_field = workflow_state.get("requested_field")
     if requested_field in (None, ""):
         requested_field = run_state.requested_field

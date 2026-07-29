@@ -637,6 +637,7 @@ def _append_idempotent_memory_message(
 
 
 def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
+    retried_failure_ids = _retried_failed_assistant_ids(messages)
     artifact_request_ids_after: set[str] = set()
     same_segment_artifact_after = False
     reconciled_reversed: list[Message] = []
@@ -654,7 +655,10 @@ def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
                 if request_id is not None
                 else same_segment_artifact_after
             )
-            if should_supersede and _is_visible_runtime_failure(metadata):
+            if (should_supersede and _is_visible_runtime_failure(metadata)) or (
+                message.id in retried_failure_ids
+                and _is_retryable_recovery_failure(metadata)
+            ):
                 updated_metadata = _supersede_retry_last_turn(metadata)
                 updated_metadata = {
                     **updated_metadata,
@@ -838,6 +842,37 @@ def _metadata_has_authoritative_artifact(
             for reference in artifact_references
         )
     return False
+
+
+def _is_retryable_recovery_failure(metadata: dict[str, Any]) -> bool:
+    recovery = metadata.get("recovery")
+    return isinstance(recovery, dict) and recovery.get("retryable") is True
+
+
+def _retried_failed_assistant_ids(messages: list[Message]) -> set[str]:
+    """A completed retry retires the failure it replaced; metadata keeps the
+    record for telemetry while the transcript stops re-rendering it."""
+    retried: set[str] = set()
+    pending: set[str] = set()
+    for message in messages:
+        metadata = message.metadata if isinstance(message.metadata, dict) else {}
+        if message.role == "user":
+            action = metadata.get("chat_action")
+            payload = action.get("payload") if isinstance(action, dict) else None
+            failed_id = (
+                payload.get("failed_assistant_id")
+                if isinstance(payload, dict)
+                and isinstance(action, dict)
+                and action.get("type") == "retry_last_turn"
+                else None
+            )
+            if isinstance(failed_id, str) and failed_id.strip():
+                pending.add(failed_id.strip())
+            continue
+        if message.role == "assistant" and pending:
+            retried.update(pending)
+            pending.clear()
+    return retried
 
 
 def _is_visible_runtime_failure(metadata: dict[str, Any]) -> bool:

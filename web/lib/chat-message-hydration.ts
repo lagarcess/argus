@@ -5,6 +5,8 @@ import {
 } from "./argus-api";
 import {
   failedActionRetryActionFromMetadata,
+  isRetryAction,
+  retryLastTurnActionFromMessage,
   retryLastTurnActionFromMetadata,
 } from "./chat-retry-actions";
 import {
@@ -362,6 +364,25 @@ export function hydrateTextMessageFromApi(
     ...unsupportedStrategyActions,
     ...retryActions,
   ];
+  // A retryable composition failure resolves in place: one tap re-sends
+  // the original turn and the replaced failure is superseded durably.
+  const compositionRecoveryCode = isAssistant
+    ? retryableAssistantRecoveryCode(metadata.recovery)
+    : null;
+  if (
+    compositionRecoveryCode &&
+    options.retryRequestMessage &&
+    !actions.some(isRetryAction)
+  ) {
+    const compositionRetry = retryLastTurnActionFromMessage(
+      options.retryRequestMessage.content ?? "",
+      {
+        assistantMessageId: message.id,
+        requestMessageId: options.retryRequestMessage.id,
+      },
+    );
+    if (compositionRetry) actions.push(compositionRetry);
+  }
 
   return {
     id: message.id,

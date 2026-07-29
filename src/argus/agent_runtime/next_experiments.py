@@ -103,11 +103,16 @@ def next_experiments_sidecar(
     benchmark_return: float | None = None,
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
+    previously_offered_kinds: list[str] | None = None,
 ) -> dict[str, Any] | None:
     options = structured_next_experiments(result_facts)
     if not options:
         return None
-    already_asked = _kinds_already_asked(recent_user_messages)
+    # Ran or ignored, a kind from the previous offer is spent (spec §4.3);
+    # restraint prefers fewer rows over repeated ones.
+    already_asked = _kinds_already_asked(recent_user_messages) | set(
+        previously_offered_kinds or []
+    )
     delta = (
         total_return - benchmark_return
         if total_return is not None and benchmark_return is not None
@@ -196,4 +201,35 @@ def _row_reason(
         return {"code": "lost_to_benchmark", "params": {"points": round(-delta, 1)}}
     if delta is not None and delta > 0:
         return {"code": "beat_benchmark", "params": {"points": round(delta, 1)}}
+    return None
+
+
+def offered_kinds_from_thread_metadata(metadata: dict[str, Any] | None) -> list[str]:
+    if not isinstance(metadata, dict):
+        return []
+    kinds = metadata.get("next_experiments_offered_kinds")
+    if not isinstance(kinds, list):
+        return []
+    return [str(kind) for kind in kinds if isinstance(kind, str) and kind]
+
+
+def detect_next_experiment_acceptance(
+    message: str,
+    thread_metadata: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """A user turn that exactly matches an offered row's label (either
+    language) is that row's acceptance; position feeds Stage-1 ordering."""
+    offered = offered_kinds_from_thread_metadata(thread_metadata)
+    if not offered:
+        return None
+    normalized = message.strip().casefold()
+    if not normalized:
+        return None
+    for labels in NEXT_EXPERIMENT_ACTION_LABELS.values():
+        for label_key, label in labels.items():
+            if label.strip().casefold() != normalized:
+                continue
+            kind = label_key.removeprefix(_LABEL_KEY_PREFIX)
+            if kind in offered:
+                return {"kind": kind, "position": offered.index(kind)}
     return None

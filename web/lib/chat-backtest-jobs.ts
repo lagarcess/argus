@@ -7,6 +7,10 @@ import {
   type BacktestRun,
 } from "./argus-api";
 import { hydrateResultActionsForRun } from "./chat-result-actions";
+import {
+  nextExperimentRowsFromMetadata,
+  type NextExperimentRow,
+} from "./chat-next-experiments";
 import type { Message } from "@/components/chat/types";
 import {
   confirmationStatusFromPayload,
@@ -94,7 +98,14 @@ export function applyBacktestJobUpdate(
       message.backtestJob?.id === response.job.id
     ) {
       if (response.job.status === "succeeded" && response.run) {
-        return resultMessageFromRun(message, response.run, response.result_readout);
+        return resultMessageFromRun(
+          message,
+          response.run,
+          response.result_readout,
+          nextExperimentRowsFromMetadata({
+            next_experiments: response.next_experiments,
+          }),
+        );
       }
       return {
         ...message,
@@ -120,6 +131,7 @@ function resultMessageFromRun(
   message: Message,
   run: BacktestRun,
   resultReadout: string | null | undefined,
+  nextExperiments?: NextExperimentRow[] | null,
 ): Message {
   const baseCard = resultCardFromRun(run);
   const actions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
@@ -133,6 +145,7 @@ function resultMessageFromRun(
       actions,
     },
     actions,
+    nextExperiments: nextExperiments ?? undefined,
     artifactId: run.id,
     artifactType: "backtest_run",
     artifactStatus: run.status,

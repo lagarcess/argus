@@ -406,6 +406,7 @@ class BacktestJobResponse(BaseModel):
     result_readout_source: str | None = None
     result_readout_fallback_used: bool | None = None
     result_readout_failure_mode: str | None = None
+    next_experiments: dict[str, Any] | None = None
 
 
 class Idea(BaseModel):

@@ -368,11 +368,20 @@ export default function ChatMessage({
                 className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
                 aria-hidden="true"
               />
-              <div className="min-w-0 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+              <div className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {displayContent}
                 </ReactMarkdown>
               </div>
+              {retryAction ? (
+                <button
+                  type="button"
+                  onClick={() => onAction?.(retryAction)}
+                  className="shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10"
+                >
+                  {actionLabel(retryAction)}
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">

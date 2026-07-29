@@ -12,6 +12,7 @@ type MergeFinalTextOptions = {
   contentPresentation?: Message["contentPresentation"];
   resultFactHeadingKey?: string | null;
   recoveryDisplay?: RecoveryDisplay | null;
+  assistantRecoveryCode?: string | null;
   discovery?: DiscoverySidecar | null;
 };
 

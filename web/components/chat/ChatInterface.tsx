@@ -1380,6 +1380,16 @@ export default function ChatInterface() {
           ...finalResponseActions,
           ...finalRetryActions,
         ];
+        if (
+          finalAssistantRecoveryCode &&
+          !finalTextActions.some(isFailedActionRetry) &&
+          text.trim()
+        ) {
+          const compositionRetry = retryLastTurnActionFromMessage(text, {
+            assistantMessageId: finalMessageId ?? assistantId,
+          });
+          if (compositionRetry) finalTextActions.push(compositionRetry);
+        }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
