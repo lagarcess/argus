@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import Enum
 from typing import Protocol
 
@@ -25,7 +26,21 @@ class ProviderHit(BaseModel):
     score: float = Field(ge=0, allow_inf_nan=False)
 
 
-class ProviderSearchResult(BaseModel):
+class ProviderUsageMetrics(BaseModel):
+    """Optional numeric metadata reported by a provider adapter."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    usage_units: int | None = Field(default=None, ge=0, strict=True)
+    reported_cost_usd: Decimal | None = Field(
+        default=None,
+        ge=Decimal("0"),
+        allow_inf_nan=False,
+        strict=True,
+    )
+
+
+class ProviderSearchResult(ProviderUsageMetrics):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     status: ProviderSearchStatus
@@ -38,7 +53,7 @@ class ProviderSearchResult(BaseModel):
         return self
 
 
-class ProviderProjectionResult(BaseModel):
+class ProviderProjectionResult(ProviderUsageMetrics):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     status: ProviderReconciliationStatus
@@ -53,7 +68,7 @@ class ProviderProjectionResult(BaseModel):
         return self
 
 
-class ProviderCleanupResult(BaseModel):
+class ProviderCleanupResult(ProviderUsageMetrics):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     status: ProviderReconciliationStatus

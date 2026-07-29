@@ -32,6 +32,11 @@ from argus.memory.subject import (
     MemorySubject,
     PersonalizationMemoryUnavailable,
 )
+from argus.memory.telemetry import (
+    MemoryEvalTraceSink,
+    MemoryEventSink,
+    MemoryProviderReceiptSink,
+)
 
 GUEST_OWNER_ID = "9d9ec96b-6fd7-4d8f-b092-b518701674f8"
 
@@ -90,6 +95,11 @@ def _exploding_service() -> MemoryService:
         id_factory=cast(IdFactory, exploding),
         store=cast(CanonicalMemoryStore, exploding),
         provider=cast(MemoryRetrievalProvider, exploding),
+        event_sink=cast(MemoryEventSink, exploding),
+        provider_receipt_sink=cast(MemoryProviderReceiptSink, exploding),
+        eval_trace_sink=cast(MemoryEvalTraceSink, exploding),
+        correlation_id_factory=cast(Callable[[], str], exploding),
+        monotonic=cast(Callable[[], float], exploding),
     )
 
 
@@ -145,7 +155,22 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
         for name, member in getmembers(MemoryService, predicate=isfunction)
         if not name.startswith("_")
     }
-    assert set(calls) == public_methods
+    expected_rows = (
+        "confirm",
+        "decline",
+        "delete",
+        "disable",
+        "edit",
+        "enable",
+        "explain",
+        "inspect",
+        "propose",
+        "propose_saved_decision",
+        "reset",
+        "retrieve",
+    )
+    assert tuple(sorted(calls)) == expected_rows
+    assert tuple(sorted(public_methods)) == expected_rows
 
     for call in calls.values():
         with pytest.raises(PersonalizationMemoryUnavailable):

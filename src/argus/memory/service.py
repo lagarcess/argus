@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import math
 import re
-from collections.abc import Callable, Iterable
+import time
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Protocol
+from decimal import Decimal
+from typing import Generic, Protocol, TypeVar
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.memory.contracts import (
     ConfirmationResult,
@@ -31,7 +35,7 @@ from argus.memory.contracts import (
     SensitivityAssessment,
     SensitivityStatus,
 )
-from argus.memory.policy import RESTRICTED_CONTEXTS, MemoryPolicy
+from argus.memory.policy import RESTRICTED_CONTEXTS, MemoryPolicy, PolicyOutcome
 from argus.memory.provider import (
     MemoryRetrievalProvider,
     NoOpMemoryProvider,
@@ -51,6 +55,19 @@ from argus.memory.subject import (
     RegisteredMemoryOwner,
     require_registered,
 )
+from argus.memory.telemetry import (
+    MemoryDomainEvent,
+    MemoryEvalTraceSink,
+    MemoryEventSink,
+    MemoryOperation,
+    MemoryOutcome,
+    MemoryPolicyTrace,
+    MemoryProviderReceiptSink,
+    ProviderCallReceipt,
+    ProviderCallStatus,
+    ProviderOperation,
+    reason_codes_for,
+)
 
 
 class MemoryAvailability(Protocol):
@@ -67,6 +84,27 @@ class Clock(Protocol):
 
 class IdFactory(Protocol):
     def __call__(self) -> str: ...
+
+
+class Monotonic(Protocol):
+    def __call__(self) -> float: ...
+
+
+ProviderResultT = TypeVar(
+    "ProviderResultT",
+    ProviderProjectionResult,
+    ProviderSearchResult,
+    ProviderCleanupResult,
+)
+
+
+@dataclass(frozen=True)
+class _ProviderCallOutcome(Generic[ProviderResultT]):
+    result: ProviderResultT | None
+    status: ProviderCallStatus
+    latency_ms: int | None
+    usage_units: int | None = None
+    reported_cost_usd: Decimal | None = None
 
 
 class MemoryServiceConfig(BaseModel):
@@ -94,6 +132,11 @@ class MemoryService:
         policy: MemoryPolicy | None = None,
         clock: Clock | Callable[[], datetime] = _utc_now,
         id_factory: IdFactory | Callable[[], str] = _new_id,
+        event_sink: MemoryEventSink | None = None,
+        provider_receipt_sink: MemoryProviderReceiptSink | None = None,
+        eval_trace_sink: MemoryEvalTraceSink | None = None,
+        correlation_id_factory: IdFactory | Callable[[], str] = _new_id,
+        monotonic: Monotonic | Callable[[], float] = time.monotonic,
     ) -> None:
         self._store = store
         self._provider = provider if provider is not None else NoOpMemoryProvider()
@@ -101,6 +144,11 @@ class MemoryService:
         self._policy = policy if policy is not None else MemoryPolicy()
         self._clock = clock
         self._id_factory = id_factory
+        self._event_sink = event_sink
+        self._provider_receipt_sink = provider_receipt_sink
+        self._eval_trace_sink = eval_trace_sink
+        self._correlation_id_factory = correlation_id_factory
+        self._monotonic = monotonic
 
     def propose_saved_decision(
         self,
@@ -120,10 +168,43 @@ class MemoryService:
             trigger=MemoryProposalTrigger.SAVED_DECISION,
             sensitivity=sensitivity,
         )
-        if not self._policy.preflight(draft, context=context).allowed:
+        preflight = self._policy.preflight(draft, context=context)
+        correlation_id = self._safe_correlation_id()
+        if not preflight.allowed:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.PROPOSE_SAVED_DECISION,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.PROPOSE_SAVED_DECISION,
+                MemoryOutcome.SUPPRESSED,
+                category=draft.category,
+            )
             return None
-        self._require_available()
-        return self._propose(owner, draft, context)
+        try:
+            self._require_available()
+        except PersonalizationMemoryUnavailable:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.PROPOSE_SAVED_DECISION,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.PROPOSE_SAVED_DECISION,
+                MemoryOutcome.UNAVAILABLE,
+                category=draft.category,
+            )
+            raise
+        return self._propose(
+            owner,
+            draft,
+            context,
+            correlation_id=correlation_id,
+            operation=MemoryOperation.PROPOSE_SAVED_DECISION,
+        )
 
     def propose(
         self,
@@ -132,10 +213,43 @@ class MemoryService:
         context: MemoryOperationContext,
     ) -> ProposalResult | None:
         owner = require_registered(subject)
-        if not self._policy.preflight(draft, context=context).allowed:
+        preflight = self._policy.preflight(draft, context=context)
+        correlation_id = self._safe_correlation_id()
+        if not preflight.allowed:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.PROPOSE,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.PROPOSE,
+                MemoryOutcome.SUPPRESSED,
+                category=draft.category,
+            )
             return None
-        self._require_available()
-        return self._propose(owner, draft, context)
+        try:
+            self._require_available()
+        except PersonalizationMemoryUnavailable:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.PROPOSE,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.PROPOSE,
+                MemoryOutcome.UNAVAILABLE,
+                category=draft.category,
+            )
+            raise
+        return self._propose(
+            owner,
+            draft,
+            context,
+            correlation_id=correlation_id,
+            operation=MemoryOperation.PROPOSE,
+        )
 
     def enable(
         self,
@@ -144,8 +258,16 @@ class MemoryService:
     ) -> MemoryConsentSettings:
         owner = require_registered(subject)
         self._policy.validate_enable_scope(categories)
+        correlation_id = self._safe_correlation_id()
         self._require_available()
-        return self._store.enable_categories(owner, categories)
+        settings = self._store.enable_categories(owner, categories)
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.ENABLE,
+            MemoryOutcome.ENABLED,
+            safe_count=len(settings.enabled_categories),
+        )
+        return settings
 
     def confirm(
         self,
@@ -156,19 +278,65 @@ class MemoryService:
         context: MemoryOperationContext,
     ) -> ConfirmationResult:
         owner = require_registered(subject)
-        if not self._policy.preflight_context(
+        preflight = self._policy.preflight_context(
             sensitivity=sensitivity,
             context=context,
-        ).allowed:
+        )
+        correlation_id = self._safe_correlation_id()
+        if not preflight.allowed:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.SUPPRESSED,
+            )
             return ConfirmationResult(created=False)
-        self._require_available()
+        try:
+            self._require_available()
+        except PersonalizationMemoryUnavailable:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.UNAVAILABLE,
+            )
+            raise
         candidate = self._store.get_candidate(owner, candidate_id)
         if candidate is None:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.NO_CHANGE,
+            )
             return ConfirmationResult(created=False)
 
         now = self._clock()
         if now - candidate.created_at >= self._config.candidate_ttl:
             self._store.discard_candidate(owner, candidate_id)
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                preflight.outcome,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.NO_CHANGE,
+                category=candidate.category,
+            )
             return ConfirmationResult(created=False)
 
         decision = self._policy.evaluate(
@@ -182,8 +350,19 @@ class MemoryService:
             last_declined_at=None,
             now=now,
         )
+        self._record_policy_trace(
+            correlation_id,
+            MemoryOperation.CONFIRM,
+            decision.outcome,
+        )
         if not decision.allowed or decision.opt_in_scope != candidate.opt_in_scope:
             self._store.discard_candidate(owner, candidate_id)
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.SUPPRESSED,
+                category=candidate.category,
+            )
             return ConfirmationResult(created=False)
         mutation = self._store.confirm_candidate(
             owner,
@@ -193,7 +372,19 @@ class MemoryService:
         )
         result = mutation.result
         if not result.created or result.record is None:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.NO_CHANGE,
+                category=candidate.category,
+            )
             return result
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.CONFIRM,
+            MemoryOutcome.CONFIRMED,
+            category=result.record.category,
+        )
         reconciliation_generation = mutation.reconciliation_generation
         assert reconciliation_generation is not None
         try:
@@ -204,13 +395,27 @@ class MemoryService:
             )
             if not has_reconciliation_turn:
                 return result
-            try:
-                projection = ProviderProjectionResult.model_validate(
-                    self._provider.project(owner, result.record)
+            projection_call = self._call_provider_project(
+                owner,
+                result.record,
+                correlation_id,
+            )
+            projection = projection_call.result
+            if projection is None:
+                self._record_provider_receipt(
+                    correlation_id,
+                    ProviderOperation.PROJECT,
+                    projection_call,
+                    ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
                 )
-            except Exception:
                 return result
             if projection.status is not ProviderReconciliationStatus.SYNCHRONIZED:
+                self._record_provider_receipt(
+                    correlation_id,
+                    ProviderOperation.PROJECT,
+                    projection_call,
+                    projection.status,
+                )
                 return result
             assert projection.provider_ref is not None
             ref_committed = self._store.compare_and_set_provider_ref(
@@ -231,7 +436,18 @@ class MemoryService:
                     owner,
                     result.record.id,
                     projection.provider_ref,
+                    correlation_id,
                 )
+            self._record_provider_receipt(
+                correlation_id,
+                ProviderOperation.PROJECT,
+                projection_call,
+                (
+                    ProviderReconciliationStatus.SYNCHRONIZED
+                    if ref_committed
+                    else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+                ),
+            )
         finally:
             self._store.finish_record_reconciliation(
                 owner,
@@ -242,29 +458,50 @@ class MemoryService:
 
     def decline(self, subject: MemorySubject, candidate_id: str) -> bool:
         owner = require_registered(subject)
+        correlation_id = self._safe_correlation_id()
         self._require_available()
         candidate = self._store.get_candidate(owner, candidate_id)
         if candidate is None:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.DECLINE,
+                MemoryOutcome.NO_CHANGE,
+            )
             return False
         declined_at = (
             None
             if candidate.trigger is MemoryProposalTrigger.EXPLICIT_REQUEST
             else self._clock()
         )
-        return self._store.decline_candidate_with_history(
+        declined = self._store.decline_candidate_with_history(
             owner,
             candidate_id,
             declined_at=declined_at,
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.DECLINE,
+            MemoryOutcome.DECLINED if declined else MemoryOutcome.NO_CHANGE,
+            category=candidate.category,
+        )
+        return declined
 
     def inspect(self, subject: MemorySubject) -> tuple[MemoryRecord, ...]:
         owner = require_registered(subject)
-        return tuple(
+        correlation_id = self._safe_correlation_id()
+        records = tuple(
             sorted(
                 self._store.list_records(owner),
                 key=lambda record: (record.created_at, record.id),
             )
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.INSPECT,
+            MemoryOutcome.INSPECTED,
+            safe_count=len(records),
+        )
+        return records
 
     def retrieve(
         self,
@@ -276,24 +513,41 @@ class MemoryService:
         limit: int = 3,
     ) -> tuple[RetrievedMemory, ...]:
         owner = require_registered(subject)
+        correlation_id = self._safe_correlation_id()
         if context in RESTRICTED_CONTEXTS:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.RETRIEVE,
+                MemoryOutcome.SUPPRESSED,
+            )
             return ()
-        self._require_available()
+        try:
+            self._require_available()
+        except PersonalizationMemoryUnavailable:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.RETRIEVE,
+                MemoryOutcome.UNAVAILABLE,
+            )
+            raise
         if not isinstance(purpose, MemoryUsePurpose):
             raise TypeError("purpose must be a MemoryUsePurpose")
         if not 1 <= limit <= 10:
             raise ValueError("retrieval limit must be between 1 and 10")
         normalized_query = query.strip()
         if not normalized_query:
+            self._emit_retrieval_result(correlation_id, ())
             return ()
 
         settings = self._store.get_settings(owner)
         if not settings.enabled:
+            self._emit_retrieval_result(correlation_id, ())
             return ()
         allowed_categories = (
             self._categories_for_purpose(purpose) & settings.enabled_categories
         )
         if not allowed_categories:
+            self._emit_retrieval_result(correlation_id, ())
             return ()
         records = {
             record.id: record
@@ -301,27 +555,32 @@ class MemoryService:
             if record.owner_id == owner.owner_id and record.category in allowed_categories
         }
         if not records:
+            self._emit_retrieval_result(correlation_id, ())
             return ()
 
         provider_result = self._search_provider(
             owner,
             normalized_query,
             limit,
+            correlation_id,
         )
         if (
             provider_result is not None
             and provider_result.status is ProviderSearchStatus.ANSWERED
         ):
-            return self._rehydrate_provider_hits(
+            result = self._rehydrate_provider_hits(
                 records,
                 provider_result,
                 limit=limit,
             )
-        return self._canonical_fallback(
-            records.values(),
-            normalized_query,
-            limit=limit,
-        )
+        else:
+            result = self._canonical_fallback(
+                records.values(),
+                normalized_query,
+                limit=limit,
+            )
+        self._emit_retrieval_result(correlation_id, result)
+        return result
 
     def explain(
         self,
@@ -329,10 +588,16 @@ class MemoryService:
         record_id: str,
     ) -> MemoryExplanation | None:
         owner = require_registered(subject)
+        correlation_id = self._safe_correlation_id()
         record = self._store.get_record(owner, record_id)
         if record is None:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.EXPLAIN,
+                MemoryOutcome.NO_CHANGE,
+            )
             return None
-        return MemoryExplanation(
+        explanation = MemoryExplanation(
             record_id=record.id,
             category=record.category,
             provenance=record.provenance_refs,
@@ -340,6 +605,13 @@ class MemoryService:
             consent_schema_version=record.consent_receipt.schema_version,
             confirmed_at=record.consent_receipt.confirmed_at,
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.EXPLAIN,
+            MemoryOutcome.EXPLAINED,
+            category=record.category,
+        )
+        return explanation
 
     def edit(
         self,
@@ -350,6 +622,7 @@ class MemoryService:
         owner = require_registered(subject)
         self._validate_record_id(record_id)
         self._validate_edit_sensitivity(edit.sensitivity)
+        correlation_id = self._safe_correlation_id()
         mutation = self._store.edit_record(
             owner,
             record_id,
@@ -357,16 +630,32 @@ class MemoryService:
             label=edit.label,
         )
         if mutation is None:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.EDIT,
+                MemoryOutcome.NO_CHANGE,
+            )
             return MemoryControlResult(
                 changed=False,
                 provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
             )
         assert mutation.after is not None
-        return MemoryControlResult(
+        result = MemoryControlResult(
             changed=True,
             record=mutation.after,
-            provider_status=self._reconcile_edit(owner, mutation),
+            provider_status=self._reconcile_edit(
+                owner,
+                mutation,
+                correlation_id,
+            ),
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.EDIT,
+            MemoryOutcome.EDITED,
+            category=mutation.after.category,
+        )
+        return result
 
     def delete(
         self,
@@ -375,8 +664,14 @@ class MemoryService:
     ) -> MemoryControlResult:
         owner = require_registered(subject)
         self._validate_record_id(record_id)
+        correlation_id = self._safe_correlation_id()
         mutation = self._store.delete_record(owner, record_id)
         if mutation is None:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.DELETE,
+                MemoryOutcome.NO_CHANGE,
+            )
             return MemoryControlResult(
                 changed=False,
                 provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
@@ -392,6 +687,7 @@ class MemoryService:
                         owner,
                         record_id,
                         provider_ref,
+                        correlation_id,
                     )
                     for provider_ref in mutation.cleanup_refs
                 )
@@ -411,46 +707,83 @@ class MemoryService:
             )
         if not reconciliation_finished:
             provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
-        return MemoryControlResult(
+        result = MemoryControlResult(
             changed=True,
             provider_status=provider_status,
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.DELETE,
+            MemoryOutcome.DELETED,
+            category=mutation.before.category,
+        )
+        return result
 
     def disable(self, subject: MemorySubject) -> MemoryControlResult:
         owner = require_registered(subject)
-        return MemoryControlResult(
-            changed=self._store.disable(owner),
+        correlation_id = self._safe_correlation_id()
+        changed = self._store.disable(owner)
+        result = MemoryControlResult(
+            changed=changed,
             provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.DISABLE,
+            MemoryOutcome.DISABLED if changed else MemoryOutcome.NO_CHANGE,
+        )
+        return result
 
     def reset(self, subject: MemorySubject) -> MemoryControlResult:
         owner = require_registered(subject)
+        correlation_id = self._safe_correlation_id()
         reset = self._store.reset(owner)
         if not reset.changed:
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.RESET,
+                MemoryOutcome.NO_CHANGE,
+            )
             return MemoryControlResult(
                 changed=False,
                 provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
             )
-        try:
-            cleanup = ProviderCleanupResult.model_validate(self._provider.reset(owner))
-            provider_status = cleanup.status
-        except Exception:
+        cleanup_call = self._call_provider_reset(owner, correlation_id)
+        cleanup = cleanup_call.result
+        if cleanup is None:
             provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        else:
+            provider_status = cleanup.status
         if (
             reset.provider_state_existed
             and provider_status is ProviderReconciliationStatus.NOT_APPLICABLE
         ):
             provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
-        return MemoryControlResult(
+        self._record_provider_receipt(
+            correlation_id,
+            ProviderOperation.RESET,
+            cleanup_call,
+            provider_status,
+        )
+        result = MemoryControlResult(
             changed=True,
             provider_status=provider_status,
         )
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.RESET,
+            MemoryOutcome.RESET,
+        )
+        return result
 
     def _propose(
         self,
         owner: RegisteredMemoryOwner,
         draft: MemoryCandidateDraft,
         context: MemoryOperationContext,
+        *,
+        correlation_id: str | None,
+        operation: MemoryOperation,
     ) -> ProposalResult | None:
         now = self._clock()
         last_proactive_prompt_at = self._store.last_proactive_prompt_at(
@@ -469,7 +802,18 @@ class MemoryService:
             last_declined_at=last_declined_at,
             now=now,
         )
+        self._record_policy_trace(
+            correlation_id,
+            operation,
+            decision.outcome,
+        )
         if not decision.allowed:
+            self._emit_event(
+                correlation_id,
+                operation,
+                MemoryOutcome.SUPPRESSED,
+                category=draft.category,
+            )
             return None
 
         candidate = MemoryCandidate(
@@ -507,8 +851,21 @@ class MemoryService:
             expected_history=expected_history,
         )
         if not admitted:
+            self._emit_event(
+                correlation_id,
+                operation,
+                MemoryOutcome.NO_CHANGE,
+                category=draft.category,
+            )
             return None
-        return ProposalResult(candidate=candidate)
+        result = ProposalResult(candidate=candidate)
+        self._emit_event(
+            correlation_id,
+            operation,
+            MemoryOutcome.CANDIDATE_CREATED,
+            category=draft.category,
+        )
+        return result
 
     @staticmethod
     def _draft_from_candidate(
@@ -548,6 +905,7 @@ class MemoryService:
         self,
         owner: RegisteredMemoryOwner,
         mutation: CanonicalRecordMutation,
+        correlation_id: str | None,
     ) -> ProviderReconciliationStatus:
         updated = mutation.after
         assert updated is not None
@@ -565,6 +923,7 @@ class MemoryService:
                     mutation,
                     updated,
                     reconciliation_generation,
+                    correlation_id,
                 )
                 if has_reconciliation_turn
                 else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
@@ -585,37 +944,58 @@ class MemoryService:
         mutation: CanonicalRecordMutation,
         updated: MemoryRecord,
         reconciliation_generation: int,
+        correlation_id: str | None,
     ) -> ProviderReconciliationStatus:
-        try:
-            projection = ProviderProjectionResult.model_validate(
-                self._provider.project(owner, updated)
-            )
-        except Exception:
+        projection_call = self._call_provider_project(
+            owner,
+            updated,
+            correlation_id,
+        )
+        projection = projection_call.result
+        if projection is None:
             if mutation.provider_ref is not None:
                 self._store.track_provider_cleanup_target(
                     owner,
                     updated.id,
                     mutation.provider_ref,
                 )
-            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            effective_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            self._record_provider_receipt(
+                correlation_id,
+                ProviderOperation.PROJECT,
+                projection_call,
+                effective_status,
+            )
+            return effective_status
 
         if projection.status is not ProviderReconciliationStatus.SYNCHRONIZED:
             if (
                 projection.status is ProviderReconciliationStatus.NOT_APPLICABLE
                 and mutation.provider_ref is None
             ):
-                return self._status_with_pending_cleanup(
+                effective_status = self._status_with_pending_cleanup(
                     owner,
                     updated.id,
                     ProviderReconciliationStatus.NOT_APPLICABLE,
                 )
-            if mutation.provider_ref is not None:
+            else:
+                effective_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            if (
+                effective_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+                and mutation.provider_ref is not None
+            ):
                 self._store.track_provider_cleanup_target(
                     owner,
                     updated.id,
                     mutation.provider_ref,
                 )
-            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            self._record_provider_receipt(
+                correlation_id,
+                ProviderOperation.PROJECT,
+                projection_call,
+                effective_status,
+            )
+            return effective_status
         assert projection.provider_ref is not None
         ref_committed = self._store.compare_and_set_provider_ref(
             owner,
@@ -635,8 +1015,16 @@ class MemoryService:
                 owner,
                 updated.id,
                 projection.provider_ref,
+                correlation_id,
             )
-            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            effective_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            self._record_provider_receipt(
+                correlation_id,
+                ProviderOperation.PROJECT,
+                projection_call,
+                effective_status,
+            )
+            return effective_status
         if (
             mutation.provider_ref is not None
             and mutation.provider_ref != projection.provider_ref
@@ -645,14 +1033,28 @@ class MemoryService:
                 owner,
                 updated.id,
                 mutation.provider_ref,
+                correlation_id,
             )
             if cleanup_status is not ProviderReconciliationStatus.SYNCHRONIZED:
+                self._record_provider_receipt(
+                    correlation_id,
+                    ProviderOperation.PROJECT,
+                    projection_call,
+                    cleanup_status,
+                )
                 return cleanup_status
-        return self._status_with_pending_cleanup(
+        effective_status = self._status_with_pending_cleanup(
             owner,
             updated.id,
             ProviderReconciliationStatus.SYNCHRONIZED,
         )
+        self._record_provider_receipt(
+            correlation_id,
+            ProviderOperation.PROJECT,
+            projection_call,
+            effective_status,
+        )
+        return effective_status
 
     def _status_with_pending_cleanup(
         self,
@@ -669,37 +1071,340 @@ class MemoryService:
         owner: RegisteredMemoryOwner,
         record_id: str,
         provider_ref: str,
+        correlation_id: str | None,
     ) -> ProviderReconciliationStatus:
-        try:
-            cleanup = ProviderCleanupResult.model_validate(
-                self._provider.delete(owner, provider_ref)
-            )
-        except Exception:
-            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
-        if cleanup.status is ProviderReconciliationStatus.SYNCHRONIZED:
+        cleanup_call = self._call_provider_delete(
+            owner,
+            provider_ref,
+            correlation_id,
+        )
+        cleanup = cleanup_call.result
+        if cleanup is None:
+            effective_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        elif cleanup.status is ProviderReconciliationStatus.SYNCHRONIZED:
             resolved = self._store.resolve_provider_cleanup_target(
                 owner,
                 record_id,
                 provider_ref,
             )
-            if not resolved:
-                return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
-            return ProviderReconciliationStatus.SYNCHRONIZED
-        return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            effective_status = (
+                ProviderReconciliationStatus.SYNCHRONIZED
+                if resolved
+                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            )
+        else:
+            effective_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        self._record_provider_receipt(
+            correlation_id,
+            ProviderOperation.DELETE,
+            cleanup_call,
+            effective_status,
+        )
+        return effective_status
 
     def _search_provider(
         self,
         owner: RegisteredMemoryOwner,
         query: str,
         limit: int,
+        correlation_id: str | None,
     ) -> ProviderSearchResult | None:
+        search_call = self._call_provider_search(
+            owner,
+            query,
+            limit,
+            correlation_id,
+        )
+        self._record_provider_receipt(
+            correlation_id,
+            ProviderOperation.SEARCH,
+            search_call,
+            ProviderReconciliationStatus.NOT_APPLICABLE,
+        )
+        return search_call.result
+
+    def _call_provider_project(
+        self,
+        owner: RegisteredMemoryOwner,
+        record: MemoryRecord,
+        correlation_id: str | None,
+    ) -> _ProviderCallOutcome[ProviderProjectionResult]:
+        started_at = self._provider_started_at(correlation_id)
         try:
-            result = self._provider.search(owner, query, limit)
-            if result is None:
+            raw_result = self._provider.project(owner, record)
+            result = self._validate_provider_result(
+                ProviderProjectionResult,
+                raw_result,
+            )
+        except Exception:
+            result = None
+        if result is None:
+            return _ProviderCallOutcome(
+                result=None,
+                status=ProviderCallStatus.FAILED,
+                latency_ms=self._provider_latency_ms(started_at),
+            )
+        return _ProviderCallOutcome(
+            result=result,
+            status=self._provider_call_status(result.status),
+            latency_ms=self._provider_latency_ms(started_at),
+            usage_units=result.usage_units,
+            reported_cost_usd=result.reported_cost_usd,
+        )
+
+    def _call_provider_search(
+        self,
+        owner: RegisteredMemoryOwner,
+        query: str,
+        limit: int,
+        correlation_id: str | None,
+    ) -> _ProviderCallOutcome[ProviderSearchResult]:
+        started_at = self._provider_started_at(correlation_id)
+        try:
+            raw_result = self._provider.search(owner, query, limit)
+            result = self._validate_provider_result(ProviderSearchResult, raw_result)
+        except Exception:
+            result = None
+        if result is None:
+            return _ProviderCallOutcome(
+                result=None,
+                status=ProviderCallStatus.FAILED,
+                latency_ms=self._provider_latency_ms(started_at),
+            )
+        return _ProviderCallOutcome(
+            result=result,
+            status=(
+                ProviderCallStatus.SUCCEEDED
+                if result.status is ProviderSearchStatus.ANSWERED
+                else ProviderCallStatus.UNAVAILABLE
+            ),
+            latency_ms=self._provider_latency_ms(started_at),
+            usage_units=result.usage_units,
+            reported_cost_usd=result.reported_cost_usd,
+        )
+
+    def _call_provider_delete(
+        self,
+        owner: RegisteredMemoryOwner,
+        provider_ref: str,
+        correlation_id: str | None,
+    ) -> _ProviderCallOutcome[ProviderCleanupResult]:
+        started_at = self._provider_started_at(correlation_id)
+        try:
+            raw_result = self._provider.delete(owner, provider_ref)
+            result = self._validate_provider_result(
+                ProviderCleanupResult,
+                raw_result,
+            )
+        except Exception:
+            result = None
+        if result is None:
+            return _ProviderCallOutcome(
+                result=None,
+                status=ProviderCallStatus.FAILED,
+                latency_ms=self._provider_latency_ms(started_at),
+            )
+        return _ProviderCallOutcome(
+            result=result,
+            status=self._provider_call_status(result.status),
+            latency_ms=self._provider_latency_ms(started_at),
+            usage_units=result.usage_units,
+            reported_cost_usd=result.reported_cost_usd,
+        )
+
+    def _call_provider_reset(
+        self,
+        owner: RegisteredMemoryOwner,
+        correlation_id: str | None,
+    ) -> _ProviderCallOutcome[ProviderCleanupResult]:
+        started_at = self._provider_started_at(correlation_id)
+        try:
+            raw_result = self._provider.reset(owner)
+            result = self._validate_provider_result(
+                ProviderCleanupResult,
+                raw_result,
+            )
+        except Exception:
+            result = None
+        if result is None:
+            return _ProviderCallOutcome(
+                result=None,
+                status=ProviderCallStatus.FAILED,
+                latency_ms=self._provider_latency_ms(started_at),
+            )
+        return _ProviderCallOutcome(
+            result=result,
+            status=self._provider_call_status(result.status),
+            latency_ms=self._provider_latency_ms(started_at),
+            usage_units=result.usage_units,
+            reported_cost_usd=result.reported_cost_usd,
+        )
+
+    @staticmethod
+    def _validate_provider_result(
+        model_type: type[ProviderResultT],
+        raw_result: object,
+    ) -> ProviderResultT | None:
+        try:
+            return model_type.model_validate(raw_result)
+        except ValidationError:
+            if isinstance(raw_result, BaseModel):
+                payload = raw_result.model_dump()
+            elif isinstance(raw_result, Mapping):
+                payload = dict(raw_result)
+            else:
                 return None
-            return ProviderSearchResult.model_validate(result)
+            allowed_fields = set(model_type.model_fields)
+            if not set(payload) <= allowed_fields:
+                return None
+            metric_payload = {
+                field: payload.pop(field)
+                for field in ("usage_units", "reported_cost_usd")
+                if field in payload
+            }
+            try:
+                sanitized = model_type.model_validate(payload).model_dump()
+            except ValidationError:
+                return None
+            for field, value in metric_payload.items():
+                try:
+                    with_metric = model_type.model_validate({**sanitized, field: value})
+                except ValidationError:
+                    continue
+                sanitized[field] = getattr(with_metric, field)
+            return model_type.model_validate(sanitized)
+
+    @staticmethod
+    def _provider_call_status(
+        reconciliation_status: ProviderReconciliationStatus,
+    ) -> ProviderCallStatus:
+        if reconciliation_status is ProviderReconciliationStatus.SYNCHRONIZED:
+            return ProviderCallStatus.SUCCEEDED
+        if reconciliation_status is ProviderReconciliationStatus.NOT_APPLICABLE:
+            return ProviderCallStatus.UNAVAILABLE
+        return ProviderCallStatus.FAILED
+
+    def _safe_correlation_id(self) -> str | None:
+        if (
+            self._event_sink is None
+            and self._provider_receipt_sink is None
+            and self._eval_trace_sink is None
+        ):
+            return None
+        try:
+            correlation_id = self._correlation_id_factory()
         except Exception:
             return None
+        if (
+            not isinstance(correlation_id, str)
+            or not correlation_id.strip()
+            or len(correlation_id) > 128
+        ):
+            return None
+        return correlation_id
+
+    def _emit_event(
+        self,
+        correlation_id: str | None,
+        operation: MemoryOperation,
+        outcome: MemoryOutcome,
+        *,
+        category: MemoryCategory | None = None,
+        safe_count: int | None = None,
+    ) -> None:
+        if correlation_id is None or self._event_sink is None:
+            return
+        try:
+            self._event_sink.emit(
+                MemoryDomainEvent(
+                    correlation_id=correlation_id,
+                    operation=operation,
+                    outcome=outcome,
+                    category=category,
+                    safe_count=safe_count,
+                )
+            )
+        except Exception:
+            return
+
+    def _record_policy_trace(
+        self,
+        correlation_id: str | None,
+        operation: MemoryOperation,
+        outcome: PolicyOutcome,
+    ) -> None:
+        if correlation_id is None or self._eval_trace_sink is None:
+            return
+        try:
+            trace = MemoryPolicyTrace(
+                correlation_id=correlation_id,
+                operation=operation,
+                outcome=outcome,
+                reason_codes=reason_codes_for(outcome),
+            )
+            self._eval_trace_sink.record(trace)
+        except Exception:
+            return
+
+    def _record_provider_receipt(
+        self,
+        correlation_id: str | None,
+        operation: ProviderOperation,
+        call: _ProviderCallOutcome[ProviderResultT],
+        reconciliation_status: ProviderReconciliationStatus,
+    ) -> None:
+        if correlation_id is None or self._provider_receipt_sink is None:
+            return
+        try:
+            receipt = ProviderCallReceipt(
+                correlation_id=correlation_id,
+                operation=operation,
+                status=call.status,
+                latency_ms=call.latency_ms,
+                usage_units=call.usage_units,
+                reported_cost_usd=call.reported_cost_usd,
+                reconciliation_status=reconciliation_status,
+            )
+            self._provider_receipt_sink.record(receipt)
+        except Exception:
+            return
+
+    def _safe_monotonic(self) -> float | None:
+        try:
+            value = self._monotonic()
+        except Exception:
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        normalized = float(value)
+        if not math.isfinite(normalized):
+            return None
+        return normalized
+
+    def _provider_started_at(self, correlation_id: str | None) -> float | None:
+        if correlation_id is None or self._provider_receipt_sink is None:
+            return None
+        return self._safe_monotonic()
+
+    def _provider_latency_ms(self, started_at: float | None) -> int | None:
+        if started_at is None:
+            return None
+        finished_at = self._safe_monotonic()
+        if finished_at is None or finished_at < started_at:
+            return None
+        return int((finished_at - started_at) * 1000)
+
+    def _emit_retrieval_result(
+        self,
+        correlation_id: str | None,
+        result: tuple[RetrievedMemory, ...],
+    ) -> None:
+        self._emit_event(
+            correlation_id,
+            MemoryOperation.RETRIEVE,
+            MemoryOutcome.RETRIEVED,
+            safe_count=len(result),
+        )
 
     @staticmethod
     def _rehydrate_provider_hits(
