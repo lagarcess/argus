@@ -6,9 +6,15 @@ from uuid import UUID
 
 import pytest
 from argus.memory.contracts import (
+    MemoryCandidateDraft,
+    MemoryCategory,
+    MemoryOperationContext,
+    MemoryProposalTrigger,
     MemoryProvenance,
     MemorySourceKind,
     SavedDecisionSource,
+    SensitivityAssessment,
+    SensitivityStatus,
 )
 from argus.memory.service import (
     Clock,
@@ -50,6 +56,28 @@ def _saved_decision_source() -> SavedDecisionSource:
     )
 
 
+def _candidate_draft() -> MemoryCandidateDraft:
+    return MemoryCandidateDraft(
+        category=MemoryCategory.WORKFLOW_PREFERENCE,
+        value="Show assumptions before results.",
+        label="Assumptions first",
+        future_benefit="Argus can keep the preferred review order.",
+        provenance=(
+            MemoryProvenance(
+                source_kind=MemorySourceKind.MESSAGE,
+                source_id="message-guest-test",
+                source_version="1",
+            ),
+        ),
+        trigger=MemoryProposalTrigger.EXPLICIT_REQUEST,
+        sensitivity=SensitivityAssessment(status=SensitivityStatus.CLEAR),
+    )
+
+
+def _clear_sensitivity() -> SensitivityAssessment:
+    return SensitivityAssessment(status=SensitivityStatus.CLEAR)
+
+
 def _exploding_service() -> MemoryService:
     exploding = _ExplodingDependency()
     return MemoryService(
@@ -68,8 +96,27 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
         kind=MemoryAccountKind.GUEST,
     )
     calls: tuple[Callable[[], object], ...] = (
-        lambda: service.propose_saved_decision(subject, _saved_decision_source()),
-        lambda: service.confirm(subject, "candidate-1"),
+        lambda: service.propose_saved_decision(
+            subject,
+            _saved_decision_source(),
+            sensitivity=_clear_sensitivity(),
+            context=MemoryOperationContext.ORDINARY,
+        ),
+        lambda: service.propose(
+            subject,
+            _candidate_draft(),
+            MemoryOperationContext.ORDINARY,
+        ),
+        lambda: service.enable(
+            subject,
+            frozenset({MemoryCategory.WORKFLOW_PREFERENCE}),
+        ),
+        lambda: service.confirm(
+            subject,
+            "candidate-1",
+            sensitivity=_clear_sensitivity(),
+            context=MemoryOperationContext.ORDINARY,
+        ),
         lambda: service.decline(subject, "candidate-1"),
     )
 
@@ -88,4 +135,9 @@ def test_guest_with_valid_owner_uuid_is_still_denied() -> None:
     )
 
     with pytest.raises(PersonalizationMemoryUnavailable):
-        service.propose_saved_decision(subject, _saved_decision_source())
+        service.propose_saved_decision(
+            subject,
+            _saved_decision_source(),
+            sensitivity=_clear_sensitivity(),
+            context=MemoryOperationContext.ORDINARY,
+        )

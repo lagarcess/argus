@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from argus.memory.contracts import (
+    ConfirmationResult,
     MemoryCategory,
+    MemoryOperationContext,
     MemoryProvenance,
     MemorySourceKind,
+    ProposalResult,
     SavedDecisionSource,
+    SensitivityAssessment,
+    SensitivityStatus,
 )
+from argus.memory.policy import MemoryPolicy
 from argus.memory.service import MemoryService, MemoryServiceConfig
 from argus.memory.store import InMemoryCanonicalMemoryStore
 from argus.memory.subject import (
@@ -42,6 +48,37 @@ def _saved_decision_source() -> SavedDecisionSource:
     )
 
 
+def _clear_sensitivity() -> SensitivityAssessment:
+    return SensitivityAssessment(status=SensitivityStatus.CLEAR)
+
+
+def _propose_saved(
+    service: MemoryService,
+    subject: MemorySubject,
+) -> ProposalResult:
+    result = service.propose_saved_decision(
+        subject,
+        _saved_decision_source(),
+        sensitivity=_clear_sensitivity(),
+        context=MemoryOperationContext.ORDINARY,
+    )
+    assert result is not None
+    return result
+
+
+def _confirm(
+    service: MemoryService,
+    subject: MemorySubject,
+    candidate_id: str,
+) -> ConfirmationResult:
+    return service.confirm(
+        subject,
+        candidate_id,
+        sensitivity=_clear_sensitivity(),
+        context=MemoryOperationContext.ORDINARY,
+    )
+
+
 def _service(
     store: InMemoryCanonicalMemoryStore,
 ) -> tuple[MemoryService, MemorySubject]:
@@ -54,10 +91,13 @@ def _service(
 def _service_with_ids(
     store: InMemoryCanonicalMemoryStore,
     ids: tuple[str, ...],
+    *,
+    policy: MemoryPolicy | None = None,
 ) -> tuple[MemoryService, MemorySubject]:
     generated_ids = iter(ids)
     service = MemoryService(
         config=MemoryServiceConfig(available=True),
+        policy=policy,
         clock=lambda: NOW,
         id_factory=lambda: next(generated_ids),
         store=store,
@@ -90,14 +130,14 @@ def test_saved_decision_confirmation_creates_one_provenance_backed_record() -> N
     service, subject = _service(store)
     owner = require_registered(subject)
 
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
 
     assert proposal.candidate.opt_in_scope == SAVED_DECISION_SCOPE
     assert store.enabled_categories(owner) == frozenset()
     assert store.list_records(owner) == ()
     assert store.list_consent_receipts(owner) == ()
 
-    confirmation = service.confirm(subject, proposal.candidate.id)
+    confirmation = _confirm(service, subject, proposal.candidate.id)
 
     assert confirmation.created is True
     assert confirmation.record is not None
@@ -126,7 +166,7 @@ def test_declined_saved_decision_never_creates_a_record() -> None:
     store = InMemoryCanonicalMemoryStore()
     service, subject = _service(store)
     owner = require_registered(subject)
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
 
     assert service.decline(subject, proposal.candidate.id) is True
     assert service.decline(subject, proposal.candidate.id) is False
@@ -142,10 +182,10 @@ def test_repeated_confirmation_is_inert() -> None:
     store = InMemoryCanonicalMemoryStore()
     service, subject = _service(store)
     owner = require_registered(subject)
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
 
-    first = service.confirm(subject, proposal.candidate.id)
-    repeated = service.confirm(subject, proposal.candidate.id)
+    first = _confirm(service, subject, proposal.candidate.id)
+    repeated = _confirm(service, subject, proposal.candidate.id)
 
     assert first.created is True
     assert repeated.created is False
@@ -168,15 +208,16 @@ def test_receipt_id_collision_rejects_without_mutating_canonical_state() -> None
             "consent-shared",
             "record-2",
         ),
+        policy=MemoryPolicy(proactive_cooldown=timedelta(0)),
     )
     owner = require_registered(subject)
-    first = service.propose_saved_decision(subject, _saved_decision_source())
-    assert service.confirm(subject, first.candidate.id).created is True
-    second = service.propose_saved_decision(subject, _saved_decision_source())
+    first = _propose_saved(service, subject)
+    assert _confirm(service, subject, first.candidate.id).created is True
+    second = _propose_saved(service, subject)
     before = _canonical_state(store, owner)
 
     with pytest.raises(ValueError, match="consent receipt id already exists"):
-        service.confirm(subject, second.candidate.id)
+        _confirm(service, subject, second.candidate.id)
 
     assert store.get_candidate(owner, second.candidate.id) == second.candidate
     assert _canonical_state(store, owner) == before
@@ -195,15 +236,16 @@ def test_record_id_collision_rejects_without_mutating_canonical_state() -> None:
             "consent-2",
             "record-shared",
         ),
+        policy=MemoryPolicy(proactive_cooldown=timedelta(0)),
     )
     owner = require_registered(subject)
-    first = service.propose_saved_decision(subject, _saved_decision_source())
-    assert service.confirm(subject, first.candidate.id).created is True
-    second = service.propose_saved_decision(subject, _saved_decision_source())
+    first = _propose_saved(service, subject)
+    assert _confirm(service, subject, first.candidate.id).created is True
+    second = _propose_saved(service, subject)
     before = _canonical_state(store, owner)
 
     with pytest.raises(ValueError, match="memory record id already exists"):
-        service.confirm(subject, second.candidate.id)
+        _confirm(service, subject, second.candidate.id)
 
     assert store.get_candidate(owner, second.candidate.id) == second.candidate
     assert _canonical_state(store, owner) == before
@@ -214,13 +256,13 @@ def test_cross_owner_confirm_and_decline_cannot_consume_candidate() -> None:
     store = InMemoryCanonicalMemoryStore()
     service, subject = _service(store)
     owner = require_registered(subject)
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
     other_subject = MemorySubject(
         owner_id="2bfab090-4075-4b52-8dd4-7a7eb725b6ba",
         kind=MemoryAccountKind.REGISTERED,
     )
 
-    assert service.confirm(other_subject, proposal.candidate.id).created is False
+    assert _confirm(service, other_subject, proposal.candidate.id).created is False
     assert service.decline(other_subject, proposal.candidate.id) is False
     assert store.get_candidate(owner, proposal.candidate.id) == proposal.candidate
     assert _canonical_state(store, owner) == (frozenset(), (), ())
@@ -245,7 +287,7 @@ def test_registered_default_off_proposal_creates_no_state() -> None:
     owner = require_registered(subject)
 
     with pytest.raises(PersonalizationMemoryUnavailable):
-        service.propose_saved_decision(subject, _saved_decision_source())
+        _propose_saved(service, subject)
 
     assert store.get_candidate(owner, "candidate-1") is None
     assert _canonical_state(store, owner) == (frozenset(), (), ())
@@ -275,11 +317,11 @@ def test_confirmation_replay_calls_neither_clock_nor_id_factory() -> None:
         owner_id=OWNER_ID,
         kind=MemoryAccountKind.REGISTERED,
     )
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
-    assert service.confirm(subject, proposal.candidate.id).created is True
+    proposal = _propose_saved(service, subject)
+    assert _confirm(service, subject, proposal.candidate.id).created is True
     before_replay = dict(calls)
 
-    repeated = service.confirm(subject, proposal.candidate.id)
+    repeated = _confirm(service, subject, proposal.candidate.id)
 
     assert repeated.created is False
     assert calls == before_replay
@@ -311,11 +353,11 @@ def test_id_factory_failure_leaves_candidate_and_canonical_state_unchanged() -> 
         kind=MemoryAccountKind.REGISTERED,
     )
     owner = require_registered(subject)
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
     before = _canonical_state(store, owner)
 
     with pytest.raises(RuntimeError, match="record id unavailable"):
-        service.confirm(subject, proposal.candidate.id)
+        _confirm(service, subject, proposal.candidate.id)
 
     assert store.get_candidate(owner, proposal.candidate.id) == proposal.candidate
     assert _canonical_state(store, owner) == before
@@ -329,11 +371,11 @@ def test_record_validation_failure_leaves_canonical_state_unchanged() -> None:
         ("candidate-1", "consent-1", ""),
     )
     owner = require_registered(subject)
-    proposal = service.propose_saved_decision(subject, _saved_decision_source())
+    proposal = _propose_saved(service, subject)
     before = _canonical_state(store, owner)
 
     with pytest.raises(ValidationError):
-        service.confirm(subject, proposal.candidate.id)
+        _confirm(service, subject, proposal.candidate.id)
 
     assert store.get_candidate(owner, proposal.candidate.id) == proposal.candidate
     assert _canonical_state(store, owner) == before
