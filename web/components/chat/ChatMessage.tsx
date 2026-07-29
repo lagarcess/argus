@@ -652,7 +652,9 @@ export default function ChatMessage({
                     <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
                   </button>
                 </Tooltip>
-                {retryAction && (
+                {/* The failure block owns the retry control; the footer only
+                    offers it for messages without that block. */}
+                {retryAction && !message.assistantRecoveryCode && (
                   <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
                     <button
                       type="button"
