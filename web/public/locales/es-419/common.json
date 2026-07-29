@@ -691,7 +691,8 @@
         "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
         "adjust_signal_periods": "Probar otros períodos de la señal",
         "adjust_contribution_cadence": "Probar otra cadencia de aportes",
-        "compare_buy_and_hold": "Comparar con comprar y mantener"
+        "compare_buy_and_hold": "Comparar con comprar y mantener",
+        "recurring_monthly_buys": "Probar compras mensuales recurrentes"
       },
       "why": {
         "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",

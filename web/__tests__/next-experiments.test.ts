@@ -35,6 +35,8 @@ describe("Try next rows (issue #249)", () => {
         label: "Change the date range",
         labelKey: "chat.next_experiments.labels.change_date_range",
         why: { code: "beat_benchmark", params: { points: 4.2 } },
+        detail: null,
+        sendText: null,
       },
     ]);
     expect(
@@ -85,6 +87,7 @@ describe("Try next rows (issue #249)", () => {
       "same_setup_peer_asset",
       "same_rule_peer_asset",
       "supported_rsi_threshold",
+      "recurring_monthly_buys",
       "supported_ma_crossover",
       "supported_rsi_or_ma_rule",
       "adjust_indicator_thresholds",

@@ -691,7 +691,8 @@
         "adjust_indicator_thresholds": "Test different indicator thresholds",
         "adjust_signal_periods": "Test different signal periods",
         "adjust_contribution_cadence": "Test a different contribution cadence",
-        "compare_buy_and_hold": "Compare with buy and hold"
+        "compare_buy_and_hold": "Compare with buy and hold",
+        "recurring_monthly_buys": "Try monthly recurring buys"
       },
       "why": {
         "lost_to_benchmark": "Lagged the benchmark by {{points}} points",

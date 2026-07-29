@@ -269,7 +269,7 @@ def test_prebaked_peer_row_carries_suffix_and_full_ask() -> None:
     )
     assert dca_row["send_text"] == (
         "Try monthly recurring buys of AAPL from 2023-01-03 to 2023-12-29 "
-        "with $1000 in total."
+        "with $1000 each month."
     )
 
 

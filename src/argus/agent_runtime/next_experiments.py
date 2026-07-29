@@ -123,7 +123,7 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
         ),
         "recurring_monthly_buys": (
             "Try monthly recurring buys of {symbol} from {start} to {end} "
-            "with ${capital} in total."
+            "with ${capital} each month."
         ),
     },
     "es-419": {
@@ -133,7 +133,7 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
         ),
         "recurring_monthly_buys": (
             "Probar compras mensuales recurrentes de {symbol} de {start} a "
-            "{end} con ${capital} en total."
+            "{end} con ${capital} cada mes."
         ),
     },
 }
@@ -303,16 +303,38 @@ def detect_next_experiment_acceptance(
 
 
 def _prebake_params(result_facts: dict[str, Any]) -> dict[str, Any] | None:
+    """Accepts both fact shapes: the persisted config_snapshot and the
+    engine envelope with resolved_* at the top level."""
     config = result_facts.get("config_snapshot")
-    if not isinstance(config, dict):
+    config = config if isinstance(config, dict) else {}
+    resolved_params = config.get("resolved_parameters") or result_facts.get(
+        "resolved_parameters"
+    )
+    resolved_params = resolved_params if isinstance(resolved_params, dict) else {}
+    resolved_strategy = config.get("resolved_strategy") or result_facts.get(
+        "resolved_strategy"
+    )
+    resolved_strategy = resolved_strategy if isinstance(resolved_strategy, dict) else {}
+    template = str(
+        config.get("template")
+        or config.get("strategy_type")
+        or resolved_strategy.get("strategy_type")
+        or ""
+    )
+    if template != "buy_and_hold":
         return None
-    symbols = config.get("symbols") or result_facts.get("symbols")
+    symbols = (
+        config.get("symbols")
+        or result_facts.get("symbols")
+        or resolved_strategy.get("asset_universe")
+        or ([resolved_strategy["symbol"]] if resolved_strategy.get("symbol") else None)
+    )
     symbol = (
         str(symbols[0]).strip().upper()
         if isinstance(symbols, list) and symbols
         else ""
     )
-    date_range = config.get("date_range")
+    date_range = config.get("date_range") or resolved_params.get("date_range")
     start = end = ""
     if isinstance(date_range, dict):
         start = str(date_range.get("start") or "").strip()
@@ -320,18 +342,23 @@ def _prebake_params(result_facts: dict[str, Any]) -> dict[str, Any] | None:
     if not start or not end:
         start = str(config.get("start_date") or "").strip()
         end = str(config.get("end_date") or "").strip()
-    capital = config.get("initial_capital") or config.get("capital_amount")
+    capital = (
+        config.get("initial_capital")
+        or config.get("capital_amount")
+        or resolved_params.get("capital_amount")
+        or resolved_params.get("initial_capital")
+    )
     if not symbol or not start or not end or not isinstance(capital, (int, float)):
         return None
-    template = str(config.get("template") or config.get("strategy_type") or "")
-    if template != "buy_and_hold":
-        return None
+    asset_class = str(
+        config.get("asset_class") or resolved_strategy.get("asset_class") or "equity"
+    )
     return {
         "symbol": symbol,
         "start": start,
         "end": end,
         "capital": int(capital) if float(capital).is_integer() else capital,
-        "asset_class": str(config.get("asset_class") or "equity"),
+        "asset_class": asset_class,
     }
 
 
