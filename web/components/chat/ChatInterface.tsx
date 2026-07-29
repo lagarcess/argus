@@ -25,6 +25,7 @@ import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
+import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import {
@@ -37,7 +38,6 @@ import {
   deleteConversation,
   getBacktestRun,
   listConversations,
-  listHistory,
   logoutFromApi,
   patchConversation,
   getMe,
@@ -52,7 +52,6 @@ import {
 } from "@/lib/argus-api";
 import {
   chatExploratorySuggestionsEnabled,
-  collectionsEnabled,
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
@@ -316,11 +315,20 @@ export default function ChatInterface() {
   const [isPinningHeaderChat, setIsPinningHeaderChat] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(
-    null,
-  );
-  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
+  const {
+    historyItems,
+    setHistoryItems,
+    historyNextCursor,
+    isLoadingMoreHistory,
+    hasRequestedOlderHistory,
+    historyLoadMoreError,
+    loadHistoryPage,
+    clearHistory,
+    loadMoreHistory,
+    refreshHistory,
+  } = useRecentConversations({
+    guestExpiresAt: account?.guest?.expires_at,
+  });
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
@@ -552,47 +560,7 @@ export default function ChatInterface() {
     transcriptSessionCache,
   ]);
 
-  const mergeHistoryItems = (
-    existing: HistoryItem[],
-    incoming: HistoryItem[],
-  ) => {
-    const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
-    const merged = [...existing];
-    for (const item of incoming) {
-      const key = `${item.type}:${item.id}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        merged.push(item);
-      }
-    }
-    return merged;
-  };
-
-  const loadHistoryPage = useCallback(
-    async (nextCursor?: string | null, append = false) => {
-      const { items, next_cursor } = await listHistory({
-        limit: 30,
-        cursor: nextCursor ?? undefined,
-      });
-      const filtered = items.filter(
-        (item) =>
-          !(item.type === "chat" && item.subtitle === "No messages yet") &&
-          (collectionsEnabled || item.type !== "collection"),
-      );
-      setHistoryItems((prev) =>
-        append ? mergeHistoryItems(prev, filtered) : filtered,
-      );
-      setHistoryNextCursor(next_cursor);
-    },
-    [],
-  );
-
   // ── History ────────────────────────────────────────────────────────────────
-
-  /** Imperative refresh — safe to call from event handlers */
-  const refreshHistory = useCallback(() => {
-    loadHistoryPage(null, false).catch(() => undefined);
-  }, [loadHistoryPage]);
 
   function schedulePostTurnHistoryRefresh(
     targetConversationId?: string | null,
@@ -642,18 +610,6 @@ export default function ChatInterface() {
     setIsStreamingResponse(false);
     activeStreamConversationIdRef.current = null;
   }
-  const loadMoreHistory = () => {
-    if (!historyNextCursor || isLoadingMoreHistory) return;
-    setIsLoadingMoreHistory(true);
-    loadHistoryPage(historyNextCursor, true)
-      .catch(() => undefined)
-      .finally(() => setIsLoadingMoreHistory(false));
-  };
-
-  useEffect(() => {
-    loadHistoryPage(null, false).catch(() => undefined);
-  }, [loadHistoryPage]);
-
   useEffect(
     () => () => {
       for (const timerId of postTurnHistoryRefreshTimersRef.current) {
@@ -1883,8 +1839,7 @@ export default function ChatInterface() {
       }
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
-      setHistoryItems([]);
-      setHistoryNextCursor(null);
+      clearHistory();
       setSearchText("");
       window.location.href = "/";
     } catch {
@@ -2181,6 +2136,8 @@ export default function ChatInterface() {
         attentionConversationIds={attentionConversationIds}
         historyNextCursor={historyNextCursor}
         isLoadingMoreHistory={isLoadingMoreHistory}
+        hasRequestedOlderHistory={hasRequestedOlderHistory}
+        historyLoadMoreError={historyLoadMoreError}
         onNewChat={() => {
           requestNewChat();
           closeTransientSidebar();
@@ -2221,6 +2178,7 @@ export default function ChatInterface() {
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
         isGuest={isGuest}
+        guestExpiresAt={account?.guest?.expires_at}
       />
 
       {omnisearchEnabled &&

@@ -59,16 +59,18 @@ function json(route: Route, body: unknown, status = 200) {
   });
 }
 
-function historyItem(conversationId: ConversationId) {
+function conversation(conversationId: ConversationId) {
   return {
-    type: "chat",
     id: conversationId,
     title: title(conversationId),
     title_source: "user_renamed",
-    subtitle: `History summary ${suffix(conversationId)}`,
     pinned: false,
+    archived: false,
+    deleted_at: null,
     created_at: CREATED_AT,
-    conversation_id: conversationId,
+    updated_at: CREATED_AT,
+    last_message_preview: `History summary ${suffix(conversationId)}`,
+    language: "en",
   };
 }
 
@@ -253,9 +255,9 @@ async function installConversationFixture(
         },
       });
     }
-    if (url.pathname.endsWith("/api/v1/history")) {
+    if (url.pathname.endsWith("/api/v1/conversations")) {
       return json(route, {
-        items: CONVERSATION_IDS.map(historyItem),
+        items: CONVERSATION_IDS.map(conversation),
         next_cursor: null,
       });
     }
@@ -316,7 +318,21 @@ async function openConversation(page: Page, conversationId: ConversationId) {
     `[role="button"][data-conversation-id="${conversationId}"]`,
   );
   if (await row.count() === 0) {
+    const showMore = page
+      .getByRole("button", { name: /Show more in|Mostrar más en/ })
+      .first();
+    if (await showMore.count()) {
+      await showMore.click();
+    }
+  }
+  if (await row.count() === 0) {
     await page.getByRole("button", { name: /Recents|Recientes/ }).click();
+  }
+  if (await row.count() === 0) {
+    await page
+      .getByRole("button", { name: /Show more in|Mostrar más en/ })
+      .first()
+      .click();
   }
   await row.click();
   await expect(page).toHaveURL(
