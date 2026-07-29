@@ -180,6 +180,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             stage_patch=_with_next_experiments(
                 {"assistant_response": response},
                 result_facts=result_facts,
+                recent_user_messages=_recent_user_messages(state),
             ),
         )
     benchmark_symbol = _benchmark_contract(
@@ -209,6 +210,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             total_return=total_return,
             benchmark_return=benchmark_return,
             max_drawdown=_max_drawdown_metric(result_payload),
+            recent_user_messages=_recent_user_messages(state),
         ),
     )
 
@@ -220,16 +222,28 @@ def _with_next_experiments(
     total_return: float | None = None,
     benchmark_return: float | None = None,
     max_drawdown: float | None = None,
+    recent_user_messages: list[str] | None = None,
 ) -> dict[str, Any]:
     sidecar = next_experiments_sidecar(
         result_facts,
         total_return=total_return,
         benchmark_return=benchmark_return,
         max_drawdown=max_drawdown,
+        recent_user_messages=recent_user_messages,
     )
     if sidecar is None:
         return patch
     return {**patch, "next_experiments": sidecar}
+
+
+def _recent_user_messages(state: RunState) -> list[str]:
+    turns = [
+        message.content
+        for message in state.recent_thread_history
+        if message.role == "user"
+    ]
+    turns.append(state.current_user_message)
+    return turns[-8:]
 
 
 def _max_drawdown_metric(result_payload: dict[str, Any]) -> float | None:

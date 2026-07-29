@@ -22,7 +22,7 @@ _LABEL_KEY_PREFIX = "chat.next_experiments.labels."
 # turn; every label must read as a supported ask for its family.
 NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
     "en": {
-        f"{_LABEL_KEY_PREFIX}change_date_range": "Change the date range",
+        f"{_LABEL_KEY_PREFIX}change_date_range": "Test a different date range",
         f"{_LABEL_KEY_PREFIX}same_setup_peer_asset": (
             "Test the same setup on a similar asset"
         ),
@@ -39,16 +39,16 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
             "Simplify into a supported RSI or SMA/EMA rule"
         ),
         f"{_LABEL_KEY_PREFIX}adjust_indicator_thresholds": (
-            "Adjust the indicator period or thresholds"
+            "Test different indicator thresholds"
         ),
-        f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Adjust the signal periods",
+        f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Test different signal periods",
         f"{_LABEL_KEY_PREFIX}adjust_contribution_cadence": (
-            "Adjust the contribution cadence"
+            "Test a different contribution cadence"
         ),
         f"{_LABEL_KEY_PREFIX}compare_buy_and_hold": "Compare with buy and hold",
     },
     "es-419": {
-        f"{_LABEL_KEY_PREFIX}change_date_range": "Cambiar el rango de fechas",
+        f"{_LABEL_KEY_PREFIX}change_date_range": "Probar otro rango de fechas",
         f"{_LABEL_KEY_PREFIX}same_setup_peer_asset": (
             "Probar el mismo enfoque en un activo similar"
         ),
@@ -65,11 +65,11 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
             "Simplificar a una regla RSI o SMA/EMA compatible"
         ),
         f"{_LABEL_KEY_PREFIX}adjust_indicator_thresholds": (
-            "Ajustar el período o los umbrales del indicador"
+            "Probar otros umbrales del indicador"
         ),
-        f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Ajustar los períodos de la señal",
+        f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Probar otros períodos de la señal",
         f"{_LABEL_KEY_PREFIX}adjust_contribution_cadence": (
-            "Ajustar la cadencia de aportes"
+            "Probar otra cadencia de aportes"
         ),
         f"{_LABEL_KEY_PREFIX}compare_buy_and_hold": "Comparar con comprar y mantener",
     },
@@ -102,10 +102,12 @@ def next_experiments_sidecar(
     total_return: float | None = None,
     benchmark_return: float | None = None,
     max_drawdown: float | None = None,
+    recent_user_messages: list[str] | None = None,
 ) -> dict[str, Any] | None:
     options = structured_next_experiments(result_facts)
     if not options:
         return None
+    already_asked = _kinds_already_asked(recent_user_messages)
     delta = (
         total_return - benchmark_return
         if total_return is not None and benchmark_return is not None
@@ -113,7 +115,11 @@ def next_experiments_sidecar(
     )
     why = _row_reason(delta=delta, max_drawdown=max_drawdown)
     ordered = _ordered_kinds(
-        [str(option["kind"]) for option in options],
+        [
+            str(option["kind"])
+            for option in options
+            if str(option["kind"]) not in already_asked
+        ],
         delta=delta,
         max_drawdown=max_drawdown,
     )
@@ -133,6 +139,26 @@ def next_experiments_sidecar(
     if not rows:
         return None
     return {"version": NEXT_EXPERIMENTS_VERSION, "rows": rows}
+
+
+def _kinds_already_asked(recent_user_messages: list[str] | None) -> set[str]:
+    """A row whose label the user already sent this conversation is spent;
+    re-offering it is the padding the spec forbids."""
+    if not recent_user_messages:
+        return set()
+    normalized = {
+        message.strip().casefold()
+        for message in recent_user_messages
+        if isinstance(message, str) and message.strip()
+    }
+    if not normalized:
+        return set()
+    spent: set[str] = set()
+    for labels in NEXT_EXPERIMENT_ACTION_LABELS.values():
+        for label_key, label in labels.items():
+            if label.strip().casefold() in normalized:
+                spent.add(label_key.removeprefix(_LABEL_KEY_PREFIX))
+    return spent
 
 
 def _ordered_kinds(

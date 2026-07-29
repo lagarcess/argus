@@ -116,3 +116,20 @@ def test_explain_stage_attaches_the_sidecar_to_the_result_patch() -> None:
     sidecar = result.patch["next_experiments"]
     assert sidecar["version"] == NEXT_EXPERIMENTS_VERSION
     assert 1 <= len(sidecar["rows"]) <= NEXT_EXPERIMENTS_ROW_CAP
+
+
+def test_rows_never_reoffer_what_the_conversation_already_asked() -> None:
+    sidecar = next_experiments_sidecar(
+        _BUY_AND_HOLD_FACTS,
+        recent_user_messages=[
+            "Test AAPL for all of 2023 with $1000.",
+            "Test a different date range",
+            "  probar el mismo enfoque en un activo similar  ",
+        ],
+    )
+
+    assert sidecar is not None
+    kinds = [row["kind"] for row in sidecar["rows"]]
+    assert "change_date_range" not in kinds
+    assert "same_setup_peer_asset" not in kinds
+    assert kinds

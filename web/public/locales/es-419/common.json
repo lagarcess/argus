@@ -682,15 +682,15 @@
     "next_experiments": {
       "section": "Qué probar después",
       "labels": {
-        "change_date_range": "Cambiar el rango de fechas",
+        "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",
         "supported_rsi_threshold": "Probar una regla RSI compatible",
         "supported_ma_crossover": "Probar un cruce SMA/EMA compatible",
         "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o SMA/EMA compatible",
-        "adjust_indicator_thresholds": "Ajustar el período o los umbrales del indicador",
-        "adjust_signal_periods": "Ajustar los períodos de la señal",
-        "adjust_contribution_cadence": "Ajustar la cadencia de aportes",
+        "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
+        "adjust_signal_periods": "Probar otros períodos de la señal",
+        "adjust_contribution_cadence": "Probar otra cadencia de aportes",
         "compare_buy_and_hold": "Comparar con comprar y mantener"
       },
       "why": {
