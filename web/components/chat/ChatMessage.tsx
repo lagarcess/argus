@@ -549,9 +549,11 @@ export default function ChatMessage({
             />
           ) : null}
 
+          {/* The result's own Try next rows are the sanctioned next-move
+              surface; only mid-turn composition suppresses them. */}
           {shouldShowAssistantFooter &&
             Boolean(isLatest) &&
-            nextMovesEnabled &&
+            !turnInFlight &&
             message.kind === "strategy_result" &&
             (message.nextExperiments?.length ?? 0) > 0 && (
               <section
@@ -562,20 +564,22 @@ export default function ChatMessage({
                   {t("chat.next_experiments.section", "Try next")}
                 </div>
                 <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
-                  {(message.nextExperiments ?? []).map((row) => {
+                  {(message.nextExperiments ?? []).map((row, rowIndex) => {
                     const rowLabel = t(row.labelKey, row.label);
-                    const whyText = row.why
-                      ? t(`chat.next_experiments.why.${row.why.code}`, {
-                          defaultValue: "",
-                          ...row.why.params,
-                        })
-                      : "";
+                    // One result-level reason; captioning every row repeats it.
+                    const whyText =
+                      row.why && rowIndex === 0
+                        ? t(`chat.next_experiments.why.${row.why.code}`, {
+                            defaultValue: "",
+                            ...row.why.params,
+                          })
+                        : "";
                     return (
                       <NextMoveRow
                         key={row.kind}
                         ariaLabel={rowLabel}
                         disabled={turnInFlight}
-                        onClick={() => onAction?.(nextExperimentAction(row))}
+                        onClick={() => onAction?.(nextExperimentAction(row, rowLabel))}
                       >
                         <NextMoveTitle>{rowLabel}</NextMoveTitle>
                         {whyText ? (

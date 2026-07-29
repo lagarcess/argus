@@ -62,19 +62,21 @@ describe("Try next rows (issue #249)", () => {
     expect(rows).toHaveLength(3);
   });
 
-  test("a tapped row dispatches an existing public action type", () => {
-    const action = nextExperimentAction({
-      kind: "change_date_range",
-      label: "Change the date range",
-      labelKey: "chat.next_experiments.labels.change_date_range",
-      why: null,
-    });
-    expect(action.type).toBe("select_response_option");
-    expect(action.labelKey).toBe(
-      "chat.next_experiments.labels.change_date_range",
+  test("a tapped row sends its localized label as an ordinary turn", () => {
+    const action = nextExperimentAction(
+      {
+        kind: "change_date_range",
+        label: "Change the date range",
+        labelKey: "chat.next_experiments.labels.change_date_range",
+        why: null,
+      },
+      "Cambiar el rango de fechas",
     );
-    expect(action.value).toBe("Change the date range");
-    expect(action.payload).toEqual({ option_id: "change_date_range" });
+    // No type: the plain send path carries the label as the user's turn.
+    expect(action.type).toBeUndefined();
+    expect(action.payload).toBeUndefined();
+    expect(action.label).toBe("Cambiar el rango de fechas");
+    expect(action.value).toBe("Cambiar el rango de fechas");
   });
 
   test("every experiment kind is localized in both languages", () => {
@@ -110,7 +112,7 @@ describe("Try next rows (issue #249)", () => {
     expect(source).toContain(
       'aria-label={t("chat.next_experiments.section", "Try next")}',
     );
-    expect(source).toContain("nextExperimentAction(row)");
+    expect(source).toContain("nextExperimentAction(row, rowLabel)");
     // Infrastructure failure renders as visibly-a-failure, never under
     // result chrome.
     expect(source).toContain("message.assistantRecoveryCode ? (");

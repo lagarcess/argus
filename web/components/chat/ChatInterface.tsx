@@ -92,6 +92,7 @@ import {
   recoveryDisplayFromMetadata,
   retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
+import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
@@ -1422,6 +1423,8 @@ export default function ChatInterface() {
             savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
             actions: resultActions,
           };
+          const finalNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1432,6 +1435,7 @@ export default function ChatInterface() {
                   content: finalText || undefined,
                   result: card,
                   actions: resultActions,
+                  nextExperiments: finalNextExperiments,
                   savedStrategyId: card.savedStrategyId,
                 }),
               ),

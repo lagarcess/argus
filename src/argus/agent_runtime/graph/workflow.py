@@ -329,6 +329,14 @@ def _apply_stage_result(
         and isinstance(state.get("assistant_response"), str)
     ):
         cleared_output_keys.discard("assistant_response")
+    # The Try next sidecar survives the closing no-op stage the same way the
+    # response text does; only a stage that patches it may replace it.
+    if (
+        outcome is WorkflowStageOutcome.END_RUN
+        and "next_experiments" not in result.patch
+        and isinstance(state.get("next_experiments"), dict)
+    ):
+        cleared_output_keys.discard("next_experiments")
     workflow_state: WorkflowState = {
         **state,
         **{key: None for key in cleared_output_keys},

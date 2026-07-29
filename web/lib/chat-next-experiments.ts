@@ -1,9 +1,10 @@
 /**
  * Typed Try next rows for a completed result (issue #249).
  *
- * The backend's Stage-0 policy composes `next_experiments` metadata; the
- * frontend projects it into `select_response_option` actions so a tapped
- * row sends its localized label as an ordinary conversational turn.
+ * The backend's Stage-0 policy composes `next_experiments` metadata; a
+ * tapped row sends its localized label as an ordinary conversational
+ * turn (a type-less action takes the plain send path — the response-
+ * option claim contract is for typed field edits, not experiments).
  * Rows render only from typed metadata — never inferred from prose.
  */
 
@@ -62,12 +63,14 @@ export function nextExperimentRowsFromMetadata(
   return rows.length > 0 ? rows : null;
 }
 
-export function nextExperimentAction(row: NextExperimentRow): ChatActionOption {
+export function nextExperimentAction(
+  row: NextExperimentRow,
+  localizedLabel?: string,
+): ChatActionOption {
+  const label = localizedLabel || row.label;
   return {
-    type: "select_response_option",
-    label: row.label,
+    label,
     labelKey: row.labelKey,
-    value: row.label,
-    payload: { option_id: row.kind },
+    value: label,
   };
 }
