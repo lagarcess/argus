@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Literal
@@ -10,6 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 MemoryConsentSchemaVersion = Literal["argus.memory-consent/v1"]
 MEMORY_CONSENT_SCHEMA_VERSION: MemoryConsentSchemaVersion = "argus.memory-consent/v1"
+MemoryConsentPolicyVersion = Literal["argus.memory-policy/v1"]
+MEMORY_CONSENT_POLICY_VERSION: MemoryConsentPolicyVersion = "argus.memory-policy/v1"
+MemorySensitivityPolicyVersion = Literal["argus.memory-sensitivity/v1"]
+MEMORY_SENSITIVITY_POLICY_VERSION: MemorySensitivityPolicyVersion = (
+    "argus.memory-sensitivity/v1"
+)
+MemoryConsentAction = Literal["direct_enable", "candidate_confirmation"]
+MAX_MEMORY_VALUE_LENGTH = 4_096
+MAX_MEMORY_FUTURE_BENEFIT_LENGTH = 512
+_SHA256_DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 
 
 class MemoryCategory(str, Enum):
@@ -99,12 +111,58 @@ class SensitivityAssessment(BaseModel):
 
     status: SensitivityStatus = SensitivityStatus.UNASSESSED
     flags: frozenset[MemorySensitivityFlag] = frozenset()
+    policy_version: MemorySensitivityPolicyVersion = MEMORY_SENSITIVITY_POLICY_VERSION
+    content_digest: str | None = Field(default=None, pattern=_SHA256_DIGEST_PATTERN)
 
     @model_validator(mode="after")
     def _validate_flags(self) -> "SensitivityAssessment":
         if self.flags and self.status is not SensitivityStatus.RESTRICTED:
             raise ValueError("sensitivity flags require restricted status")
         return self
+
+
+def memory_candidate_content_digest(
+    *,
+    category: MemoryCategory,
+    label: str,
+    value: str,
+    future_benefit: str,
+) -> str:
+    """Digest the exact candidate content assessed by sensitivity policy."""
+
+    encoded = json.dumps(
+        {
+            "category": category.value,
+            "future_benefit": future_benefit,
+            "label": label,
+            "value": value,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def bind_sensitivity_assessment(
+    assessment: SensitivityAssessment,
+    *,
+    category: MemoryCategory,
+    label: str,
+    value: str,
+    future_benefit: str,
+) -> SensitivityAssessment:
+    """Bind one typed assessment to the exact candidate content."""
+
+    digest = memory_candidate_content_digest(
+        category=category,
+        label=label,
+        value=value,
+        future_benefit=future_benefit,
+    )
+    if assessment.content_digest not in (None, digest):
+        raise ValueError("sensitivity content digest does not match candidate content")
+    return assessment.model_copy(update={"content_digest": digest})
 
 
 class MemoryConsentSettings(BaseModel):
@@ -128,9 +186,12 @@ class MemoryCandidateDraft(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     category: MemoryCategory
-    value: str = Field(min_length=1)
+    value: str = Field(min_length=1, max_length=MAX_MEMORY_VALUE_LENGTH)
     label: str = Field(min_length=1, max_length=120)
-    future_benefit: str = Field(min_length=1)
+    future_benefit: str = Field(
+        min_length=1,
+        max_length=MAX_MEMORY_FUTURE_BENEFIT_LENGTH,
+    )
     provenance: tuple[MemorySourceRef, ...] = Field(min_length=1)
     trigger: MemoryProposalTrigger
     sensitivity: SensitivityAssessment
@@ -142,7 +203,7 @@ class SavedDecisionSource(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     label: str = Field(min_length=1, max_length=120)
-    value: str = Field(min_length=1)
+    value: str = Field(min_length=1, max_length=MAX_MEMORY_VALUE_LENGTH)
     provenance: MemoryProvenance
 
 
@@ -155,7 +216,10 @@ class MemoryCandidate(BaseModel):
     owner_id: str = Field(min_length=1)
     category: MemoryCategory
     source: SavedDecisionSource
-    future_benefit: str = Field(min_length=1)
+    future_benefit: str = Field(
+        min_length=1,
+        max_length=MAX_MEMORY_FUTURE_BENEFIT_LENGTH,
+    )
     provenance_refs: tuple[MemorySourceRef, ...] = Field(min_length=1)
     trigger: MemoryProposalTrigger
     sensitivity: SensitivityAssessment
@@ -163,19 +227,73 @@ class MemoryCandidate(BaseModel):
     opt_in_scope: frozenset[MemoryCategory] = frozenset()
     created_at: datetime
 
+    @model_validator(mode="after")
+    def _validate_canonical_content(self) -> "MemoryCandidate":
+        if self.provenance_refs[0] != self.source.provenance:
+            raise ValueError("primary provenance must lead candidate provenance refs")
+        expected_digest = memory_candidate_content_digest(
+            category=self.category,
+            label=self.source.label,
+            value=self.source.value,
+            future_benefit=self.future_benefit,
+        )
+        if self.sensitivity.content_digest != expected_digest:
+            raise ValueError("candidate sensitivity must bind to exact candidate content")
+        return self
 
-class ConfirmedMemoryConsentReceipt(BaseModel):
-    """Versioned evidence of explicit confirmation for one candidate."""
+
+class MemoryConsentActionReceipt(BaseModel):
+    """Immutable evidence of the exact scope changed by one consent action."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(min_length=1)
     schema_version: MemoryConsentSchemaVersion = MEMORY_CONSENT_SCHEMA_VERSION
-    confirmed: Literal[True] = True
+    policy_version: MemoryConsentPolicyVersion = MEMORY_CONSENT_POLICY_VERSION
+    action: MemoryConsentAction
     owner_id: str = Field(min_length=1)
-    candidate_id: str = Field(min_length=1)
-    scope: frozenset[MemoryCategory] = Field(min_length=1)
-    confirmed_at: datetime
+    candidate_id: str | None = Field(default=None, min_length=1)
+    requested_scope: frozenset[MemoryCategory]
+    granted_scope: frozenset[MemoryCategory]
+    effective_scope: frozenset[MemoryCategory] = Field(min_length=1)
+    recorded_at: datetime
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def _validate_action_scope(self) -> "MemoryConsentActionReceipt":
+        if self.action == "direct_enable":
+            if self.candidate_id is not None:
+                raise ValueError("direct enable receipts cannot reference a candidate")
+            if not self.requested_scope:
+                raise ValueError("direct enable receipts require a requested scope")
+        elif self.candidate_id is None:
+            raise ValueError("candidate confirmation receipts require a candidate")
+        if not self.granted_scope <= self.requested_scope:
+            raise ValueError("granted scope must be a subset of requested scope")
+        if not self.requested_scope <= self.effective_scope:
+            raise ValueError("requested scope must be included in effective scope")
+        return self
+
+    @property
+    def confirmed(self) -> Literal[True]:
+        """Compatibility view for confirmed-record call sites."""
+
+        return True
+
+    @property
+    def scope(self) -> frozenset[MemoryCategory]:
+        """Compatibility view of the post-action effective scope."""
+
+        return self.effective_scope
+
+    @property
+    def confirmed_at(self) -> datetime:
+        """Compatibility view of the immutable action timestamp."""
+
+        return self.recorded_at
+
+
+ConfirmedMemoryConsentReceipt = MemoryConsentActionReceipt
 
 
 class MemoryRecord(BaseModel):
@@ -188,11 +306,13 @@ class MemoryRecord(BaseModel):
     candidate_id: str = Field(min_length=1)
     category: MemoryCategory
     label: str = Field(min_length=1, max_length=120)
-    value: str = Field(min_length=1)
+    value: str = Field(min_length=1, max_length=MAX_MEMORY_VALUE_LENGTH)
     provenance: MemoryProvenance
     provenance_refs: tuple[MemorySourceRef, ...] = Field(min_length=1)
     consent_receipt: ConfirmedMemoryConsentReceipt
     created_at: datetime
+    revision: int = Field(default=1, ge=1, strict=True)
+    updated_at: datetime
 
     @model_validator(mode="after")
     def _validate_confirmed_scope(self) -> "MemoryRecord":
@@ -200,10 +320,12 @@ class MemoryRecord(BaseModel):
             raise ValueError("consent owner must match memory owner")
         if self.consent_receipt.candidate_id != self.candidate_id:
             raise ValueError("consent candidate must match memory candidate")
-        if self.category not in self.consent_receipt.scope:
+        if self.category not in self.consent_receipt.effective_scope:
             raise ValueError("memory category must be included in confirmed consent")
         if self.provenance_refs[0] != self.provenance:
             raise ValueError("primary provenance must lead provenance refs")
+        if self.updated_at < self.created_at:
+            raise ValueError("memory update time cannot precede creation")
         return self
 
 
@@ -242,7 +364,11 @@ class MemoryEdit(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    value: str | None = Field(default=None, min_length=1)
+    value: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=MAX_MEMORY_VALUE_LENGTH,
+    )
     label: str | None = Field(default=None, min_length=1, max_length=120)
     sensitivity: SensitivityAssessment
 

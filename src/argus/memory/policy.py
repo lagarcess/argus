@@ -20,7 +20,14 @@ from argus.memory.contracts import (
 
 DEFAULT_PROACTIVE_COOLDOWN = timedelta(days=7)
 DEFAULT_DECLINE_COOLDOWN = timedelta(days=30)
-SAFE_MEMORY_CATEGORIES = frozenset(MemoryCategory)
+SAFE_MEMORY_CATEGORIES = frozenset(
+    {
+        MemoryCategory.PERSONALIZATION_PREFERENCE,
+        MemoryCategory.WORKFLOW_PREFERENCE,
+        MemoryCategory.EXPLICIT_DECISION_NOTE,
+        MemoryCategory.PAST_SESSION_ANCHOR,
+    }
+)
 SAVED_DECISION_OPT_IN_SCOPE = frozenset(
     {
         MemoryCategory.EXPLICIT_DECISION_NOTE,

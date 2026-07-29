@@ -6,6 +6,7 @@ from argus.memory.contracts import (
     MemoryCandidate,
     MemoryCandidateDraft,
     MemoryCategory,
+    MemoryConsentActionReceipt,
     MemoryConsentSettings,
     MemoryControlResult,
     MemoryEdit,
@@ -25,6 +26,8 @@ from argus.memory.contracts import (
     SavedDecisionSource,
     SensitivityAssessment,
     SensitivityStatus,
+    bind_sensitivity_assessment,
+    memory_candidate_content_digest,
 )
 from argus.memory.conversion import (
     MemoryConversionMode,
@@ -74,6 +77,7 @@ __all__ = [
     "MemoryCandidate",
     "MemoryCandidateDraft",
     "MemoryCategory",
+    "MemoryConsentActionReceipt",
     "MemoryConsentSettings",
     "MemoryControlResult",
     "MemoryConversionMode",
@@ -122,6 +126,8 @@ __all__ = [
     "SavedDecisionSource",
     "SensitivityAssessment",
     "SensitivityStatus",
+    "bind_sensitivity_assessment",
+    "memory_candidate_content_digest",
     "plan_guest_conversion",
     "require_registered",
 ]

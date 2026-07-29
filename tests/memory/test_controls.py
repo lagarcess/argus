@@ -553,8 +553,10 @@ def test_edit_preserves_all_noneditable_canonical_fields() -> None:
 
     assert result.record is not None
     assert result.record.model_dump(
-        exclude={"label", "value"},
-    ) == original.model_dump(exclude={"label", "value"})
+        exclude={"label", "revision", "updated_at", "value"},
+    ) == original.model_dump(
+        exclude={"label", "revision", "updated_at", "value"},
+    )
 
 
 def test_blank_or_unchanged_edit_leaves_canonical_and_provider_state_unchanged() -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Condition, RLock
 from typing import Protocol
 
@@ -13,11 +13,16 @@ from argus.memory.contracts import (
     ConfirmedMemoryConsentReceipt,
     MemoryCandidate,
     MemoryCategory,
+    MemoryConsentActionReceipt,
     MemoryConsentSettings,
     MemoryProposalTrigger,
     MemoryRecord,
 )
 from argus.memory.subject import RegisteredMemoryOwner
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +50,14 @@ class CanonicalConfirmationMutation:
 
     result: ConfirmationResult
     reconciliation_generation: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalEnableMutation:
+    """One atomic settings update and its optional consent-action evidence."""
+
+    settings: MemoryConsentSettings
+    consent_receipt: MemoryConsentActionReceipt | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +131,11 @@ class CanonicalMemoryStore(Protocol):
         self,
         owner: RegisteredMemoryOwner,
         categories: frozenset[MemoryCategory],
-    ) -> MemoryConsentSettings: ...
+        *,
+        clock: Callable[[], datetime],
+        id_factory: Callable[[], str],
+        idempotency_key: str | None,
+    ) -> CanonicalEnableMutation: ...
 
     def last_proactive_prompt_at(
         self,
@@ -163,6 +180,7 @@ class CanonicalMemoryStore(Protocol):
         *,
         value: str | None,
         label: str | None,
+        clock: Callable[[], datetime] | None = None,
     ) -> CanonicalRecordMutation | None: ...
 
     def delete_record(
@@ -386,19 +404,24 @@ class InMemoryCanonicalMemoryStore:
                 owner.owner_id,
                 MemoryConsentSettings(),
             )
-            confirmed_scope = set(settings.enabled_categories)
-            confirmed_scope.update(candidate.opt_in_scope)
-            if candidate.category not in confirmed_scope:
+            requested_scope = candidate.opt_in_scope
+            granted_scope = requested_scope - settings.enabled_categories
+            effective_scope = settings.enabled_categories | requested_scope
+            if candidate.category not in effective_scope:
                 return CanonicalConfirmationMutation(
                     result=ConfirmationResult(created=False)
                 )
 
-            receipt = ConfirmedMemoryConsentReceipt(
+            receipt = MemoryConsentActionReceipt(
                 id=id_factory(),
+                action="candidate_confirmation",
                 owner_id=owner.owner_id,
                 candidate_id=candidate.id,
-                scope=frozenset(confirmed_scope),
-                confirmed_at=confirmed_at,
+                requested_scope=requested_scope,
+                granted_scope=granted_scope,
+                effective_scope=effective_scope,
+                recorded_at=confirmed_at,
+                idempotency_key=candidate.id,
             )
             existing_receipts = self._receipts.get(owner.owner_id, {})
             if receipt.id in existing_receipts:
@@ -415,6 +438,7 @@ class InMemoryCanonicalMemoryStore:
                 provenance_refs=candidate.provenance_refs,
                 consent_receipt=receipt,
                 created_at=confirmed_at,
+                updated_at=confirmed_at,
             )
             existing_records = self._records.get(owner.owner_id, {})
             if record.id in existing_records:
@@ -436,7 +460,7 @@ class InMemoryCanonicalMemoryStore:
 
             self._settings[owner.owner_id] = MemoryConsentSettings(
                 enabled=True,
-                enabled_categories=frozenset(confirmed_scope),
+                enabled_categories=effective_scope,
             )
             self._receipts[owner.owner_id] = receipts
             self._records[owner.owner_id] = records
@@ -475,17 +499,61 @@ class InMemoryCanonicalMemoryStore:
         self,
         owner: RegisteredMemoryOwner,
         categories: frozenset[MemoryCategory],
-    ) -> MemoryConsentSettings:
+        *,
+        clock: Callable[[], datetime],
+        id_factory: Callable[[], str],
+        idempotency_key: str | None,
+    ) -> CanonicalEnableMutation:
         if not categories:
             raise ValueError("enable requires at least one category")
         with self._lock:
             current = self._settings.get(owner.owner_id, MemoryConsentSettings())
+            if categories <= current.enabled_categories:
+                return CanonicalEnableMutation(settings=current)
+            existing_receipts = self._receipts.get(owner.owner_id, {})
+            if idempotency_key is not None:
+                matching_receipt = next(
+                    (
+                        receipt
+                        for receipt in existing_receipts.values()
+                        if receipt.idempotency_key == idempotency_key
+                    ),
+                    None,
+                )
+                if matching_receipt is not None:
+                    if (
+                        matching_receipt.action != "direct_enable"
+                        or matching_receipt.requested_scope != categories
+                    ):
+                        raise ValueError(
+                            "idempotency key already belongs to another consent action"
+                        )
+                    return CanonicalEnableMutation(settings=current)
+            receipt_id = id_factory()
+            receipt = MemoryConsentActionReceipt(
+                id=receipt_id,
+                action="direct_enable",
+                owner_id=owner.owner_id,
+                requested_scope=categories,
+                granted_scope=categories - current.enabled_categories,
+                effective_scope=current.enabled_categories | categories,
+                recorded_at=clock(),
+                idempotency_key=idempotency_key or receipt_id,
+            )
+            if receipt.id in existing_receipts:
+                raise ValueError(f"consent receipt id already exists: {receipt.id}")
             settings = MemoryConsentSettings(
                 enabled=True,
-                enabled_categories=current.enabled_categories | categories,
+                enabled_categories=receipt.effective_scope,
             )
+            receipts = dict(existing_receipts)
+            receipts[receipt.id] = receipt
             self._settings[owner.owner_id] = settings
-            return settings
+            self._receipts[owner.owner_id] = receipts
+            return CanonicalEnableMutation(
+                settings=settings,
+                consent_receipt=receipt,
+            )
 
     def last_proactive_prompt_at(
         self,
@@ -558,12 +626,18 @@ class InMemoryCanonicalMemoryStore:
         *,
         value: str | None,
         label: str | None,
+        clock: Callable[[], datetime] | None = None,
     ) -> CanonicalRecordMutation | None:
         with self._reconciliation_condition:
             records = self._records.get(owner.owner_id, {})
             current = records.get(record_id)
             if current is None:
                 return None
+            if (value is None or value == current.value) and (
+                label is None or label == current.label
+            ):
+                raise ValueError("memory edit must change value or label")
+            updated_at = (clock or _utc_now)()
             updated = MemoryRecord.model_validate(
                 {
                     field_name: (
@@ -571,13 +645,15 @@ class InMemoryCanonicalMemoryStore:
                         if field_name == "value" and value is not None
                         else label
                         if field_name == "label" and label is not None
+                        else current.revision + 1
+                        if field_name == "revision"
+                        else updated_at
+                        if field_name == "updated_at"
                         else getattr(current, field_name)
                     )
                     for field_name in MemoryRecord.model_fields
                 }
             )
-            if updated == current:
-                raise ValueError("memory edit must change value or label")
             records[record_id] = updated
             reconciliation_key = (owner.owner_id, record_id)
             reconciliation_generation = (

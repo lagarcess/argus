@@ -19,6 +19,7 @@ from argus.memory.contracts import (
     SavedDecisionSource,
     SensitivityAssessment,
     SensitivityStatus,
+    bind_sensitivity_assessment,
 )
 from argus.memory.policy import MemoryPolicy, PolicyOutcome
 from argus.memory.service import (
@@ -154,15 +155,22 @@ def _candidate(
     trigger: MemoryProposalTrigger = MemoryProposalTrigger.SAVED_DECISION,
 ) -> MemoryCandidate:
     source = _saved_decision_source()
+    future_benefit = "Argus can compare this saved decision later."
     return MemoryCandidate(
         id=candidate_id,
         owner_id=OWNER_ID,
         category=MemoryCategory.EXPLICIT_DECISION_NOTE,
         source=source,
-        future_benefit="Argus can compare this saved decision later.",
+        future_benefit=future_benefit,
         provenance_refs=(source.provenance,),
         trigger=trigger,
-        sensitivity=_clear_sensitivity(),
+        sensitivity=bind_sensitivity_assessment(
+            _clear_sensitivity(),
+            category=MemoryCategory.EXPLICIT_DECISION_NOTE,
+            label=source.label,
+            value=source.value,
+            future_benefit=future_benefit,
+        ),
         proposed_context=MemoryOperationContext.ORDINARY,
         opt_in_scope=SAVED_DECISION_SCOPE,
         created_at=NOW,

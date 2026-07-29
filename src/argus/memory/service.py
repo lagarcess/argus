@@ -34,6 +34,7 @@ from argus.memory.contracts import (
     SavedDecisionSource,
     SensitivityAssessment,
     SensitivityStatus,
+    bind_sensitivity_assessment,
 )
 from argus.memory.policy import RESTRICTED_CONTEXTS, MemoryPolicy, PolicyOutcome
 from argus.memory.provider import (
@@ -255,12 +256,21 @@ class MemoryService:
         self,
         subject: MemorySubject,
         categories: frozenset[MemoryCategory],
+        *,
+        idempotency_key: str | None = None,
     ) -> MemoryConsentSettings:
         owner = require_registered(subject)
         self._policy.validate_enable_scope(categories)
         correlation_id = self._safe_correlation_id()
         self._require_available()
-        settings = self._store.enable_categories(owner, categories)
+        mutation = self._store.enable_categories(
+            owner,
+            categories,
+            clock=self._clock,
+            id_factory=self._id_factory,
+            idempotency_key=idempotency_key,
+        )
+        settings = mutation.settings
         self._emit_event(
             correlation_id,
             MemoryOperation.ENABLE,
@@ -339,11 +349,32 @@ class MemoryService:
             )
             return ConfirmationResult(created=False)
 
+        try:
+            bound_sensitivity = bind_sensitivity_assessment(
+                sensitivity,
+                category=candidate.category,
+                label=candidate.source.label,
+                value=candidate.source.value,
+                future_benefit=candidate.future_benefit,
+            )
+        except ValueError:
+            bound_sensitivity = None
+        if bound_sensitivity != candidate.sensitivity:
+            self._record_policy_trace(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                PolicyOutcome.SUPPRESSED_SENSITIVITY,
+            )
+            self._emit_event(
+                correlation_id,
+                MemoryOperation.CONFIRM,
+                MemoryOutcome.SUPPRESSED,
+                category=candidate.category,
+            )
+            return ConfirmationResult(created=False)
+
         decision = self._policy.evaluate(
-            self._draft_from_candidate(
-                candidate,
-                sensitivity=sensitivity,
-            ),
+            self._draft_from_candidate(candidate, sensitivity=bound_sensitivity),
             self._store.get_settings(owner),
             context=context,
             last_proactive_prompt_at=None,
@@ -628,6 +659,7 @@ class MemoryService:
             record_id,
             value=edit.value,
             label=edit.label,
+            clock=self._clock,
         )
         if mutation is None:
             self._emit_event(
@@ -816,6 +848,13 @@ class MemoryService:
             )
             return None
 
+        bound_sensitivity = bind_sensitivity_assessment(
+            draft.sensitivity,
+            category=draft.category,
+            label=draft.label,
+            value=draft.value,
+            future_benefit=draft.future_benefit,
+        )
         candidate = MemoryCandidate(
             id=self._id_factory(),
             owner_id=owner.owner_id,
@@ -828,7 +867,7 @@ class MemoryService:
             future_benefit=draft.future_benefit,
             provenance_refs=draft.provenance,
             trigger=draft.trigger,
-            sensitivity=draft.sensitivity,
+            sensitivity=bound_sensitivity,
             proposed_context=context,
             opt_in_scope=decision.opt_in_scope,
             created_at=now,
