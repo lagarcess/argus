@@ -8,10 +8,18 @@ from uuid import UUID
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from argus.api.chat.legacy_onboarding_markers import (
+    legacy_onboarding_sql_filters,
+)
 from argus.domain.search_sql_text import normalizer_expression
-from argus.domain.search_text import normalize_search_text
+from argus.domain.search_text import (
+    normalize_search_text,
+    search_has_indexable_token,
+)
 
 _SEARCH_ACQUIRE_TIMEOUT_SECONDS = 2.0
+_CONVERSATION_MATCH_OVERSAMPLE = 10
+_MAX_CONVERSATION_MATCHES_PER_SOURCE = 1_010
 _DECISION_STATES = ("promising", "watching", "rejected", "revisit_later")
 _ROW_GROUP_BY_SOURCE = {
     "conversation": "conversations",
@@ -37,6 +45,13 @@ class SearchReadResult:
 
 def _normalized(expression: str) -> sql.Composed:
     return normalizer_expression(sql.SQL(expression))
+
+
+def _conversation_match_limit(source_limit: int) -> int:
+    return min(
+        source_limit * _CONVERSATION_MATCH_OVERSAMPLE,
+        _MAX_CONVERSATION_MATCHES_PER_SOURCE,
+    )
 
 
 def _all_token_recheck(
@@ -396,6 +411,9 @@ _EVIDENCE_INDEX_HAYSTACK = """
         '[]'::jsonb
     )::text
 """
+_DECISION_INDEX_HAYSTACK = """
+    decision.decision_state || ' ' || coalesce(decision.note, '')
+"""
 _LATE_EVIDENCE = _LateSource(
     name="evidence",
     source_type="evidence",
@@ -564,9 +582,7 @@ def _late_source_ctes(
     has_anchor: bool,
     has_cursor: bool,
 ) -> tuple[sql.Composed, sql.Composed, sql.Composed, sql.Composed]:
-    match_predicate = sql.SQL(
-        "(input.normalized_query = '' or ({}))"
-    ).format(
+    match_predicate = sql.SQL("(input.normalized_query = '' or ({}))").format(
         _source_token_predicate(
             source,
             has_anchor=has_anchor,
@@ -1125,6 +1141,7 @@ _CONVERSATION_INPUT_CTE = sql.SQL(
             %(normalized_query)s::text as normalized_query,
             %(symbol_query)s::text as symbol_query,
             %(source_limit)s::integer as source_limit,
+            %(match_limit)s::integer as match_limit,
             %(has_cursor)s::boolean as has_cursor,
             %(cursor_pinned_rank)s::integer as cursor_pinned_rank,
             %(cursor_exact_rank)s::integer as cursor_exact_rank,
@@ -1143,9 +1160,12 @@ _CONVERSATION_INPUT_CTE = sql.SQL(
 
 def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
     chat_title_haystack = _normalized("conversation.title")
-    chat_preview_haystack = _normalized(
-        "coalesce(conversation.last_message_preview, '')"
+    chat_preview_haystack = _normalized("coalesce(conversation.last_message_preview, '')")
+    chat_index_haystack = _normalized(
+        "conversation.title || ' ' "
+        "|| coalesce(conversation.last_message_preview, '')"
     )
+    message_haystack = _normalized("message.content")
     run_haystack = _normalized(
         "coalesce(run.conversation_result_card->>'title', '') || ' ' "
         "|| coalesce(array_to_string(run.symbols, ' '), '') || ' ' "
@@ -1156,22 +1176,22 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
     )
-    decision_haystack = _normalized(
-        "coalesce(decision.note, '') || ' ' || decision.decision_state || ' ' "
-        "|| coalesce(evidence.title, '') || ' ' "
-        "|| coalesce(evidence.digest, '')"
-    )
+    decision_haystack = _normalized(_DECISION_INDEX_HAYSTACK)
 
-    def token_predicate(haystack: sql.Composable) -> sql.Composed:
+    def token_predicate(
+        haystack: sql.Composable,
+        index_haystack: sql.Composable,
+    ) -> sql.Composed:
         return _token_match_predicate(
             normalized_haystack=haystack,
-            normalized_index_haystack=haystack,
+            normalized_index_haystack=index_haystack,
             has_anchor=has_anchor,
         )
 
     return sql.SQL(
         """
         matches as (
+            (
             select
                 conversation.id as conversation_id,
                 conversation.id as source_id,
@@ -1183,7 +1203,8 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                     when ({chat_preview_predicate})
                         then conversation.last_message_preview
                 end as matched_text,
-                1::integer as layer_rank
+                1::integer as layer_rank,
+                'conversation'::text as layer
             from input
             join public.conversations as conversation
               on conversation.user_id = input.user_id
@@ -1197,9 +1218,43 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                 or ({chat_title_predicate})
                 or ({chat_preview_predicate})
             )
+            order by conversation.updated_at desc, conversation.id desc
+            limit (select match_limit from input)
+            )
 
             union all
 
+            (
+            select
+                conversation.id,
+                message.id,
+                message.created_at,
+                message.content,
+                2::integer,
+                'message'::text
+            from input
+            join public.messages as message
+              on message.user_id = input.user_id
+             and message.role = 'user'
+             and message.content <> %(legacy_skip_message)s
+             and message.content not like %(legacy_goal_pattern)s escape '\\'
+            join public.conversations as conversation
+              on conversation.id = message.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+             and (
+                 not input.guest_scope
+                 or conversation.id = input.guest_conversation_id
+             )
+            where input.normalized_query <> ''
+              and ({message_predicate})
+            order by message.created_at desc, message.id desc
+            limit (select match_limit from input)
+            )
+
+            union all
+
+            (
             select
                 conversation.id,
                 run.id,
@@ -1211,7 +1266,8 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                     nullif(run.config_snapshot->>'template', ''),
                     nullif(run.conversation_result_card->>'strategy_label', '')
                 ),
-                2::integer
+                3::integer,
+                'run'::text
             from input
             join public.backtest_runs as run
               on run.user_id = input.user_id
@@ -1226,15 +1282,22 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
              )
             where input.normalized_query <> ''
               and ({run_predicate})
+            order by
+                coalesce(run.updated_at, run.created_at) desc,
+                run.id desc
+            limit (select match_limit from input)
+            )
 
             union all
 
+            (
             select
                 conversation.id,
                 idea.id,
                 idea.updated_at,
                 concat_ws(' ', idea.title, nullif(idea.summary, '')),
-                3::integer
+                4::integer,
+                'idea'::text
             from input
             join public.ideas as idea
               on idea.user_id = input.user_id
@@ -1248,15 +1311,20 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
              )
             where input.normalized_query <> ''
               and ({idea_predicate})
+            order by idea.updated_at desc, idea.id desc
+            limit (select match_limit from input)
+            )
 
             union all
 
+            (
             select
                 conversation.id,
                 evidence.id,
                 evidence.updated_at,
                 concat_ws(' ', evidence.title, nullif(evidence.digest, '')),
-                4::integer
+                5::integer,
+                'evidence'::text
             from input
             join public.evidence_artifacts as evidence
               on evidence.user_id = input.user_id
@@ -1270,9 +1338,13 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
              )
             where input.normalized_query <> ''
               and ({evidence_predicate})
+            order by evidence.updated_at desc, evidence.id desc
+            limit (select match_limit from input)
+            )
 
             union all
 
+            (
             select
                 conversation.id,
                 decision.id,
@@ -1280,11 +1352,10 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                 concat_ws(
                     ' ',
                     nullif(decision.note, ''),
-                    decision.decision_state,
-                    nullif(evidence.title, ''),
-                    nullif(evidence.digest, '')
+                    decision.decision_state
                 ),
-                5::integer
+                6::integer,
+                'decision'::text
             from input
             join public.decision_notes as decision
               on decision.user_id = input.user_id
@@ -1296,17 +1367,22 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            left join public.evidence_artifacts as evidence
-              on evidence.id = decision.evidence_artifact_id
-             and evidence.user_id = input.user_id
             where input.normalized_query <> ''
               and ({decision_predicate})
+            order by decision.updated_at desc, decision.id desc
+            limit (select match_limit from input)
+            )
         ),
         winning_matches as (
             select *
             from (
                 select
                     matches.*,
+                    count(*) over (
+                        partition by
+                            matches.conversation_id,
+                            matches.layer_rank
+                    )::integer as match_count,
                     row_number() over (
                         partition by matches.conversation_id
                         order by
@@ -1330,6 +1406,12 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                 conversation.updated_at,
                 winning.matched_text,
                 winning.layer_rank,
+                winning.layer,
+                winning.match_count,
+                case
+                    when winning.layer = 'message' then winning.source_id
+                    else null
+                end as message_id,
                 activity.activity_at,
                 conversation.pinned::integer as pinned_rank,
                 (
@@ -1382,6 +1464,11 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                     where run.user_id = input.user_id
                       and run.conversation_id = conversation.id
                     union all
+                    select max(message.created_at)
+                    from public.messages as message
+                    where message.user_id = input.user_id
+                      and message.conversation_id = conversation.id
+                    union all
                     select max(idea.updated_at)
                     from public.ideas as idea
                     where idea.user_id = input.user_id
@@ -1413,12 +1500,28 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
         )
         """
     ).format(
-        chat_title_predicate=token_predicate(chat_title_haystack),
-        chat_preview_predicate=token_predicate(chat_preview_haystack),
-        run_predicate=token_predicate(run_haystack),
-        idea_predicate=token_predicate(idea_haystack),
-        evidence_predicate=token_predicate(evidence_haystack),
-        decision_predicate=token_predicate(decision_haystack),
+        chat_title_predicate=token_predicate(
+            chat_title_haystack,
+            chat_index_haystack,
+        ),
+        chat_preview_predicate=token_predicate(
+            chat_preview_haystack,
+            chat_index_haystack,
+        ),
+        message_predicate=token_predicate(message_haystack, message_haystack),
+        run_predicate=token_predicate(
+            run_haystack,
+            _normalized(_RUN_INDEX_HAYSTACK),
+        ),
+        idea_predicate=token_predicate(idea_haystack, idea_haystack),
+        evidence_predicate=token_predicate(
+            evidence_haystack,
+            _normalized(_EVIDENCE_INDEX_HAYSTACK),
+        ),
+        decision_predicate=token_predicate(
+            decision_haystack,
+            decision_haystack,
+        ),
         normalized_title=_normalized("conversation.title"),
         normalized_matched=_normalized("winning.matched_text"),
     )
@@ -1460,7 +1563,9 @@ def _conversation_search_sql(
             """
         )
     )
-    limit = sql.SQL("") if pivot_only else sql.SQL("limit (select source_limit from input)")
+    limit = (
+        sql.SQL("") if pivot_only else sql.SQL("limit (select source_limit from input)")
+    )
     return sql.SQL(
         """
         with {input_cte},
@@ -1484,6 +1589,9 @@ def _conversation_search_sql(
                 '_recall_match', jsonb_build_object(
                     'matched_text', ranked.matched_text,
                     'layer_rank', ranked.layer_rank,
+                    'layer', ranked.layer,
+                    'match_count', ranked.match_count,
+                    'message_id', ranked.message_id,
                     'symbol_exact_match', ranked.symbol_rank = 1,
                     'activity_at', ranked.activity_at
                 )
@@ -1923,6 +2031,20 @@ class PostgresSearchReader:
             key=len,
             default=None,
         )
+        if query.strip() and not search_has_indexable_token(query):
+            if has_cursor:
+                raise SearchCursorError(
+                    "Deferred short search cannot continue from a cursor."
+                )
+            return SearchReadResult(
+                rows=_group_candidates([], source_limit=source_limit),
+                ledger_counts=(
+                    {state: 0 for state in _DECISION_STATES}
+                    if include_ledger_groups and not guest_scope
+                    else None
+                ),
+            )
+        legacy_skip_message, legacy_goal_pattern = legacy_onboarding_sql_filters()
         params: dict[str, Any] = {
             "user_id": owner_id,
             "normalized_query": normalized_query,
@@ -1935,6 +2057,7 @@ class PostgresSearchReader:
                 else None
             ),
             "source_limit": source_limit,
+            "match_limit": _conversation_match_limit(source_limit),
             "has_cursor": has_cursor,
             "cursor_pinned_rank": 0,
             "cursor_exact_rank": 0,
@@ -1951,6 +2074,8 @@ class PostgresSearchReader:
             "guest_conversation_id": workspace_id,
             "token_patterns": [f"%{token}%" for token in normalized_tokens],
             "anchor_pattern": (f"%{anchor_token}%" if anchor_token is not None else None),
+            "legacy_skip_message": legacy_skip_message,
+            "legacy_goal_pattern": legacy_goal_pattern,
         }
         with self.pool.connection(timeout=_SEARCH_ACQUIRE_TIMEOUT_SECONDS) as connection:
             with connection.cursor(row_factory=dict_row) as cursor:
@@ -2003,9 +2128,7 @@ class PostgresSearchReader:
                         "cursor_updated_at": None,
                     }
                     cursor.execute(
-                        _conversation_ledger_sql(
-                            has_anchor=anchor_token is not None
-                        ),
+                        _conversation_ledger_sql(has_anchor=anchor_token is not None),
                         ledger_params,
                     )
                     ledger_counts = {state: 0 for state in _DECISION_STATES}

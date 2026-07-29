@@ -5,6 +5,18 @@ export type SearchConversationItem<TDecision extends string> = {
   matched_text: string;
   updated_at: string;
   conversation_id: string;
+  match: {
+    layer:
+      | "conversation"
+      | "message"
+      | "run"
+      | "idea"
+      | "evidence"
+      | "decision";
+    fragment: string;
+    count: number;
+    message_id?: string;
+  };
   dossier: {
     decision: {
       state: TDecision;

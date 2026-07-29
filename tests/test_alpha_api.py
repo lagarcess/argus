@@ -1118,9 +1118,9 @@ def test_chat_stream_sends_profile_language_to_runtime() -> None:
     assert final_payload["assistant_response"] == token_events[0]["content"]
     assert final_payload["message_id"]
     assert final_payload["run"]["conversation_id"] == conversation["id"]
-    messages = client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    ).json()["items"]
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
     assert [message["role"] for message in messages] == ["user", "assistant"]
     runtime_turn = messages[-1]["metadata"]["agent_runtime_turn"]
     assert runtime_turn["status"] == "completed"
@@ -1186,6 +1186,56 @@ def test_messages_cursor_pagination_is_stable() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_messages_can_open_one_bounded_page_at_an_owned_message_anchor() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    first = memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="First transcript turn.",
+    )
+    anchor = memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Anchored transcript turn.",
+    )
+    third = memory_message(
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Following transcript turn.",
+    )
+
+    response = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages",
+        params={"limit": 2, "anchor_message_id": anchor.id},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["id"] for item in payload["items"]] == [anchor.id, third.id]
+    assert first.id not in {item["id"] for item in payload["items"]}
+    assert len(payload["items"]) <= 2
+
+
+def test_messages_reject_foreign_message_anchor_without_leaking_ownership() -> None:
+    client = _client()
+    target = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    other = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    foreign = memory_message(
+        conversation_id=other["id"],
+        role="user",
+        content="Foreign anchor.",
+    )
+
+    response = client.get(
+        f"/api/v1/conversations/{target['id']}/messages",
+        params={"anchor_message_id": foreign.id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
 def test_search_supports_cursor_after_grouping_by_conversation() -> None:
     client = _client()
     conversation_ids = [
@@ -1230,6 +1280,97 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     assert {item["type"] for item in items} == {"conversation"}
 
 
+@pytest.mark.parametrize("query", ["a", "GL", "__"])
+def test_search_memory_mode_defers_queries_without_an_indexable_token(
+    query: str,
+) -> None:
+    client = _client()
+    client.post("/api/v1/conversations", json={"title": "A GL chat"})
+
+    response = client.get("/api/v1/search", params={"q": query})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [],
+        "next_cursor": None,
+        "ledger_groups": None,
+    }
+
+
+def test_search_memory_mode_recalls_user_message_with_typed_match_anchor() -> None:
+    client = _client()
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "Ordinary allocation notes"},
+    ).json()["conversation"]
+    matched = memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="I called this my copper lantern threshold.",
+    )
+    memory_message(
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The copper lantern threshold is only assistant-authored here.",
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "copper lantern", "limit": 20},
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["type"] == "conversation"
+    assert items[0]["id"] == conversation["id"]
+    assert items[0]["conversation_id"] == conversation["id"]
+    assert items[0]["matched_text"] == "I called this my copper lantern threshold."
+    assert items[0]["match"] == {
+        "layer": "message",
+        "fragment": "I called this my copper lantern threshold.",
+        "count": 1,
+        "message_id": matched.id,
+    }
+
+
+def test_search_memory_mode_centers_fragment_on_late_message_match() -> None:
+    client = _client()
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "Ordinary allocation notes"},
+    ).json()["conversation"]
+    content = (
+        ("Earlier copper-only context. " * 30)
+        + "My copper lantern threshold was twelve percent."
+        + (" Later unrelated context." * 20)
+    )
+    memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content=content,
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "copper threshold", "limit": 20},
+    )
+
+    assert response.status_code == 200
+    [item] = response.json()["items"]
+    fragment = item["match"]["fragment"]
+    assert len(fragment) <= 500
+    assert fragment in content
+    assert "copper lantern threshold" in fragment
+    assert fragment != content[:500]
+    assert item["matched_text"] == fragment
+    repeated = client.get(
+        "/api/v1/search",
+        params={"q": "copper threshold", "limit": 20},
+    )
+    assert repeated.json()["items"][0]["match"]["fragment"] == fragment
+
+
 def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
     observed: list[dict[str, object]] = []
 
@@ -1262,7 +1403,7 @@ def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
                 "query_present": True,
                 "decision_state_filter_present": False,
                 "result_count": 1,
-                    "returned_types": ["conversation"],
+                "returned_types": ["conversation"],
                 "has_more": False,
                 "source": "memory",
             },
@@ -1504,9 +1645,7 @@ def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [item["id"] for item in items] == [
-        promising_idea.source_conversation_id
-    ]
+    assert [item["id"] for item in items] == [promising_idea.source_conversation_id]
     assert items[0]["type"] == "conversation"
     assert items[0]["decision_states"] == ["promising"]
 
@@ -2089,9 +2228,7 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
     assert dossier["outcome"]["run_label"]
     assert dossier["outcome"]["benchmark_symbol"] == "SPY"
     assert dossier["outcome"]["quick_take"] == "I tested that idea with TSLA."
-    assert dossier["outcome"]["metrics"] == [
-        {"name": "total_return_pct", "value": 12.5}
-    ]
+    assert dossier["outcome"]["metrics"] == [{"name": "total_return_pct", "value": 12.5}]
     assert dossier["left_off"]["run_label"] == dossier["outcome"]["run_label"]
     assert dossier["left_off"]["completed_at"]
     assert dossier["left_off"]["nudge"] is None
@@ -2207,6 +2344,96 @@ def test_search_dossier_marks_a_decided_old_result_stale() -> None:
     left_off = projected[1].dossier.left_off
     assert left_off is not None
     assert left_off.nudge == "stale_result"
+
+
+def test_search_dossier_marks_only_a_definitely_untaken_suggestion() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    now = utcnow()
+    conversation_id = "untaken-suggestion"
+    run_id = "untaken-suggestion-run"
+    artifact_id = "untaken-suggestion-evidence"
+    assistant_offer = {
+        "id": "untaken-suggestion-offer",
+        "conversation_id": conversation_id,
+        "role": "assistant",
+        "content": "Here are supported next experiments.",
+        "metadata": {
+            "result_run_id": run_id,
+            "next_experiments": {
+                "version": "argus_next_experiments/v1",
+                "rows": [
+                    {
+                        "kind": "change_date_range",
+                        "label": "Test a different date range",
+                    }
+                ],
+            },
+        },
+        "created_at": now - timedelta(minutes=1),
+    }
+    projection_inputs = {
+        "conversation": {
+            "id": conversation_id,
+            "title": "Untaken suggestion",
+            "updated_at": now,
+        },
+        "runs": [
+            {
+                "id": run_id,
+                "conversation_id": conversation_id,
+                "status": "completed",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "conversation_result_card": {"title": "Current GLD outcome"},
+                "created_at": now - timedelta(minutes=3),
+            }
+        ],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": artifact_id,
+                "source_conversation_id": conversation_id,
+                "source_run_id": run_id,
+                "created_at": now - timedelta(minutes=3),
+            }
+        ],
+        "decisions": [
+            {
+                "id": "untaken-suggestion-decision",
+                "source_conversation_id": conversation_id,
+                "evidence_artifact_id": artifact_id,
+                "decision_state": "watching",
+                "created_at": now - timedelta(minutes=2),
+            }
+        ],
+        "query": "",
+    }
+
+    offered = project_conversation_recall(
+        **projection_inputs,
+        messages=[assistant_offer],
+    )
+    followed_up = project_conversation_recall(
+        **projection_inputs,
+        messages=[
+            assistant_offer,
+            {
+                "id": "untaken-suggestion-user-reply",
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": "Let me try something else.",
+                "created_at": now,
+            },
+        ],
+    )
+
+    assert offered is not None
+    assert offered[1].dossier.left_off is not None
+    assert offered[1].dossier.left_off.nudge == "suggestion_untaken"
+    assert followed_up is not None
+    assert followed_up[1].dossier.left_off is not None
+    assert followed_up[1].dossier.left_off.nudge is None
 
 
 def test_search_decision_names_judged_run_when_latest_run_is_different() -> None:

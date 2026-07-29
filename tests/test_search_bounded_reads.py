@@ -66,7 +66,7 @@ def _conversation_candidate() -> dict[str, Any]:
         "pinned_rank": 0,
         "exact_rank": 0,
         "symbol_rank": 0,
-        "layer_rank": 5,
+        "layer_rank": 6,
         "text_rank": 50,
         "payload": {
             "id": CONVERSATION_ID,
@@ -77,7 +77,10 @@ def _conversation_candidate() -> dict[str, Any]:
             "deleted_at": None,
             "_recall_match": {
                 "matched_text": "Search decision evidence",
-                "layer_rank": 5,
+                "layer_rank": 6,
+                "layer": "decision",
+                "match_count": 1,
+                "message_id": None,
                 "symbol_exact_match": False,
                 "activity_at": ACTIVITY_AT,
             },
@@ -183,7 +186,10 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
     }
     assert result.rows["conversations"][0]["_recall_match"] == {
         "matched_text": "Search decision evidence",
-        "layer_rank": 5,
+        "layer_rank": 6,
+        "layer": "decision",
+        "match_count": 1,
+        "message_id": None,
         "symbol_exact_match": False,
         "activity_at": ACTIVITY_AT,
     }
@@ -211,6 +217,32 @@ def test_search_rejects_nonpositive_bound_before_database_read() -> None:
         )
 
     assert pool.cursor.executions == []
+
+
+@pytest.mark.parametrize("query", ["a", "GL", "__"])
+def test_search_defers_nonempty_queries_without_an_indexable_token(
+    query: str,
+) -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([])
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query=query,
+        source_limit=4,
+        include_ledger_groups=True,
+    )
+
+    assert all(not rows for rows in result.rows.values())
+    assert result.asset_rollup is None
+    assert result.ledger_counts == {
+        "promising": 0,
+        "watching": 0,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+    assert pool.cursor.executions == []
+    assert pool.acquisition_timeouts == []
 
 
 @pytest.mark.parametrize("pivot_rows", [[], [_conversation_candidate()] * 2])
@@ -339,17 +371,19 @@ def test_search_groups_all_matching_layers_before_conversation_limit() -> None:
     rendered = pool.cursor.executions[0][0].as_string()
     for source_table in (
         "public.conversations",
+        "public.messages",
         "public.backtest_runs",
         "public.ideas",
         "public.evidence_artifacts",
         "public.decision_notes",
     ):
         assert source_table in rendered
+    assert "message.role = 'user'" in rendered
     assert "row_number() over" in rendered
     assert "partition by matches.conversation_id" in rendered
     assert rendered.rfind("limit") > rendered.rfind("partition by")
     # Each child layer joins its canonical active conversation before grouping.
-    assert rendered.count("conversation.deleted_at is null") >= 6
+    assert rendered.count("conversation.deleted_at is null") >= 7
 
 
 def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit() -> None:
@@ -366,7 +400,7 @@ def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit()
 
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
-    assert sql_text.count("conversation.id = input.guest_conversation_id") >= 5
+    assert sql_text.count("conversation.id = input.guest_conversation_id") >= 6
     assert sql_text.rfind("conversation.id = input.guest_conversation_id") < (
         sql_text.rfind("row_number() over")
     )
@@ -420,7 +454,7 @@ def test_search_cursor_pivots_on_conversation_projection_and_canonical_activity(
     assert "run.id = %(cursor_id)s::uuid" not in rendered
     assert "decision.id = %(cursor_id)s::uuid" not in rendered
     page_params = pool.cursor.executions[1][1]
-    assert page_params["cursor_layer_rank"] == 5
+    assert page_params["cursor_layer_rank"] == 6
     assert pivot_params["cursor_id"] == page_params["cursor_id"]
 
 
@@ -508,7 +542,9 @@ def test_search_hydration_activity_mirrors_ranked_message_activity_scope() -> No
     ) in hydration_sql
 
 
-def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_children() -> None:
+def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_children() -> (
+    None
+):
     from argus.api.search_assembly import scored_supabase_search_items
 
     reader_type, _ = _reader_types()
@@ -608,3 +644,65 @@ def test_persistent_preview_match_returns_preview_with_unrelated_title() -> None
     assert len(scored) == 1
     _, item = scored[0]
     assert item.matched_text == "Gold allocation"
+
+
+def test_conversation_recall_anchor_predicates_match_the_shipped_indexes() -> None:
+    from argus.domain.postgres_search_reader import (
+        _DECISION_INDEX_HAYSTACK,
+        _EVIDENCE_INDEX_HAYSTACK,
+        _RUN_INDEX_HAYSTACK,
+        _conversation_match_ctes,
+        _normalized,
+    )
+
+    rendered = " ".join(
+        _conversation_match_ctes(has_anchor=True).as_string().split()
+    )
+    indexed_haystacks = (
+        (
+            "conversation.title || ' ' "
+            "|| coalesce(conversation.last_message_preview, '')"
+        ),
+        "message.content",
+        _RUN_INDEX_HAYSTACK,
+        "idea.title || ' ' || coalesce(idea.summary, '')",
+        _EVIDENCE_INDEX_HAYSTACK,
+        _DECISION_INDEX_HAYSTACK,
+    )
+
+    for haystack in indexed_haystacks:
+        normalized = " ".join(_normalized(haystack).as_string().split())
+        assert f"{normalized} like %(anchor_pattern)s" in rendered
+
+
+def test_conversation_recall_caps_every_source_before_window_ranking() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="the",
+        source_limit=30,
+    )
+
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert "%(match_limit)s::integer as match_limit" in sql_text
+    bounded_matches = sql_text[
+        sql_text.index("matches as (") : sql_text.index("winning_matches as (")
+    ]
+    assert bounded_matches.count(
+        "limit (select match_limit from input)"
+    ) == 6
+    assert bounded_matches.rfind(
+        "limit (select match_limit from input)"
+    ) < sql_text.index("count(*) over")
+    assert params["match_limit"] == 300
+
+
+def test_conversation_recall_match_cap_has_an_absolute_ceiling() -> None:
+    from argus.domain.postgres_search_reader import _conversation_match_limit
+
+    assert _conversation_match_limit(1) == 10
+    assert _conversation_match_limit(101) == 1_010
+    assert _conversation_match_limit(1_000) == 1_010

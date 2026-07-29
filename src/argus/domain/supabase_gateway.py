@@ -57,6 +57,9 @@ from argus.domain.supabase_message_reads import (
     _unique_owned_rows_by_id,
 )
 from argus.domain.supabase_message_reads import (
+    MessageAnchorError as MessageAnchorError,
+)
+from argus.domain.supabase_message_reads import (
     MessageCursorError as MessageCursorError,
 )
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
@@ -436,9 +439,7 @@ class SupabaseGateway(
                 f"and(updated_at.eq.{timestamp},id.lt.{canonical_cursor_id}))"
             )
             if cursor_pinned:
-                keyset_filter = (
-                    f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
-                )
+                keyset_filter = f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
             else:
                 keyset_filter = f"and(pinned.eq.false,{within_tier})"
             query = query.or_(keyset_filter)

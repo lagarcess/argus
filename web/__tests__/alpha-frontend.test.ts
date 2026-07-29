@@ -1240,9 +1240,13 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const routing = readFileSync(
+      join(root, "lib/chat-conversation-routing.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
-    expect(chat).toContain("readActiveConversationIdFromUrl");
+    expect(routing).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
+    expect(chat).toContain("readActiveConversationRouteState");
     expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
     expect(chat).not.toContain("readActiveConversationId()");
     expect(chat).toContain(
@@ -1366,6 +1370,46 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain('searchParams.append("decision_state", decisionState)');
     expect(api).toContain('searchParams.append("include_ledger_groups", "true")');
     expect(api).toContain("export async function searchGlobal");
+  });
+
+  test("transcript matches open through the bounded anchored read and focus the message", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("anchorMessageId?: string");
+    expect(api).toContain(
+      'searchParams.append("anchor_message_id", options.anchorMessageId)',
+    );
+    expect(chat).toContain("{ anchorMessageId: requestedMessageId }");
+    expect(chat).toContain('data-message-id={msg.id}');
+    expect(chat).toContain('element.scrollIntoView({ block: "center" })');
+    expect(chat).toContain("element.focus({ preventScroll: true })");
+    expect(palette).toContain("item.matchMessageId ?? undefined");
+    const anchoredNavigation = chat.slice(
+      chat.indexOf("if (options.messageId)"),
+      chat.indexOf("let renderedStaleSnapshot"),
+    );
+    expect(anchoredNavigation).toContain(
+      "isCurrentAnchoredConversationRequest({",
+    );
+    expect(anchoredNavigation.match(/isCurrentRequest\(\)/g)).toHaveLength(2);
+  });
+
+  test("command palette highlights normalized search tokens without rewriting display text", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+
+    expect(palette).toContain("<SearchHighlight");
+    expect(palette).not.toContain("function highlightText");
   });
 
   test("result cards expose typed decision capture without prose parsing", () => {

@@ -973,6 +973,8 @@
     "conversation_count_other": "{{count}} conversaciones",
     "result_count_one": "{{count}} resultado",
     "result_count_other": "{{count}} resultados",
+    "match_count_one": "{{count}} coincidencia",
+    "match_count_other": "{{count}} coincidencias",
     "type": {
       "backtest": "Backtest",
       "chat": "Conversación",

@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from "react";
 import {
   Archive,
@@ -24,6 +23,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import {
   deleteConversation as apiDeleteConversation,
   listHistory,
@@ -52,7 +52,10 @@ import {
 
 type ChatCommandPaletteProps = {
   onClose: () => void;
-  onOpenConversation: (conversationId: string) => void;
+  onOpenConversation: (
+    conversationId: string,
+    messageId?: string,
+  ) => void;
   activeConversationId: string | null;
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
@@ -144,29 +147,6 @@ function groupItems(
   }
 
   return groups;
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightText(text: string, query: string): ReactNode {
-  const trimmed = query.trim();
-  if (!trimmed) return text;
-
-  const parts = text.split(new RegExp(`(${escapeRegExp(trimmed)})`, "gi"));
-  return parts.map((part, index) =>
-    part.toLowerCase() === trimmed.toLowerCase() ? (
-      <mark
-        key={`${part}-${index}`}
-        className="rounded-sm bg-[#c2a44d]/20 px-0.5 font-semibold text-[#c2a44d]"
-      >
-        {part}
-      </mark>
-    ) : (
-      <span key={`${part}-${index}`}>{part}</span>
-    ),
-  );
 }
 
 function rawConversationId(item: HistoryItem | SearchItem) {
@@ -494,7 +474,10 @@ export default function ChatCommandPalette({
   const openSourceConversation = useCallback(
     (item: CommandPaletteDisplayItem) => {
       if (!item.conversationId) return;
-      onOpenConversation(item.conversationId);
+      onOpenConversation(
+        item.conversationId,
+        item.matchMessageId ?? undefined,
+      );
       onClose();
     },
     [onClose, onOpenConversation],
@@ -863,7 +846,10 @@ export default function ChatCommandPalette({
                                 />
                               ) : (
                                 <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
-                                  {highlightText(item.title, query)}
+                                  <SearchHighlight
+                                    text={item.title}
+                                    query={query}
+                                  />
                                 </span>
                               )}
                               {isCurrent && (
@@ -884,9 +870,22 @@ export default function ChatCommandPalette({
                               )}
                             </div>
                             {item.snippet && (
-                              <span className="mt-0.5 line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
-                                {highlightText(item.snippet, query)}
-                              </span>
+                              <div className="mt-0.5 flex items-center gap-2">
+                                <span className="line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
+                                  <SearchHighlight
+                                    text={item.snippet}
+                                    query={query}
+                                  />
+                                </span>
+                                {item.matchCount > 1 && (
+                                  <span className="shrink-0 text-[10px] text-black/30 dark:text-white/30">
+                                    {t("command_palette.match_count", {
+                                      count: item.matchCount,
+                                      defaultValue: `${item.matchCount} matches`,
+                                    })}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                           <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">

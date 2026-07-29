@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from argus.domain.search_sql_text import normalizer_expression
+from psycopg import sql
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 pytestmark = pytest.mark.skipif(
@@ -32,6 +34,8 @@ SEARCH_EXPECTED_INDEXES = {
     "idx_backtest_runs_search_norm_trgm",
     "idx_ideas_search_norm_trgm",
     "idx_evidence_search_norm_trgm",
+    "idx_messages_user_content_norm_trgm",
+    "idx_decision_notes_recall_norm_trgm",
 }
 
 
@@ -167,6 +171,7 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
     owner_conversation_id = uuid4()
     other_conversation_id = uuid4()
     owner_message_id = uuid4()
+    owner_recall_message_id = uuid4()
     other_message_id = uuid4()
     with psycopg.connect(DSN, autocommit=True) as connection:
         with connection.cursor() as cursor:
@@ -198,10 +203,14 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
                         %s, %s, %s, 'assistant', 'Fixture',
                         '{"result_card":{"status":"complete"}}'::jsonb
                     ),
+                    (%s, %s, %s, 'user', 'Copper lantern fixture', '{}'::jsonb),
                     (%s, %s, %s, 'assistant', 'Fixture', '{}'::jsonb)
                 """,
                 (
                     owner_message_id,
+                    owner_conversation_id,
+                    owner_id,
+                    owner_recall_message_id,
                     owner_conversation_id,
                     owner_id,
                     other_message_id,
@@ -227,6 +236,7 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
             "other_id": other_id,
             "owner_conversation_id": owner_conversation_id,
             "owner_message_id": owner_message_id,
+            "owner_recall_message_id": owner_recall_message_id,
             "owner_spine": owner_spine,
             "other_spine": other_spine,
         }
@@ -410,6 +420,35 @@ def test_current_read_predicates_select_each_forward_index(
                     limit 1
                     """,
                     (owner_id, conversation_id),
+                ),
+                "idx_messages_user_content_norm_trgm": (
+                    sql.SQL(
+                        """
+                        explain (format json)
+                        select id
+                        from public.messages
+                        where role = 'user'
+                          and {} like %s
+                        limit 21
+                        """
+                    ).format(normalizer_expression(sql.Identifier("content"))),
+                    ("%copper%",),
+                ),
+                "idx_decision_notes_recall_norm_trgm": (
+                    sql.SQL(
+                        """
+                        explain (format json)
+                        select id
+                        from public.decision_notes
+                        where {} like %s
+                        limit 21
+                        """
+                    ).format(
+                        normalizer_expression(
+                            sql.SQL("decision_state || ' ' || coalesce(note, '')")
+                        )
+                    ),
+                    ("%fixture%",),
                 ),
                 "idx_decision_notes_idea_latest": (
                     """

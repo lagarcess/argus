@@ -112,7 +112,8 @@ Next.js/React/TypeScript, Bun/Vitest, Playwright.
 ### Task 2: Transcript Haystack and Jump to Match
 
 **Files:**
-- Create: `supabase/migrations/20260729000001_add_message_recall_index.sql`
+- Create: `supabase/migrations/20260729221458_add_message_recall_index.sql`
+  (created by `supabase migration new add_message_recall_index`)
 - Modify: `src/argus/api/schemas.py`
 - Modify: `src/argus/domain/postgres_search_reader.py`
 - Modify: `src/argus/api/search_assembly.py`

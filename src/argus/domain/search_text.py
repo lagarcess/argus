@@ -3,10 +3,18 @@ from __future__ import annotations
 import re
 
 _SEARCH_SEPARATOR_RE = re.compile(r"[\W_]+", re.UNICODE)
+SEARCH_INDEXABLE_TOKEN_MIN_LENGTH = 3
 
 
 def normalize_search_text(value: object) -> str:
     return " ".join(_SEARCH_SEPARATOR_RE.sub(" ", str(value).casefold()).split())
+
+
+def search_has_indexable_token(value: object) -> bool:
+    return any(
+        len(token) >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH
+        for token in normalize_search_text(value).split()
+    )
 
 
 def search_text_contains_query(*, query: str, text: object) -> bool:

@@ -370,6 +370,16 @@ Represents individual messages within a conversation.
   references. Later turns that create a new draft, active confirmation,
   completed result, or explicit cancellation should supersede stale retry
   affordances during hydration.
+- Omnisearch may recall only `role = 'user'` message content. The partial
+  `idx_messages_user_content_norm_trgm` GIN index uses the same checked-in
+  Python 3.10-compatible normalized-content SQL expression as the bounded
+  search reader and `extensions.gin_trgm_ops`. The index adds no function,
+  view, grant, or RLS change; owner, active-conversation, guest-workspace, and
+  exact-token rechecks remain query predicates before ranking and limits.
+- A transcript jump reuses the owner-scoped message page read with
+  `anchor_message_id`. The anchor is resolved inside the requested
+  conversation, and the response remains capped at the requested page limit;
+  it is not a transcript scan or a new durable memory record.
 ---
 
 ## 8.1 chat_turn_lifecycles
@@ -769,6 +779,11 @@ Durable decision capture:
   idea-version lifecycle move to `decided` together.
 - The RPC is not a public/client surface. Frontend code only calls
   `POST /evidence-artifacts/{id}/decision`.
+- Omnisearch recall uses the same bounded normalized-text pattern over the
+  existing canonical `decision_state` and `note` fields. The
+  `idx_decision_notes_recall_norm_trgm` GIN index adds no new durable memory
+  record, function, view, grant, or RLS change; owner and conversation checks
+  remain in the recall query before ranking and limits.
 
 ### RLS
 

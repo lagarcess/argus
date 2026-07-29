@@ -554,6 +554,36 @@ class SearchDossier(BaseModel):
     left_off: SearchDossierLeftOff | None = None
 
 
+SearchMatchLayer = Literal[
+    "conversation",
+    "message",
+    "run",
+    "idea",
+    "evidence",
+    "decision",
+]
+
+
+class SearchMatch(BaseModel):
+    layer: SearchMatchLayer
+    fragment: str = Field(max_length=500)
+    count: int = Field(ge=1)
+    message_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_message_anchor(self) -> SearchMatch:
+        if (self.layer == "message") != (self.message_id is not None):
+            raise ValueError("message_id must be present only for message matches")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_message_id(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if data.get("message_id") is None:
+            data.pop("message_id", None)
+        return data
+
+
 class SearchItem(BaseModel):
     type: Literal["conversation"]
     id: str
@@ -561,6 +591,7 @@ class SearchItem(BaseModel):
     matched_text: str
     updated_at: datetime
     conversation_id: str
+    match: SearchMatch
     dossier: SearchDossier
     # Bounded conversation aggregate used for decision filters and counts.
     # The dossier separately carries the latest decision.

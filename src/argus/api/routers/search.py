@@ -24,6 +24,7 @@ from argus.domain.postgres_search_reader import (
     SearchCursorError,
     SearchReadResult,
 )
+from argus.domain.search_text import search_has_indexable_token
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
@@ -68,6 +69,37 @@ def search(
         )
         workspace_conversation_id = (
             workspace.conversation_id if workspace is not None else None
+        )
+
+    if query and not search_has_indexable_token(query):
+        if cursor:
+            raise invalid_cursor_problem(request)
+        ledger_groups = (
+            []
+            if context.kind == "guest" and include_ledger_groups
+            else _ledger_groups_from_counts(None)
+            if include_ledger_groups
+            else None
+        )
+        capture_product_event(
+            "recall_usage",
+            user_id=user.id,
+            status="completed",
+            attributes={
+                "query_present": True,
+                "decision_state_filter_present": decision_state is not None,
+                "result_count": 0,
+                "returned_types": [],
+                "has_more": False,
+                "source": (
+                    "supabase" if api_state.supabase_gateway is not None else "memory"
+                ),
+            },
+        )
+        return PaginatedSearch(
+            items=[],
+            next_cursor=None,
+            ledger_groups=ledger_groups,
         )
 
     scored_items: list[tuple[int, SearchItem]] = []

@@ -760,10 +760,16 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   cursor?: string,
-  options: Readonly<{ signal?: AbortSignal }> = {},
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ) {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (options.anchorMessageId) {
+    searchParams.append("anchor_message_id", options.anchorMessageId);
+  }
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
     { signal: options.signal },

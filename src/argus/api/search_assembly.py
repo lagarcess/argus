@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any, Mapping
 
 from argus.api import state as api_state
+from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import SearchItem, User
 from argus.domain.conversation_recall import project_conversation_recall
@@ -60,12 +61,24 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 user_id=user.id,
             )
         ]
+        visible_conversation_ids = {
+            str(conversation["id"]) for conversation in conversations
+        }
+        messages = [
+            message.model_dump()
+            for conversation_id, conversation_messages in api_state.store.messages.items()
+            if conversation_id in visible_conversation_ids
+            for message in conversation_messages
+            if message.role != "user"
+            or not is_legacy_onboarding_marker(message.content)
+        ]
     return _project_rows(
         conversations=conversations,
         runs=runs,
         ideas=ideas,
         evidence=evidence,
         decisions=decisions,
+        messages=messages,
         query=query,
     )
 
@@ -93,6 +106,7 @@ def scored_supabase_search_items(
     ideas = [dict(row) for row in raw.get("ideas", [])]
     evidence = [dict(row) for row in raw.get("evidence", [])]
     decisions = [dict(row) for row in raw.get("decisions", [])]
+    messages = [dict(row) for row in raw.get("messages", [])]
 
     # Compatibility for narrow injected gateways: production readers include
     # canonical conversations, while test doubles may return only a matched
@@ -138,6 +152,7 @@ def scored_supabase_search_items(
         ideas=ideas,
         evidence=evidence,
         decisions=decisions,
+        messages=messages,
         query=query,
     )
 
@@ -149,12 +164,14 @@ def _project_rows(
     ideas: list[Mapping[str, Any]],
     evidence: list[Mapping[str, Any]],
     decisions: list[Mapping[str, Any]],
+    messages: list[Mapping[str, Any]],
     query: str,
 ) -> list[ScoredSearchItem]:
     runs_by_conversation = _group_by_conversation(runs)
     ideas_by_conversation = _group_by_conversation(ideas)
     evidence_by_conversation = _group_by_conversation(evidence)
     decisions_by_conversation = _group_by_conversation(decisions)
+    messages_by_conversation = _group_by_conversation(messages)
     projected: list[ScoredSearchItem] = []
     for conversation in conversations:
         conversation_id = str(conversation.get("id") or "")
@@ -164,6 +181,7 @@ def _project_rows(
             ideas=ideas_by_conversation[conversation_id],
             evidence=evidence_by_conversation[conversation_id],
             decisions=decisions_by_conversation[conversation_id],
+            messages=messages_by_conversation[conversation_id],
             query=query,
         )
         if item is not None:

@@ -1,11 +1,16 @@
 from pathlib import Path
 
+from argus.domain.search_sql_text import normalizer_expression
+from psycopg import sql
+
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = (
     ROOT / "supabase" / "migrations" / "20260727000001_add_bounded_read_indexes.sql"
 )
 SEARCH_MIGRATION_GLOB = "*_add_search_trigram_indexes.sql"
 HISTORY_STATE_MIGRATION_GLOB = "*_add_history_state_page_indexes.sql"
+MESSAGE_RECALL_MIGRATION_GLOB = "*_add_message_recall_index.sql"
+DECISION_RECALL_MIGRATION_GLOB = "*_add_decision_recall_index.sql"
 
 
 def _migration_sql() -> str:
@@ -134,6 +139,62 @@ def test_history_state_page_migration_adds_only_plan_proven_indexes() -> None:
     ):
         assert f"drop index if exists public.{index_name}" in migration
 
+    assert "create unique index" not in migration
+    assert "create function" not in migration
+    assert "create view" not in migration
+    assert "create materialized view" not in migration
+    assert "generated always as" not in migration
+    assert "grant " not in migration
+
+
+def test_message_recall_migration_is_user_only_private_and_index_only() -> None:
+    migrations = sorted(
+        (ROOT / "supabase" / "migrations").glob(MESSAGE_RECALL_MIGRATION_GLOB)
+    )
+    assert len(migrations) == 1, "Message recall migration is missing or ambiguous"
+    migration = " ".join(migrations[0].read_text(encoding="utf-8").lower().split())
+
+    index_name = "idx_messages_user_content_norm_trgm"
+    assert f"create index if not exists {index_name}" in migration
+    assert "on public.messages using gin" in migration
+    normalized_content = " ".join(
+        normalizer_expression(sql.Identifier("content")).as_string().lower().split()
+    )
+    assert f"(({normalized_content}) extensions.gin_trgm_ops)" in migration
+    assert "extensions.gin_trgm_ops" in migration
+    assert "where role = 'user'" in migration
+    assert f"drop index if exists public.{index_name}" in migration
+    assert migration.count("create index if not exists") == 1
+    assert "create unique index" not in migration
+    assert "create function" not in migration
+    assert "create view" not in migration
+    assert "create materialized view" not in migration
+    assert "generated always as" not in migration
+    assert "grant " not in migration
+
+
+def test_decision_recall_migration_is_private_and_index_only() -> None:
+    migrations = sorted(
+        (ROOT / "supabase" / "migrations").glob(DECISION_RECALL_MIGRATION_GLOB)
+    )
+    assert len(migrations) == 1, "Decision recall migration is missing or ambiguous"
+    migration = " ".join(migrations[0].read_text(encoding="utf-8").lower().split())
+
+    index_name = "idx_decision_notes_recall_norm_trgm"
+    assert f"create index if not exists {index_name}" in migration
+    assert "on public.decision_notes using gin" in migration
+    normalized_decision = " ".join(
+        normalizer_expression(
+            sql.SQL("decision_state || ' ' || coalesce(note, '')")
+        )
+        .as_string()
+        .lower()
+        .split()
+    )
+    assert f"(({normalized_decision}) extensions.gin_trgm_ops)" in migration
+    assert "extensions.gin_trgm_ops" in migration
+    assert f"drop index if exists public.{index_name}" in migration
+    assert migration.count("create index if not exists") == 1
     assert "create unique index" not in migration
     assert "create function" not in migration
     assert "create view" not in migration

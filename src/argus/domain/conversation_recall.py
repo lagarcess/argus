@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import deque
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Iterable, Mapping, Sequence, cast
 
@@ -12,13 +14,15 @@ from argus.api.schemas import (
     SearchDossierOutcome,
     SearchDossierTested,
     SearchItem,
+    SearchMatch,
+    SearchMatchLayer,
 )
 from argus.api.search_utils import score_search_item
 from argus.domain.evidence import (
     decision_recall_preview,
     evidence_preview_from_payload,
 )
-from argus.domain.search_text import search_text_matches_query
+from argus.domain.search_text import normalize_search_text, search_text_matches_query
 
 _MAX_SYMBOLS = 5
 _MAX_FAMILIES = 5
@@ -31,6 +35,24 @@ _DECISION_STATES: tuple[DecisionState, ...] = (
     "rejected",
     "revisit_later",
 )
+_LAYER_BY_RANK: dict[int, SearchMatchLayer] = {
+    1: "conversation",
+    2: "message",
+    3: "run",
+    4: "idea",
+    5: "evidence",
+    6: "decision",
+}
+_NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
+
+
+@dataclass(frozen=True)
+class _MatchCandidate:
+    object_rank: int
+    updated_at: datetime
+    text: str
+    layer: SearchMatchLayer
+    message_id: str | None = None
 
 
 def project_conversation_recall(
@@ -40,6 +62,7 @@ def project_conversation_recall(
     ideas: Sequence[Mapping[str, Any]],
     evidence: Sequence[Mapping[str, Any]],
     decisions: Sequence[Mapping[str, Any]],
+    messages: Sequence[Mapping[str, Any]] = (),
     query: str,
 ) -> tuple[int, SearchItem] | None:
     """Build one bounded search row from existing conversation-owned truth."""
@@ -67,6 +90,16 @@ def project_conversation_recall(
         for row in decisions
         if _text(row.get("source_conversation_id")) == conversation_id
     ]
+    conversation_messages = [
+        row
+        for row in messages
+        if _text(row.get("conversation_id")) == conversation_id
+    ]
+    relevant_messages = [
+        row
+        for row in conversation_messages
+        if row.get("role") == "user"
+    ]
     completed_runs = [
         row for row in relevant_runs if row.get("status", "completed") == "completed"
     ]
@@ -77,6 +110,7 @@ def project_conversation_recall(
         ideas=relevant_ideas,
         evidence=relevant_evidence,
         decisions=relevant_decisions,
+        messages=relevant_messages,
     )
     recall_match = conversation.get("_recall_match")
     hinted_symbol_match: bool | None = None
@@ -87,28 +121,42 @@ def project_conversation_recall(
         and search_text_matches_query(query=query, text=hinted_text)
     ):
         hinted_layer = int(recall_match.get("layer_rank") or 0)
+        layer = recall_match.get("layer") or _LAYER_BY_RANK.get(hinted_layer)
+        if layer not in _LAYER_BY_RANK.values():
+            return None
         hinted_activity = _datetime(recall_match.get("activity_at")) or _row_activity(
             conversation
         )
         hinted_symbol_match = bool(recall_match.get("symbol_exact_match"))
-        matches = [(hinted_layer * 10, hinted_activity, hinted_text)]
+        matches = [
+            _MatchCandidate(
+                object_rank=hinted_layer * 10,
+                updated_at=hinted_activity,
+                text=hinted_text,
+                layer=cast(SearchMatchLayer, layer),
+                message_id=_text(recall_match.get("message_id")),
+            )
+        ]
+        match_count = max(int(recall_match.get("match_count") or 1), 1)
     elif query:
         matches = [
             candidate
             for candidate in candidates
-            if search_text_matches_query(query=query, text=candidate[2])
+            if search_text_matches_query(query=query, text=candidate.text)
         ]
         if not matches:
             return None
+        match_count = 0
     else:
         matches = candidates[:1]
+        match_count = 1
 
     scored_matches = [
         (
             score_search_item(
                 query=query,
                 title=title,
-                matched_text=text,
+                matched_text=candidate.text,
                 pinned=pinned,
                 symbol_exact_match=(
                     hinted_symbol_match
@@ -118,18 +166,23 @@ def project_conversation_recall(
                         for symbol in _symbols_from_runs(completed_runs)
                     )
                 ),
-                match_layer_rank=object_rank // 10,
+                match_layer_rank=candidate.object_rank // 10,
             ),
-            object_rank,
-            updated_at,
-            text,
+            candidate,
         )
-        for object_rank, updated_at, text in matches
+        for candidate in matches
     ]
-    score, _, _, matched_text = max(
+    score, winning_match = max(
         scored_matches,
-        key=lambda row: (row[0], row[1], row[2], row[3]),
+        key=lambda row: (
+            row[0],
+            row[1].object_rank,
+            row[1].updated_at,
+            row[1].text,
+        ),
     )
+    if match_count == 0:
+        match_count = sum(candidate.layer == winning_match.layer for candidate in matches)
 
     sorted_runs = sorted(
         completed_runs,
@@ -166,19 +219,28 @@ def project_conversation_recall(
         evidence=relevant_evidence,
     )
     decided_run_ids = {
-        _text(artifacts_by_id.get(_text(row.get("evidence_artifact_id")), {}).get(
-            "source_run_id"
-        ))
+        _text(
+            artifacts_by_id.get(_text(row.get("evidence_artifact_id")), {}).get(
+                "source_run_id"
+            )
+        )
         for row in relevant_decisions
     }
     latest_run_decided = summary.get("latest_run_decided")
+    latest_suggestion_untaken = summary.get("latest_suggestion_untaken")
     left_off = _left_off_projection(
         run=latest_run,
         is_decided=(
             bool(latest_run_decided)
             if latest_run_decided is not None
-            else bool(
-                latest_run and _text(latest_run.get("id")) in decided_run_ids
+            else bool(latest_run and _text(latest_run.get("id")) in decided_run_ids)
+        ),
+        suggestion_untaken=(
+            bool(latest_suggestion_untaken)
+            if latest_suggestion_untaken is not None
+            else _has_untaken_suggestion(
+                run=latest_run,
+                messages=conversation_messages,
             )
         ),
     )
@@ -206,15 +268,29 @@ def project_conversation_recall(
         ),
         default=_row_activity(conversation),
     )
+    match_fragment = (
+        _query_centered_fragment(
+            winning_match.text,
+            query=query,
+            maximum=_MAX_MATCH_LENGTH,
+        )
+        or title
+    )
     return (
         score,
         SearchItem(
             type="conversation",
             id=conversation_id,
             title=title,
-            matched_text=_bounded_text(matched_text, _MAX_MATCH_LENGTH) or title,
+            matched_text=match_fragment,
             updated_at=updated_at,
             conversation_id=conversation_id,
+            match=SearchMatch(
+                layer=winning_match.layer,
+                fragment=match_fragment,
+                count=match_count,
+                message_id=winning_match.message_id,
+            ),
             dossier=SearchDossier(
                 decision=decision,
                 tested=_tested_projection(sorted_runs, summary=summary),
@@ -247,22 +323,43 @@ def _match_candidates(
     ideas: Sequence[Mapping[str, Any]],
     evidence: Sequence[Mapping[str, Any]],
     decisions: Sequence[Mapping[str, Any]],
-) -> list[tuple[int, datetime, str]]:
-    candidates: list[tuple[int, datetime, str]] = []
+    messages: Sequence[Mapping[str, Any]],
+) -> list[_MatchCandidate]:
+    candidates: list[_MatchCandidate] = []
     for conversation_text in (
         _text(conversation.get("title")),
         _text(conversation.get("last_message_preview")),
     ):
         if conversation_text:
             candidates.append(
-                (10, _row_activity(conversation), conversation_text)
+                _MatchCandidate(
+                    10,
+                    _row_activity(conversation),
+                    conversation_text,
+                    "conversation",
+                )
+            )
+    for message in messages:
+        content = _text(message.get("content"))
+        message_id = _text(message.get("id"))
+        if content and message_id:
+            candidates.append(
+                _MatchCandidate(
+                    20,
+                    _row_activity(message),
+                    content,
+                    "message",
+                    message_id,
+                )
             )
     for run in runs:
-        candidates.append((20, _row_activity(run), _run_search_text(run)))
+        candidates.append(
+            _MatchCandidate(30, _row_activity(run), _run_search_text(run), "run")
+        )
     for idea in ideas:
         candidates.append(
-            (
-                30,
+            _MatchCandidate(
+                40,
                 _row_activity(idea),
                 " ".join(
                     part
@@ -272,12 +369,13 @@ def _match_candidates(
                     )
                     if part
                 ),
+                "idea",
             )
         )
     for artifact in evidence:
         candidates.append(
-            (
-                40,
+            _MatchCandidate(
+                50,
                 _row_activity(artifact),
                 " ".join(
                     part
@@ -287,12 +385,13 @@ def _match_candidates(
                     )
                     if part
                 ),
+                "evidence",
             )
         )
     for decision in decisions:
         candidates.append(
-            (
-                50,
+            _MatchCandidate(
+                60,
                 _row_activity(decision),
                 " ".join(
                     part
@@ -304,6 +403,7 @@ def _match_candidates(
                     )
                     if part
                 ),
+                "decision",
             )
         )
     return candidates
@@ -335,9 +435,7 @@ def _decision_projection(
     state = preview.get("decision_state")
     if state not in _DECISION_STATES:
         return None
-    source_run_id = _text(
-        artifact.get("source_run_id") or latest.get("source_run_id")
-    )
+    source_run_id = _text(artifact.get("source_run_id") or latest.get("source_run_id"))
     judged_run = runs_by_id.get(source_run_id)
     return SearchDossierDecision(
         state=cast(DecisionState, state),
@@ -366,16 +464,13 @@ def _tested_projection(
         if run.get("conversation_run_count")
     ]
     return SearchDossierTested(
-        symbols=(
-            _text_list(summary.get("symbols")) or _symbols_from_runs(runs)
-        )[:_MAX_SYMBOLS],
+        symbols=(_text_list(summary.get("symbols")) or _symbols_from_runs(runs))[
+            :_MAX_SYMBOLS
+        ],
         strategy_families=(
-            _text_list(summary.get("strategy_families"))
-            or _strategy_families(runs)
+            _text_list(summary.get("strategy_families")) or _strategy_families(runs)
         )[:_MAX_FAMILIES],
-        run_count=int(
-            summary.get("run_count") or max(run_counts, default=len(runs))
-        ),
+        run_count=int(summary.get("run_count") or max(run_counts, default=len(runs))),
         start_date=_date(summary.get("start_date"))
         or (min(start_dates) if start_dates else None),
         end_date=_date(summary.get("end_date"))
@@ -392,11 +487,7 @@ def _outcome_projection(
         return None
     run_id = _text(run.get("id"))
     artifact = max(
-        (
-            row
-            for row in evidence
-            if _text(row.get("source_run_id")) == run_id
-        ),
+        (row for row in evidence if _text(row.get("source_run_id")) == run_id),
         key=_row_activity,
         default={},
     )
@@ -429,11 +520,14 @@ def _left_off_projection(
     *,
     run: Mapping[str, Any] | None,
     is_decided: bool,
+    suggestion_untaken: bool,
 ) -> SearchDossierLeftOff | None:
     if run is None:
         return None
     completed_at = _row_activity(run)
     nudge = "undecided" if not is_decided else None
+    if nudge is None and suggestion_untaken:
+        nudge = "suggestion_untaken"
     if nudge is None and _is_stale_result(completed_at):
         nudge = "stale_result"
     return SearchDossierLeftOff(
@@ -468,13 +562,7 @@ def _run_label(run: Mapping[str, Any] | None) -> str:
 
 
 def _symbols_from_runs(runs: Sequence[Mapping[str, Any]]) -> list[str]:
-    return list(
-        dict.fromkeys(
-            symbol
-            for run in runs
-            for symbol in _run_symbols(run)
-        )
-    )
+    return list(dict.fromkeys(symbol for run in runs for symbol in _run_symbols(run)))
 
 
 def _strategy_families(runs: Sequence[Mapping[str, Any]]) -> list[str]:
@@ -566,14 +654,113 @@ def _bounded_text(value: object, maximum: int) -> str | None:
     return text[:maximum]
 
 
+def _normalized_text_with_source_indexes(value: str) -> tuple[str, list[int]]:
+    normalized: list[str] = []
+    source_indexes: list[int] = []
+    pending_separator = False
+    for source_index, character in enumerate(value):
+        for folded in character.casefold():
+            if folded == "_" or not folded.isalnum():
+                pending_separator = bool(normalized)
+                continue
+            if pending_separator:
+                normalized.append(" ")
+                source_indexes.append(source_index)
+                pending_separator = False
+            normalized.append(folded)
+            source_indexes.append(source_index)
+    return "".join(normalized), source_indexes
+
+
+def _query_centered_fragment(
+    value: object,
+    *,
+    query: str,
+    maximum: int,
+) -> str | None:
+    text = _text(value)
+    if text is None or len(text) <= maximum:
+        return text
+    normalized_text, source_indexes = _normalized_text_with_source_indexes(text)
+    normalized_query = normalize_search_text(query)
+    if not normalized_query or not source_indexes:
+        return text[:maximum]
+
+    contiguous_start = normalized_text.find(normalized_query)
+    if contiguous_start >= 0:
+        normalized_spans = [(contiguous_start, contiguous_start + len(normalized_query))]
+    else:
+        token_span = _smallest_token_cover(
+            normalized_text,
+            tuple(dict.fromkeys(normalized_query.split())),
+        )
+        normalized_spans = [token_span] if token_span is not None else []
+    if not normalized_spans:
+        return text[:maximum]
+
+    source_start = source_indexes[min(start for start, _ in normalized_spans)]
+    source_end = source_indexes[max(end for _, end in normalized_spans) - 1] + 1
+    matched_length = source_end - source_start
+    if matched_length >= maximum:
+        return text[source_start : source_start + maximum]
+
+    leading_context = (maximum - matched_length) // 2
+    fragment_start = max(0, source_start - leading_context)
+    fragment_end = min(len(text), fragment_start + maximum)
+    fragment_start = max(0, fragment_end - maximum)
+    return text[fragment_start:fragment_end]
+
+
+def _smallest_token_cover(
+    normalized_text: str,
+    tokens: tuple[str, ...],
+) -> tuple[int, int] | None:
+    events: list[tuple[int, int, int]] = []
+    for token_index, token in enumerate(tokens):
+        token_start = normalized_text.find(token)
+        if token_start < 0:
+            return None
+        while token_start >= 0:
+            events.append((token_start, token_start + len(token), token_index))
+            token_start = normalized_text.find(token, token_start + 1)
+    events.sort()
+
+    counts = [0] * len(tokens)
+    covered_tokens = 0
+    left = 0
+    maximum_ends: deque[tuple[int, int]] = deque()
+    best: tuple[int, int, int] | None = None
+
+    for right, (_, token_end, token_index) in enumerate(events):
+        while maximum_ends and maximum_ends[-1][1] <= token_end:
+            maximum_ends.pop()
+        maximum_ends.append((right, token_end))
+        if counts[token_index] == 0:
+            covered_tokens += 1
+        counts[token_index] += 1
+
+        while covered_tokens == len(tokens):
+            span_start = events[left][0]
+            span_end = maximum_ends[0][1]
+            candidate = (span_end - span_start, span_start, span_end)
+            if best is None or candidate < best:
+                best = candidate
+
+            left_token_index = events[left][2]
+            counts[left_token_index] -= 1
+            if counts[left_token_index] == 0:
+                covered_tokens -= 1
+            if maximum_ends[0][0] == left:
+                maximum_ends.popleft()
+            left += 1
+
+    return None if best is None else (best[1], best[2])
+
+
 def _text_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [
-        text
-        for item in value
-        if (text := _bounded_text(item, 40)) is not None
-    ]
+    return [text for item in value if (text := _bounded_text(item, 40)) is not None]
 
 
 def _is_stale_result(completed_at: datetime) -> bool:
@@ -589,3 +776,46 @@ def _is_stale_result(completed_at: datetime) -> bool:
         second=0,
         microsecond=0,
     )
+
+
+def _has_untaken_suggestion(
+    *,
+    run: Mapping[str, Any] | None,
+    messages: Sequence[Mapping[str, Any]],
+) -> bool:
+    run_id = _text(run.get("id")) if run is not None else None
+    if run_id is None:
+        return False
+    offers = [
+        row
+        for row in messages
+        if row.get("role") == "assistant"
+        and _text(_message_metadata(row).get("result_run_id")) == run_id
+        and _valid_next_experiments(_message_metadata(row))
+    ]
+    if not offers:
+        return False
+    latest_offer = max(offers, key=_message_order)
+    return not any(
+        row.get("role") == "user" and _message_order(row) > _message_order(latest_offer)
+        for row in messages
+    )
+
+
+def _valid_next_experiments(metadata: Mapping[str, Any]) -> bool:
+    raw_sidecar = metadata.get("next_experiments")
+    sidecar = raw_sidecar if isinstance(raw_sidecar, Mapping) else {}
+    return (
+        sidecar.get("version") == _NEXT_EXPERIMENTS_VERSION
+        and isinstance(sidecar.get("rows"), list)
+        and bool(sidecar["rows"])
+    )
+
+
+def _message_order(row: Mapping[str, Any]) -> tuple[datetime, str]:
+    return _row_activity(row), _text(row.get("id")) or ""
+
+
+def _message_metadata(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    metadata = row.get("metadata")
+    return metadata if isinstance(metadata, Mapping) else {}

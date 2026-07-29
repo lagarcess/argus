@@ -2009,6 +2009,13 @@ Soft delete conversation.
 **Query Params:**
 - `limit`
 - `cursor`
+- `anchor_message_id`: optional owner-scoped message id. It is mutually
+  exclusive with `cursor` and returns one bounded page beginning with the
+  anchor (inclusive), followed by later messages in canonical
+  `(created_at, id)` order. Missing, foreign, or cross-conversation anchors
+  return `404` without revealing whether the message exists. Clients that need
+  the complete later transcript must follow `next_cursor` without repeating
+  `anchor_message_id`.
 
 **Response:**
 ```json
@@ -3125,6 +3132,12 @@ the `/search` contract.
       "matched_text": "Hold through earnings.",
       "updated_at": "timestamp",
       "conversation_id": "uuid",
+      "match": {
+        "layer": "message",
+        "fragment": "Hold through earnings.",
+        "count": 2,
+        "message_id": "uuid"
+      },
       "decision_states": ["watching"],
       "dossier": {
         "decision": {
@@ -3169,6 +3182,12 @@ the `/search` contract.
 `type` has one value: `conversation`. `id` and `conversation_id` are always the
 same canonical conversation id.
 
+`match` is the bounded provenance for the winning searchable layer. `layer` is
+one of `conversation`, `message`, `run`, `idea`, `evidence`, or `decision`;
+`fragment` is the bounded display text and `count` is the number of matches in
+that winning layer. `message_id` is present only when `layer = message`. It is
+an owner-scoped jump anchor for the normal conversation message read above.
+
 `dossier` always has the fixed reading order `decision`, `tested`, `outcome`,
 `left_off`. Optional sections are `null` when stored truth is absent. Lists are
 bounded to five symbols, five strategy families, and four typed metrics. A
@@ -3182,8 +3201,8 @@ Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
 2. **Exact Match**: Full title/name match.
 3. **Symbol Match**: Match against symbols in backtests.
-4. **Object Priority**: Decision/evidence/idea/run matches beat conversation
-   wrapper text for the same conversation.
+4. **Object Priority**: Decision/evidence/idea/run matches beat user-message
+   matches, which beat conversation wrapper text.
 5. **Recency**: Sorted by latest canonical activity.
 6. **Basic Text Relevance**: Exact and prefix-oriented metadata matching.
 
@@ -3192,10 +3211,14 @@ Search is limited to:
 - Titles and Names
 - Symbols
 - Last message preview (Conversations)
+- User-authored message content (assistant/system/tool content is excluded)
 - Backtest symbols and strategy families
 - Evidence digests, idea summaries, and decision state/note text.
 
-*Note: Alpha search does not perform deep indexing of full message bodies or complex template parameters.*
+Alpha search does not return raw transcript rows or expose full transcripts in
+the search response. It selects one bounded user-message fragment and count for
+the conversation row; opening that row uses the typed message anchor. Complex
+template parameters remain outside the search index.
 
 The dossier is an owner-scoped, bounded projection. It never exposes raw
 context packets, route receipts, provider/model metadata, retry payloads,
@@ -3210,6 +3233,10 @@ enum value from the backend attached to filters, pills, and grouped rows.
 
 Empty `q` returns recents-first conversation rows. Archived conversations remain
 eligible and soft-deleted conversations are excluded before ranking and limits.
+For a non-empty query, recall begins only when at least one normalized token has
+three characters. One- and two-character partial input returns no search rows
+and does not read transcript or artifact haystacks; the palette asks the user to
+keep typing. This protects the bounded per-keystroke read contract.
 
 *Future semantic retrieval may extend this endpoint.*
 

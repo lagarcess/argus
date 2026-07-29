@@ -901,6 +901,13 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+      - name: anchor_message_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -2713,6 +2720,8 @@ components:
           format: date-time
         conversation_id:
           type: string
+        match:
+          $ref: '#/components/schemas/SearchMatch'
         dossier:
           $ref: '#/components/schemas/SearchDossier'
         decision_states:
@@ -2733,6 +2742,7 @@ components:
       - matched_text
       - updated_at
       - conversation_id
+      - match
       - dossier
     SearchLedgerGroup:
       properties:
@@ -2748,6 +2758,32 @@ components:
       type: object
       required:
       - decision_state
+      - count
+    SearchMatch:
+      properties:
+        layer:
+          type: string
+          enum:
+          - conversation
+          - message
+          - run
+          - idea
+          - evidence
+          - decision
+        fragment:
+          type: string
+          maxLength: 500
+        count:
+          type: integer
+          minimum: 1.0
+        message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - layer
+      - fragment
       - count
     SignupRequest:
       properties:

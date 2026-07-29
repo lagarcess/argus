@@ -11,6 +11,8 @@ export type CommandPaletteDisplayItem = {
   conversationId: string | null;
   title: string;
   snippet: string;
+  matchCount: number;
+  matchMessageId: string | null;
   updatedAt: string;
   source: "recent" | "search";
   decisionState: DecisionState | null;
@@ -54,6 +56,8 @@ export function commandPaletteItemFromHistory(
     conversationId: item.conversation_id ?? item.id,
     title: item.title,
     snippet: item.subtitle ?? "",
+    matchCount: 1,
+    matchMessageId: null,
     updatedAt: item.created_at,
     source: "recent",
     decisionState: null,
@@ -75,6 +79,8 @@ export function commandPaletteItemFromSearch(
     conversationId: item.conversation_id,
     title: item.title,
     snippet: item.matched_text,
+    matchCount: item.match.count,
+    matchMessageId: item.match.message_id ?? null,
     updatedAt: item.updated_at,
     source: "search",
     decisionState: item.dossier.decision?.state ?? null,

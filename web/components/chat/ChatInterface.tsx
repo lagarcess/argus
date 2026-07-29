@@ -36,6 +36,7 @@ import {
 import {
   createConversation,
   deleteConversation,
+  getConversationMessages,
   getBacktestRun,
   listConversations,
   logoutFromApi,
@@ -70,13 +71,15 @@ import {
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
 import {
-  activeConversationRouteStateFromUrl,
+  clearActiveConversationPointer,
+  isCurrentAnchoredConversationRequest,
+  readActiveConversationRouteState,
+  rememberActiveConversationId,
   shouldApplyConversationOwnedUpdate,
   shouldApplyConversationScopedUpdate,
   shouldRetireActiveStreamForNavigation,
   shouldStartConversationForVisibleEmptyChat,
   targetConversationIdForSend,
-  type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
@@ -187,79 +190,7 @@ type SendOptions = {
 };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS = 150;
-const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
-function readActiveConversationRouteState(): ActiveConversationRouteState {
-  if (typeof window === "undefined") {
-    return {
-      conversationId: null,
-      isChatRoute: false,
-      isNewChatRoute: false,
-    };
-  }
-  try {
-    return activeConversationRouteStateFromUrl(
-      window.location.href,
-      ACTIVE_CONVERSATION_QUERY_KEY,
-    );
-  } catch {
-    return {
-      conversationId: null,
-      isChatRoute: false,
-      isNewChatRoute: false,
-    };
-  }
-}
-
-function readActiveConversationIdFromUrl() {
-  return readActiveConversationRouteState().conversationId;
-}
-
-function persistActiveConversationRoute(conversationId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const url = new URL(window.location.href);
-    if (url.pathname !== "/chat") return;
-    if (
-      url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY) === conversationId
-    ) {
-      return;
-    }
-    url.searchParams.set(ACTIVE_CONVERSATION_QUERY_KEY, conversationId);
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${url.pathname}${url.search}`,
-    );
-  } catch {
-    // URL state is a convenience for reload recovery; chat still works without it.
-  }
-}
-
-function rememberActiveConversationId(conversationId: string) {
-  persistActiveConversationRoute(conversationId);
-}
-
-function clearActiveConversationRoute(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const url = new URL(window.location.href);
-    if (url.pathname !== "/chat") return null;
-    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return null;
-    url.searchParams.delete(ACTIVE_CONVERSATION_QUERY_KEY);
-    const query = url.searchParams.toString();
-    const nextRoute = query ? `${url.pathname}?${query}` : url.pathname;
-    window.history.replaceState(window.history.state, "", nextRoute);
-    return nextRoute;
-  } catch {
-    // URL state is optional recovery metadata.
-    return null;
-  }
-}
-
-function clearActiveConversationPointer() {
-  return clearActiveConversationRoute();
-}
 
 function historyItemBelongsToConversation(
   item: HistoryItem,
@@ -375,6 +306,11 @@ export default function ChatInterface() {
     conversationId: string;
     scrollTop: number | null;
   } | null>(null);
+  const pendingMessageAnchorRef = useRef<{
+    conversationId: string;
+    messageId: string;
+  } | null>(null);
+  const messageElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
     (targetConversationId?: string | null) =>
@@ -740,18 +676,69 @@ export default function ChatInterface() {
   async function navigateConversationTranscript(
     targetConversationId: string,
     userId: string = account?.user.id ?? "",
-    options: Readonly<{ bootstrap?: boolean }> = {},
+    options: Readonly<{
+      bootstrap?: boolean;
+      messageId?: string;
+    }> = {},
   ): Promise<void> {
     if (!userId) return;
     rememberCurrentConversationScroll();
     retireActiveStreamForNavigation(targetConversationId);
-    rememberActiveConversationId(targetConversationId);
+    rememberActiveConversationId(targetConversationId, options.messageId);
     activeConversationIdRef.current = targetConversationId;
     currentViewRef.current = "chat";
     setConversationId(targetConversationId);
     setCurrentView("chat");
     setStreamStatus(null);
     setShowChatOptions(false);
+
+    if (options.messageId) {
+      const requestedMessageId = options.messageId;
+      transcriptSessionCache.cancelActiveNavigation();
+      beginColdTranscriptRetrieval(targetConversationId);
+      const isCurrentRequest = () =>
+        isCurrentAnchoredConversationRequest({
+          activeConversationId: activeConversationIdRef.current,
+          targetConversationId,
+          routeState: readActiveConversationRouteState(),
+          requestedMessageId,
+        });
+      try {
+        const items = await loadAllConversationMessagePages(
+          targetConversationId,
+          undefined,
+          { anchorMessageId: requestedMessageId },
+        );
+        if (!isCurrentRequest()) return;
+        const snapshot = hydrateMessagesFromApi(items).messages;
+        if (!snapshot.some((message) => message.id === requestedMessageId)) {
+          throw new Error("Transcript anchor was not returned.");
+        }
+        clearColdTranscriptRetrieval();
+        setIsHydratingConversation(false);
+        readyTranscriptConversationIdRef.current = targetConversationId;
+        pendingScrollRestoreRef.current = null;
+        pendingMessageAnchorRef.current = {
+          conversationId: targetConversationId,
+          messageId: requestedMessageId,
+        };
+        shouldAutoScrollRef.current = false;
+        setMessages(snapshot);
+      } catch (error) {
+        if (!isCurrentRequest()) return;
+        clearColdTranscriptRetrieval();
+        setIsHydratingConversation(false);
+        readyTranscriptConversationIdRef.current = null;
+        pendingMessageAnchorRef.current = null;
+        setMessages([]);
+        if (options.bootstrap && isMissingConversationLoadError(error)) {
+          resetToEmptyChatSurface();
+          return;
+        }
+        setFailedConversationId(targetConversationId);
+      }
+      return;
+    }
 
     let renderedStaleSnapshot = false;
     const handle = transcriptSessionCache.navigate({
@@ -861,7 +848,8 @@ export default function ChatInterface() {
           ]);
           return;
         }
-        let activeConversationId = readActiveConversationIdFromUrl();
+        const activeRoute = readActiveConversationRouteState();
+        let activeConversationId = activeRoute.conversationId;
         if (!activeConversationId && meResponse?.account_kind === "guest") {
           const { items } = await listConversations({ limit: 2 });
           if (cancelled || hasAcceptedUserInputRef.current) return;
@@ -875,6 +863,7 @@ export default function ChatInterface() {
           }
           await navigateConversationTranscript(activeConversationId, userId, {
             bootstrap: true,
+            messageId: activeRoute.messageId ?? undefined,
           });
           return;
         }
@@ -933,6 +922,23 @@ export default function ChatInterface() {
   };
 
   useLayoutEffect(() => {
+    const pendingAnchor = pendingMessageAnchorRef.current;
+    if (
+      pendingAnchor &&
+      pendingAnchor.conversationId === conversationId &&
+      pendingAnchor.conversationId === activeConversationIdRef.current
+    ) {
+      const element = messageElementRefs.current.get(pendingAnchor.messageId);
+      if (element) {
+        element.scrollIntoView({ block: "center" });
+        element.focus({ preventScroll: true });
+        pendingMessageAnchorRef.current = null;
+        pendingScrollRestoreRef.current = null;
+        shouldAutoScrollRef.current = false;
+        setShowJumpToLatest(true);
+        return;
+      }
+    }
     const pending = pendingScrollRestoreRef.current;
     const container = scrollContainerRef.current;
     if (
@@ -963,9 +969,9 @@ export default function ChatInterface() {
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
-  const loadConversation = async (convId: string) => {
+  const loadConversation = async (convId: string, messageId?: string) => {
     closeChatOptions();
-    await navigateConversationTranscript(convId);
+    await navigateConversationTranscript(convId, undefined, { messageId });
   };
 
   const loadConversationForRun = async (
@@ -2206,9 +2212,9 @@ export default function ChatInterface() {
         searchOverlayOpen && (
           <ChatCommandPalette
             onClose={() => setSearchOverlayOpen(false)}
-            onOpenConversation={(convId) => {
+            onOpenConversation={(convId, messageId) => {
               setSearchOverlayOpen(false);
-              void loadConversation(convId);
+              void loadConversation(convId, messageId);
             }}
             activeConversationId={conversationId}
             isGuest={isGuest}
@@ -2440,8 +2446,20 @@ export default function ChatInterface() {
                           !!streamStatus ||
                           (msg.content ?? "") === "");
                       return (
-                        <ChatMessage
+                        <div
                           key={msg.id}
+                          ref={(element) => {
+                            if (element) {
+                              messageElementRefs.current.set(msg.id, element);
+                            } else {
+                              messageElementRefs.current.delete(msg.id);
+                            }
+                          }}
+                          data-message-id={msg.id}
+                          tabIndex={-1}
+                          className="scroll-m-24 outline-none"
+                        >
+                          <ChatMessage
                           message={msg}
                           onAction={handleAction}
                           onFeedback={(type, context, rating) => {
@@ -2472,8 +2490,9 @@ export default function ChatInterface() {
                               ? resumeDecisionArtifactId
                               : null
                           }
-                          onDecisionResumeHandled={clearResumeDecision}
-                        />
+                            onDecisionResumeHandled={clearResumeDecision}
+                          />
+                        </div>
                       );
                     })}
                     {showStreamStatus && (

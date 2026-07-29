@@ -17,6 +17,12 @@ const conversationDossier = {
   matched_text: "Hold through earnings.",
   updated_at: "2026-07-29T18:00:00.000Z",
   conversation_id: "conversation-1",
+  match: {
+    layer: "message",
+    fragment: "Hold through earnings.",
+    count: 2,
+    message_id: "message-7",
+  },
   decision_states: ["watching"],
   dossier: {
     decision: {
@@ -54,6 +60,8 @@ describe("command palette conversation dossier", () => {
       type: "conversation",
       conversationId: "conversation-1",
       snippet: "Hold through earnings.",
+      matchCount: 2,
+      matchMessageId: "message-7",
       canManageConversation: true,
     });
     expect(commandPalettePreviewFields(display!)).toEqual([

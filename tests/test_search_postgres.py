@@ -202,6 +202,37 @@ def _insert_run(
     return run_id
 
 
+def _insert_message(
+    cursor: Any,
+    *,
+    user_id: UUID,
+    conversation_id: UUID,
+    timestamp: datetime,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None = None,
+) -> UUID:
+    message_id = uuid4()
+    cursor.execute(
+        """
+        insert into public.messages (
+            id, user_id, conversation_id, role, content, metadata, created_at
+        )
+        values (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            message_id,
+            user_id,
+            conversation_id,
+            role,
+            content,
+            Jsonb(metadata or {}),
+            timestamp,
+        ),
+    )
+    return message_id
+
+
 def _insert_idea_spine(
     cursor: Any,
     *,
@@ -399,6 +430,30 @@ def test_search_groups_all_matching_layers_into_one_conversation(
             summary="Needle evidence",
             conversation_id=conversation_id,
         )
+        first_message_id = _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=1),
+            role="user",
+            content="Needle in the first user turn.",
+        )
+        second_message_id = _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=2),
+            role="user",
+            content="Needle in the second user turn.",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=3),
+            role="assistant",
+            content="Needle assistant copy must not count.",
+        )
 
     reader, pool = _reader()
     result = reader.search_rows(
@@ -410,9 +465,192 @@ def test_search_groups_all_matching_layers_into_one_conversation(
 
     assert [item.id for _, item in ranked] == [str(conversation_id)]
     assert ranked[0][1].conversation_id == str(conversation_id)
+    assert ranked[0][1].match.layer == "decision"
+    assert ranked[0][1].match.message_id is None
+    assert ranked[0][1].match.count >= 1
+    assert first_message_id != second_message_id
     assert result.rows["strategies"] == []
     assert result.rows["collections"] == []
     assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
+
+
+def test_search_recalls_latest_user_message_with_count_and_archive_visibility(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 12, 5, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Archived ordinary notes",
+            archived=True,
+        )
+        first = _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=1),
+            role="user",
+            content="My copper lantern threshold was conservative.",
+        )
+        latest = _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=2),
+            role="user",
+            content="I revised the copper lantern threshold.",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=3),
+            role="assistant",
+            content="Assistant copper lantern threshold.",
+        )
+
+    reader, pool = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query="copper lantern",
+        source_limit=4,
+    )
+    ranked = _ranked(result.rows, "copper lantern")
+
+    assert [item.id for _, item in ranked] == [str(conversation_id)]
+    item = ranked[0][1]
+    assert item.match.layer == "message"
+    assert item.match.fragment == "I revised the copper lantern threshold."
+    assert item.match.count == 2
+    assert item.match.message_id == str(latest)
+    assert item.match.message_id != str(first)
+    assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
+
+
+def test_search_projects_and_clears_the_untaken_suggestion_nudge(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 12, 7, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="GLD suggestion history",
+        )
+        run_id = _insert_run(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now,
+            title="GLD result",
+            symbols=["GLD"],
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now + timedelta(minutes=1),
+            title="GLD idea",
+            summary="GLD decision",
+            conversation_id=conversation_id,
+            source_run_id=run_id,
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=2),
+            role="assistant",
+            content="Here are supported next experiments.",
+            metadata={
+                "result_run_id": str(run_id),
+                "next_experiments": {
+                    "version": "argus_next_experiments/v1",
+                    "rows": [
+                        {
+                            "kind": "change_date_range",
+                            "label": "Test a different date range",
+                        }
+                    ],
+                },
+            },
+        )
+
+    reader, _ = _reader()
+    offered = reader.search_rows(
+        user_id=str(owner_id),
+        query="GLD",
+        source_limit=4,
+    )
+    [(_, offered_item)] = _ranked(offered.rows, "GLD")
+    assert offered_item.dossier.left_off is not None
+    assert offered_item.dossier.left_off.nudge == "suggestion_untaken"
+
+    with _connect() as connection, connection.cursor() as cursor:
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=3),
+            role="user",
+            content="I will take a different path.",
+        )
+
+    followed_up = reader.search_rows(
+        user_id=str(owner_id),
+        query="GLD",
+        source_limit=4,
+    )
+    [(_, followed_up_item)] = _ranked(followed_up.rows, "GLD")
+    assert followed_up_item.dossier.left_off is not None
+    assert followed_up_item.dossier.left_off.nudge is None
+
+
+def test_search_centers_fragment_on_late_user_message_match(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 12, 10, tzinfo=timezone.utc)
+    content = (
+        ("Earlier copper-only context. " * 30)
+        + "My copper lantern threshold was twelve percent."
+        + (" Later unrelated context." * 20)
+    )
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Ordinary allocation notes",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now,
+            role="user",
+            content=content,
+        )
+
+    reader, _ = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query="copper threshold",
+        source_limit=4,
+    )
+    [(_, item)] = _ranked(result.rows, "copper threshold")
+
+    assert item.id == str(conversation_id)
+    assert item.match.layer == "message"
+    assert len(item.match.fragment) <= 500
+    assert item.match.fragment in content
+    assert "copper lantern threshold" in item.match.fragment
+    assert item.match.fragment != content[:500]
+    assert item.matched_text == item.match.fragment
 
 
 def test_search_title_match_returns_title_with_unrelated_preview(
@@ -555,7 +793,15 @@ def test_object_layer_precedes_recency_after_pinned_exact_and_symbol(
             cursor,
             user_id=owner_id,
             timestamp=now,
-            title="Gold allocation conversation",
+            title="Recent allocation conversation",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=recent_conversation,
+            timestamp=now,
+            role="user",
+            content="Gold allocation message.",
         )
 
     reader, _ = _reader()
@@ -572,6 +818,7 @@ def test_object_layer_precedes_recency_after_pinned_exact_and_symbol(
         str(object_conversation),
         str(recent_conversation),
     ]
+    assert [item.match.layer for _, item in ranked] == ["decision", "message"]
 
 
 def test_conversation_cursor_pages_after_evidence_winner_without_gaps(
@@ -766,9 +1013,7 @@ def test_guest_scope_and_deleted_filter_apply_before_conversation_limit(
         guest_conversation_id=str(workspace_id),
     )
 
-    assert [item.id for _, item in _ranked(result.rows, "needle")] == [
-        str(workspace_id)
-    ]
+    assert [item.id for _, item in _ranked(result.rows, "needle")] == [str(workspace_id)]
 
 
 def test_full_lineage_aggregates_survive_more_than_five_children(
