@@ -189,7 +189,9 @@ def test_confirmation_records_exact_scope_and_receipt_lifecycle() -> None:
     assert result.consent_receipt is not None
     receipt = result.consent_receipt
     assert receipt.action == "candidate_confirmation"
-    assert receipt.requested_scope == SAVED_DECISION_SCOPE
+    assert (
+        receipt.requested_scope == proposal.candidate.opt_in_scope == SAVED_DECISION_SCOPE
+    )
     assert receipt.granted_scope == SAVED_DECISION_SCOPE
     assert receipt.effective_scope == SAVED_DECISION_SCOPE
     assert receipt.candidate_id == proposal.candidate.id
@@ -226,9 +228,23 @@ def test_confirmation_with_effective_consent_records_no_scope_grant() -> None:
     )
 
     assert result.consent_receipt is not None
-    assert result.consent_receipt.requested_scope == frozenset()
+    assert result.record is not None
+    assert result.consent_receipt.requested_scope == effective
     assert result.consent_receipt.granted_scope == frozenset()
     assert result.consent_receipt.effective_scope == effective
+    receipts = store.list_consent_receipts(OWNER)
+    records = store.list_records(OWNER)
+
+    replay = service.confirm(
+        SUBJECT,
+        proposal.candidate.id,
+        sensitivity=_clear(),
+        context=MemoryOperationContext.ORDINARY,
+    )
+
+    assert replay.created is False
+    assert store.list_consent_receipts(OWNER) == receipts
+    assert store.list_records(OWNER) == records
 
 
 def test_candidate_sensitivity_is_content_bound_and_revalidated() -> None:

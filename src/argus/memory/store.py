@@ -404,7 +404,7 @@ class InMemoryCanonicalMemoryStore:
                 owner.owner_id,
                 MemoryConsentSettings(),
             )
-            requested_scope = candidate.opt_in_scope
+            requested_scope = candidate.opt_in_scope | frozenset({candidate.category})
             granted_scope = requested_scope - settings.enabled_categories
             effective_scope = settings.enabled_categories | requested_scope
             if candidate.category not in effective_scope:
