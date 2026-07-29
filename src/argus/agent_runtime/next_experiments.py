@@ -397,6 +397,9 @@ def _prebaked_row_fields(
     return {"send_text": template.format(**fields)}
 
 
+_PREBAKE_PROBE_BUDGET_SECONDS = 2.0
+
+
 def _peer_is_grounded(
     peer: str,
     *,
@@ -405,26 +408,41 @@ def _peer_is_grounded(
     end: str,
     prebake_probe: Any | None,
 ) -> bool:
-    if prebake_probe is not None:
-        try:
+    """Result-paints-first: the optional row may never delay the completed
+    result, so grounding runs under a hard budget and degrades to the
+    generic row when the provider is slow."""
+
+    def _probe() -> bool:
+        if prebake_probe is not None:
             return bool(prebake_probe(peer))
-        except Exception:
-            return False
-    try:
-        from datetime import date
+        from datetime import date, timedelta
 
         from argus.domain import market_data
 
         resolved = market_data.resolve_asset(peer)
         if resolved is None or resolved.canonical_symbol.upper() != peer:
             return False
+        # Coverage probe over the window's tail; a mid-window gap surfaces
+        # at run time through the ordinary coverage recovery.
+        end_date = date.fromisoformat(end)
+        probe_start = max(date.fromisoformat(start), end_date - timedelta(days=14))
         bars = market_data.fetch_ohlcv(
             symbol=peer,
             asset_class=asset_class,
-            start_date=date.fromisoformat(start),
-            end_date=date.fromisoformat(end),
+            start_date=probe_start,
+            end_date=end_date,
             timeframe="1D",
         )
         return bars is not None and len(bars) > 0
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        return bool(
+            executor.submit(_probe).result(timeout=_PREBAKE_PROBE_BUDGET_SECONDS)
+        )
     except Exception:
         return False
+    finally:
+        executor.shutdown(wait=False, cancel_futures=False)

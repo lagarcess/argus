@@ -687,6 +687,19 @@ def _build_thread_metadata(
             }
             if sends:
                 metadata["next_experiments_offered_texts"] = sends
+    if "next_experiments_offered_kinds" not in metadata:
+        # A turn without a new result keeps the previous result's offer on
+        # record; only a fresh offer replaces it (spec §4.3 non-repetition).
+        prior_offer_metadata = workflow_state.get("selected_thread_metadata")
+        if isinstance(prior_offer_metadata, dict):
+            prior_kinds = prior_offer_metadata.get("next_experiments_offered_kinds")
+            if isinstance(prior_kinds, list) and prior_kinds:
+                metadata["next_experiments_offered_kinds"] = list(prior_kinds)
+                prior_sends = prior_offer_metadata.get(
+                    "next_experiments_offered_texts"
+                )
+                if isinstance(prior_sends, dict) and prior_sends:
+                    metadata["next_experiments_offered_texts"] = dict(prior_sends)
     requested_field = workflow_state.get("requested_field")
     if requested_field in (None, ""):
         requested_field = run_state.requested_field

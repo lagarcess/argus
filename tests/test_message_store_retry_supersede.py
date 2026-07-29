@@ -72,3 +72,63 @@ def test_unretried_failure_keeps_its_retry() -> None:
     failed = next(item for item in reconciled if item.id == "a1")
     assert "agent_runtime_failure_superseded" not in failed.metadata
     assert failed.metadata["recovery"]["retryable"] is True
+
+
+def test_interrupted_retry_keeps_the_failure_retryable() -> None:
+    """A trailing retry turn with no assistant reply is not evidence the
+    retry completed; the failure must keep its Retry affordance."""
+
+    messages = [
+        _message("user", "u1"),
+        _message(
+            "assistant",
+            "a1",
+            {
+                "recovery": {
+                    "code": "latest_result_followup_unavailable",
+                    "retryable": True,
+                }
+            },
+        ),
+        _message(
+            "user",
+            "u2",
+            {
+                "chat_action": {
+                    "type": "retry_last_turn",
+                    "payload": {"message": "try again", "failed_assistant_id": "a1"},
+                }
+            },
+        ),
+    ]
+
+    reconciled = reconcile_reload_message_metadata(messages)
+
+    failed = next(item for item in reconciled if item.id == "a1")
+    assert "agent_runtime_failure_superseded" not in failed.metadata
+    assert failed.metadata["recovery"]["retryable"] is True
+
+
+def test_verbatim_retry_without_reply_keeps_the_failure_retryable() -> None:
+    messages = [
+        _message("user", "u1"),
+        _message(
+            "assistant",
+            "a1",
+            {
+                "recovery": {
+                    "code": "latest_result_followup_unavailable",
+                    "retryable": True,
+                }
+            },
+        ),
+        _message("user", "u2"),
+    ]
+    messages[0].content = "why did it beat the benchmark?"
+    messages[2].content = "why did it beat the benchmark?"
+
+    reconciled = reconcile_reload_message_metadata(messages)
+
+    failed = next(item for item in reconciled if item.id == "a1")
+    assert "agent_runtime_failure_superseded" not in failed.metadata
+    assert failed.metadata["recovery"]["retryable"] is True

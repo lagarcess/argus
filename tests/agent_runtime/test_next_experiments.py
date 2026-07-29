@@ -339,3 +339,75 @@ def test_acceptance_matches_the_offered_send_text() -> None:
         "2023-12-29 with $1000.",
         thread_metadata,
     ) == {"kind": "same_setup_peer_asset", "position": 0}
+
+
+def test_slow_peer_grounding_degrades_to_the_generic_row(
+    monkeypatch,
+) -> None:
+    import time
+
+    from argus.agent_runtime import next_experiments as module
+
+    monkeypatch.setattr(module, "_PREBAKE_PROBE_BUDGET_SECONDS", 0.2)
+
+    def slow_probe(peer: str) -> bool:
+        time.sleep(1.0)
+        return True
+
+    facts = {
+        "config_snapshot": {
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+            "initial_capital": 1000,
+            "asset_class": "equity",
+        },
+    }
+    started = time.monotonic()
+    sidecar = next_experiments_sidecar(facts, language="en", prebake_probe=slow_probe)
+    elapsed = time.monotonic() - started
+
+    assert sidecar is not None
+    peer_row = next(
+        row for row in sidecar["rows"] if row["kind"] == "same_setup_peer_asset"
+    )
+    assert peer_row.get("detail") is None
+    assert peer_row.get("send_text") is None
+    assert elapsed < 0.8
+
+
+def test_offered_kinds_survive_an_intervening_turn_without_a_result() -> None:
+    from argus.agent_runtime.graph.workflow import _build_thread_metadata
+    from argus.agent_runtime.state.models import RunState
+
+    run_state = RunState.new(
+        current_user_message="a follow-up question", recent_thread_history=[]
+    )
+    prior = {
+        "next_experiments_offered_kinds": ["change_date_range"],
+        "next_experiments_offered_texts": {"change_date_range": "Test 2024 instead."},
+    }
+    metadata = _build_thread_metadata(
+        workflow_state={"selected_thread_metadata": prior},
+        run_state=run_state,
+        stage_outcome="ready_to_respond",
+    )
+    assert metadata["next_experiments_offered_kinds"] == ["change_date_range"]
+    assert metadata["next_experiments_offered_texts"] == {
+        "change_date_range": "Test 2024 instead."
+    }
+
+    fresh_offer = {
+        "version": "argus_next_experiments/v1",
+        "rows": [{"kind": "same_setup_peer_asset", "label": "x", "label_key": "k"}],
+    }
+    replaced = _build_thread_metadata(
+        workflow_state={
+            "selected_thread_metadata": prior,
+            "next_experiments": fresh_offer,
+        },
+        run_state=run_state,
+        stage_outcome="ready_to_respond",
+    )
+    assert replaced["next_experiments_offered_kinds"] == ["same_setup_peer_asset"]
+    assert "next_experiments_offered_texts" not in replaced

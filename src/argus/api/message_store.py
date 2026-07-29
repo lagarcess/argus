@@ -853,9 +853,12 @@ def _retried_failed_assistant_ids(messages: list[Message]) -> set[str]:
     """A completed retry retires the failure it replaced; metadata keeps the
     record for telemetry while the transcript stops re-rendering it. The
     retry re-sends the failed request verbatim, so the durable link is the
-    identical later user turn (an explicit retry action counts too)."""
-    retried: set[str] = set()
+    identical later user turn (an explicit retry action counts too) — but
+    retirement commits only once an assistant message follows the retry
+    turn; an interrupted retry must not strip the only Retry affordance."""
+    retired: set[str] = set()
     open_failures: dict[str, str] = {}
+    pending_retirements: list[str] = []
     last_user_content: str | None = None
     for message in messages:
         metadata = message.metadata if isinstance(message.metadata, dict) else {}
@@ -871,16 +874,19 @@ def _retried_failed_assistant_ids(messages: list[Message]) -> set[str]:
                 else None
             )
             if isinstance(failed_id, str) and failed_id.strip():
-                retried.add(failed_id.strip())
+                pending_retirements.append(failed_id.strip())
             if content and content in open_failures:
-                retried.add(open_failures.pop(content))
+                pending_retirements.append(open_failures.pop(content))
             last_user_content = content or None
             continue
         if message.role == "assistant":
+            if pending_retirements:
+                retired.update(pending_retirements)
+                pending_retirements = []
             if _is_retryable_recovery_failure(metadata) and last_user_content:
                 open_failures[last_user_content] = message.id
             last_user_content = None
-    return retried
+    return retired
 
 
 def _is_visible_runtime_failure(metadata: dict[str, Any]) -> bool:
