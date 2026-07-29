@@ -32,6 +32,7 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": (
             "Try a supported RSI threshold rule"
         ),
+        f"{_LABEL_KEY_PREFIX}recurring_monthly_buys": "Try monthly recurring buys",
         f"{_LABEL_KEY_PREFIX}supported_ma_crossover": (
             "Try a supported SMA/EMA crossover"
         ),
@@ -58,6 +59,9 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": (
             "Probar una regla RSI compatible"
         ),
+        f"{_LABEL_KEY_PREFIX}recurring_monthly_buys": (
+            "Probar compras mensuales recurrentes"
+        ),
         f"{_LABEL_KEY_PREFIX}supported_ma_crossover": (
             "Probar un cruce SMA/EMA compatible"
         ),
@@ -77,6 +81,7 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
 
 _REFINEMENT_KINDS = frozenset(
     {
+        "recurring_monthly_buys",
         "adjust_indicator_thresholds",
         "adjust_signal_periods",
         "adjust_contribution_cadence",
@@ -91,6 +96,48 @@ _EXPLORATION_KINDS = frozenset(
 )
 _DEEP_DRAWDOWN_THRESHOLD_PCT = -15.0
 
+_PEER_ASSETS: dict[str, str] = {
+    "AAPL": "MSFT",
+    "MSFT": "AAPL",
+    "NVDA": "AMD",
+    "AMD": "NVDA",
+    "GOOGL": "META",
+    "META": "GOOGL",
+    "AMZN": "AAPL",
+    "TSLA": "NVDA",
+    "SPY": "QQQ",
+    "QQQ": "SPY",
+    "COST": "TGT",
+    "TGT": "COST",
+    "NFLX": "DIS",
+    "DIS": "NFLX",
+    "BTC": "ETH",
+    "ETH": "BTC",
+}
+
+_SEND_TEMPLATES: dict[str, dict[str, str]] = {
+    "en": {
+        "same_setup_peer_asset": (
+            "Test the same buy and hold setup on {peer} from {start} to "
+            "{end} with ${capital}."
+        ),
+        "recurring_monthly_buys": (
+            "Try monthly recurring buys of {symbol} from {start} to {end} "
+            "with ${capital} in total."
+        ),
+    },
+    "es-419": {
+        "same_setup_peer_asset": (
+            "Probar el mismo enfoque de comprar y mantener con {peer} de "
+            "{start} a {end} con ${capital}."
+        ),
+        "recurring_monthly_buys": (
+            "Probar compras mensuales recurrentes de {symbol} de {start} a "
+            "{end} con ${capital} en total."
+        ),
+    },
+}
+
 
 def next_experiment_label_key(kind: str) -> str:
     return f"{_LABEL_KEY_PREFIX}{kind}"
@@ -104,6 +151,8 @@ def next_experiments_sidecar(
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
     previously_offered_kinds: list[str] | None = None,
+    language: str = "en",
+    prebake_probe: Any | None = None,
 ) -> dict[str, Any] | None:
     options = structured_next_experiments(result_facts)
     if not options:
@@ -130,6 +179,7 @@ def next_experiments_sidecar(
     )
     labels = {str(option["kind"]): str(option["label"]) for option in options}
     english = NEXT_EXPERIMENT_ACTION_LABELS["en"]
+    prebake_params = _prebake_params(result_facts)
     rows = []
     for kind in ordered[:NEXT_EXPERIMENTS_ROW_CAP]:
         label_key = next_experiment_label_key(kind)
@@ -138,6 +188,14 @@ def next_experiments_sidecar(
             "label": english.get(label_key) or labels[kind],
             "label_key": label_key,
         }
+        prebaked = _prebaked_row_fields(
+            kind,
+            params=prebake_params,
+            language=language,
+            prebake_probe=prebake_probe,
+        )
+        if prebaked:
+            row.update(prebaked)
         if why is not None:
             row["why"] = why
         rows.append(row)
@@ -225,6 +283,15 @@ def detect_next_experiment_acceptance(
     normalized = message.strip().casefold()
     if not normalized:
         return None
+    sends = thread_metadata.get("next_experiments_offered_texts") if isinstance(thread_metadata, dict) else None
+    if isinstance(sends, dict):
+        for kind, send_text in sends.items():
+            if (
+                isinstance(send_text, str)
+                and send_text.strip().casefold() == normalized
+                and kind in offered
+            ):
+                return {"kind": str(kind), "position": offered.index(str(kind))}
     for labels in NEXT_EXPERIMENT_ACTION_LABELS.values():
         for label_key, label in labels.items():
             if label.strip().casefold() != normalized:
@@ -233,3 +300,104 @@ def detect_next_experiment_acceptance(
             if kind in offered:
                 return {"kind": kind, "position": offered.index(kind)}
     return None
+
+
+def _prebake_params(result_facts: dict[str, Any]) -> dict[str, Any] | None:
+    config = result_facts.get("config_snapshot")
+    if not isinstance(config, dict):
+        return None
+    symbols = config.get("symbols") or result_facts.get("symbols")
+    symbol = (
+        str(symbols[0]).strip().upper()
+        if isinstance(symbols, list) and symbols
+        else ""
+    )
+    date_range = config.get("date_range")
+    start = end = ""
+    if isinstance(date_range, dict):
+        start = str(date_range.get("start") or "").strip()
+        end = str(date_range.get("end") or "").strip()
+    if not start or not end:
+        start = str(config.get("start_date") or "").strip()
+        end = str(config.get("end_date") or "").strip()
+    capital = config.get("initial_capital") or config.get("capital_amount")
+    if not symbol or not start or not end or not isinstance(capital, (int, float)):
+        return None
+    template = str(config.get("template") or config.get("strategy_type") or "")
+    if template != "buy_and_hold":
+        return None
+    return {
+        "symbol": symbol,
+        "start": start,
+        "end": end,
+        "capital": int(capital) if float(capital).is_integer() else capital,
+        "asset_class": str(config.get("asset_class") or "equity"),
+    }
+
+
+def _prebaked_row_fields(
+    kind: str,
+    *,
+    params: dict[str, Any] | None,
+    language: str,
+    prebake_probe: Any | None,
+) -> dict[str, Any] | None:
+    """A prebaked row's tap sends a fully specified ask: nothing is missing,
+    so the normal lifecycle answers with the next confirmation card and no
+    questions. Prebaking only happens when the grounding chain agrees."""
+    if params is None or kind not in {"same_setup_peer_asset", "recurring_monthly_buys"}:
+        return None
+    templates = _SEND_TEMPLATES.get(
+        "es-419" if (language or "en").lower().startswith("es") else "en",
+        _SEND_TEMPLATES["en"],
+    )
+    template = templates.get(kind)
+    if template is None:
+        return None
+    fields = dict(params)
+    if kind == "same_setup_peer_asset":
+        peer = _PEER_ASSETS.get(params["symbol"])
+        if not peer or not _peer_is_grounded(
+            peer,
+            asset_class=params["asset_class"],
+            start=params["start"],
+            end=params["end"],
+            prebake_probe=prebake_probe,
+        ):
+            return None
+        fields["peer"] = peer
+        return {"detail": peer, "send_text": template.format(**fields)}
+    return {"send_text": template.format(**fields)}
+
+
+def _peer_is_grounded(
+    peer: str,
+    *,
+    asset_class: str,
+    start: str,
+    end: str,
+    prebake_probe: Any | None,
+) -> bool:
+    if prebake_probe is not None:
+        try:
+            return bool(prebake_probe(peer))
+        except Exception:
+            return False
+    try:
+        from datetime import date
+
+        from argus.domain import market_data
+
+        resolved = market_data.resolve_asset(peer)
+        if resolved is None or resolved.canonical_symbol.upper() != peer:
+            return False
+        bars = market_data.fetch_ohlcv(
+            symbol=peer,
+            asset_class=asset_class,
+            start_date=date.fromisoformat(start),
+            end_date=date.fromisoformat(end),
+            timeframe="1D",
+        )
+        return bars is not None and len(bars) > 0
+    except Exception:
+        return False

@@ -567,7 +567,7 @@ export default function ChatMessage({
             (message.nextExperiments?.length ?? 0) > 0 && (
               <section
                 aria-label={t("chat.next_experiments.section", "Try next")}
-                className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col"
+                className="mt-5 flex w-full max-w-[min(100%,660px)] flex-col"
               >
                 <div className="argus-result-section-label">
                   {t("chat.next_experiments.section", "Try next")}
@@ -591,6 +591,12 @@ export default function ChatMessage({
                         onClick={() => onAction?.(nextExperimentAction(row, rowLabel))}
                       >
                         <NextMoveTitle>{rowLabel}</NextMoveTitle>
+                        {row.detail ? (
+                          <>
+                            <NextMoveSeparator>·</NextMoveSeparator>
+                            <NextMoveDetail>{row.detail}</NextMoveDetail>
+                          </>
+                        ) : null}
                         {whyText ? (
                           <>
                             <NextMoveSeparator>·</NextMoveSeparator>

@@ -22,6 +22,8 @@ export type NextExperimentRow = {
   kind: string;
   label: string;
   labelKey: string;
+  detail: string | null;
+  sendText: string | null;
   why: NextExperimentReason | null;
 };
 
@@ -40,10 +42,14 @@ function rowOrNull(value: unknown): NextExperimentRow | null {
   if (!kind || !label || !labelKey) return null;
   const why = recordOrNull(raw.why);
   const whyCode = why && typeof why.code === "string" ? why.code : "";
+  const detail = typeof raw.detail === "string" ? raw.detail.trim() : "";
+  const sendText = typeof raw.send_text === "string" ? raw.send_text.trim() : "";
   return {
     kind,
     label,
     labelKey,
+    detail: detail || null,
+    sendText: sendText || null,
     why: whyCode
       ? { code: whyCode, params: recordOrNull(why?.params) ?? {} }
       : null,
@@ -67,10 +73,12 @@ export function nextExperimentAction(
   row: NextExperimentRow,
   localizedLabel?: string,
 ): ChatActionOption {
-  const label = localizedLabel || row.label;
+  // A prebaked row sends its fully specified ask; nothing is missing, so
+  // the normal lifecycle answers with the next confirmation card.
+  const send = row.sendText || localizedLabel || row.label;
   return {
-    label,
-    labelKey: row.labelKey,
-    value: label,
+    label: send,
+    labelKey: row.sendText ? undefined : row.labelKey,
+    value: send,
   };
 }

@@ -680,6 +680,13 @@ def _build_thread_metadata(
         ]
         if kinds:
             metadata["next_experiments_offered_kinds"] = kinds
+            sends = {
+                str(row.get("kind")): str(row.get("send_text"))
+                for row in offered.get("rows") or []
+                if isinstance(row, dict) and row.get("kind") and row.get("send_text")
+            }
+            if sends:
+                metadata["next_experiments_offered_texts"] = sends
     requested_field = workflow_state.get("requested_field")
     if requested_field in (None, ""):
         requested_field = run_state.requested_field

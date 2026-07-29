@@ -38,7 +38,7 @@ def test_losing_run_leads_with_refinement_and_says_why() -> None:
     assert sidecar is not None
     first = sidecar["rows"][0]
     assert first["kind"] in {
-        "supported_rsi_threshold",
+        "recurring_monthly_buys",
         "supported_ma_crossover",
         "compare_buy_and_hold",
     }
@@ -71,7 +71,7 @@ def test_deep_drawdown_outranks_the_benchmark_story() -> None:
 
     assert sidecar is not None
     assert sidecar["rows"][0]["kind"] in {
-        "supported_rsi_threshold",
+        "recurring_monthly_buys",
         "supported_ma_crossover",
         "compare_buy_and_hold",
     }
@@ -237,3 +237,105 @@ def test_deep_drawdown_reads_the_canonical_nested_metrics() -> None:
         "code": "deep_drawdown",
         "params": {"drawdown": -24.5},
     }
+
+
+def test_prebaked_peer_row_carries_suffix_and_full_ask() -> None:
+    facts = {
+        "config_snapshot": {
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+            "initial_capital": 1000,
+            "asset_class": "equity",
+        },
+    }
+    sidecar = next_experiments_sidecar(
+        facts,
+        language="en",
+        prebake_probe=lambda peer: peer == "MSFT",
+    )
+
+    assert sidecar is not None
+    peer_row = next(
+        row for row in sidecar["rows"] if row["kind"] == "same_setup_peer_asset"
+    )
+    assert peer_row["detail"] == "MSFT"
+    assert peer_row["send_text"] == (
+        "Test the same buy and hold setup on MSFT from 2023-01-03 to "
+        "2023-12-29 with $1000."
+    )
+    dca_row = next(
+        row for row in sidecar["rows"] if row["kind"] == "recurring_monthly_buys"
+    )
+    assert dca_row["send_text"] == (
+        "Try monthly recurring buys of AAPL from 2023-01-03 to 2023-12-29 "
+        "with $1000 in total."
+    )
+
+
+def test_prebake_stays_off_when_the_peer_fails_grounding() -> None:
+    facts = {
+        "config_snapshot": {
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+            "initial_capital": 1000,
+            "asset_class": "equity",
+        },
+    }
+    sidecar = next_experiments_sidecar(
+        facts,
+        language="en",
+        prebake_probe=lambda peer: False,
+    )
+
+    assert sidecar is not None
+    peer_row = next(
+        row for row in sidecar["rows"] if row["kind"] == "same_setup_peer_asset"
+    )
+    assert "detail" not in peer_row
+    assert "send_text" not in peer_row
+
+
+def test_prebaked_spanish_ask_reads_in_spanish() -> None:
+    facts = {
+        "config_snapshot": {
+            "template": "buy_and_hold",
+            "symbols": ["NVDA"],
+            "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+            "initial_capital": 1500,
+            "asset_class": "equity",
+        },
+    }
+    sidecar = next_experiments_sidecar(
+        facts,
+        language="es-419",
+        prebake_probe=lambda peer: True,
+    )
+
+    assert sidecar is not None
+    peer_row = next(
+        row for row in sidecar["rows"] if row["kind"] == "same_setup_peer_asset"
+    )
+    assert peer_row["detail"] == "AMD"
+    assert "Probar el mismo enfoque" in peer_row["send_text"]
+    assert "AMD" in peer_row["send_text"]
+
+
+def test_acceptance_matches_the_offered_send_text() -> None:
+    from argus.agent_runtime.next_experiments import detect_next_experiment_acceptance
+
+    thread_metadata = {
+        "next_experiments_offered_kinds": ["same_setup_peer_asset"],
+        "next_experiments_offered_texts": {
+            "same_setup_peer_asset": (
+                "Test the same buy and hold setup on MSFT from 2023-01-03 to "
+                "2023-12-29 with $1000."
+            )
+        },
+    }
+    assert detect_next_experiment_acceptance(
+        "Test the same buy and hold setup on MSFT from 2023-01-03 to "
+        "2023-12-29 with $1000.",
+        thread_metadata,
+    ) == {"kind": "same_setup_peer_asset", "position": 0}

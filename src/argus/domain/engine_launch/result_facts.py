@@ -73,8 +73,8 @@ def structured_next_experiments(facts: dict[str, Any]) -> list[dict[str, Any]]:
                 f"test the same buy-and-hold setup on {peer_phrase}",
             ),
             _next_experiment(
-                "supported_rsi_threshold",
-                f"try a supported RSI threshold{asset_phrase}",
+                "recurring_monthly_buys",
+                f"try monthly recurring buys{asset_phrase}",
             ),
             _next_experiment(
                 "supported_ma_crossover",

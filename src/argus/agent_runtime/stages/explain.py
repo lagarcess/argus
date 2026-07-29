@@ -182,6 +182,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
                 result_facts=result_facts,
                 recent_user_messages=_recent_user_messages(state),
                 previously_offered_kinds=state.prior_next_experiment_kinds,
+                language=language,
             ),
         )
     benchmark_symbol = _benchmark_contract(
@@ -213,6 +214,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             max_drawdown=_max_drawdown_metric(result_payload),
             recent_user_messages=_recent_user_messages(state),
             previously_offered_kinds=state.prior_next_experiment_kinds,
+            language=language,
         ),
     )
 
@@ -226,6 +228,7 @@ def _with_next_experiments(
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
     previously_offered_kinds: list[str] | None = None,
+    language: str = "en",
 ) -> dict[str, Any]:
     sidecar = next_experiments_sidecar(
         result_facts,
@@ -234,6 +237,7 @@ def _with_next_experiments(
         max_drawdown=max_drawdown,
         recent_user_messages=recent_user_messages,
         previously_offered_kinds=previously_offered_kinds,
+        language=language,
     )
     if sidecar is None:
         return patch

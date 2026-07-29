@@ -705,7 +705,7 @@ def test_result_followup_next_tests_respect_strategy_family() -> None:
 
     assert "compare with buy-and-hold" not in buy_hold_facts["runnable_next_tests"]
     assert "Runnable next tests" not in buy_hold_facts["runnable_next_tests"]
-    assert "RSI threshold on AAPL" in buy_hold_facts["runnable_next_tests"]
+    assert "monthly recurring buys on AAPL" in buy_hold_facts["runnable_next_tests"]
     assert "compare NVDA with buy-and-hold" in signal_facts["runnable_next_tests"]
     options = json.loads(signal_facts["next_experiment_options"])
     assert options[0]["contract"] == "supported_backtest_experiment"
