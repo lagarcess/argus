@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from inspect import getmembers, isfunction
 from typing import cast
 from uuid import UUID
 
@@ -99,46 +100,54 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
         owner_id=GUEST_OWNER_ID,
         kind=MemoryAccountKind.GUEST,
     )
-    calls: tuple[Callable[[], object], ...] = (
-        lambda: service.propose_saved_decision(
+    calls: dict[str, Callable[[], object]] = {
+        "propose_saved_decision": lambda: service.propose_saved_decision(
             subject,
             _saved_decision_source(),
             sensitivity=_clear_sensitivity(),
             context=MemoryOperationContext.ORDINARY,
         ),
-        lambda: service.propose(
+        "propose": lambda: service.propose(
             subject,
             _candidate_draft(),
             MemoryOperationContext.ORDINARY,
         ),
-        lambda: service.enable(
+        "enable": lambda: service.enable(
             subject,
             frozenset({MemoryCategory.WORKFLOW_PREFERENCE}),
         ),
-        lambda: service.confirm(
+        "confirm": lambda: service.confirm(
             subject,
             "candidate-1",
             sensitivity=_clear_sensitivity(),
             context=MemoryOperationContext.ORDINARY,
         ),
-        lambda: service.decline(subject, "candidate-1"),
-        lambda: service.inspect(subject),
-        lambda: service.retrieve(
+        "decline": lambda: service.decline(subject, "candidate-1"),
+        "inspect": lambda: service.inspect(subject),
+        "retrieve": lambda: service.retrieve(
             subject,
             "",
             MemoryUsePurpose.REVISIT_SAVED_DECISION,
             limit=11,
         ),
-        lambda: service.explain(subject, "record-1"),
-        lambda: service.edit(
+        "explain": lambda: service.explain(subject, "record-1"),
+        "edit": lambda: service.edit(
             subject,
             "",
             MemoryEdit(label="Never inspect this", sensitivity=_clear_sensitivity()),
         ),
-        lambda: service.delete(subject, ""),
-    )
+        "delete": lambda: service.delete(subject, ""),
+        "disable": lambda: service.disable(subject),
+        "reset": lambda: service.reset(subject),
+    }
+    public_methods = {
+        name
+        for name, member in getmembers(MemoryService, predicate=isfunction)
+        if not name.startswith("_")
+    }
+    assert set(calls) == public_methods
 
-    for call in calls:
+    for call in calls.values():
         with pytest.raises(PersonalizationMemoryUnavailable):
             call()
 

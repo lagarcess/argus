@@ -185,28 +185,59 @@ class MemoryService:
         if not decision.allowed or decision.opt_in_scope != candidate.opt_in_scope:
             self._store.discard_candidate(owner, candidate_id)
             return ConfirmationResult(created=False)
-        result = self._store.confirm_candidate(
+        mutation = self._store.confirm_candidate(
             owner,
             candidate_id,
             clock=lambda: now,
             id_factory=self._id_factory,
         )
+        result = mutation.result
         if not result.created or result.record is None:
             return result
+        reconciliation_generation = mutation.reconciliation_generation
+        assert reconciliation_generation is not None
         try:
-            projection = self._provider.project(owner, result.record)
-            if (
-                projection is not None
-                and projection.status is ProviderReconciliationStatus.SYNCHRONIZED
-                and projection.provider_ref is not None
-            ):
-                self._store.set_provider_ref(
+            has_reconciliation_turn = self._store.wait_for_reconciliation_turn(
+                owner,
+                result.record.id,
+                reconciliation_generation,
+            )
+            if not has_reconciliation_turn:
+                return result
+            try:
+                projection = ProviderProjectionResult.model_validate(
+                    self._provider.project(owner, result.record)
+                )
+            except Exception:
+                return result
+            if projection.status is not ProviderReconciliationStatus.SYNCHRONIZED:
+                return result
+            assert projection.provider_ref is not None
+            ref_committed = self._store.compare_and_set_provider_ref(
+                owner,
+                result.record.id,
+                expected_record=result.record,
+                expected_provider_ref=None,
+                reconciliation_generation=reconciliation_generation,
+                provider_ref=projection.provider_ref,
+            )
+            if not ref_committed:
+                self._store.track_provider_cleanup_target(
                     owner,
                     result.record.id,
                     projection.provider_ref,
                 )
-        except Exception:
-            pass
+                self._cleanup_provider_target(
+                    owner,
+                    result.record.id,
+                    projection.provider_ref,
+                )
+        finally:
+            self._store.finish_record_reconciliation(
+                owner,
+                result.record.id,
+                reconciliation_generation,
+            )
         return result
 
     def decline(self, subject: MemorySubject, candidate_id: str) -> bool:
@@ -350,25 +381,66 @@ class MemoryService:
                 changed=False,
                 provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
             )
-        if not mutation.cleanup_refs:
-            provider_status = ProviderReconciliationStatus.NOT_APPLICABLE
-        else:
-            cleanup_statuses = tuple(
-                self._cleanup_provider_target(
-                    owner,
-                    record_id,
-                    provider_ref,
+        reconciliation_generation = mutation.reconciliation_generation
+        assert reconciliation_generation is not None
+        try:
+            if not mutation.cleanup_refs:
+                provider_status = ProviderReconciliationStatus.NOT_APPLICABLE
+            else:
+                cleanup_statuses = tuple(
+                    self._cleanup_provider_target(
+                        owner,
+                        record_id,
+                        provider_ref,
+                    )
+                    for provider_ref in mutation.cleanup_refs
                 )
-                for provider_ref in mutation.cleanup_refs
-            )
-            provider_status = (
-                ProviderReconciliationStatus.SYNCHRONIZED
-                if all(
-                    status is ProviderReconciliationStatus.SYNCHRONIZED
-                    for status in cleanup_statuses
+                provider_status = (
+                    ProviderReconciliationStatus.SYNCHRONIZED
+                    if all(
+                        status is ProviderReconciliationStatus.SYNCHRONIZED
+                        for status in cleanup_statuses
+                    )
+                    else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
                 )
-                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        finally:
+            reconciliation_finished = self._store.finish_record_reconciliation(
+                owner,
+                record_id,
+                reconciliation_generation,
             )
+        if not reconciliation_finished:
+            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        return MemoryControlResult(
+            changed=True,
+            provider_status=provider_status,
+        )
+
+    def disable(self, subject: MemorySubject) -> MemoryControlResult:
+        owner = require_registered(subject)
+        return MemoryControlResult(
+            changed=self._store.disable(owner),
+            provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+        )
+
+    def reset(self, subject: MemorySubject) -> MemoryControlResult:
+        owner = require_registered(subject)
+        reset = self._store.reset(owner)
+        if not reset.changed:
+            return MemoryControlResult(
+                changed=False,
+                provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+            )
+        try:
+            cleanup = ProviderCleanupResult.model_validate(self._provider.reset(owner))
+            provider_status = cleanup.status
+        except Exception:
+            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        if (
+            reset.provider_state_existed
+            and provider_status is ProviderReconciliationStatus.NOT_APPLICABLE
+        ):
+            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         return MemoryControlResult(
             changed=True,
             provider_status=provider_status,

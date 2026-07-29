@@ -40,11 +40,27 @@ class CanonicalRecordMutation:
 
 
 @dataclass(frozen=True, slots=True)
+class CanonicalConfirmationMutation:
+    """One atomic confirmation and its derivative-reconciliation generation."""
+
+    result: ConfirmationResult
+    reconciliation_generation: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderCleanupTarget:
     """Inspectable derivative cleanup work retained after canonical mutation."""
 
     record_id: str
     provider_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalOwnerReset:
+    """Canonical reset outcome and prior derivative-state knowledge."""
+
+    changed: bool
+    provider_state_existed: bool
 
 
 class CanonicalMemoryStore(Protocol):
@@ -84,7 +100,7 @@ class CanonicalMemoryStore(Protocol):
         *,
         clock: Callable[[], datetime],
         id_factory: Callable[[], str],
-    ) -> ConfirmationResult: ...
+    ) -> CanonicalConfirmationMutation: ...
 
     def enabled_categories(
         self, owner: RegisteredMemoryOwner
@@ -154,6 +170,10 @@ class CanonicalMemoryStore(Protocol):
         owner: RegisteredMemoryOwner,
         record_id: str,
     ) -> CanonicalRecordMutation | None: ...
+
+    def disable(self, owner: RegisteredMemoryOwner) -> bool: ...
+
+    def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset: ...
 
     def set_provider_ref(
         self,
@@ -352,12 +372,14 @@ class InMemoryCanonicalMemoryStore:
         *,
         clock: Callable[[], datetime],
         id_factory: Callable[[], str],
-    ) -> ConfirmationResult:
+    ) -> CanonicalConfirmationMutation:
         with self._lock:
             candidates = self._candidates.get(owner.owner_id, {})
             candidate = candidates.get(candidate_id)
             if candidate is None:
-                return ConfirmationResult(created=False)
+                return CanonicalConfirmationMutation(
+                    result=ConfirmationResult(created=False)
+                )
 
             confirmed_at = clock()
             settings = self._settings.get(
@@ -367,7 +389,9 @@ class InMemoryCanonicalMemoryStore:
             confirmed_scope = set(settings.enabled_categories)
             confirmed_scope.update(candidate.opt_in_scope)
             if candidate.category not in confirmed_scope:
-                return ConfirmationResult(created=False)
+                return CanonicalConfirmationMutation(
+                    result=ConfirmationResult(created=False)
+                )
 
             receipt = ConfirmedMemoryConsentReceipt(
                 id=id_factory(),
@@ -405,6 +429,10 @@ class InMemoryCanonicalMemoryStore:
                 record=record,
                 consent_receipt=receipt,
             )
+            reconciliation_key = (owner.owner_id, record.id)
+            reconciliation_generation = (
+                self._reconciliation_generations.get(reconciliation_key, 0) + 1
+            )
 
             self._settings[owner.owner_id] = MemoryConsentSettings(
                 enabled=True,
@@ -412,8 +440,18 @@ class InMemoryCanonicalMemoryStore:
             )
             self._receipts[owner.owner_id] = receipts
             self._records[owner.owner_id] = records
+            self._reconciliation_generations[reconciliation_key] = (
+                reconciliation_generation
+            )
+            self._inflight_reconciliations.setdefault(
+                reconciliation_key,
+                set(),
+            ).add(reconciliation_generation)
             del candidates[candidate_id]
-            return result
+            return CanonicalConfirmationMutation(
+                result=result,
+                reconciliation_generation=reconciliation_generation,
+            )
 
     def enabled_categories(
         self, owner: RegisteredMemoryOwner
@@ -580,6 +618,16 @@ class InMemoryCanonicalMemoryStore:
                 cleanup_refs.add(provider_ref)
             if cleanup_refs:
                 self._cleanup_targets[reconciliation_key] = cleanup_refs
+            reconciliation_generation = (
+                self._reconciliation_generations.get(reconciliation_key, 0) + 1
+            )
+            self._reconciliation_generations[reconciliation_key] = (
+                reconciliation_generation
+            )
+            self._inflight_reconciliations.setdefault(
+                reconciliation_key,
+                set(),
+            ).add(reconciliation_generation)
 
             updated_records = dict(records)
             del updated_records[record_id]
@@ -595,7 +643,105 @@ class InMemoryCanonicalMemoryStore:
                 before=current,
                 after=None,
                 provider_ref=provider_ref,
+                reconciliation_generation=reconciliation_generation,
                 cleanup_refs=tuple(sorted(cleanup_refs)),
+            )
+
+    def disable(self, owner: RegisteredMemoryOwner) -> bool:
+        """Clear opt-in and proposal state while retaining confirmed records."""
+
+        with self._lock:
+            settings = self._settings.get(owner.owner_id, MemoryConsentSettings())
+            candidates = self._candidates.get(owner.owner_id, {})
+            has_prompt_history = any(
+                owner_id == owner.owner_id
+                for owner_id, _category in self._proactive_prompts
+            )
+            has_decline_history = any(
+                owner_id == owner.owner_id for owner_id, _category in self._declines
+            )
+            changed = (
+                settings != MemoryConsentSettings()
+                or bool(candidates)
+                or has_prompt_history
+                or has_decline_history
+            )
+            self._settings.pop(owner.owner_id, None)
+            self._candidates.pop(owner.owner_id, None)
+            self._proactive_prompts = {
+                key: at
+                for key, at in self._proactive_prompts.items()
+                if key[0] != owner.owner_id
+            }
+            self._declines = {
+                key: at for key, at in self._declines.items() if key[0] != owner.owner_id
+            }
+            return changed
+
+    def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset:
+        """Wait for prior controls, then atomically clear all canonical owner state."""
+
+        with self._reconciliation_condition:
+            self._reconciliation_condition.wait_for(
+                lambda: not any(
+                    owner_id == owner.owner_id and generations
+                    for (owner_id, _record_id), generations in (
+                        self._inflight_reconciliations.items()
+                    )
+                )
+            )
+            settings = self._settings.get(owner.owner_id, MemoryConsentSettings())
+            provider_state_existed = bool(self._provider_refs.get(owner.owner_id)) or any(
+                key[0] == owner.owner_id for key in self._cleanup_targets
+            )
+            changed = any(
+                (
+                    settings != MemoryConsentSettings(),
+                    bool(self._candidates.get(owner.owner_id)),
+                    bool(self._receipts.get(owner.owner_id)),
+                    bool(self._records.get(owner.owner_id)),
+                    bool(self._provider_refs.get(owner.owner_id)),
+                    any(key[0] == owner.owner_id for key in self._cleanup_targets),
+                    any(
+                        key[0] == owner.owner_id
+                        for key in self._reconciliation_generations
+                    ),
+                    any(key[0] == owner.owner_id for key in self._proactive_prompts),
+                    any(key[0] == owner.owner_id for key in self._declines),
+                )
+            )
+            self._settings.pop(owner.owner_id, None)
+            self._candidates.pop(owner.owner_id, None)
+            self._receipts.pop(owner.owner_id, None)
+            self._records.pop(owner.owner_id, None)
+            self._provider_refs.pop(owner.owner_id, None)
+            self._cleanup_targets = {
+                key: refs
+                for key, refs in self._cleanup_targets.items()
+                if key[0] != owner.owner_id
+            }
+            self._reconciliation_generations = {
+                key: generation
+                for key, generation in self._reconciliation_generations.items()
+                if key[0] != owner.owner_id
+            }
+            self._inflight_reconciliations = {
+                key: generations
+                for key, generations in self._inflight_reconciliations.items()
+                if key[0] != owner.owner_id
+            }
+            self._proactive_prompts = {
+                key: at
+                for key, at in self._proactive_prompts.items()
+                if key[0] != owner.owner_id
+            }
+            self._declines = {
+                key: at for key, at in self._declines.items() if key[0] != owner.owner_id
+            }
+            self._reconciliation_condition.notify_all()
+            return CanonicalOwnerReset(
+                changed=changed,
+                provider_state_existed=provider_state_existed,
             )
 
     def set_provider_ref(

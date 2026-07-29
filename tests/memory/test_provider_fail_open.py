@@ -121,6 +121,16 @@ class _NoneProjectionProvider(_ProviderBase):
         return None
 
 
+class _InvalidProjectionProvider(_ProviderBase):
+    def project(  # type: ignore[override]
+        self,
+        owner: RegisteredMemoryOwner,
+        record: MemoryRecord,
+    ) -> object:
+        del owner, record
+        return {"status": "synchronized"}
+
+
 class _CanonicalFirstProjectionProvider(_ProviderBase):
     def __init__(self, store: InMemoryCanonicalMemoryStore) -> None:
         self._store = store
@@ -138,6 +148,18 @@ class _CanonicalFirstProjectionProvider(_ProviderBase):
             status=ProviderReconciliationStatus.SYNCHRONIZED,
             provider_ref="projection-1",
         )
+
+
+class _ResetOutcomeProvider(_ProviderBase):
+    def __init__(self, outcome: object) -> None:
+        self.outcome = outcome
+        self.calls: list[RegisteredMemoryOwner] = []
+
+    def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
+        self.calls.append(owner)
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome  # type: ignore[return-value]
 
 
 def _service(
@@ -233,7 +255,11 @@ def test_answered_empty_is_definitive_and_does_not_use_fallback() -> None:
 
 @pytest.mark.parametrize(
     "provider",
-    (_ExplodingProjectionProvider(), _NoneProjectionProvider()),
+    (
+        _ExplodingProjectionProvider(),
+        _NoneProjectionProvider(),
+        _InvalidProjectionProvider(),
+    ),
 )
 def test_projection_failure_never_rolls_back_or_exposes_canonical_confirmation(
     provider: MemoryRetrievalProvider,
@@ -247,6 +273,7 @@ def test_projection_failure_never_rolls_back_or_exposes_canonical_confirmation(
     owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
     assert store.get_record(owner, record_id) is not None
     assert store.get_provider_ref(owner, record_id) is None
+    assert store.inflight_reconciliation_generations(owner, record_id) == ()
 
 
 def test_projection_runs_after_canonical_confirmation_and_retains_only_its_ref() -> None:
@@ -281,3 +308,56 @@ def test_provider_reconciliation_models_reject_unknown_statuses() -> None:
         ProviderCleanupResult(status="maybe")  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         ProviderProjectionResult(status="maybe")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    (
+        (
+            RuntimeError("secret owner reset diagnostic"),
+            ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
+        ),
+        (None, ProviderReconciliationStatus.RECONCILIATION_REQUIRED),
+        (
+            {"unexpected": "shape"},
+            ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
+        ),
+        (
+            ProviderCleanupResult(
+                status=ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            ),
+            ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
+        ),
+        (
+            ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE),
+            ProviderReconciliationStatus.NOT_APPLICABLE,
+        ),
+        (
+            ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED),
+            ProviderReconciliationStatus.SYNCHRONIZED,
+        ),
+    ),
+)
+def test_reset_provider_outcome_is_fail_open_and_truthful(
+    outcome: object,
+    expected: ProviderReconciliationStatus,
+) -> None:
+    """Catches provider reset failures escaping or restoring canonical memory."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record_id = _confirm_one(setup)
+    provider = _ResetOutcomeProvider(outcome)
+    service = _service(store, provider)
+    owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
+
+    result = service.reset(SUBJECT)
+
+    assert result.changed is True
+    assert result.provider_status is expected
+    assert provider.calls == [owner]
+    assert store.get_settings(owner).enabled is False
+    assert store.list_candidates(owner) == ()
+    assert store.list_consent_receipts(owner) == ()
+    assert store.get_record(owner, record_id) is None
+    assert store.get_provider_ref(owner, record_id) is None
+    assert store.list_provider_cleanup_targets(owner) == ()

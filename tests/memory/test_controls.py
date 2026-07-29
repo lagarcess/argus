@@ -19,6 +19,8 @@ from argus.memory.contracts import (
     MemoryRecord,
     MemorySensitivityFlag,
     MemorySourceKind,
+    MemoryUsePurpose,
+    SavedDecisionSource,
     SensitivityAssessment,
     SensitivityStatus,
 )
@@ -64,15 +66,21 @@ class _ProviderSpy(MemoryRetrievalProvider):
         cleanup: object = ProviderCleanupResult(
             status=ProviderReconciliationStatus.NOT_APPLICABLE
         ),
+        reset: object = ProviderCleanupResult(
+            status=ProviderReconciliationStatus.NOT_APPLICABLE
+        ),
         store: InMemoryCanonicalMemoryStore | None = None,
     ) -> None:
         self.projection = projection
         self.cleanup = cleanup
+        self.reset_outcome = reset
         self.store = store
         self.project_calls: list[tuple[RegisteredMemoryOwner, MemoryRecord]] = []
         self.delete_calls: list[tuple[RegisteredMemoryOwner, str]] = []
+        self.reset_calls: list[RegisteredMemoryOwner] = []
         self.project_observed_canonical = False
         self.delete_observed_canonical_absent = False
+        self.reset_observed_canonical_empty = False
 
     def project(
         self,
@@ -118,8 +126,18 @@ class _ProviderSpy(MemoryRetrievalProvider):
         return self.cleanup  # type: ignore[return-value]
 
     def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
-        del owner
-        return ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE)
+        self.reset_calls.append(owner)
+        if self.store is not None:
+            self.reset_observed_canonical_empty = (
+                self.store.get_settings(owner) == MemoryConsentSettings()
+                and self.store.list_candidates(owner) == ()
+                and self.store.list_consent_receipts(owner) == ()
+                and self.store.list_records(owner) == ()
+                and self.store.list_provider_cleanup_targets(owner) == ()
+            )
+        if isinstance(self.reset_outcome, BaseException):
+            raise self.reset_outcome
+        return self.reset_outcome  # type: ignore[return-value]
 
     def _record_id_for_ref(self, provider_ref: str) -> str:
         assert self.store is not None
@@ -280,6 +298,89 @@ class _CrossOwnerBlockingProvider(_ProviderSpy):
             status=ProviderReconciliationStatus.SYNCHRONIZED,
             provider_ref=f"projection-{owner.owner_id}",
         )
+
+
+class _ResetAwareBlockingProvider(_BlockingStatefulProvider):
+    def __init__(self) -> None:
+        super().__init__(
+            new_ref_cleanup=ProviderCleanupResult(
+                status=ProviderReconciliationStatus.SYNCHRONIZED
+            )
+        )
+        self.reset_called = Event()
+
+    def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
+        del owner
+        with self._refs_lock:
+            self.refs.clear()
+        self.reset_called.set()
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+
+
+class _BlockingDeleteProvider(_ProviderSpy):
+    def __init__(self) -> None:
+        super().__init__()
+        self.delete_started = Event()
+        self.allow_delete = Event()
+        self.reset_called = Event()
+        self.refs = {"projection-delete"}
+
+    def delete(
+        self,
+        owner: RegisteredMemoryOwner,
+        provider_ref: str,
+    ) -> ProviderCleanupResult:
+        del owner
+        self.delete_started.set()
+        if not self.allow_delete.wait(timeout=5):
+            raise TimeoutError("test did not release provider delete")
+        self.refs.discard(provider_ref)
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+
+    def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
+        del owner
+        self.refs.clear()
+        self.reset_called.set()
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+
+
+class _BlockingConfirmationResetProvider(_ProviderSpy):
+    def __init__(self) -> None:
+        super().__init__()
+        self.project_started = Event()
+        self.allow_project = Event()
+        self.reset_called = Event()
+        self.refs: set[str] = set()
+
+    def project(
+        self,
+        owner: RegisteredMemoryOwner,
+        record: MemoryRecord,
+    ) -> ProviderProjectionResult:
+        del owner, record
+        self.project_started.set()
+        if not self.allow_project.wait(timeout=5):
+            raise TimeoutError("test did not release confirmation projection")
+        self.refs.add("projection-confirmed")
+        return ProviderProjectionResult(
+            status=ProviderReconciliationStatus.SYNCHRONIZED,
+            provider_ref="projection-confirmed",
+        )
+
+    def delete(
+        self,
+        owner: RegisteredMemoryOwner,
+        provider_ref: str,
+    ) -> ProviderCleanupResult:
+        del owner
+        self.refs.discard(provider_ref)
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+
+    def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
+        del owner
+        self.refs.clear()
+        self.reset_called.set()
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
 
 
 def _service(
@@ -960,3 +1061,367 @@ def test_delete_provider_failure_never_blocks_canonical_deletion(
     assert result.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
     assert store.get_record(OWNER, record.id) is None
     assert store.get_provider_ref(OWNER, record.id) is None
+
+
+def _add_pending_saved_decision(
+    service: MemoryService,
+) -> None:
+    proposal = service.propose_saved_decision(
+        SUBJECT,
+        SavedDecisionSource(
+            label="Keep this decision pending",
+            value="Revisit the lower-drawdown alternative.",
+            provenance=MemoryProvenance(
+                source_kind=MemorySourceKind.DECISION_NOTE,
+                source_id="decision-pending-control",
+                source_version="1",
+            ),
+        ),
+        sensitivity=CLEAR,
+        context=MemoryOperationContext.ORDINARY,
+    )
+    assert proposal is not None
+
+
+def test_disable_atomically_clears_scope_candidates_and_prompt_history_only() -> None:
+    """Catches disable erasing records or leaving proposal state retrievable."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record = _confirm_one(setup)
+    _add_pending_saved_decision(setup)
+    store.mark_declined(
+        OWNER,
+        MemoryCategory.WORKFLOW_PREFERENCE,
+        NOW,
+    )
+    store.set_provider_ref(OWNER, record.id, "projection-retained")
+    receipt = record.consent_receipt
+    provider = _ProviderSpy()
+    service = _service(store, provider)
+
+    result = service.disable(SUBJECT)
+
+    assert result == MemoryControlResult(
+        changed=True,
+        provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+    )
+    assert store.get_settings(OWNER) == MemoryConsentSettings()
+    assert store.list_candidates(OWNER) == ()
+    for category in MemoryCategory:
+        assert store.last_proactive_prompt_at(OWNER, category) is None
+        assert store.last_declined_at(OWNER, category) is None
+    assert store.list_records(OWNER) == (record,)
+    assert store.list_consent_receipts(OWNER) == (receipt,)
+    assert store.get_provider_ref(OWNER, record.id) == "projection-retained"
+    assert service.inspect(SUBJECT) == (record,)
+    assert service.explain(SUBJECT, record.id) is not None
+    assert (
+        service.retrieve(
+            SUBJECT,
+            "lower drawdown",
+            MemoryUsePurpose.REVISIT_SAVED_DECISION,
+        )
+        == ()
+    )
+    assert provider.project_calls == []
+    assert provider.delete_calls == []
+    assert provider.reset_calls == []
+
+    assert service.disable(SUBJECT) == MemoryControlResult(
+        changed=False,
+        provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+    )
+
+
+def test_disable_is_owner_scoped_and_keeps_controls_available() -> None:
+    """Catches one owner's disable clearing another owner or blocking record control."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    first = _confirm_one(setup)
+    second = _confirm_one(setup, subject=OTHER_SUBJECT)
+    service = _service(store)
+
+    service.disable(SUBJECT)
+    edited = service.edit(
+        SUBJECT,
+        first.id,
+        MemoryEdit(label="Still inspectable", sensitivity=CLEAR),
+    )
+
+    assert edited.changed is True
+    assert store.get_settings(OWNER) == MemoryConsentSettings()
+    assert (
+        store.get_record(
+            RegisteredMemoryOwner(owner_id=OTHER_OWNER_ID),
+            second.id,
+        )
+        == second
+    )
+    assert store.get_settings(RegisteredMemoryOwner(owner_id=OTHER_OWNER_ID)).enabled
+
+
+def test_reset_clears_complete_owner_state_before_provider_reset() -> None:
+    """Catches reset leaving canonical, proposal, or reconciliation bookkeeping."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record = _confirm_one(setup)
+    _add_pending_saved_decision(setup)
+    store.mark_declined(
+        OWNER,
+        MemoryCategory.WORKFLOW_PREFERENCE,
+        NOW,
+    )
+    store.set_provider_ref(OWNER, record.id, "projection-current")
+    store.track_provider_cleanup_target(
+        OWNER,
+        record.id,
+        "projection-stale",
+    )
+    first_mutation = store.edit_record(
+        OWNER,
+        record.id,
+        label="First mutation generation",
+        value=None,
+    )
+    assert first_mutation is not None
+    assert first_mutation.reconciliation_generation == 2
+    assert store.finish_record_reconciliation(OWNER, record.id, 2)
+    provider = _ProviderSpy(
+        store=store,
+        reset=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED),
+    )
+    service = _service(store, provider)
+
+    result = service.reset(SUBJECT)
+
+    assert result == MemoryControlResult(
+        changed=True,
+        provider_status=ProviderReconciliationStatus.SYNCHRONIZED,
+    )
+    assert provider.reset_calls == [OWNER]
+    assert provider.reset_observed_canonical_empty is True
+    assert store.get_settings(OWNER) == MemoryConsentSettings()
+    assert store.list_candidates(OWNER) == ()
+    assert store.list_consent_receipts(OWNER) == ()
+    assert store.list_records(OWNER) == ()
+    assert store.get_provider_ref(OWNER, record.id) is None
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+    assert store.inflight_reconciliation_generations(OWNER, record.id) == ()
+    for category in MemoryCategory:
+        assert store.last_proactive_prompt_at(OWNER, category) is None
+        assert store.last_declined_at(OWNER, category) is None
+
+    fresh = _confirm_one(service)
+    fresh_mutation = store.edit_record(
+        OWNER,
+        fresh.id,
+        label="Fresh generation after reset",
+        value=None,
+    )
+    assert fresh_mutation is not None
+    assert fresh_mutation.reconciliation_generation == 2
+    assert store.finish_record_reconciliation(OWNER, fresh.id, 2)
+
+
+def test_reset_requires_reconciliation_when_known_projection_is_not_applicable() -> None:
+    """Catches a provider no-op claiming cleanup for a known derivative copy."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record = _confirm_one(setup)
+    store.set_provider_ref(OWNER, record.id, "projection-known")
+    provider = _ProviderSpy(
+        reset=ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE)
+    )
+    service = _service(store, provider)
+
+    result = service.reset(SUBJECT)
+
+    assert result.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+
+
+def test_empty_reset_is_inert_and_provider_free() -> None:
+    """Catches an already-zero reset making an unnecessary provider call."""
+    store = InMemoryCanonicalMemoryStore()
+    provider = _ProviderSpy()
+    service = _service(store, provider)
+
+    result = service.reset(SUBJECT)
+
+    assert result == MemoryControlResult(
+        changed=False,
+        provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+    )
+    assert provider.reset_calls == []
+
+
+def test_reset_is_owner_scoped() -> None:
+    """Catches reset clearing destination-owned memory for a different account."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    first = _confirm_one(setup)
+    second = _confirm_one(setup, subject=OTHER_SUBJECT)
+    service = _service(store)
+
+    service.reset(SUBJECT)
+
+    assert store.get_record(OWNER, first.id) is None
+    other_owner = RegisteredMemoryOwner(owner_id=OTHER_OWNER_ID)
+    assert store.get_record(other_owner, second.id) == second
+    assert store.get_settings(other_owner).enabled
+
+
+def test_reset_waits_for_inflight_edit_before_owner_provider_reset() -> None:
+    """Catches a late edit projection surviving an owner-wide reset."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record = _confirm_one(setup)
+    store.set_provider_ref(OWNER, record.id, "projection-old")
+    provider = _ResetAwareBlockingProvider()
+    service = _service(store, provider)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        edit_future = executor.submit(
+            service.edit,
+            SUBJECT,
+            record.id,
+            MemoryEdit(value="Blocked edit before reset.", sensitivity=CLEAR),
+        )
+        assert provider.project_started.wait(timeout=1)
+        reset_future = executor.submit(service.reset, SUBJECT)
+        reset_ran_before_edit_settled = provider.reset_called.wait(timeout=0.1)
+        provider.allow_project.set()
+        edit_result = edit_future.result(timeout=2)
+        reset_result = reset_future.result(timeout=2)
+
+    assert reset_ran_before_edit_settled is False
+    assert edit_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert reset_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert store.list_records(OWNER) == ()
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+    assert provider.refs == set()
+
+
+def test_reset_waits_for_inflight_delete_cleanup() -> None:
+    """Catches reset racing ahead of a prior canonical-first provider delete."""
+    store = InMemoryCanonicalMemoryStore()
+    setup = _service(store)
+    record = _confirm_one(setup)
+    store.set_provider_ref(OWNER, record.id, "projection-delete")
+    provider = _BlockingDeleteProvider()
+    service = _service(store, provider)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        delete_future = executor.submit(service.delete, SUBJECT, record.id)
+        assert provider.delete_started.wait(timeout=1)
+        reset_future = executor.submit(service.reset, SUBJECT)
+        reset_ran_before_delete_settled = provider.reset_called.wait(timeout=0.1)
+        provider.allow_delete.set()
+        delete_result = delete_future.result(timeout=2)
+        reset_result = reset_future.result(timeout=2)
+
+    assert reset_ran_before_delete_settled is False
+    assert delete_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert reset_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert provider.refs == set()
+
+
+def test_reset_waits_for_inflight_confirmation_projection() -> None:
+    """Catches a late confirmation projection surviving an owner-wide reset."""
+    store = InMemoryCanonicalMemoryStore()
+    provider = _BlockingConfirmationResetProvider()
+    service = _service(store, provider)
+    proposal = service.propose(
+        SUBJECT,
+        MemoryCandidateDraft(
+            category=MemoryCategory.EXPLICIT_DECISION_NOTE,
+            value="Confirm before reset.",
+            label="Confirmation reset race",
+            future_benefit="Argus can revisit the confirmed decision.",
+            provenance=(
+                MemoryProvenance(
+                    source_kind=MemorySourceKind.DECISION_NOTE,
+                    source_id="decision-confirm-reset-race",
+                    source_version="1",
+                ),
+            ),
+            trigger=MemoryProposalTrigger.EXPLICIT_REQUEST,
+            sensitivity=CLEAR,
+        ),
+        MemoryOperationContext.ORDINARY,
+    )
+    assert proposal is not None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        confirm_future = executor.submit(
+            service.confirm,
+            SUBJECT,
+            proposal.candidate.id,
+            sensitivity=CLEAR,
+            context=MemoryOperationContext.ORDINARY,
+        )
+        assert provider.project_started.wait(timeout=1)
+        committed = store.list_records(OWNER)
+        assert len(committed) == 1
+        record_id = committed[0].id
+        reset_future = executor.submit(service.reset, SUBJECT)
+        reset_ran_before_confirmation_settled = provider.reset_called.wait(timeout=0.1)
+        provider.allow_project.set()
+        confirmation = confirm_future.result(timeout=2)
+        reset_result = reset_future.result(timeout=2)
+
+    assert reset_ran_before_confirmation_settled is False
+    assert confirmation.created is True
+    assert reset_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert store.get_settings(OWNER) == MemoryConsentSettings()
+    assert store.list_candidates(OWNER) == ()
+    assert store.list_consent_receipts(OWNER) == ()
+    assert store.list_records(OWNER) == ()
+    assert store.get_provider_ref(OWNER, record_id) is None
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+    assert store.inflight_reconciliation_generations(OWNER, record_id) == ()
+    assert provider.refs == set()
+
+
+def test_confirmation_replay_creates_no_provider_work_or_generation() -> None:
+    """Catches inert confirmation replay creating derivative or pending work."""
+    store = InMemoryCanonicalMemoryStore()
+    provider = _ProviderSpy()
+    service = _service(store, provider)
+    proposal = service.propose(
+        SUBJECT,
+        MemoryCandidateDraft(
+            category=MemoryCategory.EXPLICIT_DECISION_NOTE,
+            value="Confirm once.",
+            label="One confirmation",
+            future_benefit="Argus can revisit the confirmed decision.",
+            provenance=(
+                MemoryProvenance(
+                    source_kind=MemorySourceKind.DECISION_NOTE,
+                    source_id="decision-confirm-once",
+                    source_version="1",
+                ),
+            ),
+            trigger=MemoryProposalTrigger.EXPLICIT_REQUEST,
+            sensitivity=CLEAR,
+        ),
+        MemoryOperationContext.ORDINARY,
+    )
+    assert proposal is not None
+    first = service.confirm(
+        SUBJECT,
+        proposal.candidate.id,
+        sensitivity=CLEAR,
+        context=MemoryOperationContext.ORDINARY,
+    )
+    assert first.record is not None
+
+    replay = service.confirm(
+        SUBJECT,
+        proposal.candidate.id,
+        sensitivity=CLEAR,
+        context=MemoryOperationContext.ORDINARY,
+    )
+
+    assert replay.created is False
+    assert len(provider.project_calls) == 1
+    assert store.inflight_reconciliation_generations(OWNER, first.record.id) == ()

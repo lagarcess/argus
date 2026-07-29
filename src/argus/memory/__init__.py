@@ -26,6 +26,12 @@ from argus.memory.contracts import (
     SensitivityAssessment,
     SensitivityStatus,
 )
+from argus.memory.conversion import (
+    MemoryConversionMode,
+    MemoryConversionPlan,
+    MemoryStateDigest,
+    plan_guest_conversion,
+)
 from argus.memory.policy import MemoryPolicy, PolicyDecision, PolicyOutcome
 from argus.memory.provider import (
     MemoryRetrievalProvider,
@@ -57,6 +63,8 @@ __all__ = [
     "MemoryCategory",
     "MemoryConsentSettings",
     "MemoryControlResult",
+    "MemoryConversionMode",
+    "MemoryConversionPlan",
     "MemoryEdit",
     "MemoryOperationContext",
     "MemoryExplanation",
@@ -71,6 +79,7 @@ __all__ = [
     "MemoryServiceConfig",
     "MemorySourceKind",
     "MemorySourceRef",
+    "MemoryStateDigest",
     "MemorySubject",
     "MemoryUsePurpose",
     "NoOpMemoryProvider",
@@ -89,5 +98,6 @@ __all__ = [
     "SavedDecisionSource",
     "SensitivityAssessment",
     "SensitivityStatus",
+    "plan_guest_conversion",
     "require_registered",
 ]
