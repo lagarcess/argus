@@ -160,7 +160,11 @@ def _fetch_kraken_ohlcv(
         raise ValueError("market_data_unavailable")
     pair_key = next((key for key in result if key != "last"), None)
     rows = result.get(pair_key) if pair_key else None
-    if not isinstance(rows, list) or not rows:
+    if rows is None or rows == []:
+        # Kraken answered without data for the pair — a statement about the
+        # symbol, not a transport failure.
+        raise ValueError("market_data_empty")
+    if not isinstance(rows, list):
         raise ValueError("market_data_unavailable")
 
     frame = pd.DataFrame(
@@ -195,8 +199,12 @@ def _crypto_client() -> CryptoHistoricalDataClient:
 
 
 def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
-    if df is None or df.empty:
+    if df is None:
         raise ValueError("market_data_unavailable")
+    if df.empty:
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
 
     if isinstance(df.index, pd.MultiIndex):
         df = df.reset_index(level=0, drop=True)
@@ -211,7 +219,9 @@ def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
 
     normalized = df.loc[:, ["open", "high", "low", "close", "volume"]].dropna()
     if normalized.empty:
-        raise ValueError("market_data_unavailable")
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
     return normalized.astype(float)
 
 

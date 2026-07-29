@@ -280,7 +280,8 @@ def _benchmark_adjustment_from_strategy(
             continue
         if (
             item.get("field") == "comparison_baseline"
-            and item.get("resolution_status") in {"unsupported", "ambiguous"}
+            and item.get("resolution_status")
+            in {"unsupported", "ambiguous", "unavailable_for_requested_run"}
             and str(item.get("raw_text") or "").strip()
         ):
             return {

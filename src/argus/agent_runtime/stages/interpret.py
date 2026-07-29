@@ -202,8 +202,12 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
 )
+from argus.agent_runtime.stages.interpret_internal.benchmark_coverage import (
+    strategy_with_benchmark_price_coverage as _strategy_with_benchmark_price_coverage,
+)
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
     default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
+    provenance_without_benchmark_disclosures as _without_benchmark_disclosure_provenance,
     strategy_with_default_benchmark as _strategy_with_default_benchmark,
     strategy_with_separate_benchmark_symbol as _strategy_with_separate_benchmark_symbol,
     strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
@@ -762,6 +766,9 @@ async def _stage_result_from_interpretation(
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
         )
+        strategy, benchmark_coverage_reason_codes = (
+            _strategy_with_benchmark_price_coverage(strategy)
+        )
         strategy, default_benchmark_reason_codes = _strategy_with_default_benchmark(
             strategy
         )
@@ -769,6 +776,7 @@ async def _stage_result_from_interpretation(
             *benchmark_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
+            *benchmark_coverage_reason_codes,
             *default_benchmark_reason_codes,
         ]
     strategy, optional_parameter_values = (
@@ -3097,6 +3105,21 @@ def _strategy_with_validated_benchmark_symbol(
     benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
         return strategy, []
+    scrub_reason_codes: list[str] = []
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if (
+        isinstance(field_provenance, dict)
+        and field_provenance.get("comparison_baseline") == "explicit_user"
+    ):
+        # A benchmark the user names this turn retires any earlier
+        # reconciliation disclosure; a fresh clearing re-adds its own.
+        scrubbed = _without_benchmark_disclosure_provenance(
+            strategy.resolution_provenance
+        )
+        if len(scrubbed) != len(strategy.resolution_provenance):
+            strategy = strategy.model_copy(deep=True)
+            strategy.resolution_provenance = scrubbed
+            scrub_reason_codes = ["stale_benchmark_disclosure_retired"]
     try:
         resolution = provider_context_assets.resolution_from_strategy_context(
             strategy,
@@ -3119,22 +3142,32 @@ def _strategy_with_validated_benchmark_symbol(
         if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
             updated = strategy.model_copy(deep=True)
             updated.comparison_baseline = None
-            return updated, ["invalid_benchmark_symbol_cleared"]
+            return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
         canonical = resolution.asset.canonical_symbol.strip().upper()
         if canonical == benchmark:
-            return strategy, []
+            return strategy, scrub_reason_codes
         updated = strategy.model_copy(deep=True)
         updated.comparison_baseline = canonical
-        return updated, ["benchmark_symbol_provider_validated"]
+        # The stated name rides along so a later coverage clearing can
+        # disclose the user's words rather than the canonical symbol.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
+        return updated, [*scrub_reason_codes, "benchmark_symbol_provider_validated"]
     updated = strategy.model_copy(deep=True)
     updated.comparison_baseline = None
     if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
         # The user named this leg and no clarification will run for it; keep
-        # its provenance so the constraint reports the true blocker.
+        # its provenance so the card discloses exactly this reconciliation.
         updated.resolution_provenance = _dedupe_resolution_provenance(
-            [*updated.resolution_provenance, resolution.provenance]
+            [
+                *_without_benchmark_disclosure_provenance(
+                    updated.resolution_provenance
+                ),
+                resolution.provenance,
+            ]
         )
-    return updated, ["invalid_benchmark_symbol_cleared"]
+    return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
 
 
 def _resolve_asset_candidate(

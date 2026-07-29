@@ -10704,6 +10704,292 @@ def test_ambiguous_benchmark_leg_is_disclosed_not_silently_cleared(
     assert constraints == []
 
 
+def test_resolved_benchmark_without_price_coverage_reconciles_on_the_card(
+    monkeypatch,
+) -> None:
+    """Issue #301: a catalog-resolved benchmark with no bars in the window
+    reconciles to the class default and is disclosed, never run to failure."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+    from argus.domain import market_data
+    from argus.domain.market_data import ResolvedAsset
+
+    nintendo_provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="NINTENDO",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol="NTDOY",
+        asset_class="equity",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="NINTENDO",
+            asset=ResolvedAsset(
+                canonical_symbol="NTDOY",
+                asset_class="equity",
+                name="Nintendo Co Ltd",
+                raw_symbol="NTDOY",
+            ),
+            candidates=(),
+            provenance=nintendo_provenance,
+        ),
+    )
+
+    def _no_bars(**kwargs):
+        raise ValueError("market_data_empty")
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", _no_bars)
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2023-01-03", "end": "2023-12-29"},
+        comparison_baseline="NINTENDO",
+    )
+    strategy, validated_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+    assert strategy.comparison_baseline == "NTDOY"
+    assert "benchmark_symbol_provider_validated" in validated_codes
+
+    strategy, coverage_codes = interpret_module._strategy_with_benchmark_price_coverage(
+        strategy
+    )
+    assert strategy.comparison_baseline is None
+    assert coverage_codes == ["benchmark_without_price_coverage_cleared"]
+
+    strategy, default_codes = interpret_module._strategy_with_default_benchmark(strategy)
+    assert strategy.comparison_baseline == "SPY"
+    assert "default_benchmark_applied" in default_codes
+
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in strategy.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    # The reconciled leg never blocks: the card owns disclosing the swap.
+    constraints = _unsupported_constraints_from_resolution(
+        strategy.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_validated_benchmark_keeps_resolved_provenance_for_the_probe(
+    monkeypatch,
+) -> None:
+    """Issue #301: the rewrite to the canonical symbol keeps the user's stated
+    name on provenance so a later coverage clearing discloses their words."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="NINTENDO",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol="NTDOY",
+        asset_class="equity",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="NINTENDO",
+            asset=ResolvedAsset(
+                canonical_symbol="NTDOY",
+                asset_class="equity",
+                name="Nintendo Co Ltd",
+                raw_symbol="NTDOY",
+            ),
+            candidates=(),
+            provenance=provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="NINTENDO",
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert updated.comparison_baseline == "NTDOY"
+    assert "benchmark_symbol_provider_validated" in reason_codes
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "resolved"
+        and item.canonical_symbol == "NTDOY"
+        for item in updated.resolution_provenance
+    )
+
+
+def test_explicit_benchmark_change_retires_the_stale_disclosure(
+    monkeypatch,
+) -> None:
+    """PR #303 review: replacing a reconciled benchmark by name must not
+    let the card re-disclose the old swap against the new symbol."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="QQQ",
+            asset=ResolvedAsset(
+                canonical_symbol="QQQ",
+                asset_class="equity",
+                name="Invesco QQQ Trust",
+                raw_symbol="QQQ",
+            ),
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="QQQ",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="QQQ",
+            ),
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="QQQ",
+        resolution_provenance=[
+            ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="NINTENDO",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="unavailable_for_requested_run",
+                canonical_symbol="NTDOY",
+                validated_by="price_coverage_probe",
+            )
+        ],
+        extra_parameters={
+            "field_provenance": {"comparison_baseline": "explicit_user"}
+        },
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert updated.comparison_baseline == "QQQ"
+    assert "stale_benchmark_disclosure_retired" in reason_codes
+    assert not any(
+        item.field == "comparison_baseline"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in updated.resolution_provenance
+    )
+
+
+def test_merged_benchmark_keeps_the_disclosure_between_turns(monkeypatch) -> None:
+    """An edit that does not restate the benchmark keeps the reconciliation
+    disclosure — the card still runs against the swapped default."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="SPY",
+            asset=ResolvedAsset(
+                canonical_symbol="SPY",
+                asset_class="equity",
+                name="SPDR S&P 500 ETF",
+                raw_symbol="SPY",
+            ),
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="SPY",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="SPY",
+            ),
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        resolution_provenance=[
+            ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="NINTENDO",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="unavailable_for_requested_run",
+                canonical_symbol="NTDOY",
+                validated_by="price_coverage_probe",
+            )
+        ],
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert "stale_benchmark_disclosure_retired" not in reason_codes
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in updated.resolution_provenance
+    )
+
+
 def test_ambiguous_traded_assets_still_clarify_not_constrain() -> None:
     """The ambiguous-benchmark disclosure is scoped: universe legs keep the
     clarification path."""
