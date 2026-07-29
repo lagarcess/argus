@@ -4,9 +4,9 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-28
+Last reconciled: 2026-07-29
 
-Latest integrated product checkpoint: PR #303 at `da9f8500`. Later commits may
+Latest integrated product checkpoint: PR #304 at `59a274c3`. Later commits may
 reconcile roadmap and issue state without changing product behavior. New work
 must branch from the current remote integration head rather than pinning this
 product SHA.
@@ -71,6 +71,11 @@ an accessible single-flight Load older action while preserving PR #299's
 switching and race guarantees. PR #303 then closed #301 as `da9f8500`: a
 catalog-valid benchmark with an explicit zero-bars response reconciles at card
 time to the class default instead of failing later with misleading recovery.
+PR #304 then completed issue #249 as `59a274c3`: Quick take, Explain result,
+Try next, and recoverable failure now have distinct typed owners. Completed
+results carry capped, result-aware Try next rows; Explain contains only
+grounded comprehension; retryable composition failures resolve in place; and
+the same roles survive durable jobs, reload, English, and Spanish.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
@@ -140,11 +145,11 @@ deterministic test result by itself.
 
 | Founder outcome | State | Completion evidence |
 | --- | --- | --- |
-| 1. Argus always progresses | **Baseline delivered; standing quality bar** | PR #268 delivered bounded semantic progress, durable ordinary-turn recovery, exact-once Run reconciliation, stale-authority rejection, fact-preserving refinement, concrete trajectory adapters, EN/ES browser proof, one authorized real Run, and reload-stable result truth. Reviewed head `5585c6a` landed on integration as `847c413b`. Later reproduced defects receive bounded follow-ups; they do not reopen an unbounded search for every possible conversational edge case. |
+| 1. Argus always progresses | **Baseline delivered; standing quality bar** | PR #268 delivered bounded semantic progress, durable ordinary-turn recovery, exact-once Run reconciliation, stale-authority rejection, fact-preserving refinement, concrete trajectory adapters, EN/ES browser proof, one authorized real Run, and reload-stable result truth. Reviewed head `5585c6a` landed on integration as `847c413b`. PR #304 later closed the bounded result/recovery presentation follow-up as `59a274c3`. Later reproduced defects receive bounded follow-ups; they do not reopen an unbounded search for every possible conversational edge case. |
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
-| 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). PR #300 then completed comparison phrasing, named-target grounding, unsupported-target disclosure, and pending-confirmation discovery continuity (`c21f842f`); PR #303 completed catalog-valid benchmark coverage reconciliation (`da9f8500`). #244 remains open only for the accepted exposure-vehicle product decision plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
+| 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). PR #300 then completed comparison phrasing, named-target grounding, unsupported-target disclosure, and pending-confirmation discovery continuity (`c21f842f`); PR #303 completed catalog-valid benchmark coverage reconciliation (`da9f8500`); PR #304 added capped, result-aware, typed Try next rows with distinct surface ownership (`59a274c3`). #244 remains open only for the accepted exposure-vehicle product decision plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
 Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
@@ -219,18 +224,19 @@ Execute serially:
    is **complete**. PR #277 landed as `2d5a2b52`; all eight acceptance criteria
    were reconciled and #273 is closed.
 2. [#249 — Restore result and recovery surface ownership](https://github.com/lagarcess/argus/issues/249)
-   is now ready to start from the current remote `codex/private-alpha-next`
-   head. Guest has landed, so the overlapping chat-shell and
-   recovery-presentation owner is stable.
+   is **complete**. PR #304 landed as `59a274c3`: Quick take owns the glance
+   readout, Explain result owns grounded comprehension, stacked typed rows own
+   Try next, and generic recoverable failures render as failures rather than
+   result prose. Retry resolves in place, jobs and reload preserve the same
+   ownership, and English/Spanish surfaces passed the accepted lane evidence.
 
-Issue #249 was updated instead of duplicating presentation ownership. It
-records:
+Issue #249 preserved the stress-audit lineage without duplicating presentation
+ownership. The delivered correction covers:
 
 - `TRY NEXT` / `WHAT HAPPENED` leakage on generic recovery;
 - compact recovery parity between ownership paths;
 - malformed option presentation; and
-- Quick take quality drift as an observation, not yet a separate regression or
-  blocker.
+- Quick take structure and accessibility without pinning model prose.
 
 [Coordination issue #237](https://github.com/lagarcess/argus/issues/237)
 records all three queues. Lineage notes on #238, #239, and #242 preserve the
@@ -246,16 +252,17 @@ This is the current dispatch gate, not another speculative backlog:
 | --- | --- | --- |
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
 | Protected interpreter/edit spine | #270–#272 are closed; #271 landed through PR #280 at `d16f7496` | No additional spine implementation lane is queued. Repeat representative journeys only at promotion qualification. |
-| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9`; PR #299 stabilized conversation switching; PR #302 completed bounded Recents disclosure at `928dcdbb` and closed #245 | Start #249 from the current remote integration head and preserve the landed switching/Recents contracts. |
+| Artifact lifecycle and presentation | PR #304 completed #249 as `59a274c3` after preserving Guest hydration, conversation switching, and bounded Recents | No implementation lane remains in this queue. Reopen only for a newly reproduced owner-scoped defect. |
 | Grounded discovery | PR #276 landed as `c212107a`; presentation PR #281 as `8fde4ac1`; selection identity/corroboration PR #287 as `ea2b3f35`; Guest allowance PR #291 as `f1e65dde`; cheap verified rows/Search-exception PR #295 as `8f17a45e`; live-progress/Guest-identity PR #298 as `ba0aa2f6`; comparison grounding/discovery continuity PR #300 as `c21f842f`; and benchmark price-coverage reconciliation PR #303 as `da9f8500`. Integration defaults on and #244 remains open. | Do not duplicate the landed implementation. Comparison work is complete. Keep only the exposure-vehicle product decision separately bounded; configure the hosted migrations/Render environment and prove the exact deployed SHA/canary. |
 | Chat next-move presentation | PR #281 landed as `8fde4ac1` (stacked rows, sources panel, shared in-flight lock); PR #287 landed as `ea2b3f35` (Slice D: discovery selection carries the resolver's identity, plus a resolution-corroboration fix); PR #295 delivered the provider-offload prerequisite for Slice B; PR #298 landed Slice B's truthful Search/verification progress and per-row citation ownership. | Slices B and D are closed. Do not reopen this presentation arc without a new reproduced defect. |
 | Discovery candidate resolution | PR #287 corrected a ticker-collision defect: a resolved candidate must now corroborate the entity the sources named, so a gold miner is no longer offered for a Tron question | Known limitation accepted and recorded in `docs/superpowers/specs/2026-07-25-grounded-discovery-search-v1-design.md` §5.1: crypto-exposure ETFs are dropped alongside true collisions because the two are structurally indistinguishable to a token check. Surfacing exposure vehicles deliberately is real product value and needs its own design. Owned by #244. |
 | Guest grounded discovery | PR #291 landed the visitor/global discovery allowance at `f1e65dde`; PR #295 landed the cheap verified default and Search exception at `8f17a45e`; PR #298 landed visitor/day message and simulation settlement at `ba0aa2f6`. | Identity/lifetime implementation is complete. The additive `20260727230000_add_visitor_usage_counters.sql` and `20260728120000_visitor_keyed_guest_settlement.sql` migrations plus `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING` configuration remain promotion gates. #244 stays open. |
-| Full Omnisearch | The accepted grounded-discovery contract is now on integration | Reconcile the existing Omnisearch owner onto the current remote integration head; do not invent discovery truth or activate Search implicitly. |
+| Full Omnisearch | The accepted grounded-discovery and result-surface contracts are now on integration | Issue #253 is the next unblocked product lane. Start from the current remote integration head; project existing canonical evidence and notes without hover-time generation, RAG, or new durable recall state. |
 
-The next bounded continuity implementation lane is #249. The protected
-interpreter/edit-spine queue is closed; do not reopen it without a new
-reproduction.
+No bounded continuity implementation lane remains. The protected
+interpreter/edit-spine and artifact-presentation queues are closed; do not
+reopen either without a new reproduction. Issue #253 is the next unblocked
+interim product lane for full Omnisearch recall.
 
 ### Guest Main-Promotion And Public-Exposure Register
 

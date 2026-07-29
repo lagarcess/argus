@@ -18,12 +18,12 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-28
+## Active Post-Promotion Pointer — 2026-07-29
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#298 at `ba0aa2f6`; new work must branch from the current remote
+#304 at `59a274c3`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -54,10 +54,18 @@ needs, with typed retry, fair charging, async provider offload, and live
 EN/es-419 continuity proof. PR #298 then completed the second pass with
 visitor/day Guest message and simulation settlement, truthful Search and
 verification progress, and one source-owned citation action per discovery row.
+PR #299 then completed instant, race-safe conversation switching; PR #300
+completed comparison grounding and discovery-act continuity; PR #302 added
+bounded progressive Recents disclosure; and PR #303 reconciled catalog-valid
+benchmarks that return zero price bars before confirmation.
 The PR #291 and PR #298 migrations remain later hosted promotion operations;
 these internal integration merges did not deploy or expose Guest traffic. This
 pointer does not claim that the integration checkpoint is deployed or exposed
 to testers.
+PR #304 then completed the bounded result-surface ownership arc: Quick take,
+Explain result, typed Try next rows, and recoverable failure now have distinct
+owners through live turns, durable jobs, reload, and both supported languages.
+Issue #249 is closed.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
@@ -1030,12 +1038,11 @@ canonical artifact anchor, preserves already-owned facts, asks only for
 genuinely missing fields, keeps prior results immutable, and creates no
 duplicate compute. No further protected-spine implementation lane is queued;
 #270–#272 are closed, and representative repetition belongs to later promotion
-qualification. #249 may start from the current remote integration head because
-the overlapping Guest,
-chat-next-move, and recovery-state owners have landed; it must preserve PR
-#281's stacked rows, source panel, and shared in-flight lock, PR #299's
-conversation-switching cache, and PR #302's Recents disclosure while changing
-only Quick take, Explain, Try next, and recovery presentation ownership. See
+qualification. #249 is complete through PR #304 at `59a274c3`: Quick take,
+Explain result, stacked typed Try next rows, and recoverable failure have
+distinct ownership while preserving PR #281's stacked-row/source-panel
+contract, PR #299's conversation-switching cache, and PR #302's Recents
+disclosure. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)

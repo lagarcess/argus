@@ -2,11 +2,11 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-28
+Last reconciled: 2026-07-29
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #303 at `da9f8500`. Later commits may reconcile
+Latest product checkpoint: PR #304 at `59a274c3`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -33,7 +33,10 @@ instant and race-safe browser-session conversation switching. PR #300 then
 completed comparison name grounding, unsupported-target disclosure, and
 discovery-act preservation through pending confirmations. PR #302 completed
 bounded progressive Recents disclosure, and PR #303 reconciled catalog-valid
-benchmarks with explicit zero price bars before confirmation.
+benchmarks with explicit zero price bars before confirmation. PR #304 then
+completed distinct Quick take, Explain result, typed Try next, and recoverable
+failure ownership across live turns, durable jobs, reload, English, and
+Spanish.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -181,8 +184,10 @@ Do not reopen these as debt unless a new bug is reproduced:
   remain scoped to the durable artifact instead of transcript prose.
 - Result voice cleanup is closed for this batch: Quick take and Explain result
   remain distinct, Explain result uses the deeper fact-grounded breakdown
-  surface, visible Try next result actions are removed, and normal follow-up
-  guidance stays with the LLM chat brain.
+  surface, and the old duplicate result-card Try next action remains removed.
+  PR #304 adds the successor surface: capped typed rows under one localized Try
+  next owner, with ordinary conversational turns still handled by the LLM chat
+  brain.
 - Local live QA proof was captured on 2026-06-11 in QA mode with real Supabase
   auth and API persistence: a GOOG buy-and-hold conversation rendered the
   confirmation card, completed result card, Quick take, and Explain result;
@@ -326,6 +331,12 @@ Do not reopen these as debt unless a new bug is reproduced:
   reconciles to the class default at card time with the existing localized
   disclosure; transport failures remain owned by the run path. It landed as
   `da9f8500`.
+- Result and recovery surface ownership is complete at PR #304 / issue #249.
+  Quick take owns the glance readout, Explain result owns grounded
+  comprehension, stacked typed rows own Try next, and retryable composition
+  failures render distinctly and resolve in place. Durable job projection,
+  reload, non-repetition, accessibility, and English/Spanish parity were
+  included in the accepted lane evidence. It landed as `59a274c3`.
 - Fact-preserving recovery is complete at PR #288 / issue #272: stale or
   failed actions restore the latest usable canonical confirmation or result
   anchor, preserve assets, capital, requested/effective dates, daily timeframe,
@@ -414,13 +425,11 @@ Codex should own or closely supervise this:
    - #271 landed through PR #280 at `d16f7496` and is closed. #272 landed
      through PR #288 at `9f3453a3` and is closed; do not open another modeled
      cost or canonical recovery lane without a new reproduction.
-   - #273 is closed at `2d5a2b52`. Guest, chat next-move presentation,
-     conversation switching, and bounded Recents have released the shared shell
-     owner, so new #249 work must start from the current remote integration
-     head. Preserve PR #281's stacked rows, source panel, and in-flight lock,
-     PR #287's resolver-owned selection identity, PR #299's switching cache,
-     and PR #302's Recents disclosure;
-     #249 owns the remaining Quick take, Explain, Try next, and recovery roles.
+   - #273 is closed at `2d5a2b52`. #249 is closed through PR #304 at
+     `59a274c3`; Quick take, Explain result, typed Try next rows, and
+     recoverable failure now have distinct owners while preserving Guest
+     hydration, discovery rows, conversation switching, and bounded Recents.
+     No artifact-presentation follow-up remains without a new reproduction.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.
 
