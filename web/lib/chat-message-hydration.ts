@@ -5,12 +5,15 @@ import {
 } from "./argus-api";
 import {
   failedActionRetryActionFromMetadata,
+  isRetryAction,
+  retryLastTurnActionFromMessage,
   retryLastTurnActionFromMetadata,
 } from "./chat-retry-actions";
 import {
   coverageRecoveryActionsFromMetadata,
   noProgressActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  retryableAssistantRecoveryCode,
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
@@ -271,6 +274,24 @@ function retryActionsFromMetadata(
   ].filter((action): action is ChatActionOption => Boolean(action));
 }
 
+export function precedingUserMessageForRetryableRecovery(
+  messages: ApiMessage[],
+  assistant: ApiMessage,
+): ApiMessage | null {
+  if (assistant.role === "user") return null;
+  if (!retryableAssistantRecoveryCode((assistant.metadata ?? {}).recovery)) {
+    return null;
+  }
+  const index = messages.findIndex((message) => message.id === assistant.id);
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const candidate = messages[cursor];
+    if (candidate.role === "user") {
+      return (candidate.content ?? "").trim() ? candidate : null;
+    }
+  }
+  return null;
+}
+
 export function retryRequestMessageForAssistant(
   messages: ApiMessage[],
   assistant: ApiMessage,
@@ -361,6 +382,25 @@ export function hydrateTextMessageFromApi(
     ...unsupportedStrategyActions,
     ...retryActions,
   ];
+  // A retryable composition failure resolves in place: one tap re-sends
+  // the original turn and the replaced failure is superseded durably.
+  const compositionRecoveryCode = isAssistant
+    ? retryableAssistantRecoveryCode(metadata.recovery)
+    : null;
+  if (
+    compositionRecoveryCode &&
+    options.retryRequestMessage &&
+    !actions.some(isRetryAction)
+  ) {
+    const compositionRetry = retryLastTurnActionFromMessage(
+      options.retryRequestMessage.content ?? "",
+      {
+        assistantMessageId: message.id,
+        requestMessageId: options.retryRequestMessage.id,
+      },
+    );
+    if (compositionRetry) actions.push(compositionRetry);
+  }
 
   return {
     id: message.id,
@@ -375,6 +415,9 @@ export function hydrateTextMessageFromApi(
       ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    assistantRecoveryCode: isAssistant
+      ? retryableAssistantRecoveryCode(metadata.recovery)
+      : null,
   };
 }
 

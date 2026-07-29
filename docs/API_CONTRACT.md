@@ -2806,6 +2806,33 @@ Quick take from result-card metrics. `result_readout_source` and
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
 
+Completed jobs may also carry `next_experiments`, the same versioned Try next
+sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,
+`rows` capped at three). Each row is
+`{kind, label, label_key, why?, detail?, send_text?}`: `label_key` selects the
+localized row label, `why` is a typed reason (`code` + `params`, e.g.
+`beat_benchmark` with `points`), and prebaked rows add `detail` (a short
+suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
+localized sentence a tap submits as an ordinary user turn). The frontend
+renders rows only from this sidecar and never invents rows; `null` or an
+unknown `version` means no Try next section.
+
+```json
+"next_experiments": {
+  "version": "argus_next_experiments/v1",
+  "rows": [
+    {
+      "kind": "same_setup_peer_asset",
+      "label": "Test the same setup on a similar asset",
+      "label_key": "chat.next_experiments.labels.same_setup_peer_asset",
+      "why": {"code": "beat_benchmark", "params": {"points": 29.1}},
+      "detail": "MSFT",
+      "send_text": "Test the same buy and hold setup on MSFT from 2023-01-03 to 2023-12-29 with $1000."
+    }
+  ]
+}
+```
+
 **Response: queued/running**
 ```json
 {
@@ -2829,7 +2856,8 @@ deterministic safety renderer.
   "result_readout": null,
   "result_readout_source": null,
   "result_readout_fallback_used": null,
-  "result_readout_failure_mode": null
+  "result_readout_failure_mode": null,
+  "next_experiments": null
 }
 ```
 
@@ -2860,7 +2888,18 @@ deterministic safety renderer.
   "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution.",
   "result_readout_source": "llm_explain_stage",
   "result_readout_fallback_used": false,
-  "result_readout_failure_mode": null
+  "result_readout_failure_mode": null,
+  "next_experiments": {
+    "version": "argus_next_experiments/v1",
+    "rows": [
+      {
+        "kind": "change_date_range",
+        "label": "Test a different date range",
+        "label_key": "chat.next_experiments.labels.change_date_range",
+        "why": {"code": "beat_benchmark", "params": {"points": 2.3}}
+      }
+    ]
+  }
 }
 ```
 
@@ -2881,7 +2920,8 @@ deterministic safety renderer.
   "result_readout": null,
   "result_readout_source": null,
   "result_readout_fallback_used": null,
-  "result_readout_failure_mode": null
+  "result_readout_failure_mode": null,
+  "next_experiments": null
 }
 ```
 

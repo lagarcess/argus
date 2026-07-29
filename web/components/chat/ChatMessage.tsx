@@ -10,6 +10,7 @@ import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
+import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -356,6 +357,32 @@ export default function ChatMessage({
               content={displayContent}
               label={t("chat.result_breakdown.label", "Breakdown")}
             />
+          ) : !isUser && message.assistantRecoveryCode ? (
+            // Infrastructure failure is visibly a failure: no result chrome,
+            // no normal-answer bubble (issue #249).
+            <div
+              role="status"
+              className="flex w-full max-w-[min(100%,660px)] items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]"
+            >
+              <MessageSquareWarning
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {displayContent}
+                </ReactMarkdown>
+              </div>
+              {retryAction ? (
+                <button
+                  type="button"
+                  onClick={() => onAction?.(retryAction)}
+                  className="shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10"
+                >
+                  {actionLabel(retryAction)}
+                </button>
+              ) : null}
+            </div>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               {factHeadingLabel && (
@@ -531,6 +558,58 @@ export default function ChatMessage({
             />
           ) : null}
 
+          {/* The result's own Try next rows are the sanctioned next-move
+              surface; only mid-turn composition suppresses them. */}
+          {shouldShowAssistantFooter &&
+            Boolean(isLatest) &&
+            !turnInFlight &&
+            message.kind === "strategy_result" &&
+            (message.nextExperiments?.length ?? 0) > 0 && (
+              <section
+                aria-label={t("chat.next_experiments.section", "Try next")}
+                className="mt-5 flex w-full max-w-[min(100%,660px)] flex-col"
+              >
+                <div className="argus-result-section-label">
+                  {t("chat.next_experiments.section", "Try next")}
+                </div>
+                <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
+                  {(message.nextExperiments ?? []).map((row, rowIndex) => {
+                    const rowLabel = t(row.labelKey, row.label);
+                    // One result-level reason; captioning every row repeats it.
+                    const whyText =
+                      row.why && rowIndex === 0
+                        ? t(`chat.next_experiments.why.${row.why.code}`, {
+                            defaultValue: "",
+                            ...row.why.params,
+                          })
+                        : "";
+                    return (
+                      <NextMoveRow
+                        key={row.kind}
+                        ariaLabel={rowLabel}
+                        disabled={turnInFlight}
+                        onClick={() => onAction?.(nextExperimentAction(row, rowLabel))}
+                      >
+                        <NextMoveTitle>{rowLabel}</NextMoveTitle>
+                        {row.detail ? (
+                          <>
+                            <NextMoveSeparator>·</NextMoveSeparator>
+                            <NextMoveDetail>{row.detail}</NextMoveDetail>
+                          </>
+                        ) : null}
+                        {whyText ? (
+                          <>
+                            <NextMoveSeparator>·</NextMoveSeparator>
+                            <NextMoveDetail>{whyText}</NextMoveDetail>
+                          </>
+                        ) : null}
+                      </NextMoveRow>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
           {showNextMoveRows && (
             <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">
               {footerMessageActions.map((action) => (
@@ -573,7 +652,9 @@ export default function ChatMessage({
                     <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
                   </button>
                 </Tooltip>
-                {retryAction && (
+                {/* The failure block owns the retry control; the footer only
+                    offers it for messages without that block. */}
+                {retryAction && !message.assistantRecoveryCode && (
                   <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
                     <button
                       type="button"
@@ -679,7 +760,7 @@ function ResultReadout({
   label: string;
 }) {
   return (
-    <section aria-label="Result readout">
+    <section aria-label={label}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-readout prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>

@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from argus.agent_runtime.next_experiments import next_experiments_sidecar
 from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
@@ -176,7 +177,13 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         )
         return StageResult(
             outcome="ready_to_respond",
-            stage_patch={"assistant_response": response},
+            stage_patch=_with_next_experiments(
+                {"assistant_response": response},
+                result_facts=result_facts,
+                recent_user_messages=_recent_user_messages(state),
+                previously_offered_kinds=state.prior_next_experiment_kinds,
+                language=language,
+            ),
         )
     benchmark_symbol = _benchmark_contract(
         strategy=strategy,
@@ -199,8 +206,71 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
 
     return StageResult(
         outcome="ready_to_respond",
-        stage_patch={"assistant_response": response},
+        stage_patch=_with_next_experiments(
+            {"assistant_response": response},
+            result_facts=result_facts,
+            total_return=total_return,
+            benchmark_return=benchmark_return,
+            max_drawdown=_max_drawdown_metric(result_payload),
+            recent_user_messages=_recent_user_messages(state),
+            previously_offered_kinds=state.prior_next_experiment_kinds,
+            language=language,
+        ),
     )
+
+
+def _with_next_experiments(
+    patch: dict[str, Any],
+    *,
+    result_facts: dict[str, Any],
+    total_return: float | None = None,
+    benchmark_return: float | None = None,
+    max_drawdown: float | None = None,
+    recent_user_messages: list[str] | None = None,
+    previously_offered_kinds: list[str] | None = None,
+    language: str = "en",
+) -> dict[str, Any]:
+    sidecar = next_experiments_sidecar(
+        result_facts,
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        max_drawdown=max_drawdown,
+        recent_user_messages=recent_user_messages,
+        previously_offered_kinds=previously_offered_kinds,
+        language=language,
+    )
+    if sidecar is None:
+        return patch
+    return {**patch, "next_experiments": sidecar}
+
+
+def _recent_user_messages(state: RunState) -> list[str]:
+    turns = [
+        message.content
+        for message in state.recent_thread_history
+        if message.role == "user"
+    ]
+    turns.append(state.current_user_message)
+    return turns[-8:]
+
+
+def _max_drawdown_metric(result_payload: dict[str, Any]) -> float | None:
+    metrics = result_payload.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    # Canonical engine shape first; flat keys are the legacy fallback.
+    nested: Any = metrics
+    for key in ("aggregate", "performance"):
+        nested = nested.get(key) if isinstance(nested, dict) else None
+    if isinstance(nested, dict):
+        value = nested.get("max_drawdown_pct")
+        if isinstance(value, (int, float)):
+            return float(value)
+    for key in ("max_drawdown_pct", "max_drawdown"):
+        value = metrics.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
 
 
 async def explain_stage_async(*, state: RunState, language: str = "en") -> StageResult:
@@ -366,6 +436,9 @@ async def _llm_explanation(
                 "user-facing copy. "
                 "Set language_quality to mixed_or_wrong_language if any rendered "
                 "sentence mixes languages or copies internal field wording. "
+                "Write complete sentences and end cleanly; never end on a dangling "
+                "fragment such as a bare data-frequency note. Fold caveats into a "
+                "readable sentence instead of appending them as fragments. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
                 " For user-facing beat/lagged wording, use the benchmark symbol "

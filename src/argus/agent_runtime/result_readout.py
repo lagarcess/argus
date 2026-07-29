@@ -30,6 +30,7 @@ class ResultReadout:
     source: str
     fallback_used: bool
     failure_mode: str | None = None
+    next_experiments: dict[str, Any] | None = None
 
 
 def result_readout_from_backtest_payload(
@@ -115,6 +116,9 @@ async def result_readout_with_metadata_from_backtest_payload_async(
         language=_optional_str(language or request.get("language")) or "en",
     )
     patch = result.stage_patch
+    next_experiments = patch.get("next_experiments")
+    if not isinstance(next_experiments, dict):
+        next_experiments = None
     text = patch.get("assistant_response")
     source = _optional_str(patch.get("assistant_response_source"))
     fallback_used = bool(patch.get("assistant_response_fallback_used"))
@@ -139,6 +143,7 @@ async def result_readout_with_metadata_from_backtest_payload_async(
         source=source or _default_source_for_fallback(fallback_used),
         fallback_used=fallback_used,
         failure_mode=failure_mode,
+        next_experiments=next_experiments,
     )
 
 

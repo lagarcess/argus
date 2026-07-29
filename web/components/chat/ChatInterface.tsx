@@ -90,7 +90,9 @@ import {
 import {
   recoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
+import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
@@ -1359,6 +1361,9 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalAssistantRecoveryCode = retryableAssistantRecoveryCode(
+          finalPayload.recovery,
+        );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
@@ -1375,6 +1380,16 @@ export default function ChatInterface() {
           ...finalResponseActions,
           ...finalRetryActions,
         ];
+        if (
+          finalAssistantRecoveryCode &&
+          !finalTextActions.some(isFailedActionRetry) &&
+          text.trim()
+        ) {
+          const compositionRetry = retryLastTurnActionFromMessage(text, {
+            assistantMessageId: finalMessageId ?? assistantId,
+          });
+          if (compositionRetry) finalTextActions.push(compositionRetry);
+        }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
@@ -1418,6 +1433,8 @@ export default function ChatInterface() {
             savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
             actions: resultActions,
           };
+          const finalNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1428,6 +1445,7 @@ export default function ChatInterface() {
                   content: finalText || undefined,
                   result: card,
                   actions: resultActions,
+                  nextExperiments: finalNextExperiments,
                   savedStrategyId: card.savedStrategyId,
                 }),
               ),
@@ -1467,6 +1485,7 @@ export default function ChatInterface() {
                   finalText,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
+                  assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   contentPresentation:
                     action?.type === "show_breakdown"
@@ -1484,6 +1503,7 @@ export default function ChatInterface() {
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
+                assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 contentPresentation:
                   action?.type === "show_breakdown"

@@ -457,7 +457,8 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(message).toContain("function ResultReadout");
-    expect(message).toContain('aria-label="Result readout"');
+    // Issue #249: the accessible section name is the localized label.
+    expect(message).toContain("aria-label={label}");
     expect(message).toContain(
       'label={t("chat.result_readout.quick_take", "Quick take")}',
     );
@@ -2055,3 +2056,4 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).not.toContain("[argus-api] Fetching");
   });
 });
+

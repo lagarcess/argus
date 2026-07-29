@@ -33,6 +33,11 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
 )
 from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+from argus.agent_runtime.strategy_contract import (
+    SUPPORTED_STRATEGY_TYPES,
+    canonical_strategy_type,
+    executable_strategy_type,
+)
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
 
 
@@ -135,9 +140,10 @@ def _complete_draft_owns_its_own_route(
     decision: InterpretDecision,
     anchor: ArtifactAnchor,
 ) -> bool:
-    """An executable-complete unplanned draft that swaps the traded assets is
-    its own idea or edit; patching it onto the anchor would silently overwrite
-    the user's explicit assets and strategy shape with the completed run's."""
+    """An executable-complete unplanned draft that swaps the traded assets or
+    declares a different strategy family is its own idea or edit; patching it
+    onto the anchor would silently overwrite the user's explicit assets and
+    strategy shape with the completed run's."""
 
     if "artifact_assumption_edit_planned" in decision.reason_codes:
         return False
@@ -145,7 +151,12 @@ def _complete_draft_owns_its_own_route(
     draft_assets = [symbol for symbol in draft.asset_universe if str(symbol).strip()]
     if not draft_assets or anchor.draft is None:
         return False
-    if same_asset_universe(draft_assets, anchor.draft.asset_universe):
+    if same_asset_universe(
+        draft_assets, anchor.draft.asset_universe
+    ) and not _draft_declares_different_strategy_family(
+        draft=draft,
+        anchor_draft=anchor.draft,
+    ):
         return False
     missing_fields = set(
         missing_required_fields_for_strategy(
@@ -154,6 +165,18 @@ def _complete_draft_owns_its_own_route(
         )
     )
     return not (missing_fields - {"strategy_thesis"})
+
+
+def _draft_declares_different_strategy_family(
+    *,
+    draft: StrategySummary,
+    anchor_draft: StrategySummary,
+) -> bool:
+    declared = canonical_strategy_type(draft.strategy_type)
+    if declared not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    anchor_family = executable_strategy_type(anchor_draft)
+    return anchor_family in SUPPORTED_STRATEGY_TYPES and declared != anchor_family
 
 
 def _planned_asset_universe_for_result_patch(

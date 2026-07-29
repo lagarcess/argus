@@ -18,7 +18,6 @@ from argus.domain.benchmark_comparison import (
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
-    structured_next_experiments,
 )
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema_sync,
@@ -197,7 +196,7 @@ def _result_breakdown_llm_messages(
                 "of borrowing English terms like benchmark. "
                 "For non-English product_language, literal English words such as "
                 "benchmark, drawdown, back-test, backtest, setup, total return, risk, "
-                "assumptions, and useful next check are language-quality failures. "
+                "and assumptions are language-quality failures. "
                 "Some source fact values may be stored in English; translate their "
                 "meaning into product_language in your visible section bodies. Do "
                 "not judge source fact values, fact IDs, or schema keys as user-facing "
@@ -224,10 +223,10 @@ def _result_breakdown_llm_messages(
                 "context packet language, provider names, source plumbing, app internals, "
                 "or implementation terms in user-facing prose. If context facts are "
                 "available, describe them naturally as market or macro backdrop. Keep "
-                "source/provider details internal. Respect capability truth in next "
-                "steps: runnable ideas must come from runnable_next_tests, while "
-                "draft-only or future ideas must be clearly labeled that way. Promote "
-                "discovery by naming one or two runnable next experiments, but do not "
+                "source/provider details internal. Do not recommend, list, or hint "
+                "at next tests, next experiments, or what to try next; the "
+                "conversation's Try next surface owns those and Explain must stay "
+                "pure grounded comprehension. Do not "
                 "label any section Quick Take or Quick Breakdown; this action is the "
                 "deeper Explain result surface, not the first-glance readout. "
                 "invent causes, trades, prices, support, missing metrics, unsupported "
@@ -241,9 +240,9 @@ def _result_breakdown_llm_messages(
                 "and include context_packet_limitations; do not claim causality unless "
                 "the supplied fact directly supports it. Cover "
                 "what was tested, what drove the observed result, benchmark comparison, "
-                "risk or drawdown, assumptions, caveats, and one useful next test. "
+                "risk or drawdown, assumptions, and caveats. "
                 "Keep the breakdown clearly deeper than the Quick Take: setup, drivers, "
-                "risk/assumptions, and next experiment should each have their own job."
+                "and risk/assumptions should each have their own job."
             ),
         },
         {
@@ -353,23 +352,6 @@ def result_breakdown_fact_bank(
         )
     )
     fact_bank["caveat"] = _breakdown_caveat(language=resolved_language)
-    next_options = structured_next_experiments(
-        {
-            "config_snapshot": context.get("config_snapshot"),
-            "symbols": context.get("symbols"),
-        }
-    )
-    fact_bank["runnable_next_tests"] = _runnable_next_tests_label(
-        next_options,
-        language=resolved_language,
-    )
-    fact_bank["next_experiment_options"] = json.dumps(
-        next_options,
-        default=str,
-    )
-    fact_bank["draft_only_or_future_tests"] = _draft_only_tests_label(
-        language=resolved_language
-    )
     return fact_bank
 
 
@@ -425,30 +407,6 @@ def _benchmark_comparison_phrase(
     return comparison.user_phrase
 
 
-def _runnable_next_tests_label(
-    options: list[dict[str, Any]],
-    *,
-    language: str,
-) -> str:
-    if not options:
-        return (
-            "Try next: change the date range, test the same supported setup on "
-            "a different same-class asset, or simplify the idea into a supported "
-            "RSI or SMA/EMA rule"
-        )
-    labels = ", ".join(str(option["label"]) for option in options[:-1])
-    if len(options) > 1:
-        labels = f"{labels}, or {options[-1]['label']}"
-    else:
-        labels = str(options[0]["label"])
-    return f"Try next: {labels}"
-
-
-def _draft_only_tests_label(*, language: str) -> str:
-    return (
-        "Draft-only or future support: DCA with separate starting principal, "
-        "investment ceilings, and unsupported custom rules."
-    )
 
 
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
@@ -822,7 +780,6 @@ def fallback_result_breakdown_message(
     language: str = "en",
 ) -> str:
     resolved_language = _response_language(language or context.get("language"))
-    fact_bank = result_breakdown_fact_bank(context, language=resolved_language)
     total_return = _result_breakdown_metric(
         context,
         "total_return_pct",
@@ -881,8 +838,6 @@ def fallback_result_breakdown_message(
     rule_summary = _localized_rule_summary(context, language=resolved_language)
     execution_summary = _localized_execution_note(context, language=resolved_language)
     assumption_text = "; ".join(line.rstrip(".") for line in assumption_lines)
-    next_check_text = _strip_try_next_label(fact_bank["runnable_next_tests"])
-
     period_sentence = f" over {date_range}" if date_range else ""
     setup_lines = [
         f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration."
@@ -907,18 +862,10 @@ def fallback_result_breakdown_message(
         f"**Risk and assumptions.** Max drawdown was {drawdown_text}, the largest "
         "peak-to-trough decline captured by the simulation. The run used "
         f"{assumption_text or 'the stored run settings'}.\n\n"
-        f"**Useful next check.** {_ensure_sentence(next_check_text)}\n\n"
         "Use this as historical simulation evidence, not a prediction or trading "
         "recommendation."
     )
 
-
-def _strip_try_next_label(value: str) -> str:
-    text = str(value or "").strip()
-    prefix = "try next:"
-    if text.casefold().startswith(prefix):
-        return text[len(prefix) :].strip()
-    return text
 
 
 def _localized_rule_summary(context: dict[str, Any], *, language: str) -> str | None:

@@ -259,8 +259,10 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
 };
 
 export type DiscoverySource = {

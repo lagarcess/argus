@@ -3382,13 +3382,8 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
     assert not answer.startswith("**")
-    assert result.patch["response_intent"] == {
-        "kind": "result_followup_chrome",
-        "facts": {
-            "focus": "next_experiment",
-            "heading_key": "next_experiment",
-        },
-    }
+    # Issue #249: failure prose never wears result chrome.
+    assert "response_intent" not in result.patch
     assert "could not safely answer that follow-up" in answer_lower
     assert result.patch["recovery"] == {
         "code": "latest_result_followup_unavailable",
@@ -3600,10 +3595,8 @@ def test_result_followup_timeout_uses_localized_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     assert not answer.startswith("**")
-    assert result.patch["response_intent"] == {
-        "kind": "result_followup_chrome",
-        "facts": {"focus": "general", "heading_key": "general"},
-    }
+    # Issue #249: failure prose never wears result chrome.
+    assert "response_intent" not in result.patch
     assert "could not safely answer that follow-up" in answer
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"

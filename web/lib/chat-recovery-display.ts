@@ -79,6 +79,19 @@ export function recoveryDisplayFromMetadata(
   );
 }
 
+/**
+ * A retryable recovery code marks transient infrastructure failure; the
+ * assistant message wearing it renders as visibly-a-failure, never as a
+ * normal answer (issue #249).
+ */
+export function retryableAssistantRecoveryCode(value: unknown): string | null {
+  const recovery = recordOrNull(value);
+  const code = stringOrNull(recovery?.code);
+  if (!code) return null;
+  return recovery?.retryable === true ? code : null;
+}
+
+
 export function recoveryDisplayFromRecoveryState(
   value: unknown,
 ): RecoveryDisplay | null {

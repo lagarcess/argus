@@ -678,6 +678,27 @@
         "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
       },
       "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
+    },
+    "next_experiments": {
+      "section": "Qué probar después",
+      "labels": {
+        "change_date_range": "Probar otro rango de fechas",
+        "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
+        "same_rule_peer_asset": "Probar la misma regla en un activo similar",
+        "supported_rsi_threshold": "Probar una regla RSI compatible",
+        "supported_ma_crossover": "Probar un cruce SMA/EMA compatible",
+        "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o SMA/EMA compatible",
+        "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
+        "adjust_signal_periods": "Probar otros períodos de la señal",
+        "adjust_contribution_cadence": "Probar otra cadencia de aportes",
+        "compare_buy_and_hold": "Comparar con comprar y mantener",
+        "recurring_monthly_buys": "Probar compras mensuales recurrentes"
+      },
+      "why": {
+        "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",
+        "beat_benchmark": "Superó la referencia por {{points}} puntos",
+        "deep_drawdown": "La peor caída fue {{drawdown}}%"
+      }
     }
   },
   "strategies": {

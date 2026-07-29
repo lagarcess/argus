@@ -149,6 +149,7 @@ export type BacktestJobResponse = {
   run: BacktestRun | null;
   result_readout?: string | null;
   result_readout_source?: string | null;
+  next_experiments?: Record<string, unknown> | null;
   result_readout_fallback_used?: boolean | null;
   result_readout_failure_mode?: string | null;
 };

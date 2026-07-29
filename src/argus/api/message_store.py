@@ -637,6 +637,7 @@ def _append_idempotent_memory_message(
 
 
 def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
+    retried_failure_ids = _retried_failed_assistant_ids(messages)
     artifact_request_ids_after: set[str] = set()
     same_segment_artifact_after = False
     reconciled_reversed: list[Message] = []
@@ -654,7 +655,10 @@ def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
                 if request_id is not None
                 else same_segment_artifact_after
             )
-            if should_supersede and _is_visible_runtime_failure(metadata):
+            if (should_supersede and _is_visible_runtime_failure(metadata)) or (
+                message.id in retried_failure_ids
+                and _is_retryable_recovery_failure(metadata)
+            ):
                 updated_metadata = _supersede_retry_last_turn(metadata)
                 updated_metadata = {
                     **updated_metadata,
@@ -838,6 +842,51 @@ def _metadata_has_authoritative_artifact(
             for reference in artifact_references
         )
     return False
+
+
+def _is_retryable_recovery_failure(metadata: dict[str, Any]) -> bool:
+    recovery = metadata.get("recovery")
+    return isinstance(recovery, dict) and recovery.get("retryable") is True
+
+
+def _retried_failed_assistant_ids(messages: list[Message]) -> set[str]:
+    """A completed retry retires the failure it replaced; metadata keeps the
+    record for telemetry while the transcript stops re-rendering it. The
+    retry re-sends the failed request verbatim, so the durable link is the
+    identical later user turn (an explicit retry action counts too) — but
+    retirement commits only once an assistant message follows the retry
+    turn; an interrupted retry must not strip the only Retry affordance."""
+    retired: set[str] = set()
+    open_failures: dict[str, str] = {}
+    pending_retirements: list[str] = []
+    last_user_content: str | None = None
+    for message in messages:
+        metadata = message.metadata if isinstance(message.metadata, dict) else {}
+        if message.role == "user":
+            content = " ".join((message.content or "").split()).casefold()
+            action = metadata.get("chat_action")
+            payload = action.get("payload") if isinstance(action, dict) else None
+            failed_id = (
+                payload.get("failed_assistant_id")
+                if isinstance(payload, dict)
+                and isinstance(action, dict)
+                and action.get("type") == "retry_last_turn"
+                else None
+            )
+            if isinstance(failed_id, str) and failed_id.strip():
+                pending_retirements.append(failed_id.strip())
+            if content and content in open_failures:
+                pending_retirements.append(open_failures.pop(content))
+            last_user_content = content or None
+            continue
+        if message.role == "assistant":
+            if pending_retirements:
+                retired.update(pending_retirements)
+                pending_retirements = []
+            if _is_retryable_recovery_failure(metadata) and last_user_content:
+                open_failures[last_user_content] = message.id
+            last_user_content = None
+    return retired
 
 
 def _is_visible_runtime_failure(metadata: dict[str, Any]) -> bool:

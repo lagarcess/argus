@@ -1524,6 +1524,11 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        next_experiments:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
       type: object
       required:
       - job

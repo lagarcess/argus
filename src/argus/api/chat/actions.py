@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from argus.agent_runtime.next_experiments import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
@@ -144,6 +145,10 @@ def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") ->
         if localized:
             return localized
     return payload.action.label or chat_request_message(payload, language=language)
+
+
+for _language, _labels in NEXT_EXPERIMENT_ACTION_LABELS.items():
+    _ACTION_LABELS[_language].update(_labels)
 
 
 def _localized_action_label(label_key: str, *, language: str) -> str | None:

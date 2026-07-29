@@ -537,6 +537,11 @@ def _result_readout_metadata(result_readout: "ResultReadout") -> dict[str, Any]:
     metadata = {
         "result_readout_source": result_readout.source,
         "result_readout_fallback_used": result_readout.fallback_used,
+        **(
+            {"next_experiments": result_readout.next_experiments}
+            if result_readout.next_experiments
+            else {}
+        ),
     }
     if result_readout.text:
         metadata["result_readout"] = result_readout.text

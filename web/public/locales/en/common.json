@@ -678,6 +678,27 @@
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
       },
       "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
+    },
+    "next_experiments": {
+      "section": "Try next",
+      "labels": {
+        "change_date_range": "Test a different date range",
+        "same_setup_peer_asset": "Test the same setup on a similar asset",
+        "same_rule_peer_asset": "Test the same rule on a similar asset",
+        "supported_rsi_threshold": "Try a supported RSI threshold rule",
+        "supported_ma_crossover": "Try a supported SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify into a supported RSI or SMA/EMA rule",
+        "adjust_indicator_thresholds": "Test different indicator thresholds",
+        "adjust_signal_periods": "Test different signal periods",
+        "adjust_contribution_cadence": "Test a different contribution cadence",
+        "compare_buy_and_hold": "Compare with buy and hold",
+        "recurring_monthly_buys": "Try monthly recurring buys"
+      },
+      "why": {
+        "lost_to_benchmark": "Lagged the benchmark by {{points}} points",
+        "beat_benchmark": "Beat the benchmark by {{points}} points",
+        "deep_drawdown": "Worst drop was {{drawdown}}%"
+      }
     }
   },
   "strategies": {
