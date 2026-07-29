@@ -928,6 +928,50 @@ def test_confirmation_card_discloses_reconciled_benchmark() -> None:
     }
 
 
+def test_confirmation_card_discloses_benchmark_without_price_coverage() -> None:
+    """Issue #301: a catalog-resolved benchmark with no bars in the window
+    rides the same pinned disclosure as an unsupported name."""
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+                    "capital_amount": 1000,
+                    "comparison_baseline": "SPY",
+                    "resolution_provenance": [
+                        {
+                            "field": "comparison_baseline",
+                            "raw_text": "NINTENDO",
+                            "source": "llm_extraction",
+                            "candidate_kind": "asset",
+                            "resolution_status": "unavailable_for_requested_run",
+                            "canonical_symbol": "NTDOY",
+                        }
+                    ],
+                },
+                "optional_parameters": {},
+                "launch_payload": {},
+            },
+        },
+        confirmation_id="conf-301",
+        conversation_id="conv-301",
+        language="en",
+    )
+
+    assert card is not None
+    assert card["benchmark_adjustment"] == {
+        "code": "comparison_target_unsupported",
+        "requested_target": "NINTENDO",
+        "effective_benchmark": "SPY",
+    }
+
+
 def test_confirmation_card_has_no_benchmark_note_without_a_cleared_leg() -> None:
     from argus.api.chat.confirmation import runtime_confirmation_card
 

@@ -211,7 +211,9 @@ def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
 
     normalized = df.loc[:, ["open", "high", "low", "close", "volume"]].dropna()
     if normalized.empty:
-        raise ValueError("market_data_unavailable")
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
     return normalized.astype(float)
 
 

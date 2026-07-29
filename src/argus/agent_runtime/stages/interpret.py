@@ -202,6 +202,9 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
 )
+from argus.agent_runtime.stages.interpret_internal.benchmark_coverage import (
+    strategy_with_benchmark_price_coverage as _strategy_with_benchmark_price_coverage,
+)
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
     default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
     strategy_with_default_benchmark as _strategy_with_default_benchmark,
@@ -762,6 +765,9 @@ async def _stage_result_from_interpretation(
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
         )
+        strategy, benchmark_coverage_reason_codes = (
+            _strategy_with_benchmark_price_coverage(strategy)
+        )
         strategy, default_benchmark_reason_codes = _strategy_with_default_benchmark(
             strategy
         )
@@ -769,6 +775,7 @@ async def _stage_result_from_interpretation(
             *benchmark_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
+            *benchmark_coverage_reason_codes,
             *default_benchmark_reason_codes,
         ]
     strategy, optional_parameter_values = (
@@ -3125,6 +3132,11 @@ def _strategy_with_validated_benchmark_symbol(
             return strategy, []
         updated = strategy.model_copy(deep=True)
         updated.comparison_baseline = canonical
+        # The stated name rides along so a later coverage clearing can
+        # disclose the user's words rather than the canonical symbol.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
         return updated, ["benchmark_symbol_provider_validated"]
     updated = strategy.model_copy(deep=True)
     updated.comparison_baseline = None
