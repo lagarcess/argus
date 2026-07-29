@@ -11,8 +11,10 @@ import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
 } from "@/lib/chat-backtest-jobs";
+import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
 import {
   hydrateTextMessageFromApi,
+  precedingUserMessageForRetryableRecovery,
   isHydratableResultCard,
   recordOrNull,
   retryRequestMessageForAssistant,
@@ -323,11 +325,13 @@ export function hydrateMessagesFromApi(
         };
       }
       const hydratedText = hydrateTextMessageFromApi(message, {
+        retryRequestMessage:
+          retryRequestMessageForAssistant(items, message) ??
+          precedingUserMessageForRetryableRecovery(items, message),
         contentPresentation:
           message.role !== "user" && isBreakdownActionMetadata(metadata)
             ? "result_breakdown"
             : undefined,
-        retryRequestMessage: retryRequestMessageForAssistant(items, message),
       });
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
@@ -336,15 +340,19 @@ export function hydrateMessagesFromApi(
       return hydratedText;
     });
 
+  // Retirement runs before the durable normalize: it needs to see the
+  // superseded failure to pop the retry's duplicate request bubble.
   const normalized = normalizeDurableRetryActionHistory(
-    applyConsumedResultActions(
-      applyHydratedBacktestJobTruth(
-        applyConfirmationActionEffects(
-          normalizeConfirmationHistory(messages),
-          confirmationActionEffects.effects,
+    retireSupersededFailures(
+      applyConsumedResultActions(
+        applyHydratedBacktestJobTruth(
+          applyConfirmationActionEffects(
+            normalizeConfirmationHistory(messages),
+            confirmationActionEffects.effects,
+          ),
         ),
+        consumedResultActions,
       ),
-      consumedResultActions,
     ),
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };

@@ -274,6 +274,24 @@ function retryActionsFromMetadata(
   ].filter((action): action is ChatActionOption => Boolean(action));
 }
 
+export function precedingUserMessageForRetryableRecovery(
+  messages: ApiMessage[],
+  assistant: ApiMessage,
+): ApiMessage | null {
+  if (assistant.role === "user") return null;
+  if (!retryableAssistantRecoveryCode((assistant.metadata ?? {}).recovery)) {
+    return null;
+  }
+  const index = messages.findIndex((message) => message.id === assistant.id);
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const candidate = messages[cursor];
+    if (candidate.role === "user") {
+      return (candidate.content ?? "").trim() ? candidate : null;
+    }
+  }
+  return null;
+}
+
 export function retryRequestMessageForAssistant(
   messages: ApiMessage[],
   assistant: ApiMessage,
