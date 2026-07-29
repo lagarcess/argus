@@ -76,6 +76,19 @@ feedback
 usage_counters
 ```
 
+Incubation-only, with no API/runtime/UI consumer:
+```text
+memory_settings
+memory_candidates
+memory_consent_actions
+memory_records
+memory_provenance
+memory_prompt_history
+memory_reconciliations
+memory_provider_projections
+memory_provider_cleanup
+```
+
 Optional or later:
 ```
 - assets
@@ -882,6 +895,80 @@ Cost model notes:
 - Cost rows never store raw prompts, transcripts, credentials, balances,
   holdings, full audio, or frontend-only payloads.
 
+## 12.1.2 Personalization Memory Persistence Incubation
+
+Personalization memory is an isolated, no-consumer persistence checkpoint. It
+does not change P2 recall, Omnisearch, canonical Ideas, EvidenceArtifacts,
+DecisionNotes, conversations, backtests, LangGraph state, or ordinary Guest
+chat. Product exposure, API wiring, runtime retrieval, Data Controls, providers,
+analytics, and hosted-database application remain closed.
+
+Memory is registered-account-only and off by absence. Supabase Auth and
+`guest_workspaces` are the database-canonical eligibility boundary:
+
+- `auth.users.is_anonymous` must be false;
+- no same-identity Guest workspace may be `active` or `claiming`;
+- browser/Data API roles (`PUBLIC`, `anon`, `authenticated`, and
+  `service_role`) have no direct table or sequence privileges;
+- a fixed-search-path private predicate is called by every memory-table insert
+  and update trigger;
+- owner identity is immutable; forged JWT claims cannot replace Auth/workspace
+  truth.
+
+All memory tables have RLS enabled and forced, with no client policies. The
+future injected backend Postgres adapter is the only intended access path and
+must still derive a registered owner from a verified request before entering
+the store.
+
+### Canonical and derivative tables
+
+- `memory_settings`: one enabled category row per owner. No rows means memory is
+  disabled. Categories are closed to personalization preference, workflow
+  preference, explicit decision note, and past-session anchor.
+- `memory_candidates`: bounded pending proposal content, trigger/context,
+  exact opt-in scope, and sensitivity-policy digest. A candidate is not a
+  durable memory.
+- `memory_consent_actions`: immutable direct-enable or
+  candidate-confirmation evidence with exact requested, granted, and effective
+  scopes plus schema/policy versions and idempotency identity. Direct enable
+  has no candidate and grants a non-empty scope. Confirmation requires an
+  existing same-owner candidate whose category appears in the requested scope.
+- `memory_records`: confirmed canonical label/value state. The owner, candidate,
+  consent action, category, and creation identity are immutable. An edit may
+  change only label/value with the next positive revision and a later
+  `updated_at`.
+- `memory_provenance`: immutable, ordered owner-scoped pointers attached to
+  exactly one candidate or record. Source kinds are closed to Argus-owned
+  EvidenceArtifact, DecisionNote, Idea, IdeaVersion, Conversation, and Message
+  identities.
+- `memory_prompt_history`: category-scoped proactive-prompt and decline
+  timestamps used for durable cooldown/suppression decisions.
+- `memory_reconciliations`: positive, ordered provider-projection work
+  generations. Unfinished work restricts record deletion so derivative cleanup
+  cannot disappear silently.
+- `memory_provider_projections`: the current derivative provider pointer and
+  positive generation for a canonical record.
+- `memory_provider_cleanup`: durable pending/resolved cleanup targets that
+  survive canonical record deletion. Provider pointers are never canonical
+  memory content.
+
+Composite foreign keys include `owner_id` at every live relationship so a
+candidate, consent action, record, provenance row, reconciliation, or provider
+projection cannot cross owners. Candidate-confirmation receipts survive
+candidate consumption; records link to the immutable receipt by owner,
+candidate identity, and receipt identity. Account deletion cascades the full
+owner state, including durable cleanup targets.
+
+### Guest conversion zero state
+
+Memory never enters the Guest transfer graph. A `BEFORE UPDATE` trigger on
+`guest_workspaces` counts all nine memory tables when an `active`/`claiming`
+workspace moves to `claimed`. Any row blocks both same-identity link and
+existing-account handoff, and the surrounding conversion transaction rolls
+back without transferring memory. A clean conversion carries zero memory,
+performs no retrospective extraction, and leaves personalization disabled until
+the registered user later completes a fresh scoped opt-in.
+
 ## 12.2 backtest_jobs
 
 Represents durable lifecycle state for a backtest execution job. Jobs bridge
@@ -1198,7 +1285,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
-  `usage_counters`, `guest_workspaces`.
+  `usage_counters`, `guest_workspaces`, `memory_settings`,
+  `memory_candidates`, `memory_consent_actions`, `memory_records`,
+  `memory_provenance`, `memory_prompt_history`, `memory_reconciliations`,
+  `memory_provider_projections`, `memory_provider_cleanup`.
 
 ### Guest ownership
 - Supabase anonymous identities use the `authenticated` role, so every guest
@@ -1206,6 +1296,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   authorization.
 - Expired guest identities cannot read or write product rows.
 - Another guest and a permanent user see zero guest workspace rows.
+- Guest memory state must be zero before either same-identity claim or
+  existing-account handoff. Memory rows are rejected rather than transferred.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
@@ -1238,6 +1330,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **usage_counters**: `(user_id, resource, period_start DESC)`
 - **usage_counters**: `(period_end)`
 - **usage_counters unique**: `(user_id, resource, period, period_start)`
+- **memory_candidates**: `(owner_id, created_at, id)`
+- **memory_consent_actions**: `(owner_id, recorded_at, id)`, unique confirmed
+  `(owner_id, candidate_id)`
+- **memory_records**: `(owner_id, created_at, id)`, covering
+  `(owner_id, consent_action_id, candidate_id)`, unique
+  `(owner_id, candidate_id)`
+- **memory_provenance**: unique ordered candidate and record indexes on
+  `(owner_id, parent_id, ordinal)`
+- **memory_reconciliations**: partial pending/running index on
+  `(owner_id, status, record_id, generation)`
+- **memory_provider_cleanup**: partial pending index on
+  `(owner_id, status, created_at, record_id)`
 ---
 
 # 21. Naming & Title Defaults
