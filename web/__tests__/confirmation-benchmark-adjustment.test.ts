@@ -5,18 +5,29 @@ import { join } from "node:path";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
 
 const root = join(import.meta.dir, "..");
+type TranslationCatalog = {
+  [key: string]: string | TranslationCatalog;
+};
+
 const en = JSON.parse(
   readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
-);
+) as TranslationCatalog;
 const es = JSON.parse(
   readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
-);
+) as TranslationCatalog;
 
-function tFrom(catalog: Record<string, any>) {
+function tFrom(catalog: TranslationCatalog) {
   return (key: string, options: { target: string; benchmark: string }) => {
     const template = key
       .split(".")
-      .reduce((node: any, part) => node?.[part], catalog) as string;
+      .reduce<string | TranslationCatalog | undefined>(
+        (node, part) =>
+          typeof node === "object" && node !== null ? node[part] : undefined,
+        catalog,
+      );
+    if (typeof template !== "string") {
+      return key;
+    }
     return template
       .replace("{{target}}", options.target)
       .replace("{{benchmark}}", options.benchmark);

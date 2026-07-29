@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TFunction } from "i18next";
 import {
   ChevronDown,
   Compass,
@@ -28,6 +27,12 @@ import {
   conversationDisplayTitle,
   renamePrefillTitle,
 } from "@/lib/chat-title-display";
+import {
+  RECENTS_INITIAL_GROUP_LIMIT,
+  getVisibleRecentChats,
+  groupRecentChats,
+  type RecentChatGroupKey,
+} from "@/lib/chat-recents";
 
 import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 
@@ -64,6 +69,10 @@ export type ChatSidebarProps = {
   historyNextCursor: string | null;
   /** Whether a history page load is in progress */
   isLoadingMoreHistory: boolean;
+  /** Whether the user has explicitly requested at least one older page */
+  hasRequestedOlderHistory: boolean;
+  /** Whether the latest explicit history-page request failed */
+  historyLoadMoreError: boolean;
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onNewChat: () => void;
@@ -90,61 +99,8 @@ export type ChatSidebarProps = {
   canManageConversation?: boolean;
   showProfileMenu?: boolean;
   isGuest?: boolean;
+  guestExpiresAt?: string | null;
 };
-
-// ─── Date grouping helpers ────────────────────────────────────────────────────
-
-type HistoryGroup = {
-  label: string;
-  items: HistoryItem[];
-  isPinned: boolean;
-};
-
-function groupByDate(
-  items: HistoryItem[],
-  t: TFunction,
-) {
-  const pinned: HistoryItem[] = [];
-  const today: HistoryItem[] = [];
-  const yesterday: HistoryItem[] = [];
-  const last7Days: HistoryItem[] = [];
-  const last30Days: HistoryItem[] = [];
-  const older: HistoryItem[] = [];
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterdayStart = todayStart - 86400000;
-  const last7Start = todayStart - 86400000 * 6;
-  const last30Start = todayStart - 86400000 * 29;
-
-  items.forEach((item) => {
-    if (item.pinned) {
-      pinned.push(item);
-      return;
-    }
-    const d = new Date(item.created_at).getTime();
-    if (d >= todayStart) {
-      today.push(item);
-    } else if (d >= yesterdayStart) {
-      yesterday.push(item);
-    } else if (d >= last7Start) {
-      last7Days.push(item);
-    } else if (d >= last30Start) {
-      last30Days.push(item);
-    } else {
-      older.push(item);
-    }
-  });
-
-  const groups: HistoryGroup[] = [];
-  if (pinned.length > 0) groups.push({ label: t("chat.history.pinned"), items: pinned, isPinned: true });
-  if (today.length > 0) groups.push({ label: t("chat.history.today"), items: today, isPinned: false });
-  if (yesterday.length > 0) groups.push({ label: t("chat.history.yesterday"), items: yesterday, isPinned: false });
-  if (last7Days.length > 0) groups.push({ label: t("chat.history.last_7_days"), items: last7Days, isPinned: false });
-  if (last30Days.length > 0) groups.push({ label: t("chat.history.last_30_days", "Last 30 Days"), items: last30Days, isPinned: false });
-  if (older.length > 0) groups.push({ label: t("chat.history.earlier"), items: older, isPinned: false });
-  return groups;
-}
 
 function historyConversationId(item: HistoryItem): string {
   return item.conversation_id ?? item.id;
@@ -164,6 +120,8 @@ export default function ChatSidebar({
   attentionConversationIds = EMPTY_ATTENTION_IDS,
   historyNextCursor,
   isLoadingMoreHistory,
+  hasRequestedOlderHistory,
+  historyLoadMoreError,
   onNewChat,
   onNavigate,
   onOpenItem,
@@ -181,6 +139,7 @@ export default function ChatSidebar({
   canManageConversation = true,
   showProfileMenu = true,
   isGuest = false,
+  guestExpiresAt = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -191,8 +150,10 @@ export default function ChatSidebar({
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isDeletingAllConversations, setIsDeletingAllConversations] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [expandedRecentGroups, setExpandedRecentGroups] = useState<
+    Set<RecentChatGroupKey>
+  >(() => new Set());
   const profileButtonRef = useRef<HTMLElement | null>(null);
-  const recentsScrollRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPointerInsideSidebarRef = useRef(false);
 
@@ -252,7 +213,22 @@ export default function ChatSidebar({
   );
 
   // ── Date-grouped history ────────────────────────────────────────────────
-  const groupedHistory = useMemo(() => groupByDate(chatItems, t), [chatItems, t]);
+  const groupedHistory = useMemo(
+    () => groupRecentChats(chatItems),
+    [chatItems],
+  );
+
+  const toggleRecentGroup = useCallback((groupKey: RecentChatGroupKey) => {
+    setExpandedRecentGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  }, []);
 
   // ── Chat actions ────────────────────────────────────────────────────────
   const handlePin = useCallback(async (id: string, pinned: boolean) => {
@@ -372,27 +348,6 @@ export default function ChatSidebar({
     [chatItems, pendingDeleteId],
   );
 
-  // ── Infinite scroll for recents ─────────────────────────────────────────
-  useEffect(() => {
-    const el = recentsScrollRef.current;
-    if (!el || !historyNextCursor || isLoadingMoreHistory) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onLoadMoreHistory();
-        }
-      },
-      { root: el, threshold: 0.1 },
-    );
-
-    // Observe the last item in the list as a sentinel
-    const sentinel = el.querySelector("[data-sentinel]");
-    if (sentinel) observer.observe(sentinel);
-
-    return () => observer.disconnect();
-  }, [historyNextCursor, isLoadingMoreHistory, onLoadMoreHistory, groupedHistory]);
-
   return (
     <aside
       onMouseEnter={handleMouseEnter}
@@ -488,7 +443,8 @@ export default function ChatSidebar({
           />
 
           {isRecentsExpanded && isOpen && (
-            <div ref={recentsScrollRef} className="max-h-[50vh] overflow-y-auto pb-2">
+            <div className="max-h-[50vh] overflow-y-auto pb-2">
+              <div className="flex flex-col gap-4 pb-2">
               {chatItems.length === 0 ? (
                 <div className="px-11 py-6">
                   <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
@@ -496,18 +452,39 @@ export default function ChatSidebar({
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4 pb-2">
-                  {groupedHistory.map((group) => (
-                    <div key={group.label} className="flex flex-col">
-                      <div className="px-11 py-2">
-                        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                          {group.isPinned && (
-                            <Pin className="h-3 w-3" />
-                          )}
-                          {group.label}
-                        </span>
-                      </div>
-                      {group.items.map((item) => {
+                <>
+                  {groupedHistory.map((group) => {
+                    const groupLabel = t(`chat.history.${group.key}`);
+                    const groupHeadingId = `recents-${group.key}-heading`;
+                    const groupItemsId = `recents-${group.key}-items`;
+                    const isGroupExpanded = expandedRecentGroups.has(group.key);
+                    const canToggleGroup =
+                      !group.isPinned &&
+                      group.items.length > RECENTS_INITIAL_GROUP_LIMIT;
+                    const visibleItems = getVisibleRecentChats(group, {
+                      expanded: isGroupExpanded,
+                      selectedConversationId: conversationId,
+                    });
+
+                    return (
+                      <section
+                        key={group.key}
+                        aria-labelledby={groupHeadingId}
+                        className="flex flex-col"
+                      >
+                        <div className="px-11 py-2">
+                          <h3
+                            id={groupHeadingId}
+                            className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40"
+                          >
+                            {group.isPinned && (
+                              <Pin className="h-3 w-3" />
+                            )}
+                            {groupLabel}
+                          </h3>
+                        </div>
+                        <div id={groupItemsId}>
+                        {visibleItems.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
                         const hasConversationAttention =
@@ -522,6 +499,7 @@ export default function ChatSidebar({
                           : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
+                        const expiresAt = item.expires_at ?? guestExpiresAt;
 
                         return (
                           <div
@@ -608,10 +586,10 @@ export default function ChatSidebar({
                                 }`}>
                                   {item.subtitle}
                                 </span>
-                                {isGuest && item.expires_at ? (
+                                {isGuest && expiresAt ? (
                                   <time
-                                    dateTime={item.expires_at}
-                                    title={item.expires_at}
+                                    dateTime={expiresAt}
+                                    title={expiresAt}
                                     className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
                                   >
                                     {t("guest.history.expires_at", {
@@ -622,7 +600,7 @@ export default function ChatSidebar({
                                           dateStyle: "medium",
                                           timeStyle: "short",
                                         },
-                                      ).format(new Date(item.expires_at)),
+                                      ).format(new Date(expiresAt)),
                                     })}
                                   </time>
                                 ) : null}
@@ -642,18 +620,71 @@ export default function ChatSidebar({
                           )}
                           </div>
                         );
-                      })}
-                    </div>
-                  ))}
-                  {/* Infinite scroll sentinel */}
+                        })}
+                        </div>
+                        {canToggleGroup && (
+                          <button
+                            type="button"
+                            aria-controls={groupItemsId}
+                            aria-expanded={isGroupExpanded}
+                            aria-label={t(
+                              isGroupExpanded
+                                ? "chat.history.show_less_in"
+                                : "chat.history.show_more_in",
+                              { group: groupLabel },
+                            )}
+                            onClick={() => toggleRecentGroup(group.key)}
+                            className="mx-11 flex min-h-11 items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40"
+                          >
+                            {t(
+                              isGroupExpanded
+                                ? "chat.history.show_less"
+                                : "chat.history.show_more",
+                            )}
+                          </button>
+                        )}
+                      </section>
+                    );
+                  })}
+                </>
+              )}
                   {historyNextCursor && (
-                    <div data-sentinel className="h-4">
-                      {isLoadingMoreHistory && (
-                        <p className="px-11 text-[12px] text-black/30 dark:text-white/30">
-                          {t("common.loading")}
-                        </p>
-                      )}
+                    <div className="px-11">
+                      <button
+                        type="button"
+                        disabled={isLoadingMoreHistory}
+                        aria-busy={isLoadingMoreHistory}
+                        onClick={onLoadMoreHistory}
+                        className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:text-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40 dark:disabled:text-white/30"
+                      >
+                        {t(
+                          isLoadingMoreHistory
+                            ? "chat.history.loading_older"
+                            : "chat.history.load_older",
+                        )}
+                      </button>
                     </div>
+                  )}
+                  {!historyNextCursor &&
+                    hasRequestedOlderHistory &&
+                    !historyLoadMoreError && (
+                      <div className="px-11">
+                        <button
+                          type="button"
+                          disabled
+                          className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/30 dark:text-white/30"
+                        >
+                          {t("chat.history.no_older")}
+                        </button>
+                      </div>
+                    )}
+                  {historyLoadMoreError && (
+                    <p
+                      role="alert"
+                      className="px-11 text-[12px] leading-relaxed text-[#b84e58] dark:text-[#e38d95]"
+                    >
+                      {t("chat.history.load_older_error")}
+                    </p>
                   )}
                   {isGuest ? (
                     <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
@@ -664,7 +695,6 @@ export default function ChatSidebar({
                     </p>
                   ) : null}
                 </div>
-              )}
             </div>
           )}
         </div>

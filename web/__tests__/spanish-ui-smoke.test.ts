@@ -199,6 +199,10 @@ describe("Spanish UI Smoke Harness", () => {
       path.join(webRoot, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
     );
+    const recentsSource = fs.readFileSync(
+      path.join(webRoot, "lib/chat-recents.ts"),
+      "utf-8",
+    );
 
     expect(sidebarPreferenceSource).toContain('aria-label={t("settings.sidebar.close")}');
     for (const key of [
@@ -211,7 +215,7 @@ describe("Spanish UI Smoke Harness", () => {
       expect(sidebarPreferenceSource).toContain(`t("${key}")`);
       expect(sidebarPreferenceSource).not.toContain(`t("${key}",`);
     }
-    expect(sidebarSource).toContain("isPinned: true");
+    expect(recentsSource).toContain('["pinned", true]');
     expect(sidebarSource).toContain("{group.isPinned &&");
     expect(sidebarSource).not.toContain('group.label === t("chat.history.pinned",');
   });

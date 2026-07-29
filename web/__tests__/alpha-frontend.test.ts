@@ -106,7 +106,8 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(flags).toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
-    expect(chat).toContain("collectionsEnabled");
+    expect(chat).not.toContain("collectionsEnabled");
+    expect(chat).toContain("useRecentConversations");
     expect(chat).not.toContain("trigger_create_collection");
     expect(chat).not.toContain("CollectionsView");
     expect(chat).not.toContain("CollectionPicker");
@@ -1937,7 +1938,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(logoutHandler).toContain("settings.logout_error");
     expect(logoutHandler).toContain('result.revocation === "failed"');
     expect(logoutHandler).toContain("resetToEmptyChatSurface()");
-    expect(logoutHandler).toContain("setHistoryItems([])");
+    expect(logoutHandler).toContain("clearHistory()");
     expect(logoutHandler.indexOf("resetToEmptyChatSurface()"))
       .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
   });
