@@ -1324,7 +1324,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert "**Setup.**" in breakdown
     assert "**How to read it.**" in breakdown
     assert "**Risk and assumptions.**" in breakdown
-    assert "**Useful next check.**" in breakdown
+    # Issue #249: Explain owns grounded comprehension only; the Try next
+    # surface owns next experiments.
+    assert "**Useful next check.**" not in breakdown
     assert "Try next:" not in breakdown
     assert "- Result:" not in breakdown
     assert "- Next step:" not in breakdown

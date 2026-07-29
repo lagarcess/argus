@@ -587,7 +587,7 @@ def test_spanish_result_breakdown_fallback_is_grounded_without_language_branch()
     assert "**Setup.**" in text
     assert "**How to read it.**" in text
     assert "**Risk and assumptions.**" in text
-    assert "**Useful next check.**" in text
+    assert "**Useful next check.**" not in text
     assert "Entry rule: buy at the start of the period" in text
     assert "Beat by 23.6 percentage points" in text
     assert "Prueba siguiente: Prueba siguiente" not in text
@@ -2357,7 +2357,7 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     assert "plain language" in system_prompt.lower()
     assert "curiosity-forward" in system_prompt.lower()
     assert "dense financial pdf" in system_prompt.lower()
-    assert "capability truth" in system_prompt.lower()
+    assert "try next surface owns those" in system_prompt.lower()
     assert "profitable trades" in system_prompt.lower()
     assert "alternative benchmarks" in system_prompt.lower()
     assert "stayed in cash" in system_prompt.lower()
@@ -2365,8 +2365,8 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     assert "context packet language" in system_prompt.lower()
     assert "market or macro backdrop" in system_prompt.lower()
     assert "fact_bank" in user_payload
-    assert "runnable_next_tests" in user_payload
-    assert "draft_only_or_future_tests" in user_payload
+    assert "runnable_next_tests" not in user_payload
+    assert "draft_only_or_future_tests" not in user_payload
 
 
 def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
@@ -2512,7 +2512,6 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
                 "benchmark_comparison",
                 "max_drawdown",
                 "assumptions",
-                "runnable_next_tests",
                 "caveat",
             ],
         }
@@ -2899,7 +2898,7 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "**Setup.**" in text
     assert "**How to read it.**" in text
     assert "**Risk and assumptions.**" in text
-    assert "**Useful next check.**" in text
+    assert "**Useful next check.**" not in text
     assert "Try next:" not in text
     assert "- Tested:" not in text
     assert "- Result:" not in text
