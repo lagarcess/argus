@@ -21,6 +21,8 @@ type ConversationRecord = ReturnType<typeof conversation>;
 
 type FixtureOptions = {
   firstPage?: ConversationRecord[];
+  firstPageDelayMs?: number;
+  firstPageDelayOnRequest?: number;
   language?: "en" | "es-419";
   secondPage?: ConversationRecord[];
   secondPageDelayMs?: number;
@@ -72,6 +74,7 @@ async function installRecentsFixture(
   page: Page,
   options: FixtureOptions = {},
 ): Promise<FixtureState> {
+  await page.clock.setFixedTime(new Date(TODAY));
   const language = options.language ?? "en";
   const firstPage =
     options.firstPage ??
@@ -143,9 +146,31 @@ async function installRecentsFixture(
     ) {
       state.conversationRequests.push(`${url.pathname}${url.search}`);
       const isSecondPage = url.searchParams.get("cursor") === CURSOR;
+      const firstPageAttempt = state.conversationRequests.filter(
+        (path) => !path.includes("cursor="),
+      ).length;
       const secondPageAttempt = state.conversationRequests.filter(
         (path) => path.includes(`cursor=${CURSOR}`),
       ).length;
+      const pageIds = (isSecondPage ? secondPage : firstPage).map(
+        (item) => item.id,
+      );
+      const items = pageIds
+        .map((id) => records.get(id))
+        .filter(
+          (item): item is ConversationRecord =>
+            Boolean(item && !item.archived && item.deleted_at === null),
+        )
+        .map((item) => ({ ...item }));
+      if (
+        !isSecondPage &&
+        firstPageAttempt === options.firstPageDelayOnRequest &&
+        options.firstPageDelayMs
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.firstPageDelayMs),
+        );
+      }
       if (isSecondPage && options.secondPageDelayMs) {
         await new Promise((resolve) =>
           setTimeout(resolve, options.secondPageDelayMs),
@@ -157,15 +182,6 @@ async function installRecentsFixture(
       ) {
         return json(route, { detail: "Controlled older-page failure" }, 503);
       }
-      const pageIds = (isSecondPage ? secondPage : firstPage).map(
-        (item) => item.id,
-      );
-      const items = pageIds
-        .map((id) => records.get(id))
-        .filter(
-          (item): item is ConversationRecord =>
-            Boolean(item && !item.archived && item.deleted_at === null),
-        );
       return json(route, {
         items,
         next_cursor:
@@ -566,6 +582,55 @@ test("a failed older-page request reports the error and remains retryable", asyn
     page.getByRole("button", { name: "No older chats" }),
   ).toBeDisabled();
   expect(fixture.conversationRequests).toHaveLength(3);
+  expect(fixture.historyRequests).toEqual([]);
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
+test("a completed mutation queues a fresh first-page request behind an in-flight refresh", async ({
+  page,
+}) => {
+  const fixture = await installRecentsFixture(page, {
+    firstPage: [conversation("today-1"), conversation("today-2")],
+    firstPageDelayMs: 1_000,
+    firstPageDelayOnRequest: 2,
+    secondPage: [],
+  });
+
+  await page.goto("/chat?conversation=today-1");
+  await openRecents(page);
+  const row = recentRow(page, "today-1");
+  await expect(row).toBeVisible();
+
+  await row.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Pin" }).click();
+  await expect
+    .poll(() => fixture.conversationRequests.length)
+    .toBe(2);
+
+  await row.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  const renameInput = row.locator("input");
+  await renameInput.fill("Renamed during refresh");
+  await renameInput.press("Enter");
+
+  await expect(
+    row.getByText("Renamed during refresh", { exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() => fixture.conversationRequests.length)
+    .toBe(3);
+  expect(fixture.mutations).toEqual([
+    {
+      method: "PATCH",
+      conversationId: "today-1",
+      body: { pinned: true },
+    },
+    {
+      method: "PATCH",
+      conversationId: "today-1",
+      body: { title: "Renamed during refresh" },
+    },
+  ]);
   expect(fixture.historyRequests).toEqual([]);
   expect(fixture.unexpectedRequests).toEqual([]);
 });

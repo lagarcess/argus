@@ -93,7 +93,13 @@ export function useRecentConversations({
   );
 
   const refreshHistory = useCallback(() => {
-    void loadHistoryPage(null, false).catch(() => undefined);
+    const runRefresh = () => loadHistoryPage(null, false);
+    const inFlightFirstPage =
+      pageRequestsRef.current.get("first-page");
+    const refreshRequest = inFlightFirstPage
+      ? inFlightFirstPage.then(runRefresh, runRefresh)
+      : runRefresh();
+    void refreshRequest.catch(() => undefined);
   }, [loadHistoryPage]);
 
   const clearHistory = useCallback(() => {
