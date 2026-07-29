@@ -24,6 +24,11 @@ EXISTING_ACCOUNT = MemorySubject(
     kind=MemoryAccountKind.REGISTERED,
 )
 ZERO = MemoryStateDigest()
+NEW_DURABLE_STATE_FIELDS = (
+    "consent_receipt_count",
+    "provenance_count",
+    "reconciliation_work_count",
+)
 
 
 def test_same_identity_link_starts_at_zero_and_requires_fresh_opt_in() -> None:
@@ -42,6 +47,36 @@ def test_same_identity_link_starts_at_zero_and_requires_fresh_opt_in() -> None:
         initialize_memory_enabled=False,
         preserve_destination_memory=False,
     )
+
+
+@pytest.mark.parametrize("field", NEW_DURABLE_STATE_FIELDS)
+def test_new_durable_guest_state_fails_handoff_closed(field: str) -> None:
+    """Catches receipts, provenance, or reconciliation work surviving handoff."""
+    source_state = MemoryStateDigest.model_validate({field: 1})
+
+    with pytest.raises(ValueError, match="Guest memory state must be zero"):
+        plan_guest_conversion(
+            mode=MemoryConversionMode.EXISTING_ACCOUNT_HANDOFF,
+            source_subject=GUEST,
+            source_state=source_state,
+            destination_subject=EXISTING_ACCOUNT,
+            destination_state=ZERO,
+        )
+
+
+@pytest.mark.parametrize("field", NEW_DURABLE_STATE_FIELDS)
+def test_new_same_identity_destination_state_fails_link_closed(field: str) -> None:
+    """Catches linked accounts inheriting unexplained durable memory state."""
+    destination_state = MemoryStateDigest.model_validate({field: 1})
+
+    with pytest.raises(ValueError, match="initial destination memory state must be zero"):
+        plan_guest_conversion(
+            mode=MemoryConversionMode.SAME_IDENTITY_LINK,
+            source_subject=GUEST,
+            source_state=ZERO,
+            destination_subject=LINKED_ACCOUNT,
+            destination_state=destination_state,
+        )
 
 
 @pytest.mark.parametrize(

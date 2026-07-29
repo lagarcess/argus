@@ -22,9 +22,12 @@ class MemoryStateDigest(BaseModel):
 
     settings_count: int = Field(default=0, ge=0, strict=True)
     candidate_count: int = Field(default=0, ge=0, strict=True)
+    consent_receipt_count: int = Field(default=0, ge=0, strict=True)
     record_count: int = Field(default=0, ge=0, strict=True)
+    provenance_count: int = Field(default=0, ge=0, strict=True)
     prompt_history_count: int = Field(default=0, ge=0, strict=True)
     pending_work_count: int = Field(default=0, ge=0, strict=True)
+    reconciliation_work_count: int = Field(default=0, ge=0, strict=True)
     provider_projection_count: int = Field(default=0, ge=0, strict=True)
 
     def is_zero(self) -> bool:
