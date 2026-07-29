@@ -1062,7 +1062,11 @@ def _ambiguous_fields_from_resolution(
             reason_code=f"{item.candidate_kind}_resolution_ambiguous",
         )
         for item in provenance
-        if item.source == "llm_extraction" and item.resolution_status == "ambiguous"
+        if item.source == "llm_extraction"
+        and item.resolution_status == "ambiguous"
+        # A reconciled benchmark leg proceeds with the default and is
+        # disclosed on the confirmation card; it never re-asks here.
+        and item.field != "comparison_baseline"
     ]
 
 
@@ -1150,6 +1154,9 @@ def _unsupported_constraints_from_resolution(
                 "unavailable_for_requested_run",
             }
             or item.source != "llm_extraction"
+            # A cleared benchmark leg proceeds with the default benchmark and
+            # is disclosed on the confirmation card, never blocked here.
+            or item.field == "comparison_baseline"
         ):
             continue
         category = (

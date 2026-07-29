@@ -261,7 +261,34 @@ def runtime_confirmation_card(
     period_adjustment = _period_adjustment_from_launch_payload(launch_payload)
     if period_adjustment is not None:
         card["period_adjustment"] = period_adjustment
+    benchmark_adjustment = _benchmark_adjustment_from_strategy(strategy)
+    if benchmark_adjustment is not None:
+        card["benchmark_adjustment"] = benchmark_adjustment
     return card
+
+
+def _benchmark_adjustment_from_strategy(
+    strategy: dict[str, Any],
+) -> dict[str, Any] | None:
+    """The user's named comparison target that could not be executed rides
+    the strategy's resolution provenance; the card owns disclosing the swap."""
+    effective = str(strategy.get("comparison_baseline") or "").strip()
+    if not effective:
+        return None
+    for item in strategy.get("resolution_provenance") or []:
+        if not isinstance(item, dict):
+            continue
+        if (
+            item.get("field") == "comparison_baseline"
+            and item.get("resolution_status") in {"unsupported", "ambiguous"}
+            and str(item.get("raw_text") or "").strip()
+        ):
+            return {
+                "code": "comparison_target_unsupported",
+                "requested_target": str(item["raw_text"]).strip(),
+                "effective_benchmark": effective,
+            }
+    return None
 
 
 def _period_adjustment_from_launch_payload(

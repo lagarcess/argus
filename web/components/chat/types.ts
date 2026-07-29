@@ -195,6 +195,12 @@ export type StrategyConfirmationPeriodAdjustment = {
   effective_date_range: StrategyConfirmationDateRange;
 };
 
+export type StrategyConfirmationBenchmarkAdjustment = {
+  code: string;
+  requested_target: string;
+  effective_benchmark: string;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -213,6 +219,7 @@ export type StrategyConfirmationPayload = {
   capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
+  benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];

@@ -2298,7 +2298,12 @@ def _strategy_with_requested_asset_answer_resolution(
     semantic_turn_act: str | None,
     pending_resolution_applied: bool,
 ) -> tuple[StrategySummary, bool]:
-    if pending_resolution_applied or semantic_turn_act == "new_idea":
+    if pending_resolution_applied or semantic_turn_act in {
+        "new_idea",
+        # A typed discovery ask names assets to ask ABOUT them, never to
+        # answer a pending asset slot.
+        "asset_discovery",
+    }:
         return strategy, False
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
@@ -3123,6 +3128,12 @@ def _strategy_with_validated_benchmark_symbol(
         return updated, ["benchmark_symbol_provider_validated"]
     updated = strategy.model_copy(deep=True)
     updated.comparison_baseline = None
+    if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
+        # The user named this leg and no clarification will run for it; keep
+        # its provenance so the constraint reports the true blocker.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
     return updated, ["invalid_benchmark_symbol_cleared"]
 
 

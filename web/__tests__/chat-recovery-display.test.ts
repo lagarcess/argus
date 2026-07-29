@@ -292,6 +292,42 @@ describe("chat recovery display", () => {
     expect(text).not.toContain("invalid_chronological_date_range");
   });
 
+  test("unsupported-symbol option localizes from the reason code (#296)", () => {
+    const display = recoveryDisplayFromMetadata({
+      response_intent: {
+        kind: "unsupported_recovery",
+        facts: {
+          strategy: {
+            asset_universe: ["AAPL"],
+          },
+          unsupported_constraints: [
+            {
+              category: "unsupported_symbol",
+              raw_value: "SAMSUNG",
+            },
+          ],
+        },
+        options: [
+          {
+            compatibility_label: "Use a supported stock or crypto symbol",
+            replacement_values: {},
+          },
+        ],
+      },
+    });
+
+    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+    // The true blocker is named and the advisory option renders in Spanish —
+    // no backend English inside a localized sentence.
+    expect(es).toContain("SAMSUNG");
+    expect(es).toContain("Usar un símbolo de acción o cripto compatible");
+    expect(es).not.toContain("Use a supported stock");
+
+    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+    expect(en).toContain("SAMSUNG");
+    expect(en).toContain("Use a supported stock or crypto symbol");
+  });
+
   test("uncategorized constraint asks for the rule, never names the raw text", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {

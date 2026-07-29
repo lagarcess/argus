@@ -418,3 +418,58 @@ def test_macd_is_searchable_and_executable() -> None:
     assert result.status == "resolved"
     assert result.provenance.canonical_symbol == "macd"
     assert result.provenance.validated_by == "indicator_registry"
+
+
+def test_llm_extraction_uppercased_company_name_resolves_by_leading_word(
+    monkeypatch,
+) -> None:
+    """Issue #296: "Apple" carried verbatim and uppercased must still ground."""
+    from argus.agent_runtime import resolution
+
+    def fail_resolve(_: str) -> AssetStub:
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(resolution, "resolve_market_asset", fail_resolve)
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: [
+            AssetStub("AAPL", "equity", "Apple Inc. Common Stock", "AAPL")
+        ][:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "APPLE",
+        field="asset_universe[0]",
+        source="llm_extraction",
+    )
+
+    assert result.status == "resolved"
+    assert result.asset is not None
+    assert result.asset.canonical_symbol == "AAPL"
+
+
+def test_llm_extraction_hallucinated_ticker_stays_unsupported(monkeypatch) -> None:
+    """A made-up symbol matches no leading catalog word and never fuzzy-grounds."""
+    from argus.agent_runtime import resolution
+
+    def fail_resolve(_: str) -> AssetStub:
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(resolution, "resolve_market_asset", fail_resolve)
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: [
+            AssetStub("FAKA", "equity", "Fabrinet Advanced Km Holdings", "FAKA")
+        ][:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "FAKEX",
+        field="asset_universe[0]",
+        source="llm_extraction",
+    )
+
+    assert result.status == "unsupported"
+    assert result.candidates == ()

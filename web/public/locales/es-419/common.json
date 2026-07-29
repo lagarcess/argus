@@ -335,7 +335,8 @@
       "rsi_threshold": "Usar una regla RSI compatible",
       "buy_and_hold": "Comparar con comprar y mantener",
       "moving_average_crossover": "Usar un cruce de medias móviles compatible",
-      "historical_period": "Probarlo en un período histórico"
+      "historical_period": "Probarlo en un período histórico",
+      "supported_symbol": "Usar un símbolo de acción o cripto compatible"
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
@@ -675,7 +676,8 @@
         "cancel": "Cancelar",
         "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
         "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
-      }
+      },
+      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     }
   },
   "strategies": {
