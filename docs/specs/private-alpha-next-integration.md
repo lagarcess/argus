@@ -6,7 +6,7 @@ Last reconciled: 2026-07-28
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #299 at `f368febb`. Later commits may reconcile
+Latest product checkpoint: PR #303 at `da9f8500`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -29,7 +29,11 @@ tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
 after stale or failed actions without changing public artifact contracts.
 Later slices culminated in PR #298's visitor/day Guest settlement, honest
 discovery progress, and per-candidate source ownership, followed by PR #299's
-instant and race-safe browser-session conversation switching.
+instant and race-safe browser-session conversation switching. PR #300 then
+completed comparison name grounding, unsupported-target disclosure, and
+discovery-act preservation through pending confirmations. PR #302 completed
+bounded progressive Recents disclosure, and PR #303 reconciled catalog-valid
+benchmarks with explicit zero price bars before confirmation.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -307,6 +311,21 @@ Do not reopen these as debt unless a new bug is reproduced:
   scroll restoration, auth clearing, EN/es-419, keyboard, and reduced-motion
   behavior passed exact-head browser QA. It landed as `f368febb`. Profiling did
   not justify prefetch or virtualization, so neither was added.
+- Comparison grounding and discovery-act continuity are complete at PR #300 /
+  issues #292 and #296. Company names reach the provider-backed resolver,
+  unsupported named comparison targets reconcile to the class default with a
+  localized pinned disclosure, and a pending confirmation cannot capture a
+  typed discovery ask. It landed as `c21f842f`.
+- Progressive Recents disclosure is complete at PR #302 / issue #245. Recents
+  uses the bounded chat-only conversation endpoint, caps each loaded unpinned
+  time group at five until explicitly expanded, and loads older pages only
+  after an accessible single-flight action. It landed as `928dcdbb` while
+  preserving PR #299 switching, race, selection, attention, and reload truth.
+- Benchmark price-coverage reconciliation is complete at PR #303 / issue #301.
+  An explicit provider zero-bars response for a catalog-valid benchmark
+  reconciles to the class default at card time with the existing localized
+  disclosure; transport failures remain owned by the run path. It landed as
+  `da9f8500`.
 - Fact-preserving recovery is complete at PR #288 / issue #272: stale or
   failed actions restore the latest usable canonical confirmation or result
   anchor, preserve assets, capital, requested/effective dates, daily timeframe,
@@ -376,11 +395,13 @@ Codex should own or closely supervise this:
 
 1. **Finish the remaining interim product outcome and activation gates**
    - Grounded discovery now includes the PR #295 continuity pass at
-     `8f17a45e` and PR #298's second pass at `ba0aa2f6`. Do not rebuild the
-     cheap verified rows, Search-exception policy, live progress, citation
-     ownership, or visitor/day Guest settlement. Keep #244 open for its
-     accepted comparison/exposure follow-ups and the hosted migrations, Render
-     configuration, and exact-SHA canary.
+     `8f17a45e`, PR #298's second pass at `ba0aa2f6`, PR #300's comparison
+     grounding and discovery-act continuity at `c21f842f`, and PR #303's
+     benchmark coverage reconciliation at `da9f8500`. Do not rebuild the cheap
+     verified rows, Search-exception policy, live progress, citation ownership,
+     visitor/day Guest settlement, or comparison corridor. Keep #244 open only
+     for the accepted exposure-vehicle product decision and the hosted
+     migrations, Render configuration, and exact-SHA canary.
    - Full Omnisearch may now build against the accepted grounded-discovery
      contract. Its owner must reconcile onto this checkpoint and must not
      invent discovery truth or implicitly activate Search.
@@ -393,10 +414,12 @@ Codex should own or closely supervise this:
    - #271 landed through PR #280 at `d16f7496` and is closed. #272 landed
      through PR #288 at `9f3453a3` and is closed; do not open another modeled
      cost or canonical recovery lane without a new reproduction.
-   - #273 is closed at `2d5a2b52`. Guest and chat next-move presentation have
-     released the shared shell owner, so new #249 work must start from the
-     current remote integration head. Preserve PR #281's stacked rows, source panel, and
-     in-flight lock plus PR #287's resolver-owned selection identity;
+   - #273 is closed at `2d5a2b52`. Guest, chat next-move presentation,
+     conversation switching, and bounded Recents have released the shared shell
+     owner, so new #249 work must start from the current remote integration
+     head. Preserve PR #281's stacked rows, source panel, and in-flight lock,
+     PR #287's resolver-owned selection identity, PR #299's switching cache,
+     and PR #302's Recents disclosure;
      #249 owns the remaining Quick take, Explain, Try next, and recovery roles.
    - The exact handoff table lives in
      `docs/specs/private-alpha-interim-roadmap.md`.

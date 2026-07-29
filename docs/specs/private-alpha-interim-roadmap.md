@@ -6,7 +6,7 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-28
 
-Latest integrated product checkpoint: PR #299 at `f368febb`. Later commits may
+Latest integrated product checkpoint: PR #303 at `da9f8500`. Later commits may
 reconcile roadmap and issue state without changing product behavior. New work
 must branch from the current remote integration head rather than pinning this
 product SHA.
@@ -60,6 +60,17 @@ surface, retired requests cannot overwrite the newest destination, and
 destination-owned Retry, scroll, auth clearing, localization, and accessibility
 survive the exact-head browser matrix. No durable browser storage, prefetch,
 virtualization, backend contract, or provider path was added.
+PR #300 then landed comparison grounding and discovery-act continuity as
+`c21f842f`: company names reach provider-backed resolution, unsupported named
+comparison targets reconcile to the class default with a localized pinned
+disclosure, and a discovery ask cannot be captured by a pending confirmation.
+Issues #292 and #296 are closed. PR #302 completed issue #245 as `928dcdbb`:
+Recents now uses bounded chat-only pages, caps each loaded unpinned time group
+at five until explicitly expanded, and replaces silent scroll pagination with
+an accessible single-flight Load older action while preserving PR #299's
+switching and race guarantees. PR #303 then closed #301 as `da9f8500`: a
+catalog-valid benchmark with an explicit zero-bars response reconciles at card
+time to the class default instead of failing later with misleading recovery.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
@@ -133,7 +144,7 @@ deterministic test result by itself.
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
-| 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). #244 remains open only for the accepted comparison/exposure follow-ups plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
+| 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). PR #300 then completed comparison phrasing, named-target grounding, unsupported-target disclosure, and pending-confirmation discovery continuity (`c21f842f`); PR #303 completed catalog-valid benchmark coverage reconciliation (`da9f8500`). #244 remains open only for the accepted exposure-vehicle product decision plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
 Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
@@ -235,8 +246,8 @@ This is the current dispatch gate, not another speculative backlog:
 | --- | --- | --- |
 | Runtime reliability | #269 correction landed inside Guest PR #279 at `53e812e9`; #269 is closed | No runtime lane remains. |
 | Protected interpreter/edit spine | #270–#272 are closed; #271 landed through PR #280 at `d16f7496` | No additional spine implementation lane is queued. Repeat representative journeys only at promotion qualification. |
-| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9` and released the shared shell owner | Start #249 from the current remote integration head. |
-| Grounded discovery | PR #276 landed as `c212107a`; presentation PR #281 as `8fde4ac1`; selection identity/corroboration PR #287 as `ea2b3f35`; Guest allowance PR #291 as `f1e65dde`; cheap verified rows/Search-exception PR #295 as `8f17a45e`; and the live-progress/Guest-identity second pass PR #298 as `ba0aa2f6`. Integration defaults on and #244 remains open. | Do not duplicate the landed implementation. Product implementation is complete for this bounded arc. Configure the hosted migrations/Render environment and prove the exact deployed SHA/canary; keep the comparison/exposure product follow-ups separately bounded. |
+| Artifact lifecycle and presentation | Guest PR #279 landed at `53e812e9`; PR #299 stabilized conversation switching; PR #302 completed bounded Recents disclosure at `928dcdbb` and closed #245 | Start #249 from the current remote integration head and preserve the landed switching/Recents contracts. |
+| Grounded discovery | PR #276 landed as `c212107a`; presentation PR #281 as `8fde4ac1`; selection identity/corroboration PR #287 as `ea2b3f35`; Guest allowance PR #291 as `f1e65dde`; cheap verified rows/Search-exception PR #295 as `8f17a45e`; live-progress/Guest-identity PR #298 as `ba0aa2f6`; comparison grounding/discovery continuity PR #300 as `c21f842f`; and benchmark price-coverage reconciliation PR #303 as `da9f8500`. Integration defaults on and #244 remains open. | Do not duplicate the landed implementation. Comparison work is complete. Keep only the exposure-vehicle product decision separately bounded; configure the hosted migrations/Render environment and prove the exact deployed SHA/canary. |
 | Chat next-move presentation | PR #281 landed as `8fde4ac1` (stacked rows, sources panel, shared in-flight lock); PR #287 landed as `ea2b3f35` (Slice D: discovery selection carries the resolver's identity, plus a resolution-corroboration fix); PR #295 delivered the provider-offload prerequisite for Slice B; PR #298 landed Slice B's truthful Search/verification progress and per-row citation ownership. | Slices B and D are closed. Do not reopen this presentation arc without a new reproduced defect. |
 | Discovery candidate resolution | PR #287 corrected a ticker-collision defect: a resolved candidate must now corroborate the entity the sources named, so a gold miner is no longer offered for a Tron question | Known limitation accepted and recorded in `docs/superpowers/specs/2026-07-25-grounded-discovery-search-v1-design.md` §5.1: crypto-exposure ETFs are dropped alongside true collisions because the two are structurally indistinguishable to a token check. Surfacing exposure vehicles deliberately is real product value and needs its own design. Owned by #244. |
 | Guest grounded discovery | PR #291 landed the visitor/global discovery allowance at `f1e65dde`; PR #295 landed the cheap verified default and Search exception at `8f17a45e`; PR #298 landed visitor/day message and simulation settlement at `ba0aa2f6`. | Identity/lifetime implementation is complete. The additive `20260727230000_add_visitor_usage_counters.sql` and `20260728120000_visitor_keyed_guest_settlement.sql` migrations plus `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING` configuration remain promotion gates. #244 stays open. |
@@ -385,7 +396,7 @@ implementation queue.
 
 | Outcome | Product proof still required |
 | --- | --- |
-| Grounded discovery and suggestions | The default-on baseline, presentation, selection identity, Guest allowances, cheap verified rows/Search exception, honest live progress, and per-row citations are merged through PR #298. Apply the hosted migrations/configuration and pass the exact-SHA canary; keep #244 open for those promotion gates and the separately accepted comparison/exposure follow-ups. |
+| Grounded discovery and suggestions | The default-on baseline, presentation, selection identity, Guest allowances, cheap verified rows/Search exception, honest live progress, per-row citations, comparison grounding, and benchmark coverage reconciliation are merged through PR #303. Keep #244 open only for the exposure-vehicle product decision plus hosted migrations/configuration and the exact-SHA canary. |
 | Full Omnisearch | Owner-scoped conversations, results, decisions, and evidence are retrievable with truthful previews and useful navigation. |
 
 Do not select the next slice from the archived issue dependency graph. Select

@@ -954,9 +954,7 @@ default-on **grounded discovery and suggestions** baseline at candidate
 adds one typed discovery route, bounded source-backed Search,
 provider-resolved candidates for equity, crypto, and currency-pair assets,
 persisted EN/ES rendering, honest kill-switch recovery, and operational cost
-evidence. Issue #244 remains open: one comparison phrasing missed the typed
-route in the sanctioned live eval, and Render configuration plus exact-SHA
-canary evidence are still required before tester exposure. PR #281 then landed
+evidence. PR #281 then landed
 the frontend presentation slice as `8fde4ac1`: conversational next moves and
 discovery candidates render as stacked rows under their owning message,
 candidate reasons remain visible, and the persisted discovery evidence opens
@@ -973,10 +971,14 @@ work is offloaded, and J1/J2 continuity passed live in English and Spanish.
 PR #298 landed as `ba0aa2f6` and completed the second pass: Search and
 verification progress are truthful runtime events, each candidate owns its
 source citation, and Guest message/simulation allowances survive session
-renewal through visitor/day settlement. Promotion remains a separate gate.
-Issue #244 stays open for the accepted comparison/exposure follow-ups plus
-hosted migration, configuration, and exact-SHA canary proof. Full Omnisearch
-is the remaining unbuilt founder outcome.
+renewal through visitor/day settlement. PR #300 landed as `c21f842f` and
+completed comparison phrasing, named-target grounding, unsupported-target
+disclosure, and discovery-act preservation through pending confirmations.
+PR #303 landed as `da9f8500` and completed catalog-valid benchmark
+price-coverage reconciliation. Promotion remains a separate gate. Issue #244
+stays open only for the exposure-vehicle product decision plus hosted
+migration, configuration, and exact-SHA canary proof. Full Omnisearch is the
+remaining unbuilt founder outcome.
 
 Integration-verification checkpoint (2026-07-27): PR #282 landed as
 `059f8e82` and made the ordinary backend test environment provider-free by
@@ -992,8 +994,22 @@ and class now survive initial submission and durable Retry as a normal mention;
 interpretation, guardrails, and confirmation remain mandatory. The same PR
 added candidate/entity corroboration to prevent unrelated cross-class ticker
 collisions. It intentionally filters crypto-exposure vehicles along with true
-collisions; #244 remains open for that product decision, comparison-phrase
-reliability, hosted configuration, and exact-SHA canary evidence.
+collisions; #244 remains open for that product decision, hosted configuration,
+and exact-SHA canary evidence. Comparison-phrase reliability is complete
+through PR #300.
+
+Conversation/discovery checkpoint (2026-07-28): PR #300 landed as `c21f842f`
+and closed issues #292 and #296. Comparison company names now reach
+provider-backed resolution, unsupported named targets reconcile with a
+localized pinned disclosure, and pending confirmations cannot capture typed
+discovery asks. PR #302 landed as `928dcdbb` and closed #245: Recents now
+discloses loaded chats in bounded five-row time groups and fetches older pages
+only after an explicit accessible action while preserving PR #299 switching
+truth. PR #303 landed as `da9f8500` and closed #301: catalog-valid benchmarks
+with an explicit zero-bars response reconcile at card time instead of failing
+later with misleading recovery. #244 no longer owns comparison phrasing; it
+remains open for the exposure-vehicle product decision and release-owned
+hosted migration/configuration/canary gates.
 
 Post-merge stress-audit qualification (2026-07-25): the bounded closure evidence
 above remains valid, but a longer same-conversation exploration at integration
@@ -1017,8 +1033,9 @@ duplicate compute. No further protected-spine implementation lane is queued;
 qualification. #249 may start from the current remote integration head because
 the overlapping Guest,
 chat-next-move, and recovery-state owners have landed; it must preserve PR
-#281's stacked rows, source panel, and shared in-flight lock while changing only
-Quick take, Explain, Try next, and recovery presentation ownership. See
+#281's stacked rows, source panel, and shared in-flight lock, PR #299's
+conversation-switching cache, and PR #302's Recents disclosure while changing
+only Quick take, Explain, Try next, and recovery presentation ownership. See
 `docs/reports/2026-07-25-always-progresses-post-merge-stress-audit.md`.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
