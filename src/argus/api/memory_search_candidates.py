@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Any, Iterable, Mapping
@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import User
+from argus.api.search_utils import score_search_item, search_rank_key
 from argus.domain.conversation_recall import (
     conversation_has_untaken_suggestion,
     valid_next_experiments_metadata,
@@ -55,6 +56,17 @@ class _Candidate:
 
 
 @dataclass(frozen=True)
+class _ConversationQueryMatch:
+    conversation_id: str
+    candidate: _Candidate
+    layer: str
+    layer_rank: int
+    score: int
+    symbol_exact_match: bool
+    match_count: int = 1
+
+
+@dataclass(frozen=True)
 class _MemorySearchIndex:
     revision: int
     conversations: dict[str, dict[str, Any]]
@@ -72,6 +84,8 @@ class _MemorySearchIndex:
     asset_symbols: tuple[str, ...]
     asset_run_ids: dict[str, frozenset[str]]
     decision_states_by_conversation: dict[str, frozenset[str]]
+    conversation_activity_by_id: dict[str, datetime]
+    conversation_symbols_by_id: dict[str, frozenset[str]]
 
 
 _INDEX_CACHE: dict[tuple[int, str], _MemorySearchIndex] = {}
@@ -115,25 +129,23 @@ def bounded_memory_search_snapshot(
 
     selected_conversation_ids: set[str] = set()
     selected_message_ids: set[str] = set()
+    selected_query_matches: dict[str, _ConversationQueryMatch] = {}
     if include_conversation_rows:
         if query:
-            for layer in _SOURCE_LAYERS:
-                candidates = _query_candidates(
-                    index,
-                    layer=layer,
-                    query=query,
-                    candidate_limit=candidate_limit,
-                    eligible_conversation_ids=eligible_conversation_ids,
-                    cursor_updated_at=cursor_updated_at,
-                    cursor_id=cursor_id,
-                )
-                selected_conversation_ids.update(
-                    candidate.conversation_id for candidate in candidates
-                )
-                if layer == "message":
-                    selected_message_ids.update(
-                        candidate.source_id for candidate in candidates
-                    )
+            selected_query_matches = _query_conversation_window(
+                index,
+                query=query,
+                candidate_limit=candidate_limit,
+                eligible_conversation_ids=eligible_conversation_ids,
+                cursor_updated_at=cursor_updated_at,
+                cursor_id=cursor_id,
+            )
+            selected_conversation_ids.update(selected_query_matches)
+            selected_message_ids.update(
+                match.candidate.source_id
+                for match in selected_query_matches.values()
+                if match.layer == "message"
+            )
         else:
             selected_conversation_ids.update(
                 _recent_conversation_window(
@@ -173,7 +185,10 @@ def bounded_memory_search_snapshot(
 
     return MemorySearchSnapshot(
         conversations=[
-            index.conversations[conversation_id]
+            _conversation_with_query_match(
+                index.conversations[conversation_id],
+                selected_query_matches.get(conversation_id),
+            )
             for conversation_id in selected_conversation_ids
             if conversation_id in index.conversations
         ],
@@ -322,6 +337,15 @@ def _build_memory_search_index(
     decisions = [row.model_dump() for row in decision_refs]
     evidence_by_id = {str(row["id"]): row for row in evidence}
     runs_by_conversation = _group_rows(runs, field="conversation_id")
+    ideas_by_conversation = _group_rows(ideas, field="source_conversation_id")
+    evidence_by_conversation = _group_rows(
+        evidence,
+        field="source_conversation_id",
+    )
+    decisions_by_conversation = _group_rows(
+        decisions,
+        field="source_conversation_id",
+    )
     messages_by_conversation = _group_rows(messages, field="conversation_id")
     for conversation in conversations:
         conversation_id = str(conversation["id"])
@@ -445,6 +469,30 @@ def _build_memory_search_index(
             decision_states_by_conversation[str(conversation_id)].add(
                 str(decision_state)
             )
+    conversation_activity_by_id = {
+        conversation_id: max(
+            _mapping_activity(row)
+            for row in (
+                conversation,
+                *runs_by_conversation.get(conversation_id, []),
+                *ideas_by_conversation.get(conversation_id, []),
+                *evidence_by_conversation.get(conversation_id, []),
+                *decisions_by_conversation.get(conversation_id, []),
+            )
+        )
+        for conversation_id, conversation in (
+            (str(row["id"]), row) for row in conversations
+        )
+    }
+    conversation_symbols_by_id = {
+        conversation_id: frozenset(
+            symbol.lower()
+            for run in runs_by_conversation.get(conversation_id, [])
+            if run.get("status", "completed") == "completed"
+            for symbol in _run_symbols(run)
+        )
+        for conversation_id in conversation_activity_by_id
+    }
 
     return _MemorySearchIndex(
         revision=revision,
@@ -458,15 +506,9 @@ def _build_memory_search_index(
             )
         ),
         runs_by_conversation=runs_by_conversation,
-        ideas_by_conversation=_group_rows(ideas, field="source_conversation_id"),
-        evidence_by_conversation=_group_rows(
-            evidence,
-            field="source_conversation_id",
-        ),
-        decisions_by_conversation=_group_rows(
-            decisions,
-            field="source_conversation_id",
-        ),
+        ideas_by_conversation=ideas_by_conversation,
+        evidence_by_conversation=evidence_by_conversation,
+        decisions_by_conversation=decisions_by_conversation,
         messages_by_id={str(row["id"]): row for row in messages},
         candidates_by_layer=sorted_candidates,
         postings_by_layer=postings,
@@ -482,6 +524,8 @@ def _build_memory_search_index(
             conversation_id: frozenset(states)
             for conversation_id, states in decision_states_by_conversation.items()
         },
+        conversation_activity_by_id=conversation_activity_by_id,
+        conversation_symbols_by_id=conversation_symbols_by_id,
     )
 
 
@@ -515,44 +559,142 @@ def _matching_candidate_indexes(
     return candidate_indexes
 
 
-def _query_candidates(
+def _query_conversation_window(
     index: _MemorySearchIndex,
     *,
-    layer: str,
     query: str,
     candidate_limit: int,
     eligible_conversation_ids: set[str],
     cursor_updated_at: datetime | None,
     cursor_id: str | None,
-) -> list[_Candidate]:
-    candidate_indexes = _matching_candidate_indexes(
+) -> dict[str, _ConversationQueryMatch]:
+    matches = _conversation_query_matches(
         index,
-        layer=layer,
         query=query,
+        eligible_conversation_ids=eligible_conversation_ids,
     )
-    if not candidate_indexes:
-        return []
-    rows = index.candidates_by_layer[layer]
-    matching = [
-        rows[candidate_index]
-        for candidate_index in sorted(candidate_indexes)
-        if rows[candidate_index].conversation_id in eligible_conversation_ids
-        if search_text_matches_query(query=query, text=rows[candidate_index].text)
-    ]
-    if cursor_updated_at is None or cursor_id is None:
-        return matching[:candidate_limit]
-    cursor_window = [
-        candidate
-        for candidate in matching
-        if candidate.activity <= cursor_updated_at
-        or candidate.conversation_id == cursor_id
-    ][:candidate_limit]
-    return list(
-        {
-            (candidate.conversation_id, candidate.source_id): candidate
-            for candidate in (*matching[:candidate_limit], *cursor_window)
-        }.values()
+    ordered = sorted(
+        matches.values(),
+        key=lambda match: _conversation_query_rank_key(index, match),
+        reverse=True,
     )
+    selected = ordered[:candidate_limit]
+    if cursor_updated_at is not None and cursor_id is not None:
+        cursor_match = matches.get(cursor_id)
+        if (
+            cursor_match is not None
+            and index.conversation_activity_by_id[cursor_id] == cursor_updated_at
+        ):
+            cursor_key = _conversation_query_rank_key(index, cursor_match)
+            cursor_window = [
+                match
+                for match in ordered
+                if _conversation_query_rank_key(index, match) <= cursor_key
+            ][:candidate_limit]
+            selected.extend(cursor_window)
+    return {match.conversation_id: match for match in selected}
+
+
+def _conversation_query_matches(
+    index: _MemorySearchIndex,
+    *,
+    query: str,
+    eligible_conversation_ids: set[str],
+) -> dict[str, _ConversationQueryMatch]:
+    matches: dict[str, _ConversationQueryMatch] = {}
+    layer_match_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
+    for layer_rank, layer in enumerate(_SOURCE_LAYERS, start=1):
+        rows = index.candidates_by_layer[layer]
+        for candidate_index in _matching_candidate_indexes(
+            index,
+            layer=layer,
+            query=query,
+        ):
+            candidate = rows[candidate_index]
+            conversation_id = candidate.conversation_id
+            if (
+                conversation_id not in eligible_conversation_ids
+                or not search_text_matches_query(query=query, text=candidate.text)
+            ):
+                continue
+            layer_match_counts[(conversation_id, layer)] += 1
+            conversation = index.conversations[conversation_id]
+            symbol_exact_match = (
+                query in index.conversation_symbols_by_id[conversation_id]
+            )
+            proposed = _ConversationQueryMatch(
+                conversation_id=conversation_id,
+                candidate=candidate,
+                layer=layer,
+                layer_rank=layer_rank,
+                score=score_search_item(
+                    query=query,
+                    title=str(
+                        conversation.get("title") or "Untitled conversation"
+                    ),
+                    matched_text=candidate.text,
+                    pinned=bool(conversation.get("pinned")),
+                    symbol_exact_match=symbol_exact_match,
+                    match_layer_rank=layer_rank,
+                ),
+                symbol_exact_match=symbol_exact_match,
+            )
+            current = matches.get(conversation_id)
+            if current is None or _winning_match_key(proposed) > _winning_match_key(
+                current
+            ):
+                matches[conversation_id] = proposed
+    return {
+        conversation_id: replace(
+            match,
+            match_count=layer_match_counts[(conversation_id, match.layer)],
+        )
+        for conversation_id, match in matches.items()
+    }
+
+
+def _winning_match_key(
+    match: _ConversationQueryMatch,
+) -> tuple[int, int, datetime, str]:
+    return (
+        match.score,
+        match.layer_rank,
+        match.candidate.activity,
+        match.candidate.text,
+    )
+
+
+def _conversation_query_rank_key(
+    index: _MemorySearchIndex,
+    match: _ConversationQueryMatch,
+) -> tuple[int, int, int, int, datetime, int, int, str]:
+    return search_rank_key(
+        score=match.score,
+        kind="conversation",
+        updated_at=index.conversation_activity_by_id[match.conversation_id],
+        item_id=match.conversation_id,
+    )
+
+
+def _conversation_with_query_match(
+    conversation: dict[str, Any],
+    match: _ConversationQueryMatch | None,
+) -> dict[str, Any]:
+    if match is None:
+        return conversation
+    projected = dict(conversation)
+    projected["_recall_match"] = {
+        "matched_text": match.candidate.text,
+        "layer": match.layer,
+        "layer_rank": match.layer_rank,
+        "activity_at": match.candidate.activity,
+        "symbol_exact_match": match.symbol_exact_match,
+        "message_id": (
+            match.candidate.source_id if match.layer == "message" else None
+        ),
+        "match_count": match.match_count,
+    }
+    return projected
 
 
 def _recent_conversation_window(
@@ -717,6 +859,19 @@ def _run_search_text(run: Mapping[str, Any]) -> str:
             str(config.get("template") or card.get("strategy_label") or ""),
         )
         if value
+    )
+
+
+def _run_symbols(run: Mapping[str, Any]) -> list[str]:
+    symbols = run.get("symbols")
+    if isinstance(symbols, list) and symbols:
+        return [str(symbol) for symbol in symbols]
+    card = run.get("conversation_result_card")
+    card_symbols = card.get("symbols") if isinstance(card, Mapping) else None
+    return (
+        [str(symbol) for symbol in card_symbols]
+        if isinstance(card_symbols, list)
+        else []
     )
 
 

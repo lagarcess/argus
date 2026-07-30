@@ -1273,6 +1273,42 @@ def _conversation_match_ctes(
         )::integer
         """
     )
+    conversation_activity_query = sql.SQL(
+        """
+        select max(source_activity.activity_at) as activity_at
+        from (
+            select conversation.updated_at as activity_at
+            union all
+            select max(coalesce(run.updated_at, run.created_at))
+            from public.backtest_runs as run
+            where run.user_id = input.user_id
+              and run.conversation_id = conversation.id
+            union all
+            select max(message.created_at)
+            from public.messages as message
+            where message.user_id = input.user_id
+              and message.conversation_id = conversation.id
+            union all
+            select max(idea.updated_at)
+            from public.ideas as idea
+            where idea.user_id = input.user_id
+              and idea.source_conversation_id = conversation.id
+            union all
+            select max(evidence.updated_at)
+            from public.evidence_artifacts as evidence
+            where evidence.user_id = input.user_id
+              and evidence.source_conversation_id = conversation.id
+            union all
+            select max(decision.updated_at)
+            from public.decision_notes as decision
+            where decision.user_id = input.user_id
+              and decision.source_conversation_id = conversation.id
+        ) as source_activity
+        """
+    )
+    conversation_activity_sql = sql.SQL("({activity_query})").format(
+        activity_query=conversation_activity_query
+    )
 
     def conversation_text_rank(matched_text_sql: sql.Composable) -> sql.Composed:
         return sql.SQL(
@@ -1317,7 +1353,6 @@ def _conversation_match_ctes(
     def bounded_source_window(
         *,
         source_sql: sql.Composable,
-        activity_sql: sql.Composable,
         layer_rank_sql: sql.Composable,
         matched_text_sql: sql.Composable,
         source_tiebreak_sql: sql.Composable,
@@ -1350,7 +1385,7 @@ def _conversation_match_ctes(
                 )
                 """
             ).format(
-                activity_sql=activity_sql,
+                activity_sql=conversation_activity_sql,
                 exact_rank_sql=conversation_exact_rank,
                 symbol_rank_sql=conversation_symbol_rank,
                 layer_rank_sql=layer_rank_sql,
@@ -1375,13 +1410,13 @@ def _conversation_match_ctes(
                 exact_rank_sql=conversation_exact_rank,
                 symbol_rank_sql=conversation_symbol_rank,
                 layer_rank_sql=layer_rank_sql,
-                activity_sql=activity_sql,
+                activity_sql=conversation_activity_sql,
                 text_rank_sql=text_rank_sql,
                 source_tiebreak_sql=source_tiebreak_sql,
             )
             if cursor_relative
             else sql.SQL("{activity_sql} desc, {source_tiebreak_sql}").format(
-                activity_sql=activity_sql,
+                activity_sql=conversation_activity_sql,
                 source_tiebreak_sql=source_tiebreak_sql,
             )
         )
@@ -1625,41 +1660,35 @@ def _conversation_match_ctes(
             sql.Composable,
             sql.Composable,
             sql.Composable,
-            sql.Composable,
         ],
         ...,
     ] = (
         (
             conversation_source,
-            sql.SQL("conversation.updated_at"),
             sql.SQL("1::integer"),
             conversation_matched_text,
             sql.SQL("conversation.id desc"),
         ),
         (
             message_source,
-            sql.SQL("message.created_at"),
             sql.SQL("2::integer"),
             sql.SQL("message.content"),
             sql.SQL("message.id desc"),
         ),
         (
             run_source,
-            sql.SQL("coalesce(run.updated_at, run.created_at)"),
             sql.SQL("3::integer"),
             run_matched_text,
             sql.SQL("run.id desc"),
         ),
         (
             idea_source,
-            sql.SQL("idea.updated_at"),
             sql.SQL("4::integer"),
             idea_matched_text,
             sql.SQL("idea.id desc"),
         ),
         (
             evidence_source,
-            sql.SQL("evidence.updated_at"),
             sql.SQL("5::integer"),
             evidence_matched_text,
             sql.SQL("evidence.id desc"),
@@ -1760,7 +1789,6 @@ def _conversation_match_ctes(
         windows = tuple(
             bounded_source_window(
                 source_sql=source,
-                activity_sql=sql.SQL("decision.updated_at"),
                 layer_rank_sql=sql.SQL("6::integer"),
                 matched_text_sql=decision_matched_text,
                 source_tiebreak_sql=sql.SQL("decision.id desc"),
@@ -1773,18 +1801,14 @@ def _conversation_match_ctes(
                 match_name=match_name,
                 window=windows[0],
             )
-        deduplicated_scope = (
-            sql.SQL(
-                """
-                cross join input
-                join public.conversations as conversation
-                  on conversation.id = deduplicated.conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                """
-            )
-            if cursor_relative
-            else sql.SQL("")
+        deduplicated_scope = sql.SQL(
+            """
+            cross join input
+            join public.conversations as conversation
+              on conversation.id = deduplicated.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            """
         )
         deduplicated_order = (
             sql.SQL(
@@ -1793,7 +1817,7 @@ def _conversation_match_ctes(
                 {exact_rank_sql} desc,
                 {symbol_rank_sql} desc,
                 6::integer desc,
-                deduplicated.candidate_at desc,
+                {activity_sql} desc,
                 {text_rank_sql} desc,
                 conversation.id desc,
                 deduplicated.source_id desc
@@ -1801,6 +1825,7 @@ def _conversation_match_ctes(
             ).format(
                 exact_rank_sql=conversation_exact_rank,
                 symbol_rank_sql=conversation_symbol_rank,
+                activity_sql=conversation_activity_sql,
                 text_rank_sql=conversation_text_rank(
                     sql.SQL("deduplicated.matched_text")
                 ),
@@ -1808,10 +1833,10 @@ def _conversation_match_ctes(
             if cursor_relative
             else sql.SQL(
                 """
-                deduplicated.candidate_at desc,
+                {activity_sql} desc,
                 deduplicated.source_id desc
                 """
-            )
+            ).format(activity_sql=conversation_activity_sql)
         )
         return sql.SQL(
             """
@@ -1854,7 +1879,6 @@ def _conversation_match_ctes(
         windows = [
             bounded_source_window(
                 source_sql=source,
-                activity_sql=activity,
                 layer_rank_sql=layer_rank,
                 matched_text_sql=matched_text,
                 source_tiebreak_sql=source_tiebreak,
@@ -1862,7 +1886,6 @@ def _conversation_match_ctes(
             )
             for (
                 source,
-                activity,
                 layer_rank,
                 matched_text,
                 source_tiebreak,
@@ -1979,37 +2002,7 @@ def _conversation_match_ctes(
               on conversation.id = winning.conversation_id
              and conversation.user_id = input.user_id
              and conversation.deleted_at is null
-            cross join lateral (
-                select max(source_activity.activity_at) as activity_at
-                from (
-                    select conversation.updated_at as activity_at
-                    union all
-                    select max(coalesce(run.updated_at, run.created_at))
-                    from public.backtest_runs as run
-                    where run.user_id = input.user_id
-                      and run.conversation_id = conversation.id
-                    union all
-                    select max(message.created_at)
-                    from public.messages as message
-                    where message.user_id = input.user_id
-                      and message.conversation_id = conversation.id
-                    union all
-                    select max(idea.updated_at)
-                    from public.ideas as idea
-                    where idea.user_id = input.user_id
-                      and idea.source_conversation_id = conversation.id
-                    union all
-                    select max(evidence.updated_at)
-                    from public.evidence_artifacts as evidence
-                    where evidence.user_id = input.user_id
-                      and evidence.source_conversation_id = conversation.id
-                    union all
-                    select max(decision.updated_at)
-                    from public.decision_notes as decision
-                    where decision.user_id = input.user_id
-                      and decision.source_conversation_id = conversation.id
-                ) as source_activity
-            ) as activity
+            cross join lateral ({activity_query}) as activity
         )
         """
     ).format(
@@ -2017,6 +2010,7 @@ def _conversation_match_ctes(
         exact_rank_sql=conversation_exact_rank,
         symbol_rank_sql=conversation_symbol_rank,
         text_rank_sql=conversation_text_rank(sql.SQL("winning.matched_text")),
+        activity_query=conversation_activity_query,
     )
 
 

@@ -14,6 +14,7 @@ from argus.api.schemas import (
     EvidenceArtifact,
     Message,
 )
+from argus.api.search_utils import search_rank_key
 
 
 @pytest.fixture(autouse=True)
@@ -178,6 +179,74 @@ def test_memory_ledger_counts_all_distinct_matches_beyond_presentation_cap() -> 
         "revisit_later": 0,
     }
     assert len(snapshot.conversations) <= 10
+
+
+def test_memory_candidate_window_uses_final_conversation_rank_beyond_source_cap() -> (
+    None
+):
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+
+    for index in range(11):
+        conversation_id = f"conversation-source-newer-{index:02d}"
+        api_state.store.conversations[conversation_id] = Conversation(
+            id=conversation_id,
+            title=f"Unrelated title {index}",
+            last_message_preview="Unrelated recent activity",
+            created_at=now,
+            updated_at=now + timedelta(minutes=index),
+            language="en",
+        )
+        api_state.store.conversation_owners[conversation_id] = user.id
+        api_state.store.messages[conversation_id] = [
+            Message(
+                id=f"message-source-newer-{index:02d}",
+                conversation_id=conversation_id,
+                role="user",
+                content="needle in an ordinary message",
+                created_at=now + timedelta(minutes=index + 1),
+                metadata={},
+            )
+        ]
+
+    target_id = "conversation-old-match-recent-activity"
+    api_state.store.conversations[target_id] = Conversation(
+        id=target_id,
+        title="Unrelated target title",
+        last_message_preview="Newest unrelated activity",
+        created_at=now - timedelta(days=2),
+        updated_at=now + timedelta(days=1),
+        language="en",
+    )
+    api_state.store.conversation_owners[target_id] = user.id
+    api_state.store.messages[target_id] = [
+        Message(
+            id="message-old-match",
+            conversation_id=target_id,
+            role="user",
+            content="needle in an old message",
+            created_at=now - timedelta(days=1),
+            metadata={},
+        )
+    ]
+
+    read = search_assembly.memory_search_read(
+        user=user,
+        query="needle",
+        source_limit=1,
+    )
+    ranked = sorted(
+        read.scored_items,
+        key=lambda pair: search_rank_key(
+            score=pair[0],
+            kind=pair[1].type,
+            updated_at=pair[1].updated_at,
+            item_id=pair[1].id,
+        ),
+        reverse=True,
+    )
+
+    assert ranked[0][1].id == target_id
 
 
 def test_memory_search_preserves_the_latest_untaken_assistant_offer() -> None:

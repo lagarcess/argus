@@ -1034,6 +1034,78 @@ def test_conversation_cursor_reaches_identical_rank_rows_after_source_cap(
     assert set(seen) == inserted
 
 
+def test_conversation_source_cap_uses_conversation_wide_activity(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 28, 12, tzinfo=timezone.utc)
+    expected: list[str] = []
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(20):
+            timestamp = now - timedelta(minutes=offset)
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp,
+                title=f"Source-cap filler {offset}",
+            )
+            expected.append(str(conversation_id))
+            _insert_message(
+                cursor,
+                user_id=owner_id,
+                conversation_id=conversation_id,
+                timestamp=timestamp,
+                role="user",
+                content="Needle source-cap filler.",
+            )
+
+        old_match_at = now - timedelta(days=1)
+        revived_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=old_match_at,
+            title="Revived source-cap conversation",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=revived_id,
+            timestamp=old_match_at,
+            role="user",
+            content="Needle old matching source.",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=revived_id,
+            timestamp=now + timedelta(minutes=1),
+            role="assistant",
+            content="Recent unrelated activity.",
+        )
+
+    reader, _ = _reader()
+    seen: list[str] = []
+    cursor_at = None
+    cursor_id = None
+    for _ in range(22):
+        result = reader.search_rows(
+            user_id=str(owner_id),
+            query="needle",
+            source_limit=2,
+            cursor_updated_at=cursor_at,
+            cursor_id=cursor_id,
+        )
+        page = _ranked(result.rows, "needle")[:1]
+        if not page:
+            break
+        item = page[0][1]
+        seen.append(item.id)
+        cursor_at = item.updated_at
+        cursor_id = item.id
+
+    assert seen == [str(revived_id), *expected]
+
+
 def test_message_activity_cursor_from_page_one_is_accepted_on_page_two(
     search_identities,
 ) -> None:

@@ -1041,6 +1041,7 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     base_matches = sql_text[
         sql_text.index("base_matches as (") : sql_text.index("cursor_matches as (")
     ]
+    base_decisions = sql_text[: sql_text.index("cursor_decision_matches as (")]
     cursor_decisions = sql_text[
         sql_text.index("cursor_decision_matches as (") : sql_text.index(
             "base_matches as ("
@@ -1052,6 +1053,12 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
 
     # The decision top window is capped in the preceding decision_matches CTE.
     assert base_matches.count("limit (select match_limit from input)") == 5
+    assert (
+        (base_decisions + base_matches).count(
+            "select max(source_activity.activity_at)"
+        )
+        == 6
+    )
     assert cursor_decisions.count("limit (select match_limit from input)") == 1
     assert cursor_matches.count("limit (select match_limit from input)") == 5
     bounded_cursor_windows = cursor_decisions + cursor_matches
@@ -1072,6 +1079,10 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     assert bounded_cursor_windows.count("input.cursor_text_rank") == 6
     assert bounded_cursor_windows.count("input.cursor_id") == 12
     assert bounded_cursor_windows.count("conversation.id desc") >= 6
+    assert (
+        bounded_cursor_windows.count("select max(source_activity.activity_at)")
+        == 12
+    )
     candidate_keys = bounded_cursor_windows.split(") <= row(")[:-1]
     assert len(candidate_keys) == 6
     for candidate_key, layer_rank in zip(
