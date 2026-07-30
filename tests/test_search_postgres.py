@@ -906,6 +906,134 @@ def test_conversation_cursor_pages_after_evidence_winner_without_gaps(
     assert set(seen) == inserted
 
 
+def test_conversation_cursor_reaches_message_after_source_candidate_cap(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 18, tzinfo=timezone.utc)
+    newer_pinned: list[str] = []
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(20):
+            timestamp = now - timedelta(minutes=offset)
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp,
+                title=f"Transcript research {offset}",
+                pinned=True,
+            )
+            newer_pinned.append(str(conversation_id))
+            _insert_message(
+                cursor,
+                user_id=owner_id,
+                conversation_id=conversation_id,
+                timestamp=timestamp,
+                role="user",
+                content="Needle source-cap transcript.",
+            )
+        unpinned_at = now - timedelta(minutes=20)
+        unpinned_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=unpinned_at,
+            title="Unpinned transcript research",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=unpinned_id,
+            timestamp=unpinned_at,
+            role="user",
+            content="Needle source-cap transcript.",
+        )
+        last_pinned_at = now - timedelta(minutes=21)
+        last_pinned_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=last_pinned_at,
+            title="Last pinned transcript research",
+            pinned=True,
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=last_pinned_id,
+            timestamp=last_pinned_at,
+            role="user",
+            content="Needle source-cap transcript.",
+        )
+
+    reader, _ = _reader()
+    seen: list[str] = []
+    cursor_at = None
+    cursor_id = None
+    while True:
+        result = reader.search_rows(
+            user_id=str(owner_id),
+            query="needle",
+            source_limit=2,
+            cursor_updated_at=cursor_at,
+            cursor_id=cursor_id,
+        )
+        page = _ranked(result.rows, "needle")[:1]
+        if not page:
+            break
+        item = page[0][1]
+        seen.append(item.id)
+        cursor_at = item.updated_at
+        cursor_id = item.id
+
+    assert seen == [*newer_pinned, str(last_pinned_id), str(unpinned_id)]
+
+
+def test_conversation_cursor_reaches_identical_rank_rows_after_source_cap(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    timestamp = datetime(2026, 7, 27, 19, tzinfo=timezone.utc)
+    inserted: set[str] = set()
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(21):
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=timestamp,
+                title=f"Identical-rank transcript {offset}",
+            )
+            inserted.add(str(conversation_id))
+            _insert_message(
+                cursor,
+                user_id=owner_id,
+                conversation_id=conversation_id,
+                timestamp=timestamp,
+                role="user",
+                content="Needle identical-rank transcript.",
+            )
+
+    reader, _ = _reader()
+    seen: list[str] = []
+    cursor_at = None
+    cursor_id = None
+    for _ in range(22):
+        result = reader.search_rows(
+            user_id=str(owner_id),
+            query="needle",
+            source_limit=2,
+            cursor_updated_at=cursor_at,
+            cursor_id=cursor_id,
+        )
+        page = _ranked(result.rows, "needle")[:1]
+        if not page:
+            break
+        item = page[0][1]
+        seen.append(item.id)
+        cursor_at = item.updated_at
+        cursor_id = item.id
+
+    assert len(seen) == len(set(seen))
+    assert set(seen) == inserted
+
+
 def test_message_activity_cursor_from_page_one_is_accepted_on_page_two(
     search_identities,
 ) -> None:

@@ -2219,6 +2219,7 @@ export default function ChatInterface() {
               void loadConversation(convId, messageId, openAtLeftOff);
             }}
             onRunFresh={handleOmnisearchRunFresh}
+            runFreshDisabled={turnInFlight}
             activeConversationId={conversationId}
             isGuest={isGuest}
             groundedDiscoveryAvailable={canUseGroundedDiscovery}

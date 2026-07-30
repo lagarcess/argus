@@ -75,6 +75,7 @@ type ChatCommandPaletteProps = {
     openAtLeftOff?: boolean,
   ) => void;
   onRunFresh: (conversationId: string, sendText: string) => Promise<void> | void;
+  runFreshDisabled?: boolean;
   activeConversationId: string | null;
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
@@ -232,6 +233,7 @@ export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
   onRunFresh,
+  runFreshDisabled = false,
   activeConversationId,
   isGuest = false,
   groundedDiscoveryAvailable = true,
@@ -1668,13 +1670,14 @@ export default function ChatCommandPalette({
                           selectedPreview.conversationId && (
                             <button
                               type="button"
+                              disabled={runFreshDisabled}
                               onClick={() =>
                                 void onRunFresh(
                                   selectedPreview.conversationId!,
                                   selectedRunFreshAction.send_text,
                                 )
                               }
-                              className="inline-flex min-h-11 items-center rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white transition-colors hover:bg-black dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
+                              className="inline-flex min-h-11 items-center rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
                             >
                               {t(
                                 "command_palette.run_fresh",

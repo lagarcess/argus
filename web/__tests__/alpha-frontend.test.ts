@@ -1477,6 +1477,27 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("run_backtest");
   });
 
+  test("omnisearch disables Run it fresh while another turn owns the stream", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const runFreshButton = palette.slice(
+      palette.indexOf("{selectedRunFreshAction &&"),
+      palette.indexOf("{selectedDecisionAction &&"),
+    );
+
+    expect(chat).toContain("runFreshDisabled={turnInFlight}");
+    expect(palette).toContain("runFreshDisabled?: boolean");
+    expect(runFreshButton).toContain("disabled={runFreshDisabled}");
+    expect(runFreshButton).toContain("disabled:cursor-not-allowed");
+    expect(runFreshButton).toContain("disabled:opacity-50");
+  });
+
   test("debounced omnisearch synchronizes rows and ledger counts under one request owner", () => {
     const palette = readFileSync(
       join(root, "components/sidebar/ChatCommandPalette.tsx"),

@@ -1027,6 +1027,94 @@ def test_conversation_recall_caps_every_source_before_window_ranking() -> None:
     assert params["match_limit"] == 300
 
 
+def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> None:
+    from argus.domain.postgres_search_reader import _conversation_match_ctes
+
+    sql_text = " ".join(
+        _conversation_match_ctes(
+            has_anchor=False,
+            has_cursor=True,
+        )
+        .as_string()
+        .split()
+    )
+    base_matches = sql_text[
+        sql_text.index("base_matches as (") : sql_text.index("cursor_matches as (")
+    ]
+    cursor_decisions = sql_text[
+        sql_text.index("cursor_decision_matches as (") : sql_text.index(
+            "base_matches as ("
+        )
+    ]
+    cursor_matches = sql_text[
+        sql_text.index("cursor_matches as (") : sql_text.index("winning_matches as (")
+    ]
+
+    # The decision top window is capped in the preceding decision_matches CTE.
+    assert base_matches.count("limit (select match_limit from input)") == 5
+    assert cursor_decisions.count("limit (select match_limit from input)") == 1
+    assert cursor_matches.count("limit (select match_limit from input)") == 5
+    bounded_cursor_windows = cursor_decisions + cursor_matches
+    assert (
+        bounded_cursor_windows.count(
+            "order by conversation.pinned::integer desc"
+        )
+        == 6
+    )
+    assert bounded_cursor_windows.count("input.has_cursor") == 6
+    assert bounded_cursor_windows.count("conversation.id = input.cursor_id") == 6
+    assert bounded_cursor_windows.count(") <= row(") == 6
+    assert bounded_cursor_windows.count("conversation.pinned::integer") == 12
+    assert bounded_cursor_windows.count("input.cursor_exact_rank") == 6
+    assert bounded_cursor_windows.count("input.cursor_symbol_rank") == 6
+    assert bounded_cursor_windows.count("input.cursor_layer_rank") == 6
+    assert bounded_cursor_windows.count("input.cursor_updated_at") == 6
+    assert bounded_cursor_windows.count("input.cursor_text_rank") == 6
+    assert bounded_cursor_windows.count("input.cursor_id") == 12
+    assert bounded_cursor_windows.count("conversation.id desc") >= 6
+    candidate_keys = bounded_cursor_windows.split(") <= row(")[:-1]
+    assert len(candidate_keys) == 6
+    for candidate_key, layer_rank in zip(
+        candidate_keys,
+        (6, 1, 2, 3, 4, 5),
+        strict=True,
+    ):
+        candidate_key = candidate_key[candidate_key.rfind("row(") :]
+        assert (
+            candidate_key.index("conversation.pinned::integer")
+            < candidate_key.index("input.normalized_query <> ''")
+            < candidate_key.index(
+                "symbol_run.conversation_id = conversation.id"
+            )
+            < candidate_key.index(f"{layer_rank}::integer")
+        )
+
+    anchored_sql = " ".join(
+        _conversation_match_ctes(
+            has_anchor=True,
+            has_cursor=True,
+        )
+        .as_string()
+        .split()
+    )
+    anchored_cursor_decisions = anchored_sql[
+        anchored_sql.index("cursor_decision_candidates as (") : anchored_sql.index(
+            "base_matches as ("
+        )
+    ]
+    assert anchored_cursor_decisions.count("like %(anchor_pattern)s") == 2
+    assert "select distinct on (candidate.source_id)" in anchored_cursor_decisions
+    assert (
+        anchored_cursor_decisions.count(
+            "order by conversation.pinned::integer desc"
+        )
+        == 3
+    )
+    assert (
+        anchored_cursor_decisions.count("limit (select match_limit from input)") == 3
+    )
+
+
 def test_conversation_recall_match_cap_has_an_absolute_ceiling() -> None:
     from argus.domain.postgres_search_reader import _conversation_match_limit
 

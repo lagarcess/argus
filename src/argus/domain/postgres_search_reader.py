@@ -1223,7 +1223,11 @@ _CONVERSATION_DECISION_FILTER = sql.SQL(
 )
 
 
-def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
+def _conversation_match_ctes(
+    *,
+    has_anchor: bool,
+    has_cursor: bool = False,
+) -> sql.Composed:
     chat_title_haystack = _normalized("conversation.title")
     chat_preview_haystack = _normalized("coalesce(conversation.last_message_preview, '')")
     chat_index_haystack = _normalized(
@@ -1248,162 +1252,56 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
         """
     )
     decision_all_tokens = _all_token_recheck(decision_haystack)
-    if has_anchor:
-        decision_match_ctes = sql.SQL(
+    conversation_exact_rank = sql.SQL(
+        """
+        (
+            input.normalized_query <> ''
+            and input.normalized_query = {normalized_title}
+        )::integer
+        """
+    ).format(normalized_title=_normalized("conversation.title"))
+    conversation_symbol_rank = sql.SQL(
+        """
+        exists (
+            select 1
+            from public.backtest_runs as symbol_run
+            cross join unnest(symbol_run.symbols) as symbol
+            where symbol_run.user_id = input.user_id
+              and symbol_run.conversation_id = conversation.id
+              and symbol_run.status = 'completed'
+              and input.symbol_query = lower(symbol)
+        )::integer
+        """
+    )
+
+    def conversation_text_rank(matched_text_sql: sql.Composable) -> sql.Composed:
+        return sql.SQL(
             """
-            decision_candidates as (
-                (
-                select
-                    conversation.id as conversation_id,
-                    decision.id as source_id,
-                    decision.updated_at as candidate_at,
-                    concat_ws(
-                        ' ',
-                        nullif(decision.note, ''),
-                        decision.decision_state,
-                        nullif(evidence.title, ''),
-                        nullif(evidence.digest, '')
-                    ) as matched_text,
-                    6::integer as layer_rank,
-                    'decision'::text as layer
-                from input
-                join public.decision_notes as decision
-                  on decision.user_id = input.user_id
-                 and {decision_index} like %(anchor_pattern)s
-                join public.evidence_artifacts as evidence
-                  on evidence.id = decision.evidence_artifact_id
-                 and evidence.user_id = input.user_id
-                 and evidence.source_conversation_id =
-                     decision.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                 and (
-                     not input.guest_scope
-                     or conversation.id = input.guest_conversation_id
-                 )
-                 {decision_filter}
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
-                order by decision.updated_at desc, decision.id desc
-                limit (select match_limit from input)
-                )
-
-                union all
-
-                (
-                select
-                    conversation.id,
-                    decision.id,
-                    decision.updated_at,
-                    concat_ws(
-                        ' ',
-                        nullif(decision.note, ''),
-                        decision.decision_state,
-                        nullif(evidence.title, ''),
-                        nullif(evidence.digest, '')
-                    ),
-                    6::integer,
-                    'decision'::text
-                from input
-                join public.evidence_artifacts as evidence
-                  on evidence.user_id = input.user_id
-                 and {evidence_index} like %(anchor_pattern)s
-                join public.decision_notes as decision
-                  on decision.evidence_artifact_id = evidence.id
-                 and decision.user_id = input.user_id
-                 and decision.source_conversation_id =
-                     evidence.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                 and (
-                     not input.guest_scope
-                     or conversation.id = input.guest_conversation_id
-                 )
-                 {decision_filter}
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
-                order by decision.updated_at desc, decision.id desc
-                limit (select match_limit from input)
-                )
-            ),
-            decision_matches as (
-                select
-                    deduplicated.conversation_id,
-                    deduplicated.source_id,
-                    deduplicated.candidate_at,
-                    deduplicated.matched_text,
-                    deduplicated.layer_rank,
-                    deduplicated.layer
-                from (
-                    select distinct on (candidate.source_id)
-                        candidate.*
-                    from decision_candidates as candidate
-                    order by
-                        candidate.source_id,
-                        candidate.candidate_at desc
-                ) as deduplicated
-                order by
-                    deduplicated.candidate_at desc,
-                    deduplicated.source_id desc
-                limit (select match_limit from input)
-            )
+            (
+                case
+                    when input.normalized_query <> ''
+                     and strpos(
+                         {normalized_title},
+                         input.normalized_query
+                     ) > 0
+                        then 100
+                    else 0
+                end
+                +
+                case
+                    when input.normalized_query <> ''
+                     and strpos(
+                         {normalized_matched},
+                         input.normalized_query
+                     ) > 0
+                        then 50
+                    else 0
+                end
+            )::integer
             """
         ).format(
-            decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
-            evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
-            all_tokens=decision_all_tokens,
-            decision_filter=_CONVERSATION_DECISION_FILTER,
-        )
-    else:
-        decision_match_ctes = sql.SQL(
-            """
-            decision_matches as (
-                select
-                    conversation.id as conversation_id,
-                    decision.id as source_id,
-                    decision.updated_at as candidate_at,
-                    concat_ws(
-                        ' ',
-                        nullif(decision.note, ''),
-                        decision.decision_state,
-                        nullif(evidence.title, ''),
-                        nullif(evidence.digest, '')
-                    ) as matched_text,
-                    6::integer as layer_rank,
-                    'decision'::text as layer
-                from input
-                join public.decision_notes as decision
-                  on decision.user_id = input.user_id
-                join public.evidence_artifacts as evidence
-                  on evidence.id = decision.evidence_artifact_id
-                 and evidence.user_id = input.user_id
-                 and evidence.source_conversation_id =
-                     decision.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                 and (
-                     not input.guest_scope
-                     or conversation.id = input.guest_conversation_id
-                 )
-                 {decision_filter}
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
-                order by decision.updated_at desc, decision.id desc
-                limit (select match_limit from input)
-            )
-            """
-        ).format(
-            all_tokens=decision_all_tokens,
-            decision_filter=_CONVERSATION_DECISION_FILTER,
+            normalized_title=_normalized("conversation.title"),
+            normalized_matched=normalizer_expression(matched_text_sql),
         )
 
     def token_predicate(
@@ -1416,188 +1314,621 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
             has_anchor=has_anchor,
         )
 
-    return sql.SQL(
-        """
-        {decision_match_ctes},
-        matches as (
-            (
-            select
-                conversation.id as conversation_id,
-                conversation.id as source_id,
-                conversation.updated_at as candidate_at,
-                case
-                    when input.normalized_query = ''
-                      or ({chat_title_predicate})
-                        then conversation.title
-                    when ({chat_preview_predicate})
-                        then conversation.last_message_preview
-                end as matched_text,
-                1::integer as layer_rank,
-                'conversation'::text as layer
-            from input
-            join public.conversations as conversation
-              on conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-             {decision_filter}
-            where (
-                input.normalized_query = ''
-                or (
-                    input.text_search_enabled
-                    and (
-                        ({chat_title_predicate})
-                        or ({chat_preview_predicate})
+    def bounded_source_window(
+        *,
+        source_sql: sql.Composable,
+        activity_sql: sql.Composable,
+        layer_rank_sql: sql.Composable,
+        matched_text_sql: sql.Composable,
+        source_tiebreak_sql: sql.Composable,
+        cursor_relative: bool,
+    ) -> sql.Composed:
+        text_rank_sql = conversation_text_rank(matched_text_sql)
+        cursor_predicate = (
+            sql.SQL(
+                """
+                and input.has_cursor
+                and (
+                    conversation.id = input.cursor_id
+                    or row(
+                        conversation.pinned::integer,
+                        {exact_rank_sql},
+                        {symbol_rank_sql},
+                        {layer_rank_sql},
+                        {activity_sql},
+                        {text_rank_sql},
+                        conversation.id
+                    ) <= row(
+                        input.cursor_pinned_rank,
+                        input.cursor_exact_rank,
+                        input.cursor_symbol_rank,
+                        input.cursor_layer_rank,
+                        input.cursor_updated_at,
+                        input.cursor_text_rank,
+                        input.cursor_id
                     )
                 )
+                """
+            ).format(
+                activity_sql=activity_sql,
+                exact_rank_sql=conversation_exact_rank,
+                symbol_rank_sql=conversation_symbol_rank,
+                layer_rank_sql=layer_rank_sql,
+                text_rank_sql=text_rank_sql,
             )
-            order by conversation.updated_at desc, conversation.id desc
+            if cursor_relative
+            else sql.SQL("")
+        )
+        window_order_sql = (
+            sql.SQL(
+                """
+                conversation.pinned::integer desc,
+                {exact_rank_sql} desc,
+                {symbol_rank_sql} desc,
+                {layer_rank_sql} desc,
+                {activity_sql} desc,
+                {text_rank_sql} desc,
+                conversation.id desc,
+                {source_tiebreak_sql}
+                """
+            ).format(
+                exact_rank_sql=conversation_exact_rank,
+                symbol_rank_sql=conversation_symbol_rank,
+                layer_rank_sql=layer_rank_sql,
+                activity_sql=activity_sql,
+                text_rank_sql=text_rank_sql,
+                source_tiebreak_sql=source_tiebreak_sql,
+            )
+            if cursor_relative
+            else sql.SQL("{activity_sql} desc, {source_tiebreak_sql}").format(
+                activity_sql=activity_sql,
+                source_tiebreak_sql=source_tiebreak_sql,
+            )
+        )
+        return sql.SQL(
+            """
+            (
+            {source_sql}
+            {cursor_predicate}
+            order by {window_order_sql}
             limit (select match_limit from input)
             )
+            """
+        ).format(
+            source_sql=source_sql,
+            cursor_predicate=cursor_predicate,
+            window_order_sql=window_order_sql,
+        )
 
-            union all
+    chat_title_predicate = token_predicate(
+        chat_title_haystack,
+        chat_index_haystack,
+    )
+    chat_preview_predicate = token_predicate(
+        chat_preview_haystack,
+        chat_index_haystack,
+    )
+    message_predicate = token_predicate(message_haystack, message_haystack)
+    run_predicate = token_predicate(
+        run_haystack,
+        _normalized(_RUN_INDEX_HAYSTACK),
+    )
+    idea_predicate = token_predicate(idea_haystack, idea_haystack)
+    evidence_predicate = token_predicate(
+        evidence_haystack,
+        _normalized(_EVIDENCE_INDEX_HAYSTACK),
+    )
+    conversation_matched_text = sql.SQL(
+        """
+        case
+            when input.normalized_query = ''
+              or ({chat_title_predicate})
+                then conversation.title
+            when ({chat_preview_predicate})
+                then conversation.last_message_preview
+        end
+        """
+    ).format(
+        chat_title_predicate=chat_title_predicate,
+        chat_preview_predicate=chat_preview_predicate,
+    )
+    run_matched_text = sql.SQL(
+        """
+        concat_ws(
+            ' ',
+            nullif(run.conversation_result_card->>'title', ''),
+            nullif(array_to_string(run.symbols, ' '), ''),
+            nullif(run.config_snapshot->>'template', ''),
+            nullif(run.conversation_result_card->>'strategy_label', '')
+        )
+        """
+    )
+    idea_matched_text = sql.SQL(
+        "concat_ws(' ', idea.title, nullif(idea.summary, ''))"
+    )
+    evidence_matched_text = sql.SQL(
+        "concat_ws(' ', evidence.title, nullif(evidence.digest, ''))"
+    )
+    decision_matched_text = sql.SQL(
+        """
+        concat_ws(
+            ' ',
+            nullif(decision.note, ''),
+            decision.decision_state,
+            nullif(evidence.title, ''),
+            nullif(evidence.digest, '')
+        )
+        """
+    )
 
-            (
-            select
-                conversation.id,
-                message.id,
-                message.created_at,
-                message.content,
-                2::integer,
-                'message'::text
-            from input
-            join public.messages as message
-              on message.user_id = input.user_id
-             and message.role = 'user'
-             and message.content <> %(legacy_skip_message)s
-             and message.content not like %(legacy_goal_pattern)s escape '\\'
-            join public.conversations as conversation
-              on conversation.id = message.conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-             {decision_filter}
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({message_predicate})
-            order by message.created_at desc, message.id desc
-            limit (select match_limit from input)
+    conversation_source = sql.SQL(
+        """
+        select
+            conversation.id as conversation_id,
+            conversation.id as source_id,
+            conversation.updated_at as candidate_at,
+            {matched_text_sql} as matched_text,
+            1::integer as layer_rank,
+            'conversation'::text as layer
+        from input
+        join public.conversations as conversation
+          on conversation.user_id = input.user_id
+         and conversation.deleted_at is null
+         and (
+             not input.guest_scope
+             or conversation.id = input.guest_conversation_id
+         )
+         {decision_filter}
+        where (
+            input.normalized_query = ''
+            or (
+                input.text_search_enabled
+                and (
+                    ({chat_title_predicate})
+                    or ({chat_preview_predicate})
+                )
             )
-
-            union all
-
-            (
-            select
-                conversation.id,
-                run.id,
-                coalesce(run.updated_at, run.created_at),
-                concat_ws(
-                    ' ',
-                    nullif(run.conversation_result_card->>'title', ''),
-                    nullif(array_to_string(run.symbols, ' '), ''),
-                    nullif(run.config_snapshot->>'template', ''),
-                    nullif(run.conversation_result_card->>'strategy_label', '')
-                ),
-                3::integer,
-                'run'::text
-            from input
-            join public.backtest_runs as run
-              on run.user_id = input.user_id
-             and run.status = 'completed'
-            join public.conversations as conversation
-              on conversation.id = run.conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-             {decision_filter}
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({run_predicate})
-            order by
-                coalesce(run.updated_at, run.created_at) desc,
-                run.id desc
-            limit (select match_limit from input)
-            )
-
-            union all
-
-            (
-            select
-                conversation.id,
-                idea.id,
-                idea.updated_at,
-                concat_ws(' ', idea.title, nullif(idea.summary, '')),
-                4::integer,
-                'idea'::text
-            from input
-            join public.ideas as idea
-              on idea.user_id = input.user_id
-            join public.conversations as conversation
-              on conversation.id = idea.source_conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-             {decision_filter}
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({idea_predicate})
-            order by idea.updated_at desc, idea.id desc
-            limit (select match_limit from input)
-            )
-
-            union all
-
-            (
-            select
-                conversation.id,
-                evidence.id,
-                evidence.updated_at,
-                concat_ws(' ', evidence.title, nullif(evidence.digest, '')),
-                5::integer,
-                'evidence'::text
-            from input
-            join public.evidence_artifacts as evidence
-              on evidence.user_id = input.user_id
-            join public.conversations as conversation
-              on conversation.id = evidence.source_conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-             {decision_filter}
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({evidence_predicate})
-            order by evidence.updated_at desc, evidence.id desc
-            limit (select match_limit from input)
-            )
-
-            union all
-
-            (
-            select
-                decision_match.conversation_id,
-                decision_match.source_id,
-                decision_match.candidate_at,
-                decision_match.matched_text,
-                decision_match.layer_rank,
-                decision_match.layer
-            from decision_matches as decision_match
-            )
+        )
+        """
+    ).format(
+        matched_text_sql=conversation_matched_text,
+        chat_title_predicate=chat_title_predicate,
+        chat_preview_predicate=chat_preview_predicate,
+        decision_filter=_CONVERSATION_DECISION_FILTER,
+    )
+    message_source = sql.SQL(
+        """
+        select
+            conversation.id as conversation_id,
+            message.id as source_id,
+            message.created_at as candidate_at,
+            message.content as matched_text,
+            2::integer as layer_rank,
+            'message'::text as layer
+        from input
+        join public.messages as message
+          on message.user_id = input.user_id
+         and message.role = 'user'
+         and message.content <> %(legacy_skip_message)s
+         and message.content not like %(legacy_goal_pattern)s escape '\\'
+        join public.conversations as conversation
+          on conversation.id = message.conversation_id
+         and conversation.user_id = input.user_id
+         and conversation.deleted_at is null
+         and (
+             not input.guest_scope
+             or conversation.id = input.guest_conversation_id
+         )
+         {decision_filter}
+        where input.text_search_enabled
+          and input.normalized_query <> ''
+          and ({message_predicate})
+        """
+    ).format(
+        message_predicate=message_predicate,
+        decision_filter=_CONVERSATION_DECISION_FILTER,
+    )
+    run_source = sql.SQL(
+        """
+        select
+            conversation.id as conversation_id,
+            run.id as source_id,
+            coalesce(run.updated_at, run.created_at) as candidate_at,
+            {matched_text_sql} as matched_text,
+            3::integer as layer_rank,
+            'run'::text as layer
+        from input
+        join public.backtest_runs as run
+          on run.user_id = input.user_id
+         and run.status = 'completed'
+        join public.conversations as conversation
+          on conversation.id = run.conversation_id
+         and conversation.user_id = input.user_id
+         and conversation.deleted_at is null
+         and (
+             not input.guest_scope
+             or conversation.id = input.guest_conversation_id
+         )
+         {decision_filter}
+        where input.text_search_enabled
+          and input.normalized_query <> ''
+          and ({run_predicate})
+        """
+    ).format(
+        matched_text_sql=run_matched_text,
+        run_predicate=run_predicate,
+        decision_filter=_CONVERSATION_DECISION_FILTER,
+    )
+    idea_source = sql.SQL(
+        """
+        select
+            conversation.id as conversation_id,
+            idea.id as source_id,
+            idea.updated_at as candidate_at,
+            {matched_text_sql} as matched_text,
+            4::integer as layer_rank,
+            'idea'::text as layer
+        from input
+        join public.ideas as idea
+          on idea.user_id = input.user_id
+        join public.conversations as conversation
+          on conversation.id = idea.source_conversation_id
+         and conversation.user_id = input.user_id
+         and conversation.deleted_at is null
+         and (
+             not input.guest_scope
+             or conversation.id = input.guest_conversation_id
+         )
+         {decision_filter}
+        where input.text_search_enabled
+          and input.normalized_query <> ''
+          and ({idea_predicate})
+        """
+    ).format(
+        matched_text_sql=idea_matched_text,
+        idea_predicate=idea_predicate,
+        decision_filter=_CONVERSATION_DECISION_FILTER,
+    )
+    evidence_source = sql.SQL(
+        """
+        select
+            conversation.id as conversation_id,
+            evidence.id as source_id,
+            evidence.updated_at as candidate_at,
+            {matched_text_sql} as matched_text,
+            5::integer as layer_rank,
+            'evidence'::text as layer
+        from input
+        join public.evidence_artifacts as evidence
+          on evidence.user_id = input.user_id
+        join public.conversations as conversation
+          on conversation.id = evidence.source_conversation_id
+         and conversation.user_id = input.user_id
+         and conversation.deleted_at is null
+         and (
+             not input.guest_scope
+             or conversation.id = input.guest_conversation_id
+         )
+         {decision_filter}
+        where input.text_search_enabled
+          and input.normalized_query <> ''
+          and ({evidence_predicate})
+        """
+    ).format(
+        matched_text_sql=evidence_matched_text,
+        evidence_predicate=evidence_predicate,
+        decision_filter=_CONVERSATION_DECISION_FILTER,
+    )
+    source_specs: tuple[
+        tuple[
+            sql.Composable,
+            sql.Composable,
+            sql.Composable,
+            sql.Composable,
+            sql.Composable,
+        ],
+        ...,
+    ] = (
+        (
+            conversation_source,
+            sql.SQL("conversation.updated_at"),
+            sql.SQL("1::integer"),
+            conversation_matched_text,
+            sql.SQL("conversation.id desc"),
         ),
+        (
+            message_source,
+            sql.SQL("message.created_at"),
+            sql.SQL("2::integer"),
+            sql.SQL("message.content"),
+            sql.SQL("message.id desc"),
+        ),
+        (
+            run_source,
+            sql.SQL("coalesce(run.updated_at, run.created_at)"),
+            sql.SQL("3::integer"),
+            run_matched_text,
+            sql.SQL("run.id desc"),
+        ),
+        (
+            idea_source,
+            sql.SQL("idea.updated_at"),
+            sql.SQL("4::integer"),
+            idea_matched_text,
+            sql.SQL("idea.id desc"),
+        ),
+        (
+            evidence_source,
+            sql.SQL("evidence.updated_at"),
+            sql.SQL("5::integer"),
+            evidence_matched_text,
+            sql.SQL("evidence.id desc"),
+        ),
+    )
+
+    def decision_source(indexed_joins: sql.Composable) -> sql.Composed:
+        return sql.SQL(
+            """
+            select
+                conversation.id as conversation_id,
+                decision.id as source_id,
+                decision.updated_at as candidate_at,
+                {matched_text_sql} as matched_text,
+                6::integer as layer_rank,
+                'decision'::text as layer
+            from input
+            {indexed_joins}
+            join public.conversations as conversation
+              on conversation.id = decision.source_conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+             and (
+                 not input.guest_scope
+                 or conversation.id = input.guest_conversation_id
+             )
+             {decision_filter}
+            where input.text_search_enabled
+              and input.normalized_query <> ''
+              and ({all_tokens})
+            """
+        ).format(
+            indexed_joins=indexed_joins,
+            matched_text_sql=decision_matched_text,
+            decision_filter=_CONVERSATION_DECISION_FILTER,
+            all_tokens=decision_all_tokens,
+        )
+
+    if has_anchor:
+        decision_sources = (
+            decision_source(
+                sql.SQL(
+                    """
+                    join public.decision_notes as decision
+                      on decision.user_id = input.user_id
+                     and {decision_index} like %(anchor_pattern)s
+                    join public.evidence_artifacts as evidence
+                      on evidence.id = decision.evidence_artifact_id
+                     and evidence.user_id = input.user_id
+                     and evidence.source_conversation_id =
+                         decision.source_conversation_id
+                    """
+                ).format(
+                    decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
+                )
+            ),
+            decision_source(
+                sql.SQL(
+                    """
+                    join public.evidence_artifacts as evidence
+                      on evidence.user_id = input.user_id
+                     and {evidence_index} like %(anchor_pattern)s
+                    join public.decision_notes as decision
+                      on decision.evidence_artifact_id = evidence.id
+                     and decision.user_id = input.user_id
+                     and decision.source_conversation_id =
+                         evidence.source_conversation_id
+                    """
+                ).format(
+                    evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
+                )
+            ),
+        )
+    else:
+        decision_sources = (
+            decision_source(
+                sql.SQL(
+                    """
+                    join public.decision_notes as decision
+                      on decision.user_id = input.user_id
+                    join public.evidence_artifacts as evidence
+                      on evidence.id = decision.evidence_artifact_id
+                     and evidence.user_id = input.user_id
+                     and evidence.source_conversation_id =
+                         decision.source_conversation_id
+                    """
+                )
+            ),
+        )
+
+    def decision_window_ctes(*, cursor_relative: bool) -> sql.Composed:
+        candidate_name = sql.SQL(
+            "cursor_decision_candidates" if cursor_relative else "decision_candidates"
+        )
+        match_name = sql.SQL(
+            "cursor_decision_matches" if cursor_relative else "decision_matches"
+        )
+        windows = tuple(
+            bounded_source_window(
+                source_sql=source,
+                activity_sql=sql.SQL("decision.updated_at"),
+                layer_rank_sql=sql.SQL("6::integer"),
+                matched_text_sql=decision_matched_text,
+                source_tiebreak_sql=sql.SQL("decision.id desc"),
+                cursor_relative=cursor_relative,
+            )
+            for source in decision_sources
+        )
+        if not has_anchor:
+            return sql.SQL("{match_name} as ({window})").format(
+                match_name=match_name,
+                window=windows[0],
+            )
+        deduplicated_scope = (
+            sql.SQL(
+                """
+                cross join input
+                join public.conversations as conversation
+                  on conversation.id = deduplicated.conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                """
+            )
+            if cursor_relative
+            else sql.SQL("")
+        )
+        deduplicated_order = (
+            sql.SQL(
+                """
+                conversation.pinned::integer desc,
+                {exact_rank_sql} desc,
+                {symbol_rank_sql} desc,
+                6::integer desc,
+                deduplicated.candidate_at desc,
+                {text_rank_sql} desc,
+                conversation.id desc,
+                deduplicated.source_id desc
+                """
+            ).format(
+                exact_rank_sql=conversation_exact_rank,
+                symbol_rank_sql=conversation_symbol_rank,
+                text_rank_sql=conversation_text_rank(
+                    sql.SQL("deduplicated.matched_text")
+                ),
+            )
+            if cursor_relative
+            else sql.SQL(
+                """
+                deduplicated.candidate_at desc,
+                deduplicated.source_id desc
+                """
+            )
+        )
+        return sql.SQL(
+            """
+            {candidate_name} as (
+                {candidate_windows}
+            ),
+            {match_name} as (
+                select
+                    deduplicated.conversation_id,
+                    deduplicated.source_id,
+                    deduplicated.candidate_at,
+                    deduplicated.matched_text,
+                    deduplicated.layer_rank,
+                    deduplicated.layer
+                from (
+                    select distinct on (candidate.source_id)
+                        candidate.*
+                    from {candidate_name} as candidate
+                    order by
+                        candidate.source_id,
+                        candidate.candidate_at desc
+                ) as deduplicated
+                {deduplicated_scope}
+                order by {deduplicated_order}
+                limit (select match_limit from input)
+            )
+            """
+        ).format(
+            candidate_name=candidate_name,
+            candidate_windows=sql.SQL("\nunion all\n").join(windows),
+            deduplicated_scope=deduplicated_scope,
+            deduplicated_order=deduplicated_order,
+            match_name=match_name,
+        )
+
+    def source_windows(*, cursor_relative: bool) -> sql.Composed:
+        decision_match_name = sql.SQL(
+            "cursor_decision_matches" if cursor_relative else "decision_matches"
+        )
+        windows = [
+            bounded_source_window(
+                source_sql=source,
+                activity_sql=activity,
+                layer_rank_sql=layer_rank,
+                matched_text_sql=matched_text,
+                source_tiebreak_sql=source_tiebreak,
+                cursor_relative=cursor_relative,
+            )
+            for (
+                source,
+                activity,
+                layer_rank,
+                matched_text,
+                source_tiebreak,
+            ) in source_specs
+        ]
+        windows.append(
+            sql.SQL(
+                """
+                (
+                select
+                    decision_match.conversation_id,
+                    decision_match.source_id,
+                    decision_match.candidate_at,
+                    decision_match.matched_text,
+                    decision_match.layer_rank,
+                    decision_match.layer
+                from {decision_match_name} as decision_match
+                )
+                """
+            ).format(decision_match_name=decision_match_name)
+        )
+        return sql.SQL("\nunion all\n").join(windows)
+
+    base_decision_ctes = decision_window_ctes(cursor_relative=False)
+    match_window_ctes = (
+        sql.SQL(
+            """
+            {decision_match_ctes},
+            base_matches as (
+                {base_matches}
+            ),
+            cursor_matches as (
+                {cursor_matches}
+            ),
+            matches as (
+                select * from base_matches
+                union
+                select * from cursor_matches
+            )
+            """
+        ).format(
+            decision_match_ctes=sql.SQL(",\n").join(
+                (
+                    base_decision_ctes,
+                    decision_window_ctes(cursor_relative=True),
+                )
+            ),
+            base_matches=source_windows(cursor_relative=False),
+            cursor_matches=source_windows(cursor_relative=True),
+        )
+        if has_cursor
+        else sql.SQL(
+            """
+            {decision_match_ctes},
+            matches as (
+                {base_matches}
+            )
+            """
+        ).format(
+            decision_match_ctes=base_decision_ctes,
+            base_matches=source_windows(cursor_relative=False),
+        )
+    )
+    return sql.SQL(
+        """
+        {match_window_ctes},
         winning_matches as (
             select *
             from (
@@ -1639,40 +1970,9 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                 end as message_id,
                 activity.activity_at,
                 conversation.pinned::integer as pinned_rank,
-                (
-                    input.normalized_query <> ''
-                    and input.normalized_query = {normalized_title}
-                )::integer as exact_rank,
-                exists (
-                    select 1
-                    from public.backtest_runs as symbol_run
-                    cross join unnest(symbol_run.symbols) as symbol
-                    where symbol_run.user_id = input.user_id
-                      and symbol_run.conversation_id = conversation.id
-                      and symbol_run.status = 'completed'
-                      and input.symbol_query = lower(symbol)
-                )::integer as symbol_rank,
-                (
-                    case
-                        when input.normalized_query <> ''
-                         and strpos(
-                             {normalized_title},
-                             input.normalized_query
-                         ) > 0
-                            then 100
-                        else 0
-                    end
-                    +
-                    case
-                        when input.normalized_query <> ''
-                         and strpos(
-                             {normalized_matched},
-                             input.normalized_query
-                         ) > 0
-                            then 50
-                        else 0
-                    end
-                )::integer as text_rank
+                {exact_rank_sql} as exact_rank,
+                {symbol_rank_sql} as symbol_rank,
+                {text_rank_sql} as text_rank
             from winning_matches as winning
             cross join input
             join public.conversations as conversation
@@ -1713,28 +2013,10 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
         )
         """
     ).format(
-        decision_match_ctes=decision_match_ctes,
-        chat_title_predicate=token_predicate(
-            chat_title_haystack,
-            chat_index_haystack,
-        ),
-        chat_preview_predicate=token_predicate(
-            chat_preview_haystack,
-            chat_index_haystack,
-        ),
-        message_predicate=token_predicate(message_haystack, message_haystack),
-        run_predicate=token_predicate(
-            run_haystack,
-            _normalized(_RUN_INDEX_HAYSTACK),
-        ),
-        idea_predicate=token_predicate(idea_haystack, idea_haystack),
-        evidence_predicate=token_predicate(
-            evidence_haystack,
-            _normalized(_EVIDENCE_INDEX_HAYSTACK),
-        ),
-        decision_filter=_CONVERSATION_DECISION_FILTER,
-        normalized_title=_normalized("conversation.title"),
-        normalized_matched=_normalized("winning.matched_text"),
+        match_window_ctes=match_window_ctes,
+        exact_rank_sql=conversation_exact_rank,
+        symbol_rank_sql=conversation_symbol_rank,
+        text_rank_sql=conversation_text_rank(sql.SQL("winning.matched_text")),
     )
 
 
@@ -1998,6 +2280,7 @@ def _asset_rollup_search_sql() -> sql.Composed:
 def _conversation_search_sql(
     *,
     has_anchor: bool,
+    has_cursor: bool = False,
     pivot_only: bool = False,
 ) -> sql.Composed:
     terminal_predicate = (
@@ -2083,7 +2366,10 @@ def _conversation_search_sql(
             """
         ).format(
             input_cte=_CONVERSATION_INPUT_CTE,
-            match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
+            match_ctes=_conversation_match_ctes(
+                has_anchor=has_anchor,
+                has_cursor=has_cursor,
+            ),
             conversation_rows=conversation_rows,
         )
 
@@ -2112,7 +2398,10 @@ def _conversation_search_sql(
         """
     ).format(
         input_cte=_CONVERSATION_INPUT_CTE,
-        match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
+        match_ctes=_conversation_match_ctes(
+            has_anchor=has_anchor,
+            has_cursor=has_cursor,
+        ),
         asset_rollup_ctes=_asset_rollup_ctes(),
         asset_rollup_rows=_asset_rollup_rows_sql(),
         conversation_rows=conversation_rows,
@@ -2825,6 +3114,7 @@ class PostgresSearchReader:
                     cursor.execute(
                         _conversation_search_sql(
                             has_anchor=anchor_token is not None,
+                            has_cursor=True,
                             pivot_only=True,
                         ),
                         params,
@@ -2846,6 +3136,7 @@ class PostgresSearchReader:
                 search_sql = (
                     _conversation_search_sql(
                         has_anchor=anchor_token is not None,
+                        has_cursor=has_cursor,
                     )
                     if text_search_enabled
                     else _asset_rollup_search_sql()
