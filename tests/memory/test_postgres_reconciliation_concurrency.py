@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import threading
 import uuid
+from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from typing import Any
@@ -164,7 +165,7 @@ def _insert_record(cursor, state: _LifecycleState) -> None:
 
 
 @pytest.fixture
-def lifecycle_state() -> _LifecycleState:
+def lifecycle_state() -> Iterator[_LifecycleState]:
     with _connect() as connection:
         state = _seed_lifecycle_state(connection)
     try:
