@@ -501,7 +501,11 @@ def _build_memory_search_index(
             str(row["id"])
             for row in sorted(
                 conversations,
-                key=lambda row: (_mapping_activity(row), str(row["id"])),
+                key=lambda row: _recent_conversation_seek_key(
+                    conversation_id=str(row["id"]),
+                    conversation=row,
+                    activity=conversation_activity_by_id[str(row["id"])],
+                ),
                 reverse=True,
             )
         ),
@@ -712,14 +716,43 @@ def _recent_conversation_window(
     ]
     if cursor_updated_at is None or cursor_id is None:
         return eligible[:candidate_limit]
+    cursor_conversation = index.conversations.get(cursor_id)
+    cursor_activity = index.conversation_activity_by_id.get(cursor_id)
+    if (
+        cursor_conversation is None
+        or cursor_activity is None
+        or cursor_activity != cursor_updated_at
+    ):
+        return eligible[:candidate_limit]
+    cursor_key = _recent_conversation_seek_key(
+        conversation_id=cursor_id,
+        conversation=cursor_conversation,
+        activity=cursor_activity,
+    )
     cursor_window = [
         conversation_id
         for conversation_id in eligible
-        if _mapping_activity(index.conversations[conversation_id])
-        <= cursor_updated_at
-        or conversation_id == cursor_id
+        if _recent_conversation_seek_key(
+            conversation_id=conversation_id,
+            conversation=index.conversations[conversation_id],
+            activity=index.conversation_activity_by_id[conversation_id],
+        )
+        <= cursor_key
     ][:candidate_limit]
     return list(dict.fromkeys((*eligible[:candidate_limit], *cursor_window)))
+
+
+def _recent_conversation_seek_key(
+    *,
+    conversation_id: str,
+    conversation: Mapping[str, Any],
+    activity: datetime,
+) -> tuple[int, datetime, str]:
+    return (
+        int(bool(conversation.get("pinned"))),
+        activity,
+        conversation_id,
+    )
 
 
 def _ledger_counts(

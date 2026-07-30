@@ -249,6 +249,139 @@ def test_memory_candidate_window_uses_final_conversation_rank_beyond_source_cap(
     assert ranked[0][1].id == target_id
 
 
+def test_memory_recents_window_uses_final_seek_key_before_candidate_cap() -> None:
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+
+    for index in range(210):
+        conversation_id = f"conversation-recent-window-{index:03d}"
+        api_state.store.conversations[conversation_id] = Conversation(
+            id=conversation_id,
+            title=f"Recent conversation {index}",
+            created_at=now,
+            updated_at=now + timedelta(minutes=index),
+            language="en",
+        )
+        api_state.store.conversation_owners[conversation_id] = user.id
+
+    pinned_id = "conversation-old-but-pinned"
+    api_state.store.conversations[pinned_id] = Conversation(
+        id=pinned_id,
+        title="Old pinned conversation",
+        pinned=True,
+        created_at=now - timedelta(days=3),
+        updated_at=now - timedelta(days=3),
+        language="en",
+    )
+    api_state.store.conversation_owners[pinned_id] = user.id
+
+    decision_activity_id = "conversation-old-with-recent-decision"
+    api_state.store.conversations[decision_activity_id] = Conversation(
+        id=decision_activity_id,
+        title="Old conversation with a new decision",
+        created_at=now - timedelta(days=2),
+        updated_at=now - timedelta(days=2),
+        language="en",
+    )
+    api_state.store.conversation_owners[decision_activity_id] = user.id
+    decision_id = "decision-recent-window"
+    api_state.store.decision_notes[decision_id] = DecisionNote(
+        id=decision_id,
+        idea_id="idea-recent-window",
+        idea_version_id="version-recent-window",
+        evidence_artifact_id="artifact-recent-window",
+        source_conversation_id=decision_activity_id,
+        decision_state="watching",
+        note="A newer decision on an older chat.",
+        created_at=now + timedelta(days=1),
+        updated_at=now + timedelta(days=1),
+    )
+    api_state.store.decision_note_owners[decision_id] = user.id
+
+    base_snapshot = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="",
+        source_limit=21,
+        include_conversation_rows=True,
+    )
+    cursor_snapshot = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="",
+        source_limit=21,
+        include_conversation_rows=True,
+        cursor_updated_at=now + timedelta(minutes=209),
+        cursor_id="conversation-recent-window-209",
+    )
+
+    assert len(base_snapshot.conversations) == 210
+    assert {
+        pinned_id,
+        decision_activity_id,
+    }.issubset({row["id"] for row in base_snapshot.conversations})
+    assert {
+        pinned_id,
+        decision_activity_id,
+    }.issubset({row["id"] for row in cursor_snapshot.conversations})
+
+
+def test_memory_recents_cursor_window_uses_final_seek_key_beyond_head() -> None:
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+
+    for index in range(10):
+        conversation_id = f"conversation-old-pinned-{index:02d}"
+        api_state.store.conversations[conversation_id] = Conversation(
+            id=conversation_id,
+            title=f"Old pinned conversation {index}",
+            pinned=True,
+            created_at=now - timedelta(days=2),
+            updated_at=now - timedelta(days=2, minutes=index),
+            language="en",
+        )
+        api_state.store.conversation_owners[conversation_id] = user.id
+
+    for conversation_id, updated_at in (
+        ("conversation-cursor", now),
+        ("conversation-after-cursor", now - timedelta(minutes=1)),
+    ):
+        api_state.store.conversations[conversation_id] = Conversation(
+            id=conversation_id,
+            title=conversation_id,
+            created_at=updated_at,
+            updated_at=updated_at,
+            language="en",
+        )
+        api_state.store.conversation_owners[conversation_id] = user.id
+
+    base_snapshot = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="",
+        source_limit=1,
+        include_conversation_rows=True,
+    )
+    cursor_snapshot = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="",
+        source_limit=1,
+        include_conversation_rows=True,
+        cursor_updated_at=now,
+        cursor_id="conversation-cursor",
+    )
+
+    base_ids = {row["id"] for row in base_snapshot.conversations}
+    cursor_ids = {row["id"] for row in cursor_snapshot.conversations}
+    assert "conversation-cursor" not in base_ids
+    assert "conversation-after-cursor" not in base_ids
+    assert {
+        "conversation-cursor",
+        "conversation-after-cursor",
+    }.issubset(cursor_ids)
+
+
 def test_memory_search_preserves_the_latest_untaken_assistant_offer() -> None:
     user = api_state.store.get_or_create_dev_user()
     now = datetime.now(timezone.utc)
