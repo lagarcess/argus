@@ -1541,19 +1541,25 @@ class SupabaseGateway(
         include_ledger_groups: bool = False,
         guest_scope: bool = False,
         guest_conversation_id: str | None = None,
+        conversation_ids: list[str] | None = None,
     ) -> SearchReadResult:
         if self.search_reader is None:
             raise RuntimeError("Persistent Search requires its Postgres reader.")
+        kwargs: dict[str, Any] = {
+            "user_id": user_id,
+            "query": query,
+            "source_limit": source_limit,
+            "cursor_updated_at": cursor_updated_at,
+            "cursor_id": cursor_id,
+            "decision_state": decision_state,
+            "include_ledger_groups": include_ledger_groups,
+            "guest_scope": guest_scope,
+            "guest_conversation_id": guest_conversation_id,
+        }
+        if conversation_ids is not None:
+            kwargs["conversation_ids"] = conversation_ids
         return self.search_reader.search_rows(
-            user_id=user_id,
-            query=query,
-            source_limit=source_limit,
-            cursor_updated_at=cursor_updated_at,
-            cursor_id=cursor_id,
-            decision_state=decision_state,
-            include_ledger_groups=include_ledger_groups,
-            guest_scope=guest_scope,
-            guest_conversation_id=guest_conversation_id,
+            **kwargs,
         )
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:

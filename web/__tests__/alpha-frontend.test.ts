@@ -1587,7 +1587,7 @@ describe("Argus Alpha frontend contract", () => {
     );
     const historyEffect = palette.slice(
       palette.lastIndexOf("useEffect(() => {", historyRequestStart),
-      palette.indexOf("const refreshRecentsLedgerGroups"),
+      palette.indexOf("const clearSearchAndLedger"),
     );
 
     expect(historyEffect).toContain("!isRecentsMode");
@@ -1655,9 +1655,28 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(palette).toContain("const isRecentsMode =");
     expect(historyEffect).toContain("!isRecentsMode");
-    expect(historyEffect).toContain("[isRecentsMode, retryNonce]");
+    expect(historyEffect).toContain(
+      "[isGuest, isRecentsMode, retryNonce]",
+    );
     expect(historyRequestStart).toBeLessThan(
       palette.indexOf("const trimmed = query.trim()"),
+    );
+    expect(
+      clearSearchAndLedger.indexOf(
+        "historyRequestIdRef.current += 1",
+      ),
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      clearSearchAndLedger.indexOf(
+        "historyRequestIdRef.current += 1",
+      ),
+    ).toBeLessThan(
+      clearSearchAndLedger.indexOf(
+        "searchSignatureRef.current = RECENTS_SEARCH_SIGNATURE",
+      ),
+    );
+    expect(clearSearchAndLedger).toContain(
+      "searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE",
     );
     expect(
       clearSearchAndLedger.indexOf(
@@ -1665,7 +1684,25 @@ describe("Argus Alpha frontend contract", () => {
       ),
     ).toBeLessThan(clearSearchAndLedger.indexOf('setQuery("")'));
     expect(
-      searchInputChange.indexOf("searchSignatureRef.current = JSON.stringify"),
+      searchInputChange.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeGreaterThanOrEqual(0);
+    expect(searchInputChange).toContain(
+      "const nextSignature = JSON.stringify",
+    );
+    expect(searchInputChange).toContain(
+      "nextSignature !== searchSignatureRef.current",
+    );
+    expect(
+      searchInputChange.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeLessThan(
+      searchInputChange.indexOf(
+        "searchSignatureRef.current = nextSignature",
+      ),
+    );
+    expect(
+      searchInputChange.indexOf(
+        "searchSignatureRef.current = nextSignature",
+      ),
     ).toBeLessThan(searchInputChange.indexOf("setQuery(nextQuery)"));
 
     const recentsSignature = JSON.stringify(["", false, null]);
@@ -1688,18 +1725,29 @@ describe("Argus Alpha frontend contract", () => {
         currentSignature,
         currentRequestId,
       });
+    const updateSignature = (nextSignature: string) => {
+      if (nextSignature !== currentSignature) currentRequestId += 1;
+      currentSignature = nextSignature;
+    };
 
     const initialHistory = startHistoryRead(true);
     expect(initialHistory).not.toBeNull();
 
-    currentSignature = JSON.stringify(["gold", false, null]);
+    updateSignature(JSON.stringify(["gold", false, null]));
     expect(requestIsCurrent(initialHistory!)).toBe(false);
     expect(startHistoryRead(false)).toBeNull();
 
-    currentSignature = recentsSignature;
+    updateSignature(recentsSignature);
+    expect(requestIsCurrent(initialHistory!)).toBe(false);
     const returnedHistory = startHistoryRead(true);
     expect(returnedHistory).not.toBeNull();
     expect(requestIsCurrent(initialHistory!)).toBe(false);
+    expect(requestIsCurrent(returnedHistory!)).toBe(true);
+
+    const whitespaceSignature = JSON.stringify([" ".trim(), false, null]);
+    updateSignature(whitespaceSignature);
+    expect(requestIsCurrent(returnedHistory!)).toBe(true);
+    updateSignature(recentsSignature);
     expect(requestIsCurrent(returnedHistory!)).toBe(true);
   });
 
@@ -1708,12 +1756,13 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
-    const recentsLedgerRefresh = palette.slice(
-      palette.indexOf("const refreshRecentsLedgerGroups"),
-      palette.indexOf(
-        "useEffect(() =>",
-        palette.indexOf("const refreshRecentsLedgerGroups"),
-      ),
+    const recentRecall = readFileSync(
+      join(root, "lib/command-palette-recent-recall.ts"),
+      "utf-8",
+    );
+    const recentsHistoryAndDossierRead = palette.slice(
+      palette.indexOf("const requestId = ++historyRequestIdRef.current"),
+      palette.indexOf("const clearSearchAndLedger"),
     );
     const clearSearchAndLedger = palette.slice(
       palette.indexOf("const clearSearchAndLedger"),
@@ -1734,21 +1783,24 @@ describe("Argus Alpha frontend contract", () => {
       ),
     );
 
-    expect(recentsLedgerRefresh).toContain(
+    expect(recentsHistoryAndDossierRead).toContain(
       "const capturedSignature = RECENTS_SEARCH_SIGNATURE",
     );
-    expect(recentsLedgerRefresh).toContain("commandPaletteRequestIsCurrent");
-    expect(recentsLedgerRefresh).toContain("includeLedgerGroups: true");
+    expect(recentsHistoryAndDossierRead).toContain(
+      "commandPaletteRequestIsCurrent",
+    );
+    expect(recentsHistoryAndDossierRead).toContain(
+      "loadCommandPaletteRecentRecall",
+    );
+    expect(recentRecall).toContain("includeLedgerGroups: true");
     expect(clearSearchAndLedger).toContain("setLedgerGroups([])");
-    expect(clearSearchAndLedger).toContain(
-      "void refreshRecentsLedgerGroups()",
-    );
+    expect(clearSearchAndLedger).not.toContain("searchGlobal(");
     expect(loadLedgerBrowse).toContain("setLedgerGroups([])");
-    expect(searchInputChange).toContain("ledgerRequestIdRef.current += 1");
-    expect(searchInputChange).toContain("setLedgerGroups([])");
     expect(searchInputChange).toContain(
-      "if (!nextQuery.trim()) void refreshRecentsLedgerGroups()",
+      "ledgerBrowseRequestIdRef.current += 1",
     );
+    expect(searchInputChange).toContain("setLedgerGroups([])");
+    expect(searchInputChange).not.toContain("searchGlobal(");
   });
 
   test("decision refresh invalidates an older Recents dossier enrichment", () => {
@@ -1761,9 +1813,13 @@ describe("Argus Alpha frontend contract", () => {
       palette.indexOf("const saveDecision"),
     );
 
-    expect(canonicalRefresh).toContain("ledgerRequestIdRef.current += 1");
-    expect(canonicalRefresh.indexOf("ledgerRequestIdRef.current += 1")).toBeLessThan(
-      canonicalRefresh.indexOf("const requestId = ++searchRequestIdRef.current"),
+    expect(canonicalRefresh).toContain("historyRequestIdRef.current += 1");
+    expect(
+      canonicalRefresh.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeLessThan(
+      canonicalRefresh.indexOf(
+        "const requestId = ++searchRequestIdRef.current",
+      ),
     );
   });
 
@@ -1772,13 +1828,9 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
-    const initialLedgerFetch = palette.slice(
-      palette.indexOf("const refreshRecentsLedgerGroups"),
-      palette.indexOf("const clearSearchAndLedger"),
-    );
     const initialHistoryFetch = palette.slice(
       palette.indexOf("const requestId = ++historyRequestIdRef.current"),
-      palette.indexOf("const refreshRecentsLedgerGroups"),
+      palette.indexOf("const clearSearchAndLedger"),
     );
     const clearSearchAndLedger = palette.slice(
       palette.indexOf("const clearSearchAndLedger"),
@@ -1811,16 +1863,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("const SEARCH_DEBOUNCE_MS = 200");
     expect(palette).toContain("searchQueryIsIndexable");
     expect(palette).toContain("command_palette.keep_typing");
-    expect(palette).toContain("const ledgerRequestIdRef = useRef(0)");
     expect(palette).toContain("const ledgerBrowseRequestIdRef = useRef(0)");
-    expect(initialLedgerFetch).toContain("++ledgerRequestIdRef.current");
-    expect(initialLedgerFetch).not.toContain("++searchRequestIdRef.current");
-    expect(initialLedgerFetch).toContain("setLedgerGroups([])");
-    expect(initialLedgerFetch).not.toContain("setReadError");
     expect(initialHistoryFetch).toContain(
       "const capturedSignature = RECENTS_SEARCH_SIGNATURE",
     );
     expect(initialHistoryFetch).toContain("commandPaletteRequestIsCurrent");
+    expect(initialHistoryFetch).toContain(
+      "loadCommandPaletteRecentRecall",
+    );
+    expect(initialHistoryFetch).toContain("setLedgerGroups(");
     expect(loadLedgerBrowse).toContain("++ledgerBrowseRequestIdRef.current");
     expect(loadLedgerBrowse).not.toContain("++searchRequestIdRef.current");
     expect(clearSearchAndLedger).toContain(
@@ -1874,9 +1925,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(
       saveDecision.slice(saveDecision.indexOf("await refreshCanonicalSearch")),
     ).not.toContain("setDecisionSaveFailed(true)");
-    expect(saveDecision).toContain(
-      'setReadError(currentLedgerMode ? "ledger" : "search")',
-    );
+    expect(saveDecision).toContain(': currentQuery');
+    expect(saveDecision).toContain('? "search"');
+    expect(saveDecision).toContain(': "history"');
     expect(saveDecision).not.toContain("capturedSignature");
     expect(saveDecision.indexOf("await createEvidenceDecision")).toBeLessThan(
       saveDecision.indexOf("const currentSignature"),

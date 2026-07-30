@@ -31,6 +31,31 @@ def test_generated_and_checked_artifacts_are_structurally_compatible(
     assert failures == [], "\n".join(failures)
 
 
+def test_search_declares_bounded_visible_conversation_recall(
+    generated: dict,
+) -> None:
+    operation = generated["paths"]["/api/v1/search"]["get"]
+    parameters = {
+        parameter["name"]: parameter for parameter in operation["parameters"]
+    }
+
+    conversation_ids = parameters["conversation_id"]
+    assert conversation_ids["in"] == "query"
+    assert conversation_ids["required"] is False
+    assert conversation_ids["schema"] == {
+        "anyOf": [
+            {
+                "items": {"type": "string", "format": "uuid"},
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 50,
+            },
+            {"type": "null"},
+        ],
+        "title": "Conversation Id",
+    }
+
+
 def test_prefix_appears_exactly_once_per_public_operation(
     generated: dict, checked: dict
 ) -> None:

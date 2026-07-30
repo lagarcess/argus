@@ -2507,6 +2507,105 @@ def test_search_empty_query_includes_archived_recents_and_excludes_deleted() -> 
     ]
 
 
+def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    target_id = "00000000-0000-0000-0000-000000000777"
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id=target_id,
+        title="Visible active conversation",
+        updated_at=now - timedelta(days=7),
+    )
+    deleted_id = "00000000-0000-0000-0000-000000000778"
+    foreign_id = "00000000-0000-0000-0000-000000000779"
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id=deleted_id,
+        title="Deleted conversation",
+        updated_at=now,
+        deleted_at=now,
+    )
+    _store_search_conversation(
+        user_id="00000000-0000-0000-0000-000000000999",
+        conversation_id=foreign_id,
+        title="Foreign conversation",
+        updated_at=now,
+    )
+    for index in range(101):
+        conversation_id = f"conversation-archived-pinned-{index:03d}"
+        _store_search_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            title=f"Archived pinned conversation {index}",
+            updated_at=now + timedelta(minutes=index),
+            archived=True,
+        )
+        conversation = api_state.store.conversations[conversation_id]
+        api_state.store.conversations[conversation_id] = conversation.model_copy(
+            update={"pinned": True}
+        )
+
+    ranked = client.get("/api/v1/search", params={"q": "", "limit": 100})
+    recalled = client.get(
+        "/api/v1/search",
+        params={
+            "q": "",
+            "limit": 3,
+            "conversation_id": [target_id, deleted_id, foreign_id],
+            "include_ledger_groups": "true",
+        },
+    )
+
+    assert ranked.status_code == 200
+    assert target_id not in {item["id"] for item in ranked.json()["items"]}
+    assert recalled.status_code == 200
+    payload = recalled.json()
+    assert [item["id"] for item in payload["items"]] == [target_id]
+    assert payload["items"][0]["title"] == "Visible active conversation"
+    assert payload["items"][0]["dossier"]["decision"] is None
+    assert payload["items"][0]["dossier"]["tested"]["run_count"] == 0
+    assert payload["items"][0]["dossier"]["outcome"] is None
+    assert payload["items"][0]["dossier"]["left_off"] is None
+    assert payload["next_cursor"] is None
+    assert len(payload["ledger_groups"]) == 4
+
+
+def test_search_id_scoped_recall_rejects_ranked_search_controls() -> None:
+    client = _client()
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "gold",
+            "limit": 1,
+            "conversation_id": ["00000000-0000-0000-0000-000000000001"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "validation_error"
+
+
+def test_search_id_scoped_recall_caps_visible_conversation_ids_at_fifty() -> None:
+    client = _client()
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "",
+            "limit": 50,
+            "conversation_id": [
+                f"00000000-0000-0000-0000-{index:012d}" for index in range(51)
+            ],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]

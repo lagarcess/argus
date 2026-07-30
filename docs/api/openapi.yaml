@@ -1243,6 +1243,18 @@ paths:
         schema:
           type: boolean
           default: false
+      - name: conversation_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          - type: 'null'
       responses:
         '200':
           description: Successful Response

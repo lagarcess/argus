@@ -2924,6 +2924,7 @@ class PostgresSearchReader:
         include_ledger_groups: bool = False,
         guest_scope: bool = False,
         guest_conversation_id: str | None = None,
+        conversation_ids: list[str] | None = None,
     ) -> SearchReadResult:
         if source_limit < 1:
             raise ValueError("Search source limit must be positive.")
@@ -2951,6 +2952,22 @@ class PostgresSearchReader:
             )
         except (TypeError, ValueError) as exc:
             raise ValueError("Guest workspace conversation id is invalid.") from exc
+        requested_conversation_ids: list[UUID] = []
+        for raw_conversation_id in dict.fromkeys(conversation_ids or ()):
+            try:
+                requested_conversation_ids.append(UUID(raw_conversation_id))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Visible conversation id is invalid.") from exc
+        if len(requested_conversation_ids) > 50:
+            raise ValueError("Visible conversation recall accepts at most 50 ids.")
+        if len(requested_conversation_ids) > source_limit:
+            raise ValueError("Visible conversation recall exceeds its source limit.")
+        if requested_conversation_ids and (
+            query.strip() or has_cursor or decision_state is not None
+        ):
+            raise ValueError(
+                "Visible conversation recall cannot use ranked search controls."
+            )
 
         normalized_query = normalize_search_text(query)
         normalized_tokens = tuple(dict.fromkeys(normalized_query.split()))
@@ -3016,7 +3033,24 @@ class PostgresSearchReader:
         }
         with self.pool.connection(timeout=_SEARCH_ACQUIRE_TIMEOUT_SECONDS) as connection:
             with connection.cursor(row_factory=dict_row) as cursor:
-                if has_cursor:
+                if requested_conversation_ids:
+                    grouped = {
+                        group: [] for group in _CONVERSATION_ROW_GROUPS
+                    }
+                    grouped["conversations"] = [
+                        {"id": str(conversation_id)}
+                        for conversation_id in requested_conversation_ids
+                    ]
+                    asset_rollup = None
+                    grouped = _hydrate_conversation_recall(
+                        cursor=cursor,
+                        owner_id=owner_id,
+                        grouped=grouped,
+                        guest_conversation_id=(
+                            workspace_id if guest_scope else None
+                        ),
+                    )
+                elif has_cursor:
                     cursor.execute(
                         _conversation_search_sql(
                             has_anchor=anchor_token is not None,
@@ -3039,32 +3073,35 @@ class PostgresSearchReader:
                         cursor_text_rank=int(pivot["text_rank"]),
                     )
 
-                search_sql = (
-                    _conversation_search_sql(
-                        has_anchor=anchor_token is not None,
-                        has_cursor=has_cursor,
+                if not requested_conversation_ids:
+                    search_sql = (
+                        _conversation_search_sql(
+                            has_anchor=anchor_token is not None,
+                            has_cursor=has_cursor,
+                        )
+                        if text_search_enabled
+                        else _asset_rollup_search_sql()
                     )
-                    if text_search_enabled
-                    else _asset_rollup_search_sql()
-                )
-                cursor.execute(search_sql, params)
-                candidate_rows = cursor.fetchall()
-                grouped = _group_candidates(
-                    candidate_rows,
-                    source_limit=source_limit,
-                )
-                asset_rows = grouped.pop("asset_rollups", [])
-                asset_rollup = (
-                    SearchAssetRollup.model_validate(asset_rows[0])
-                    if asset_rows
-                    else None
-                )
-                grouped = _hydrate_conversation_recall(
-                    cursor=cursor,
-                    owner_id=owner_id,
-                    grouped=grouped,
-                    guest_conversation_id=workspace_id if guest_scope else None,
-                )
+                    cursor.execute(search_sql, params)
+                    candidate_rows = cursor.fetchall()
+                    grouped = _group_candidates(
+                        candidate_rows,
+                        source_limit=source_limit,
+                    )
+                    asset_rows = grouped.pop("asset_rollups", [])
+                    asset_rollup = (
+                        SearchAssetRollup.model_validate(asset_rows[0])
+                        if asset_rows
+                        else None
+                    )
+                    grouped = _hydrate_conversation_recall(
+                        cursor=cursor,
+                        owner_id=owner_id,
+                        grouped=grouped,
+                        guest_conversation_id=(
+                            workspace_id if guest_scope else None
+                        ),
+                    )
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
                     ledger_counts = {state: 0 for state in _DECISION_STATES}

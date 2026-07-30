@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 from argus.api import state as api_state
 from argus.api.memory_search_candidates import bounded_memory_search_snapshot
@@ -35,6 +35,7 @@ def memory_search_read(
     decision_state: str | None = None,
     include_ledger_groups: bool = False,
     guest_conversation_id: str | None = None,
+    conversation_ids: Iterable[str] | None = None,
 ) -> MemorySearchRead:
     """Project owned memory records through the same conversation read model."""
     snapshot = bounded_memory_search_snapshot(
@@ -48,6 +49,7 @@ def memory_search_read(
         decision_state=decision_state,
         include_ledger_groups=include_ledger_groups,
         guest_conversation_id=guest_conversation_id,
+        conversation_ids=conversation_ids,
     )
     return MemorySearchRead(
         scored_items=(

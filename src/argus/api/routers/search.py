@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user
+from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
@@ -49,10 +51,35 @@ def search(
     cursor: str | None = Query(None),
     decision_state: DecisionState | None = Query(None),  # noqa: B008
     include_ledger_groups: bool = Query(False),  # noqa: B008
+    conversation_id: list[UUID] | None = Query(  # noqa: B008
+        None,
+        min_length=1,
+        max_length=50,
+    ),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedSearch:
     context = account_context(request)
     query = q.strip().lower()
+    requested_conversation_ids = list(
+        dict.fromkeys(str(value) for value in (conversation_id or ()))
+    )
+    id_scoped_recall = bool(requested_conversation_ids)
+    if id_scoped_recall and (
+        query
+        or cursor is not None
+        or decision_state is not None
+        or len(requested_conversation_ids) > limit
+    ):
+        raise problem(
+            request,
+            status_code=400,
+            code="validation_error",
+            title="Validation Error",
+            detail=(
+                "Visible conversation recall requires an empty query, no cursor "
+                "or decision filter, and a limit covering every requested id."
+            ),
+        )
 
     cursor_dt: datetime | None = None
     cursor_id: str | None = None
@@ -116,16 +143,25 @@ def search(
     memory_ledger_counts: dict[str, int] | None = None
     if api_state.supabase_gateway is not None:
         try:
+            read_kwargs: dict[str, Any] = {
+                "user_id": user.id,
+                "query": query,
+                "source_limit": (
+                    len(requested_conversation_ids)
+                    if id_scoped_recall
+                    else limit + 1
+                ),
+                "cursor_updated_at": cursor_dt,
+                "cursor_id": cursor_id,
+                "decision_state": decision_state,
+                "include_ledger_groups": include_ledger_groups,
+                "guest_scope": context.kind == "guest",
+                "guest_conversation_id": workspace_conversation_id,
+            }
+            if id_scoped_recall:
+                read_kwargs["conversation_ids"] = requested_conversation_ids
             read_result = api_state.supabase_gateway.search_rows(
-                user_id=user.id,
-                query=query,
-                source_limit=limit + 1,
-                cursor_updated_at=cursor_dt,
-                cursor_id=cursor_id,
-                decision_state=decision_state,
-                include_ledger_groups=include_ledger_groups,
-                guest_scope=context.kind == "guest",
-                guest_conversation_id=workspace_conversation_id,
+                **read_kwargs,
             )
         except SearchCursorError:
             raise invalid_cursor_problem(request) from None
@@ -149,7 +185,11 @@ def search(
         memory_read = memory_search_read(
             user=user,
             query=query,
-            source_limit=limit + 1,
+            source_limit=(
+                len(requested_conversation_ids)
+                if id_scoped_recall
+                else limit + 1
+            ),
             allow_decision_action=context.capabilities.can_save_decision,
             include_conversation_rows=text_search_enabled,
             cursor_updated_at=cursor_dt,
@@ -157,6 +197,9 @@ def search(
             decision_state=decision_state,
             include_ledger_groups=include_ledger_groups,
             guest_conversation_id=workspace_conversation_id,
+            conversation_ids=(
+                requested_conversation_ids if id_scoped_recall else None
+            ),
         )
         scored_items.extend(memory_read.scored_items)
         asset_rollup = memory_read.asset_rollup
@@ -170,6 +213,13 @@ def search(
             for pair in scored_items
             if workspace_conversation_id is not None
             and pair[1].conversation_id == workspace_conversation_id
+        ]
+    if id_scoped_recall:
+        requested_ids = set(requested_conversation_ids)
+        scored_items = [
+            pair
+            for pair in scored_items
+            if pair[1].conversation_id in requested_ids
         ]
 
     scored_items.sort(
@@ -229,9 +279,9 @@ def search(
             < cursor_key
         ]
 
-    page = filtered[: limit + 1]
-    has_more = len(page) > limit
-    page_items = page[:limit]
+    page = filtered if id_scoped_recall else filtered[: limit + 1]
+    has_more = False if id_scoped_recall else len(page) > limit
+    page_items = page if id_scoped_recall else page[:limit]
     next_cursor = None
     if has_more and page_items:
         _, last_item = page_items[-1]

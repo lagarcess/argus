@@ -104,10 +104,18 @@ def bounded_memory_search_snapshot(
     decision_state: str | None = None,
     include_ledger_groups: bool = False,
     guest_conversation_id: str | None = None,
+    conversation_ids: Iterable[str] | None = None,
 ) -> MemorySearchSnapshot:
     """Read a bounded query page from a revision-keyed, non-durable index."""
     if source_limit < 1:
         raise ValueError("Memory search source limit must be positive.")
+    requested_conversation_ids = tuple(
+        dict.fromkeys(str(value) for value in (conversation_ids or ()))
+    )
+    if len(requested_conversation_ids) > 50:
+        raise ValueError("Visible conversation recall accepts at most 50 ids.")
+    if len(requested_conversation_ids) > source_limit:
+        raise ValueError("Visible conversation recall exceeds its source limit.")
     candidate_limit = min(
         max(source_limit * _MEMORY_MATCH_OVERSAMPLE, _MEMORY_MATCH_OVERSAMPLE),
         _MEMORY_MATCH_LIMIT_MAX,
@@ -130,7 +138,13 @@ def bounded_memory_search_snapshot(
     selected_conversation_ids: set[str] = set()
     selected_message_ids: set[str] = set()
     selected_query_matches: dict[str, _ConversationQueryMatch] = {}
-    if include_conversation_rows:
+    if requested_conversation_ids:
+        selected_conversation_ids.update(
+            conversation_id
+            for conversation_id in requested_conversation_ids
+            if conversation_id in eligible_conversation_ids
+        )
+    elif include_conversation_rows:
         if query:
             selected_query_matches = _query_conversation_window(
                 index,

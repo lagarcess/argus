@@ -3120,6 +3120,10 @@ the `/search` contract.
   `watching`, `promising`, `rejected`, `revisit_later`.
 - `include_ledger_groups`: optional boolean. When true, the response includes
   backend-owned conversation decision-state groups and exact counts.
+- `conversation_id`: optional repeated conversation id for bounded Recents
+  dossier hydration. At most 50 ids are accepted. This mode requires empty
+  `q`, no `cursor` or `decision_state`, and `limit` greater than or equal to
+  the number of unique requested ids.
 
 **Response:**
 ```json
@@ -3342,6 +3346,12 @@ enum value from the backend attached to filters, pills, and grouped rows.
 
 Empty `q` returns recents-first conversation rows. Archived conversations remain
 eligible and soft-deleted conversations are excluded before ranking and limits.
+When `conversation_id` is supplied, ranking and cursor pagination do not apply:
+the response contains only those requested, owner-visible, non-deleted
+conversation dossiers and `next_cursor = null`. Missing, foreign, or deleted
+ids are omitted without revealing ownership. This is one bounded read for the
+at-most-50 chats already visible in History; clients must not replace it with
+one request per row or an automatic walk through unrelated ranked pages.
 For a non-empty query, recall begins only when at least one normalized token has
 three characters. One- and two-character partial input returns no search rows
 and does not read transcript or artifact haystacks; the palette asks the user to

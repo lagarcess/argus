@@ -903,6 +903,7 @@ export async function searchGlobal(params: {
   cursor?: string;
   decisionState?: DecisionState | null;
   includeLedgerGroups?: boolean;
+  conversationIds?: string[];
 }) {
   const {
     q,
@@ -910,6 +911,7 @@ export async function searchGlobal(params: {
     cursor,
     decisionState,
     includeLedgerGroups = false,
+    conversationIds,
   } = params;
   const searchParams = new URLSearchParams({
     q,
@@ -920,6 +922,8 @@ export async function searchGlobal(params: {
   if (includeLedgerGroups) {
     searchParams.append("include_ledger_groups", "true");
   }
+  for (const id of conversationIds ?? [])
+    searchParams.append("conversation_id", id);
   return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );

@@ -556,6 +556,52 @@ def test_search_recalls_latest_user_message_with_count_and_archive_visibility(
     assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
 
 
+def test_visible_id_recall_is_one_owner_scoped_hydration(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    other_id = search_identities["other"]
+    now = datetime(2026, 7, 27, 12, 10, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        archived_target = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=30),
+            title="Visible History target",
+            archived=True,
+        )
+        deleted_target = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Deleted target",
+            deleted=True,
+        )
+        foreign_target = _insert_conversation(
+            cursor,
+            user_id=other_id,
+            timestamp=now,
+            title="Foreign target",
+        )
+
+    reader, pool = _reader()
+    result = reader.search_rows(
+        user_id=str(owner_id),
+        query="",
+        source_limit=3,
+        conversation_ids=[
+            str(archived_target),
+            str(deleted_target),
+            str(foreign_target),
+        ],
+    )
+
+    assert [row["id"] for row in result.rows["conversations"]] == [
+        str(archived_target)
+    ]
+    assert pool.tracker == {"query_count": 1, "row_counts": [1]}
+
+
 def test_search_projects_and_clears_the_untaken_suggestion_nudge(
     search_identities,
 ) -> None:

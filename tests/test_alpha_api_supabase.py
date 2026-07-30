@@ -2444,6 +2444,58 @@ def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
     )
 
 
+def test_search_supabase_pushes_visible_conversation_ids_to_bounded_reader(
+    mock_gateway,
+):
+    conversation_ids = [
+        "00000000-0000-0000-0000-000000000091",
+        "00000000-0000-0000-0000-000000000092",
+    ]
+    mock_gateway.search_rows.return_value = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts={
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "",
+            "limit": 2,
+            "conversation_id": conversation_ids,
+            "include_ledger_groups": "true",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="",
+        source_limit=2,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=True,
+        guest_scope=False,
+        guest_conversation_id=None,
+        conversation_ids=conversation_ids,
+    )
+    assert response.json()["next_cursor"] is None
+
+
 def test_search_reader_cursor_failure_maps_to_invalid_cursor_problem(
     mock_gateway,
 ):

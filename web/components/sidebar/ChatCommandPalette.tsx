@@ -62,6 +62,7 @@ import {
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
+import { loadCommandPaletteRecentRecall } from "@/lib/command-palette-recent-recall";
 
 type DossierAction = SearchConversationItem["actions"][number];
 type RunFreshAction = Extract<DossierAction, { type: "run_fresh" }>;
@@ -273,7 +274,6 @@ export default function ChatCommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyRequestIdRef = useRef(0);
-  const ledgerRequestIdRef = useRef(0);
   const ledgerBrowseRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
   const decisionMutationIdRef = useRef(0);
@@ -345,69 +345,48 @@ export default function ChatCommandPalette({
     const capturedSignature = RECENTS_SEARCH_SIGNATURE;
     setIsColdStartLoading(true);
     setReadError(null);
-    listHistory({ limit: 50 })
-      .then(({ items }) => {
-        if (requestId !== historyRequestIdRef.current) return;
-        setRecentItems(items.filter((item) => item.type === "chat"));
-      })
-      .catch(() => {
-        if (
-          !commandPaletteRequestIsCurrent({
-            capturedSignature,
-            capturedRequestId: requestId,
-            currentSignature: searchSignatureRef.current,
-            currentRequestId: historyRequestIdRef.current,
-          })
-        ) {
-          return;
-        }
-        setReadError("history");
-      })
-      .finally(() => {
-        if (requestId === historyRequestIdRef.current) {
-          setIsColdStartLoading(false);
-        }
-      });
-  }, [isRecentsMode, retryNonce]);
-
-  const refreshRecentsLedgerGroups = useCallback(() => {
-    const capturedSignature = RECENTS_SEARCH_SIGNATURE;
-    if (isGuest) {
-      setLedgerGroups([]);
-    }
-    if (capturedSignature !== searchSignatureRef.current) return;
-    const requestId = ++ledgerRequestIdRef.current;
     const isCurrent = () =>
       commandPaletteRequestIsCurrent({
         capturedSignature,
         capturedRequestId: requestId,
         currentSignature: searchSignatureRef.current,
-        currentRequestId: ledgerRequestIdRef.current,
+        currentRequestId: historyRequestIdRef.current,
       });
-    searchGlobal({
-      q: "",
-      limit: 100,
-      includeLedgerGroups: true,
-    })
-      .then(({ items, ledger_groups }) => {
+    void (async () => {
+      try {
+        const { items } = await listHistory({ limit: 50 });
         if (!isCurrent()) return;
-        setSearchResults(items);
-        setLedgerGroups(isGuest ? [] : (ledger_groups ?? []));
-      })
-      .catch(() => {
+        const visibleRecents = items.filter((item) => item.type === "chat");
+        setRecentItems(visibleRecents);
+        const response = await loadCommandPaletteRecentRecall({
+          conversationIds: visibleRecents.map(rawConversationId),
+          fetchRecall: searchGlobal,
+          isCurrent,
+        });
+        if (!response || !isCurrent()) return;
+        setSearchResults(response.items);
+        setSearchNextCursor(null);
+        setLedgerGroups(isGuest ? [] : (response.ledger_groups ?? []));
+        setReadError(null);
+      } catch {
         if (!isCurrent()) return;
+        setSearchResults([]);
         setLedgerGroups([]);
-      });
-  }, [isGuest]);
-
-  useEffect(() => {
-    refreshRecentsLedgerGroups();
-  }, [refreshRecentsLedgerGroups, retryNonce]);
+        setReadError("history");
+      } finally {
+        if (requestId === historyRequestIdRef.current) {
+          setIsColdStartLoading(false);
+        }
+      }
+    })();
+  }, [isGuest, isRecentsMode, retryNonce]);
 
   const clearSearchAndLedger = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE) {
+      historyRequestIdRef.current += 1;
+    }
     searchSignatureRef.current = RECENTS_SEARCH_SIGNATURE;
-    ledgerRequestIdRef.current += 1;
     ledgerBrowseRequestIdRef.current += 1;
     searchRequestIdRef.current += 1;
     setLedgerGroups([]);
@@ -421,8 +400,7 @@ export default function ChatCommandPalette({
     setIsLedgerLoading(false);
     setIsLoadingMoreSearch(false);
     setReadError(null);
-    void refreshRecentsLedgerGroups();
-  }, [refreshRecentsLedgerGroups]);
+  }, []);
 
   const loadLedgerBrowse = useCallback(
     async (nextDecisionState: DecisionState | null) => {
@@ -433,7 +411,6 @@ export default function ChatCommandPalette({
         nextDecisionState,
       ]);
       searchSignatureRef.current = capturedSignature;
-      ledgerRequestIdRef.current += 1;
       searchRequestIdRef.current += 1;
       setLedgerGroups([]);
       setQuery("");
@@ -682,31 +659,40 @@ export default function ChatCommandPalette({
         ];
       setIsLoadingMoreSearch(false);
       setIsLedgerLoading(false);
-      ledgerRequestIdRef.current += 1;
+      historyRequestIdRef.current += 1;
       ledgerBrowseRequestIdRef.current += 1;
       const requestId = ++searchRequestIdRef.current;
-      const response = await searchGlobal({
-        q: currentQuery,
-        limit: commandPaletteCanonicalRecallLimit(
-          currentQuery,
-          currentLedgerMode,
-        ),
-        decisionState: currentLedgerMode ? currentDecisionState : null,
-        includeLedgerGroups: true,
-      });
-      if (
+      const isStale = () =>
         mutationId !== decisionMutationIdRef.current ||
         requestId !== searchRequestIdRef.current ||
-        capturedSignature !== searchSignatureRef.current
-      ) {
-        return;
-      }
+        capturedSignature !== searchSignatureRef.current;
+      const response =
+        currentQuery === "" && !currentLedgerMode
+          ? await loadCommandPaletteRecentRecall({
+              conversationIds: recentItems.map(rawConversationId),
+              fetchRecall: searchGlobal,
+              isCurrent: () => !isStale(),
+            })
+          : await searchGlobal({
+              q: currentQuery,
+              limit: commandPaletteCanonicalRecallLimit(
+                currentQuery,
+                currentLedgerMode,
+              ),
+              decisionState: currentLedgerMode ? currentDecisionState : null,
+              includeLedgerGroups: true,
+            });
+      if (!response || isStale()) return;
       setSearchResults(response.items);
       setSearchNextCursor(response.next_cursor);
-      setLedgerGroups(response.ledger_groups ?? []);
+      setLedgerGroups(
+        currentQuery === "" && !currentLedgerMode && isGuest
+          ? []
+          : (response.ledger_groups ?? []),
+      );
       setReadError(null);
     },
-    [],
+    [isGuest, recentItems],
   );
 
   const saveDecision = useCallback(
@@ -732,7 +718,9 @@ export default function ChatCommandPalette({
         setDecisionDraft(null);
         onMutated?.();
         const currentSignature = searchSignatureRef.current;
-        const [, currentLedgerMode] = JSON.parse(currentSignature) as [
+        const [currentQuery, currentLedgerMode] = JSON.parse(
+          currentSignature,
+        ) as [
           string,
           boolean,
           DecisionState | null,
@@ -744,7 +732,13 @@ export default function ChatCommandPalette({
             mutationId === decisionMutationIdRef.current &&
             currentSignature === searchSignatureRef.current
           ) {
-            setReadError(currentLedgerMode ? "ledger" : "search");
+            setReadError(
+              currentLedgerMode
+                ? "ledger"
+                : currentQuery
+                  ? "search"
+                  : "history",
+            );
           }
         }
       } finally {
@@ -1081,12 +1075,15 @@ export default function ChatCommandPalette({
             value={query}
             onChange={(event) => {
               const nextQuery = event.target.value;
-              searchSignatureRef.current = JSON.stringify([
+              const nextSignature = JSON.stringify([
                 nextQuery.trim(),
                 false,
                 null,
               ]);
-              ledgerRequestIdRef.current += 1;
+              if (nextSignature !== searchSignatureRef.current) {
+                historyRequestIdRef.current += 1;
+              }
+              searchSignatureRef.current = nextSignature;
               ledgerBrowseRequestIdRef.current += 1;
               searchRequestIdRef.current += 1;
               setLedgerGroups([]);
@@ -1099,7 +1096,6 @@ export default function ChatCommandPalette({
                 setSearchResults([]);
                 setSearchNextCursor(null);
               }
-              if (!nextQuery.trim()) void refreshRecentsLedgerGroups();
             }}
             placeholder={t(
               "command_palette.search_placeholder",

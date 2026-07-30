@@ -223,6 +223,63 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
     assert pool.acquisition_timeouts == [2.0]
 
 
+def test_search_visible_id_recall_is_one_bounded_hydration_and_one_ledger_read() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool(
+        [
+            [_hydration_row()],
+            [
+                {"decision_state": "promising", "count": 1},
+                {"decision_state": "watching", "count": 1},
+            ],
+        ]
+    )
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="",
+        source_limit=1,
+        conversation_ids=[CONVERSATION_ID],
+        include_ledger_groups=True,
+    )
+
+    assert [row["id"] for row in result.rows["conversations"]] == [
+        CONVERSATION_ID
+    ]
+    assert len(pool.cursor.executions) == 2
+    hydration_sql, hydration_params = pool.cursor.executions[0]
+    assert "conversation.id = any(%(conversation_ids)s::uuid[])" in str(
+        hydration_sql
+    )
+    assert [str(value) for value in hydration_params["conversation_ids"]] == [
+        CONVERSATION_ID
+    ]
+    assert "conversation_candidates" not in str(hydration_sql)
+    assert result.ledger_counts == {
+        "promising": 1,
+        "watching": 1,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+
+
+def test_search_visible_id_recall_rejects_more_than_fifty_before_database_read() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([])
+
+    with pytest.raises(ValueError, match="at most 50"):
+        reader_type(pool).search_rows(
+            user_id=OWNER_ID,
+            query="",
+            source_limit=50,
+            conversation_ids=[
+                f"00000000-0000-0000-0000-{index:012d}" for index in range(51)
+            ],
+        )
+
+    assert pool.cursor.executions == []
+
+
 def test_search_rejects_nonpositive_bound_before_database_read() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([])
