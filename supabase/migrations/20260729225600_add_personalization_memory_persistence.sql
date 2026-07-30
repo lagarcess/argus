@@ -341,7 +341,8 @@ create table public.memory_prompt_history (
 );
 
 create table public.memory_reconciliations (
-  owner_id uuid not null,
+  owner_id uuid not null
+    references public.profiles(id) on delete cascade,
   record_id text not null,
   generation bigint not null
     check (generation >= 1),
@@ -357,10 +358,6 @@ create table public.memory_reconciliations (
   created_at timestamptz not null default now(),
   completed_at timestamptz,
   primary key (owner_id, record_id, generation),
-  constraint memory_reconciliations_record_fkey
-    foreign key (owner_id, record_id)
-    references public.memory_records(owner_id, id)
-    on delete cascade,
   constraint memory_reconciliations_terminal_shape
     check (
       (
@@ -689,6 +686,79 @@ $$;
 revoke all on function argus_private.guard_memory_record_delete()
   from public, anon, authenticated, service_role;
 
+create or replace function argus_private.validate_memory_reconciliation_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_record_exists boolean;
+begin
+  if tg_table_schema <> 'public'
+     or tg_table_name <> 'memory_reconciliations'
+     or tg_op not in ('INSERT', 'UPDATE') then
+    raise exception
+      'unsupported reconciliation lifecycle target: %.% %',
+      tg_table_schema,
+      tg_table_name,
+      tg_op
+      using errcode = '23514';
+  end if;
+
+  if new.operation not in ('create', 'update', 'delete') then
+    raise exception 'unsupported reconciliation operation: %', new.operation
+      using errcode = '23514';
+  end if;
+  if new.status not in ('pending', 'running', 'succeeded', 'failed') then
+    raise exception 'unsupported reconciliation status: %', new.status
+      using errcode = '23514';
+  end if;
+  if (
+    new.status in ('pending', 'running')
+    and new.completed_at is not null
+  )
+  or (
+    new.status in ('succeeded', 'failed')
+    and new.completed_at is null
+  ) then
+    raise exception 'invalid reconciliation state for status %', new.status
+      using errcode = '23514';
+  end if;
+  if tg_op = 'UPDATE'
+     and new.operation is distinct from old.operation then
+    raise exception 'memory reconciliation operation is immutable'
+      using errcode = '23514';
+  end if;
+
+  select exists (
+    select 1
+      from public.memory_records
+     where owner_id = new.owner_id
+       and id = new.record_id
+  )
+    into v_record_exists;
+
+  if new.operation in ('create', 'update')
+     and not v_record_exists then
+    raise exception
+      '% reconciliation requires a live same-owner record',
+      new.operation
+      using errcode = '23514';
+  end if;
+  if new.operation = 'delete'
+     and v_record_exists then
+    raise exception 'delete reconciliation requires record absence'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.validate_memory_reconciliation_lifecycle()
+  from public, anon, authenticated, service_role;
+
 create or replace function argus_private.guard_guest_memory_zero_state()
 returns trigger
 language plpgsql
@@ -825,6 +895,11 @@ for each row execute function argus_private.protect_memory_child_identity();
 create trigger guard_memory_record_delete
 before delete on public.memory_records
 for each row execute function argus_private.guard_memory_record_delete();
+
+create trigger validate_memory_reconciliation_lifecycle
+before insert or update on public.memory_reconciliations
+for each row execute function
+  argus_private.validate_memory_reconciliation_lifecycle();
 
 create trigger guard_guest_memory_zero_state
 before update on public.guest_workspaces
