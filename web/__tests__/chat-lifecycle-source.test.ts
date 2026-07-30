@@ -14,7 +14,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(loadConversationStart).toBeGreaterThan(-1);
     expect(chat).toContain("new TranscriptSessionCache<Message[]>()");
     expect(loadConversation).toContain(
-      "navigateConversationTranscript(convId, undefined, { messageId })",
+      "convId, undefined, { messageId, scrollToLatest }",
     );
     expect(loadConversation).not.toContain('setStreamStatus(t("common.loading"))');
     expect(chat).toContain('phase === "loading"');

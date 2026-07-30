@@ -96,3 +96,12 @@ export function normalizedSearchTokens(value: string): string[] {
   const normalized = normalizeSearchText(value);
   return normalized ? normalized.split(" ") : [];
 }
+
+export const SEARCH_INDEXABLE_TOKEN_MIN_LENGTH = 3;
+
+export function searchHasIndexableToken(value: string): boolean {
+  return normalizedSearchTokens(value).some(
+    (token) =>
+      Array.from(token).length >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH,
+  );
+}

@@ -2585,6 +2585,106 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
 
 
+def test_search_supabase_projects_localized_actions_without_generation(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    from argus.agent_runtime import runtime as agent_runtime
+    from argus.domain import engine as domain_engine
+
+    def unexpected_external_call(*_: object, **__: object) -> None:
+        raise AssertionError("Search action projection must not call external systems")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", unexpected_external_call)
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", unexpected_external_call)
+    monkeypatch.setattr(agent_runtime, "run_agent_turn", unexpected_external_call)
+    spanish_user = _mock_profile(language="es-419")
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = spanish_user
+    mock_gateway.get_or_create_mock_user.return_value = spanish_user
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-action-es",
+                "title": "Dossier GLD",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "runs": [
+            {
+                "id": "run-action-es",
+                "conversation_id": "conversation-action-es",
+                "status": "completed",
+                "asset_class": "equity",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "timeframe": "1D",
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-12-31",
+                    "resolved_parameters": {
+                        "sizing_mode": "capital_amount",
+                        "capital_amount": 10_000,
+                    },
+                },
+                "conversation_result_card": {"title": "GLD anual"},
+                "created_at": now.isoformat(),
+            }
+        ],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "evidence-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "source_run_id": "run-action-es",
+                "title": "GLD anual",
+                "digest": "GLD frente a SPY.",
+                "payload": {},
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "evidence_artifact_id": "evidence-action-es",
+                "decision_state": "promising",
+                "note": "Revisar el próximo año.",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "messages": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=GLD&limit=20",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    conversation = response.json()["items"][0]
+    run_fresh, decision = conversation["actions"]
+    assert run_fresh["type"] == "run_fresh"
+    assert run_fresh["source_run_id"] == "run-action-es"
+    assert run_fresh["send_text"].startswith(
+        "Prueba nuevamente esta configuración compatible exacta"
+    )
+    assert run_fresh["send_text"].endswith(
+        "Muestra la confirmación Lista para ejecutar; todavía no la ejecutes."
+    )
+    assert decision == {
+        "type": "decision",
+        "evidence_artifact_id": "evidence-action-es",
+        "decision_state": "promising",
+        "note": "Revisar el próximo año.",
+        "run_label": "GLD anual",
+    }
+
+
 def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     mock_gateway,
 ):

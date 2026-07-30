@@ -11,6 +11,7 @@ SEARCH_MIGRATION_GLOB = "*_add_search_trigram_indexes.sql"
 HISTORY_STATE_MIGRATION_GLOB = "*_add_history_state_page_indexes.sql"
 MESSAGE_RECALL_MIGRATION_GLOB = "*_add_message_recall_index.sql"
 DECISION_RECALL_MIGRATION_GLOB = "*_add_decision_recall_index.sql"
+ASSET_SYMBOL_MIGRATION_GLOB = "*_add_asset_symbol_prefix_indexes.sql"
 
 
 def _migration_sql() -> str:
@@ -201,3 +202,44 @@ def test_decision_recall_migration_is_private_and_index_only() -> None:
     assert "create materialized view" not in migration
     assert "generated always as" not in migration
     assert "grant " not in migration
+
+
+def test_asset_symbol_prefix_migration_indexes_all_five_canonical_slots() -> None:
+    from argus.domain.search_sql_text import symbol_normalizer_expression
+
+    from scripts.generate_asset_symbol_index_migration import render_migration
+
+    migrations = sorted(
+        (ROOT / "supabase" / "migrations").glob(ASSET_SYMBOL_MIGRATION_GLOB)
+    )
+    assert len(migrations) == 1, "Asset symbol prefix migration is missing or ambiguous"
+    migration = " ".join(migrations[0].read_text(encoding="utf-8").split())
+    lowered = migration.lower()
+    function_name = "public.argus_search_symbol_casefold"
+    expected_casefold = " ".join(
+        symbol_normalizer_expression(sql.Identifier("source_text"))
+        .as_string()
+        .split()
+    )
+
+    assert f"create or replace function {function_name}" in lowered
+    assert expected_casefold in migration
+    assert "language sql immutable strict parallel safe" in lowered
+    for slot in range(1, 6):
+        index_name = f"idx_backtest_runs_owner_symbol_{slot}_prefix"
+        assert f"create index if not exists {index_name}" in lowered
+        assert (
+            f"on public.backtest_runs ( user_id, "
+            f"(btrim({function_name}(symbols[{slot}])) collate \"c\") )"
+        ) in lowered
+        assert (
+            f"where status = 'completed' and symbols[{slot}] is not null"
+        ) in lowered
+        assert f"drop index if exists public.{index_name}" in lowered
+    assert lowered.count("create index if not exists") == 5
+    assert f"drop function if exists {function_name}(text)" in lowered
+    assert "create table" not in lowered
+    assert "create view" not in lowered
+    assert "create materialized view" not in lowered
+    assert "generated always as" not in lowered
+    assert migrations[0].read_text(encoding="utf-8") == render_migration()

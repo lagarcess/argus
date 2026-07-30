@@ -554,6 +554,99 @@ class SearchDossier(BaseModel):
     left_off: SearchDossierLeftOff | None = None
 
 
+SearchRunFreshStrategyType = Literal[
+    "buy_and_hold",
+    "dca_accumulation",
+    "indicator_threshold",
+    "signal_strategy",
+]
+SearchRunFreshSizingMode = Literal["capital_amount", "position_size"]
+SearchRunFreshCadence = Literal[
+    "daily",
+    "weekly",
+    "biweekly",
+    "monthly",
+    "quarterly",
+]
+
+
+class SearchRunFreshDateRange(BaseModel):
+    start: date
+    end: date
+
+
+class SearchRunFreshSetup(BaseModel):
+    strategy_type: SearchRunFreshStrategyType
+    symbols: list[str] = Field(min_length=1, max_length=5)
+    asset_class: AssetClass
+    timeframe: str = Field(min_length=1, max_length=24)
+    date_range: SearchRunFreshDateRange
+    sizing_mode: SearchRunFreshSizingMode
+    capital_amount: float | None = Field(default=None, gt=0)
+    position_size: float | None = Field(default=None, gt=0)
+    cadence: SearchRunFreshCadence | None = None
+    recurring_contribution: float | None = Field(default=None, gt=0)
+    starting_principal: float | None = Field(default=None, ge=0)
+    benchmark_symbol: str = Field(min_length=1, max_length=24)
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    execution_realism: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_setup_shape(self) -> SearchRunFreshSetup:
+        if self.sizing_mode == "capital_amount":
+            if self.capital_amount is None or self.position_size is not None:
+                raise ValueError("capital_amount sizing requires only capital_amount")
+        elif self.position_size is None or self.capital_amount is not None:
+            raise ValueError("position_size sizing requires only position_size")
+        if self.strategy_type == "dca_accumulation":
+            if self.cadence is None:
+                raise ValueError("cadence is required for dca_accumulation")
+            if (
+                self.sizing_mode != "capital_amount"
+                or self.recurring_contribution is None
+                or self.starting_principal != 0
+                or self.capital_amount != self.recurring_contribution
+            ):
+                raise ValueError(
+                    "dca_accumulation requires an exact recurring contribution "
+                    "and zero starting principal"
+                )
+        elif (
+            self.cadence is not None
+            or self.recurring_contribution is not None
+            or self.starting_principal is not None
+        ):
+            raise ValueError(
+                "cadence and DCA contribution fields are only for dca_accumulation"
+            )
+        return self
+
+
+class SearchRunFreshAction(BaseModel):
+    type: Literal["run_fresh"] = "run_fresh"
+    source_run_id: str
+    run_label: str = Field(max_length=160)
+    canonical_setup: SearchRunFreshSetup
+    send_text: str = Field(max_length=4000)
+
+
+class SearchDecisionAction(BaseModel):
+    type: Literal["decision"] = "decision"
+    evidence_artifact_id: str
+    decision_state: DecisionState | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str = Field(max_length=160)
+
+
+SearchDossierAction = Annotated[
+    SearchRunFreshAction | SearchDecisionAction,
+    Field(discriminator="type"),
+]
+
+
 SearchMatchLayer = Literal[
     "conversation",
     "message",
@@ -593,6 +686,7 @@ class SearchItem(BaseModel):
     conversation_id: str
     match: SearchMatch
     dossier: SearchDossier
+    actions: list[SearchDossierAction] = Field(default_factory=list, max_length=2)
     # Bounded conversation aggregate used for decision filters and counts.
     # The dossier separately carries the latest decision.
     decision_states: tuple[DecisionState, ...] = ()

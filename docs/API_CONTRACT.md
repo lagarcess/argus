@@ -3178,7 +3178,48 @@ the `/search` contract.
           "completed_at": "timestamp",
           "nudge": "undecided"
         }
-      }
+      },
+      "actions": [
+        {
+          "type": "run_fresh",
+          "source_run_id": "uuid",
+          "run_label": "Weekly GLD pullback",
+          "canonical_setup": {
+            "strategy_type": "indicator_threshold",
+            "symbols": ["GLD"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+              "start": "2025-07-29",
+              "end": "2026-07-29"
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10000.0,
+            "position_size": null,
+            "cadence": null,
+            "recurring_contribution": null,
+            "starting_principal": null,
+            "benchmark_symbol": "SPY",
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": {
+              "indicator": "rsi",
+              "operator": "below",
+              "threshold": 30
+            },
+            "parameters": {},
+            "execution_realism": null
+          },
+          "send_text": "Test this exact supported setup again ... Show the Ready-to-run confirmation; do not run it yet."
+        },
+        {
+          "type": "decision",
+          "evidence_artifact_id": "uuid",
+          "decision_state": "watching",
+          "note": "Hold through earnings.\nReview risk first.",
+          "run_label": "Weekly GLD pullback"
+        }
+      ]
     }
   ],
   "next_cursor": null,
@@ -3220,6 +3261,34 @@ preserved. `run_label` is present on the decision when multiple runs make its
 target otherwise ambiguous. `left_off.nudge` is null or one of `undecided`,
 `suggestion_untaken`, `stale_result`; the backend never invents a nudge.
 
+`actions` is a bounded, backend-owned list attached only to conversation rows.
+It contains at most one `run_fresh` action followed by at most one `decision`
+action:
+
+- `run_fresh` is projected only from the latest supported completed run. Its
+  `canonical_setup` contains the public, executable strategy shape rather than
+  raw provider or engine configuration. The backend preserves the original
+  inclusive window length and shifts that window to end on the current date.
+  DCA actions preserve both the recurring contribution and zero starting
+  principal from the persisted engine snapshot. Modeled costs are read from
+  the persisted engine configuration and summarized without exposing provider
+  details. If those stored facts are absent or conflict, the backend omits the
+  action instead of guessing.
+  `send_text` is deterministic and localized from stored facts. The client
+  submits it through the ordinary chat-send path; it must reach the normal
+  Ready-to-run confirmation and must never directly execute a backtest.
+- `decision` targets the latest evidence artifact for that same latest run.
+  Its optional state and note describe the current decision on that exact
+  artifact. Saving uses the existing owner-checked, idempotent
+  `POST /evidence-artifacts/{artifact_id}/decision` contract, then the client
+  re-reads `/search` as canonical truth.
+
+The action ids are narrow, opaque mutation targets for those two explicit
+owner actions. They are not searchable content and do not authorize access by
+themselves. Guest responses omit the `decision` action; asset rollups have no
+`actions` field. Unsupported or incomplete stored run shapes omit `run_fresh`
+rather than guessing.
+
 **Ranking Logic:**
 Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
@@ -3246,12 +3315,24 @@ template parameters remain outside the search index.
 
 The dossier is an owner-scoped, bounded projection. It never exposes raw
 context packets, route receipts, provider/model metadata, retry payloads,
-conversation transcripts, internal source-run ids, or artifact ids. Search and
-dossier assembly make zero LLM or market-data provider calls. Asset recognition
-uses only canonical symbols stored on owned completed BacktestRuns; it does not
-resolve aliases or call an asset resolver/provider. Archived conversations
-remain eligible, soft-deleted conversations are excluded, and guest rollups are
-restricted to the active owned guest workspace.
+conversation transcripts, or general internal ids. The only id exceptions are
+the opaque latest-run and latest-evidence targets inside the typed actions
+described above. Search and dossier/action assembly make zero LLM or
+market-data provider calls. Asset recognition uses only canonical symbols
+stored on owned completed BacktestRuns; it does not resolve aliases or call an
+asset resolver/provider. Archived conversations remain eligible, soft-deleted
+conversations are excluded, and guest rollups are restricted to the active
+owned guest workspace.
+
+Persistent asset rollups resolve a bounded set of raw-casefolded symbol
+prefixes through the five canonical BacktestRun symbol slots before reading
+evidence or decisions. Once an exact or unambiguous stored symbol is selected,
+only that symbol's indexed run lineage is aggregated. Memory mode mirrors this
+shape with a non-durable, revision-keyed in-process index over canonical
+records: canonical writes invalidate it, while consecutive palette keystrokes
+read bounded postings rather than copying or projecting the full transcript.
+This cache is runtime acceleration only; it is not a durable recall model,
+summary, RAG surface, or alternate source of truth.
 
 When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
 Idea Ledger group order and counts. Empty groups must be returned with

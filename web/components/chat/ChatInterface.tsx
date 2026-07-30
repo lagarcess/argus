@@ -8,10 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ArrowDown,
-  Plus,
-} from "lucide-react";
+import { ArrowDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
@@ -492,11 +489,7 @@ export default function ChatInterface() {
       resetToEmptyChatSurface();
     }
     authenticatedUserIdRef.current = nextUserId;
-  }, [
-    account?.user.id,
-    resetToEmptyChatSurface,
-    transcriptSessionCache,
-  ]);
+  }, [account?.user.id, resetToEmptyChatSurface, transcriptSessionCache]);
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -679,6 +672,7 @@ export default function ChatInterface() {
     options: Readonly<{
       bootstrap?: boolean;
       messageId?: string;
+      scrollToLatest?: boolean;
     }> = {},
   ): Promise<void> {
     if (!userId) return;
@@ -763,13 +757,16 @@ export default function ChatInterface() {
             targetConversationId,
             userId,
             state.snapshot,
+            options.scrollToLatest ? null : undefined,
           );
           return;
         }
         if (state.phase === "ready") {
-          const currentScrollTop =
-            renderedStaleSnapshot &&
-            readyTranscriptConversationIdRef.current === targetConversationId
+          const currentScrollTop = options.scrollToLatest
+            ? null
+            : renderedStaleSnapshot &&
+                readyTranscriptConversationIdRef.current ===
+                  targetConversationId
               ? (scrollContainerRef.current?.scrollTop ?? null)
               : undefined;
           stageTranscriptSnapshot(
@@ -791,17 +788,11 @@ export default function ChatInterface() {
         readyTranscriptConversationIdRef.current = null;
         pendingScrollRestoreRef.current = null;
         setMessages([]);
-        if (
-          options.bootstrap &&
-          isMissingConversationLoadError(state.error)
-        ) {
+        if (options.bootstrap && isMissingConversationLoadError(state.error)) {
           setHistoryItems((current) =>
             current.filter(
               (item) =>
-                !historyItemBelongsToConversation(
-                  item,
-                  targetConversationId,
-                ),
+                !historyItemBelongsToConversation(item, targetConversationId),
             ),
           );
           resetToEmptyChatSurface();
@@ -843,7 +834,7 @@ export default function ChatInterface() {
               id: "offline",
               role: "ai",
               kind: "text",
-              content: t('chat.error_offline'),
+              content: t("chat.error_offline"),
             },
           ]);
           return;
@@ -969,9 +960,13 @@ export default function ChatInterface() {
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
-  const loadConversation = async (convId: string, messageId?: string) => {
+  const loadConversation = async (
+    convId: string, messageId?: string, scrollToLatest = false,
+  ) => {
     closeChatOptions();
-    await navigateConversationTranscript(convId, undefined, { messageId });
+    await navigateConversationTranscript(
+      convId, undefined, { messageId, scrollToLatest },
+    );
   };
 
   const loadConversationForRun = async (
@@ -1087,11 +1082,11 @@ export default function ChatInterface() {
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
       action.labelKey
-      ? t(action.labelKey, {
-          defaultValue: action.label,
-          ...((action.payload ?? {}) as Record<string, unknown>),
-        })
-      : action.label,
+        ? t(action.labelKey, {
+            defaultValue: action.label,
+            ...((action.payload ?? {}) as Record<string, unknown>),
+          })
+        : action.label,
     [t],
   );
 
@@ -2003,6 +1998,17 @@ export default function ChatInterface() {
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 
+  const handleOmnisearchRunFresh = async (
+    conversationId: string,
+    sendText: string,
+  ) => {
+    setSearchOverlayOpen(false);
+    await loadConversation(conversationId, undefined, true);
+    if (activeConversationIdRef.current !== conversationId) return;
+    if (readyTranscriptConversationIdRef.current !== conversationId) return;
+    await handleSend(sendText);
+  };
+
   // ── Chat options helpers ───────────────────────────────────────────────────
 
   const closeChatOptions = useCallback(() => {
@@ -2051,10 +2057,7 @@ export default function ChatInterface() {
     setIsSavingHeaderRename(true);
     try {
       await patchConversation(conversationId, { title: nextTitle });
-      invalidateTranscriptForMutation(
-        conversationId,
-        "conversation_rename",
-      );
+      invalidateTranscriptForMutation(conversationId, "conversation_rename");
       refreshHistory();
       showToast(t("common.save"));
       closeChatOptions();
@@ -2131,8 +2134,7 @@ export default function ChatInterface() {
     messages.length === 0
       ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
       : t("chat.followup_placeholder", "Ask a follow-up...");
-  const showEmptyChatSurface =
-    conversationId === null && messages.length === 0;
+  const showEmptyChatSurface = conversationId === null && messages.length === 0;
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -2212,10 +2214,11 @@ export default function ChatInterface() {
         searchOverlayOpen && (
           <ChatCommandPalette
             onClose={() => setSearchOverlayOpen(false)}
-            onOpenConversation={(convId, messageId) => {
+            onOpenConversation={(convId, messageId, openAtLeftOff) => {
               setSearchOverlayOpen(false);
-              void loadConversation(convId, messageId);
+              void loadConversation(convId, messageId, openAtLeftOff);
             }}
+            onRunFresh={handleOmnisearchRunFresh}
             activeConversationId={conversationId}
             isGuest={isGuest}
             groundedDiscoveryAvailable={canUseGroundedDiscovery}
@@ -2254,12 +2257,12 @@ export default function ChatInterface() {
             <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
               {currentView === "chat" &&
                 (conversationId !== null || messages.length > 0) && (
-                <ChatHeaderTitle
-                  conversationId={conversationId}
-                  title={headerConversationTitle}
-                  titleSource={headerConversationTitleSource}
-                />
-              )}
+                  <ChatHeaderTitle
+                    conversationId={conversationId}
+                    title={headerConversationTitle}
+                    titleSource={headerConversationTitleSource}
+                  />
+                )}
               {currentView === "strategies" && t("common.strategies")}
             </h1>
 
@@ -2402,10 +2405,9 @@ export default function ChatInterface() {
               <>
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
 
-                {showConversationRetrievalState &&
-                  isHydratingConversation && (
-                    <ConversationRetrievalAnnouncement />
-                  )}
+                {showConversationRetrievalState && isHydratingConversation && (
+                  <ConversationRetrievalAnnouncement />
+                )}
 
                 {/* Messages */}
                 <div
@@ -2460,36 +2462,36 @@ export default function ChatInterface() {
                           className="scroll-m-24 outline-none"
                         >
                           <ChatMessage
-                          message={msg}
-                          onAction={handleAction}
-                          onFeedback={(type, context, rating) => {
-                            setFeedbackState({
-                              isOpen: true,
-                              type,
-                              context: {
-                                ...context,
-                                conversation_id: conversationId,
-                              },
-                              rating,
-                            });
-                            setIsSidebarOpen(false);
-                          }}
-                          onToast={showToast}
-                          isLatest={isLatestAi}
-                          isStreaming={isWorkingMessage}
-                          conversationId={conversationId}
-                          nextMovesEnabled={nextMovesEnabled}
-                          turnInFlight={turnInFlight}
-                          isGuest={isGuest}
-                          canSaveDecision={canSaveDecision}
-                          onDecisionUnavailable={requestGuestDecision}
-                          onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
-                          onRequestSearchUpgrade={requestGuestSearchUpgrade}
-                          resumeDecisionArtifactId={
-                            msg.id === resumeDecisionMessageId
-                              ? resumeDecisionArtifactId
-                              : null
-                          }
+                            message={msg}
+                            onAction={handleAction}
+                            onFeedback={(type, context, rating) => {
+                              setFeedbackState({
+                                isOpen: true,
+                                type,
+                                context: {
+                                  ...context,
+                                  conversation_id: conversationId,
+                                },
+                                rating,
+                              });
+                              setIsSidebarOpen(false);
+                            }}
+                            onToast={showToast}
+                            isLatest={isLatestAi}
+                            isStreaming={isWorkingMessage}
+                            conversationId={conversationId}
+                            nextMovesEnabled={nextMovesEnabled}
+                            turnInFlight={turnInFlight}
+                            isGuest={isGuest}
+                            canSaveDecision={canSaveDecision}
+                            onDecisionUnavailable={requestGuestDecision}
+                            onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
+                            onRequestSearchUpgrade={requestGuestSearchUpgrade}
+                            resumeDecisionArtifactId={
+                              msg.id === resumeDecisionMessageId
+                                ? resumeDecisionArtifactId
+                                : null
+                            }
                             onDecisionResumeHandled={clearResumeDecision}
                           />
                         </div>

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
+import re
 from collections import deque
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 from argus.api.schemas import (
     DecisionState,
     SearchAssetDecisionCounts,
     SearchAssetRollup,
+    SearchDecisionAction,
     SearchDossier,
     SearchDossierDecision,
     SearchDossierLeftOff,
@@ -18,6 +21,8 @@ from argus.api.schemas import (
     SearchItem,
     SearchMatch,
     SearchMatchLayer,
+    SearchRunFreshAction,
+    SearchRunFreshSetup,
 )
 from argus.api.search_utils import score_search_item
 from argus.domain.evidence import (
@@ -50,6 +55,33 @@ _LAYER_BY_RANK: dict[int, SearchMatchLayer] = {
     6: "decision",
 }
 _NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
+_RUN_FRESH_STRATEGIES = {
+    "buy_and_hold",
+    "dca_accumulation",
+    "indicator_threshold",
+    "signal_strategy",
+}
+_RUN_FRESH_CADENCES = {
+    "daily",
+    "weekly",
+    "biweekly",
+    "monthly",
+    "quarterly",
+}
+_RUN_FRESH_PARAMETER_KEYS = (
+    "indicator",
+    "indicator_period",
+    "entry_threshold",
+    "exit_threshold",
+    "fast_period",
+    "slow_period",
+    "moving_average_type",
+)
+_ISO_FRACTION_RE = re.compile(
+    r"^(?P<prefix>.*\d{2}:\d{2}:\d{2}\.)"
+    r"(?P<fraction>\d{1,6})"
+    r"(?P<zone>Z|[+-]\d{2}(?::?\d{2})?)$"
+)
 
 
 @dataclass(frozen=True)
@@ -175,6 +207,8 @@ def project_conversation_recall(
     decisions: Sequence[Mapping[str, Any]],
     messages: Sequence[Mapping[str, Any]] = (),
     query: str,
+    allow_decision_action: bool = True,
+    language: str = "en",
 ) -> tuple[int, SearchItem] | None:
     """Build one bounded search row from existing conversation-owned truth."""
     conversation_id = _text(conversation.get("id"))
@@ -355,6 +389,18 @@ def project_conversation_recall(
             )
         ),
     )
+    actions = []
+    run_fresh_action = _run_fresh_action(run=latest_run, language=language)
+    if run_fresh_action is not None:
+        actions.append(run_fresh_action)
+    decision_action = _decision_action(
+        run=latest_run,
+        evidence=relevant_evidence,
+        decisions=relevant_decisions,
+        allow=allow_decision_action,
+    )
+    if decision_action is not None:
+        actions.append(decision_action)
     summary_states = _text_list(summary.get("decision_states"))
     decision_states = tuple(
         state
@@ -408,6 +454,7 @@ def project_conversation_recall(
                 outcome=outcome,
                 left_off=left_off,
             ),
+            actions=actions,
             decision_states=decision_states,
         ),
     )
@@ -648,6 +695,350 @@ def _left_off_projection(
     )
 
 
+def _run_fresh_action(
+    *,
+    run: Mapping[str, Any] | None,
+    language: str,
+) -> SearchRunFreshAction | None:
+    if run is None:
+        return None
+    run_id = _text(run.get("id"))
+    config = _config(run)
+    resolved_strategy = _mapping(config.get("resolved_strategy"))
+    resolved_parameters = _mapping(config.get("resolved_parameters"))
+    resolved_engine_config = _mapping(resolved_parameters.get("engine_config"))
+    snapshot_engine_config = _mapping(config.get("engine_config"))
+    strategy_type = _text(
+        resolved_strategy.get("strategy_type") or config.get("template")
+    )
+    if strategy_type not in _RUN_FRESH_STRATEGIES or run_id is None:
+        return None
+
+    symbols = _run_symbols(run)
+    asset_class = _text(
+        resolved_strategy.get("asset_class") or run.get("asset_class")
+    )
+    timeframe = _text(resolved_parameters.get("timeframe") or config.get("timeframe"))
+    benchmark_symbol = _text(
+        resolved_parameters.get("benchmark_symbol")
+        or config.get("benchmark_symbol")
+        or run.get("benchmark_symbol")
+    )
+    original_start, original_end = _run_date_span(run)
+    if (
+        not symbols
+        or asset_class not in {"equity", "crypto", "currency_pair"}
+        or timeframe is None
+        or benchmark_symbol is None
+        or original_start is None
+        or original_end is None
+        or original_end < original_start
+    ):
+        return None
+
+    sizing_mode = _text(resolved_parameters.get("sizing_mode"))
+    capital_amount = _number(
+        resolved_parameters.get("capital_amount")
+        or config.get("starting_capital")
+        or config.get("capital_amount")
+    )
+    position_size = _number(resolved_parameters.get("position_size"))
+    if sizing_mode is None:
+        sizing_mode = "position_size" if position_size is not None else "capital_amount"
+    if sizing_mode == "capital_amount":
+        position_size = None
+    elif sizing_mode == "position_size":
+        capital_amount = None
+    else:
+        return None
+    cadence = _text(resolved_parameters.get("cadence") or config.get("cadence"))
+    if strategy_type == "dca_accumulation":
+        if cadence not in _RUN_FRESH_CADENCES:
+            return None
+        recurring_contribution = _consistent_number(
+            resolved_parameters.get("recurring_contribution"),
+            resolved_engine_config.get("recurring_contribution"),
+            snapshot_engine_config.get("recurring_contribution"),
+        )
+        starting_principal = _consistent_number(
+            resolved_parameters.get("starting_principal"),
+            resolved_engine_config.get("starting_principal"),
+            snapshot_engine_config.get("starting_principal"),
+            allow_zero=True,
+        )
+        if (
+            recurring_contribution is None
+            or starting_principal != 0
+            or capital_amount != recurring_contribution
+        ):
+            return None
+    else:
+        cadence = None
+        recurring_contribution = None
+        starting_principal = None
+
+    today = date.today()
+    current_start = today - timedelta(days=(original_end - original_start).days)
+    parameters = {
+        key: resolved_parameters[key]
+        for key in _RUN_FRESH_PARAMETER_KEYS
+        if key in resolved_parameters
+        and isinstance(resolved_parameters[key], (str, int, float, bool))
+    }
+    execution_realism_valid, execution_realism = _consistent_mapping(
+        resolved_engine_config.get("_execution_realism"),
+        snapshot_engine_config.get("_execution_realism"),
+        resolved_parameters.get("_execution_realism"),
+        resolved_parameters.get("execution_realism"),
+        config.get("_execution_realism"),
+    )
+    if not execution_realism_valid:
+        return None
+    try:
+        setup = SearchRunFreshSetup(
+            strategy_type=strategy_type,
+            symbols=symbols,
+            asset_class=asset_class,
+            timeframe=timeframe,
+            date_range={"start": current_start, "end": today},
+            sizing_mode=sizing_mode,
+            capital_amount=capital_amount,
+            position_size=position_size,
+            cadence=cadence,
+            recurring_contribution=recurring_contribution,
+            starting_principal=starting_principal,
+            benchmark_symbol=benchmark_symbol,
+            entry_rule=_mapping_or_none(resolved_strategy.get("entry_rule")),
+            exit_rule=_mapping_or_none(resolved_strategy.get("exit_rule")),
+            rule_spec=_mapping_or_none(
+                resolved_strategy.get("rule_spec")
+                or resolved_parameters.get("rule_spec")
+                or config.get("rule_spec")
+            ),
+            parameters=parameters,
+            execution_realism=execution_realism,
+        )
+    except ValueError:
+        return None
+    return SearchRunFreshAction(
+        source_run_id=run_id,
+        run_label=_run_label(run),
+        canonical_setup=setup,
+        send_text=_run_fresh_send_text(setup=setup, language=language),
+    )
+
+
+def _decision_action(
+    *,
+    run: Mapping[str, Any] | None,
+    evidence: Sequence[Mapping[str, Any]],
+    decisions: Sequence[Mapping[str, Any]],
+    allow: bool,
+) -> SearchDecisionAction | None:
+    if not allow or run is None:
+        return None
+    run_id = _text(run.get("id"))
+    artifact = max(
+        (row for row in evidence if _text(row.get("source_run_id")) == run_id),
+        key=_row_activity,
+        default=None,
+    )
+    if artifact is None or (artifact_id := _text(artifact.get("id"))) is None:
+        return None
+    latest_decision = max(
+        (
+            row
+            for row in decisions
+            if _text(row.get("evidence_artifact_id")) == artifact_id
+        ),
+        key=_row_activity,
+        default=None,
+    )
+    state = latest_decision.get("decision_state") if latest_decision else None
+    return SearchDecisionAction(
+        evidence_artifact_id=artifact_id,
+        decision_state=cast(DecisionState | None, state)
+        if state in _DECISION_STATES
+        else None,
+        note=_bounded_text(latest_decision.get("note"), 2000)
+        if latest_decision
+        else None,
+        run_label=_run_label(run),
+    )
+
+
+def _run_fresh_send_text(*, setup: SearchRunFreshSetup, language: str) -> str:
+    symbols = ", ".join(setup.symbols)
+    amount = (
+        _format_number(setup.capital_amount)
+        if setup.sizing_mode == "capital_amount"
+        else _format_number(setup.position_size)
+    )
+    if language == "es-419":
+        cadence = {
+            "daily": "diaria",
+            "weekly": "semanal",
+            "biweekly": "quincenal",
+            "monthly": "mensual",
+            "quarterly": "trimestral",
+        }.get(setup.cadence or "", setup.cadence or "")
+        strategy = {
+            "buy_and_hold": "comprar y mantener",
+            "dca_accumulation": f"acumulación DCA {cadence}",
+            "indicator_threshold": "estrategia de umbral de indicador",
+            "signal_strategy": "estrategia de señales",
+        }[setup.strategy_type]
+        if setup.strategy_type == "dca_accumulation":
+            sizing = (
+                f"un aporte recurrente de "
+                f"${_format_number(setup.recurring_contribution)} {cadence} y "
+                f"capital inicial de ${_format_number(setup.starting_principal)}"
+            )
+        else:
+            sizing = (
+                f"${amount} de capital inicial"
+                if setup.sizing_mode == "capital_amount"
+                else f"{amount} por posición"
+            )
+        prefix = (
+            "Prueba nuevamente esta configuración compatible exacta del "
+            f"{setup.date_range.start.isoformat()} al "
+            f"{setup.date_range.end.isoformat()}: {strategy} {symbols} en "
+            f"{setup.timeframe} con {sizing}, referencia "
+            f"{setup.benchmark_symbol}, solo posiciones largas y pesos iguales"
+        )
+        suffix = (
+            ". Muestra la confirmación Lista para ejecutar; todavía no la ejecutes."
+        )
+        detail_labels = {
+            "entry_rule": "regla de entrada",
+            "exit_rule": "regla de salida",
+            "rule_spec": "especificación de reglas",
+            "parameters": "parámetros",
+            "execution_realism": "costos modelados",
+        }
+    else:
+        cadence = setup.cadence or ""
+        strategy = {
+            "buy_and_hold": "buy and hold",
+            "dca_accumulation": f"{cadence} DCA accumulation",
+            "indicator_threshold": "indicator threshold strategy",
+            "signal_strategy": "signal strategy",
+        }[setup.strategy_type]
+        if setup.strategy_type == "dca_accumulation":
+            sizing = (
+                f"a ${_format_number(setup.recurring_contribution)} {cadence} "
+                "recurring contribution and "
+                f"${_format_number(setup.starting_principal)} starting principal"
+            )
+        else:
+            sizing = (
+                f"${amount} starting capital"
+                if setup.sizing_mode == "capital_amount"
+                else f"{amount} per position"
+            )
+        prefix = (
+            "Test this exact supported setup again from "
+            f"{setup.date_range.start.isoformat()} to "
+            f"{setup.date_range.end.isoformat()}: {strategy} {symbols} on "
+            f"{setup.timeframe} with {sizing}, benchmark "
+            f"{setup.benchmark_symbol}, long only and equal weight"
+        )
+        suffix = (
+            ". Show the Ready-to-run confirmation; do not run it yet."
+        )
+        detail_labels = {
+            "entry_rule": "entry rule",
+            "exit_rule": "exit rule",
+            "rule_spec": "rule spec",
+            "parameters": "parameters",
+            "execution_realism": "execution realism",
+        }
+    details = [
+        (detail_id, value)
+        for detail_id, value in (
+            ("entry_rule", setup.entry_rule),
+            ("exit_rule", setup.exit_rule),
+            ("rule_spec", setup.rule_spec),
+            ("parameters", setup.parameters or None),
+            ("execution_realism", setup.execution_realism),
+        )
+        if value is not None
+    ]
+    if setup.strategy_type == "buy_and_hold":
+        details = [
+            pair
+            for pair in details
+            if pair[0] not in {"entry_rule", "exit_rule"}
+        ]
+    detail_text = "".join(
+        f"; {detail_labels[detail_id]} {_stable_json(value)}"
+        for detail_id, value in details
+    )
+    return f"{prefix}{detail_text}{suffix}"
+
+
+def _format_number(value: float | None) -> str:
+    if value is None:
+        return "0"
+    return f"{value:g}"
+
+
+def _stable_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _mapping(value: object) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _mapping_or_none(value: object) -> dict[str, Any] | None:
+    return dict(value) if isinstance(value, Mapping) else None
+
+
+def _consistent_mapping(*values: object) -> tuple[bool, dict[str, Any] | None]:
+    present = [value for value in values if value is not None]
+    if not present:
+        return True, None
+    if any(not isinstance(value, Mapping) for value in present):
+        return False, None
+    mappings = [dict(cast(Mapping[str, Any], value)) for value in present]
+    if any(value != mappings[0] for value in mappings[1:]):
+        return False, None
+    return True, mappings[0]
+
+
+def _consistent_number(
+    *values: object,
+    allow_zero: bool = False,
+) -> float | None:
+    present = [value for value in values if value is not None]
+    if not present:
+        return None
+    parsed = [
+        _nonnegative_number(value) if allow_zero else _number(value)
+        for value in present
+    ]
+    if any(value is None for value in parsed):
+        return None
+    numbers = cast(list[float], parsed)
+    if any(value != numbers[0] for value in numbers[1:]):
+        return None
+    return numbers[0]
+
+
+def _number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if value > 0 else None
+
+
+def _nonnegative_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if value >= 0 else None
+
+
 def _run_search_text(run: Mapping[str, Any]) -> str:
     return " ".join(
         part
@@ -703,13 +1094,22 @@ def _config(run: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def _run_date_span(run: Mapping[str, Any]) -> tuple[date | None, date | None]:
     config = _config(run)
+    config_date_range = _mapping(config.get("date_range"))
     card = run.get("conversation_result_card")
     date_range = card.get("date_range") if isinstance(card, dict) else None
     if not isinstance(date_range, dict):
         date_range = {}
     return (
-        _date(config.get("start_date") or date_range.get("start")),
-        _date(config.get("end_date") or date_range.get("end")),
+        _date(
+            config.get("start_date")
+            or config_date_range.get("start")
+            or date_range.get("start")
+        ),
+        _date(
+            config.get("end_date")
+            or config_date_range.get("end")
+            or date_range.get("end")
+        ),
     )
 
 
@@ -728,9 +1128,8 @@ def _datetime(value: object) -> datetime | None:
     if isinstance(value, datetime) and value.tzinfo is not None:
         return value
     if isinstance(value, str):
-        try:
-            parsed = datetime.fromisoformat(value)
-        except ValueError:
+        parsed = _parse_iso_datetime(value)
+        if parsed is None:
             return None
         return parsed if parsed.tzinfo is not None else None
     return None
@@ -742,13 +1141,31 @@ def _row_activity(row: Mapping[str, Any]) -> datetime:
         if isinstance(value, datetime):
             return value
         if isinstance(value, str):
-            try:
-                parsed = datetime.fromisoformat(value)
-            except ValueError:
+            parsed = _parse_iso_datetime(value)
+            if parsed is None:
                 continue
             if parsed.tzinfo is not None:
                 return parsed
     return datetime.min.astimezone()
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    normalized = value.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        match = _ISO_FRACTION_RE.fullmatch(value)
+        if match is None:
+            return None
+        normalized = (
+            f"{match.group('prefix')}"
+            f"{match.group('fraction').ljust(6, '0')}"
+            f"{match.group('zone').replace('Z', '+00:00')}"
+        )
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
 
 
 def _text(value: object) -> str | None:

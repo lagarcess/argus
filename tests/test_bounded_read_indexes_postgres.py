@@ -36,6 +36,11 @@ SEARCH_EXPECTED_INDEXES = {
     "idx_evidence_search_norm_trgm",
     "idx_messages_user_content_norm_trgm",
     "idx_decision_notes_recall_norm_trgm",
+    "idx_backtest_runs_owner_symbol_1_prefix",
+    "idx_backtest_runs_owner_symbol_2_prefix",
+    "idx_backtest_runs_owner_symbol_3_prefix",
+    "idx_backtest_runs_owner_symbol_4_prefix",
+    "idx_backtest_runs_owner_symbol_5_prefix",
 }
 
 
@@ -503,3 +508,28 @@ def test_current_read_predicates_select_each_forward_index(
                 cursor.execute(query, params)
                 plan = cursor.fetchone()[0][0]["Plan"]
                 assert expected_index in _plan_index_names(plan)
+
+            for slot in range(1, 6):
+                cursor.execute(
+                    f"""
+                    explain (format json)
+                    select id
+                    from public.backtest_runs
+                    where user_id = %s
+                      and status = 'completed'
+                      and symbols[{slot}] is not null
+                      and btrim(
+                          public.argus_search_symbol_casefold(symbols[{slot}])
+                      ) collate "C" >= %s collate "C"
+                      and btrim(
+                          public.argus_search_symbol_casefold(symbols[{slot}])
+                      ) collate "C" < %s collate "C"
+                    limit 2
+                    """,  # noqa: S608
+                    (owner_id, "aap", "aaq"),
+                )
+                plan = cursor.fetchone()[0][0]["Plan"]
+                assert (
+                    f"idx_backtest_runs_owner_symbol_{slot}_prefix"
+                    in _plan_index_names(plan)
+                )

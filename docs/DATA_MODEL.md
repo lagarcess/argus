@@ -784,6 +784,13 @@ Durable decision capture:
   `idx_decision_notes_recall_norm_trgm` GIN index adds no new durable memory
   record, function, view, grant, or RLS change; owner and conversation checks
   remain in the recall query before ranking and limits.
+- Asset rollups use the existing maximum-five-symbol BacktestRun contract as
+  an index boundary. `argus_search_symbol_casefold(text)` is a pure immutable
+  SQL helper with Python 3.10 raw-casefold parity, and
+  `idx_backtest_runs_owner_symbol_{1..5}_prefix` are owner-first partial
+  B-tree expression indexes for completed non-null symbol slots. They add no
+  table, recall record, view, grant, or RLS change. The reader resolves an
+  exact or unique indexed prefix before evidence/decision lineage hydration.
 
 ### RLS
 

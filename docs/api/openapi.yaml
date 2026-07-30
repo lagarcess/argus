@@ -2625,6 +2625,35 @@ components:
       - run_count
       - decision_counts
       - last_touched_at
+    SearchDecisionAction:
+      properties:
+        type:
+          type: string
+          const: decision
+          default: decision
+        evidence_artifact_id:
+          type: string
+        decision_state:
+          anyOf:
+          - type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          - type: 'null'
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          type: string
+          maxLength: 160
+      type: object
+      required:
+      - evidence_artifact_id
+      - run_label
     SearchDossier:
       properties:
         decision:
@@ -2775,6 +2804,18 @@ components:
           $ref: '#/components/schemas/SearchMatch'
         dossier:
           $ref: '#/components/schemas/SearchDossier'
+        actions:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchRunFreshAction'
+            - $ref: '#/components/schemas/SearchDecisionAction'
+            discriminator:
+              propertyName: type
+              mapping:
+                decision: '#/components/schemas/SearchDecisionAction'
+                run_fresh: '#/components/schemas/SearchRunFreshAction'
+          type: array
+          maxItems: 2
         decision_states:
           items:
             type: string
@@ -2836,6 +2877,138 @@ components:
       - layer
       - fragment
       - count
+    SearchRunFreshAction:
+      properties:
+        type:
+          type: string
+          const: run_fresh
+          default: run_fresh
+        source_run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        canonical_setup:
+          $ref: '#/components/schemas/SearchRunFreshSetup'
+        send_text:
+          type: string
+          maxLength: 4000
+      type: object
+      required:
+      - source_run_id
+      - run_label
+      - canonical_setup
+      - send_text
+    SearchRunFreshDateRange:
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+      type: object
+      required:
+      - start
+      - end
+    SearchRunFreshSetup:
+      properties:
+        strategy_type:
+          type: string
+          enum:
+          - buy_and_hold
+          - dca_accumulation
+          - indicator_threshold
+          - signal_strategy
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+        timeframe:
+          type: string
+          maxLength: 24
+          minLength: 1
+        date_range:
+          $ref: '#/components/schemas/SearchRunFreshDateRange'
+        sizing_mode:
+          type: string
+          enum:
+          - capital_amount
+          - position_size
+        capital_amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        position_size:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+            enum:
+            - daily
+            - weekly
+            - biweekly
+            - monthly
+            - quarterly
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        starting_principal:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+        benchmark_symbol:
+          type: string
+          maxLength: 24
+          minLength: 1
+        entry_rule:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        exit_rule:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        rule_spec:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        parameters:
+          additionalProperties: true
+          type: object
+        execution_realism:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+      type: object
+      required:
+      - strategy_type
+      - symbols
+      - asset_class
+      - timeframe
+      - date_range
+      - sizing_mode
+      - benchmark_symbol
     SignupRequest:
       properties:
         email:

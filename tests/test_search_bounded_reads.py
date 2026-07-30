@@ -113,9 +113,19 @@ def _hydration_row() -> dict[str, Any]:
             "id": "00000000-0000-0000-0000-000000000401",
             "conversation_id": CONVERSATION_ID,
             "status": "completed",
+            "asset_class": "equity",
             "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
-            "config_snapshot": {"template": "buy_and_hold"},
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "timeframe": "1D",
+                "start_date": "2025-01-01",
+                "end_date": "2025-12-31",
+                "resolved_parameters": {
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 10_000,
+                },
+            },
             "conversation_result_card": {"title": "Latest run"},
             "created_at": ACTIVITY_AT,
             "updated_at": ACTIVITY_AT,
@@ -152,6 +162,14 @@ def _hydration_row() -> dict[str, Any]:
             "artifact_payload": {},
             "updated_at": ACTIVITY_AT,
         },
+        "latest_run_decision_payload": {
+            "id": "00000000-0000-0000-0000-000000000502",
+            "source_conversation_id": CONVERSATION_ID,
+            "evidence_artifact_id": "00000000-0000-0000-0000-000000000301",
+            "decision_state": "watching",
+            "note": "Latest-run decision.",
+            "updated_at": "2026-07-26T13:00:00+00:00",
+        },
     }
 
 
@@ -182,7 +200,7 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "runs": 2,
         "ideas": 0,
         "evidence": 1,
-        "decisions": 1,
+        "decisions": 2,
     }
     assert result.rows["conversations"][0]["_recall_match"] == {
         "matched_text": "Search decision evidence",
@@ -241,6 +259,91 @@ def test_search_defers_nonempty_queries_without_an_indexable_token(
         "rejected": 0,
         "revisit_later": 0,
     }
+    assert pool.cursor.executions == []
+    assert pool.acquisition_timeouts == []
+
+
+def test_search_allows_long_punctuated_symbol_without_text_scans() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ss/e",
+        source_limit=4,
+        include_ledger_groups=True,
+    )
+
+    assert result.asset_rollup is None
+    assert result.ledger_counts == {
+        "promising": 0,
+        "watching": 0,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+    assert len(pool.cursor.executions) == 1
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert params["symbol_query"] == "ss/e"
+    assert params["text_search_enabled"] is False
+    assert "%(text_search_enabled)s::boolean as text_search_enabled" in sql_text
+    assert "conversation_page" not in sql_text
+    assert "decision_candidates" not in sql_text
+    assert "public.messages" not in sql_text
+    assert "public.ideas" not in sql_text
+
+
+def test_empty_search_keeps_recents_and_ledger_reads_enabled() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[], []])
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="",
+        source_limit=4,
+        include_ledger_groups=True,
+    )
+
+    assert result.ledger_counts == {
+        "promising": 0,
+        "watching": 0,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+    assert len(pool.cursor.executions) == 2
+    assert pool.cursor.executions[0][1]["text_search_enabled"] is True
+
+
+def test_conversation_search_sql_guards_all_text_match_sources() -> None:
+    from argus.domain.postgres_search_reader import _conversation_search_sql
+
+    rendered = _conversation_search_sql(has_anchor=False).as_string()
+
+    assert rendered.count("input.text_search_enabled") == 6
+
+
+def test_search_indexability_includes_long_punctuated_symbols() -> None:
+    from argus.domain.search_text import search_query_is_indexable
+
+    assert search_query_is_indexable("ss/e") is True
+    assert search_query_is_indexable("J\u030c/USD") is True
+    for deferred in ("GL", "__", "___", "\x00__", "/-.", "a"):
+        assert search_query_is_indexable(deferred) is False
+
+
+def test_symbol_only_search_rejects_cursor_before_database_read() -> None:
+    reader_type, cursor_error = _reader_types()
+    pool = _RecordingPool([])
+
+    with pytest.raises(cursor_error, match="symbol-only"):
+        reader_type(pool).search_rows(
+            user_id=OWNER_ID,
+            query="ss/e",
+            source_limit=4,
+            cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
+            cursor_id=CONVERSATION_ID,
+        )
+
     assert pool.cursor.executions == []
     assert pool.acquisition_timeouts == []
 
@@ -480,6 +583,60 @@ def test_asset_rollup_is_one_bounded_owner_scoped_row_outside_conversation_limit
     assert str(params["user_id"]) == OWNER_ID
 
 
+def test_asset_rollup_bounds_indexed_symbol_candidates_before_lineage_hydration() -> (
+    None
+):
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="gold",
+        source_limit=4,
+    )
+
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    symbol_candidates = sql_text.index("asset_symbol_candidates as (")
+    candidate_limit = sql_text.index(
+        "limit (select asset_symbol_limit from input)",
+        symbol_candidates,
+    )
+    lineage = sql_text.index("asset_run_lineage as (")
+
+    assert symbol_candidates < candidate_limit < lineage
+    candidate_sql = sql_text[symbol_candidates:candidate_limit]
+    assert 'btrim(public.argus_search_symbol_casefold(run.symbols[1])) collate "C"' in (
+        candidate_sql
+    )
+    assert "input.symbol_query" in candidate_sql
+    assert "input.symbol_prefix_end" in candidate_sql
+    assert "public.evidence_artifacts" not in candidate_sql
+    assert "public.decision_notes" not in candidate_sql
+    selected_symbol = sql_text.index("asset_selected_symbol as (")
+    matching_runs = sql_text.index("asset_matching_runs as materialized (")
+    first_evidence_read = sql_text.index(
+        "public.evidence_artifacts",
+        matching_runs,
+    )
+    first_decision_read = sql_text.index(
+        "public.decision_notes",
+        matching_runs,
+    )
+    asset_rollup = sql_text.index("asset_rollup as (", lineage)
+    lineage_sql = sql_text[lineage:asset_rollup]
+    assert selected_symbol < matching_runs < first_evidence_read
+    assert matching_runs < first_decision_read
+    assert "conversation.id" not in lineage_sql
+    assert lineage_sql.count("run.conversation_id") == 3
+    assert sql_text[symbol_candidates:selected_symbol].count(
+        "limit (select asset_symbol_limit from input)"
+    ) == 5
+    assert params["asset_symbol_limit"] == 2
+    assert params["symbol_query"] == "gold"
+    assert params["symbol_prefix_end"] == "gole"
+
+
 def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[]])
@@ -494,8 +651,9 @@ def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit()
 
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
-    conversation_sql = sql_text[: sql_text.index("asset_run_lineage")]
-    asset_sql = sql_text[sql_text.index("asset_run_lineage") :]
+    asset_start = sql_text.index("asset_symbol_candidates")
+    conversation_sql = sql_text[:asset_start]
+    asset_sql = sql_text[asset_start:]
     assert sql_text.count("conversation.id = input.guest_conversation_id") >= 6
     assert conversation_sql.rfind(
         "conversation.id = input.guest_conversation_id"
@@ -530,6 +688,43 @@ def test_search_decision_filter_and_ledger_match_all_conversation_layers() -> No
         assert source_table in ledger_sql
     assert "count(distinct conversation_id)" in ledger_sql
     assert pool.cursor.executions[1][1]["decision_state"] is None
+
+
+@pytest.mark.parametrize(
+    ("has_anchor", "expected_prefilter_count"),
+    [(False, 6), (True, 7)],
+)
+def test_search_decision_filter_precedes_every_source_match_cap(
+    has_anchor: bool,
+    expected_prefilter_count: int,
+) -> None:
+    from argus.domain.postgres_search_reader import _conversation_match_ctes
+
+    sql_text = " ".join(
+        _conversation_match_ctes(has_anchor=has_anchor).as_string().split()
+    )
+    bounded_sources = sql_text[: sql_text.index("winning_matches as (")]
+
+    assert (
+        bounded_sources.count("source_decision.decision_state = input.decision_state")
+        == expected_prefilter_count
+    )
+    assert bounded_sources.rfind(
+        "source_decision.decision_state = input.decision_state"
+    ) < bounded_sources.rfind("limit (select match_limit from input)")
+
+
+def test_conversation_ledger_counts_use_indexed_uncapped_match_membership() -> None:
+    from argus.domain.postgres_search_reader import _conversation_ledger_sql
+
+    sql_text = " ".join(_conversation_ledger_sql(has_anchor=True).as_string().split())
+
+    assert "ranked_conversations" not in sql_text
+    assert "match_limit" not in sql_text
+    assert "limit (select match_limit from input)" not in sql_text
+    assert sql_text.count("like %(anchor_pattern)s") >= 7
+    assert "count(distinct conversation_id)::integer as count" in sql_text
+    assert "group by decision_state" in sql_text
 
 
 def test_search_cursor_pivots_on_conversation_projection_and_canonical_activity() -> None:
@@ -667,6 +862,16 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     assert item.dossier.decision.run_label == "Judged older run"
     assert item.dossier.outcome is not None
     assert item.dossier.outcome.run_label == "Latest run"
+    assert [action.type for action in item.actions] == ["run_fresh", "decision"]
+    decision_action = item.actions[1]
+    assert decision_action.type == "decision"
+    assert decision_action.evidence_artifact_id == (
+        "00000000-0000-0000-0000-000000000301"
+    )
+    assert decision_action.decision_state == "watching"
+    hydration_sql = str(pool.cursor.executions[1][0])
+    assert "latest_run_decision_payload" in hydration_sql
+    assert "decision.evidence_artifact_id" in hydration_sql
 
 
 def test_persistent_title_match_never_trusts_an_unrelated_preview_hint() -> None:
@@ -770,6 +975,31 @@ def test_conversation_recall_anchor_predicates_match_the_shipped_indexes() -> No
     for haystack in indexed_haystacks:
         normalized = " ".join(_normalized(haystack).as_string().split())
         assert f"{normalized} like %(anchor_pattern)s" in rendered
+
+
+def test_decision_match_combines_owned_evidence_text_with_indexed_prefilters() -> None:
+    from argus.domain.postgres_search_reader import (
+        _DECISION_INDEX_HAYSTACK,
+        _EVIDENCE_INDEX_HAYSTACK,
+        _conversation_match_ctes,
+        _normalized,
+    )
+
+    rendered = " ".join(
+        _conversation_match_ctes(has_anchor=True).as_string().split()
+    )
+    decision_branch = rendered[: rendered.index(" matches as (")]
+
+    assert "join public.evidence_artifacts as evidence" in decision_branch
+    assert "evidence.id = decision.evidence_artifact_id" in decision_branch
+    assert "decision.evidence_artifact_id = evidence.id" in decision_branch
+    assert "union all" in decision_branch
+    assert "select distinct on (candidate.source_id)" in decision_branch
+    for haystack in (_DECISION_INDEX_HAYSTACK, _EVIDENCE_INDEX_HAYSTACK):
+        normalized = " ".join(_normalized(haystack).as_string().split())
+        assert f"{normalized} like %(anchor_pattern)s" in decision_branch
+    assert "coalesce(evidence.digest, '')" in decision_branch
+    assert decision_branch.count("unnest(%(token_patterns)s::text[])") == 2
 
 
 def test_conversation_recall_caps_every_source_before_window_ranking() -> None:

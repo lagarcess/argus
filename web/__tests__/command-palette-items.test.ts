@@ -4,9 +4,16 @@ import { join } from "node:path";
 
 import {
   commandPaletteAssetRollupFromSearch,
+  commandPaletteDecisionVerb,
+  commandPaletteDigitSelectionIndex,
   commandPaletteGroupsByLedgerState,
   commandPaletteItemFromSearch,
+  commandPaletteItemsInRenderedOrder,
+  commandPaletteKeyboardAction,
+  commandPaletteOpenMessageId,
   commandPalettePreviewFields,
+  commandPaletteRequestIsCurrent,
+  commandPaletteSelectedRenderedPreview,
   commandPaletteSelectedPreview,
 } from "../lib/command-palette-items";
 import type { SearchAssetRollupItem, SearchItem } from "../lib/argus-api";
@@ -25,6 +32,40 @@ const conversationDossier = {
     message_id: "message-7",
   },
   decision_states: ["watching"],
+  actions: [
+    {
+      type: "run_fresh",
+      source_run_id: "run-2",
+      run_label: "Weekly GLD pullback",
+      canonical_setup: {
+        strategy_type: "buy_and_hold",
+        symbols: ["GLD"],
+        asset_class: "equity",
+        timeframe: "1D",
+        date_range: { start: "2025-07-29", end: "2026-07-29" },
+        sizing_mode: "capital_amount",
+        capital_amount: 10_000,
+        position_size: null,
+        cadence: null,
+        recurring_contribution: null,
+        starting_principal: null,
+        benchmark_symbol: "SPY",
+        entry_rule: { type: "start_of_period" },
+        exit_rule: { type: "end_of_period" },
+        rule_spec: null,
+        parameters: {},
+        execution_realism: null,
+      },
+      send_text: "Test this exact supported setup again.",
+    },
+    {
+      type: "decision",
+      evidence_artifact_id: "evidence-2",
+      decision_state: null,
+      note: null,
+      run_label: "Weekly GLD pullback",
+    },
+  ],
   dossier: {
     decision: {
       state: "watching",
@@ -80,6 +121,7 @@ describe("command palette conversation dossier", () => {
       ],
       lastTouched: "Last touched 2026-07-29",
     });
+    expect("actions" in assetRollup).toBe(false);
   });
 
   test("localizes the asset rollup fully in Spanish", () => {
@@ -135,6 +177,7 @@ describe("command palette conversation dossier", () => {
       matchCount: 2,
       matchMessageId: "message-7",
       canManageConversation: true,
+      actions: conversationDossier.actions,
     });
     expect(commandPalettePreviewFields(display!)).toEqual([
       expect.objectContaining({
@@ -174,6 +217,19 @@ describe("command palette conversation dossier", () => {
     for (const key of ["decision", "note", "tested", "outcome", "left_off"]) {
       expect(en.command_palette.preview_fields[key]).toBeTruthy();
       expect(es.command_palette.preview_fields[key]).toBeTruthy();
+    }
+    for (const key of [
+      "run_fresh",
+      "add_decision",
+      "change_decision",
+      "save_decision",
+      "open_at_match",
+      "open_at_left_off",
+      "read_error",
+      "try_searching",
+    ]) {
+      expect(en.command_palette[key]).toBeTruthy();
+      expect(es.command_palette[key]).toBeTruthy();
     }
     expect(en.command_palette.asset_rollup.heading).toBeTruthy();
     expect(en.command_palette.asset_rollup.runs_involving_other).toContain(
@@ -227,10 +283,13 @@ describe("command palette conversation dossier", () => {
     };
 
     expect(
-      commandPaletteGroupsByLedgerState([watching, promising], [
-        { decision_state: "promising", count: 1 },
-        { decision_state: "watching", count: 1 },
-      ]),
+      commandPaletteGroupsByLedgerState(
+        [watching, promising],
+        [
+          { decision_state: "promising", count: 1 },
+          { decision_state: "watching", count: 1 },
+        ],
+      ),
     ).toEqual([
       expect.objectContaining({
         decisionState: "promising",
@@ -244,5 +303,283 @@ describe("command palette conversation dossier", () => {
       }),
     ]);
     expect(commandPaletteSelectedPreview(promising, [watching])).toBe(watching);
+  });
+
+  test("flattens ledger rows in their rendered order for digit shortcuts", () => {
+    const watching = commandPaletteItemFromSearch(conversationDossier);
+    const multiState = {
+      ...watching,
+      decisionStates: ["watching", "rejected"] as const,
+    };
+    const promising = {
+      ...watching,
+      id: "conversation-2",
+      conversationId: "conversation-2",
+      decisionState: "promising" as const,
+      decisionStates: ["promising" as const],
+    };
+    const groups = commandPaletteGroupsByLedgerState(
+      [multiState, promising],
+      [
+        { decision_state: "promising", count: 1 },
+        { decision_state: "watching", count: 1 },
+        { decision_state: "rejected", count: 1 },
+      ],
+    );
+
+    expect(commandPaletteItemsInRenderedOrder(groups)).toEqual([
+      promising,
+      multiState,
+      multiState,
+    ]);
+  });
+
+  test("defaults the preview to the first row visible in a filtered ledger", () => {
+    const watching = commandPaletteItemFromSearch(conversationDossier);
+    const multiState = {
+      ...watching,
+      id: "conversation-2",
+      conversationId: "conversation-2",
+      decisionStates: ["watching", "promising"] as const,
+    };
+    const promising = {
+      ...watching,
+      id: "conversation-3",
+      conversationId: "conversation-3",
+      decisionState: "promising" as const,
+      decisionStates: ["promising"] as const,
+    };
+    const promisingGroup = commandPaletteGroupsByLedgerState(
+      [watching, multiState, promising],
+      [{ decision_state: "promising", count: 2 }],
+    );
+
+    expect(
+      commandPaletteSelectedRenderedPreview(null, promisingGroup),
+    ).toBe(multiState);
+  });
+
+  test("rebinds the selected dossier to the canonical refreshed object", () => {
+    const before = commandPaletteItemFromSearch(conversationDossier);
+    const after = {
+      ...before,
+      decisionState: "promising" as const,
+      decisionStates: ["promising" as const],
+      dossier: {
+        ...before.dossier!,
+        decision: {
+          state: "promising" as const,
+          note: "Updated after refetch.",
+          run_label: "Weekly GLD pullback",
+        },
+      },
+    };
+
+    expect(commandPaletteSelectedPreview(before, [after])).toBe(after);
+  });
+
+  test("keeps keyboard navigation deterministic and editable inputs safe", () => {
+    const display = commandPaletteItemFromSearch(conversationDossier);
+    expect(commandPaletteOpenMessageId(display, false)).toBe("message-7");
+    expect(commandPaletteOpenMessageId(display, true)).toBeNull();
+    expect(commandPaletteDigitSelectionIndex("1", 3, false)).toBe(0);
+    expect(commandPaletteDigitSelectionIndex("3", 3, false)).toBe(2);
+    expect(commandPaletteDigitSelectionIndex("4", 3, false)).toBeNull();
+    expect(commandPaletteDigitSelectionIndex("1", 3, true)).toBeNull();
+  });
+
+  test("opens from the focused search input but suppresses numeric and editable shortcuts", () => {
+    expect(
+      commandPaletteKeyboardAction({
+        key: "Enter",
+        itemCount: 3,
+        hasSelection: true,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+        isEditing: false,
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ type: "open", openAtLeftOff: false });
+    expect(
+      commandPaletteKeyboardAction({
+        key: "Enter",
+        itemCount: 3,
+        hasSelection: true,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+        isEditing: false,
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toEqual({ type: "open", openAtLeftOff: true });
+    expect(
+      commandPaletteKeyboardAction({
+        key: "Enter",
+        itemCount: 3,
+        hasSelection: true,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+        isEditing: false,
+        metaKey: false,
+        ctrlKey: true,
+      }),
+    ).toEqual({ type: "open", openAtLeftOff: true });
+    expect(
+      commandPaletteKeyboardAction({
+        key: "2",
+        itemCount: 3,
+        hasSelection: true,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+        isEditing: false,
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ type: "none" });
+    for (const target of ["rename", "note", "other-editable"]) {
+      expect(
+        commandPaletteKeyboardAction({
+          key: "Enter",
+          itemCount: 3,
+          hasSelection: true,
+          targetIsEditable: true,
+          targetIsSearchInput: false,
+          isEditing: target === "rename",
+          metaKey: true,
+          ctrlKey: false,
+        }),
+      ).toEqual({ type: "none" });
+    }
+  });
+
+  test("rejects deferred More pages after query or decision-chip changes", async () => {
+    for (const nextSignature of [
+      JSON.stringify(["new query", false, null]),
+      JSON.stringify(["", true, "promising"]),
+    ]) {
+      let currentSignature = JSON.stringify(["old query", false, null]);
+      let currentRequestId = 7;
+      const capturedSignature = currentSignature;
+      const capturedRequestId = currentRequestId;
+      let resolvePage: (() => void) | null = null;
+      const page = new Promise<void>((resolve) => {
+        resolvePage = resolve;
+      });
+      const applied = page.then(() =>
+        commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId,
+          currentSignature,
+          currentRequestId,
+        }),
+      );
+
+      currentSignature = nextSignature;
+      currentRequestId += 1;
+      resolvePage?.();
+
+      expect(await applied).toBe(false);
+    }
+  });
+
+  test("releases deferred More loading when a same-query decision refresh takes ownership", async () => {
+    const signature = JSON.stringify(["old query", false, null]);
+    let currentRequestId = 7;
+    let isLoadingMore = true;
+    let rows = ["old-row"];
+    let cursor: string | null = "old-next";
+    const capturedRequestId = currentRequestId;
+    let resolvePage: (() => void) | null = null;
+    const page = new Promise<void>((resolve) => {
+      resolvePage = resolve;
+    });
+    const stalePage = page.then(() => {
+      if (
+        commandPaletteRequestIsCurrent({
+          capturedSignature: signature,
+          capturedRequestId,
+          currentSignature: signature,
+          currentRequestId,
+        })
+      ) {
+        rows = [...rows, "stale-row"];
+        cursor = "stale-next";
+        isLoadingMore = false;
+      }
+    });
+
+    // The same-query decision refresh synchronously releases and invalidates
+    // pagination before publishing its canonical rows and cursor.
+    isLoadingMore = false;
+    currentRequestId += 1;
+    rows = ["refreshed-row"];
+    cursor = "refreshed-next";
+    resolvePage?.();
+    await stalePage;
+
+    expect(rows).toEqual(["refreshed-row"]);
+    expect(cursor).toBe("refreshed-next");
+    expect(isLoadingMore).toBe(false);
+  });
+
+  test("blocks a second More request while the same-query decision refresh is pending", async () => {
+    const signature = JSON.stringify(["old query", false, null]);
+    let currentRequestId = 7;
+    let isSavingDecision = true;
+    let isLoadingMore = true;
+    let rows = ["old-row"];
+    let cursor: string | null = "old-next";
+    const staleMoreRequestId = currentRequestId;
+    let resolveStalePage: (() => void) | null = null;
+    const stalePage = new Promise<void>((resolve) => {
+      resolveStalePage = resolve;
+    }).then(() => {
+      if (
+        commandPaletteRequestIsCurrent({
+          capturedSignature: signature,
+          capturedRequestId: staleMoreRequestId,
+          currentSignature: signature,
+          currentRequestId,
+        })
+      ) {
+        rows = [...rows, "stale-row"];
+        cursor = "stale-next";
+      }
+    });
+
+    isLoadingMore = false;
+    const refreshRequestId = ++currentRequestId;
+    const tryStartMore = () => {
+      if (isSavingDecision || isLoadingMore) return false;
+      currentRequestId += 1;
+      return true;
+    };
+
+    expect(tryStartMore()).toBe(false);
+    expect(currentRequestId).toBe(refreshRequestId);
+    rows = ["refreshed-row"];
+    cursor = "refreshed-next";
+    isSavingDecision = false;
+    resolveStalePage?.();
+    await stalePage;
+
+    expect(rows).toEqual(["refreshed-row"]);
+    expect(cursor).toBe("refreshed-next");
+  });
+
+  test("names add versus change from the anchored action state", () => {
+    const display = commandPaletteItemFromSearch(conversationDossier);
+    const decision = display.actions.find(
+      (action) => action.type === "decision",
+    );
+    expect(decision?.type).toBe("decision");
+    expect(commandPaletteDecisionVerb(decision!)).toBe("add");
+    expect(
+      commandPaletteDecisionVerb({
+        ...decision!,
+        decision_state: "watching",
+      }),
+    ).toBe("change");
   });
 });

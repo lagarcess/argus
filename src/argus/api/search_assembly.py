@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Mapping
 
 from argus.api import state as api_state
-from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
-from argus.api.memory_ownership import memory_object_visible
+from argus.api.memory_search_candidates import bounded_memory_search_snapshot
 from argus.api.schemas import SearchAssetRollup, SearchItem, User
 from argus.domain.conversation_recall import (
     project_asset_rollup,
@@ -20,121 +20,97 @@ ScoredSearchItem = tuple[int, SearchItem]
 class MemorySearchRead:
     scored_items: list[ScoredSearchItem]
     asset_rollup: SearchAssetRollup | None
+    ledger_counts: dict[str, int] | None = None
 
 
-def memory_search_read(*, user: User, query: str) -> MemorySearchRead:
+def memory_search_read(
+    *,
+    user: User,
+    query: str,
+    source_limit: int,
+    allow_decision_action: bool = True,
+    include_conversation_rows: bool = True,
+    cursor_updated_at: datetime | None = None,
+    cursor_id: str | None = None,
+    decision_state: str | None = None,
+    include_ledger_groups: bool = False,
+    guest_conversation_id: str | None = None,
+) -> MemorySearchRead:
     """Project owned memory records through the same conversation read model."""
-    with api_state.store.backtest_finalization_lock:
-        conversations = [
-            conversation.model_dump()
-            for conversation in api_state.store.conversations.values()
-            if memory_object_visible(
-                owner_map=api_state.store.conversation_owners,
-                object_id=conversation.id,
-                user_id=user.id,
-            )
-            and conversation.deleted_at is None
-        ]
-        runs = [
-            run.model_dump()
-            for run in api_state.store.backtest_runs.values()
-            if memory_object_visible(
-                owner_map=api_state.store.backtest_run_owners,
-                object_id=run.id,
-                user_id=user.id,
-            )
-        ]
-        ideas = [
-            idea.model_dump()
-            for idea in api_state.store.ideas.values()
-            if memory_object_visible(
-                owner_map=api_state.store.idea_owners,
-                object_id=idea.id,
-                user_id=user.id,
-            )
-        ]
-        evidence = [
-            artifact.model_dump()
-            for artifact in api_state.store.evidence_artifacts.values()
-            if memory_object_visible(
-                owner_map=api_state.store.evidence_artifact_owners,
-                object_id=artifact.id,
-                user_id=user.id,
-            )
-        ]
-        decisions = [
-            decision.model_dump()
-            for decision in api_state.store.decision_notes.values()
-            if memory_object_visible(
-                owner_map=api_state.store.decision_note_owners,
-                object_id=decision.id,
-                user_id=user.id,
-            )
-        ]
-        visible_conversation_ids = {
-            str(conversation["id"]) for conversation in conversations
-        }
-        runs = [
-            run
-            for run in runs
-            if str(run.get("conversation_id") or "") in visible_conversation_ids
-        ]
-        evidence = [
-            artifact
-            for artifact in evidence
-            if str(artifact.get("source_conversation_id") or "")
-            in visible_conversation_ids
-        ]
-        decisions = [
-            decision
-            for decision in decisions
-            if str(decision.get("source_conversation_id") or "")
-            in visible_conversation_ids
-        ]
-        messages = [
-            message.model_dump()
-            for conversation_id, conversation_messages in api_state.store.messages.items()
-            if conversation_id in visible_conversation_ids
-            for message in conversation_messages
-            if message.role != "user"
-            or not is_legacy_onboarding_marker(message.content)
-        ]
+    snapshot = bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query=query,
+        source_limit=source_limit,
+        include_conversation_rows=include_conversation_rows,
+        cursor_updated_at=cursor_updated_at,
+        cursor_id=cursor_id,
+        decision_state=decision_state,
+        include_ledger_groups=include_ledger_groups,
+        guest_conversation_id=guest_conversation_id,
+    )
     return MemorySearchRead(
-        scored_items=_project_rows(
-            conversations=conversations,
-            runs=runs,
-            ideas=ideas,
-            evidence=evidence,
-            decisions=decisions,
-            messages=messages,
-            query=query,
+        scored_items=(
+            _project_rows(
+                conversations=snapshot.conversations,
+                runs=snapshot.runs,
+                ideas=snapshot.ideas,
+                evidence=snapshot.evidence,
+                decisions=snapshot.decisions,
+                messages=snapshot.messages,
+                query=query,
+                allow_decision_action=allow_decision_action,
+                language=user.language,
+            )
+            if include_conversation_rows
+            else []
         ),
         asset_rollup=project_asset_rollup(
-            runs=runs,
-            evidence=evidence,
-            decisions=decisions,
+            runs=snapshot.asset_runs,
+            evidence=snapshot.asset_evidence,
+            decisions=snapshot.asset_decisions,
             query=query,
         ),
+        ledger_counts=snapshot.ledger_counts,
     )
 
 
 def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
-    return memory_search_read(user=user, query=query).scored_items
+    return memory_search_read(
+        user=user,
+        query=query,
+        source_limit=101,
+    ).scored_items
 
 
 def scored_supabase_search_items(
     *,
     raw: dict[str, list[dict[str, object]]],
     query: str,
+    allow_decision_action: bool = True,
+    language: str = "en",
 ) -> list[ScoredSearchItem]:
     """Adapt persistent and injected-gateway rows to the shared projector."""
     if "conversation_recall" in raw:
         rows = raw["conversation_recall"]
-        return [
-            (int(row.get("score") or 0), SearchItem.model_validate(row["item"]))
-            for row in rows
-            if isinstance(row.get("item"), dict)
-        ]
+        projected: list[ScoredSearchItem] = []
+        for row in rows:
+            raw_item = row.get("item")
+            if not isinstance(raw_item, dict):
+                continue
+            item = SearchItem.model_validate(raw_item)
+            if not allow_decision_action:
+                item = item.model_copy(
+                    update={
+                        "actions": [
+                            action
+                            for action in item.actions
+                            if action.type != "decision"
+                        ]
+                    }
+                )
+            projected.append((int(row.get("score") or 0), item))
+        return projected
 
     conversations: dict[str, dict[str, Any]] = {
         str(row["id"]): dict(row)
@@ -193,6 +169,8 @@ def scored_supabase_search_items(
         decisions=decisions,
         messages=messages,
         query=query,
+        allow_decision_action=allow_decision_action,
+        language=language,
     )
 
 
@@ -205,6 +183,8 @@ def _project_rows(
     decisions: list[Mapping[str, Any]],
     messages: list[Mapping[str, Any]],
     query: str,
+    allow_decision_action: bool = True,
+    language: str = "en",
 ) -> list[ScoredSearchItem]:
     runs_by_conversation = _group_by_conversation(runs)
     ideas_by_conversation = _group_by_conversation(ideas)
@@ -222,6 +202,8 @@ def _project_rows(
             decisions=decisions_by_conversation[conversation_id],
             messages=messages_by_conversation[conversation_id],
             query=query,
+            allow_decision_action=allow_decision_action,
+            language=language,
         )
         if item is not None:
             projected.append(item)

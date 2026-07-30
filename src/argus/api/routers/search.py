@@ -25,7 +25,10 @@ from argus.domain.postgres_search_reader import (
     SearchCursorError,
     SearchReadResult,
 )
-from argus.domain.search_text import search_has_indexable_token
+from argus.domain.search_text import (
+    search_has_indexable_token,
+    search_query_is_indexable,
+)
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
@@ -72,7 +75,7 @@ def search(
             workspace.conversation_id if workspace is not None else None
         )
 
-    if query and not search_has_indexable_token(query):
+    if query and not search_query_is_indexable(query):
         if cursor:
             raise invalid_cursor_problem(request)
         ledger_groups = (
@@ -103,9 +106,14 @@ def search(
             ledger_groups=ledger_groups,
         )
 
+    text_search_enabled = not query or search_has_indexable_token(query)
+    if cursor and not text_search_enabled:
+        raise invalid_cursor_problem(request)
+
     scored_items: list[tuple[int, SearchItem]] = []
     asset_rollup: SearchAssetRollup | None = None
     search_read: SearchReadResult | None = None
+    memory_ledger_counts: dict[str, int] | None = None
     if api_state.supabase_gateway is not None:
         try:
             read_result = api_state.supabase_gateway.search_rows(
@@ -129,11 +137,30 @@ def search(
             # Keep injected test gateways compatible while the production
             # Supabase gateway always returns the typed reader result.
             raw = read_result
-        scored_items.extend(scored_supabase_search_items(raw=raw, query=query))
+        scored_items.extend(
+            scored_supabase_search_items(
+                raw=raw,
+                query=query,
+                allow_decision_action=context.capabilities.can_save_decision,
+                language=user.language,
+            )
+        )
     else:
-        memory_read = memory_search_read(user=user, query=query)
+        memory_read = memory_search_read(
+            user=user,
+            query=query,
+            source_limit=limit + 1,
+            allow_decision_action=context.capabilities.can_save_decision,
+            include_conversation_rows=text_search_enabled,
+            cursor_updated_at=cursor_dt,
+            cursor_id=cursor_id,
+            decision_state=decision_state,
+            include_ledger_groups=include_ledger_groups,
+            guest_conversation_id=workspace_conversation_id,
+        )
         scored_items.extend(memory_read.scored_items)
         asset_rollup = memory_read.asset_rollup
+        memory_ledger_counts = memory_read.ledger_counts
 
     if context.kind == "guest":
         # Defense in depth: the persistent reader applies this scope before
@@ -159,6 +186,8 @@ def search(
         if context.kind == "guest" and include_ledger_groups
         else _ledger_groups_from_counts(search_read.ledger_counts)
         if include_ledger_groups and search_read is not None
+        else _ledger_groups_from_counts(memory_ledger_counts)
+        if include_ledger_groups and memory_ledger_counts is not None
         else _ledger_groups_from_items(scored_items)
         if include_ledger_groups
         else None

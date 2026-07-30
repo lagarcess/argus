@@ -4,6 +4,7 @@ import {
   PYTHON_CASEFOLD_UNICODE_VERSION,
   normalizeSearchText,
   normalizedSearchTokenSpans,
+  searchHasIndexableToken,
 } from "../lib/search-text";
 
 describe("frontend search normalization", () => {
@@ -49,5 +50,12 @@ describe("frontend search normalization", () => {
       { normalized: "α", start: 10, end: 11 },
       { normalized: "ι", start: 10, end: 11 },
     ]);
+  });
+
+  test("waits for one normalized token with at least three characters", () => {
+    expect(searchHasIndexableToken("a")).toBeFalse();
+    expect(searchHasIndexableToken("GL")).toBeFalse();
+    expect(searchHasIndexableToken("x GLD")).toBeTrue();
+    expect(searchHasIndexableToken("ßß")).toBeTrue();
   });
 });

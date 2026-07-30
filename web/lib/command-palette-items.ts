@@ -19,6 +19,7 @@ export type CommandPaletteDisplayItem = {
   decisionState: DecisionState | null;
   decisionStates: DecisionState[];
   dossier: SearchConversationItem["dossier"] | null;
+  actions: SearchConversationItem["actions"];
   canManageConversation: boolean;
   activation: "open_conversation";
 };
@@ -91,6 +92,7 @@ export function commandPaletteItemFromHistory(
     decisionState: null,
     decisionStates: [],
     dossier: null,
+    actions: [],
     canManageConversation: true,
     activation: "open_conversation",
   };
@@ -114,6 +116,7 @@ export function commandPaletteItemFromSearch(
     decisionState: item.dossier.decision?.state ?? null,
     decisionStates: item.decision_states,
     dossier: item.dossier,
+    actions: item.actions,
     canManageConversation: true,
     activation: "open_conversation",
   };
@@ -144,8 +147,7 @@ export function commandPaletteAssetRollupFromSearch(
         label: `${stateLabel} ${count}`,
       };
     }),
-    lastTouched:
-      copy.lastTouched?.(date) ?? `Last touched ${date}`,
+    lastTouched: copy.lastTouched?.(date) ?? `Last touched ${date}`,
   };
 }
 
@@ -153,18 +155,97 @@ export function commandPaletteSelectedPreview(
   previewItem: CommandPaletteDisplayItem | null,
   displayItems: readonly CommandPaletteDisplayItem[],
 ): CommandPaletteDisplayItem | null {
-  if (
-    previewItem &&
-    displayItems.some(
+  if (previewItem) {
+    const refreshed = displayItems.find(
       (item) =>
         item.id === previewItem.id &&
         item.type === previewItem.type &&
         item.source === previewItem.source,
-    )
-  ) {
-    return previewItem;
+    );
+    if (refreshed) return refreshed;
   }
   return displayItems[0] ?? null;
+}
+
+export function commandPaletteOpenMessageId(
+  item: CommandPaletteDisplayItem,
+  openAtLeftOff: boolean,
+) {
+  return openAtLeftOff ? null : item.matchMessageId;
+}
+
+export function commandPaletteDigitSelectionIndex(
+  key: string,
+  itemCount: number,
+  isEditableTarget: boolean,
+) {
+  if (isEditableTarget || !/^[1-9]$/.test(key)) return null;
+  const index = Number(key) - 1;
+  return index < itemCount ? index : null;
+}
+
+export type CommandPaletteKeyboardAction =
+  | { type: "none" }
+  | { type: "select"; index: number }
+  | { type: "open"; openAtLeftOff: boolean };
+
+export function commandPaletteKeyboardAction({
+  key,
+  itemCount,
+  hasSelection,
+  targetIsEditable,
+  targetIsSearchInput,
+  isEditing,
+  metaKey,
+  ctrlKey,
+}: {
+  key: string;
+  itemCount: number;
+  hasSelection: boolean;
+  targetIsEditable: boolean;
+  targetIsSearchInput: boolean;
+  isEditing: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}): CommandPaletteKeyboardAction {
+  if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
+    return { type: "none" };
+  }
+  if (key === "Enter" && hasSelection) {
+    return { type: "open", openAtLeftOff: metaKey || ctrlKey };
+  }
+  const index = commandPaletteDigitSelectionIndex(
+    key,
+    itemCount,
+    targetIsEditable,
+  );
+  return index === null ? { type: "none" } : { type: "select", index };
+}
+
+export function commandPaletteRequestIsCurrent({
+  capturedSignature,
+  capturedRequestId,
+  currentSignature,
+  currentRequestId,
+}: {
+  capturedSignature: string;
+  capturedRequestId: number;
+  currentSignature: string;
+  currentRequestId: number;
+}) {
+  return (
+    capturedSignature === currentSignature &&
+    capturedRequestId === currentRequestId
+  );
+}
+
+export function commandPaletteDecisionVerb(
+  action: Extract<
+    SearchConversationItem["actions"][number],
+    { type: "decision" }
+  >,
+) {
+  return action.decision_state ? "change" : "add";
 }
 
 export function commandPaletteGroupsByLedgerState(
@@ -181,7 +262,25 @@ export function commandPaletteGroupsByLedgerState(
   }));
 }
 
-export function commandPaletteTypeLabelKey(type: CommandPaletteDisplayItem["type"]) {
+export function commandPaletteItemsInRenderedOrder<T>(
+  groups: readonly { items: readonly T[] }[],
+): T[] {
+  return groups.flatMap((group) => group.items);
+}
+
+export function commandPaletteSelectedRenderedPreview(
+  previewItem: CommandPaletteDisplayItem | null,
+  groups: readonly { items: readonly CommandPaletteDisplayItem[] }[],
+): CommandPaletteDisplayItem | null {
+  return commandPaletteSelectedPreview(
+    previewItem,
+    commandPaletteItemsInRenderedOrder(groups),
+  );
+}
+
+export function commandPaletteTypeLabelKey(
+  type: CommandPaletteDisplayItem["type"],
+) {
   return `command_palette.type.${type}`;
 }
 
@@ -204,16 +303,12 @@ export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
     : null;
 }
 
-export function commandPaletteOpenLabelKey(
-  item: CommandPaletteDisplayItem,
-) {
+export function commandPaletteOpenLabelKey(item: CommandPaletteDisplayItem) {
   void item;
   return "command_palette.open_conversation";
 }
 
-export function commandPaletteOpenFallback(
-  item: CommandPaletteDisplayItem,
-) {
+export function commandPaletteOpenFallback(item: CommandPaletteDisplayItem) {
   void item;
   return "Open conversation";
 }
@@ -262,8 +357,8 @@ export function commandPalettePreviewFields(
       "decision",
       "Decision",
       dossier.decision.run_label
-        ? copy.decisionAttribution?.(state, dossier.decision.run_label) ??
-          `${state} · on ${dossier.decision.run_label}`
+        ? (copy.decisionAttribution?.(state, dossier.decision.run_label) ??
+            `${state} · on ${dossier.decision.run_label}`)
         : state,
     );
     // Do not trim or normalize: this is the user's exact stored note.
@@ -286,9 +381,9 @@ export function commandPalettePreviewFields(
           copy.dateLabel?.(tested.end_date) ?? tested.end_date
         }`
       : tested.start_date || tested.end_date
-        ? copy.dateLabel?.(tested.start_date ?? tested.end_date ?? "") ??
+        ? (copy.dateLabel?.(tested.start_date ?? tested.end_date ?? "") ??
           tested.start_date ??
-          tested.end_date
+          tested.end_date)
         : null,
   ].filter((value): value is string => Boolean(value));
   add("tested", "What you tested", testedParts.join(" · "));
@@ -310,8 +405,8 @@ export function commandPalettePreviewFields(
         copy.dateLabel?.(dossier.left_off.completed_at) ??
           dossier.left_off.completed_at.slice(0, 10),
         dossier.left_off.nudge
-          ? copy.nudgeLabel?.(dossier.left_off.nudge) ??
-            nudgeFallback(dossier.left_off.nudge)
+          ? (copy.nudgeLabel?.(dossier.left_off.nudge) ??
+            nudgeFallback(dossier.left_off.nudge))
           : null,
       ]
         .filter(Boolean)
@@ -359,9 +454,8 @@ function metricsText(
   };
   return metrics
     .map(({ name, value }) => {
-      const label = copy.metricLabel?.(name, labels[name] ?? name) ??
-        labels[name] ??
-        name;
+      const label =
+        copy.metricLabel?.(name, labels[name] ?? name) ?? labels[name] ?? name;
       const rendered =
         typeof value === "number" && name.endsWith("_pct")
           ? `${value.toFixed(1)}%`

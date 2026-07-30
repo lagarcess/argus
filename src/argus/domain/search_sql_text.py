@@ -104,6 +104,11 @@ def symbol_normalizer_expression(value: sql.Composable) -> sql.Composed:
     return sql.Composed([expression])
 
 
+def symbol_index_expression(value: sql.Composable) -> sql.Composed:
+    """Call the immutable SQL casefold helper used by symbol-slot indexes."""
+    return sql.SQL("public.argus_search_symbol_casefold({})").format(value)
+
+
 def normalizer_expression(value: sql.Composable) -> sql.Composed:
     expression = _casefold_expression(value)
     expression = sql.SQL("regexp_replace({}, {}, ' ', 'g')").format(

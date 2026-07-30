@@ -1646,6 +1646,72 @@ def test_search_asset_rollup_matches_expanding_and_combining_casefolds() -> None
     assert expanding.symbol == "ẞ/EUR"
 
 
+def test_search_memory_mode_symbol_only_query_returns_only_asset_rollup() -> None:
+    from argus.api.pagination import encode_cursor
+
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "SS Europe unrelated conversation"},
+    ).json()["conversation"]
+    run = BacktestRun(
+        id="asset-rollup-expanding-casefold-api",
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="currency_pair",
+        symbols=["ẞ/EUR"],
+        allocation_method="equal_weight",
+        benchmark_symbol="ẞ/EUR",
+        metrics={},
+        config_snapshot={"template": "buy_and_hold"},
+        conversation_result_card={"title": "Expanding casefold run"},
+        created_at=now,
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "ss/e", "include_ledger_groups": "true"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "type": "asset_rollup",
+                "symbol": "ẞ/EUR",
+                "run_count": 1,
+                "decision_counts": {
+                    "promising": 0,
+                    "watching": 0,
+                    "rejected": 0,
+                    "revisit_later": 0,
+                },
+                "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+            }
+        ],
+        "next_cursor": None,
+        "ledger_groups": [
+            {"decision_state": "promising", "count": 0},
+            {"decision_state": "watching", "count": 0},
+            {"decision_state": "rejected", "count": 0},
+            {"decision_state": "revisit_later", "count": 0},
+        ],
+    }
+
+    cursor = encode_cursor(now.isoformat(), conversation["id"])
+    rejected = client.get(
+        "/api/v1/search",
+        params={"q": "ss/e", "cursor": cursor},
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["code"] == "validation_error"
+
+
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     # Memory mode shares the Supabase matcher semantics: a multi-word query
     # matches when every token appears, not only as one contiguous substring.
@@ -2676,6 +2742,32 @@ def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> No
     ]
 
 
+def test_search_dossier_accepts_postgres_trimmed_fractional_activity() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    projected = project_conversation_recall(
+        conversation={
+            "id": "trimmed-postgres-fraction",
+            "title": "Trimmed PostgreSQL timestamp",
+            "updated_at": "2026-07-27T15:00:00+00:00",
+            "_recall_summary": {
+                "latest_activity": "2026-07-30T07:38:21.24646+00:00"
+            },
+        },
+        runs=[],
+        ideas=[],
+        evidence=[],
+        decisions=[],
+        query="",
+    )
+
+    assert projected is not None
+    assert (
+        projected[1].updated_at.isoformat(timespec="microseconds")
+        == "2026-07-30T07:38:21.246460+00:00"
+    )
+
+
 def test_search_dossier_marks_a_decided_old_result_stale() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
@@ -2854,6 +2946,531 @@ def test_search_decision_names_judged_run_when_latest_run_is_different() -> None
     assert dossier["decision"]["run_label"] == first["conversation_result_card"]["title"]
     assert dossier["outcome"]["run_label"] == second["conversation_result_card"]["title"]
     assert dossier["left_off"]["nudge"] == "undecided"
+
+
+def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import runtime as agent_runtime
+    from argus.domain import engine as domain_engine
+
+    def unexpected_external_call(*_: object, **__: object) -> None:
+        raise AssertionError("Omnisearch action projection must stay deterministic")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", unexpected_external_call)
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", unexpected_external_call)
+    monkeypatch.setattr(agent_runtime, "run_agent_turn", unexpected_external_call)
+
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation_id = "actionable-dossier-conversation"
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        title="Actionable GLD dossier",
+        updated_at=now,
+    )
+    run = BacktestRun(
+        id="actionable-dossier-run",
+        conversation_id=conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["GLD"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["GLD"],
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "benchmark_symbol": "SPY",
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["GLD"],
+                "asset_class": "equity",
+                "entry_rule": {"type": "start_of_period"},
+                "exit_rule": {"type": "end_of_period"},
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10_000,
+                "benchmark_symbol": "SPY",
+            },
+        },
+        conversation_result_card={"title": "Annual GLD buy and hold"},
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="actionable-dossier-evidence",
+        idea_id="actionable-dossier-idea",
+        idea_version_id="actionable-dossier-version",
+        source_conversation_id=conversation_id,
+        source_run_id=run.id,
+        artifact_type="backtest",
+        lifecycle="decided",
+        title="Annual GLD buy and hold",
+        digest="GLD was tested against SPY.",
+        payload={},
+        created_at=now,
+        updated_at=now,
+    )
+    decision = DecisionNote(
+        id="actionable-dossier-decision",
+        idea_id=artifact.idea_id,
+        idea_version_id=artifact.idea_version_id,
+        evidence_artifact_id=artifact.id,
+        source_conversation_id=conversation_id,
+        decision_state="watching",
+        note="Review after the next annual window.",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    api_state.store.decision_notes[decision.id] = decision
+    api_state.store.decision_note_owners[decision.id] = user_id
+    run_ids_before = set(api_state.store.backtest_runs)
+
+    response = client.get("/api/v1/search", params={"q": "GLD", "limit": 20})
+
+    assert response.status_code == 200
+    conversation = next(
+        item for item in response.json()["items"] if item["type"] == "conversation"
+    )
+    run_fresh, change_decision = conversation["actions"]
+    expected_end = date.today()
+    expected_start = expected_end - timedelta(days=365)
+    assert run_fresh == {
+        "type": "run_fresh",
+        "source_run_id": run.id,
+        "run_label": "Annual GLD buy and hold",
+        "canonical_setup": {
+            "strategy_type": "buy_and_hold",
+            "symbols": ["GLD"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+                "start": expected_start.isoformat(),
+                "end": expected_end.isoformat(),
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10_000.0,
+            "position_size": None,
+            "cadence": None,
+            "recurring_contribution": None,
+            "starting_principal": None,
+            "benchmark_symbol": "SPY",
+            "entry_rule": {"type": "start_of_period"},
+            "exit_rule": {"type": "end_of_period"},
+            "rule_spec": None,
+            "parameters": {},
+            "execution_realism": None,
+        },
+        "send_text": (
+            f"Test this exact supported setup again from "
+            f"{expected_start.isoformat()} to {expected_end.isoformat()}: "
+            "buy and hold GLD on 1D with $10000 starting capital, benchmark "
+            "SPY, long only and equal weight. Show the Ready-to-run "
+            "confirmation; do not run it yet."
+        ),
+    }
+    assert change_decision == {
+        "type": "decision",
+        "evidence_artifact_id": artifact.id,
+        "decision_state": "watching",
+        "note": "Review after the next annual window.",
+        "run_label": "Annual GLD buy and hold",
+    }
+    assert set(api_state.store.backtest_runs) == run_ids_before
+
+
+def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    now = utcnow()
+    older = {
+        "id": "older-run",
+        "conversation_id": "multi-run-action-conversation",
+        "status": "completed",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "benchmark_symbol": "SPY",
+        "config_snapshot": {
+            "template": "buy_and_hold",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-06-30"},
+            "resolved_parameters": {
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1_000,
+            },
+        },
+        "conversation_result_card": {"title": "Older AAPL run"},
+        "created_at": now - timedelta(days=1),
+    }
+    latest = {
+        **older,
+        "id": "latest-run",
+        "symbols": ["MSFT"],
+        "conversation_result_card": {"title": "Latest MSFT run"},
+        "created_at": now,
+    }
+    evidence = [
+        {
+            "id": "older-evidence",
+            "source_conversation_id": "multi-run-action-conversation",
+            "source_run_id": "older-run",
+            "created_at": now - timedelta(days=1),
+        },
+        {
+            "id": "latest-evidence",
+            "source_conversation_id": "multi-run-action-conversation",
+            "source_run_id": "latest-run",
+            "created_at": now,
+        },
+    ]
+    decisions = [
+        {
+            "id": "older-decision",
+            "source_conversation_id": "multi-run-action-conversation",
+            "evidence_artifact_id": "older-evidence",
+            "decision_state": "watching",
+            "note": "This belongs to the older run.",
+            "created_at": now - timedelta(hours=12),
+        }
+    ]
+
+    projected = project_conversation_recall(
+        conversation={
+            "id": "multi-run-action-conversation",
+            "title": "Two run dossier",
+            "updated_at": now,
+        },
+        runs=[older, latest],
+        ideas=[],
+        evidence=evidence,
+        decisions=decisions,
+        query="",
+        allow_decision_action=False,
+    )
+
+    assert projected is not None
+    _, item = projected
+    assert [action.type for action in item.actions] == ["run_fresh"]
+    assert item.actions[0].source_run_id == "latest-run"
+    assert item.dossier.decision is not None
+    assert item.dossier.decision.run_label == "Older AAPL run"
+    assert item.dossier.left_off is not None
+    assert item.dossier.left_off.nudge == "undecided"
+
+
+def _chat_persisted_run_fresh_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    request_payload: dict[str, Any],
+    language: str = "es-419",
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+    from argus.domain.engine_launch.adapter import run_launch_backtest
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    launch = run_launch_backtest(LaunchBacktestRequest.model_validate(request_payload))
+    assert launch.envelope.execution_status == "succeeded"
+    assert launch.result_card is not None
+    envelope = launch.envelope.model_dump(mode="python")
+    run = build_runtime_backtest_run(
+        user_id="action-fixture-user",
+        conversation_id="action-fixture-conversation",
+        result_card=launch.result_card,
+        envelope=envelope,
+        classify_symbol_func=_fake_resolve_asset,
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+        run_id=f"action-fixture-{request_payload['strategy_type']}",
+    )
+    assert run is not None
+
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    projected = project_conversation_recall(
+        conversation={
+            "id": run.conversation_id,
+            "title": "Real chat-produced run",
+            "updated_at": run.created_at,
+        },
+        runs=[run.model_dump(mode="python")],
+        ideas=[],
+        evidence=[],
+        decisions=[],
+        query="",
+        language=language,
+    )
+    assert projected is not None
+    _, item = projected
+    action = next(
+        (candidate for candidate in item.actions if candidate.type == "run_fresh"),
+        None,
+    )
+    assert action is not None
+    return (
+        action.model_dump(mode="python"),
+        envelope,
+        run.model_dump(mode="python"),
+    )
+
+
+def _run_fresh_spanish_dates() -> tuple[str, str]:
+    current_end = date.today()
+    current_start = current_end - timedelta(days=365)
+    return current_start.isoformat(), current_end.isoformat()
+
+
+def _stable_test_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def test_search_run_fresh_preserves_chat_dca_contribution_and_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    action, envelope, _ = _chat_persisted_run_fresh_fixture(
+        monkeypatch,
+        request_payload={
+            "strategy_type": "dca_accumulation",
+            "symbol": "TSLA",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 500.0,
+            "position_size": None,
+            "cadence": "monthly",
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        },
+    )
+
+    setup = action["canonical_setup"]
+    assert setup["capital_amount"] == 500.0
+    assert setup["recurring_contribution"] == 500.0
+    assert setup["starting_principal"] == 0.0
+    assert setup["execution_realism"] is None
+    start, end = _run_fresh_spanish_dates()
+    entry_rule = envelope["resolved_strategy"]["entry_rule"]
+    exit_rule = envelope["resolved_strategy"]["exit_rule"]
+    assert action["send_text"] == (
+        "Prueba nuevamente esta configuración compatible exacta del "
+        f"{start} al {end}: acumulación DCA mensual TSLA en 1D con un aporte "
+        "recurrente de $500 mensual y capital inicial de $0, referencia SPY, "
+        "solo posiciones largas y pesos iguales; regla de entrada "
+        f"{_stable_test_json(entry_rule)}; regla de salida "
+        f"{_stable_test_json(exit_rule)}. Muestra la confirmación Lista para "
+        "ejecutar; todavía no la ejecutes."
+    )
+
+
+def test_search_run_fresh_reads_nested_chat_modeled_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    execution_realism = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+    action, _, _ = _chat_persisted_run_fresh_fixture(
+        monkeypatch,
+        request_payload={
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10_000.0,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "_execution_realism": execution_realism,
+        },
+    )
+
+    assert action["canonical_setup"]["execution_realism"] == execution_realism
+    start, end = _run_fresh_spanish_dates()
+    assert action["send_text"] == (
+        "Prueba nuevamente esta configuración compatible exacta del "
+        f"{start} al {end}: comprar y mantener TSLA en 1D con $10000 de "
+        "capital inicial, referencia SPY, solo posiciones largas y pesos "
+        "iguales; costos modelados "
+        f"{_stable_test_json(execution_realism)}. Muestra la confirmación "
+        "Lista para ejecutar; todavía no la ejecutes."
+    )
+
+
+@pytest.mark.parametrize(
+    ("request_payload", "strategy_copy"),
+    [
+        (
+            {
+                "strategy_type": "indicator_threshold",
+                "symbol": "TSLA",
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "entry_rule": {
+                    "indicator": "rsi",
+                    "operator": "below",
+                    "threshold": 30,
+                },
+                "exit_rule": {
+                    "indicator": "rsi",
+                    "operator": "above",
+                    "threshold": 55,
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10_000.0,
+                "position_size": None,
+                "cadence": None,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+            },
+            "estrategia de umbral de indicador",
+        ),
+        (
+            {
+                "strategy_type": "signal_strategy",
+                "symbol": "TSLA",
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "entry_rule": {
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bullish",
+                },
+                "exit_rule": {
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bearish",
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10_000.0,
+                "position_size": None,
+                "cadence": None,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+            },
+            "estrategia de señales",
+        ),
+    ],
+)
+def test_search_run_fresh_localizes_full_spanish_rule_details(
+    monkeypatch: pytest.MonkeyPatch,
+    request_payload: dict[str, Any],
+    strategy_copy: str,
+) -> None:
+    action, envelope, _ = _chat_persisted_run_fresh_fixture(
+        monkeypatch,
+        request_payload=request_payload,
+    )
+    setup = action["canonical_setup"]
+    start, end = _run_fresh_spanish_dates()
+    details = [
+        ("regla de entrada", envelope["resolved_strategy"].get("entry_rule")),
+        ("regla de salida", envelope["resolved_strategy"].get("exit_rule")),
+        (
+            "especificación de reglas",
+            envelope["resolved_strategy"].get("rule_spec")
+            or envelope["resolved_parameters"].get("rule_spec"),
+        ),
+        ("parámetros", setup["parameters"] or None),
+    ]
+    detail_text = "".join(
+        f"; {label} {_stable_test_json(value)}"
+        for label, value in details
+        if value is not None
+    )
+    assert action["send_text"] == (
+        "Prueba nuevamente esta configuración compatible exacta del "
+        f"{start} al {end}: {strategy_copy} TSLA en 1D con $10000 de capital "
+        "inicial, referencia SPY, solo posiciones largas y pesos iguales"
+        f"{detail_text}. Muestra la confirmación Lista para ejecutar; todavía "
+        "no la ejecutes."
+    )
+    for leaked_label in (
+        "entry rule",
+        "exit rule",
+        "rule spec",
+        "parameters",
+        "execution realism",
+    ):
+        assert f"; {leaked_label} " not in action["send_text"]
+
+
+def test_search_run_fresh_omits_unfaithful_dca_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    action, _, run = _chat_persisted_run_fresh_fixture(
+        monkeypatch,
+        request_payload={
+            "strategy_type": "dca_accumulation",
+            "symbol": "TSLA",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 500.0,
+            "position_size": None,
+            "cadence": "monthly",
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        },
+    )
+    assert action["canonical_setup"]["capital_amount"] == 500.0
+
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    # Start from the real writer-shaped setup and remove the only facts that
+    # distinguish a recurring contribution from a starting principal.
+    resolved_parameters = run["config_snapshot"]["resolved_parameters"]
+    engine_config = resolved_parameters["engine_config"]
+    for key in ("recurring_contribution", "starting_principal"):
+        resolved_parameters.pop(key)
+        engine_config.pop(key)
+        run["config_snapshot"]["engine_config"].pop(key)
+    projected = project_conversation_recall(
+        conversation={
+            "id": run["conversation_id"],
+            "title": "Incomplete DCA",
+            "updated_at": utcnow(),
+        },
+        runs=[run],
+        ideas=[],
+        evidence=[],
+        decisions=[],
+        query="",
+    )
+    assert projected is not None
+    _, item = projected
+    assert all(candidate.type != "run_fresh" for candidate in item.actions)
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

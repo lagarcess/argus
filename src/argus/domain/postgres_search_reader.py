@@ -14,12 +14,13 @@ from argus.api.chat.legacy_onboarding_markers import (
 from argus.api.schemas import SearchAssetRollup
 from argus.domain.search_sql_text import (
     normalizer_expression,
-    symbol_normalizer_expression,
+    symbol_index_expression,
 )
 from argus.domain.search_text import (
     normalize_search_symbol,
     normalize_search_text,
     search_has_indexable_token,
+    search_query_is_indexable,
 )
 
 _SEARCH_ACQUIRE_TIMEOUT_SECONDS = 2.0
@@ -68,6 +69,24 @@ def _conversation_match_limit(source_limit: int) -> int:
     )
 
 
+def _symbol_prefix_end(prefix: str | None) -> str | None:
+    """Return the exclusive C-collation upper bound for one text prefix."""
+    if not prefix:
+        return None
+    codepoints = [ord(character) for character in prefix]
+    for index in range(len(codepoints) - 1, -1, -1):
+        codepoint = codepoints[index]
+        if codepoint >= 0x10FFFF:
+            continue
+        successor = codepoint + 1
+        if 0xD800 <= successor <= 0xDFFF:
+            successor = 0xE000
+        return "".join(
+            chr(value) for value in (*codepoints[:index], successor)
+        )
+    return None
+
+
 def _all_token_recheck(
     normalized_haystack: sql.Composable,
 ) -> sql.Composed:
@@ -109,6 +128,7 @@ _INPUT_CTE = sql.SQL(
             %(user_id)s::uuid as user_id,
             %(normalized_query)s::text as normalized_query,
             %(symbol_query)s::text as symbol_query,
+            %(symbol_prefix_end)s::text as symbol_prefix_end,
             %(source_limit)s::integer as source_limit,
             %(has_cursor)s::boolean as has_cursor,
             %(cursor_pinned_rank)s::integer as cursor_pinned_rank,
@@ -1154,8 +1174,11 @@ _CONVERSATION_INPUT_CTE = sql.SQL(
             %(user_id)s::uuid as user_id,
             %(normalized_query)s::text as normalized_query,
             %(symbol_query)s::text as symbol_query,
+            %(symbol_prefix_end)s::text as symbol_prefix_end,
             %(source_limit)s::integer as source_limit,
             %(match_limit)s::integer as match_limit,
+            %(asset_symbol_limit)s::integer as asset_symbol_limit,
+            %(text_search_enabled)s::boolean as text_search_enabled,
             %(has_cursor)s::boolean as has_cursor,
             %(cursor_pinned_rank)s::integer as cursor_pinned_rank,
             %(cursor_exact_rank)s::integer as cursor_exact_rank,
@@ -1167,6 +1190,34 @@ _CONVERSATION_INPUT_CTE = sql.SQL(
             %(decision_state)s::text as decision_state,
             %(guest_scope)s::boolean as guest_scope,
             %(guest_conversation_id)s::uuid as guest_conversation_id
+    )
+    """
+)
+
+
+_CONVERSATION_LEDGER_INPUT_CTE = sql.SQL(
+    """
+    input as (
+        select
+            %(user_id)s::uuid as user_id,
+            %(normalized_query)s::text as normalized_query,
+            %(text_search_enabled)s::boolean as text_search_enabled
+    )
+    """
+)
+
+
+_CONVERSATION_DECISION_FILTER = sql.SQL(
+    """
+    and (
+        input.decision_state is null
+        or exists (
+            select 1
+            from public.decision_notes as source_decision
+            where source_decision.user_id = input.user_id
+              and source_decision.source_conversation_id = conversation.id
+              and source_decision.decision_state = input.decision_state
+        )
     )
     """
 )
@@ -1190,7 +1241,170 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
     )
-    decision_haystack = _normalized(_DECISION_INDEX_HAYSTACK)
+    decision_haystack = _normalized(
+        f"""
+        {_DECISION_INDEX_HAYSTACK} || ' '
+        || evidence.title || ' ' || coalesce(evidence.digest, '')
+        """
+    )
+    decision_all_tokens = _all_token_recheck(decision_haystack)
+    if has_anchor:
+        decision_match_ctes = sql.SQL(
+            """
+            decision_candidates as (
+                (
+                select
+                    conversation.id as conversation_id,
+                    decision.id as source_id,
+                    decision.updated_at as candidate_at,
+                    concat_ws(
+                        ' ',
+                        nullif(decision.note, ''),
+                        decision.decision_state,
+                        nullif(evidence.title, ''),
+                        nullif(evidence.digest, '')
+                    ) as matched_text,
+                    6::integer as layer_rank,
+                    'decision'::text as layer
+                from input
+                join public.decision_notes as decision
+                  on decision.user_id = input.user_id
+                 and {decision_index} like %(anchor_pattern)s
+                join public.evidence_artifacts as evidence
+                  on evidence.id = decision.evidence_artifact_id
+                 and evidence.user_id = input.user_id
+                 and evidence.source_conversation_id =
+                     decision.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                 and (
+                     not input.guest_scope
+                     or conversation.id = input.guest_conversation_id
+                 )
+                 {decision_filter}
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+                order by decision.updated_at desc, decision.id desc
+                limit (select match_limit from input)
+                )
+
+                union all
+
+                (
+                select
+                    conversation.id,
+                    decision.id,
+                    decision.updated_at,
+                    concat_ws(
+                        ' ',
+                        nullif(decision.note, ''),
+                        decision.decision_state,
+                        nullif(evidence.title, ''),
+                        nullif(evidence.digest, '')
+                    ),
+                    6::integer,
+                    'decision'::text
+                from input
+                join public.evidence_artifacts as evidence
+                  on evidence.user_id = input.user_id
+                 and {evidence_index} like %(anchor_pattern)s
+                join public.decision_notes as decision
+                  on decision.evidence_artifact_id = evidence.id
+                 and decision.user_id = input.user_id
+                 and decision.source_conversation_id =
+                     evidence.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                 and (
+                     not input.guest_scope
+                     or conversation.id = input.guest_conversation_id
+                 )
+                 {decision_filter}
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+                order by decision.updated_at desc, decision.id desc
+                limit (select match_limit from input)
+                )
+            ),
+            decision_matches as (
+                select
+                    deduplicated.conversation_id,
+                    deduplicated.source_id,
+                    deduplicated.candidate_at,
+                    deduplicated.matched_text,
+                    deduplicated.layer_rank,
+                    deduplicated.layer
+                from (
+                    select distinct on (candidate.source_id)
+                        candidate.*
+                    from decision_candidates as candidate
+                    order by
+                        candidate.source_id,
+                        candidate.candidate_at desc
+                ) as deduplicated
+                order by
+                    deduplicated.candidate_at desc,
+                    deduplicated.source_id desc
+                limit (select match_limit from input)
+            )
+            """
+        ).format(
+            decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
+            evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
+            all_tokens=decision_all_tokens,
+            decision_filter=_CONVERSATION_DECISION_FILTER,
+        )
+    else:
+        decision_match_ctes = sql.SQL(
+            """
+            decision_matches as (
+                select
+                    conversation.id as conversation_id,
+                    decision.id as source_id,
+                    decision.updated_at as candidate_at,
+                    concat_ws(
+                        ' ',
+                        nullif(decision.note, ''),
+                        decision.decision_state,
+                        nullif(evidence.title, ''),
+                        nullif(evidence.digest, '')
+                    ) as matched_text,
+                    6::integer as layer_rank,
+                    'decision'::text as layer
+                from input
+                join public.decision_notes as decision
+                  on decision.user_id = input.user_id
+                join public.evidence_artifacts as evidence
+                  on evidence.id = decision.evidence_artifact_id
+                 and evidence.user_id = input.user_id
+                 and evidence.source_conversation_id =
+                     decision.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                 and (
+                     not input.guest_scope
+                     or conversation.id = input.guest_conversation_id
+                 )
+                 {decision_filter}
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+                order by decision.updated_at desc, decision.id desc
+                limit (select match_limit from input)
+            )
+            """
+        ).format(
+            all_tokens=decision_all_tokens,
+            decision_filter=_CONVERSATION_DECISION_FILTER,
+        )
 
     def token_predicate(
         haystack: sql.Composable,
@@ -1204,6 +1418,7 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
 
     return sql.SQL(
         """
+        {decision_match_ctes},
         matches as (
             (
             select
@@ -1227,10 +1442,16 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
+             {decision_filter}
             where (
                 input.normalized_query = ''
-                or ({chat_title_predicate})
-                or ({chat_preview_predicate})
+                or (
+                    input.text_search_enabled
+                    and (
+                        ({chat_title_predicate})
+                        or ({chat_preview_predicate})
+                    )
+                )
             )
             order by conversation.updated_at desc, conversation.id desc
             limit (select match_limit from input)
@@ -1260,7 +1481,9 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            where input.normalized_query <> ''
+             {decision_filter}
+            where input.text_search_enabled
+              and input.normalized_query <> ''
               and ({message_predicate})
             order by message.created_at desc, message.id desc
             limit (select match_limit from input)
@@ -1294,7 +1517,9 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            where input.normalized_query <> ''
+             {decision_filter}
+            where input.text_search_enabled
+              and input.normalized_query <> ''
               and ({run_predicate})
             order by
                 coalesce(run.updated_at, run.created_at) desc,
@@ -1323,7 +1548,9 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            where input.normalized_query <> ''
+             {decision_filter}
+            where input.text_search_enabled
+              and input.normalized_query <> ''
               and ({idea_predicate})
             order by idea.updated_at desc, idea.id desc
             limit (select match_limit from input)
@@ -1350,7 +1577,9 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            where input.normalized_query <> ''
+             {decision_filter}
+            where input.text_search_enabled
+              and input.normalized_query <> ''
               and ({evidence_predicate})
             order by evidence.updated_at desc, evidence.id desc
             limit (select match_limit from input)
@@ -1360,31 +1589,13 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
 
             (
             select
-                conversation.id,
-                decision.id,
-                decision.updated_at,
-                concat_ws(
-                    ' ',
-                    nullif(decision.note, ''),
-                    decision.decision_state
-                ),
-                6::integer,
-                'decision'::text
-            from input
-            join public.decision_notes as decision
-              on decision.user_id = input.user_id
-            join public.conversations as conversation
-              on conversation.id = decision.source_conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-             and (
-                 not input.guest_scope
-                 or conversation.id = input.guest_conversation_id
-             )
-            where input.normalized_query <> ''
-              and ({decision_predicate})
-            order by decision.updated_at desc, decision.id desc
-            limit (select match_limit from input)
+                decision_match.conversation_id,
+                decision_match.source_id,
+                decision_match.candidate_at,
+                decision_match.matched_text,
+                decision_match.layer_rank,
+                decision_match.layer
+            from decision_matches as decision_match
             )
         ),
         winning_matches as (
@@ -1499,21 +1710,10 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
                       and decision.source_conversation_id = conversation.id
                 ) as source_activity
             ) as activity
-            where (
-                input.decision_state is null
-                or exists (
-                    select 1
-                    from public.decision_notes as filtered_decision
-                    where filtered_decision.user_id = input.user_id
-                      and filtered_decision.source_conversation_id =
-                          conversation.id
-                      and filtered_decision.decision_state =
-                          input.decision_state
-                )
-            )
         )
         """
     ).format(
+        decision_match_ctes=decision_match_ctes,
         chat_title_predicate=token_predicate(
             chat_title_haystack,
             chat_index_haystack,
@@ -1532,27 +1732,37 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
             evidence_haystack,
             _normalized(_EVIDENCE_INDEX_HAYSTACK),
         ),
-        decision_predicate=token_predicate(
-            decision_haystack,
-            decision_haystack,
-        ),
+        decision_filter=_CONVERSATION_DECISION_FILTER,
         normalized_title=_normalized("conversation.title"),
         normalized_matched=_normalized("winning.matched_text"),
     )
 
 
-def _asset_rollup_ctes() -> sql.Composed:
+def _asset_symbol_slot(slot: int) -> sql.Composed:
+    return sql.SQL("btrim({})").format(
+        symbol_index_expression(
+            sql.SQL("run.symbols[{}]").format(sql.Literal(slot))
+        )
+    )
+
+
+def _asset_symbol_candidate_branch(slot: int) -> sql.Composed:
+    normalized_symbol = _asset_symbol_slot(slot)
+    raw_symbol = sql.SQL("run.symbols[{}]").format(sql.Literal(slot))
     return sql.SQL(
         """
-        asset_run_lineage as (
+        (
             select
-                run.id as run_id,
-                run_symbol.symbol,
-                normalized_run_symbol.value as normalized_symbol,
-                coalesce(run.updated_at, run.created_at) as run_touched_at,
-                evidence_touch.updated_at as evidence_touched_at,
-                latest_decision.decision_state,
-                latest_decision.updated_at as decision_touched_at
+                {normalized_symbol} as normalized_symbol,
+                (
+                    array_agg(
+                        {raw_symbol}
+                        order by
+                            coalesce(run.updated_at, run.created_at) desc,
+                            run.id desc
+                    )
+                )[1] as symbol,
+                max(coalesce(run.updated_at, run.created_at)) as last_seen_at
             from input
             join public.backtest_runs as run
               on run.user_id = input.user_id
@@ -1565,15 +1775,124 @@ def _asset_rollup_ctes() -> sql.Composed:
                  not input.guest_scope
                  or conversation.id = input.guest_conversation_id
              )
-            cross join lateral unnest(run.symbols) as run_symbol(symbol)
-            cross join lateral (
-                select {normalized_symbol} as value
-            ) as normalized_run_symbol
+            where input.symbol_query is not null
+              and input.symbol_prefix_end is not null
+              and {raw_symbol} is not null
+              and {normalized_symbol} collate "C"
+                    >= input.symbol_query collate "C"
+              and {normalized_symbol} collate "C"
+                    < input.symbol_prefix_end collate "C"
+            group by {normalized_symbol}
+            order by {normalized_symbol} collate "C"
+            limit (select asset_symbol_limit from input)
+        )
+        """
+    ).format(
+        normalized_symbol=normalized_symbol,
+        raw_symbol=raw_symbol,
+    )
+
+
+def _asset_rollup_ctes() -> sql.Composed:
+    candidate_branches = sql.SQL("\nunion all\n").join(
+        _asset_symbol_candidate_branch(slot) for slot in range(1, 6)
+    )
+    matching_slot_predicates = sql.SQL("\n or \n").join(
+        sql.SQL(
+            """
+            (
+                run.symbols[{slot}] is not null
+                and {normalized_symbol} collate "C"
+                    = selected.normalized_symbol collate "C"
+            )
+            """
+        ).format(
+            slot=sql.Literal(slot),
+            normalized_symbol=_asset_symbol_slot(slot),
+        )
+        for slot in range(1, 6)
+    )
+    return sql.SQL(
+        """
+        asset_symbol_candidates as (
+            {candidate_branches}
+        ),
+        asset_symbol_stats as (
+            select
+                candidate.normalized_symbol,
+                (
+                    array_agg(
+                        candidate.symbol
+                        order by
+                            candidate.last_seen_at desc,
+                            candidate.symbol
+                    )
+                )[1] as symbol,
+                max(candidate.last_seen_at) as last_seen_at
+            from asset_symbol_candidates as candidate
+            group by candidate.normalized_symbol
+        ),
+        asset_symbol_resolution as (
+            select
+                stats.*,
+                count(*) over () as matching_symbol_count,
+                bool_or(
+                    stats.normalized_symbol = input.symbol_query
+                ) over () as exact_present
+            from asset_symbol_stats as stats
+            cross join input
+        ),
+        asset_selected_symbol as (
+            select resolution.*
+            from asset_symbol_resolution as resolution
+            cross join input
+            where resolution.normalized_symbol = input.symbol_query
+               or (
+                   not resolution.exact_present
+                   and resolution.matching_symbol_count = 1
+               )
+            order by
+                (
+                    resolution.normalized_symbol = input.symbol_query
+                ) desc,
+                resolution.last_seen_at desc,
+                resolution.symbol
+            limit 1
+        ),
+        asset_matching_runs as materialized (
+            select run.*
+            from input
+            join public.backtest_runs as run
+              on run.user_id = input.user_id
+             and run.status = 'completed'
+            join public.conversations as conversation
+              on conversation.id = run.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+             and (
+                 not input.guest_scope
+                 or conversation.id = input.guest_conversation_id
+             )
+            cross join asset_selected_symbol as selected
+            where ({matching_slot_predicates})
+        ),
+        asset_run_lineage as (
+            select
+                run.id as run_id,
+                selected.symbol,
+                selected.normalized_symbol,
+                coalesce(run.updated_at, run.created_at) as run_touched_at,
+                evidence_touch.updated_at as evidence_touched_at,
+                latest_decision.decision_state,
+                latest_decision.updated_at as decision_touched_at
+            from input
+            cross join asset_selected_symbol as selected
+            cross join asset_matching_runs as run
             left join lateral (
                 select max(evidence.updated_at) as updated_at
                 from public.evidence_artifacts as evidence
                 where evidence.user_id = input.user_id
-                  and evidence.source_conversation_id = conversation.id
+                  and evidence.source_conversation_id = run.conversation_id
                   and evidence.source_run_id = run.id
             ) as evidence_touch
               on true
@@ -1585,29 +1904,19 @@ def _asset_rollup_ctes() -> sql.Composed:
                 join public.decision_notes as decision
                   on decision.evidence_artifact_id = evidence.id
                  and decision.user_id = input.user_id
-                 and decision.source_conversation_id = conversation.id
+                 and decision.source_conversation_id = run.conversation_id
                 where evidence.user_id = input.user_id
-                  and evidence.source_conversation_id = conversation.id
+                  and evidence.source_conversation_id = run.conversation_id
                   and evidence.source_run_id = run.id
                 order by decision.updated_at desc, decision.id desc
                 limit 1
             ) as latest_decision
               on true
-            where input.symbol_query is not null
-              and left(
-                  normalized_run_symbol.value,
-                  length(input.symbol_query)
-              ) = input.symbol_query
         ),
-        asset_symbol_stats as (
+        asset_rollup as (
             select
                 lineage.normalized_symbol,
-                (
-                    array_agg(
-                        lineage.symbol
-                        order by lineage.run_touched_at desc, lineage.run_id desc
-                    )
-                )[1] as symbol,
+                lineage.symbol,
                 count(distinct lineage.run_id)::integer as run_count,
                 count(distinct lineage.run_id) filter (
                     where lineage.decision_state = 'promising'
@@ -1635,40 +1944,54 @@ def _asset_rollup_ctes() -> sql.Composed:
                     )
                 ) as last_touched_at
             from asset_run_lineage as lineage
-            group by lineage.normalized_symbol
-        ),
-        asset_symbol_resolution as (
-            select
-                stats.*,
-                count(*) over () as matching_symbol_count,
-                bool_or(
-                    stats.normalized_symbol = input.symbol_query
-                ) over () as exact_present
-            from asset_symbol_stats as stats
-            cross join input
-        ),
-        asset_rollup as (
-            select resolution.*
-            from asset_symbol_resolution as resolution
-            cross join input
-            where resolution.normalized_symbol = input.symbol_query
-               or (
-                   not resolution.exact_present
-                   and resolution.matching_symbol_count = 1
-               )
-            order by
-                (
-                    resolution.normalized_symbol = input.symbol_query
-                ) desc,
-                resolution.last_touched_at desc,
-                resolution.symbol
-            limit 1
+            group by lineage.normalized_symbol, lineage.symbol
         )
         """
     ).format(
-        normalized_symbol=sql.SQL("btrim({})").format(
-            symbol_normalizer_expression(sql.SQL("run_symbol.symbol"))
-        ),
+        candidate_branches=candidate_branches,
+        matching_slot_predicates=matching_slot_predicates,
+    )
+
+
+def _asset_rollup_rows_sql() -> sql.SQL:
+    return sql.SQL(
+        """
+        select
+            'asset_rollup'::text as source_type,
+            0::integer as pinned_rank,
+            0::integer as exact_rank,
+            0::integer as symbol_rank,
+            0::integer as layer_rank,
+            0::integer as text_rank,
+            jsonb_build_object(
+                'type', 'asset_rollup',
+                'symbol', asset.symbol,
+                'run_count', asset.run_count,
+                'decision_counts', jsonb_build_object(
+                    'promising', asset.promising_count,
+                    'watching', asset.watching_count,
+                    'rejected', asset.rejected_count,
+                    'revisit_later', asset.revisit_later_count
+                ),
+                'last_touched_at', asset.last_touched_at
+            ) as payload
+        from asset_rollup as asset
+        """
+    )
+
+
+def _asset_rollup_search_sql() -> sql.Composed:
+    """Build the symbol-only path without transcript/object search relations."""
+    return sql.SQL(
+        """
+        with {input_cte},
+        {asset_rollup_ctes}
+        {asset_rollup_rows}
+        """
+    ).format(
+        input_cte=_CONVERSATION_INPUT_CTE,
+        asset_rollup_ctes=_asset_rollup_ctes(),
+        asset_rollup_rows=_asset_rollup_rows_sql(),
     )
 
 
@@ -1785,43 +2108,216 @@ def _conversation_search_sql(
 
         union all
 
-        select
-            'asset_rollup'::text as source_type,
-            0::integer as pinned_rank,
-            0::integer as exact_rank,
-            0::integer as symbol_rank,
-            0::integer as layer_rank,
-            0::integer as text_rank,
-            jsonb_build_object(
-                'type', 'asset_rollup',
-                'symbol', asset.symbol,
-                'run_count', asset.run_count,
-                'decision_counts', jsonb_build_object(
-                    'promising', asset.promising_count,
-                    'watching', asset.watching_count,
-                    'rejected', asset.rejected_count,
-                    'revisit_later', asset.revisit_later_count
-                ),
-                'last_touched_at', asset.last_touched_at
-            ) as payload
-        from asset_rollup as asset
+        {asset_rollup_rows}
         """
     ).format(
         input_cte=_CONVERSATION_INPUT_CTE,
         match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
         asset_rollup_ctes=_asset_rollup_ctes(),
+        asset_rollup_rows=_asset_rollup_rows_sql(),
         conversation_rows=conversation_rows,
     )
 
 
 def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
+    chat_title_haystack = _normalized("conversation.title")
+    chat_preview_haystack = _normalized(
+        "coalesce(conversation.last_message_preview, '')"
+    )
+    chat_index_haystack = _normalized(
+        "conversation.title || ' ' "
+        "|| coalesce(conversation.last_message_preview, '')"
+    )
+    message_haystack = _normalized("message.content")
+    run_haystack = _normalized(
+        "coalesce(run.conversation_result_card->>'title', '') || ' ' "
+        "|| coalesce(array_to_string(run.symbols, ' '), '') || ' ' "
+        "|| coalesce(run.config_snapshot->>'template', '') || ' ' "
+        "|| coalesce(run.conversation_result_card->>'strategy_label', '')"
+    )
+    idea_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
+    evidence_haystack = _normalized(
+        "evidence.title || ' ' || coalesce(evidence.digest, '')"
+    )
+    decision_haystack = _normalized(
+        f"""
+        {_DECISION_INDEX_HAYSTACK} || ' '
+        || evidence.title || ' ' || coalesce(evidence.digest, '')
+        """
+    )
+
+    def token_predicate(
+        haystack: sql.Composable,
+        index_haystack: sql.Composable,
+    ) -> sql.Composed:
+        return _token_match_predicate(
+            normalized_haystack=haystack,
+            normalized_index_haystack=index_haystack,
+            has_anchor=has_anchor,
+        )
+
+    decision_all_tokens = _all_token_recheck(decision_haystack)
+    if has_anchor:
+        decision_matches = sql.SQL(
+            """
+            decision_matching_conversations as (
+                (
+                select conversation.id as conversation_id
+                from input
+                join public.decision_notes as decision
+                  on decision.user_id = input.user_id
+                 and {decision_index} like %(anchor_pattern)s
+                join public.evidence_artifacts as evidence
+                  on evidence.id = decision.evidence_artifact_id
+                 and evidence.user_id = input.user_id
+                 and evidence.source_conversation_id =
+                     decision.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+                )
+
+                union
+
+                (
+                select conversation.id
+                from input
+                join public.evidence_artifacts as evidence
+                  on evidence.user_id = input.user_id
+                 and {evidence_index} like %(anchor_pattern)s
+                join public.decision_notes as decision
+                  on decision.evidence_artifact_id = evidence.id
+                 and decision.user_id = input.user_id
+                 and decision.source_conversation_id =
+                     evidence.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+                )
+            )
+            """
+        ).format(
+            decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
+            evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
+            all_tokens=decision_all_tokens,
+        )
+    else:
+        decision_matches = sql.SQL(
+            """
+            decision_matching_conversations as (
+                select conversation.id as conversation_id
+                from input
+                join public.decision_notes as decision
+                  on decision.user_id = input.user_id
+                join public.evidence_artifacts as evidence
+                  on evidence.id = decision.evidence_artifact_id
+                 and evidence.user_id = input.user_id
+                 and evidence.source_conversation_id =
+                     decision.source_conversation_id
+                join public.conversations as conversation
+                  on conversation.id = decision.source_conversation_id
+                 and conversation.user_id = input.user_id
+                 and conversation.deleted_at is null
+                where input.text_search_enabled
+                  and input.normalized_query <> ''
+                  and ({all_tokens})
+            )
+            """
+        ).format(all_tokens=decision_all_tokens)
+
     return sql.SQL(
         """
         with {input_cte},
-        {match_ctes},
+        {decision_matches},
         matching_conversations as (
-            select distinct conversation_id
-            from ranked_conversations
+            select conversation.id as conversation_id
+            from input
+            join public.conversations as conversation
+              on conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            where (
+                input.normalized_query = ''
+                or (
+                    input.text_search_enabled
+                    and (
+                        ({chat_title_predicate})
+                        or ({chat_preview_predicate})
+                    )
+                )
+            )
+
+            union
+
+            select conversation.id
+            from input
+            join public.messages as message
+              on message.user_id = input.user_id
+             and message.role = 'user'
+             and message.content <> %(legacy_skip_message)s
+             and message.content not like %(legacy_goal_pattern)s escape '\\'
+            join public.conversations as conversation
+              on conversation.id = message.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            where input.text_search_enabled
+              and input.normalized_query <> ''
+              and ({message_predicate})
+
+            union
+
+            select conversation.id
+            from input
+            join public.backtest_runs as run
+              on run.user_id = input.user_id
+             and run.status = 'completed'
+            join public.conversations as conversation
+              on conversation.id = run.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            where input.text_search_enabled
+              and input.normalized_query <> ''
+              and ({run_predicate})
+
+            union
+
+            select conversation.id
+            from input
+            join public.ideas as idea
+              on idea.user_id = input.user_id
+            join public.conversations as conversation
+              on conversation.id = idea.source_conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            where input.text_search_enabled
+              and input.normalized_query <> ''
+              and ({idea_predicate})
+
+            union
+
+            select conversation.id
+            from input
+            join public.evidence_artifacts as evidence
+              on evidence.user_id = input.user_id
+            join public.conversations as conversation
+              on conversation.id = evidence.source_conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+            where input.text_search_enabled
+              and input.normalized_query <> ''
+              and ({evidence_predicate})
+
+            union
+
+            select conversation_id
+            from decision_matching_conversations
         ),
         conversation_states as (
             select distinct
@@ -1840,8 +2336,26 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
         group by decision_state
         """
     ).format(
-        input_cte=_CONVERSATION_INPUT_CTE,
-        match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
+        input_cte=_CONVERSATION_LEDGER_INPUT_CTE,
+        decision_matches=decision_matches,
+        chat_title_predicate=token_predicate(
+            chat_title_haystack,
+            chat_index_haystack,
+        ),
+        chat_preview_predicate=token_predicate(
+            chat_preview_haystack,
+            chat_index_haystack,
+        ),
+        message_predicate=token_predicate(message_haystack, message_haystack),
+        run_predicate=token_predicate(
+            run_haystack,
+            _normalized(_RUN_INDEX_HAYSTACK),
+        ),
+        idea_predicate=token_predicate(idea_haystack, idea_haystack),
+        evidence_predicate=token_predicate(
+            evidence_haystack,
+            _normalized(_EVIDENCE_INDEX_HAYSTACK),
+        ),
     )
 
 
@@ -1875,6 +2389,7 @@ select
     latest_run.payload as latest_run_payload,
     judged_run.payload as judged_run_payload,
     latest_evidence.payload as latest_evidence_payload,
+    latest_run_decision.payload as latest_run_decision_payload,
     latest_decision.payload as latest_decision_payload
 from public.conversations as conversation
 left join lateral (
@@ -2087,6 +2602,27 @@ left join lateral (
     order by evidence.updated_at desc, evidence.id desc
     limit 1
 ) as latest_evidence on true
+left join lateral (
+    select jsonb_build_object(
+        'id', decision.id,
+        'idea_id', decision.idea_id,
+        'idea_version_id', decision.idea_version_id,
+        'evidence_artifact_id', decision.evidence_artifact_id,
+        'source_conversation_id', decision.source_conversation_id,
+        'decision_state', decision.decision_state,
+        'note', decision.note,
+        'created_at', decision.created_at,
+        'updated_at', decision.updated_at
+    ) as payload
+    from public.decision_notes as decision
+    where decision.user_id = %(user_id)s
+      and decision.source_conversation_id = conversation.id
+      and decision.evidence_artifact_id = (
+          latest_evidence.payload->>'id'
+      )::uuid
+    order by decision.updated_at desc, decision.id desc
+    limit 1
+) as latest_run_decision on true
 cross join lateral (
     select max(source_activity.activity_at) as activity_at
     from (
@@ -2224,12 +2760,15 @@ class PostgresSearchReader:
         normalized_query = normalize_search_text(query)
         normalized_tokens = tuple(dict.fromkeys(normalized_query.split()))
         symbol_query = normalize_search_symbol(query)
+        text_search_enabled = (
+            not normalized_query or search_has_indexable_token(query)
+        )
         anchor_token = max(
             (token for token in normalized_tokens if len(token) >= 3),
             key=len,
             default=None,
         )
-        if query.strip() and not search_has_indexable_token(query):
+        if query.strip() and not search_query_is_indexable(query):
             if has_cursor:
                 raise SearchCursorError(
                     "Deferred short search cannot continue from a cursor."
@@ -2242,6 +2781,10 @@ class PostgresSearchReader:
                     else None
                 ),
             )
+        if has_cursor and not text_search_enabled:
+            raise SearchCursorError(
+                "A symbol-only search cannot continue from a conversation cursor."
+            )
         legacy_skip_message, legacy_goal_pattern = legacy_onboarding_sql_filters()
         params: dict[str, Any] = {
             "user_id": owner_id,
@@ -2250,8 +2793,13 @@ class PostgresSearchReader:
             # exact, while raw symbol equality must be false for such a query
             # because stored Postgres symbols cannot contain NUL either.
             "symbol_query": (symbol_query if "\x00" not in query else None),
+            "symbol_prefix_end": (
+                _symbol_prefix_end(symbol_query) if "\x00" not in query else None
+            ),
             "source_limit": source_limit,
             "match_limit": _conversation_match_limit(source_limit),
+            "asset_symbol_limit": 2,
+            "text_search_enabled": text_search_enabled,
             "has_cursor": has_cursor,
             "cursor_pinned_rank": 0,
             "cursor_exact_rank": 0,
@@ -2295,12 +2843,14 @@ class PostgresSearchReader:
                         cursor_text_rank=int(pivot["text_rank"]),
                     )
 
-                cursor.execute(
+                search_sql = (
                     _conversation_search_sql(
                         has_anchor=anchor_token is not None,
-                    ),
-                    params,
+                    )
+                    if text_search_enabled
+                    else _asset_rollup_search_sql()
                 )
+                cursor.execute(search_sql, params)
                 candidate_rows = cursor.fetchall()
                 grouped = _group_candidates(
                     candidate_rows,
@@ -2320,22 +2870,25 @@ class PostgresSearchReader:
                 )
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
-                    ledger_params = {
-                        **params,
-                        "decision_state": None,
-                        "has_cursor": False,
-                        "cursor_id": None,
-                        "cursor_updated_at": None,
-                    }
-                    cursor.execute(
-                        _conversation_ledger_sql(has_anchor=anchor_token is not None),
-                        ledger_params,
-                    )
                     ledger_counts = {state: 0 for state in _DECISION_STATES}
-                    for row in cursor.fetchall():
-                        state = str(row.get("decision_state") or "")
-                        if state in ledger_counts:
-                            ledger_counts[state] = int(row.get("count") or 0)
+                    if text_search_enabled:
+                        ledger_params = {
+                            **params,
+                            "decision_state": None,
+                            "has_cursor": False,
+                            "cursor_id": None,
+                            "cursor_updated_at": None,
+                        }
+                        cursor.execute(
+                            _conversation_ledger_sql(
+                                has_anchor=anchor_token is not None
+                            ),
+                            ledger_params,
+                        )
+                        for row in cursor.fetchall():
+                            state = str(row.get("decision_state") or "")
+                            if state in ledger_counts:
+                                ledger_counts[state] = int(row.get("count") or 0)
 
         return SearchReadResult(
             rows=grouped,
@@ -2394,8 +2947,15 @@ def _hydrate_conversation_recall(
         latest_evidence = row.get("latest_evidence_payload")
         if isinstance(latest_evidence, dict):
             hydrated["evidence"].append(latest_evidence)
-        latest_decision = row.get("latest_decision_payload")
-        if isinstance(latest_decision, dict):
+        seen_decision_ids: set[str] = set()
+        for key in ("latest_decision_payload", "latest_run_decision_payload"):
+            latest_decision = row.get(key)
+            if not isinstance(latest_decision, dict):
+                continue
+            decision_id = str(latest_decision.get("id") or "")
+            if not decision_id or decision_id in seen_decision_ids:
+                continue
+            seen_decision_ids.add(decision_id)
             hydrated["decisions"].append(latest_decision)
     return hydrated
 

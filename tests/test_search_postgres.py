@@ -733,8 +733,18 @@ def test_search_preview_match_returns_preview_with_unrelated_title(
     assert pool.tracker == {"query_count": 2, "row_counts": [1, 1]}
 
 
+@pytest.mark.parametrize(
+    ("decision_note", "evidence_digest", "query"),
+    [
+        ("localtoken", "evidencetoken", "localtoken evidencetoken"),
+        ("decisionlongtoken", "localtoken", "decisionlongtoken localtoken"),
+    ],
+)
 def test_search_matches_all_tokens_across_decision_and_evidence_text(
     search_identities,
+    decision_note: str,
+    evidence_digest: str,
+    query: str,
 ) -> None:
     owner_id = search_identities["owner"]
     now = datetime(2026, 7, 27, 13, tzinfo=timezone.utc)
@@ -752,22 +762,23 @@ def test_search_matches_all_tokens_across_decision_and_evidence_text(
             title="Ordinary idea",
             summary="Ordinary summary",
             conversation_id=conversation_id,
-            decision_note="localtoken",
-            evidence_digest="evidencetoken",
+            decision_note=decision_note,
+            evidence_digest=evidence_digest,
         )
 
     reader, _ = _reader()
     result = reader.search_rows(
         user_id=str(owner_id),
-        query="localtoken evidencetoken",
+        query=query,
         source_limit=3,
     )
+    ranked = _ranked(result.rows, query)
 
-    assert [item.id for _, item in _ranked(result.rows, "localtoken evidencetoken")] == [
-        str(conversation_id)
-    ]
-    assert result.rows["decisions"][0]["note"] == "localtoken"
-    assert result.rows["decisions"][0]["artifact_digest"] == "evidencetoken"
+    assert [item.id for _, item in ranked] == [str(conversation_id)]
+    assert ranked[0][1].match is not None
+    assert ranked[0][1].match.layer == "decision"
+    assert result.rows["decisions"][0]["note"] == decision_note
+    assert result.rows["decisions"][0]["artifact_digest"] == evidence_digest
 
 
 @pytest.mark.parametrize("query", ["\x00needle\x00", "nee\x00dle"])
@@ -1301,7 +1312,8 @@ def test_asset_rollup_pair_symbol_normalization_matches_memory_contract(
         query="J\u030c/USD",
         source_limit=20,
     )
-    expanding = _reader()[0].search_rows(
+    expanding_reader, expanding_pool = _reader()
+    expanding = expanding_reader.search_rows(
         user_id=str(owner_id),
         query="ss/e",
         source_limit=20,
@@ -1317,6 +1329,8 @@ def test_asset_rollup_pair_symbol_normalization_matches_memory_contract(
     assert combining.asset_rollup.symbol == "ǰ/USD"
     assert expanding.asset_rollup is not None
     assert expanding.asset_rollup.symbol == "ẞ/EUR"
+    assert all(not rows for rows in expanding.rows.values())
+    assert expanding_pool.tracker == {"query_count": 1, "row_counts": [1]}
     assert provider_calls == []
 
 
@@ -1373,6 +1387,87 @@ def test_ledger_counts_distinct_conversations_across_all_match_layers(
     assert result.ledger_counts == {
         "promising": 1,
         "watching": 1,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+
+
+def test_decision_filter_reaches_older_match_beyond_unfiltered_source_cap(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 20, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(10):
+            _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(seconds=offset),
+                title=f"Needle without decision {offset}",
+            )
+        qualifying_conversation = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(minutes=1),
+            title="Needle older watching decision",
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(minutes=1),
+            title="Older watching idea",
+            summary="Separate judgment",
+            conversation_id=qualifying_conversation,
+            decision_state="watching",
+        )
+
+    result = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=1,
+        decision_state="watching",
+    )
+
+    assert [item.id for _, item in _ranked(result.rows, "needle")] == [
+        str(qualifying_conversation)
+    ]
+
+
+def test_ledger_counts_include_matches_beyond_presentation_source_cap(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 21, tzinfo=timezone.utc)
+    expected_count = 12
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(expected_count):
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(seconds=offset),
+                title=f"Needle ledger {offset}",
+            )
+            _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(seconds=offset),
+                title=f"Ledger idea {offset}",
+                summary="Separate judgment",
+                conversation_id=conversation_id,
+                decision_state="watching",
+            )
+
+    result = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=1,
+        include_ledger_groups=True,
+    )
+
+    assert len(result.rows["conversations"]) == 1
+    assert result.ledger_counts == {
+        "promising": 0,
+        "watching": expected_count,
         "rejected": 0,
         "revisit_later": 0,
     }

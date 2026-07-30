@@ -25,6 +25,18 @@ def normalize_search_symbol(value: object) -> str | None:
     return symbol.casefold()
 
 
+def search_query_is_indexable(value: object) -> bool:
+    if search_has_indexable_token(value):
+        return True
+    symbol = normalize_search_symbol(value)
+    return (
+        symbol is not None
+        and "\x00" not in symbol
+        and len(symbol) >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH
+        and any(character.isalnum() for character in symbol)
+    )
+
+
 def search_text_contains_query(*, query: str, text: object) -> bool:
     normalized_query = normalize_search_text(query)
     if not normalized_query:
