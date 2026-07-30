@@ -608,30 +608,38 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.owner_id is distinct from old.owner_id
-     or (
-       tg_table_name in ('memory_prompt_history')
-       and new.category is distinct from old.category
-     )
-     or (
-       tg_table_name in (
-         'memory_reconciliations',
-         'memory_provider_projections',
-         'memory_provider_cleanup'
-       )
-       and new.record_id is distinct from old.record_id
-     )
-     or (
-       tg_table_name in ('memory_reconciliations', 'memory_provider_cleanup')
-       and new.generation is distinct from old.generation
-     )
-     or (
-       tg_table_name = 'memory_provider_cleanup'
-       and new.provider_ref is distinct from old.provider_ref
-     ) then
-    raise exception '% identity is immutable', tg_table_name
+  if tg_table_name = 'memory_prompt_history' then
+    if new.owner_id is distinct from old.owner_id
+       or new.category is distinct from old.category then
+      raise exception '% identity is immutable', tg_table_name
+        using errcode = '23514';
+    end if;
+  elsif tg_table_name = 'memory_reconciliations' then
+    if new.owner_id is distinct from old.owner_id
+       or new.record_id is distinct from old.record_id
+       or new.generation is distinct from old.generation then
+      raise exception '% identity is immutable', tg_table_name
+        using errcode = '23514';
+    end if;
+  elsif tg_table_name = 'memory_provider_projections' then
+    if new.owner_id is distinct from old.owner_id
+       or new.record_id is distinct from old.record_id then
+      raise exception '% identity is immutable', tg_table_name
+        using errcode = '23514';
+    end if;
+  elsif tg_table_name = 'memory_provider_cleanup' then
+    if new.owner_id is distinct from old.owner_id
+       or new.record_id is distinct from old.record_id
+       or new.provider_ref is distinct from old.provider_ref
+       or new.generation is distinct from old.generation then
+      raise exception '% identity is immutable', tg_table_name
+        using errcode = '23514';
+    end if;
+  else
+    raise exception 'unsupported memory child table: %', tg_table_name
       using errcode = '23514';
   end if;
+
   return new;
 end;
 $$;
