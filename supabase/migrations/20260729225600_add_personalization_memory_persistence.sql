@@ -459,6 +459,10 @@ create index memory_provider_cleanup_pending_idx
   )
   where status = 'pending';
 
+create index memory_provider_cleanup_reservation_idx
+  on public.memory_provider_cleanup (owner_id, provider_ref)
+  where status = 'pending';
+
 create or replace function argus_private.is_registered_memory_owner(
   p_owner_id uuid
 )
@@ -720,6 +724,77 @@ $$;
 
 revoke all on function
   argus_private.protect_memory_provider_cleanup_lifecycle()
+  from public, anon, authenticated, service_role;
+
+create or replace function argus_private.reserve_memory_provider_ref()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner_id uuid;
+  v_provider_ref text;
+  v_provider_refs text[];
+begin
+  if tg_table_name = 'memory_provider_projections' then
+    v_owner_id := new.owner_id;
+    v_provider_refs := array[new.provider_ref];
+    if tg_op = 'UPDATE' then
+      v_provider_refs := array_append(v_provider_refs, old.provider_ref);
+    end if;
+  elsif tg_table_name = 'memory_provider_cleanup' then
+    v_owner_id := new.owner_id;
+    v_provider_refs := array[new.provider_ref];
+  else
+    raise exception 'unsupported memory provider reservation table: %',
+      tg_table_name
+      using errcode = '23514';
+  end if;
+
+  for v_provider_ref in
+    select distinct ref
+      from unnest(v_provider_refs) as provider_refs(ref)
+     order by ref
+  loop
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(
+        'argus:memory-provider-ref:' || v_owner_id::text || ':' || v_provider_ref,
+        0
+      )
+    );
+  end loop;
+
+  if tg_table_name = 'memory_provider_projections'
+     and exists (
+       select 1
+         from public.memory_provider_cleanup
+        where owner_id = new.owner_id
+          and provider_ref = new.provider_ref
+          and status = 'pending'
+     ) then
+    raise exception 'memory provider ref is reserved for pending cleanup'
+      using errcode = '23514';
+  end if;
+
+  if tg_table_name = 'memory_provider_cleanup'
+     and tg_op = 'INSERT'
+     and exists (
+       select 1
+         from public.memory_provider_projections
+        where owner_id = new.owner_id
+          and provider_ref = new.provider_ref
+          and record_id <> new.record_id
+     ) then
+    raise exception 'memory provider ref belongs to a different live record'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.reserve_memory_provider_ref()
   from public, anon, authenticated, service_role;
 
 create or replace function argus_private.lock_memory_record_lifecycle()
@@ -1103,9 +1178,17 @@ create trigger protect_memory_provider_projection_identity
 before update on public.memory_provider_projections
 for each row execute function argus_private.protect_memory_child_identity();
 
+create trigger reserve_memory_provider_projection_ref
+before insert or update on public.memory_provider_projections
+for each row execute function argus_private.reserve_memory_provider_ref();
+
 create trigger protect_memory_provider_cleanup_identity
 before update on public.memory_provider_cleanup
 for each row execute function argus_private.protect_memory_child_identity();
+
+create trigger reserve_memory_provider_cleanup_ref
+before insert or update on public.memory_provider_cleanup
+for each row execute function argus_private.reserve_memory_provider_ref();
 
 create trigger validate_memory_provider_cleanup_lifecycle
 before insert or update on public.memory_provider_cleanup

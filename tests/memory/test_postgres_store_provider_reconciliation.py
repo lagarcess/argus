@@ -12,9 +12,21 @@ from threading import Event
 from typing import Any
 
 import pytest
+from argus.memory.contracts import ProviderReconciliationStatus
 from argus.memory.postgres_store import PostgresCanonicalMemoryStore
+from argus.memory.provider import (
+    ProviderCleanupResult,
+    ProviderProjectionResult,
+    ProviderSearchResult,
+    ProviderSearchStatus,
+)
+from argus.memory.service import MemoryService, MemoryServiceConfig
 from argus.memory.store import ProviderCleanupTarget, ReconciliationClaim
-from argus.memory.subject import RegisteredMemoryOwner
+from argus.memory.subject import (
+    MemoryAccountKind,
+    MemorySubject,
+    RegisteredMemoryOwner,
+)
 from psycopg_pool import ConnectionPool
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
@@ -767,3 +779,231 @@ def test_cleanup_resolution_is_idempotent_and_removes_only_matching_projection(
         == "provider-keep"
     )
     assert store.list_provider_cleanup_targets(database["owner"]) == ()
+
+
+def test_pending_cleanup_reserves_ref_against_same_and_different_record_set(
+    database: dict[str, Any],
+) -> None:
+    scheduler = PostgresCanonicalMemoryStore(database["pool"])
+    contender = PostgresCanonicalMemoryStore(database["pool"])
+    assert scheduler.track_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-reserved-set"
+    )
+
+    same_record_assigned = contender.set_provider_ref(
+        database["owner"], database["record_id"], "provider-reserved-set"
+    )
+    different_record_assigned = contender.set_provider_ref(
+        database["owner"],
+        database["second_record_id"],
+        "provider-reserved-set",
+    )
+    other_owner_assigned = contender.set_provider_ref(
+        database["other_owner"],
+        database["other_record_id"],
+        "provider-reserved-set",
+    )
+
+    assert same_record_assigned is False
+    assert different_record_assigned is False
+    assert other_owner_assigned is True
+    assert scheduler.list_provider_cleanup_targets(database["owner"]) == (
+        ProviderCleanupTarget(
+            record_id=database["record_id"],
+            provider_ref="provider-reserved-set",
+        ),
+    )
+    assert scheduler.resolve_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-reserved-set"
+    )
+    assert contender.set_provider_ref(
+        database["owner"], database["record_id"], "provider-reserved-set"
+    )
+
+
+def test_pending_cleanup_reserves_ref_against_exact_claim_cas_until_resolved(
+    database: dict[str, Any],
+) -> None:
+    scheduler = PostgresCanonicalMemoryStore(database["pool"])
+    contender = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: "reserved-cas",
+    )
+    assert scheduler.track_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-reserved-cas"
+    )
+    record = contender.get_record(database["owner"], database["second_record_id"])
+    assert record is not None
+    claim = contender.claim_reconciliation_turn(
+        database["owner"], database["second_record_id"], 1
+    )
+    assert claim is not None
+
+    assert not contender.compare_and_set_provider_ref(
+        database["owner"],
+        database["second_record_id"],
+        expected_record=record,
+        expected_provider_ref=None,
+        reconciliation_claim=claim,
+        provider_ref="provider-reserved-cas",
+    )
+    assert scheduler.list_provider_cleanup_targets(database["owner"]) == (
+        ProviderCleanupTarget(
+            record_id=database["record_id"],
+            provider_ref="provider-reserved-cas",
+        ),
+    )
+    assert scheduler.resolve_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-reserved-cas"
+    )
+    assert contender.compare_and_set_provider_ref(
+        database["owner"],
+        database["second_record_id"],
+        expected_record=record,
+        expected_provider_ref=None,
+        reconciliation_claim=claim,
+        provider_ref="provider-reserved-cas",
+    )
+
+
+@pytest.mark.parametrize("operation", ("insert", "update"))
+def test_database_rejects_raw_projection_assignment_to_pending_cleanup_ref(
+    database: dict[str, Any],
+    operation: str,
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    assert store.track_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-raw-reserved"
+    )
+    if operation == "update":
+        assert store.set_provider_ref(
+            database["owner"],
+            database["second_record_id"],
+            "provider-raw-prior",
+        )
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        with pytest.raises(psycopg.errors.CheckViolation, match="reserved"):
+            if operation == "insert":
+                connection.execute(
+                    """
+                    insert into public.memory_provider_projections (
+                      owner_id,record_id,provider_ref,generation
+                    )
+                    values (%s,%s,'provider-raw-reserved',1)
+                    """,
+                    (
+                        database["owner"].owner_id,
+                        database["second_record_id"],
+                    ),
+                )
+            else:
+                connection.execute(
+                    """
+                    update public.memory_provider_projections
+                       set provider_ref='provider-raw-reserved',
+                           generation=generation+1,
+                           updated_at=now()
+                     where owner_id=%s and record_id=%s
+                    """,
+                    (
+                        database["owner"].owner_id,
+                        database["second_record_id"],
+                    ),
+                )
+
+
+class _BlockingCleanupProvider:
+    def __init__(self, store: PostgresCanonicalMemoryStore) -> None:
+        self._store = store
+        self.delete_started = Event()
+        self.allow_delete = Event()
+        self.delete_calls: list[tuple[RegisteredMemoryOwner, str]] = []
+        self.deleted_live_projection = False
+
+    def project(
+        self,
+        owner: RegisteredMemoryOwner,
+        record: object,
+    ) -> ProviderProjectionResult:
+        del owner, record
+        return ProviderProjectionResult(
+            status=ProviderReconciliationStatus.NOT_APPLICABLE
+        )
+
+    def search(
+        self,
+        owner: RegisteredMemoryOwner,
+        query: str,
+        limit: int,
+    ) -> ProviderSearchResult:
+        del owner, query, limit
+        return ProviderSearchResult(status=ProviderSearchStatus.UNAVAILABLE)
+
+    def delete(
+        self,
+        owner: RegisteredMemoryOwner,
+        provider_ref: str,
+    ) -> ProviderCleanupResult:
+        self.delete_calls.append((owner, provider_ref))
+        self.delete_started.set()
+        if not self.allow_delete.wait(timeout=5):
+            raise TimeoutError("test did not release provider cleanup")
+        self.deleted_live_projection = any(
+            self._store.get_provider_ref(owner, record.id) == provider_ref
+            for record in self._store.list_records(owner)
+        )
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+
+    def reset(self, owner: RegisteredMemoryOwner) -> ProviderCleanupResult:
+        del owner
+        return ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE)
+
+
+def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: "service-delete-claim",
+    )
+    initial_claim = store.claim_reconciliation_turn(
+        database["owner"], database["record_id"], 1
+    )
+    assert initial_claim is not None
+    assert store.finish_reconciliation_claim(
+        database["owner"],
+        initial_claim,
+        succeeded=True,
+        error_code=None,
+        completed_at=datetime.now(timezone.utc),
+    )
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-service-reserved"
+    )
+    provider = _BlockingCleanupProvider(store)
+    service = MemoryService(
+        store=store,
+        provider=provider,
+        config=MemoryServiceConfig(available=True),
+    )
+    subject = MemorySubject(
+        owner_id=database["owner"].owner_id,
+        kind=MemoryAccountKind.REGISTERED,
+    )
+    contender = PostgresCanonicalMemoryStore(database["pool"])
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        deletion = executor.submit(service.delete, subject, database["record_id"])
+        assert provider.delete_started.wait(timeout=2)
+        ref_reassigned = contender.set_provider_ref(
+            database["owner"],
+            database["second_record_id"],
+            "provider-service-reserved",
+        )
+        provider.allow_delete.set()
+        result = deletion.result(timeout=5)
+
+    assert ref_reassigned is False
+    assert provider.delete_calls == [(database["owner"], "provider-service-reserved")]
+    assert provider.deleted_live_projection is False
+    assert result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED

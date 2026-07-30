@@ -885,6 +885,11 @@ class InMemoryCanonicalMemoryStore:
         with self._lock:
             if record_id not in self._records.get(owner.owner_id, {}):
                 return False
+            if any(
+                owner_id == owner.owner_id and provider_ref in refs
+                for (owner_id, _target_record_id), refs in self._cleanup_targets.items()
+            ):
+                return False
             owner_refs = self._provider_refs.setdefault(owner.owner_id, {})
             if any(
                 other_record_id != record_id and other_ref == provider_ref
@@ -940,6 +945,11 @@ class InMemoryCanonicalMemoryStore:
                 or reconciliation_claim != self._reconciliation_claims.get(claim_key)
                 or reconciliation_claim.generation
                 not in self._inflight_reconciliations.get(reconciliation_key, set())
+            ):
+                return False
+            if any(
+                owner_id == owner.owner_id and provider_ref in refs
+                for (owner_id, _target_record_id), refs in self._cleanup_targets.items()
             ):
                 return False
             if any(

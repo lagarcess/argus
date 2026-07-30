@@ -170,6 +170,44 @@ class PostgresCanonicalMemoryStore:
         )
 
     @staticmethod
+    def _lock_provider_refs(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        provider_refs: tuple[str, ...],
+    ) -> None:
+        for provider_ref in sorted(set(provider_refs)):
+            cursor.execute(
+                """
+                select pg_advisory_xact_lock(
+                  pg_catalog.hashtextextended(%s, 0)
+                )
+                """,
+                (f"argus:memory-provider-ref:{owner_id}:{provider_ref}",),
+            )
+
+    @staticmethod
+    def _provider_ref_is_reserved(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        provider_ref: str,
+    ) -> bool:
+        cursor.execute(
+            """
+            select exists (
+              select 1
+                from public.memory_provider_cleanup
+               where owner_id = %s
+                 and provider_ref = %s
+                 and status = 'pending'
+            )
+            """,
+            (owner_id, provider_ref),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        return bool(row[0])
+
+    @staticmethod
     def _read_settings(
         cursor: Cursor[Any],
         owner_id: UUID,
@@ -1594,6 +1632,21 @@ class PostgresCanonicalMemoryStore:
                 )
                 if current_provider_ref != expected_provider_ref:
                     return False
+                self._lock_provider_refs(
+                    cursor,
+                    owner_id,
+                    tuple(
+                        ref
+                        for ref in (current_provider_ref, provider_ref)
+                        if ref is not None
+                    ),
+                )
+                if self._provider_ref_is_reserved(
+                    cursor,
+                    owner_id,
+                    provider_ref,
+                ):
+                    return False
                 if (
                     current_provider_ref is not None
                     and current_provider_ref != provider_ref
@@ -1679,6 +1732,24 @@ class PostgresCanonicalMemoryStore:
                     (owner_id, record_id),
                 )
                 projection = cursor.fetchone()
+                self._lock_provider_refs(
+                    cursor,
+                    owner_id,
+                    tuple(
+                        ref
+                        for ref in (
+                            None if projection is None else str(projection[0]),
+                            provider_ref,
+                        )
+                        if ref is not None
+                    ),
+                )
+                if self._provider_ref_is_reserved(
+                    cursor,
+                    owner_id,
+                    provider_ref,
+                ):
+                    return False
                 if projection is not None and projection[0] == provider_ref:
                     return True
                 cursor.execute(
@@ -1783,6 +1854,7 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("provider ref must contain 1 to 1024 characters")
         with self._confirmation_transaction(owner) as (cursor, owner_id):
             self._lock_record(cursor, owner_id, record_id)
+            self._lock_provider_refs(cursor, owner_id, (provider_ref,))
             cursor.execute(
                 """
                 select record_id
@@ -1824,6 +1896,7 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("provider ref must contain 1 to 1024 characters")
         with self._confirmation_transaction(owner) as (cursor, owner_id):
             self._lock_record(cursor, owner_id, record_id)
+            self._lock_provider_refs(cursor, owner_id, (provider_ref,))
             cursor.execute(
                 """
                 update public.memory_provider_cleanup

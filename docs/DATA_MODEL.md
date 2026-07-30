@@ -964,6 +964,10 @@ store.
   return at most 100 unique pending targets in deterministic newest-first
   order. Cleanup scheduling refuses a pointer currently projected by another
   record for the same owner, preventing deletion of live reused provider state.
+  While any cleanup row remains pending, its `(owner_id, provider_ref)` is a
+  fail-closed reservation: neither application code nor direct SQL may assign
+  that pointer to a live projection. The reservation ends only when cleanup is
+  resolved.
   Provider pointers are derivative identifiers, never canonical memory content.
 
 Composite foreign keys include `owner_id` at every live relationship so a
