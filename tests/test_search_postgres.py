@@ -986,6 +986,71 @@ def test_conversation_cursor_reaches_message_after_source_candidate_cap(
     assert seen == [*newer_pinned, str(last_pinned_id), str(unpinned_id)]
 
 
+def test_message_source_cap_collapses_conversation_before_limit(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 18, 30, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        dominant_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Dominant transcript",
+        )
+        for offset in range(21):
+            _insert_message(
+                cursor,
+                user_id=owner_id,
+                conversation_id=dominant_id,
+                timestamp=now + timedelta(seconds=offset),
+                role="user",
+                content=f"Needle repeated transcript {offset}.",
+            )
+        remaining_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=1),
+            title="Remaining transcript",
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=remaining_id,
+            timestamp=now - timedelta(days=1),
+            role="user",
+            content="Needle only appears in this message.",
+        )
+
+    reader, _ = _reader()
+    first_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="needle",
+        source_limit=2,
+    )
+    first_ranked = _ranked(first_result.rows, "needle")
+
+    assert [item.id for _, item in first_ranked] == [
+        str(dominant_id),
+        str(remaining_id),
+    ]
+    assert first_ranked[0][1].match is not None
+    assert first_ranked[0][1].match.count == 21
+
+    page_one = first_ranked[:1]
+    page_two = _ranked(
+        reader.search_rows(
+            user_id=str(owner_id),
+            query="needle",
+            source_limit=2,
+            cursor_updated_at=page_one[-1][1].updated_at,
+            cursor_id=page_one[-1][1].id,
+        ).rows,
+        "needle",
+    )[:1]
+    assert [item.id for _, item in page_two] == [str(remaining_id)]
+
+
 def test_conversation_cursor_reaches_identical_rank_rows_after_source_cap(
     search_identities,
 ) -> None:

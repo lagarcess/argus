@@ -1353,23 +1353,22 @@ def _conversation_match_ctes(
     def bounded_source_window(
         *,
         source_sql: sql.Composable,
-        layer_rank_sql: sql.Composable,
-        matched_text_sql: sql.Composable,
-        source_tiebreak_sql: sql.Composable,
         cursor_relative: bool,
     ) -> sql.Composed:
-        text_rank_sql = conversation_text_rank(matched_text_sql)
+        text_rank_sql = conversation_text_rank(
+            sql.SQL("source_winner.matched_text")
+        )
         cursor_predicate = (
             sql.SQL(
                 """
-                and input.has_cursor
+                where input.has_cursor
                 and (
                     conversation.id = input.cursor_id
                     or row(
                         conversation.pinned::integer,
                         {exact_rank_sql},
                         {symbol_rank_sql},
-                        {layer_rank_sql},
+                        source_winner.layer_rank,
                         {activity_sql},
                         {text_rank_sql},
                         conversation.id
@@ -1388,7 +1387,6 @@ def _conversation_match_ctes(
                 activity_sql=conversation_activity_sql,
                 exact_rank_sql=conversation_exact_rank,
                 symbol_rank_sql=conversation_symbol_rank,
-                layer_rank_sql=layer_rank_sql,
                 text_rank_sql=text_rank_sql,
             )
             if cursor_relative
@@ -1400,30 +1398,67 @@ def _conversation_match_ctes(
                 conversation.pinned::integer desc,
                 {exact_rank_sql} desc,
                 {symbol_rank_sql} desc,
-                {layer_rank_sql} desc,
+                source_winner.layer_rank desc,
                 {activity_sql} desc,
                 {text_rank_sql} desc,
                 conversation.id desc,
-                {source_tiebreak_sql}
+                source_winner.source_id desc
                 """
             ).format(
                 exact_rank_sql=conversation_exact_rank,
                 symbol_rank_sql=conversation_symbol_rank,
-                layer_rank_sql=layer_rank_sql,
                 activity_sql=conversation_activity_sql,
                 text_rank_sql=text_rank_sql,
-                source_tiebreak_sql=source_tiebreak_sql,
             )
             if cursor_relative
-            else sql.SQL("{activity_sql} desc, {source_tiebreak_sql}").format(
+            else sql.SQL(
+                "{activity_sql} desc, source_winner.source_id desc"
+            ).format(
                 activity_sql=conversation_activity_sql,
-                source_tiebreak_sql=source_tiebreak_sql,
             )
         )
         return sql.SQL(
             """
             (
-            {source_sql}
+            select
+                source_winner.conversation_id,
+                source_winner.source_id,
+                source_winner.candidate_at,
+                source_winner.matched_text,
+                source_winner.layer_rank,
+                source_winner.layer,
+                source_winner.match_count
+            from (
+                select ranked_source.*
+                from (
+                    select
+                        source_match.*,
+                        count(*) over (
+                            partition by source_match.conversation_id
+                        )::integer as match_count,
+                        row_number() over (
+                            partition by source_match.conversation_id
+                            order by
+                                source_match.candidate_at desc,
+                                source_match.matched_text
+                                    collate "und-x-icu" desc,
+                                source_match.source_id desc
+                        ) as source_conversation_rank
+                    from (
+                        {source_sql}
+                    ) as source_match
+                ) as ranked_source
+                where ranked_source.source_conversation_rank = 1
+            ) as source_winner
+            cross join input
+            join public.conversations as conversation
+              on conversation.id = source_winner.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+             and (
+                 not input.guest_scope
+                 or conversation.id = input.guest_conversation_id
+             )
             {cursor_predicate}
             order by {window_order_sql}
             limit (select match_limit from input)
@@ -1654,47 +1689,6 @@ def _conversation_match_ctes(
         evidence_predicate=evidence_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
-    source_specs: tuple[
-        tuple[
-            sql.Composable,
-            sql.Composable,
-            sql.Composable,
-            sql.Composable,
-        ],
-        ...,
-    ] = (
-        (
-            conversation_source,
-            sql.SQL("1::integer"),
-            conversation_matched_text,
-            sql.SQL("conversation.id desc"),
-        ),
-        (
-            message_source,
-            sql.SQL("2::integer"),
-            sql.SQL("message.content"),
-            sql.SQL("message.id desc"),
-        ),
-        (
-            run_source,
-            sql.SQL("3::integer"),
-            run_matched_text,
-            sql.SQL("run.id desc"),
-        ),
-        (
-            idea_source,
-            sql.SQL("4::integer"),
-            idea_matched_text,
-            sql.SQL("idea.id desc"),
-        ),
-        (
-            evidence_source,
-            sql.SQL("5::integer"),
-            evidence_matched_text,
-            sql.SQL("evidence.id desc"),
-        ),
-    )
-
     def decision_source(indexed_joins: sql.Composable) -> sql.Composed:
         return sql.SQL(
             """
@@ -1779,71 +1773,10 @@ def _conversation_match_ctes(
             ),
         )
 
-    def decision_window_ctes(*, cursor_relative: bool) -> sql.Composed:
-        candidate_name = sql.SQL(
-            "cursor_decision_candidates" if cursor_relative else "decision_candidates"
-        )
-        match_name = sql.SQL(
-            "cursor_decision_matches" if cursor_relative else "decision_matches"
-        )
-        windows = tuple(
-            bounded_source_window(
-                source_sql=source,
-                layer_rank_sql=sql.SQL("6::integer"),
-                matched_text_sql=decision_matched_text,
-                source_tiebreak_sql=sql.SQL("decision.id desc"),
-                cursor_relative=cursor_relative,
-            )
-            for source in decision_sources
-        )
-        if not has_anchor:
-            return sql.SQL("{match_name} as ({window})").format(
-                match_name=match_name,
-                window=windows[0],
-            )
-        deduplicated_scope = sql.SQL(
+    decision_candidates = (
+        sql.SQL(
             """
-            cross join input
-            join public.conversations as conversation
-              on conversation.id = deduplicated.conversation_id
-             and conversation.user_id = input.user_id
-             and conversation.deleted_at is null
-            """
-        )
-        deduplicated_order = (
-            sql.SQL(
-                """
-                conversation.pinned::integer desc,
-                {exact_rank_sql} desc,
-                {symbol_rank_sql} desc,
-                6::integer desc,
-                {activity_sql} desc,
-                {text_rank_sql} desc,
-                conversation.id desc,
-                deduplicated.source_id desc
-                """
-            ).format(
-                exact_rank_sql=conversation_exact_rank,
-                symbol_rank_sql=conversation_symbol_rank,
-                activity_sql=conversation_activity_sql,
-                text_rank_sql=conversation_text_rank(
-                    sql.SQL("deduplicated.matched_text")
-                ),
-            )
-            if cursor_relative
-            else sql.SQL(
-                """
-                {activity_sql} desc,
-                deduplicated.source_id desc
-                """
-            ).format(activity_sql=conversation_activity_sql)
-        )
-        return sql.SQL(
-            """
-            {candidate_name} as (
-                {candidate_windows}
-            ),
-            {match_name} as (
+            decision_candidates as (
                 select
                     deduplicated.conversation_id,
                     deduplicated.source_id,
@@ -1854,66 +1787,63 @@ def _conversation_match_ctes(
                 from (
                     select distinct on (candidate.source_id)
                         candidate.*
-                    from {candidate_name} as candidate
+                    from (
+                        {candidate_sources}
+                    ) as candidate
                     order by
                         candidate.source_id,
-                        candidate.candidate_at desc
+                        candidate.candidate_at desc,
+                        candidate.matched_text collate "und-x-icu" desc,
+                        candidate.conversation_id desc
                 ) as deduplicated
-                {deduplicated_scope}
-                order by {deduplicated_order}
-                limit (select match_limit from input)
             )
             """
         ).format(
-            candidate_name=candidate_name,
-            candidate_windows=sql.SQL("\nunion all\n").join(windows),
-            deduplicated_scope=deduplicated_scope,
-            deduplicated_order=deduplicated_order,
-            match_name=match_name,
+            candidate_sources=sql.SQL("\nunion all\n").join(decision_sources),
         )
+        if has_anchor
+        else sql.SQL(
+            """
+            decision_candidates as (
+                {decision_source}
+            )
+            """
+        ).format(decision_source=decision_sources[0])
+    )
+    decision_candidate_source = sql.SQL(
+        """
+        select
+            decision_candidate.conversation_id,
+            decision_candidate.source_id,
+            decision_candidate.candidate_at,
+            decision_candidate.matched_text,
+            decision_candidate.layer_rank,
+            decision_candidate.layer
+        from decision_candidates as decision_candidate
+        """
+    )
+    source_specs = (
+        conversation_source,
+        message_source,
+        run_source,
+        idea_source,
+        evidence_source,
+        decision_candidate_source,
+    )
 
     def source_windows(*, cursor_relative: bool) -> sql.Composed:
-        decision_match_name = sql.SQL(
-            "cursor_decision_matches" if cursor_relative else "decision_matches"
-        )
-        windows = [
+        return sql.SQL("\nunion all\n").join(
             bounded_source_window(
                 source_sql=source,
-                layer_rank_sql=layer_rank,
-                matched_text_sql=matched_text,
-                source_tiebreak_sql=source_tiebreak,
                 cursor_relative=cursor_relative,
             )
-            for (
-                source,
-                layer_rank,
-                matched_text,
-                source_tiebreak,
-            ) in source_specs
-        ]
-        windows.append(
-            sql.SQL(
-                """
-                (
-                select
-                    decision_match.conversation_id,
-                    decision_match.source_id,
-                    decision_match.candidate_at,
-                    decision_match.matched_text,
-                    decision_match.layer_rank,
-                    decision_match.layer
-                from {decision_match_name} as decision_match
-                )
-                """
-            ).format(decision_match_name=decision_match_name)
+            for source in source_specs
         )
-        return sql.SQL("\nunion all\n").join(windows)
 
-    base_decision_ctes = decision_window_ctes(cursor_relative=False)
     match_window_ctes = (
         sql.SQL(
             """
-            {decision_match_ctes},
+            {decision_candidates},
             base_matches as (
                 {base_matches}
             ),
@@ -1927,25 +1857,20 @@ def _conversation_match_ctes(
             )
             """
         ).format(
-            decision_match_ctes=sql.SQL(",\n").join(
-                (
-                    base_decision_ctes,
-                    decision_window_ctes(cursor_relative=True),
-                )
-            ),
+            decision_candidates=decision_candidates,
             base_matches=source_windows(cursor_relative=False),
             cursor_matches=source_windows(cursor_relative=True),
         )
         if has_cursor
         else sql.SQL(
             """
-            {decision_match_ctes},
+            {decision_candidates},
             matches as (
                 {base_matches}
             )
             """
         ).format(
-            decision_match_ctes=base_decision_ctes,
+            decision_candidates=decision_candidates,
             base_matches=source_windows(cursor_relative=False),
         )
     )
@@ -1957,11 +1882,6 @@ def _conversation_match_ctes(
             from (
                 select
                     matches.*,
-                    count(*) over (
-                        partition by
-                            matches.conversation_id,
-                            matches.layer_rank
-                    )::integer as match_count,
                     row_number() over (
                         partition by matches.conversation_id
                         order by

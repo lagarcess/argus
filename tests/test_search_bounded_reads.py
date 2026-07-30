@@ -1014,16 +1014,35 @@ def test_conversation_recall_caps_every_source_before_window_ranking() -> None:
 
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
+    normalized_sql = " ".join(sql_text.split())
     assert "%(match_limit)s::integer as match_limit" in sql_text
-    bounded_matches = sql_text[
-        sql_text.index("matches as (") : sql_text.index("winning_matches as (")
+    bounded_matches = normalized_sql[
+        normalized_sql.index("matches as (") : normalized_sql.index(
+            "winning_matches as ("
+        )
     ]
     assert bounded_matches.count(
         "limit (select match_limit from input)"
     ) == 6
-    assert bounded_matches.rfind(
+    assert bounded_matches.count(
+        "count(*) over ( partition by source_match.conversation_id )"
+    ) == 6
+    assert bounded_matches.count(
+        "row_number() over ( partition by source_match.conversation_id "
+        'order by source_match.candidate_at desc, source_match.matched_text '
+        'collate "und-x-icu" desc, source_match.source_id desc )'
+    ) == 6
+    for bounded_window in bounded_matches.split(
         "limit (select match_limit from input)"
-    ) < sql_text.index("count(*) over")
+    )[:-1]:
+        assert "count(*) over" in bounded_window
+        assert "row_number() over" in bounded_window
+    winning_matches = sql_text[
+        sql_text.index("winning_matches as (") : sql_text.index(
+            "ranked_conversations as ("
+        )
+    ]
+    assert "count(*) over" not in winning_matches
     assert params["match_limit"] == 300
 
 
@@ -1041,27 +1060,16 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     base_matches = sql_text[
         sql_text.index("base_matches as (") : sql_text.index("cursor_matches as (")
     ]
-    base_decisions = sql_text[: sql_text.index("cursor_decision_matches as (")]
-    cursor_decisions = sql_text[
-        sql_text.index("cursor_decision_matches as (") : sql_text.index(
-            "base_matches as ("
-        )
-    ]
     cursor_matches = sql_text[
         sql_text.index("cursor_matches as (") : sql_text.index("winning_matches as (")
     ]
 
-    # The decision top window is capped in the preceding decision_matches CTE.
-    assert base_matches.count("limit (select match_limit from input)") == 5
+    assert base_matches.count("limit (select match_limit from input)") == 6
     assert (
-        (base_decisions + base_matches).count(
-            "select max(source_activity.activity_at)"
-        )
-        == 6
+        base_matches.count("select max(source_activity.activity_at)") == 6
     )
-    assert cursor_decisions.count("limit (select match_limit from input)") == 1
-    assert cursor_matches.count("limit (select match_limit from input)") == 5
-    bounded_cursor_windows = cursor_decisions + cursor_matches
+    assert cursor_matches.count("limit (select match_limit from input)") == 6
+    bounded_cursor_windows = cursor_matches
     assert (
         bounded_cursor_windows.count(
             "order by conversation.pinned::integer desc"
@@ -1085,11 +1093,7 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     )
     candidate_keys = bounded_cursor_windows.split(") <= row(")[:-1]
     assert len(candidate_keys) == 6
-    for candidate_key, layer_rank in zip(
-        candidate_keys,
-        (6, 1, 2, 3, 4, 5),
-        strict=True,
-    ):
+    for candidate_key in candidate_keys:
         candidate_key = candidate_key[candidate_key.rfind("row(") :]
         assert (
             candidate_key.index("conversation.pinned::integer")
@@ -1097,7 +1101,7 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
             < candidate_key.index(
                 "symbol_run.conversation_id = conversation.id"
             )
-            < candidate_key.index(f"{layer_rank}::integer")
+            < candidate_key.index("source_winner.layer_rank")
         )
 
     anchored_sql = " ".join(
@@ -1108,21 +1112,24 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
         .as_string()
         .split()
     )
-    anchored_cursor_decisions = anchored_sql[
-        anchored_sql.index("cursor_decision_candidates as (") : anchored_sql.index(
+    anchored_decisions = anchored_sql[
+        anchored_sql.index("decision_candidates as (") : anchored_sql.index(
             "base_matches as ("
         )
     ]
-    assert anchored_cursor_decisions.count("like %(anchor_pattern)s") == 2
-    assert "select distinct on (candidate.source_id)" in anchored_cursor_decisions
-    assert (
-        anchored_cursor_decisions.count(
-            "order by conversation.pinned::integer desc"
+    anchored_cursor_matches = anchored_sql[
+        anchored_sql.index("cursor_matches as (") : anchored_sql.index(
+            "winning_matches as ("
         )
-        == 3
-    )
+    ]
+    assert anchored_decisions.count("like %(anchor_pattern)s") == 2
+    assert "select distinct on (candidate.source_id)" in anchored_decisions
+    assert "limit (select match_limit from input)" not in anchored_decisions
+    assert anchored_cursor_matches.count(
+        "order by conversation.pinned::integer desc"
+    ) == 6
     assert (
-        anchored_cursor_decisions.count("limit (select match_limit from input)") == 3
+        anchored_cursor_matches.count("limit (select match_limit from input)") == 6
     )
 
 
