@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 
 import pytest
 from argus.api import memory_search_candidates, search_assembly
 from argus.api import state as api_state
-from argus.api.schemas import Conversation, DecisionNote
+from argus.api.schemas import (
+    BacktestRun,
+    Conversation,
+    DecisionNote,
+    EvidenceArtifact,
+    Message,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -172,3 +178,109 @@ def test_memory_ledger_counts_all_distinct_matches_beyond_presentation_cap() -> 
         "revisit_later": 0,
     }
     assert len(snapshot.conversations) <= 10
+
+
+def test_memory_search_preserves_the_latest_untaken_assistant_offer() -> None:
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+    conversation_id = "conversation-with-untaken-offer"
+    _owned_conversation(
+        conversation_id=conversation_id,
+        title="Gold follow-up ideas",
+    )
+    run = BacktestRun(
+        id="run-with-untaken-offer",
+        conversation_id=conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["GLD"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={},
+        conversation_result_card={"title": "GLD result"},
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="evidence-with-untaken-offer",
+        idea_id="idea-with-untaken-offer",
+        idea_version_id="version-with-untaken-offer",
+        source_conversation_id=conversation_id,
+        source_run_id=run.id,
+        lifecycle="decided",
+        title="GLD result evidence",
+        digest="GLD completed against SPY.",
+        payload={},
+        created_at=now,
+        updated_at=now,
+    )
+    decision = DecisionNote(
+        id="decision-with-untaken-offer",
+        idea_id=artifact.idea_id,
+        idea_version_id=artifact.idea_version_id,
+        evidence_artifact_id=artifact.id,
+        source_conversation_id=conversation_id,
+        decision_state="watching",
+        note="Keep watching this setup.",
+        created_at=now,
+        updated_at=now,
+    )
+    offer = Message(
+        id="assistant-offer",
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Try one of these supported follow-ups.",
+        created_at=now,
+        metadata={
+            "result_run_id": run.id,
+            "next_experiments": {
+                "version": "argus_next_experiments/v1",
+                "rows": [{"kind": "parameter_sweep"}],
+            },
+        },
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user.id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user.id
+    api_state.store.decision_notes[decision.id] = decision
+    api_state.store.decision_note_owners[decision.id] = user.id
+    api_state.store.messages[conversation_id] = [offer]
+
+    read = search_assembly.memory_search_read(
+        user=user,
+        query="",
+        source_limit=1,
+    )
+
+    assert len(read.scored_items) == 1
+    _, item = read.scored_items[0]
+    assert item.dossier.left_off is not None
+    assert item.dossier.left_off.nudge == "suggestion_untaken"
+
+    assistant_text_search = search_assembly.memory_search_read(
+        user=user,
+        query="supported follow-ups",
+        source_limit=1,
+    )
+    assert assistant_text_search.scored_items == []
+
+    api_state.store.messages[conversation_id] = [
+        offer,
+        Message(
+            id="later-user-reply",
+            conversation_id=conversation_id,
+            role="user",
+            content="I already followed up.",
+            created_at=now + timedelta(microseconds=1),
+            metadata={},
+        ),
+    ]
+    followed_up = search_assembly.memory_search_read(
+        user=user,
+        query="",
+        source_limit=1,
+    )
+    assert followed_up.scored_items[0][1].dossier.left_off is not None
+    assert followed_up.scored_items[0][1].dossier.left_off.nudge is None

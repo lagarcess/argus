@@ -9,6 +9,10 @@ from typing import Any, Iterable, Mapping
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import User
+from argus.domain.conversation_recall import (
+    conversation_has_untaken_suggestion,
+    valid_next_experiments_metadata,
+)
 from argus.domain.search_text import (
     normalize_search_symbol,
     normalize_search_text,
@@ -254,7 +258,15 @@ def _build_memory_search_index(
             for conversation_id, conversation_messages in store.messages.items()
             if conversation_id in visible_conversation_ids
             for message in conversation_messages
-            if message.role == "user"
+            if (
+                message.role == "user"
+                or (
+                    message.role == "assistant"
+                    and valid_next_experiments_metadata(
+                        getattr(message, "metadata", None)
+                    )
+                )
+            )
             and not is_legacy_onboarding_marker(message.content)
         ]
     with store.backtest_finalization_lock:
@@ -309,6 +321,25 @@ def _build_memory_search_index(
     evidence = [row.model_dump() for row in evidence_refs]
     decisions = [row.model_dump() for row in decision_refs]
     evidence_by_id = {str(row["id"]): row for row in evidence}
+    runs_by_conversation = _group_rows(runs, field="conversation_id")
+    messages_by_conversation = _group_rows(messages, field="conversation_id")
+    for conversation in conversations:
+        conversation_id = str(conversation["id"])
+        latest_run = max(
+            (
+                run
+                for run in runs_by_conversation.get(conversation_id, [])
+                if run.get("status") == "completed"
+            ),
+            key=_mapping_activity,
+            default=None,
+        )
+        conversation["_recall_summary"] = {
+            "latest_suggestion_untaken": conversation_has_untaken_suggestion(
+                run=latest_run,
+                messages=messages_by_conversation.get(conversation_id, []),
+            )
+        }
 
     candidates: dict[str, list[_Candidate]] = {
         layer: [] for layer in _SOURCE_LAYERS
@@ -329,6 +360,8 @@ def _build_memory_search_index(
                     )
                 )
     for message in messages:
+        if message.get("role") != "user":
+            continue
         candidates["message"].append(
             _candidate(
                 conversation_id=str(message["conversation_id"]),
@@ -424,7 +457,7 @@ def _build_memory_search_index(
                 reverse=True,
             )
         ),
-        runs_by_conversation=_group_rows(runs, field="conversation_id"),
+        runs_by_conversation=runs_by_conversation,
         ideas_by_conversation=_group_rows(ideas, field="source_conversation_id"),
         evidence_by_conversation=_group_rows(
             evidence,

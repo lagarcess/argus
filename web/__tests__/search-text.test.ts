@@ -5,6 +5,7 @@ import {
   normalizeSearchText,
   normalizedSearchTokenSpans,
   searchHasIndexableToken,
+  searchQueryIsIndexable,
 } from "../lib/search-text";
 
 describe("frontend search normalization", () => {
@@ -57,5 +58,15 @@ describe("frontend search normalization", () => {
     expect(searchHasIndexableToken("GL")).toBeFalse();
     expect(searchHasIndexableToken("x GLD")).toBeTrue();
     expect(searchHasIndexableToken("ßß")).toBeTrue();
+  });
+
+  test("allows one punctuated canonical symbol through the search gate", () => {
+    expect(searchQueryIsIndexable("BF.B")).toBeTrue();
+    expect(searchQueryIsIndexable("ss/e")).toBeTrue();
+    expect(searchQueryIsIndexable("GL")).toBeFalse();
+    expect(searchQueryIsIndexable("BF B")).toBeFalse();
+    expect(searchQueryIsIndexable("B\u0085F")).toBeFalse();
+    expect(searchQueryIsIndexable("B\u001cF")).toBeFalse();
+    expect(searchQueryIsIndexable("\0BF.B")).toBeFalse();
   });
 });

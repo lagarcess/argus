@@ -99,9 +99,53 @@ export function normalizedSearchTokens(value: string): string[] {
 
 export const SEARCH_INDEXABLE_TOKEN_MIN_LENGTH = 3;
 
+function isPythonWhitespace(character: string): boolean {
+  const codepoint = character.codePointAt(0);
+  if (codepoint === undefined) return false;
+  return (
+    (codepoint >= 0x0009 && codepoint <= 0x000d) ||
+    (codepoint >= 0x001c && codepoint <= 0x0020) ||
+    codepoint === 0x0085 ||
+    codepoint === 0x00a0 ||
+    codepoint === 0x1680 ||
+    (codepoint >= 0x2000 && codepoint <= 0x200a) ||
+    (codepoint >= 0x2028 && codepoint <= 0x2029) ||
+    codepoint === 0x202f ||
+    codepoint === 0x205f ||
+    codepoint === 0x3000
+  );
+}
+
+function pythonStripWhitespace(value: string): string {
+  const characters = Array.from(value);
+  let start = 0;
+  let end = characters.length;
+  while (start < end && isPythonWhitespace(characters[start])) start += 1;
+  while (end > start && isPythonWhitespace(characters[end - 1])) end -= 1;
+  return characters.slice(start, end).join("");
+}
+
 export function searchHasIndexableToken(value: string): boolean {
   return normalizedSearchTokens(value).some(
     (token) =>
       Array.from(token).length >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH,
+  );
+}
+
+export function searchQueryIsIndexable(value: string): boolean {
+  if (searchHasIndexableToken(value)) return true;
+
+  const symbol = pythonStripWhitespace(value);
+  if (
+    !symbol ||
+    symbol.includes("\0") ||
+    Array.from(symbol).some(isPythonWhitespace)
+  ) {
+    return false;
+  }
+  const foldedSymbol = pythonCasefold(symbol);
+  return (
+    Array.from(foldedSymbol).length >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH &&
+    Array.from(foldedSymbol).some(isPythonAlphanumeric)
   );
 }

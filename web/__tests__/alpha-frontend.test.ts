@@ -1788,7 +1788,7 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(palette).toContain("const SEARCH_DEBOUNCE_MS = 200");
-    expect(palette).toContain("searchHasIndexableToken");
+    expect(palette).toContain("searchQueryIsIndexable");
     expect(palette).toContain("command_palette.keep_typing");
     expect(palette).toContain("const ledgerRequestIdRef = useRef(0)");
     expect(palette).toContain("const ledgerBrowseRequestIdRef = useRef(0)");

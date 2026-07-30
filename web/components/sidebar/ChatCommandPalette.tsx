@@ -26,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
-import { searchHasIndexableToken } from "@/lib/search-text";
+import { searchQueryIsIndexable } from "@/lib/search-text";
 import {
   deleteConversation as apiDeleteConversation,
   createEvidenceDecision,
@@ -496,7 +496,7 @@ export default function ChatCommandPalette({
       if (!isLedgerMode) setReadError(null);
       return;
     }
-    if (!searchHasIndexableToken(trimmed)) {
+    if (!searchQueryIsIndexable(trimmed)) {
       searchRequestIdRef.current += 1;
       setSearchResults([]);
       setSearchNextCursor(null);
@@ -546,7 +546,7 @@ export default function ChatCommandPalette({
 
   const isFiltering = query.trim().length > 0;
   const isWaitingForIndexableQuery =
-    isFiltering && !searchHasIndexableToken(query);
+    isFiltering && !searchQueryIsIndexable(query);
   const isResultMode = isFiltering || isLedgerMode;
   const assetRollup = useMemo(
     () =>

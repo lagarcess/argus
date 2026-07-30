@@ -383,7 +383,7 @@ def project_conversation_recall(
         suggestion_untaken=(
             bool(latest_suggestion_untaken)
             if latest_suggestion_untaken is not None
-            else _has_untaken_suggestion(
+            else conversation_has_untaken_suggestion(
                 run=latest_run,
                 messages=conversation_messages,
             )
@@ -1306,7 +1306,7 @@ def _is_stale_result(completed_at: datetime) -> bool:
     )
 
 
-def _has_untaken_suggestion(
+def conversation_has_untaken_suggestion(
     *,
     run: Mapping[str, Any] | None,
     messages: Sequence[Mapping[str, Any]],
@@ -1319,7 +1319,7 @@ def _has_untaken_suggestion(
         for row in messages
         if row.get("role") == "assistant"
         and _text(_message_metadata(row).get("result_run_id")) == run_id
-        and _valid_next_experiments(_message_metadata(row))
+        and valid_next_experiments_metadata(_message_metadata(row))
     ]
     if not offers:
         return False
@@ -1330,7 +1330,9 @@ def _has_untaken_suggestion(
     )
 
 
-def _valid_next_experiments(metadata: Mapping[str, Any]) -> bool:
+def valid_next_experiments_metadata(metadata: object) -> bool:
+    if not isinstance(metadata, Mapping):
+        return False
     raw_sidecar = metadata.get("next_experiments")
     sidecar = raw_sidecar if isinstance(raw_sidecar, Mapping) else {}
     return (
