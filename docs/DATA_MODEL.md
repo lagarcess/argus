@@ -953,6 +953,15 @@ store.
   unfinished generations cause a bounded, lock-free wait before later work for
   the same record, while other owners remain independent. Unfinished work
   restricts record deletion so derivative cleanup cannot disappear silently.
+  Owner-wide reset uses the reserved `operation = reset`, `record_id = ''`
+  sentinel. Record operations require a non-empty record id. Reset first
+  removes canonical and user-visible memory, snapshots every provider pointer
+  into cleanup, and retains one retryable reset generation. Failed attempts
+  remain terminal evidence; a retry appends the next generation, while a crash
+  before a terminal outcome reuses or reclaims the unfinished generation.
+  While reset metadata remains unresolved, fresh canonical memory may be
+  confirmed after a new opt-in but record-specific provider work cannot claim
+  a lease.
 - `memory_provider_projections`: the current derivative provider pointer and
   positive generation for a canonical record. A provider pointer is unique per
   owner but may be reused independently by another owner. Replacements are
@@ -969,6 +978,13 @@ store.
   that pointer to a live projection. The reservation ends only when cleanup is
   resolved.
   Provider pointers are derivative identifiers, never canonical memory content.
+
+An owner reset calls any derivative provider only after the canonical
+transaction commits and only when cleanup exists. A synchronized provider
+result may clear cleanup, projections, and reset metadata only with the exact
+unexpired reset claim. Provider failure, malformed output, or
+`not_applicable` retains cleanup for retry. Completion never deletes canonical
+records created after the earlier reset.
 
 Composite foreign keys include `owner_id` at every live relationship so a
 candidate, consent action, record, provenance row, reconciliation, or provider

@@ -971,6 +971,10 @@ def test_reset_receipt_maps_known_derivative_state_to_control_truth(
 
     result = service.reset(SUBJECT)
 
+    if not known_derivative:
+        assert receipts.items == []
+        assert result.provider_status is ProviderReconciliationStatus.NOT_APPLICABLE
+        return
     receipt = receipts.items[-1]
     assert receipt.operation is ProviderOperation.RESET
     assert receipt.status is expected_call

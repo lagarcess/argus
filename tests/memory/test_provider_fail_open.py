@@ -330,7 +330,7 @@ def test_provider_reconciliation_models_reject_unknown_statuses() -> None:
         ),
         (
             ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE),
-            ProviderReconciliationStatus.NOT_APPLICABLE,
+            ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
         ),
         (
             ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED),
@@ -346,9 +346,10 @@ def test_reset_provider_outcome_is_fail_open_and_truthful(
     store = InMemoryCanonicalMemoryStore()
     setup = _service(store)
     record_id = _confirm_one(setup)
+    owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
+    assert store.set_provider_ref(owner, record_id, "provider-reset-outcome")
     provider = _ResetOutcomeProvider(outcome)
     service = _service(store, provider)
-    owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
 
     result = service.reset(SUBJECT)
 
@@ -360,4 +361,7 @@ def test_reset_provider_outcome_is_fail_open_and_truthful(
     assert store.list_consent_receipts(owner) == ()
     assert store.get_record(owner, record_id) is None
     assert store.get_provider_ref(owner, record_id) is None
-    assert store.list_provider_cleanup_targets(owner) == ()
+    if expected is ProviderReconciliationStatus.SYNCHRONIZED:
+        assert store.list_provider_cleanup_targets(owner) == ()
+    else:
+        assert store.list_provider_cleanup_targets(owner) != ()

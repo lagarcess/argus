@@ -155,6 +155,20 @@ class PostgresCanonicalMemoryStore:
             cls._lock_category(cursor, owner_id, category)
 
     @staticmethod
+    def _lock_owner(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+    ) -> None:
+        cursor.execute(
+            """
+            select pg_advisory_xact_lock(
+              pg_catalog.hashtextextended(%s, 0)
+            )
+            """,
+            (f"argus:memory-owner:{owner_id}",),
+        )
+
+    @staticmethod
     def _lock_record(
         cursor: Cursor[Any],
         owner_id: UUID,
@@ -1427,8 +1441,8 @@ class PostgresCanonicalMemoryStore:
         record_id: str,
         reconciliation_generation: int,
     ) -> ReconciliationClaim | None:
-        if not record_id.strip():
-            raise ValueError("reconciliation record id must not be blank")
+        if record_id != "" and (not record_id.strip() or len(record_id) > 128):
+            raise ValueError("record id must contain 1 to 128 characters")
         if reconciliation_generation < 1:
             raise ValueError("reconciliation generation must be positive")
         self._owner_uuid(owner)
@@ -1456,7 +1470,24 @@ class PostgresCanonicalMemoryStore:
         lease_expires_at = now + self._reconciliation_lease
 
         with self._confirmation_transaction(owner) as (cursor, owner_id):
-            self._lock_record(cursor, owner_id, record_id)
+            self._lock_owner(cursor, owner_id)
+            if record_id != "":
+                cursor.execute(
+                    """
+                    select exists (
+                      select 1
+                        from public.memory_reconciliations
+                       where owner_id = %s
+                         and operation = 'reset'
+                    )
+                    """,
+                    (owner_id,),
+                )
+                reset_row = cursor.fetchone()
+                assert reset_row is not None
+                if reset_row[0]:
+                    return None, False
+                self._lock_record(cursor, owner_id, record_id)
             cursor.execute(
                 """
                 select operation,status,claim_token,lease_expires_at
@@ -1567,7 +1598,9 @@ class PostgresCanonicalMemoryStore:
                 )
             status = "failed"
         with self._confirmation_transaction(owner) as (cursor, owner_id):
-            self._lock_record(cursor, owner_id, claim.record_id)
+            self._lock_owner(cursor, owner_id)
+            if claim.record_id != "":
+                self._lock_record(cursor, owner_id, claim.record_id)
             cursor.execute(
                 """
                 update public.memory_reconciliations
@@ -1617,6 +1650,22 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("reconciliation clock must return an aware datetime")
         try:
             with self._confirmation_transaction(owner) as (cursor, owner_id):
+                self._lock_owner(cursor, owner_id)
+                cursor.execute(
+                    """
+                    select exists (
+                      select 1
+                        from public.memory_reconciliations
+                       where owner_id = %s
+                         and operation = 'reset'
+                    )
+                    """,
+                    (owner_id,),
+                )
+                reset_row = cursor.fetchone()
+                assert reset_row is not None
+                if reset_row[0]:
+                    return False
                 self._lock_record(cursor, owner_id, record_id)
                 if (
                     reconciliation_claim.record_id != record_id
@@ -1736,6 +1785,22 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("record id must contain 1 to 128 characters")
         try:
             with self._confirmation_transaction(owner) as (cursor, owner_id):
+                self._lock_owner(cursor, owner_id)
+                cursor.execute(
+                    """
+                    select exists (
+                      select 1
+                        from public.memory_reconciliations
+                       where owner_id = %s
+                         and operation = 'reset'
+                    )
+                    """,
+                    (owner_id,),
+                )
+                reset_row = cursor.fetchone()
+                assert reset_row is not None
+                if reset_row[0]:
+                    return False
                 self._lock_record(cursor, owner_id, record_id)
                 cursor.execute(
                     """
@@ -2100,13 +2165,19 @@ class PostgresCanonicalMemoryStore:
             return changed
 
     def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset:
-        self._wait_for_owner_reconciliation(owner)
+        self._owner_uuid(owner)
+        self._wait_for_owner_record_reconciliation(owner)
         with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_owner(cursor, owner_id)
             self._lock_all_categories(cursor, owner_id)
-            record_ids = self._logical_record_ids(cursor, owner_id)
+            record_ids = tuple(
+                record_id
+                for record_id in self._logical_record_ids(cursor, owner_id)
+                if record_id
+            )
             for record_id in record_ids:
                 self._lock_record(cursor, owner_id, record_id)
-            if self._owner_has_pending_reconciliation(cursor, owner_id):
+            if self._owner_has_pending_record_reconciliation(cursor, owner_id):
                 raise TimeoutError(
                     "memory control timed out waiting for provider reconciliation"
                 )
@@ -2128,8 +2199,8 @@ class PostgresCanonicalMemoryStore:
             )
             provider_state_row = cursor.fetchone()
             assert provider_state_row is not None
-            provider_state_existed = provider_state_row[0]
-            changed = any(counts)
+            provider_state_existed = bool(provider_state_row[0])
+            changed = any(counts[:6])
             cursor.execute(
                 """
                 insert into public.memory_provider_cleanup (
@@ -2161,6 +2232,14 @@ class PostgresCanonicalMemoryStore:
                   %s
                   from public.memory_provider_projections as projection
                  where projection.owner_id = %s
+                   and not exists (
+                     select 1
+                       from public.memory_provider_cleanup as pending_cleanup
+                      where pending_cleanup.owner_id = projection.owner_id
+                        and pending_cleanup.record_id = projection.record_id
+                        and pending_cleanup.provider_ref = projection.provider_ref
+                        and pending_cleanup.status = 'pending'
+                   )
                 on conflict do nothing
                 """,
                 (_utc_now(), owner_id),
@@ -2182,7 +2261,10 @@ class PostgresCanonicalMemoryStore:
                 (owner_id,),
             )
             cursor.execute(
-                "delete from public.memory_reconciliations where owner_id = %s",
+                """
+                delete from public.memory_reconciliations
+                 where owner_id = %s and record_id <> ''
+                """,
                 (owner_id,),
             )
             cursor.execute(
@@ -2196,10 +2278,119 @@ class PostgresCanonicalMemoryStore:
                 """,
                 (owner_id,),
             )
+            reset_generation: int | None = None
+            if provider_state_existed:
+                cursor.execute(
+                    """
+                    select generation
+                      from public.memory_reconciliations
+                     where owner_id = %s
+                       and record_id = ''
+                       and operation = 'reset'
+                       and status in ('pending', 'running')
+                     order by generation desc
+                     limit 1
+                    """,
+                    (owner_id,),
+                )
+                unfinished = cursor.fetchone()
+                if unfinished is not None:
+                    reset_generation = int(unfinished[0])
+                else:
+                    cursor.execute(
+                        """
+                        select coalesce(max(generation), 0) + 1
+                          from public.memory_reconciliations
+                         where owner_id = %s
+                           and record_id = ''
+                        """,
+                        (owner_id,),
+                    )
+                    generation_row = cursor.fetchone()
+                    assert generation_row is not None
+                    reset_generation = int(generation_row[0])
+                    cursor.execute(
+                        """
+                        insert into public.memory_reconciliations (
+                          owner_id,
+                          record_id,
+                          generation,
+                          operation,
+                          status,
+                          created_at
+                        )
+                        values (%s, '', %s, 'reset', 'pending', statement_timestamp())
+                        """,
+                        (owner_id, reset_generation),
+                    )
+            else:
+                cursor.execute(
+                    """
+                    delete from public.memory_reconciliations
+                     where owner_id = %s and record_id = ''
+                    """,
+                    (owner_id,),
+                )
+                cursor.execute(
+                    "delete from public.memory_provider_projections where owner_id = %s",
+                    (owner_id,),
+                )
+                cursor.execute(
+                    "delete from public.memory_provider_cleanup where owner_id = %s",
+                    (owner_id,),
+                )
             return CanonicalOwnerReset(
                 changed=changed,
                 provider_state_existed=provider_state_existed,
+                reconciliation_generation=reset_generation,
             )
+
+    def complete_owner_reset(
+        self,
+        owner: RegisteredMemoryOwner,
+        reconciliation_claim: ReconciliationClaim,
+    ) -> bool:
+        if (
+            reconciliation_claim.operation != "reset"
+            or reconciliation_claim.record_id != ""
+        ):
+            return False
+        self._owner_uuid(owner)
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_owner(cursor, owner_id)
+            self._lock_all_categories(cursor, owner_id)
+            record_ids = tuple(
+                record_id
+                for record_id in self._logical_record_ids(cursor, owner_id)
+                if record_id
+            )
+            for record_id in record_ids:
+                self._lock_record(cursor, owner_id, record_id)
+            if not self._reconciliation_claim_is_live(
+                cursor,
+                owner_id,
+                "",
+                reconciliation_claim,
+            ):
+                return False
+            cursor.execute(
+                "delete from public.memory_provider_projections where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_provider_cleanup where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                """
+                delete from public.memory_reconciliations
+                 where owner_id = %s
+                   and record_id = ''
+                   and operation = 'reset'
+                """,
+                (owner_id,),
+            )
+            return True
 
     @staticmethod
     def _next_reconciliation_generation(
@@ -2242,7 +2433,7 @@ class PostgresCanonicalMemoryStore:
         return bool(pending_row[0])
 
     @staticmethod
-    def _owner_has_pending_reconciliation(
+    def _owner_has_pending_record_reconciliation(
         cursor: Cursor[Any],
         owner_id: UUID,
     ) -> bool:
@@ -2252,6 +2443,7 @@ class PostgresCanonicalMemoryStore:
               select 1
                 from public.memory_reconciliations
                where owner_id = %s
+                 and record_id <> ''
                  and status in ('pending', 'running')
             )
             """,
@@ -2279,17 +2471,20 @@ class PostgresCanonicalMemoryStore:
                 time.sleep(_RECONCILIATION_WAIT_SECONDS)
         raise TimeoutError("memory control timed out waiting for provider reconciliation")
 
-    def _wait_for_owner_reconciliation(
+    def _wait_for_owner_record_reconciliation(
         self,
         owner: RegisteredMemoryOwner,
     ) -> None:
-        for attempt in range(_RECONCILIATION_WAIT_ATTEMPTS):
+        for attempt in range(self._reconciliation_wait_attempts):
             with self._confirmation_transaction(owner) as (cursor, owner_id):
-                pending = self._owner_has_pending_reconciliation(cursor, owner_id)
+                pending = self._owner_has_pending_record_reconciliation(
+                    cursor,
+                    owner_id,
+                )
             if not pending:
                 return
-            if attempt + 1 < _RECONCILIATION_WAIT_ATTEMPTS:
-                time.sleep(_RECONCILIATION_WAIT_SECONDS)
+            if attempt + 1 < self._reconciliation_wait_attempts:
+                self._reconciliation_sleeper(self._reconciliation_wait_seconds)
         raise TimeoutError("memory control timed out waiting for provider reconciliation")
 
     @staticmethod

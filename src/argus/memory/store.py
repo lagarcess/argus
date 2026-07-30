@@ -79,11 +79,14 @@ class ReconciliationClaim:
     claim_token: str
 
     def __post_init__(self) -> None:
-        if not self.record_id.strip():
+        if self.operation == "reset":
+            if self.record_id != "":
+                raise ValueError("reset reconciliation requires the owner sentinel")
+        elif not self.record_id.strip():
             raise ValueError("reconciliation record id must not be blank")
         if self.generation < 1:
             raise ValueError("reconciliation generation must be positive")
-        if self.operation not in {"create", "update", "delete"}:
+        if self.operation not in {"create", "update", "delete", "reset"}:
             raise ValueError("unsupported reconciliation operation")
         if not self.claim_token.strip() or len(self.claim_token) > 128:
             raise ValueError(
@@ -97,6 +100,7 @@ class CanonicalOwnerReset:
 
     changed: bool
     provider_state_existed: bool
+    reconciliation_generation: int | None = None
 
 
 class CanonicalMemoryStore(Protocol):
@@ -216,6 +220,12 @@ class CanonicalMemoryStore(Protocol):
 
     def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset: ...
 
+    def complete_owner_reset(
+        self,
+        owner: RegisteredMemoryOwner,
+        reconciliation_claim: ReconciliationClaim,
+    ) -> bool: ...
+
     def set_provider_ref(
         self,
         owner: RegisteredMemoryOwner,
@@ -306,6 +316,7 @@ class InMemoryCanonicalMemoryStore:
         self._reconciliation_generations: dict[tuple[str, str], int] = {}
         self._inflight_reconciliations: dict[tuple[str, str], set[int]] = {}
         self._reconciliation_operations: dict[tuple[str, str, int], str] = {}
+        self._reconciliation_statuses: dict[tuple[str, str, int], str] = {}
         self._reconciliation_claims: dict[tuple[str, str, int], ReconciliationClaim] = {}
         self._proactive_prompts: dict[tuple[str, MemoryCategory], datetime] = {}
         self._declines: dict[tuple[str, MemoryCategory], datetime] = {}
@@ -509,6 +520,9 @@ class InMemoryCanonicalMemoryStore:
             self._reconciliation_operations[
                 (owner.owner_id, record.id, reconciliation_generation)
             ] = "create"
+            self._reconciliation_statuses[
+                (owner.owner_id, record.id, reconciliation_generation)
+            ] = "pending"
             del candidates[candidate_id]
             return CanonicalConfirmationMutation(
                 result=result,
@@ -707,6 +721,9 @@ class InMemoryCanonicalMemoryStore:
             self._reconciliation_operations[
                 (owner.owner_id, record_id, reconciliation_generation)
             ] = "update"
+            self._reconciliation_statuses[
+                (owner.owner_id, record_id, reconciliation_generation)
+            ] = "pending"
             return CanonicalRecordMutation(
                 before=current,
                 after=updated,
@@ -748,6 +765,9 @@ class InMemoryCanonicalMemoryStore:
             self._reconciliation_operations[
                 (owner.owner_id, record_id, reconciliation_generation)
             ] = "delete"
+            self._reconciliation_statuses[
+                (owner.owner_id, record_id, reconciliation_generation)
+            ] = "pending"
 
             updated_records = dict(records)
             del updated_records[record_id]
@@ -799,20 +819,29 @@ class InMemoryCanonicalMemoryStore:
             return changed
 
     def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset:
-        """Wait for prior controls, then atomically clear all canonical owner state."""
+        """Clear canonical state while retaining retryable derivative cleanup."""
 
         with self._reconciliation_condition:
             self._reconciliation_condition.wait_for(
                 lambda: not any(
-                    owner_id == owner.owner_id and generations
-                    for (owner_id, _record_id), generations in (
+                    owner_id == owner.owner_id and record_id != "" and generations
+                    for (owner_id, record_id), generations in (
                         self._inflight_reconciliations.items()
                     )
                 )
             )
             settings = self._settings.get(owner.owner_id, MemoryConsentSettings())
-            provider_state_existed = bool(self._provider_refs.get(owner.owner_id)) or any(
-                key[0] == owner.owner_id for key in self._cleanup_targets
+            provider_refs = dict(self._provider_refs.get(owner.owner_id, {}))
+            for record_id, provider_ref in provider_refs.items():
+                self._cleanup_targets.setdefault(
+                    (owner.owner_id, record_id),
+                    set(),
+                ).add(provider_ref)
+            provider_state_existed = any(
+                owner_id == owner.owner_id and provider_refs
+                for (owner_id, _record_id), provider_refs in (
+                    self._cleanup_targets.items()
+                )
             )
             changed = any(
                 (
@@ -820,12 +849,6 @@ class InMemoryCanonicalMemoryStore:
                     bool(self._candidates.get(owner.owner_id)),
                     bool(self._receipts.get(owner.owner_id)),
                     bool(self._records.get(owner.owner_id)),
-                    bool(self._provider_refs.get(owner.owner_id)),
-                    any(key[0] == owner.owner_id for key in self._cleanup_targets),
-                    any(
-                        key[0] == owner.owner_id
-                        for key in self._reconciliation_generations
-                    ),
                     any(key[0] == owner.owner_id for key in self._proactive_prompts),
                     any(key[0] == owner.owner_id for key in self._declines),
                 )
@@ -835,30 +858,30 @@ class InMemoryCanonicalMemoryStore:
             self._receipts.pop(owner.owner_id, None)
             self._records.pop(owner.owner_id, None)
             self._provider_refs.pop(owner.owner_id, None)
-            self._cleanup_targets = {
-                key: refs
-                for key, refs in self._cleanup_targets.items()
-                if key[0] != owner.owner_id
-            }
             self._reconciliation_generations = {
                 key: generation
                 for key, generation in self._reconciliation_generations.items()
-                if key[0] != owner.owner_id
+                if key[0] != owner.owner_id or key[1] == ""
             }
             self._inflight_reconciliations = {
                 key: generations
                 for key, generations in self._inflight_reconciliations.items()
-                if key[0] != owner.owner_id
+                if key[0] != owner.owner_id or key[1] == ""
             }
             self._reconciliation_operations = {
                 key: operation
                 for key, operation in self._reconciliation_operations.items()
-                if key[0] != owner.owner_id
+                if key[0] != owner.owner_id or key[1] == ""
+            }
+            self._reconciliation_statuses = {
+                key: status
+                for key, status in self._reconciliation_statuses.items()
+                if key[0] != owner.owner_id or key[1] == ""
             }
             self._reconciliation_claims = {
                 key: claim
                 for key, claim in self._reconciliation_claims.items()
-                if key[0] != owner.owner_id
+                if key[0] != owner.owner_id or key[1] == ""
             }
             self._proactive_prompts = {
                 key: at
@@ -868,11 +891,109 @@ class InMemoryCanonicalMemoryStore:
             self._declines = {
                 key: at for key, at in self._declines.items() if key[0] != owner.owner_id
             }
+            reset_key = (owner.owner_id, "")
+            reset_generation: int | None = None
+            if provider_state_existed:
+                unfinished = tuple(
+                    generation
+                    for (owner_id, record_id, generation), status in (
+                        self._reconciliation_statuses.items()
+                    )
+                    if owner_id == owner.owner_id
+                    and record_id == ""
+                    and status in {"pending", "running"}
+                )
+                if unfinished:
+                    reset_generation = max(unfinished)
+                else:
+                    reset_generation = (
+                        self._reconciliation_generations.get(reset_key, 0) + 1
+                    )
+                    self._reconciliation_generations[reset_key] = reset_generation
+                    self._inflight_reconciliations.setdefault(
+                        reset_key,
+                        set(),
+                    ).add(reset_generation)
+                    claim_key = (owner.owner_id, "", reset_generation)
+                    self._reconciliation_operations[claim_key] = "reset"
+                    self._reconciliation_statuses[claim_key] = "pending"
+            else:
+                self._cleanup_targets = {
+                    key: refs
+                    for key, refs in self._cleanup_targets.items()
+                    if key[0] != owner.owner_id
+                }
+                self._reconciliation_generations.pop(reset_key, None)
+                self._inflight_reconciliations.pop(reset_key, None)
+                self._reconciliation_operations = {
+                    key: operation
+                    for key, operation in self._reconciliation_operations.items()
+                    if key[0] != owner.owner_id or key[1] != ""
+                }
+                self._reconciliation_statuses = {
+                    key: status
+                    for key, status in self._reconciliation_statuses.items()
+                    if key[0] != owner.owner_id or key[1] != ""
+                }
+                self._reconciliation_claims = {
+                    key: claim
+                    for key, claim in self._reconciliation_claims.items()
+                    if key[0] != owner.owner_id or key[1] != ""
+                }
             self._reconciliation_condition.notify_all()
             return CanonicalOwnerReset(
                 changed=changed,
                 provider_state_existed=provider_state_existed,
+                reconciliation_generation=reset_generation,
             )
+
+    def complete_owner_reset(
+        self,
+        owner: RegisteredMemoryOwner,
+        reconciliation_claim: ReconciliationClaim,
+    ) -> bool:
+        """Clear derivative reset state only for the exact active owner claim."""
+
+        if reconciliation_claim.operation != "reset":
+            return False
+        with self._reconciliation_condition:
+            claim_key = (
+                owner.owner_id,
+                "",
+                reconciliation_claim.generation,
+            )
+            reset_key = (owner.owner_id, "")
+            if (
+                self._reconciliation_claims.get(claim_key) != reconciliation_claim
+                or reconciliation_claim.generation
+                not in self._inflight_reconciliations.get(reset_key, set())
+            ):
+                return False
+            self._provider_refs.pop(owner.owner_id, None)
+            self._cleanup_targets = {
+                key: refs
+                for key, refs in self._cleanup_targets.items()
+                if key[0] != owner.owner_id
+            }
+            self._reconciliation_generations.pop(reset_key, None)
+            self._inflight_reconciliations.pop(reset_key, None)
+            self._reconciliation_operations = {
+                key: operation
+                for key, operation in self._reconciliation_operations.items()
+                if key[0] != owner.owner_id or key[1] != ""
+            }
+            self._reconciliation_statuses = {
+                key: status
+                for key, status in self._reconciliation_statuses.items()
+                if key[0] != owner.owner_id or key[1] != ""
+            }
+            self._reconciliation_claims = {
+                key: claim
+                for key, claim in self._reconciliation_claims.items()
+                if key[0] != owner.owner_id or key[1] != ""
+            }
+            self._reconciliation_condition.notify_all()
+            return True
 
     def set_provider_ref(
         self,
@@ -883,6 +1004,8 @@ class InMemoryCanonicalMemoryStore:
         if not provider_ref:
             raise ValueError("provider ref must not be empty")
         with self._lock:
+            if self._owner_reset_is_unresolved(owner.owner_id):
+                return False
             if record_id not in self._records.get(owner.owner_id, {}):
                 return False
             if any(
@@ -1001,7 +1124,9 @@ class InMemoryCanonicalMemoryStore:
                 return False
             inflight.remove(reconciliation_generation)
             self._reconciliation_claims.pop(claim_key, None)
-            self._reconciliation_operations.pop(claim_key, None)
+            self._reconciliation_statuses[claim_key] = (
+                "succeeded" if succeeded else "failed"
+            )
             if not inflight:
                 self._inflight_reconciliations.pop(reconciliation_key, None)
             self._reconciliation_condition.notify_all()
@@ -1014,6 +1139,14 @@ class InMemoryCanonicalMemoryStore:
         reconciliation_generation: int,
     ) -> ReconciliationClaim | None:
         with self._reconciliation_condition:
+            if not record_id.strip():
+                operation = self._reconciliation_operations.get(
+                    (owner.owner_id, record_id, reconciliation_generation)
+                )
+                if operation != "reset":
+                    raise ValueError("reconciliation record id must not be blank")
+            elif self._owner_reset_is_unresolved(owner.owner_id):
+                return None
             reconciliation_key = (owner.owner_id, record_id)
             claim_key = (owner.owner_id, record_id, reconciliation_generation)
 
@@ -1042,7 +1175,18 @@ class InMemoryCanonicalMemoryStore:
                 claim_token=self._reconciliation_token_factory(),
             )
             self._reconciliation_claims[claim_key] = claim
+            self._reconciliation_statuses[claim_key] = "running"
             return claim
+
+    def _owner_reset_is_unresolved(self, owner_id: str) -> bool:
+        return any(
+            candidate_owner_id == owner_id
+            and record_id == ""
+            and status in {"pending", "running", "failed"}
+            for (candidate_owner_id, record_id, _generation), status in (
+                self._reconciliation_statuses.items()
+            )
+        )
 
     def inflight_reconciliation_generations(
         self,

@@ -347,7 +347,7 @@ create table public.memory_reconciliations (
   generation bigint not null
     check (generation >= 1),
   operation text not null
-    check (operation in ('create', 'update', 'delete')),
+    check (operation in ('create', 'update', 'delete', 'reset')),
   status text not null
     check (status in ('pending', 'running', 'succeeded', 'failed')),
   claim_token text
@@ -366,6 +366,14 @@ create table public.memory_reconciliations (
   created_at timestamptz not null default now(),
   completed_at timestamptz,
   primary key (owner_id, record_id, generation),
+  constraint memory_reconciliations_operation_record_shape
+    check (
+      (operation = 'reset' and record_id = '')
+      or (
+        operation in ('create', 'update', 'delete')
+        and length(record_id) between 1 and 128
+      )
+    ),
   constraint memory_reconciliations_terminal_shape
     check (
       (
@@ -838,6 +846,18 @@ begin
       using errcode = '23514';
   end if;
 
+  if tg_table_name = 'memory_reconciliations' then
+    if new.operation = 'reset' then
+      perform pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(
+          'argus:memory-owner:' || v_owner_id::text,
+          0
+        )
+      );
+      return new;
+    end if;
+  end if;
+
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(
       'argus:memory-record:'
@@ -934,7 +954,7 @@ begin
       using errcode = '23514';
   end if;
 
-  if new.operation not in ('create', 'update', 'delete') then
+  if new.operation not in ('create', 'update', 'delete', 'reset') then
     raise exception 'unsupported reconciliation operation: %', new.operation
       using errcode = '23514';
   end if;
@@ -956,6 +976,30 @@ begin
   if tg_op = 'UPDATE'
      and new.operation is distinct from old.operation then
     raise exception 'memory reconciliation operation is immutable'
+      using errcode = '23514';
+  end if;
+
+  if (
+    new.operation = 'reset'
+    and new.record_id <> ''
+  )
+  or (
+    new.operation <> 'reset'
+    and length(new.record_id) not between 1 and 128
+  ) then
+    raise exception 'invalid reconciliation operation and record shape'
+      using errcode = '23514';
+  end if;
+  if new.operation <> 'reset'
+     and new.status = 'running'
+     and exists (
+       select 1
+         from public.memory_reconciliations
+        where owner_id = new.owner_id
+          and operation = 'reset'
+     ) then
+    raise exception
+      'memory provider work is blocked by unresolved owner reset'
       using errcode = '23514';
   end if;
   if tg_op = 'UPDATE'

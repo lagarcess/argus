@@ -133,7 +133,6 @@ class _ProviderSpy(MemoryRetrievalProvider):
                 and self.store.list_candidates(owner) == ()
                 and self.store.list_consent_receipts(owner) == ()
                 and self.store.list_records(owner) == ()
-                and self.store.list_provider_cleanup_targets(owner) == ()
             )
         if isinstance(self.reset_outcome, BaseException):
             raise self.reset_outcome
@@ -1299,6 +1298,142 @@ def test_reset_clears_complete_owner_state_before_provider_reset() -> None:
     )
 
 
+def test_reset_without_derivative_state_never_calls_provider() -> None:
+    """Catches canonical-only reset spending a provider call without cleanup work."""
+    store = InMemoryCanonicalMemoryStore()
+    record = _confirm_one(_service(store))
+    provider = _ProviderSpy(
+        reset=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+    )
+
+    result = _service(store, provider).reset(SUBJECT)
+
+    assert result == MemoryControlResult(
+        changed=True,
+        provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+    )
+    assert provider.reset_calls == []
+    assert store.get_record(OWNER, record.id) is None
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+
+
+def test_failed_reset_keeps_cleanup_and_retry_can_complete_physical_zero() -> None:
+    """Catches canonical reset forgetting derivative cleanup after provider failure."""
+    store = InMemoryCanonicalMemoryStore(
+        reconciliation_token_factory=iter(
+            ("initial-create", "reset-first", "reset-second")
+        ).__next__,
+    )
+    projected_provider = _ProviderSpy(
+        projection=ProviderProjectionResult(
+            status=ProviderReconciliationStatus.SYNCHRONIZED,
+            provider_ref="provider-reset-retry",
+        )
+    )
+    record = _confirm_one(_service(store, projected_provider))
+    failing_provider = _ProviderSpy(reset=RuntimeError("provider unavailable"))
+
+    first = _service(store, failing_provider).reset(SUBJECT)
+
+    assert first == MemoryControlResult(
+        changed=True,
+        provider_status=ProviderReconciliationStatus.RECONCILIATION_REQUIRED,
+    )
+    assert failing_provider.reset_calls == [OWNER]
+    assert store.get_record(OWNER, record.id) is None
+    assert store.list_provider_cleanup_targets(OWNER) != ()
+
+    successful_provider = _ProviderSpy(
+        reset=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+    )
+    second = _service(store, successful_provider).reset(SUBJECT)
+
+    assert second == MemoryControlResult(
+        changed=False,
+        provider_status=ProviderReconciliationStatus.SYNCHRONIZED,
+    )
+    assert successful_provider.reset_calls == [OWNER]
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+    assert store.inflight_reconciliation_generations(OWNER, "") == ()
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    (
+        None,
+        {"status": "synchronized", "unexpected": True},
+        ProviderCleanupResult(status=ProviderReconciliationStatus.NOT_APPLICABLE),
+    ),
+)
+def test_malformed_or_not_applicable_reset_keeps_retryable_cleanup(
+    outcome: object,
+) -> None:
+    """Catches an untrusted reset result erasing durable provider cleanup."""
+    store = InMemoryCanonicalMemoryStore()
+    record = _confirm_one(_service(store))
+    store.set_provider_ref(OWNER, record.id, "provider-reset-untrusted")
+    provider = _ProviderSpy(reset=outcome)
+
+    result = _service(store, provider).reset(SUBJECT)
+
+    assert result.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+    assert store.list_provider_cleanup_targets(OWNER) != ()
+
+
+def test_stale_reset_claim_cannot_complete_newer_cleanup_attempt() -> None:
+    """Catches an old reset token clearing cleanup owned by a newer attempt."""
+    tokens = iter(("initial-create", "reset-stale", "reset-current"))
+    store = InMemoryCanonicalMemoryStore(
+        reconciliation_token_factory=lambda: next(tokens)
+    )
+    record = _confirm_one(_service(store))
+    store.set_provider_ref(OWNER, record.id, "provider-reset-claim")
+    first_reset = store.reset(OWNER)
+    assert first_reset.reconciliation_generation == 1
+    first_claim = store.claim_reconciliation_turn(OWNER, "", 1)
+    assert first_claim is not None
+    assert store.finish_reconciliation_claim(
+        OWNER,
+        first_claim,
+        succeeded=False,
+        error_code="provider_reconciliation_required",
+        completed_at=NOW,
+    )
+    second_reset = store.reset(OWNER)
+    assert second_reset.reconciliation_generation == 2
+    second_claim = store.claim_reconciliation_turn(OWNER, "", 2)
+    assert second_claim is not None
+
+    assert not store.complete_owner_reset(OWNER, first_claim)
+    assert store.list_provider_cleanup_targets(OWNER) != ()
+    assert store.complete_owner_reset(OWNER, second_claim)
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+
+
+def test_failed_reset_blocks_new_projection_until_owner_cleanup_finishes() -> None:
+    """Catches fresh opt-in projecting while prior owner reset remains unresolved."""
+    store = InMemoryCanonicalMemoryStore()
+    original = _confirm_one(_service(store))
+    store.set_provider_ref(OWNER, original.id, "provider-reset-block")
+    failed = _service(
+        store,
+        _ProviderSpy(reset=RuntimeError("reset unavailable")),
+    ).reset(SUBJECT)
+    assert failed.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+    projection_provider = _ProviderSpy(
+        projection=ProviderProjectionResult(
+            status=ProviderReconciliationStatus.SYNCHRONIZED,
+            provider_ref="provider-must-wait",
+        )
+    )
+
+    fresh = _confirm_one(_service(store, projection_provider))
+
+    assert projection_provider.project_calls == []
+    assert store.get_record(OWNER, fresh.id) == fresh
+    assert store.get_provider_ref(OWNER, fresh.id) is None
+
+
 def test_in_memory_reconciliation_requires_the_exact_claim() -> None:
     store = InMemoryCanonicalMemoryStore(
         reconciliation_token_factory=lambda: "in-memory-exact",
@@ -1340,6 +1475,33 @@ def test_in_memory_reconciliation_requires_the_exact_claim() -> None:
         error_code=None,
         completed_at=NOW,
     )
+
+
+def test_reset_reconciliation_claim_uses_the_owner_sentinel() -> None:
+    """Catches reset claims being confused with record-scoped provider work."""
+    assert (
+        ReconciliationClaim(
+            record_id="",
+            generation=1,
+            operation="reset",
+            claim_token="owner-reset",
+        ).record_id
+        == ""
+    )
+    with pytest.raises(ValueError, match="must not be blank"):
+        ReconciliationClaim(
+            record_id="",
+            generation=1,
+            operation="delete",
+            claim_token="record-delete",
+        )
+    with pytest.raises(ValueError, match="owner sentinel"):
+        ReconciliationClaim(
+            record_id="record-1",
+            generation=1,
+            operation="reset",
+            claim_token="invalid-reset",
+        )
 
 
 def test_reset_requires_reconciliation_when_known_projection_is_not_applicable() -> None:
@@ -1440,7 +1602,8 @@ def test_reset_waits_for_inflight_delete_cleanup() -> None:
 
     assert reset_ran_before_delete_settled is False
     assert delete_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
-    assert reset_result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+    assert reset_result.provider_status is ProviderReconciliationStatus.NOT_APPLICABLE
+    assert provider.reset_called.is_set() is False
     assert provider.refs == set()
 
 

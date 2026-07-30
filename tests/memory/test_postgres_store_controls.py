@@ -1014,7 +1014,8 @@ def test_reset_retains_only_unresolved_provider_cleanup_obligations(
 
     assert reset.changed is True
     assert reset.provider_state_existed is True
-    assert _table_counts(owner.owner_id) == (0, 0, 0, 0, 0, 0, 0, 0, 2)
+    assert reset.reconciliation_generation == 1
+    assert _table_counts(owner.owner_id) == (0, 0, 0, 0, 0, 0, 1, 0, 2)
     with psycopg.connect(DSN, autocommit=True) as connection:
         assert connection.execute(
             """
@@ -1030,9 +1031,10 @@ def test_reset_retains_only_unresolved_provider_cleanup_obligations(
         ]
 
     repeated = store.reset(owner)
-    assert repeated.changed is True
+    assert repeated.changed is False
     assert repeated.provider_state_existed is True
-    assert _table_counts(owner.owner_id) == (0, 0, 0, 0, 0, 0, 0, 0, 2)
+    assert repeated.reconciliation_generation == 1
+    assert _table_counts(owner.owner_id) == (0, 0, 0, 0, 0, 0, 1, 0, 2)
 
 
 def test_reset_timeout_changes_nothing(

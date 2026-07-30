@@ -788,27 +788,44 @@ class MemoryService:
         owner = require_registered(subject)
         correlation_id = self._safe_correlation_id()
         reset = self._store.reset(owner)
-        if not reset.changed:
+        reconciliation_generation = reset.reconciliation_generation
+        if reconciliation_generation is None:
             self._emit_event(
                 correlation_id,
                 MemoryOperation.RESET,
-                MemoryOutcome.NO_CHANGE,
+                MemoryOutcome.RESET if reset.changed else MemoryOutcome.NO_CHANGE,
             )
             return MemoryControlResult(
-                changed=False,
+                changed=reset.changed,
                 provider_status=ProviderReconciliationStatus.NOT_APPLICABLE,
+            )
+        claim = self._store.claim_reconciliation_turn(
+            owner,
+            "",
+            reconciliation_generation,
+        )
+        if claim is None:
+            return MemoryControlResult(
+                changed=reset.changed,
+                provider_status=(ProviderReconciliationStatus.RECONCILIATION_REQUIRED),
             )
         cleanup_call = self._call_provider_reset(owner, correlation_id)
         cleanup = cleanup_call.result
-        if cleanup is None:
-            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
-        else:
-            provider_status = cleanup.status
+        provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         if (
-            reset.provider_state_existed
-            and provider_status is ProviderReconciliationStatus.NOT_APPLICABLE
+            cleanup is not None
+            and cleanup.status is ProviderReconciliationStatus.SYNCHRONIZED
+            and self._store.complete_owner_reset(owner, claim)
         ):
-            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            provider_status = ProviderReconciliationStatus.SYNCHRONIZED
+        else:
+            self._store.finish_reconciliation_claim(
+                owner,
+                claim,
+                succeeded=False,
+                error_code="provider_reconciliation_required",
+                completed_at=self._clock(),
+            )
         self._record_provider_receipt(
             correlation_id,
             ProviderOperation.RESET,
@@ -816,13 +833,13 @@ class MemoryService:
             provider_status,
         )
         result = MemoryControlResult(
-            changed=True,
+            changed=reset.changed,
             provider_status=provider_status,
         )
         self._emit_event(
             correlation_id,
             MemoryOperation.RESET,
-            MemoryOutcome.RESET,
+            MemoryOutcome.RESET if reset.changed else MemoryOutcome.NO_CHANGE,
         )
         return result
 
