@@ -961,7 +961,10 @@ store.
   before a terminal outcome reuses or reclaims the unfinished generation.
   While reset metadata remains unresolved, fresh canonical memory may be
   confirmed after a new opt-in but record-specific provider work cannot claim
-  a lease.
+  a lease. A later reset recognizes the existing owner-reset history and
+  atomically supersedes that post-reset canonical work instead of waiting on
+  its intentionally blocked provider reconciliation. The first reset still
+  performs a bounded wait for genuine pre-reset provider work.
 - `memory_provider_projections`: the current derivative provider pointer and
   positive generation for a canonical record. A provider pointer is unique per
   owner but may be reused independently by another owner. Replacements are

@@ -822,14 +822,15 @@ class InMemoryCanonicalMemoryStore:
         """Clear canonical state while retaining retryable derivative cleanup."""
 
         with self._reconciliation_condition:
-            self._reconciliation_condition.wait_for(
-                lambda: not any(
-                    owner_id == owner.owner_id and record_id != "" and generations
-                    for (owner_id, record_id), generations in (
-                        self._inflight_reconciliations.items()
+            if not self._owner_reset_is_unresolved(owner.owner_id):
+                self._reconciliation_condition.wait_for(
+                    lambda: not any(
+                        owner_id == owner.owner_id and record_id != "" and generations
+                        for (owner_id, record_id), generations in (
+                            self._inflight_reconciliations.items()
+                        )
                     )
                 )
-            )
             settings = self._settings.get(owner.owner_id, MemoryConsentSettings())
             provider_refs = dict(self._provider_refs.get(owner.owner_id, {}))
             for record_id, provider_ref in provider_refs.items():

@@ -337,3 +337,86 @@ def test_unresolved_reset_blocks_record_projection_claim_but_not_other_owner(
 
     assert store.claim_reconciliation_turn(owner, fresh_record_id, 1) is None
     assert store.claim_reconciliation_turn(other_owner, other_record_id, 1) is not None
+
+
+def test_reset_retry_supersedes_fresh_work_blocked_by_existing_reset(
+    database: dict[str, Any],
+) -> None:
+    owner = database["owner"]
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        original_record_id = _seed_record(connection, owner)
+    tokens = iter(("reset-failed", "reset-retry"))
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: next(tokens),
+        reconciliation_wait_attempts=2,
+        reconciliation_wait_seconds=0,
+    )
+    assert store.set_provider_ref(
+        owner,
+        original_record_id,
+        "provider-reset-cycle",
+    )
+    first = store.reset(owner)
+    assert first.reconciliation_generation == 1
+    first_claim = store.claim_reconciliation_turn(owner, "", 1)
+    assert first_claim is not None
+    assert store.finish_reconciliation_claim(
+        owner,
+        first_claim,
+        succeeded=False,
+        error_code="provider_reconciliation_required",
+        completed_at=datetime.now(timezone.utc),
+    )
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        fresh_record_id = _seed_record(connection, owner)
+        connection.execute(
+            """
+            insert into public.memory_reconciliations (
+              owner_id,record_id,generation,operation,status
+            )
+            values (%s,%s,1,'create','pending')
+            """,
+            (owner.owner_id, fresh_record_id),
+        )
+    assert store.claim_reconciliation_turn(owner, fresh_record_id, 1) is None
+
+    retry = store.reset(owner)
+
+    assert retry.changed is True
+    assert retry.provider_state_existed is True
+    assert retry.reconciliation_generation == 2
+    assert store.get_record(owner, fresh_record_id) is None
+    assert _counts(owner) == (0, 0, 0, 0, 0, 0, 2, 0, 1)
+    retry_claim = store.claim_reconciliation_turn(owner, "", 2)
+    assert retry_claim is not None
+    assert store.complete_owner_reset(owner, retry_claim)
+    assert _counts(owner) == (0,) * len(MEMORY_TABLES)
+
+
+def test_first_reset_still_waits_for_genuine_pre_reset_work(
+    database: dict[str, Any],
+) -> None:
+    owner = database["owner"]
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        record_id = _seed_record(connection, owner)
+        connection.execute(
+            """
+            insert into public.memory_reconciliations (
+              owner_id,record_id,generation,operation,status
+            )
+            values (%s,%s,1,'create','pending')
+            """,
+            (owner.owner_id, record_id),
+        )
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_wait_attempts=2,
+        reconciliation_wait_seconds=0,
+    )
+    before = _counts(owner)
+
+    with pytest.raises(TimeoutError, match="provider reconciliation"):
+        store.reset(owner)
+
+    assert _counts(owner) == before

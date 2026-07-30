@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from threading import Event, Lock
+from threading import Event, Lock, Thread
 from typing import Any
 
 import pytest
@@ -1432,6 +1432,56 @@ def test_failed_reset_blocks_new_projection_until_owner_cleanup_finishes() -> No
     assert projection_provider.project_calls == []
     assert store.get_record(OWNER, fresh.id) == fresh
     assert store.get_provider_ref(OWNER, fresh.id) is None
+
+
+def test_reset_retry_supersedes_fresh_canonical_work_blocked_from_projection() -> None:
+    """Catches reset retry waiting forever on work blocked by that same reset."""
+    store = InMemoryCanonicalMemoryStore()
+    original = _confirm_one(_service(store))
+    store.set_provider_ref(OWNER, original.id, "provider-reset-cycle")
+    failed = _service(
+        store,
+        _ProviderSpy(reset=RuntimeError("reset unavailable")),
+    ).reset(SUBJECT)
+    assert failed.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+
+    projection_provider = _ProviderSpy(
+        projection=ProviderProjectionResult(
+            status=ProviderReconciliationStatus.SYNCHRONIZED,
+            provider_ref="provider-blocked-after-reset",
+        )
+    )
+    fresh = _confirm_one(_service(store, projection_provider))
+    assert projection_provider.project_calls == []
+    assert store.get_record(OWNER, fresh.id) == fresh
+
+    reset_provider = _ProviderSpy(
+        reset=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
+    )
+    retry_results: list[MemoryControlResult] = []
+    retry_thread = Thread(
+        target=lambda: retry_results.append(
+            _service(store, reset_provider).reset(SUBJECT)
+        ),
+        daemon=True,
+    )
+    retry_thread.start()
+    retry_thread.join(timeout=0.2)
+
+    assert not retry_thread.is_alive()
+    assert retry_results == [
+        MemoryControlResult(
+            changed=True,
+            provider_status=ProviderReconciliationStatus.SYNCHRONIZED,
+        )
+    ]
+    assert reset_provider.reset_calls == [OWNER]
+    assert store.get_settings(OWNER) == MemoryConsentSettings()
+    assert store.list_candidates(OWNER) == ()
+    assert store.list_consent_receipts(OWNER) == ()
+    assert store.list_records(OWNER) == ()
+    assert store.list_provider_cleanup_targets(OWNER) == ()
+    assert store.inflight_reconciliation_generations(OWNER, "") == ()
 
 
 def test_in_memory_reconciliation_requires_the_exact_claim() -> None:
