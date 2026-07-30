@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
-import type { SearchConversationItem } from "./search-contract";
+import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -285,7 +285,17 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchItem = SearchConversationItem<DecisionState>;
+export type SearchConversationItem = SearchConversationContract<DecisionState>;
+
+export type SearchAssetRollupItem = {
+  type: "asset_rollup";
+  symbol: string;
+  run_count: number;
+  decision_counts: Record<DecisionState, number>;
+  last_touched_at: string;
+};
+
+export type SearchItem = SearchConversationItem | SearchAssetRollupItem;
 
 export type SearchLedgerGroup = {
   decision_state: DecisionState;

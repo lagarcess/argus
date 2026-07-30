@@ -3126,6 +3126,18 @@ the `/search` contract.
 {
   "items": [
     {
+      "type": "asset_rollup",
+      "symbol": "GLD",
+      "run_count": 2,
+      "decision_counts": {
+        "promising": 0,
+        "watching": 1,
+        "rejected": 0,
+        "revisit_later": 0
+      },
+      "last_touched_at": "timestamp"
+    },
+    {
       "type": "conversation",
       "id": "uuid",
       "title": "Gold pullback ideas",
@@ -3179,8 +3191,20 @@ the `/search` contract.
 }
 ```
 
-`type` has one value: `conversation`. `id` and `conversation_id` are always the
-same canonical conversation id.
+`type` is `asset_rollup` or `conversation`. When a single-token exact or
+unambiguous prefix query matches a canonical symbol from the owner's completed
+runs, the response places one `asset_rollup` above the conversation rows. It
+summarizes completed runs involving that symbol; a multi-asset run counts once
+under each involved symbol. Each decision count comes from the latest
+owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
+run contributes to at most one decision state. `last_touched_at` is the latest
+activity on those runs or their evidence/decision lineage.
+
+The asset rollup is an additive presentation row. It is outside the
+conversation `limit`, ranking, decision filter, ledger grouping, and cursor
+sequence; it has no conversation id or management actions and cannot become a
+cursor pivot. Conversation `id` and `conversation_id` are always the same
+canonical conversation id.
 
 `match` is the bounded provenance for the winning searchable layer. `layer` is
 one of `conversation`, `message`, `run`, `idea`, `evidence`, or `decision`;
@@ -3223,7 +3247,11 @@ template parameters remain outside the search index.
 The dossier is an owner-scoped, bounded projection. It never exposes raw
 context packets, route receipts, provider/model metadata, retry payloads,
 conversation transcripts, internal source-run ids, or artifact ids. Search and
-dossier assembly make zero LLM or market-data provider calls.
+dossier assembly make zero LLM or market-data provider calls. Asset recognition
+uses only canonical symbols stored on owned completed BacktestRuns; it does not
+resolve aliases or call an asset resolver/provider. Archived conversations
+remain eligible, soft-deleted conversations are excluded, and guest rollups are
+restricted to the active owned guest workspace.
 
 When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
 Idea Ledger group order and counts. Empty groups must be returned with

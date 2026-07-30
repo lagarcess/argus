@@ -34,7 +34,7 @@ import {
   type RecentChatGroupKey,
 } from "@/lib/chat-recents";
 
-import type { HistoryItem, SearchItem } from "@/lib/argus-api";
+import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export type ChatSidebarProps = {
   // ── Callbacks ────────────────────────────────────────────────────────────
   onNewChat: () => void;
   onNavigate: (view: View) => void;
-  onOpenItem: (item: HistoryItem | SearchItem) => void;
+  onOpenItem: (item: HistoryItem | SearchConversationItem) => void;
   onLoadMoreHistory: () => void;
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */

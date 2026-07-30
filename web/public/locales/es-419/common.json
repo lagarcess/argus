@@ -899,6 +899,12 @@
     "guest": {
       "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
     },
+    "asset_rollup": {
+      "heading": "Tu historial con este activo",
+      "runs_involving_one": "{{count}} ejecución que incluye {{symbol}}",
+      "runs_involving_other": "{{count}} ejecuciones que incluyen {{symbol}}",
+      "last_touched": "Última actividad: {{date}}"
+    },
     "no_results": "No se encontraron resultados",
     "no_conversations": "No hay conversaciones aún",
     "clear_search": "Borrar búsqueda",

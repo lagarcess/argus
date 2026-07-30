@@ -11,12 +11,13 @@ from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_pr
 from argus.api.schemas import (
     DecisionState,
     PaginatedSearch,
+    SearchAssetRollup,
     SearchItem,
     SearchLedgerGroup,
     User,
 )
 from argus.api.search_assembly import (
-    scored_memory_search_items,
+    memory_search_read,
     scored_supabase_search_items,
 )
 from argus.api.search_utils import search_rank_key
@@ -103,6 +104,7 @@ def search(
         )
 
     scored_items: list[tuple[int, SearchItem]] = []
+    asset_rollup: SearchAssetRollup | None = None
     search_read: SearchReadResult | None = None
     if api_state.supabase_gateway is not None:
         try:
@@ -121,6 +123,7 @@ def search(
             raise invalid_cursor_problem(request) from None
         if isinstance(read_result, SearchReadResult):
             search_read = read_result
+            asset_rollup = read_result.asset_rollup
             raw = read_result.rows
         else:
             # Keep injected test gateways compatible while the production
@@ -128,7 +131,9 @@ def search(
             raw = read_result
         scored_items.extend(scored_supabase_search_items(raw=raw, query=query))
     else:
-        scored_items.extend(scored_memory_search_items(user=user, query=query))
+        memory_read = memory_search_read(user=user, query=query)
+        scored_items.extend(memory_read.scored_items)
+        asset_rollup = memory_read.asset_rollup
 
     if context.kind == "guest":
         # Defense in depth: the persistent reader applies this scope before
@@ -160,9 +165,7 @@ def search(
     )
     if decision_state is not None:
         scored_items = [
-            pair
-            for pair in scored_items
-            if decision_state in pair[1].decision_states
+            pair for pair in scored_items if decision_state in pair[1].decision_states
         ]
     filtered = scored_items
     if cursor and search_read is None:
@@ -211,14 +214,17 @@ def search(
         attributes={
             "query_present": bool(query),
             "decision_state_filter_present": decision_state is not None,
-            "result_count": len(page_items),
-            "returned_types": _returned_types(page_items),
+            "result_count": len(page_items) + (1 if asset_rollup is not None else 0),
+            "returned_types": _returned_types(page_items, asset_rollup=asset_rollup),
             "has_more": has_more,
             "source": "supabase" if api_state.supabase_gateway is not None else "memory",
         },
     )
     return PaginatedSearch(
-        items=[item for _, item in page_items],
+        items=[
+            *([asset_rollup] if asset_rollup is not None else []),
+            *(item for _, item in page_items),
+        ],
         next_cursor=next_cursor,
         ledger_groups=ledger_groups,
     )
@@ -247,8 +253,14 @@ def _ledger_groups_from_counts(
     ]
 
 
-def _returned_types(page_items: list[tuple[int, SearchItem]]) -> list[str]:
+def _returned_types(
+    page_items: list[tuple[int, SearchItem]],
+    *,
+    asset_rollup: SearchAssetRollup | None,
+) -> list[str]:
     returned: list[str] = []
+    if asset_rollup is not None:
+        returned.append(asset_rollup.type)
     for _, item in page_items:
         if item.type not in returned:
             returned.append(item.type)

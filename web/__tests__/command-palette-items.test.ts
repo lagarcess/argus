@@ -3,12 +3,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  commandPaletteAssetRollupFromSearch,
   commandPaletteGroupsByLedgerState,
   commandPaletteItemFromSearch,
   commandPalettePreviewFields,
   commandPaletteSelectedPreview,
 } from "../lib/command-palette-items";
-import type { SearchItem } from "../lib/argus-api";
+import type { SearchAssetRollupItem, SearchItem } from "../lib/argus-api";
 
 const conversationDossier = {
   type: "conversation",
@@ -52,7 +53,78 @@ const conversationDossier = {
   },
 } satisfies SearchItem;
 
+const assetRollup = {
+  type: "asset_rollup",
+  symbol: "TSLA",
+  run_count: 2,
+  decision_counts: {
+    promising: 1,
+    watching: 1,
+    rejected: 0,
+    revisit_later: 0,
+  },
+  last_touched_at: "2026-07-29T18:00:00.000Z",
+} satisfies SearchAssetRollupItem;
+
 describe("command palette conversation dossier", () => {
+  test("renders an asset rollup with involving language and state counts", () => {
+    expect(commandPaletteAssetRollupFromSearch(assetRollup)).toEqual({
+      heading: "Your history with this asset",
+      symbol: "TSLA",
+      runs: "2 runs involving TSLA",
+      decisions: [
+        { state: "promising", count: 1, label: "Promising 1" },
+        { state: "watching", count: 1, label: "Watching 1" },
+        { state: "rejected", count: 0, label: "Rejected 0" },
+        { state: "revisit_later", count: 0, label: "Revisit later 0" },
+      ],
+      lastTouched: "Last touched 2026-07-29",
+    });
+  });
+
+  test("localizes the asset rollup fully in Spanish", () => {
+    const display = commandPaletteAssetRollupFromSearch(assetRollup, {
+      heading: "Tu historial con este activo",
+      runsInvolving: (count, symbol) =>
+        `${count} ejecuciones que incluyen ${symbol}`,
+      decisionStateLabel: (state) =>
+        ({
+          promising: "Prometedoras",
+          watching: "En observación",
+          rejected: "Rechazadas",
+          revisit_later: "Revisar después",
+        })[state] ?? state,
+      dateLabel: () => "29 jul 2026",
+      lastTouched: (date) => `Última actividad: ${date}`,
+    });
+
+    expect(display).toEqual({
+      heading: "Tu historial con este activo",
+      symbol: "TSLA",
+      runs: "2 ejecuciones que incluyen TSLA",
+      decisions: [
+        { state: "promising", count: 1, label: "Prometedoras 1" },
+        { state: "watching", count: 1, label: "En observación 1" },
+        { state: "rejected", count: 0, label: "Rechazadas 0" },
+        {
+          state: "revisit_later",
+          count: 0,
+          label: "Revisar después 0",
+        },
+      ],
+      lastTouched: "Última actividad: 29 jul 2026",
+    });
+    const visibleText = [
+      display.heading,
+      display.runs,
+      ...display.decisions.map((decision) => decision.label),
+      display.lastTouched,
+    ].join(" ");
+    expect(visibleText).not.toMatch(
+      /Your history|\bruns?\b|\binvolving\b|Last touched|Revisit later/,
+    );
+  });
+
   test("renders the fixed dossier order and preserves the note newlines", () => {
     const display = commandPaletteItemFromSearch(conversationDossier);
 
@@ -103,6 +175,16 @@ describe("command palette conversation dossier", () => {
       expect(en.command_palette.preview_fields[key]).toBeTruthy();
       expect(es.command_palette.preview_fields[key]).toBeTruthy();
     }
+    expect(en.command_palette.asset_rollup.heading).toBeTruthy();
+    expect(en.command_palette.asset_rollup.runs_involving_other).toContain(
+      "involving",
+    );
+    expect(en.command_palette.asset_rollup.last_touched).toBeTruthy();
+    expect(es.command_palette.asset_rollup.heading).toBeTruthy();
+    expect(es.command_palette.asset_rollup.runs_involving_other).toContain(
+      "incluyen",
+    );
+    expect(es.command_palette.asset_rollup.last_touched).toBeTruthy();
   });
 
   test("localizes every Spanish dossier value without leaking raw codes", () => {

@@ -49,7 +49,7 @@ import {
   type ChatActionRequest,
   type HistoryItem,
   type BacktestRun,
-  type SearchItem,
+  type SearchConversationItem,
 } from "@/lib/argus-api";
 import {
   chatExploratorySuggestionsEnabled,
@@ -975,7 +975,7 @@ export default function ChatInterface() {
   };
 
   const loadConversationForRun = async (
-    item: Pick<HistoryItem | SearchItem, "id" | "conversation_id">,
+    item: Pick<HistoryItem | SearchConversationItem, "id" | "conversation_id">,
   ) => {
     if (item.conversation_id) {
       void loadConversation(item.conversation_id);
@@ -994,7 +994,7 @@ export default function ChatInterface() {
     closeTransientSidebar();
   };
 
-  const openHistoryItem = (item: HistoryItem | SearchItem) => {
+  const openHistoryItem = (item: HistoryItem | SearchConversationItem) => {
     if (item.type === "chat") {
       void loadConversation(item.id);
       return;

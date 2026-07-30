@@ -318,6 +318,48 @@ def test_search_nul_query_keeps_normalized_text_but_never_binds_raw_nul() -> Non
     assert "\x00" not in str(params)
 
 
+def test_search_binds_punctuation_preserving_single_symbol_query() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="  bTc/uSd  ",
+        source_limit=4,
+    )
+
+    params = pool.cursor.executions[0][1]
+    assert params["normalized_query"] == "btc usd"
+    assert params["symbol_query"] == "btc/usd"
+
+
+def test_symbol_sql_normalizer_uses_raw_expanding_and_combining_casefolds() -> None:
+    from argus.domain.search_sql_text import symbol_normalizer_expression
+    from psycopg import sql
+
+    rendered = symbol_normalizer_expression(sql.Identifier("symbol")).as_string()
+
+    assert "'ß', 'ss'" in rendered
+    assert "'ǰ', 'ǰ'" in rendered
+    assert "btrim(" not in rendered
+    assert "regexp_replace(" not in rendered
+
+
+def test_search_does_not_bind_true_multi_symbol_query() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="BTC/USD TSLA",
+        source_limit=4,
+    )
+
+    params = pool.cursor.executions[0][1]
+    assert params["normalized_query"] == "btc usd tsla"
+    assert params["symbol_query"] is None
+
+
 def test_search_uses_bound_token_array_without_row_token_splitting() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[]])
@@ -386,6 +428,58 @@ def test_search_groups_all_matching_layers_before_conversation_limit() -> None:
     assert rendered.count("conversation.deleted_at is null") >= 7
 
 
+def test_asset_rollup_is_one_bounded_owner_scoped_row_outside_conversation_limit() -> (
+    None
+):
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool(
+        [
+            [
+                {
+                    "source_type": "asset_rollup",
+                    "payload": {
+                        "type": "asset_rollup",
+                        "symbol": "TSLA",
+                        "run_count": 12,
+                        "decision_counts": {
+                            "promising": 3,
+                            "watching": 2,
+                            "rejected": 1,
+                            "revisit_later": 0,
+                        },
+                        "last_touched_at": ACTIVITY_AT,
+                    },
+                }
+            ]
+        ]
+    )
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="tsl",
+        source_limit=4,
+    )
+
+    assert result.rows["conversations"] == []
+    assert result.asset_rollup is not None
+    assert result.asset_rollup.symbol == "TSLA"
+    assert result.asset_rollup.run_count == 12
+    assert len(pool.cursor.executions) == 1
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert "count(distinct lineage.run_id)" in sql_text
+    assert "count(distinct lineage.run_id) filter" in sql_text
+    assert "conversation.deleted_at is null" in sql_text
+    assert "run.status = 'completed'" in sql_text
+    assert "limit 1" in sql_text
+    assert "conversation_page" in sql_text
+    assert sql_text.index("limit (select source_limit from input)") < sql_text.index(
+        "'asset_rollup'::text as source_type"
+    )
+    assert params["source_limit"] == 4
+    assert str(params["user_id"]) == OWNER_ID
+
+
 def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[]])
@@ -400,10 +494,13 @@ def test_search_guest_workspace_scope_is_inside_every_match_layer_before_limit()
 
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
+    conversation_sql = sql_text[: sql_text.index("asset_run_lineage")]
+    asset_sql = sql_text[sql_text.index("asset_run_lineage") :]
     assert sql_text.count("conversation.id = input.guest_conversation_id") >= 6
-    assert sql_text.rfind("conversation.id = input.guest_conversation_id") < (
-        sql_text.rfind("row_number() over")
-    )
+    assert conversation_sql.rfind(
+        "conversation.id = input.guest_conversation_id"
+    ) < conversation_sql.rfind("row_number() over")
+    assert "conversation.id = input.guest_conversation_id" in asset_sql
     assert str(params["guest_conversation_id"]) == CONVERSATION_ID
     assert params["source_limit"] == 1
 

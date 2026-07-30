@@ -402,6 +402,32 @@ def test_sql_normalizer_matches_python_for_unicode_and_random_text() -> None:
         assert cursor.fetchone()[0] == 0
 
 
+def test_symbol_sql_normalizer_matches_raw_python_casefold_for_every_scalar() -> None:
+    from argus.domain.search_sql_text import symbol_normalizer_expression
+
+    values = [
+        chr(codepoint)
+        for codepoint in range(1, sys.maxunicode + 1)
+        if not 0xD800 <= codepoint <= 0xDFFF
+    ]
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "create temporary table symbol_normalizer_probe "
+            "(source_text text not null, expected text not null)"
+        )
+        with cursor.copy(
+            "copy symbol_normalizer_probe (source_text, expected) from stdin"
+        ) as copy:
+            for value in values:
+                copy.write_row((value, value.casefold()))
+        cursor.execute(
+            sql.SQL(
+                "select count(*) from symbol_normalizer_probe where {} <> expected"
+            ).format(symbol_normalizer_expression(sql.Identifier("source_text")))
+        )
+        assert cursor.fetchone()[0] == 0
+
+
 def test_search_groups_all_matching_layers_into_one_conversation(
     search_identities,
 ) -> None:
@@ -1070,6 +1096,228 @@ def test_full_lineage_aggregates_survive_more_than_five_children(
     assert item.dossier.decision.run_label == "Run 0"
     assert item.dossier.outcome is not None
     assert item.dossier.outcome.run_label == "Run 6"
+
+
+def test_asset_rollup_exact_prefix_multi_asset_and_guest_scope_use_run_lineage(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    other_id = search_identities["other"]
+    now = datetime(2026, 7, 29, 20, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        active = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=4),
+            title="Active canonical history",
+        )
+        archived = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=3),
+            title="Archived canonical history",
+            archived=True,
+        )
+        deleted = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Deleted canonical history",
+            deleted=True,
+        )
+        foreign = _insert_conversation(
+            cursor,
+            user_id=other_id,
+            timestamp=now,
+            title="Foreign canonical history",
+        )
+        active_run = _insert_run(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=3),
+            title="Active multi-asset run",
+            conversation_id=active,
+            symbols=["TSLA", "AAPL"],
+        )
+        archived_run = _insert_run(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=2),
+            title="Archived TSLA run",
+            conversation_id=archived,
+            symbols=["TSLA"],
+        )
+        _insert_run(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Deleted TSLA run",
+            conversation_id=deleted,
+            symbols=["TSLA"],
+        )
+        _insert_run(
+            cursor,
+            user_id=other_id,
+            timestamp=now,
+            title="Foreign TSLA run",
+            conversation_id=foreign,
+            symbols=["TSLA"],
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=1),
+            title="Active decision",
+            summary="Promising active run",
+            conversation_id=active,
+            source_run_id=active_run,
+            decision_state="promising",
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Archived decision",
+            summary="Watching archived run",
+            conversation_id=archived,
+            source_run_id=archived_run,
+            decision_state="watching",
+        )
+
+    prefix_reader, prefix_pool = _reader()
+    prefix = prefix_reader.search_rows(
+        user_id=str(owner_id),
+        query="tsl",
+        source_limit=20,
+    )
+    exact = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="TSLA",
+        source_limit=20,
+    )
+    multi_asset = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="AAPL",
+        source_limit=20,
+    )
+    no_alias = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="Tesla",
+        source_limit=20,
+    )
+    guest = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="TSLA",
+        source_limit=20,
+        guest_scope=True,
+        guest_conversation_id=str(active),
+    )
+
+    for result in (prefix, exact):
+        assert result.asset_rollup is not None
+        assert result.asset_rollup.model_dump() == {
+            "type": "asset_rollup",
+            "symbol": "TSLA",
+            "run_count": 2,
+            "decision_counts": {
+                "promising": 1,
+                "watching": 1,
+                "rejected": 0,
+                "revisit_later": 0,
+            },
+            "last_touched_at": now,
+        }
+    assert multi_asset.asset_rollup is not None
+    assert multi_asset.asset_rollup.symbol == "AAPL"
+    assert multi_asset.asset_rollup.run_count == 1
+    assert multi_asset.asset_rollup.decision_counts.promising == 1
+    assert multi_asset.asset_rollup.last_touched_at == now - timedelta(days=1)
+    assert no_alias.asset_rollup is None
+    assert guest.asset_rollup is not None
+    assert guest.asset_rollup.symbol == "TSLA"
+    assert guest.asset_rollup.run_count == 1
+    assert guest.asset_rollup.decision_counts.promising == 1
+    assert guest.asset_rollup.decision_counts.watching == 0
+    assert prefix_pool.tracker == {
+        "query_count": 2,
+        "row_counts": [3, 2],
+    }
+
+
+def test_asset_rollup_pair_symbol_normalization_matches_memory_contract(
+    search_identities,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    provider_calls: list[str] = []
+
+    def fail_if_resolved(symbol: str) -> object:
+        provider_calls.append(symbol)
+        raise AssertionError("Omnisearch asset rollups must not resolve symbols")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", fail_if_resolved)
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 29, 21, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Canonical pair and equity history",
+        )
+        for index, symbol in enumerate(("BTC/USD", "TSLA", "TSM", "ǰ/USD", "ẞ/EUR")):
+            _insert_run(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=index),
+                title=f"{symbol} run",
+                conversation_id=conversation_id,
+                symbols=[symbol],
+            )
+
+    exact = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="  bTc/uSd  ",
+        source_limit=20,
+    )
+    prefix = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="btc/",
+        source_limit=20,
+    )
+    multi_symbol = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="BTC/USD TSLA",
+        source_limit=20,
+    )
+    ambiguous = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="ts",
+        source_limit=20,
+    )
+    combining = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="J\u030c/USD",
+        source_limit=20,
+    )
+    expanding = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="ss/e",
+        source_limit=20,
+    )
+
+    for result in (exact, prefix):
+        assert result.asset_rollup is not None
+        assert result.asset_rollup.symbol == "BTC/USD"
+        assert result.asset_rollup.run_count == 1
+    assert multi_symbol.asset_rollup is None
+    assert ambiguous.asset_rollup is None
+    assert combining.asset_rollup is not None
+    assert combining.asset_rollup.symbol == "ǰ/USD"
+    assert expanding.asset_rollup is not None
+    assert expanding.asset_rollup.symbol == "ẞ/EUR"
+    assert provider_calls == []
 
 
 def test_ledger_counts_distinct_conversations_across_all_match_layers(

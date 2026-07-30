@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "web" / "lib" / "search-casefold-data.ts"
+BACKEND_TARGET = ROOT / "src" / "argus" / "domain" / "search_symbol_casefold_data.py"
 EXPECTED_UNICODE_VERSION = "13.0.0"
 _CHUNK_SIZE = 80
 
@@ -28,10 +29,10 @@ def _string_chunks(value: str) -> list[str]:
     ]
 
 
-def render_casefold_module() -> str:
+def _casefold_contract() -> tuple[str, str, list[tuple[str, str]], list[tuple[int, int]]]:
     if unicodedata.unidata_version != EXPECTED_UNICODE_VERSION:
         raise RuntimeError(
-            "Frontend search casefold data must be generated with the pinned "
+            "Search casefold data must be generated with the pinned "
             f"Python 3.10 Unicode {EXPECTED_UNICODE_VERSION} contract; got "
             f"{unicodedata.unidata_version}."
         )
@@ -65,8 +66,20 @@ def render_casefold_module() -> str:
         assert range_end is not None
         alphanumeric_ranges.append((range_start, range_end))
 
-    single_source = "".join(source for source, _ in single_character_folds)
-    single_target = "".join(target for _, target in single_character_folds)
+    return (
+        "".join(source for source, _ in single_character_folds),
+        "".join(target for _, target in single_character_folds),
+        expansions,
+        alphanumeric_ranges,
+    )
+
+
+def render_casefold_module(
+    contract: tuple[str, str, list[tuple[str, str]], list[tuple[int, int]]] | None = None,
+) -> str:
+    single_source, single_target, expansions, alphanumeric_ranges = (
+        contract or _casefold_contract()
+    )
     source_chunks = ",\n".join(
         f"  {_typescript_string(chunk)}" for chunk in _string_chunks(single_source)
     )
@@ -104,6 +117,41 @@ export const PYTHON_ALPHANUMERIC_RANGES = [
 """
 
 
+def render_backend_symbol_casefold_module(
+    contract: tuple[str, str, list[tuple[str, str]], list[tuple[int, int]]] | None = None,
+) -> str:
+    single_source, single_target, expansions, _ = contract or _casefold_contract()
+    source_chunks = "\n".join(
+        f"    {_typescript_string(chunk)}" for chunk in _string_chunks(single_source)
+    )
+    target_chunks = "\n".join(
+        f"    {_typescript_string(chunk)}" for chunk in _string_chunks(single_target)
+    )
+    expansion_rows = "\n".join(
+        f"    ({_typescript_string(source)}, {_typescript_string(target)}),"
+        for source, target in expansions
+    )
+
+    return f'''"""Generated raw Python 3.10 casefold data for Postgres symbols."""
+
+from __future__ import annotations
+
+PYTHON_CASEFOLD_UNICODE_VERSION = "{EXPECTED_UNICODE_VERSION}"
+
+PYTHON_CASEFOLD_SINGLE_SOURCE = (
+{source_chunks}
+)
+
+PYTHON_CASEFOLD_SINGLE_TARGET = (
+{target_chunks}
+)
+
+PYTHON_CASEFOLD_EXPANSIONS = (
+{expansion_rows}
+)
+'''
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -112,18 +160,27 @@ def main() -> int:
         help="Fail when the checked-in TypeScript map is stale.",
     )
     args = parser.parse_args()
-    expected = render_casefold_module().encode("utf-8")
+    contract = _casefold_contract()
+    expected_by_target = {
+        TARGET: render_casefold_module(contract).encode("utf-8"),
+        BACKEND_TARGET: render_backend_symbol_casefold_module(contract).encode("utf-8"),
+    }
     if args.check:
-        if not TARGET.exists() or TARGET.read_bytes() != expected:
+        if any(
+            not target.exists() or target.read_bytes() != expected
+            for target, expected in expected_by_target.items()
+        ):
             print(
-                "Frontend search casefold data is stale; regenerate it with "
+                "Search casefold data is stale; regenerate it with "
                 f"{Path(__file__).relative_to(ROOT)}.",
                 file=sys.stderr,
             )
             return 1
         return 0
 
-    TARGET.write_bytes(expected)
+    for target, expected in expected_by_target.items():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(expected)
     return 0
 
 

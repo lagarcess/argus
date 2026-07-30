@@ -1265,6 +1265,387 @@ def test_search_supports_cursor_after_grouping_by_conversation() -> None:
     )
 
 
+def test_search_asset_rollup_is_first_and_does_not_consume_conversation_cursor() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation_ids: list[str] = []
+    for index in range(2):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"TSLA history {index}"},
+        ).json()["conversation"]
+        conversation_ids.append(conversation["id"])
+        run = BacktestRun(
+            id=f"asset-rollup-run-{index}",
+            conversation_id=conversation["id"],
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["TSLA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"TSLA run {index}"},
+            created_at=now - timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    first_page = client.get("/api/v1/search?q=TSLA&limit=1")
+
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert first_payload["items"][0] == {
+        "type": "asset_rollup",
+        "symbol": "TSLA",
+        "run_count": 2,
+        "decision_counts": {
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+        "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+    }
+    first_conversations = [
+        item["conversation_id"]
+        for item in first_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(first_conversations) == 1
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        "/api/v1/search",
+        params={
+            "q": "TSLA",
+            "limit": 1,
+            "cursor": first_payload["next_cursor"],
+        },
+    )
+
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    second_conversations = [
+        item["conversation_id"]
+        for item in second_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(second_conversations) == 1
+    assert set(first_conversations + second_conversations) == set(conversation_ids)
+    assert second_payload["next_cursor"] is None
+
+
+def test_search_asset_rollup_uses_owned_canonical_run_and_decision_lineage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    provider_calls: list[str] = []
+
+    def fail_if_resolved(symbol: str) -> ResolvedAsset:
+        provider_calls.append(symbol)
+        raise AssertionError("Omnisearch asset rollups must not resolve symbols")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", fail_if_resolved)
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    other_user_id = "00000000-0000-0000-0000-000000000099"
+    now = utcnow()
+    conversation_rows = (
+        ("asset-rollup-active", False, None, user_id),
+        ("asset-rollup-archived", True, None, user_id),
+        ("asset-rollup-deleted", False, now, user_id),
+        ("asset-rollup-foreign", False, None, other_user_id),
+    )
+    for conversation_id, archived, deleted_at, owner_id in conversation_rows:
+        _store_search_conversation(
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            title=f"Canonical history {conversation_id}",
+            updated_at=now,
+            archived=archived,
+            deleted_at=deleted_at,
+        )
+
+    runs = (
+        BacktestRun(
+            id="asset-rollup-active-run",
+            conversation_id="asset-rollup-active",
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["TSLA", "AAPL"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": "Active multi-asset run"},
+            created_at=now - timedelta(days=3),
+        ),
+        BacktestRun(
+            id="asset-rollup-archived-run",
+            conversation_id="asset-rollup-archived",
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["TSLA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": "Archived TSLA run"},
+            created_at=now - timedelta(days=2),
+        ),
+        BacktestRun(
+            id="asset-rollup-deleted-run",
+            conversation_id="asset-rollup-deleted",
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["TSLA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": "Deleted TSLA run"},
+            created_at=now,
+        ),
+        BacktestRun(
+            id="asset-rollup-foreign-run",
+            conversation_id="asset-rollup-foreign",
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["TSLA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": "Foreign TSLA run"},
+            created_at=now,
+        ),
+        BacktestRun(
+            id="asset-rollup-failed-run",
+            conversation_id="asset-rollup-active",
+            strategy_id=None,
+            status="failed",
+            asset_class="equity",
+            symbols=["TSLA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": "Failed TSLA run"},
+            created_at=now,
+        ),
+    )
+    for run in runs:
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = (
+            other_user_id if run.id == "asset-rollup-foreign-run" else user_id
+        )
+
+    decisions = (
+        (
+            runs[0],
+            "asset-rollup-active-evidence",
+            "asset-rollup-active-decision",
+            "promising",
+            now - timedelta(days=1),
+        ),
+        (
+            runs[1],
+            "asset-rollup-archived-evidence",
+            "asset-rollup-archived-decision",
+            "watching",
+            now,
+        ),
+    )
+    for run, evidence_id, decision_id, state, touched_at in decisions:
+        artifact = EvidenceArtifact(
+            id=evidence_id,
+            idea_id=f"{evidence_id}-idea",
+            idea_version_id=f"{evidence_id}-version",
+            source_conversation_id=run.conversation_id,
+            source_run_id=run.id,
+            artifact_type="backtest",
+            lifecycle="decided",
+            title=f"{run.id} evidence",
+            digest="Canonical evidence.",
+            payload={},
+            created_at=touched_at,
+            updated_at=touched_at,
+        )
+        decision = DecisionNote(
+            id=decision_id,
+            idea_id=artifact.idea_id,
+            idea_version_id=artifact.idea_version_id,
+            evidence_artifact_id=artifact.id,
+            source_conversation_id=run.conversation_id,
+            decision_state=state,
+            note="Canonical decision.",
+            created_at=touched_at,
+            updated_at=touched_at,
+        )
+        api_state.store.evidence_artifacts[artifact.id] = artifact
+        api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    prefix = client.get("/api/v1/search?q=tsl&limit=20")
+    exact = client.get("/api/v1/search?q=TSLA&limit=20")
+    multi_asset = client.get("/api/v1/search?q=AAPL&limit=20")
+    alias_no_match = client.get("/api/v1/search?q=Tesla&limit=20")
+
+    assert prefix.status_code == exact.status_code == multi_asset.status_code == 200
+    expected_tsla = {
+        "type": "asset_rollup",
+        "symbol": "TSLA",
+        "run_count": 2,
+        "decision_counts": {
+            "promising": 1,
+            "watching": 1,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+        "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+    }
+    assert prefix.json()["items"][0] == expected_tsla
+    assert exact.json()["items"][0] == expected_tsla
+    assert multi_asset.json()["items"][0] == {
+        "type": "asset_rollup",
+        "symbol": "AAPL",
+        "run_count": 1,
+        "decision_counts": {
+            "promising": 1,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+        "last_touched_at": (now - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+    }
+    assert [
+        item for item in alias_no_match.json()["items"] if item["type"] == "asset_rollup"
+    ] == []
+    assert provider_calls == []
+
+
+def test_search_asset_rollup_preserves_pair_punctuation_and_rejects_true_multi_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    provider_calls: list[str] = []
+
+    def fail_if_resolved(symbol: str) -> ResolvedAsset:
+        provider_calls.append(symbol)
+        raise AssertionError("Omnisearch asset rollups must not resolve symbols")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", fail_if_resolved)
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation_id = "asset-rollup-symbol-normalization"
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        title="Canonical pair and equity history",
+        updated_at=now,
+    )
+    for index, symbol in enumerate(("BTC/USD", "TSLA", "TSM")):
+        run = BacktestRun(
+            id=f"asset-rollup-symbol-normalization-{index}",
+            conversation_id=conversation_id,
+            strategy_id=None,
+            status="completed",
+            asset_class="crypto" if symbol == "BTC/USD" else "equity",
+            symbols=[symbol],
+            allocation_method="equal_weight",
+            benchmark_symbol="BTC" if symbol == "BTC/USD" else "SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"{symbol} run"},
+            created_at=now - timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    exact = client.get(
+        "/api/v1/search",
+        params={"q": "  bTc/uSd  ", "limit": 20},
+    )
+    prefix = client.get(
+        "/api/v1/search",
+        params={"q": "btc/", "limit": 20},
+    )
+    multi_symbol = client.get(
+        "/api/v1/search",
+        params={"q": "BTC/USD TSLA", "limit": 20},
+    )
+    ambiguous = client.get(
+        "/api/v1/search",
+        params={"q": "ts", "limit": 20},
+    )
+
+    for response in (exact, prefix, multi_symbol, ambiguous):
+        assert response.status_code == 200
+    for response in (exact, prefix):
+        asset_items = [
+            item for item in response.json()["items"] if item["type"] == "asset_rollup"
+        ]
+        assert len(asset_items) == 1
+        assert asset_items[0]["symbol"] == "BTC/USD"
+        assert asset_items[0]["run_count"] == 1
+    for response in (multi_symbol, ambiguous):
+        assert [
+            item for item in response.json()["items"] if item["type"] == "asset_rollup"
+        ] == []
+    assert provider_calls == []
+
+
+def test_search_asset_rollup_matches_expanding_and_combining_casefolds() -> None:
+    from argus.domain.conversation_recall import project_asset_rollup
+
+    now = utcnow()
+    runs = [
+        {
+            "id": "combining-casefold-run",
+            "conversation_id": "combining-casefold-conversation",
+            "status": "completed",
+            "symbols": ["ǰ/USD"],
+            "created_at": now,
+        },
+        {
+            "id": "expanding-casefold-run",
+            "conversation_id": "expanding-casefold-conversation",
+            "status": "completed",
+            "symbols": ["ẞ/EUR"],
+            "created_at": now - timedelta(minutes=1),
+        },
+    ]
+
+    combining = project_asset_rollup(
+        runs=runs,
+        evidence=[],
+        decisions=[],
+        query="J\u030c/USD",
+    )
+    expanding = project_asset_rollup(
+        runs=runs,
+        evidence=[],
+        decisions=[],
+        query="ss/e",
+    )
+
+    assert combining is not None
+    assert combining.symbol == "ǰ/USD"
+    assert expanding is not None
+    assert expanding.symbol == "ẞ/EUR"
+
+
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     # Memory mode shares the Supabase matcher semantics: a multi-word query
     # matches when every token appears, not only as one contiguous substring.
@@ -2208,8 +2589,9 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
 
     payload = client.get("/api/v1/search?q=TSLA&limit=20").json()
 
-    assert len(payload["items"]) == 1
-    item = payload["items"][0]
+    conversations = [item for item in payload["items"] if item["type"] == "conversation"]
+    assert len(conversations) == 1
+    item = conversations[0]
     assert item["type"] == "conversation"
     assert item["id"] == conversation["id"]
     assert item["conversation_id"] == conversation["id"]

@@ -899,6 +899,12 @@
     "guest": {
       "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
     },
+    "asset_rollup": {
+      "heading": "Your history with this asset",
+      "runs_involving_one": "{{count}} run involving {{symbol}}",
+      "runs_involving_other": "{{count}} runs involving {{symbol}}",
+      "last_touched": "Last touched {{date}}"
+    },
     "no_results": "No results found",
     "no_conversations": "No conversations yet",
     "clear_search": "Clear search",

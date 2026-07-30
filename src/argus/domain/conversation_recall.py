@@ -7,6 +7,8 @@ from typing import Any, Iterable, Mapping, Sequence, cast
 
 from argus.api.schemas import (
     DecisionState,
+    SearchAssetDecisionCounts,
+    SearchAssetRollup,
     SearchDossier,
     SearchDossierDecision,
     SearchDossierLeftOff,
@@ -22,7 +24,11 @@ from argus.domain.evidence import (
     decision_recall_preview,
     evidence_preview_from_payload,
 )
-from argus.domain.search_text import normalize_search_text, search_text_matches_query
+from argus.domain.search_text import (
+    normalize_search_symbol,
+    normalize_search_text,
+    search_text_matches_query,
+)
 
 _MAX_SYMBOLS = 5
 _MAX_FAMILIES = 5
@@ -53,6 +59,111 @@ class _MatchCandidate:
     text: str
     layer: SearchMatchLayer
     message_id: str | None = None
+
+
+def project_asset_rollup(
+    *,
+    runs: Sequence[Mapping[str, Any]],
+    evidence: Sequence[Mapping[str, Any]],
+    decisions: Sequence[Mapping[str, Any]],
+    query: str,
+) -> SearchAssetRollup | None:
+    """Summarize one unambiguous canonical symbol from owned completed runs."""
+    normalized_query = normalize_search_symbol(query)
+    if normalized_query is None:
+        return None
+
+    completed_by_id: dict[str, Mapping[str, Any]] = {}
+    symbols_by_normalized: dict[str, str] = {}
+    run_symbols: dict[str, set[str]] = {}
+    for run in runs:
+        if run.get("status") != "completed":
+            continue
+        run_id = _text(run.get("id"))
+        if run_id is None:
+            continue
+        completed_by_id[run_id] = run
+        normalized_symbols: set[str] = set()
+        for symbol in _run_symbols(run):
+            normalized_symbol = normalize_search_symbol(symbol)
+            if normalized_symbol is None:
+                continue
+            normalized_symbols.add(normalized_symbol)
+            symbols_by_normalized.setdefault(normalized_symbol, symbol)
+        run_symbols[run_id] = normalized_symbols
+
+    matching_symbols = sorted(
+        symbol for symbol in symbols_by_normalized if symbol.startswith(normalized_query)
+    )
+    exact = [symbol for symbol in matching_symbols if symbol == normalized_query]
+    if exact:
+        resolved_symbol = exact[0]
+    elif len(matching_symbols) == 1:
+        resolved_symbol = matching_symbols[0]
+    else:
+        return None
+
+    matching_run_ids = {
+        run_id for run_id, symbols in run_symbols.items() if resolved_symbol in symbols
+    }
+    if not matching_run_ids:
+        return None
+
+    artifact_run_ids: dict[str, str] = {}
+    artifact_conversation_ids: dict[str, str] = {}
+    touched_at_by_run = {
+        run_id: _row_activity(completed_by_id[run_id]) for run_id in matching_run_ids
+    }
+    for artifact in evidence:
+        artifact_id = _text(artifact.get("id"))
+        run_id = _text(artifact.get("source_run_id"))
+        if artifact_id is None or run_id not in matching_run_ids:
+            continue
+        run_conversation_id = _text(completed_by_id[run_id].get("conversation_id"))
+        artifact_conversation_id = _text(artifact.get("source_conversation_id"))
+        if run_conversation_id is None or artifact_conversation_id != run_conversation_id:
+            continue
+        artifact_run_ids[artifact_id] = run_id
+        artifact_conversation_ids[artifact_id] = artifact_conversation_id
+        touched_at_by_run[run_id] = max(
+            touched_at_by_run[run_id],
+            _row_activity(artifact),
+        )
+
+    latest_decision_by_run: dict[str, Mapping[str, Any]] = {}
+    for decision in decisions:
+        artifact_id = _text(decision.get("evidence_artifact_id"))
+        run_id = artifact_run_ids.get(artifact_id or "")
+        if run_id is None or _text(
+            decision.get("source_conversation_id")
+        ) != artifact_conversation_ids.get(artifact_id or ""):
+            continue
+        touched_at_by_run[run_id] = max(
+            touched_at_by_run[run_id],
+            _row_activity(decision),
+        )
+        current = latest_decision_by_run.get(run_id)
+        if current is None or (
+            _row_activity(decision),
+            _text(decision.get("id")) or "",
+        ) > (
+            _row_activity(current),
+            _text(current.get("id")) or "",
+        ):
+            latest_decision_by_run[run_id] = decision
+
+    decision_counts: dict[DecisionState, int] = {state: 0 for state in _DECISION_STATES}
+    for decision in latest_decision_by_run.values():
+        state = decision.get("decision_state")
+        if state in decision_counts:
+            decision_counts[cast(DecisionState, state)] += 1
+
+    return SearchAssetRollup(
+        symbol=symbols_by_normalized[resolved_symbol],
+        run_count=len(matching_run_ids),
+        decision_counts=SearchAssetDecisionCounts(**decision_counts),
+        last_touched_at=max(touched_at_by_run.values()),
+    )
 
 
 def project_conversation_recall(

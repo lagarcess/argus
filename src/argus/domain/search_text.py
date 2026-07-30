@@ -17,6 +17,14 @@ def search_has_indexable_token(value: object) -> bool:
     )
 
 
+def normalize_search_symbol(value: object) -> str | None:
+    """Normalize one canonical symbol without discarding its punctuation."""
+    symbol = str(value).strip()
+    if not symbol or any(character.isspace() for character in symbol):
+        return None
+    return symbol.casefold()
+
+
 def search_text_contains_query(*, query: str, text: object) -> bool:
     normalized_query = normalize_search_text(query)
     if not normalized_query:

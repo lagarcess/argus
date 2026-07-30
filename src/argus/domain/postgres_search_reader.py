@@ -11,8 +11,13 @@ from psycopg.rows import dict_row
 from argus.api.chat.legacy_onboarding_markers import (
     legacy_onboarding_sql_filters,
 )
-from argus.domain.search_sql_text import normalizer_expression
+from argus.api.schemas import SearchAssetRollup
+from argus.domain.search_sql_text import (
+    normalizer_expression,
+    symbol_normalizer_expression,
+)
 from argus.domain.search_text import (
+    normalize_search_symbol,
     normalize_search_text,
     search_has_indexable_token,
 )
@@ -30,7 +35,15 @@ _ROW_GROUP_BY_SOURCE = {
     "idea": "ideas",
     "evidence": "evidence",
     "decision": "decisions",
+    "asset_rollup": "asset_rollups",
 }
+_CONVERSATION_ROW_GROUPS = tuple(
+    dict.fromkeys(
+        group
+        for source, group in _ROW_GROUP_BY_SOURCE.items()
+        if source != "asset_rollup"
+    )
+)
 
 
 class SearchCursorError(ValueError):
@@ -41,6 +54,7 @@ class SearchCursorError(ValueError):
 class SearchReadResult:
     rows: dict[str, list[dict[str, Any]]]
     ledger_counts: dict[str, int] | None = None
+    asset_rollup: SearchAssetRollup | None = None
 
 
 def _normalized(expression: str) -> sql.Composed:
@@ -1527,6 +1541,137 @@ def _conversation_match_ctes(*, has_anchor: bool) -> sql.Composed:
     )
 
 
+def _asset_rollup_ctes() -> sql.Composed:
+    return sql.SQL(
+        """
+        asset_run_lineage as (
+            select
+                run.id as run_id,
+                run_symbol.symbol,
+                normalized_run_symbol.value as normalized_symbol,
+                coalesce(run.updated_at, run.created_at) as run_touched_at,
+                evidence_touch.updated_at as evidence_touched_at,
+                latest_decision.decision_state,
+                latest_decision.updated_at as decision_touched_at
+            from input
+            join public.backtest_runs as run
+              on run.user_id = input.user_id
+             and run.status = 'completed'
+            join public.conversations as conversation
+              on conversation.id = run.conversation_id
+             and conversation.user_id = input.user_id
+             and conversation.deleted_at is null
+             and (
+                 not input.guest_scope
+                 or conversation.id = input.guest_conversation_id
+             )
+            cross join lateral unnest(run.symbols) as run_symbol(symbol)
+            cross join lateral (
+                select {normalized_symbol} as value
+            ) as normalized_run_symbol
+            left join lateral (
+                select max(evidence.updated_at) as updated_at
+                from public.evidence_artifacts as evidence
+                where evidence.user_id = input.user_id
+                  and evidence.source_conversation_id = conversation.id
+                  and evidence.source_run_id = run.id
+            ) as evidence_touch
+              on true
+            left join lateral (
+                select
+                    decision.decision_state,
+                    decision.updated_at
+                from public.evidence_artifacts as evidence
+                join public.decision_notes as decision
+                  on decision.evidence_artifact_id = evidence.id
+                 and decision.user_id = input.user_id
+                 and decision.source_conversation_id = conversation.id
+                where evidence.user_id = input.user_id
+                  and evidence.source_conversation_id = conversation.id
+                  and evidence.source_run_id = run.id
+                order by decision.updated_at desc, decision.id desc
+                limit 1
+            ) as latest_decision
+              on true
+            where input.symbol_query is not null
+              and left(
+                  normalized_run_symbol.value,
+                  length(input.symbol_query)
+              ) = input.symbol_query
+        ),
+        asset_symbol_stats as (
+            select
+                lineage.normalized_symbol,
+                (
+                    array_agg(
+                        lineage.symbol
+                        order by lineage.run_touched_at desc, lineage.run_id desc
+                    )
+                )[1] as symbol,
+                count(distinct lineage.run_id)::integer as run_count,
+                count(distinct lineage.run_id) filter (
+                    where lineage.decision_state = 'promising'
+                )::integer as promising_count,
+                count(distinct lineage.run_id) filter (
+                    where lineage.decision_state = 'watching'
+                )::integer as watching_count,
+                count(distinct lineage.run_id) filter (
+                    where lineage.decision_state = 'rejected'
+                )::integer as rejected_count,
+                count(distinct lineage.run_id) filter (
+                    where lineage.decision_state = 'revisit_later'
+                )::integer as revisit_later_count,
+                max(
+                    greatest(
+                        lineage.run_touched_at,
+                        coalesce(
+                            lineage.evidence_touched_at,
+                            lineage.run_touched_at
+                        ),
+                        coalesce(
+                            lineage.decision_touched_at,
+                            lineage.run_touched_at
+                        )
+                    )
+                ) as last_touched_at
+            from asset_run_lineage as lineage
+            group by lineage.normalized_symbol
+        ),
+        asset_symbol_resolution as (
+            select
+                stats.*,
+                count(*) over () as matching_symbol_count,
+                bool_or(
+                    stats.normalized_symbol = input.symbol_query
+                ) over () as exact_present
+            from asset_symbol_stats as stats
+            cross join input
+        ),
+        asset_rollup as (
+            select resolution.*
+            from asset_symbol_resolution as resolution
+            cross join input
+            where resolution.normalized_symbol = input.symbol_query
+               or (
+                   not resolution.exact_present
+                   and resolution.matching_symbol_count = 1
+               )
+            order by
+                (
+                    resolution.normalized_symbol = input.symbol_query
+                ) desc,
+                resolution.last_touched_at desc,
+                resolution.symbol
+            limit 1
+        )
+        """
+    ).format(
+        normalized_symbol=sql.SQL("btrim({})").format(
+            symbol_normalizer_expression(sql.SQL("run_symbol.symbol"))
+        ),
+    )
+
+
 def _conversation_search_sql(
     *,
     has_anchor: bool,
@@ -1563,13 +1708,8 @@ def _conversation_search_sql(
             """
         )
     )
-    limit = (
-        sql.SQL("") if pivot_only else sql.SQL("limit (select source_limit from input)")
-    )
-    return sql.SQL(
+    conversation_rows = sql.SQL(
         """
-        with {input_cte},
-        {match_ctes}
         select
             'conversation'::text as source_type,
             ranked.pinned_rank,
@@ -1607,13 +1747,70 @@ def _conversation_search_sql(
             ranked.activity_at desc,
             ranked.text_rank desc,
             ranked.conversation_id desc
-        {limit}
+        """
+    ).format(
+        terminal_predicate=terminal_predicate,
+    )
+    if pivot_only:
+        return sql.SQL(
+            """
+            with {input_cte},
+            {match_ctes}
+            {conversation_rows}
+            """
+        ).format(
+            input_cte=_CONVERSATION_INPUT_CTE,
+            match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
+            conversation_rows=conversation_rows,
+        )
+
+    return sql.SQL(
+        """
+        with {input_cte},
+        {match_ctes},
+        {asset_rollup_ctes},
+        conversation_page as (
+            {conversation_rows}
+            limit (select source_limit from input)
+        )
+        select
+            source_type,
+            pinned_rank,
+            exact_rank,
+            symbol_rank,
+            layer_rank,
+            text_rank,
+            payload
+        from conversation_page
+
+        union all
+
+        select
+            'asset_rollup'::text as source_type,
+            0::integer as pinned_rank,
+            0::integer as exact_rank,
+            0::integer as symbol_rank,
+            0::integer as layer_rank,
+            0::integer as text_rank,
+            jsonb_build_object(
+                'type', 'asset_rollup',
+                'symbol', asset.symbol,
+                'run_count', asset.run_count,
+                'decision_counts', jsonb_build_object(
+                    'promising', asset.promising_count,
+                    'watching', asset.watching_count,
+                    'rejected', asset.rejected_count,
+                    'revisit_later', asset.revisit_later_count
+                ),
+                'last_touched_at', asset.last_touched_at
+            ) as payload
+        from asset_rollup as asset
         """
     ).format(
         input_cte=_CONVERSATION_INPUT_CTE,
         match_ctes=_conversation_match_ctes(has_anchor=has_anchor),
-        terminal_predicate=terminal_predicate,
-        limit=limit,
+        asset_rollup_ctes=_asset_rollup_ctes(),
+        conversation_rows=conversation_rows,
     )
 
 
@@ -2026,6 +2223,7 @@ class PostgresSearchReader:
 
         normalized_query = normalize_search_text(query)
         normalized_tokens = tuple(dict.fromkeys(normalized_query.split()))
+        symbol_query = normalize_search_symbol(query)
         anchor_token = max(
             (token for token in normalized_tokens if len(token) >= 3),
             key=len,
@@ -2051,11 +2249,7 @@ class PostgresSearchReader:
             # PostgreSQL text cannot represent NUL. Normalized matching remains
             # exact, while raw symbol equality must be false for such a query
             # because stored Postgres symbols cannot contain NUL either.
-            "symbol_query": (
-                normalized_query
-                if "\x00" not in query and len(normalized_tokens) == 1
-                else None
-            ),
+            "symbol_query": (symbol_query if "\x00" not in query else None),
             "source_limit": source_limit,
             "match_limit": _conversation_match_limit(source_limit),
             "has_cursor": has_cursor,
@@ -2112,6 +2306,12 @@ class PostgresSearchReader:
                     candidate_rows,
                     source_limit=source_limit,
                 )
+                asset_rows = grouped.pop("asset_rollups", [])
+                asset_rollup = (
+                    SearchAssetRollup.model_validate(asset_rows[0])
+                    if asset_rows
+                    else None
+                )
                 grouped = _hydrate_conversation_recall(
                     cursor=cursor,
                     owner_id=owner_id,
@@ -2137,7 +2337,11 @@ class PostgresSearchReader:
                         if state in ledger_counts:
                             ledger_counts[state] = int(row.get("count") or 0)
 
-        return SearchReadResult(rows=grouped, ledger_counts=ledger_counts)
+        return SearchReadResult(
+            rows=grouped,
+            ledger_counts=ledger_counts,
+            asset_rollup=asset_rollup,
+        )
 
 
 def _hydrate_conversation_recall(
@@ -2159,11 +2363,11 @@ def _hydrate_conversation_recall(
             value for value in unique_ids if value == str(guest_conversation_id)
         ]
     if not unique_ids:
-        return {group: [] for group in _ROW_GROUP_BY_SOURCE.values()}
+        return {group: [] for group in _CONVERSATION_ROW_GROUPS}
 
     params = {"user_id": owner_id, "conversation_ids": unique_ids}
     hydrated: dict[str, list[dict[str, Any]]] = {
-        group: [] for group in _ROW_GROUP_BY_SOURCE.values()
+        group: [] for group in _CONVERSATION_ROW_GROUPS
     }
     cursor.execute(_CONVERSATION_HYDRATION_SQL, params)
     for row in cursor.fetchall():

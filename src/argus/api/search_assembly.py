@@ -1,18 +1,28 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from argus.api import state as api_state
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.memory_ownership import memory_object_visible
-from argus.api.schemas import SearchItem, User
-from argus.domain.conversation_recall import project_conversation_recall
+from argus.api.schemas import SearchAssetRollup, SearchItem, User
+from argus.domain.conversation_recall import (
+    project_asset_rollup,
+    project_conversation_recall,
+)
 
 ScoredSearchItem = tuple[int, SearchItem]
 
 
-def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
+@dataclass(frozen=True)
+class MemorySearchRead:
+    scored_items: list[ScoredSearchItem]
+    asset_rollup: SearchAssetRollup | None
+
+
+def memory_search_read(*, user: User, query: str) -> MemorySearchRead:
     """Project owned memory records through the same conversation read model."""
     with api_state.store.backtest_finalization_lock:
         conversations = [
@@ -64,6 +74,23 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         visible_conversation_ids = {
             str(conversation["id"]) for conversation in conversations
         }
+        runs = [
+            run
+            for run in runs
+            if str(run.get("conversation_id") or "") in visible_conversation_ids
+        ]
+        evidence = [
+            artifact
+            for artifact in evidence
+            if str(artifact.get("source_conversation_id") or "")
+            in visible_conversation_ids
+        ]
+        decisions = [
+            decision
+            for decision in decisions
+            if str(decision.get("source_conversation_id") or "")
+            in visible_conversation_ids
+        ]
         messages = [
             message.model_dump()
             for conversation_id, conversation_messages in api_state.store.messages.items()
@@ -72,15 +99,27 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
             if message.role != "user"
             or not is_legacy_onboarding_marker(message.content)
         ]
-    return _project_rows(
-        conversations=conversations,
-        runs=runs,
-        ideas=ideas,
-        evidence=evidence,
-        decisions=decisions,
-        messages=messages,
-        query=query,
+    return MemorySearchRead(
+        scored_items=_project_rows(
+            conversations=conversations,
+            runs=runs,
+            ideas=ideas,
+            evidence=evidence,
+            decisions=decisions,
+            messages=messages,
+            query=query,
+        ),
+        asset_rollup=project_asset_rollup(
+            runs=runs,
+            evidence=evidence,
+            decisions=decisions,
+            query=query,
+        ),
     )
+
+
+def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
+    return memory_search_read(user=user, query=query).scored_items
 
 
 def scored_supabase_search_items(

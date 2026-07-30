@@ -598,13 +598,34 @@ class SearchItem(BaseModel):
     decision_states: tuple[DecisionState, ...] = ()
 
 
+class SearchAssetDecisionCounts(BaseModel):
+    promising: int = Field(ge=0)
+    watching: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    revisit_later: int = Field(ge=0)
+
+
+class SearchAssetRollup(BaseModel):
+    type: Literal["asset_rollup"] = "asset_rollup"
+    symbol: str = Field(min_length=1, max_length=24)
+    run_count: int = Field(ge=1)
+    decision_counts: SearchAssetDecisionCounts
+    last_touched_at: datetime
+
+
+SearchResultItem = Annotated[
+    SearchItem | SearchAssetRollup,
+    Field(discriminator="type"),
+]
+
+
 class SearchLedgerGroup(BaseModel):
     decision_state: DecisionState
     count: int
 
 
 class PaginatedSearch(BaseModel):
-    items: list[SearchItem]
+    items: list[SearchResultItem]
     next_cursor: str | None = None
     ledger_groups: list[SearchLedgerGroup] | None = None
 

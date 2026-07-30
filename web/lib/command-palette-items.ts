@@ -1,7 +1,8 @@
 import type {
   DecisionState,
   HistoryItem,
-  SearchItem,
+  SearchAssetRollupItem,
+  SearchConversationItem,
   SearchLedgerGroup,
 } from "./argus-api";
 
@@ -17,7 +18,7 @@ export type CommandPaletteDisplayItem = {
   source: "recent" | "search";
   decisionState: DecisionState | null;
   decisionStates: DecisionState[];
-  dossier: SearchItem["dossier"] | null;
+  dossier: SearchConversationItem["dossier"] | null;
   canManageConversation: boolean;
   activation: "open_conversation";
 };
@@ -46,6 +47,33 @@ export type CommandPaletteItemCopy = {
   metricLabel?: (id: string, fallback: string) => string;
 };
 
+export type CommandPaletteAssetRollupCopy = {
+  heading?: string;
+  runsInvolving?: (count: number, symbol: string) => string;
+  decisionStateLabel?: (state: DecisionState) => string;
+  dateLabel?: (value: string) => string;
+  lastTouched?: (date: string) => string;
+};
+
+export type CommandPaletteAssetRollup = {
+  heading: string;
+  symbol: string;
+  runs: string;
+  decisions: Array<{
+    state: DecisionState;
+    count: number;
+    label: string;
+  }>;
+  lastTouched: string;
+};
+
+const ASSET_ROLLUP_DECISION_ORDER: readonly DecisionState[] = [
+  "promising",
+  "watching",
+  "rejected",
+  "revisit_later",
+];
+
 export function commandPaletteItemFromHistory(
   item: HistoryItem,
 ): CommandPaletteDisplayItem | null {
@@ -69,7 +97,7 @@ export function commandPaletteItemFromHistory(
 }
 
 export function commandPaletteItemFromSearch(
-  item: SearchItem,
+  item: SearchConversationItem,
   copy: CommandPaletteItemCopy = {},
 ): CommandPaletteDisplayItem {
   void copy;
@@ -88,6 +116,36 @@ export function commandPaletteItemFromSearch(
     dossier: item.dossier,
     canManageConversation: true,
     activation: "open_conversation",
+  };
+}
+
+export function commandPaletteAssetRollupFromSearch(
+  item: SearchAssetRollupItem,
+  copy: CommandPaletteAssetRollupCopy = {},
+): CommandPaletteAssetRollup {
+  const date =
+    copy.dateLabel?.(item.last_touched_at) ?? item.last_touched_at.slice(0, 10);
+  return {
+    heading: copy.heading ?? "Your history with this asset",
+    symbol: item.symbol,
+    runs:
+      copy.runsInvolving?.(item.run_count, item.symbol) ??
+      `${item.run_count} ${
+        item.run_count === 1 ? "run" : "runs"
+      } involving ${item.symbol}`,
+    decisions: ASSET_ROLLUP_DECISION_ORDER.map((state) => {
+      const count = item.decision_counts[state];
+      const stateLabel =
+        copy.decisionStateLabel?.(state) ??
+        commandPaletteDecisionStateFallback(state);
+      return {
+        state,
+        count,
+        label: `${stateLabel} ${count}`,
+      };
+    }),
+    lastTouched:
+      copy.lastTouched?.(date) ?? `Last touched ${date}`,
   };
 }
 

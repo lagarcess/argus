@@ -2517,7 +2517,14 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/SearchItem'
+            oneOf:
+            - $ref: '#/components/schemas/SearchItem'
+            - $ref: '#/components/schemas/SearchAssetRollup'
+            discriminator:
+              propertyName: type
+              mapping:
+                asset_rollup: '#/components/schemas/SearchAssetRollup'
+                conversation: '#/components/schemas/SearchItem'
           type: array
         next_cursor:
           anyOf:
@@ -2574,6 +2581,50 @@ components:
             - system
           - type: 'null'
       type: object
+    SearchAssetDecisionCounts:
+      properties:
+        promising:
+          type: integer
+          minimum: 0.0
+        watching:
+          type: integer
+          minimum: 0.0
+        rejected:
+          type: integer
+          minimum: 0.0
+        revisit_later:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - promising
+      - watching
+      - rejected
+      - revisit_later
+    SearchAssetRollup:
+      properties:
+        type:
+          type: string
+          const: asset_rollup
+          default: asset_rollup
+        symbol:
+          type: string
+          maxLength: 24
+          minLength: 1
+        run_count:
+          type: integer
+          minimum: 1.0
+        decision_counts:
+          $ref: '#/components/schemas/SearchAssetDecisionCounts'
+        last_touched_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - symbol
+      - run_count
+      - decision_counts
+      - last_touched_at
     SearchDossier:
       properties:
         decision:
