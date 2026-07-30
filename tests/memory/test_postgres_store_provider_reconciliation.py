@@ -402,6 +402,90 @@ def test_database_expired_exact_claim_cannot_commit_with_lagging_process_clock(
     assert store.get_provider_ref(database["owner"], database["record_id"]) is None
 
 
+def test_claim_expiring_while_waiting_for_provider_ref_lock_cannot_commit(
+    database: dict[str, Any],
+) -> None:
+    provider_ref = "provider-expired-after-ref-wait"
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: "expires-behind-ref-lock",
+        reconciliation_lease=timedelta(seconds=1),
+    )
+    record = store.get_record(database["owner"], database["record_id"])
+    assert record is not None
+    claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert claim is not None
+    holder = psycopg.connect(DSN)
+    holder.execute(
+        """
+        select pg_advisory_xact_lock(
+          pg_catalog.hashtextextended(%s, 0)
+        )
+        """,
+        ("argus:memory-provider-ref:" f"{database['owner'].owner_id}:{provider_ref}",),
+    )
+    holder_pid_row = holder.execute("select pg_backend_pid()").fetchone()
+    assert holder_pid_row is not None
+    holder_pid = int(holder_pid_row[0])
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            commit_attempt = executor.submit(
+                store.compare_and_set_provider_ref,
+                database["owner"],
+                database["record_id"],
+                expected_record=record,
+                expected_provider_ref=None,
+                reconciliation_claim=claim,
+                provider_ref=provider_ref,
+            )
+            deadline = time.monotonic() + 2
+            blocked = False
+            while time.monotonic() < deadline:
+                with psycopg.connect(DSN, autocommit=True) as monitor:
+                    blocked_row = monitor.execute(
+                        """
+                        select exists (
+                          select 1
+                            from pg_catalog.pg_stat_activity
+                           where %s = any(pg_catalog.pg_blocking_pids(pid))
+                             and wait_event = 'advisory'
+                        )
+                        """,
+                        (holder_pid,),
+                    ).fetchone()
+                assert blocked_row is not None
+                if blocked_row[0]:
+                    blocked = True
+                    break
+                time.sleep(0.01)
+            assert blocked is True
+            with psycopg.connect(DSN, autocommit=True) as monitor:
+                monitor.execute("select pg_sleep(1.05)")
+                expired_row = monitor.execute(
+                    """
+                    select lease_expires_at <= statement_timestamp()
+                      from public.memory_reconciliations
+                     where owner_id=%s and record_id=%s and generation=1
+                    """,
+                    (
+                        database["owner"].owner_id,
+                        database["record_id"],
+                    ),
+                ).fetchone()
+            assert expired_row == (True,)
+            holder.commit()
+            committed = commit_attempt.result(timeout=2)
+    finally:
+        holder.rollback()
+        holder.close()
+
+    assert committed is False
+    assert store.get_provider_ref(database["owner"], database["record_id"]) is None
+    assert store.get_record(database["owner"], database["record_id"]) == record
+    assert store.list_provider_cleanup_targets(database["owner"]) == ()
+
+
 def test_prior_unfinished_generation_blocks_next_claim(
     database: dict[str, Any],
 ) -> None:

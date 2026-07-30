@@ -208,6 +208,39 @@ class PostgresCanonicalMemoryStore:
         return bool(row[0])
 
     @staticmethod
+    def _reconciliation_claim_is_live(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+        claim: ReconciliationClaim,
+    ) -> bool:
+        cursor.execute(
+            """
+            select exists (
+              select 1
+                from public.memory_reconciliations
+               where owner_id = %s
+                 and record_id = %s
+                 and generation = %s
+                 and operation = %s
+                 and status = 'running'
+                 and claim_token = %s
+                 and lease_expires_at > statement_timestamp()
+            )
+            """,
+            (
+                owner_id,
+                record_id,
+                claim.generation,
+                claim.operation,
+                claim.claim_token,
+            ),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        return bool(row[0])
+
+    @staticmethod
     def _read_settings(
         cursor: Cursor[Any],
         owner_id: UUID,
@@ -1585,29 +1618,14 @@ class PostgresCanonicalMemoryStore:
         try:
             with self._confirmation_transaction(owner) as (cursor, owner_id):
                 self._lock_record(cursor, owner_id, record_id)
-                cursor.execute(
-                    """
-                    select 1
-                      from public.memory_reconciliations
-                     where owner_id = %s
-                       and record_id = %s
-                       and generation = %s
-                       and operation = %s
-                       and status = 'running'
-                       and claim_token = %s
-                       and lease_expires_at > statement_timestamp()
-                    """,
-                    (
-                        owner_id,
-                        record_id,
-                        reconciliation_claim.generation,
-                        reconciliation_claim.operation,
-                        reconciliation_claim.claim_token,
-                    ),
-                )
                 if (
                     reconciliation_claim.record_id != record_id
-                    or cursor.fetchone() is None
+                    or not self._reconciliation_claim_is_live(
+                        cursor,
+                        owner_id,
+                        record_id,
+                        reconciliation_claim,
+                    )
                 ):
                     return False
                 current_record = self._read_record_if_present(
@@ -1641,6 +1659,13 @@ class PostgresCanonicalMemoryStore:
                         if ref is not None
                     ),
                 )
+                if not self._reconciliation_claim_is_live(
+                    cursor,
+                    owner_id,
+                    record_id,
+                    reconciliation_claim,
+                ):
+                    return False
                 if self._provider_ref_is_reserved(
                     cursor,
                     owner_id,
