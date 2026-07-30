@@ -4,10 +4,12 @@ import { join } from "node:path";
 
 import {
   commandPaletteAssetRollupFromSearch,
+  commandPaletteCanonicalRecallLimit,
   commandPaletteDecisionVerb,
   commandPaletteDigitSelectionIndex,
   commandPaletteGroupsByLedgerState,
   commandPaletteItemFromSearch,
+  commandPaletteItemsFromHistory,
   commandPaletteItemsInRenderedOrder,
   commandPaletteKeyboardAction,
   commandPaletteOpenMessageId,
@@ -16,7 +18,11 @@ import {
   commandPaletteSelectedRenderedPreview,
   commandPaletteSelectedPreview,
 } from "../lib/command-palette-items";
-import type { SearchAssetRollupItem, SearchItem } from "../lib/argus-api";
+import type {
+  HistoryItem,
+  SearchAssetRollupItem,
+  SearchItem,
+} from "../lib/argus-api";
 
 const conversationDossier = {
   type: "conversation",
@@ -108,6 +114,63 @@ const assetRollup = {
 } satisfies SearchAssetRollupItem;
 
 describe("command palette conversation dossier", () => {
+  test("keeps all Recents dossiers available after a canonical refresh", () => {
+    expect(commandPaletteCanonicalRecallLimit("", false)).toBe(100);
+    expect(commandPaletteCanonicalRecallLimit("gold", false)).toBe(30);
+    expect(commandPaletteCanonicalRecallLimit("", true)).toBe(100);
+  });
+
+  test("keeps Recents rows lightweight while reusing their canonical dossier", () => {
+    const recents = [
+      {
+        type: "chat",
+        id: "history-row-1",
+        title: "Gold in my long-term mix",
+        subtitle: "The last thing I said in this conversation.",
+        pinned: false,
+        created_at: "2026-07-30T09:00:00.000Z",
+        conversation_id: "conversation-1",
+      },
+      {
+        type: "chat",
+        id: "history-row-2",
+        title: "Unmatched recent conversation",
+        subtitle: "This row still has a useful preview.",
+        pinned: false,
+        created_at: "2026-07-29T09:00:00.000Z",
+        conversation_id: "conversation-2",
+      },
+    ] satisfies HistoryItem[];
+
+    const display = commandPaletteItemsFromHistory(recents, [
+      conversationDossier,
+    ]);
+
+    expect(display[0]).toMatchObject({
+      id: "history-row-1",
+      type: "chat",
+      conversationId: "conversation-1",
+      title: "Gold in my long-term mix",
+      snippet: "The last thing I said in this conversation.",
+      matchCount: 1,
+      matchMessageId: null,
+      updatedAt: "2026-07-30T09:00:00.000Z",
+      source: "recent",
+      decisionState: "watching",
+      decisionStates: ["watching"],
+      dossier: conversationDossier.dossier,
+      actions: conversationDossier.actions,
+    });
+    expect(commandPalettePreviewFields(display[0])).toHaveLength(5);
+    expect(display[0].snippet).not.toBe(conversationDossier.matched_text);
+    expect(display[1]).toMatchObject({
+      id: "history-row-2",
+      source: "recent",
+      dossier: null,
+      actions: [],
+    });
+  });
+
   test("renders an asset rollup with involving language and state counts", () => {
     expect(commandPaletteAssetRollupFromSearch(assetRollup)).toEqual({
       heading: "Your history with this asset",

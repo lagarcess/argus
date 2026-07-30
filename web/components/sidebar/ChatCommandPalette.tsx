@@ -42,11 +42,12 @@ import {
 } from "@/lib/argus-api";
 import {
   commandPaletteAssetRollupFromSearch,
+  commandPaletteCanonicalRecallLimit,
   commandPaletteDecisionVerb,
   commandPaletteDecisionStateFallback,
   commandPaletteGroupsByLedgerState,
-  commandPaletteItemFromHistory,
   commandPaletteItemFromSearch,
+  commandPaletteItemsFromHistory,
   commandPaletteItemsInRenderedOrder,
   commandPaletteKeyboardAction,
   commandPaletteOpenFallback,
@@ -371,7 +372,6 @@ export default function ChatCommandPalette({
     const capturedSignature = RECENTS_SEARCH_SIGNATURE;
     if (isGuest) {
       setLedgerGroups([]);
-      return;
     }
     if (capturedSignature !== searchSignatureRef.current) return;
     const requestId = ++ledgerRequestIdRef.current;
@@ -382,10 +382,15 @@ export default function ChatCommandPalette({
         currentSignature: searchSignatureRef.current,
         currentRequestId: ledgerRequestIdRef.current,
       });
-    searchGlobal({ q: "", limit: 100, includeLedgerGroups: true })
-      .then(({ ledger_groups }) => {
+    searchGlobal({
+      q: "",
+      limit: 100,
+      includeLedgerGroups: true,
+    })
+      .then(({ items, ledger_groups }) => {
         if (!isCurrent()) return;
-        setLedgerGroups(ledger_groups ?? []);
+        setSearchResults(items);
+        setLedgerGroups(isGuest ? [] : (ledger_groups ?? []));
       })
       .catch(() => {
         if (!isCurrent()) return;
@@ -593,7 +598,10 @@ export default function ChatCommandPalette({
       ? searchResults
           .filter(isSearchConversationItem)
           .map((item) => commandPaletteItemFromSearch(item, dossierCopy))
-      : recentItems.map(commandPaletteItemFromHistory);
+      : commandPaletteItemsFromHistory(
+          recentItems,
+          searchResults.filter(isSearchConversationItem),
+        );
     return items
       .filter((item): item is CommandPaletteDisplayItem => Boolean(item))
       .map((item) =>
@@ -672,11 +680,15 @@ export default function ChatCommandPalette({
         ];
       setIsLoadingMoreSearch(false);
       setIsLedgerLoading(false);
+      ledgerRequestIdRef.current += 1;
       ledgerBrowseRequestIdRef.current += 1;
       const requestId = ++searchRequestIdRef.current;
       const response = await searchGlobal({
         q: currentQuery,
-        limit: currentLedgerMode ? 100 : 30,
+        limit: commandPaletteCanonicalRecallLimit(
+          currentQuery,
+          currentLedgerMode,
+        ),
         decisionState: currentLedgerMode ? currentDecisionState : null,
         includeLedgerGroups: true,
       });

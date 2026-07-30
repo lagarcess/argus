@@ -1730,6 +1730,22 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
+  test("decision refresh invalidates an older Recents dossier enrichment", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const canonicalRefresh = palette.slice(
+      palette.indexOf("const refreshCanonicalSearch"),
+      palette.indexOf("const saveDecision"),
+    );
+
+    expect(canonicalRefresh).toContain("ledgerRequestIdRef.current += 1");
+    expect(canonicalRefresh.indexOf("ledgerRequestIdRef.current += 1")).toBeLessThan(
+      canonicalRefresh.indexOf("const requestId = ++searchRequestIdRef.current"),
+    );
+  });
+
   test("omnisearch canon pins keyboard, error truth, debounce, and mobile controls", () => {
     const palette = readFileSync(
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
@@ -1852,8 +1868,10 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(refreshCanonicalSearch).toContain("q: currentQuery");
     expect(refreshCanonicalSearch).toContain(
-      "limit: currentLedgerMode ? 100 : 30",
+      "commandPaletteCanonicalRecallLimit(",
     );
+    expect(refreshCanonicalSearch).toContain("currentQuery,");
+    expect(refreshCanonicalSearch).toContain("currentLedgerMode,");
     expect(palette).toContain(
       "disabled={isLoadingMoreSearch || isSavingDecision}",
     );

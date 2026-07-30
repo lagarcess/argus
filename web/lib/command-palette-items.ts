@@ -75,6 +75,13 @@ const ASSET_ROLLUP_DECISION_ORDER: readonly DecisionState[] = [
   "revisit_later",
 ];
 
+export function commandPaletteCanonicalRecallLimit(
+  query: string,
+  isLedgerMode: boolean,
+): 30 | 100 {
+  return isLedgerMode || query.trim() === "" ? 100 : 30;
+}
+
 export function commandPaletteItemFromHistory(
   item: HistoryItem,
 ): CommandPaletteDisplayItem | null {
@@ -96,6 +103,37 @@ export function commandPaletteItemFromHistory(
     canManageConversation: true,
     activation: "open_conversation",
   };
+}
+
+export function commandPaletteItemsFromHistory(
+  items: readonly HistoryItem[],
+  recallItems: readonly SearchConversationItem[],
+): CommandPaletteDisplayItem[] {
+  const recallByConversationId = new Map(
+    recallItems.map((item) => [item.conversation_id, item]),
+  );
+  const displayItems: CommandPaletteDisplayItem[] = [];
+
+  for (const item of items) {
+    const recent = commandPaletteItemFromHistory(item);
+    if (!recent) continue;
+    const recall = recent.conversationId
+      ? recallByConversationId.get(recent.conversationId)
+      : null;
+    displayItems.push(
+      recall
+        ? {
+            ...recent,
+            decisionState: recall.dossier.decision?.state ?? null,
+            decisionStates: recall.decision_states,
+            dossier: recall.dossier,
+            actions: recall.actions,
+          }
+        : recent,
+    );
+  }
+
+  return displayItems;
 }
 
 export function commandPaletteItemFromSearch(
