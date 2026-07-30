@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from psycopg import Cursor, errors
 from psycopg.rows import tuple_row
@@ -33,6 +33,7 @@ from argus.memory.store import (
     CanonicalOwnerReset,
     CanonicalRecordMutation,
     ProposalHistorySnapshot,
+    ReconciliationClaim,
 )
 from argus.memory.subject import (
     PersonalizationMemoryUnavailable,
@@ -44,6 +45,7 @@ _CANDIDATE_CAS_ATTEMPTS = 2
 _CONTROL_READ_LIMIT = 100
 _RECONCILIATION_WAIT_ATTEMPTS = 20
 _RECONCILIATION_WAIT_SECONDS = 0.05
+_DEFAULT_RECONCILIATION_LEASE = timedelta(seconds=30)
 _READ_COMMITTED = "set transaction isolation level read committed"
 _SERIALIZABLE = "set transaction isolation level serializable"
 
@@ -55,8 +57,22 @@ def _utc_now() -> datetime:
 class PostgresCanonicalMemoryStore:
     """Direct-database adapter with canonical registered-owner revalidation."""
 
-    def __init__(self, pool: ConnectionPool[Any]) -> None:
+    def __init__(
+        self,
+        pool: ConnectionPool[Any],
+        *,
+        reconciliation_clock: Callable[[], datetime] = _utc_now,
+        reconciliation_token_factory: Callable[[], str] | None = None,
+        reconciliation_lease: timedelta = _DEFAULT_RECONCILIATION_LEASE,
+    ) -> None:
+        if reconciliation_lease <= timedelta(0):
+            raise ValueError("reconciliation lease must be positive")
         self._pool = pool
+        self._reconciliation_clock = reconciliation_clock
+        self._reconciliation_token_factory = reconciliation_token_factory or (
+            lambda: str(uuid4())
+        )
+        self._reconciliation_lease = reconciliation_lease
 
     @contextmanager
     def _transaction(
@@ -1322,6 +1338,343 @@ class PostgresCanonicalMemoryStore:
                 reconciliation_generation=generation,
                 cleanup_refs=tuple(sorted(cleanup_refs)),
             )
+
+    def claim_reconciliation_turn(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> ReconciliationClaim | None:
+        if not record_id.strip():
+            raise ValueError("reconciliation record id must not be blank")
+        if reconciliation_generation < 1:
+            raise ValueError("reconciliation generation must be positive")
+        now = self._reconciliation_clock()
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("reconciliation clock must return an aware datetime")
+        lease_expires_at = now + self._reconciliation_lease
+
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                select operation,status,claim_token,lease_expires_at
+                  from public.memory_reconciliations
+                 where owner_id = %s
+                   and record_id = %s
+                   and generation = %s
+                 for update
+                """,
+                (owner_id, record_id, reconciliation_generation),
+            )
+            row = cursor.fetchone()
+            if row is None or row[1] in ("succeeded", "failed"):
+                return None
+            cursor.execute(
+                """
+                select exists (
+                  select 1
+                    from public.memory_reconciliations
+                   where owner_id = %s
+                     and record_id = %s
+                     and generation < %s
+                     and status in ('pending', 'running')
+                )
+                """,
+                (owner_id, record_id, reconciliation_generation),
+            )
+            prior_row = cursor.fetchone()
+            assert prior_row is not None
+            if prior_row[0]:
+                return None
+
+            operation, status, old_claim_token, old_lease_expires_at = row
+            if (
+                status == "running"
+                and old_lease_expires_at is not None
+                and old_lease_expires_at > now
+            ):
+                return None
+            claim_token = self._reconciliation_token_factory()
+            if not isinstance(claim_token, str):
+                raise ValueError("reconciliation claim token must be text")
+            claim_token = claim_token.strip()
+            if not claim_token or len(claim_token) > 128:
+                raise ValueError(
+                    "reconciliation claim token must contain 1 to 128 characters"
+                )
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status = 'running',
+                       claim_token = %s,
+                       lease_expires_at = %s,
+                       attempt_count = attempt_count + 1,
+                       error_code = null,
+                       completed_at = null
+                 where owner_id = %s
+                   and record_id = %s
+                   and generation = %s
+                   and status = %s
+                   and claim_token is not distinct from %s
+                   and lease_expires_at is not distinct from %s
+             returning operation
+                """,
+                (
+                    claim_token,
+                    lease_expires_at,
+                    owner_id,
+                    record_id,
+                    reconciliation_generation,
+                    status,
+                    old_claim_token,
+                    old_lease_expires_at,
+                ),
+            )
+            updated = cursor.fetchone()
+            if updated is None:
+                return None
+            return ReconciliationClaim(
+                record_id=record_id,
+                generation=reconciliation_generation,
+                operation=operation,
+                claim_token=claim_token,
+            )
+
+    def finish_reconciliation_claim(
+        self,
+        owner: RegisteredMemoryOwner,
+        claim: ReconciliationClaim,
+        *,
+        succeeded: bool,
+        error_code: str | None,
+        completed_at: datetime,
+    ) -> bool:
+        if completed_at.tzinfo is None or completed_at.utcoffset() is None:
+            raise ValueError("reconciliation completion time must be aware")
+        if succeeded:
+            if error_code is not None:
+                raise ValueError("successful reconciliation forbids an error code")
+            status = "succeeded"
+        else:
+            if error_code is None or not error_code.strip() or len(error_code) > 128:
+                raise ValueError(
+                    "failed reconciliation requires a 1 to 128 character error code"
+                )
+            status = "failed"
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, claim.record_id)
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status = %s,
+                       lease_expires_at = null,
+                       error_code = %s,
+                       completed_at = %s
+                 where owner_id = %s
+                   and record_id = %s
+                   and generation = %s
+                   and operation = %s
+                   and status = 'running'
+                   and claim_token = %s
+             returning 1
+                """,
+                (
+                    status,
+                    error_code,
+                    completed_at,
+                    owner_id,
+                    claim.record_id,
+                    claim.generation,
+                    claim.operation,
+                    claim.claim_token,
+                ),
+            )
+            return cursor.fetchone() is not None
+
+    def compare_and_set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        expected_record: MemoryRecord,
+        expected_provider_ref: str | None,
+        reconciliation_claim: ReconciliationClaim,
+        provider_ref: str,
+    ) -> bool:
+        if not provider_ref:
+            raise ValueError("provider ref must not be empty")
+        if len(provider_ref) > 1_024:
+            raise ValueError("provider ref must not exceed 1024 characters")
+        try:
+            with self._confirmation_transaction(owner) as (cursor, owner_id):
+                self._lock_record(cursor, owner_id, record_id)
+                cursor.execute(
+                    """
+                    select 1
+                      from public.memory_reconciliations
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = %s
+                       and operation = %s
+                       and status = 'running'
+                       and claim_token = %s
+                    """,
+                    (
+                        owner_id,
+                        record_id,
+                        reconciliation_claim.generation,
+                        reconciliation_claim.operation,
+                        reconciliation_claim.claim_token,
+                    ),
+                )
+                if (
+                    reconciliation_claim.record_id != record_id
+                    or cursor.fetchone() is None
+                ):
+                    return False
+                current_record = self._read_record_if_present(
+                    cursor,
+                    owner_id,
+                    record_id,
+                )
+                if current_record != expected_record:
+                    return False
+                cursor.execute(
+                    """
+                    select provider_ref
+                      from public.memory_provider_projections
+                     where owner_id = %s and record_id = %s
+                     for update
+                    """,
+                    (owner_id, record_id),
+                )
+                projection_row = cursor.fetchone()
+                current_provider_ref = (
+                    None if projection_row is None else projection_row[0]
+                )
+                if current_provider_ref != expected_provider_ref:
+                    return False
+                if projection_row is None:
+                    cursor.execute(
+                        """
+                        insert into public.memory_provider_projections (
+                          owner_id,
+                          record_id,
+                          provider_ref,
+                          generation,
+                          updated_at
+                        )
+                        values (%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            owner_id,
+                            record_id,
+                            provider_ref,
+                            reconciliation_claim.generation,
+                            self._reconciliation_clock(),
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        update public.memory_provider_projections
+                           set provider_ref = %s,
+                               generation = %s,
+                               updated_at = %s
+                         where owner_id = %s and record_id = %s
+                        """,
+                        (
+                            provider_ref,
+                            reconciliation_claim.generation,
+                            self._reconciliation_clock(),
+                            owner_id,
+                            record_id,
+                        ),
+                    )
+                return True
+        except errors.UniqueViolation:
+            return False
+
+    def set_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool:
+        if not provider_ref or len(provider_ref) > 1_024:
+            raise ValueError("provider ref must contain 1 to 1024 characters")
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                insert into public.memory_provider_projections (
+                  owner_id,
+                  record_id,
+                  provider_ref,
+                  generation,
+                  updated_at
+                )
+                select %s, %s, %s, coalesce(max(reconciliation.generation), 1), %s
+                  from public.memory_records as record
+                  left join public.memory_reconciliations as reconciliation
+                    on reconciliation.owner_id = record.owner_id
+                   and reconciliation.record_id = record.id
+                 where record.owner_id = %s and record.id = %s
+                 group by record.owner_id, record.id
+                on conflict (owner_id, record_id)
+                do update set
+                  provider_ref = excluded.provider_ref,
+                  generation = excluded.generation,
+                  updated_at = excluded.updated_at
+                returning 1
+                """,
+                (
+                    owner_id,
+                    record_id,
+                    provider_ref,
+                    self._reconciliation_clock(),
+                    owner_id,
+                    record_id,
+                ),
+            )
+            return cursor.fetchone() is not None
+
+    def get_provider_ref(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> str | None:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select provider_ref
+                  from public.memory_provider_projections
+                 where owner_id = %s and record_id = %s
+                """,
+                (owner_id, record_id),
+            )
+            row = cursor.fetchone()
+            return None if row is None else row[0]
+
+    def inflight_reconciliation_generations(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> tuple[int, ...]:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select generation
+                  from public.memory_reconciliations
+                 where owner_id = %s
+                   and record_id = %s
+                   and status in ('pending', 'running')
+                 order by generation
+                """,
+                (owner_id, record_id),
+            )
+            return tuple(int(row[0]) for row in cursor.fetchall())
 
     def disable(self, owner: RegisteredMemoryOwner) -> bool:
         with self._confirmation_transaction(owner) as (cursor, owner_id):

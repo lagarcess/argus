@@ -341,11 +341,32 @@ def _seed_record(
             """
             insert into public.memory_reconciliations (
               owner_id, record_id, generation, operation,
-              status, created_at, completed_at
+              status, created_at
             )
-            values (%s, %s, 1, 'create', 'succeeded', %s, %s)
+            values (%s, %s, 1, 'create', 'pending', %s)
             """,
-            (owner.owner_id, record_id, created_at, created_at),
+            (owner.owner_id, record_id, created_at),
+        )
+        cursor.execute(
+            """
+            update public.memory_reconciliations
+               set status='running',
+                   claim_token=%s,
+                   lease_expires_at=now() + interval '1 hour',
+                   attempt_count=1
+             where owner_id=%s and record_id=%s and generation=1
+            """,
+            (f"seed-{record_id}", owner.owner_id, record_id),
+        )
+        cursor.execute(
+            """
+            update public.memory_reconciliations
+               set status='succeeded',
+                   lease_expires_at=null,
+                   completed_at=%s
+             where owner_id=%s and record_id=%s and generation=1
+            """,
+            (created_at, owner.owner_id, record_id),
         )
     return MemoryRecord(
         id=record_id,
@@ -886,9 +907,10 @@ def test_delete_timeout_changes_nothing(
         original = _seed_record(connection, owner, database["sources"])
         connection.execute(
             """
-            update public.memory_reconciliations
-               set status = 'running', completed_at = null
-             where owner_id = %s and record_id = %s and generation = 1
+            insert into public.memory_reconciliations (
+              owner_id,record_id,generation,operation,status
+            )
+            values (%s,%s,2,'update','pending')
             """,
             (owner.owner_id, original.id),
         )
@@ -1008,9 +1030,10 @@ def test_reset_timeout_changes_nothing(
         record = _seed_record(connection, owner, database["sources"])
         connection.execute(
             """
-            update public.memory_reconciliations
-               set status = 'running', completed_at = null
-             where owner_id = %s and record_id = %s and generation = 1
+            insert into public.memory_reconciliations (
+              owner_id,record_id,generation,operation,status
+            )
+            values (%s,%s,2,'update','pending')
             """,
             (owner.owner_id, record.id),
         )

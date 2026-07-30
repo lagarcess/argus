@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Condition, RLock
 from typing import Protocol
+from uuid import uuid4
 
 from argus.memory.contracts import (
     ConfirmationResult,
@@ -66,6 +67,28 @@ class ProviderCleanupTarget:
 
     record_id: str
     provider_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationClaim:
+    """One immutable lease identity for provider reconciliation work."""
+
+    record_id: str
+    generation: int
+    operation: str
+    claim_token: str
+
+    def __post_init__(self) -> None:
+        if not self.record_id.strip():
+            raise ValueError("reconciliation record id must not be blank")
+        if self.generation < 1:
+            raise ValueError("reconciliation generation must be positive")
+        if self.operation not in {"create", "update", "delete"}:
+            raise ValueError("unsupported reconciliation operation")
+        if not self.claim_token.strip() or len(self.claim_token) > 128:
+            raise ValueError(
+                "reconciliation claim token must contain 1 to 128 characters"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,23 +236,26 @@ class CanonicalMemoryStore(Protocol):
         *,
         expected_record: MemoryRecord,
         expected_provider_ref: str | None,
-        reconciliation_generation: int,
+        reconciliation_claim: ReconciliationClaim,
         provider_ref: str,
     ) -> bool: ...
 
-    def finish_record_reconciliation(
+    def finish_reconciliation_claim(
         self,
         owner: RegisteredMemoryOwner,
-        record_id: str,
-        reconciliation_generation: int,
+        claim: ReconciliationClaim,
+        *,
+        succeeded: bool,
+        error_code: str | None,
+        completed_at: datetime,
     ) -> bool: ...
 
-    def wait_for_reconciliation_turn(
+    def claim_reconciliation_turn(
         self,
         owner: RegisteredMemoryOwner,
         record_id: str,
         reconciliation_generation: int,
-    ) -> bool: ...
+    ) -> ReconciliationClaim | None: ...
 
     def inflight_reconciliation_generations(
         self,
@@ -261,9 +287,16 @@ class CanonicalMemoryStore(Protocol):
 class InMemoryCanonicalMemoryStore:
     """Deterministic stand-in for future canonical persistence."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        reconciliation_token_factory: Callable[[], str] | None = None,
+    ) -> None:
         self._lock = RLock()
         self._reconciliation_condition = Condition(self._lock)
+        self._reconciliation_token_factory = reconciliation_token_factory or (
+            lambda: str(uuid4())
+        )
         self._candidates: dict[str, dict[str, MemoryCandidate]] = {}
         self._settings: dict[str, MemoryConsentSettings] = {}
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
@@ -272,6 +305,8 @@ class InMemoryCanonicalMemoryStore:
         self._cleanup_targets: dict[tuple[str, str], set[str]] = {}
         self._reconciliation_generations: dict[tuple[str, str], int] = {}
         self._inflight_reconciliations: dict[tuple[str, str], set[int]] = {}
+        self._reconciliation_operations: dict[tuple[str, str, int], str] = {}
+        self._reconciliation_claims: dict[tuple[str, str, int], ReconciliationClaim] = {}
         self._proactive_prompts: dict[tuple[str, MemoryCategory], datetime] = {}
         self._declines: dict[tuple[str, MemoryCategory], datetime] = {}
 
@@ -471,6 +506,9 @@ class InMemoryCanonicalMemoryStore:
                 reconciliation_key,
                 set(),
             ).add(reconciliation_generation)
+            self._reconciliation_operations[
+                (owner.owner_id, record.id, reconciliation_generation)
+            ] = "create"
             del candidates[candidate_id]
             return CanonicalConfirmationMutation(
                 result=result,
@@ -666,6 +704,9 @@ class InMemoryCanonicalMemoryStore:
                 reconciliation_key,
                 set(),
             ).add(reconciliation_generation)
+            self._reconciliation_operations[
+                (owner.owner_id, record_id, reconciliation_generation)
+            ] = "update"
             return CanonicalRecordMutation(
                 before=current,
                 after=updated,
@@ -704,6 +745,9 @@ class InMemoryCanonicalMemoryStore:
                 reconciliation_key,
                 set(),
             ).add(reconciliation_generation)
+            self._reconciliation_operations[
+                (owner.owner_id, record_id, reconciliation_generation)
+            ] = "delete"
 
             updated_records = dict(records)
             del updated_records[record_id]
@@ -806,6 +850,16 @@ class InMemoryCanonicalMemoryStore:
                 for key, generations in self._inflight_reconciliations.items()
                 if key[0] != owner.owner_id
             }
+            self._reconciliation_operations = {
+                key: operation
+                for key, operation in self._reconciliation_operations.items()
+                if key[0] != owner.owner_id
+            }
+            self._reconciliation_claims = {
+                key: claim
+                for key, claim in self._reconciliation_claims.items()
+                if key[0] != owner.owner_id
+            }
             self._proactive_prompts = {
                 key: at
                 for key, at in self._proactive_prompts.items()
@@ -849,7 +903,7 @@ class InMemoryCanonicalMemoryStore:
         *,
         expected_record: MemoryRecord,
         expected_provider_ref: str | None,
-        reconciliation_generation: int,
+        reconciliation_claim: ReconciliationClaim,
         provider_ref: str,
     ) -> bool:
         if not provider_ref:
@@ -860,10 +914,17 @@ class InMemoryCanonicalMemoryStore:
                 record_id
             )
             reconciliation_key = (owner.owner_id, record_id)
+            claim_key = (
+                owner.owner_id,
+                record_id,
+                reconciliation_claim.generation,
+            )
             if (
                 current_record != expected_record
                 or current_provider_ref != expected_provider_ref
-                or reconciliation_generation
+                or reconciliation_claim.record_id != record_id
+                or reconciliation_claim != self._reconciliation_claims.get(claim_key)
+                or reconciliation_claim.generation
                 not in self._inflight_reconciliations.get(reconciliation_key, set())
             ):
                 return False
@@ -879,31 +940,51 @@ class InMemoryCanonicalMemoryStore:
             self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
             return True
 
-    def finish_record_reconciliation(
+    def finish_reconciliation_claim(
         self,
         owner: RegisteredMemoryOwner,
-        record_id: str,
-        reconciliation_generation: int,
+        claim: ReconciliationClaim,
+        *,
+        succeeded: bool,
+        error_code: str | None,
+        completed_at: datetime,
     ) -> bool:
+        del completed_at
+        if succeeded != (error_code is None):
+            raise ValueError(
+                "successful reconciliation forbids an error code and failure requires one"
+            )
+        if error_code is not None and (not error_code.strip() or len(error_code) > 128):
+            raise ValueError("reconciliation error code must contain 1 to 128 characters")
         with self._reconciliation_condition:
+            record_id = claim.record_id
+            reconciliation_generation = claim.generation
             reconciliation_key = (owner.owner_id, record_id)
+            claim_key = (owner.owner_id, record_id, reconciliation_generation)
             inflight = self._inflight_reconciliations.get(reconciliation_key)
-            if inflight is None or reconciliation_generation not in inflight:
+            if (
+                inflight is None
+                or reconciliation_generation not in inflight
+                or self._reconciliation_claims.get(claim_key) != claim
+            ):
                 return False
             inflight.remove(reconciliation_generation)
+            self._reconciliation_claims.pop(claim_key, None)
+            self._reconciliation_operations.pop(claim_key, None)
             if not inflight:
                 self._inflight_reconciliations.pop(reconciliation_key, None)
             self._reconciliation_condition.notify_all()
             return True
 
-    def wait_for_reconciliation_turn(
+    def claim_reconciliation_turn(
         self,
         owner: RegisteredMemoryOwner,
         record_id: str,
         reconciliation_generation: int,
-    ) -> bool:
+    ) -> ReconciliationClaim | None:
         with self._reconciliation_condition:
             reconciliation_key = (owner.owner_id, record_id)
+            claim_key = (owner.owner_id, record_id, reconciliation_generation)
 
             def _is_turn_or_finished() -> bool:
                 inflight = self._inflight_reconciliations.get(reconciliation_key)
@@ -914,10 +995,23 @@ class InMemoryCanonicalMemoryStore:
                 )
 
             self._reconciliation_condition.wait_for(_is_turn_or_finished)
-            return reconciliation_generation in self._inflight_reconciliations.get(
-                reconciliation_key,
-                set(),
+            if reconciliation_generation not in self._inflight_reconciliations.get(
+                reconciliation_key, set()
+            ):
+                return None
+            if claim_key in self._reconciliation_claims:
+                return None
+            operation = self._reconciliation_operations.get(claim_key)
+            if operation is None:
+                return None
+            claim = ReconciliationClaim(
+                record_id=record_id,
+                generation=reconciliation_generation,
+                operation=operation,
+                claim_token=self._reconciliation_token_factory(),
             )
+            self._reconciliation_claims[claim_key] = claim
+            return claim
 
     def inflight_reconciliation_generations(
         self,

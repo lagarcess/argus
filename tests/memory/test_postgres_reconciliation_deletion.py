@@ -6,7 +6,6 @@ import os
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
 
 import pytest
 
@@ -98,13 +97,6 @@ def _seed_complete_memory_state(
     receipt_id = f"receipt-{suffix}"
     record_id = f"record-{suffix}"
     provider_ref = f"provider-{suffix}"
-    completed_at = (
-        None
-        if reconciliation_status in UNFINISHED_STATUSES
-        else datetime.now(timezone.utc)
-    )
-    error_code = "provider_failed" if reconciliation_status == "failed" else None
-
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -229,29 +221,41 @@ def _seed_complete_memory_state(
               record_id,
               generation,
               operation,
-              status,
-              error_code,
-              completed_at
+              status
             )
-            values (
-              %s,
-              %s,
-              1,
-              %s,
-              %s,
-              %s,
-              %s
-            )
+            values (%s,%s,1,%s,'pending')
             """,
-            (
-                owner_id,
-                record_id,
-                reconciliation_operation,
-                reconciliation_status,
-                error_code,
-                completed_at,
-            ),
+            (owner_id, record_id, reconciliation_operation),
         )
+        if reconciliation_status != "pending":
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status='running',
+                       claim_token=%s,
+                       lease_expires_at=now() + interval '1 hour',
+                       attempt_count=1
+                 where owner_id=%s and record_id=%s and generation=1
+                """,
+                (f"seed-{suffix}", owner_id, record_id),
+            )
+        if reconciliation_status in ("succeeded", "failed"):
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status=%s,
+                       lease_expires_at=null,
+                       error_code=%s,
+                       completed_at=now()
+                 where owner_id=%s and record_id=%s and generation=1
+                """,
+                (
+                    reconciliation_status,
+                    ("provider_failed" if reconciliation_status == "failed" else None),
+                    owner_id,
+                    record_id,
+                ),
+            )
         cursor.execute(
             """
             insert into public.memory_provider_projections (
@@ -293,8 +297,6 @@ def _insert_reconciliation(
     operation: str,
     status: str,
 ) -> None:
-    completed_at = None if status in UNFINISHED_STATUSES else datetime.now(timezone.utc)
-    error_code = "provider_failed" if status == "failed" else None
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -303,22 +305,42 @@ def _insert_reconciliation(
               record_id,
               generation,
               operation,
-              status,
-              error_code,
-              completed_at
+              status
             )
-            values (%s,%s,%s,%s,%s,%s,%s)
+            values (%s,%s,%s,%s,'pending')
             """,
-            (
-                owner_id,
-                record_id,
-                generation,
-                operation,
-                status,
-                error_code,
-                completed_at,
-            ),
+            (owner_id, record_id, generation, operation),
         )
+        if status != "pending":
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status='running',
+                       claim_token=%s,
+                       lease_expires_at=now() + interval '1 hour',
+                       attempt_count=1
+                 where owner_id=%s and record_id=%s and generation=%s
+                """,
+                (f"seed-{generation}-{uuid.uuid4()}", owner_id, record_id, generation),
+            )
+        if status in ("succeeded", "failed"):
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status=%s,
+                       lease_expires_at=null,
+                       error_code=%s,
+                       completed_at=now()
+                 where owner_id=%s and record_id=%s and generation=%s
+                """,
+                (
+                    status,
+                    "provider_failed" if status == "failed" else None,
+                    owner_id,
+                    record_id,
+                    generation,
+                ),
+            )
 
 
 @pytest.fixture
@@ -488,7 +510,21 @@ def test_delete_generation_starts_after_record_absence_and_finishes_later(
             cursor.execute(
                 """
                 update public.memory_reconciliations
+                   set status='running',
+                       claim_token='delete-generation-2',
+                       lease_expires_at=now() + interval '1 hour',
+                       attempt_count=1
+                 where owner_id=%s
+                   and record_id=%s
+                   and generation=2
+                """,
+                (seeded_memory["owner_id"], seeded_memory["record_id"]),
+            )
+            cursor.execute(
+                """
+                update public.memory_reconciliations
                    set status='succeeded',
+                       lease_expires_at=null,
                        completed_at=now()
                  where owner_id=%s
                    and record_id=%s

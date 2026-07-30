@@ -228,8 +228,22 @@ def test_reconciliation_outcome_fields_are_mutable(
             cursor.execute(
                 """
                 update public.memory_reconciliations
+                   set status = 'running',
+                       claim_token = 'claim-outcome-fields',
+                       lease_expires_at = now() + interval '1 minute',
+                       attempt_count = 1
+                 where owner_id = %s
+                   and record_id = %s
+                   and generation = 1
+                """,
+                (memory_graph["owner_id"], memory_graph["record_id"]),
+            )
+            cursor.execute(
+                """
+                update public.memory_reconciliations
                    set status = 'failed',
                        error_code = 'provider_timeout',
+                       lease_expires_at = null,
                        completed_at = now()
                  where owner_id = %s
                    and record_id = %s
@@ -239,6 +253,119 @@ def test_reconciliation_outcome_fields_are_mutable(
                 (memory_graph["owner_id"], memory_graph["record_id"]),
             )
             assert cursor.fetchone() == ("failed", "provider_timeout", True)
+
+
+def test_reconciliation_rows_expose_leased_claim_state() -> None:
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                select column_name
+                  from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name = 'memory_reconciliations'
+                   and column_name in (
+                     'claim_token',
+                     'lease_expires_at',
+                     'attempt_count'
+                   )
+                 order by column_name
+                """
+            )
+            assert tuple(row[0] for row in cursor.fetchall()) == (
+                "attempt_count",
+                "claim_token",
+                "lease_expires_at",
+            )
+
+
+def test_pending_reconciliation_cannot_skip_claim_to_terminal(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="transition",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    update public.memory_reconciliations
+                       set status = 'failed',
+                           error_code = 'provider_timeout',
+                           completed_at = now()
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = 1
+                    """,
+                    (memory_graph["owner_id"], memory_graph["record_id"]),
+                )
+
+
+def test_running_reconciliation_requires_exact_claim_shape(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="claim",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    update public.memory_reconciliations
+                       set status = 'running'
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = 1
+                    """,
+                    (memory_graph["owner_id"], memory_graph["record_id"]),
+                )
+
+
+def test_succeeded_reconciliation_forbids_error_code(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="succeeded",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    update public.memory_reconciliations
+                       set status = 'succeeded',
+                           error_code = 'must-not-survive',
+                           completed_at = now()
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = 1
+                    """,
+                    (memory_graph["owner_id"], memory_graph["record_id"]),
+                )
+
+
+def test_failed_reconciliation_requires_bounded_error_code(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="failed",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    update public.memory_reconciliations
+                       set status = 'failed',
+                           completed_at = now()
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = 1
+                    """,
+                    (memory_graph["owner_id"], memory_graph["record_id"]),
+                )
 
 
 def test_provider_projection_derivative_fields_are_mutable(

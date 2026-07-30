@@ -33,7 +33,7 @@ from argus.memory.provider import (
     ProviderSearchStatus,
 )
 from argus.memory.service import MemoryService, MemoryServiceConfig
-from argus.memory.store import InMemoryCanonicalMemoryStore
+from argus.memory.store import InMemoryCanonicalMemoryStore, ReconciliationClaim
 from argus.memory.subject import MemoryAccountKind, MemorySubject, RegisteredMemoryOwner
 from pydantic import ValidationError
 
@@ -383,6 +383,17 @@ class _BlockingConfirmationResetProvider(_ProviderSpy):
         return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
 
 
+class _NoClaimStore(InMemoryCanonicalMemoryStore):
+    def claim_reconciliation_turn(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> ReconciliationClaim | None:
+        del owner, record_id, reconciliation_generation
+        return None
+
+
 def _service(
     store: InMemoryCanonicalMemoryStore,
     provider: MemoryRetrievalProvider | None = None,
@@ -433,6 +444,18 @@ def _confirm_one(
     assert confirmation.created is True
     assert confirmation.record is not None
     return confirmation.record
+
+
+def test_provider_is_not_called_without_an_exact_reconciliation_claim() -> None:
+    store = _NoClaimStore()
+    provider = _ProviderSpy()
+    service = _service(store, provider)
+
+    record = _confirm_one(service)
+
+    assert store.get_record(OWNER, record.id) == record
+    assert provider.project_calls == []
+    assert provider.delete_calls == []
 
 
 @pytest.mark.parametrize(
@@ -621,13 +644,28 @@ def test_concurrent_disjoint_edits_do_not_lose_an_owner_change() -> None:
         )
         mutations = (label_result.result(), value_result.result())
 
-    for mutation in mutations:
+    for mutation in sorted(
+        mutations,
+        key=lambda item: (
+            0
+            if item is None or item.reconciliation_generation is None
+            else item.reconciliation_generation
+        ),
+    ):
         assert mutation is not None
         assert mutation.reconciliation_generation is not None
-        assert store.finish_record_reconciliation(
+        claim = store.claim_reconciliation_turn(
             OWNER,
             original.id,
             mutation.reconciliation_generation,
+        )
+        assert claim is not None
+        assert store.finish_reconciliation_claim(
+            OWNER,
+            claim,
+            succeeded=True,
+            error_code=None,
+            completed_at=NOW,
         )
 
     record = store.get_record(OWNER, original.id)
@@ -1187,7 +1225,15 @@ def test_reset_clears_complete_owner_state_before_provider_reset() -> None:
     )
     assert first_mutation is not None
     assert first_mutation.reconciliation_generation == 2
-    assert store.finish_record_reconciliation(OWNER, record.id, 2)
+    first_claim = store.claim_reconciliation_turn(OWNER, record.id, 2)
+    assert first_claim is not None
+    assert store.finish_reconciliation_claim(
+        OWNER,
+        first_claim,
+        succeeded=True,
+        error_code=None,
+        completed_at=NOW,
+    )
     provider = _ProviderSpy(
         store=store,
         reset=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED),
@@ -1222,7 +1268,58 @@ def test_reset_clears_complete_owner_state_before_provider_reset() -> None:
     )
     assert fresh_mutation is not None
     assert fresh_mutation.reconciliation_generation == 2
-    assert store.finish_record_reconciliation(OWNER, fresh.id, 2)
+    fresh_claim = store.claim_reconciliation_turn(OWNER, fresh.id, 2)
+    assert fresh_claim is not None
+    assert store.finish_reconciliation_claim(
+        OWNER,
+        fresh_claim,
+        succeeded=True,
+        error_code=None,
+        completed_at=NOW,
+    )
+
+
+def test_in_memory_reconciliation_requires_the_exact_claim() -> None:
+    store = InMemoryCanonicalMemoryStore(
+        reconciliation_token_factory=lambda: "in-memory-exact",
+    )
+    service = _service(store)
+    record = _confirm_one(service)
+    mutation = store.edit_record(
+        OWNER,
+        record.id,
+        label="Claimed edit",
+        value=None,
+    )
+    assert mutation is not None
+    assert mutation.reconciliation_generation is not None
+    claim = store.claim_reconciliation_turn(
+        OWNER,
+        record.id,
+        mutation.reconciliation_generation,
+    )
+    assert claim is not None
+    stale = ReconciliationClaim(
+        record_id=claim.record_id,
+        generation=claim.generation,
+        operation=claim.operation,
+        claim_token="in-memory-stale",
+    )
+
+    assert not store.finish_reconciliation_claim(
+        OWNER,
+        stale,
+        succeeded=True,
+        error_code=None,
+        completed_at=NOW,
+    )
+    assert store.finish_reconciliation_claim(
+        OWNER,
+        claim,
+        succeeded=True,
+        error_code=None,
+        completed_at=NOW,
+    )
 
 
 def test_reset_requires_reconciliation_when_known_projection_is_not_applicable() -> None:

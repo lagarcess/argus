@@ -916,9 +916,9 @@ Memory is registered-account-only and off by absence. Supabase Auth and
   truth.
 
 All memory tables have RLS enabled and forced, with no client policies. The
-future injected backend Postgres adapter is the only intended access path and
-must still derive a registered owner from a verified request before entering
-the store.
+private backend Postgres adapter is the only intended access path and must
+still derive a registered owner from a verified request before entering the
+store.
 
 ### Canonical and derivative tables
 
@@ -944,8 +944,14 @@ the store.
 - `memory_prompt_history`: category-scoped proactive-prompt and decline
   timestamps used for durable cooldown/suppression decisions.
 - `memory_reconciliations`: positive, ordered provider-projection work
-  generations. Unfinished work restricts record deletion so derivative cleanup
-  cannot disappear silently.
+  generations. Rows start pending, then move through an exact leased claim to
+  running before reaching immutable succeeded/failed terminal state. The claim
+  token, expiry, and attempt count make restart recovery inspectable: a live
+  lease cannot be stolen, an expired lease may be reclaimed with a new token,
+  and only the exact current claim may commit a provider pointer or terminal
+  outcome. Lower unfinished generations block later work for the same record,
+  while other owners remain independent. Unfinished work restricts record
+  deletion so derivative cleanup cannot disappear silently.
 - `memory_provider_projections`: the current derivative provider pointer and
   positive generation for a canonical record.
 - `memory_provider_cleanup`: durable pending/resolved cleanup targets that

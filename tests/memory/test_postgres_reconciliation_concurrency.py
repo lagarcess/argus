@@ -123,10 +123,30 @@ def _seed_lifecycle_state(connection) -> _LifecycleState:
               record_id,
               generation,
               operation,
-              status,
-              completed_at
+              status
             )
-            values (%s,%s,1,'create','succeeded',now())
+            values (%s,%s,1,'create','pending')
+            """,
+            (state.owner_id, state.record_id),
+        )
+        cursor.execute(
+            """
+            update public.memory_reconciliations
+               set status='running',
+                   claim_token='lifecycle-seed',
+                   lease_expires_at=now() + interval '1 hour',
+                   attempt_count=1
+             where owner_id=%s and record_id=%s and generation=1
+            """,
+            (state.owner_id, state.record_id),
+        )
+        cursor.execute(
+            """
+            update public.memory_reconciliations
+               set status='succeeded',
+                   lease_expires_at=null,
+                   completed_at=now()
+             where owner_id=%s and record_id=%s and generation=1
             """,
             (state.owner_id, state.record_id),
         )
@@ -527,7 +547,7 @@ def test_reconciliation_update_serializes_against_open_record_delete(
 
     assert error is not None
     assert error[0] == "23514"
-    assert "requires a live same-owner record" in error[1]
+    assert "invalid reconciliation transition" in error[1]
     with _connect() as connection:
         with connection.cursor() as cursor:
             cursor.execute(

@@ -49,6 +49,7 @@ from argus.memory.store import (
     CanonicalMemoryStore,
     CanonicalRecordMutation,
     ProposalHistorySnapshot,
+    ReconciliationClaim,
 )
 from argus.memory.subject import (
     MemorySubject,
@@ -418,14 +419,15 @@ class MemoryService:
         )
         reconciliation_generation = mutation.reconciliation_generation
         assert reconciliation_generation is not None
+        claim = self._store.claim_reconciliation_turn(
+            owner,
+            result.record.id,
+            reconciliation_generation,
+        )
+        if claim is None:
+            return result
+        reconciliation_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         try:
-            has_reconciliation_turn = self._store.wait_for_reconciliation_turn(
-                owner,
-                result.record.id,
-                reconciliation_generation,
-            )
-            if not has_reconciliation_turn:
-                return result
             projection_call = self._call_provider_project(
                 owner,
                 result.record,
@@ -441,6 +443,7 @@ class MemoryService:
                 )
                 return result
             if projection.status is not ProviderReconciliationStatus.SYNCHRONIZED:
+                reconciliation_status = projection.status
                 self._record_provider_receipt(
                     correlation_id,
                     ProviderOperation.PROJECT,
@@ -454,7 +457,7 @@ class MemoryService:
                 result.record.id,
                 expected_record=result.record,
                 expected_provider_ref=None,
-                reconciliation_generation=reconciliation_generation,
+                reconciliation_claim=claim,
                 provider_ref=projection.provider_ref,
             )
             if not ref_committed:
@@ -479,11 +482,16 @@ class MemoryService:
                     else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
                 ),
             )
+            reconciliation_status = (
+                ProviderReconciliationStatus.SYNCHRONIZED
+                if ref_committed
+                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            )
         finally:
-            self._store.finish_record_reconciliation(
+            self._finish_reconciliation_claim(
                 owner,
-                result.record.id,
-                reconciliation_generation,
+                claim,
+                reconciliation_status,
             )
         return result
 
@@ -710,33 +718,43 @@ class MemoryService:
             )
         reconciliation_generation = mutation.reconciliation_generation
         assert reconciliation_generation is not None
-        try:
-            if not mutation.cleanup_refs:
-                provider_status = ProviderReconciliationStatus.NOT_APPLICABLE
-            else:
-                cleanup_statuses = tuple(
-                    self._cleanup_provider_target(
-                        owner,
-                        record_id,
-                        provider_ref,
-                        correlation_id,
+        claim = self._store.claim_reconciliation_turn(
+            owner,
+            record_id,
+            reconciliation_generation,
+        )
+        if claim is None:
+            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            reconciliation_finished = False
+        else:
+            provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            try:
+                if not mutation.cleanup_refs:
+                    provider_status = ProviderReconciliationStatus.NOT_APPLICABLE
+                else:
+                    cleanup_statuses = tuple(
+                        self._cleanup_provider_target(
+                            owner,
+                            record_id,
+                            provider_ref,
+                            correlation_id,
+                        )
+                        for provider_ref in mutation.cleanup_refs
                     )
-                    for provider_ref in mutation.cleanup_refs
-                )
-                provider_status = (
-                    ProviderReconciliationStatus.SYNCHRONIZED
-                    if all(
-                        status is ProviderReconciliationStatus.SYNCHRONIZED
-                        for status in cleanup_statuses
+                    provider_status = (
+                        ProviderReconciliationStatus.SYNCHRONIZED
+                        if all(
+                            status is ProviderReconciliationStatus.SYNCHRONIZED
+                            for status in cleanup_statuses
+                        )
+                        else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
                     )
-                    else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+            finally:
+                reconciliation_finished = self._finish_reconciliation_claim(
+                    owner,
+                    claim,
+                    provider_status,
                 )
-        finally:
-            reconciliation_finished = self._store.finish_record_reconciliation(
-                owner,
-                record_id,
-                reconciliation_generation,
-            )
         if not reconciliation_finished:
             provider_status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         result = MemoryControlResult(
@@ -940,6 +958,24 @@ class MemoryService:
         if sensitivity.status is not SensitivityStatus.CLEAR or sensitivity.flags:
             raise ValueError("memory edits require a current clear sensitivity result")
 
+    def _finish_reconciliation_claim(
+        self,
+        owner: RegisteredMemoryOwner,
+        claim: ReconciliationClaim,
+        status: ProviderReconciliationStatus,
+    ) -> bool:
+        succeeded = status in {
+            ProviderReconciliationStatus.SYNCHRONIZED,
+            ProviderReconciliationStatus.NOT_APPLICABLE,
+        }
+        return self._store.finish_reconciliation_claim(
+            owner,
+            claim,
+            succeeded=succeeded,
+            error_code=None if succeeded else "provider_reconciliation_required",
+            completed_at=self._clock(),
+        )
+
     def _reconcile_edit(
         self,
         owner: RegisteredMemoryOwner,
@@ -950,28 +986,27 @@ class MemoryService:
         assert updated is not None
         reconciliation_generation = mutation.reconciliation_generation
         assert reconciliation_generation is not None
+        claim = self._store.claim_reconciliation_turn(
+            owner,
+            updated.id,
+            reconciliation_generation,
+        )
+        if claim is None:
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+        status = ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         try:
-            has_reconciliation_turn = self._store.wait_for_reconciliation_turn(
+            status = self._reconcile_edit_generation(
                 owner,
-                updated.id,
-                reconciliation_generation,
-            )
-            status = (
-                self._reconcile_edit_generation(
-                    owner,
-                    mutation,
-                    updated,
-                    reconciliation_generation,
-                    correlation_id,
-                )
-                if has_reconciliation_turn
-                else ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+                mutation,
+                updated,
+                claim,
+                correlation_id,
             )
         finally:
-            reconciliation_finished = self._store.finish_record_reconciliation(
+            reconciliation_finished = self._finish_reconciliation_claim(
                 owner,
-                updated.id,
-                reconciliation_generation,
+                claim,
+                status,
             )
         if not reconciliation_finished:
             return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
@@ -982,7 +1017,7 @@ class MemoryService:
         owner: RegisteredMemoryOwner,
         mutation: CanonicalRecordMutation,
         updated: MemoryRecord,
-        reconciliation_generation: int,
+        reconciliation_claim: ReconciliationClaim,
         correlation_id: str | None,
     ) -> ProviderReconciliationStatus:
         projection_call = self._call_provider_project(
@@ -1041,7 +1076,7 @@ class MemoryService:
             updated.id,
             expected_record=updated,
             expected_provider_ref=mutation.provider_ref,
-            reconciliation_generation=reconciliation_generation,
+            reconciliation_claim=reconciliation_claim,
             provider_ref=projection.provider_ref,
         )
         if not ref_committed:

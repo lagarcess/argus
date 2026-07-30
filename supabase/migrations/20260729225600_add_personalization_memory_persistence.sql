@@ -350,6 +350,14 @@ create table public.memory_reconciliations (
     check (operation in ('create', 'update', 'delete')),
   status text not null
     check (status in ('pending', 'running', 'succeeded', 'failed')),
+  claim_token text
+    check (
+      claim_token is null
+      or length(claim_token) between 1 and 128
+    ),
+  lease_expires_at timestamptz,
+  attempt_count integer not null default 0
+    check (attempt_count >= 0),
   error_code text
     check (
       error_code is null
@@ -361,11 +369,35 @@ create table public.memory_reconciliations (
   constraint memory_reconciliations_terminal_shape
     check (
       (
-        status in ('pending', 'running')
+        status = 'pending'
+        and claim_token is null
+        and lease_expires_at is null
+        and attempt_count = 0
+        and error_code is null
         and completed_at is null
       )
       or (
-        status in ('succeeded', 'failed')
+        status = 'running'
+        and claim_token is not null
+        and lease_expires_at is not null
+        and attempt_count >= 1
+        and error_code is null
+        and completed_at is null
+      )
+      or (
+        status = 'succeeded'
+        and claim_token is not null
+        and lease_expires_at is null
+        and attempt_count >= 1
+        and error_code is null
+        and completed_at is not null
+      )
+      or (
+        status = 'failed'
+        and claim_token is not null
+        and lease_expires_at is null
+        and attempt_count >= 1
+        and error_code is not null
         and completed_at is not null
       )
     )
@@ -803,6 +835,63 @@ begin
   if tg_op = 'UPDATE'
      and new.operation is distinct from old.operation then
     raise exception 'memory reconciliation operation is immutable'
+      using errcode = '23514';
+  end if;
+  if tg_op = 'UPDATE'
+     and new.created_at is distinct from old.created_at then
+    raise exception 'memory reconciliation creation time is immutable'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.status <> 'pending'
+       or new.claim_token is not null
+       or new.lease_expires_at is not null
+       or new.attempt_count <> 0
+       or new.error_code is not null
+       or new.completed_at is not null then
+      raise exception 'invalid reconciliation insert transition'
+        using errcode = '23514';
+    end if;
+  elsif old.status = 'pending' and new.status = 'running' then
+    if new.claim_token is null
+       or new.lease_expires_at is null
+       or new.lease_expires_at <= statement_timestamp()
+       or new.attempt_count <> old.attempt_count + 1
+       or new.error_code is not null
+       or new.completed_at is not null then
+      raise exception 'running reconciliation requires a fresh claim'
+        using errcode = '23514';
+    end if;
+  elsif old.status = 'running' and new.status = 'running' then
+    if old.lease_expires_at is null
+       or old.lease_expires_at > statement_timestamp()
+       or new.claim_token is null
+       or new.claim_token is not distinct from old.claim_token
+       or new.lease_expires_at is null
+       or new.lease_expires_at <= statement_timestamp()
+       or new.attempt_count <> old.attempt_count + 1
+       or new.error_code is not null
+       or new.completed_at is not null then
+      raise exception 'running reconciliation lease is not reclaimable'
+        using errcode = '23514';
+    end if;
+  elsif old.status = 'running'
+        and new.status in ('succeeded', 'failed') then
+    if new.claim_token is distinct from old.claim_token
+       or new.attempt_count <> old.attempt_count
+       or new.lease_expires_at is not null
+       or new.completed_at is null
+       or (new.status = 'succeeded' and new.error_code is not null)
+       or (new.status = 'failed' and new.error_code is null) then
+      raise exception 'invalid % reconciliation terminal transition', new.status
+        using errcode = '23514';
+    end if;
+  else
+    raise exception
+      'invalid reconciliation transition: % to %',
+      old.status,
+      new.status
       using errcode = '23514';
   end if;
 
