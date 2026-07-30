@@ -63,6 +63,7 @@ import {
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
 import { loadCommandPaletteRecentRecall } from "@/lib/command-palette-recent-recall";
+import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type DossierAction = SearchConversationItem["actions"][number];
 type RunFreshAction = Extract<DossierAction, { type: "run_fresh" }>;
@@ -255,6 +256,7 @@ export default function ChatCommandPalette({
   const [isSearching, setIsSearching] = useState(false);
   const [isLedgerLoading, setIsLedgerLoading] = useState(false);
   const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [readError, setReadError] = useState<SearchReadError>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [previewItem, setPreviewItem] =
@@ -399,6 +401,7 @@ export default function ChatCommandPalette({
     setIsSearching(false);
     setIsLedgerLoading(false);
     setIsLoadingMoreSearch(false);
+    setLoadMoreFailed(false);
     setReadError(null);
   }, []);
 
@@ -420,6 +423,7 @@ export default function ChatCommandPalette({
       setIsSearching(false);
       setIsLedgerLoading(true);
       setIsLoadingMoreSearch(false);
+      setLoadMoreFailed(false);
       setReadError(null);
       const requestId = ++ledgerBrowseRequestIdRef.current;
       const isCurrent = () =>
@@ -464,6 +468,7 @@ export default function ChatCommandPalette({
     ]);
     searchSignatureRef.current = capturedSignature;
     setIsLoadingMoreSearch(false);
+    setLoadMoreFailed(false);
     setPreviewItem(null);
     if (!trimmed) {
       searchRequestIdRef.current += 1;
@@ -658,6 +663,7 @@ export default function ChatCommandPalette({
           DecisionState | null,
         ];
       setIsLoadingMoreSearch(false);
+      setLoadMoreFailed(false);
       setIsLedgerLoading(false);
       historyRequestIdRef.current += 1;
       ledgerBrowseRequestIdRef.current += 1;
@@ -810,6 +816,7 @@ export default function ChatCommandPalette({
     const capturedSignature = searchSignatureRef.current;
     const requestId = ++searchRequestIdRef.current;
     setIsLoadingMoreSearch(true);
+    setLoadMoreFailed(false);
     try {
       const { items, next_cursor } = await searchGlobal({
         q: trimmed,
@@ -850,7 +857,7 @@ export default function ChatCommandPalette({
           currentRequestId: searchRequestIdRef.current,
         })
       ) {
-        setReadError(isLedgerMode ? "ledger" : "search");
+        setLoadMoreFailed(true);
       }
     } finally {
       if (
@@ -1563,16 +1570,12 @@ export default function ChatCommandPalette({
                   );
                 })}
                 {isResultMode && searchNextCursor && (
-                  <button
-                    type="button"
-                    onClick={() => void loadMoreSearch()}
+                  <CommandPaletteLoadMoreControl
+                    failed={loadMoreFailed}
+                    loading={isLoadingMoreSearch}
                     disabled={isLoadingMoreSearch || isSavingDecision}
-                    className="mx-2 rounded-[12px] border border-black/10 px-3 py-2 text-[12px] font-medium text-black/60 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
-                  >
-                    {isLoadingMoreSearch
-                      ? t("common.loading")
-                      : t("common.more", "More")}
-                  </button>
+                    onLoadMore={() => void loadMoreSearch()}
+                  />
                 )}
               </div>
             )}

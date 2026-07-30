@@ -1900,7 +1900,7 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(loadMore).toContain("commandPaletteRequestIsCurrent");
     expect(loadMore).toContain("isSavingDecision");
-    expect(loadMore).toContain("setReadError");
+    expect(loadMore).not.toContain("setReadError");
     expect(loadMore).toContain("setIsLoadingMoreSearch(false)");
     expect(refreshCanonicalSearch).toContain("setIsLoadingMoreSearch(false)");
     expect(refreshCanonicalSearch).toContain(
@@ -1986,6 +1986,70 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("ChatMessage");
     expect(palette).not.toContain("streamChatMessage");
     expect(palette).not.toContain("handleAction");
+  });
+
+  test("failed More keeps loaded results visible and isolates its retry state", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const loadMoreControl = readFileSync(
+      join(root, "components/sidebar/CommandPaletteLoadMoreControl.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(
+        join(root, "public/locales/es-419/common.json"),
+        "utf-8",
+      ),
+    );
+    const loadMore = palette.slice(
+      palette.indexOf("const loadMoreSearch"),
+      palette.indexOf("const openSourceConversation"),
+    );
+    const loadMoreCatch = loadMore.slice(
+      loadMore.indexOf("} catch {"),
+      loadMore.indexOf("} finally {"),
+    );
+    const resultsRenderStart = palette.indexOf("displayItems.length === 0");
+    const resultsRender = palette.slice(
+      resultsRenderStart,
+      palette.indexOf('layoutMode === "expanded"', resultsRenderStart),
+    );
+
+    expect(loadMore).toContain("setLoadMoreFailed(false)");
+    expect(loadMoreCatch).toContain("setLoadMoreFailed(true)");
+    expect(loadMoreCatch).not.toContain("setReadError");
+    expect(loadMoreCatch).not.toContain("setSearchResults");
+    expect(resultsRender).toContain("CommandPaletteLoadMoreControl");
+    expect(resultsRender).toContain("failed={loadMoreFailed}");
+    expect(resultsRender).toContain("onLoadMore={() => void loadMoreSearch()}");
+    expect(loadMoreControl).toContain('"command_palette.load_more_error"');
+    expect(loadMoreControl).toContain('"command_palette.retry_load_more"');
+    expect(en.command_palette.load_more_error).toBe(
+      "Argus couldn’t load more results. Your current results are still available.",
+    );
+    expect(es.command_palette.load_more_error).toBe(
+      "Argus no pudo cargar más resultados. Tus resultados actuales siguen disponibles.",
+    );
+    expect(en.command_palette.retry_load_more).toBe("Try loading more");
+    expect(es.command_palette.retry_load_more).toBe(
+      "Intentar cargar más",
+    );
+
+    const loadedResults = ["first-page-a", "first-page-b"];
+    const cursor = "next-page";
+    const readError: "search" | null = null;
+    let loadMoreFailed = false;
+    loadMoreFailed = true;
+
+    expect(loadedResults).toEqual(["first-page-a", "first-page-b"]);
+    expect(cursor).toBe("next-page");
+    expect(readError).toBeNull();
+    expect(loadMoreFailed).toBeTrue();
   });
 
   test("chat schedules bounded history refreshes for async artifact naming", () => {

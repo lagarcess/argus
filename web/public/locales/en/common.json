@@ -911,6 +911,8 @@
     "keep_typing_detail": "Search starts when one word has at least 3 characters.",
     "read_error": "Argus couldn’t load these results.",
     "retry_search": "Try searching again",
+    "load_more_error": "Argus couldn’t load more results. Your current results are still available.",
+    "retry_load_more": "Try loading more",
     "no_conversations": "No conversations yet",
     "clear_search": "Clear search",
     "rename_conversation": "Rename conversation",
