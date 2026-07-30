@@ -369,7 +369,7 @@ def test_failed_reconciliation_requires_bounded_error_code(
                 )
 
 
-def test_running_reconciliation_cannot_finish_after_its_effective_lease(
+def test_running_reconciliation_cannot_finish_after_database_lease_expires(
     memory_graph: dict[str, str],
 ) -> None:
     with _connect() as connection:
@@ -379,7 +379,8 @@ def test_running_reconciliation_cannot_finish_after_its_effective_lease(
                 update public.memory_reconciliations
                    set status = 'running',
                        claim_token = 'expired-terminal-claim',
-                       lease_expires_at = now() + interval '1 hour',
+                       lease_expires_at = statement_timestamp()
+                         + interval '100 milliseconds',
                        attempt_count = 1
                  where owner_id = %s
                    and record_id = %s
@@ -387,6 +388,7 @@ def test_running_reconciliation_cannot_finish_after_its_effective_lease(
                 """,
                 (memory_graph["owner_id"], memory_graph["record_id"]),
             )
+            cursor.execute("select pg_sleep(0.15)")
         with pytest.raises(
             psycopg.errors.CheckViolation,
             match="expired",
@@ -398,7 +400,8 @@ def test_running_reconciliation_cannot_finish_after_its_effective_lease(
                        set status = 'succeeded',
                            claim_token = null,
                            lease_expires_at = null,
-                           completed_at = now() + interval '2 hours'
+                           completed_at = statement_timestamp()
+                             - interval '1 hour'
                      where owner_id = %s
                        and record_id = %s
                        and generation = 1

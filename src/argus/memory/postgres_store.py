@@ -1510,7 +1510,7 @@ class PostgresCanonicalMemoryStore:
                    and operation = %s
                    and status = 'running'
                    and claim_token = %s
-                   and lease_expires_at > %s
+                   and lease_expires_at > statement_timestamp()
              returning 1
                 """,
                 (
@@ -1522,7 +1522,6 @@ class PostgresCanonicalMemoryStore:
                     claim.generation,
                     claim.operation,
                     claim.claim_token,
-                    completed_at,
                 ),
             )
             return cursor.fetchone() is not None
@@ -1557,7 +1556,7 @@ class PostgresCanonicalMemoryStore:
                        and operation = %s
                        and status = 'running'
                        and claim_token = %s
-                       and lease_expires_at > %s
+                       and lease_expires_at > statement_timestamp()
                     """,
                     (
                         owner_id,
@@ -1565,7 +1564,6 @@ class PostgresCanonicalMemoryStore:
                         reconciliation_claim.generation,
                         reconciliation_claim.operation,
                         reconciliation_claim.claim_token,
-                        effective_at,
                     ),
                 )
                 if (

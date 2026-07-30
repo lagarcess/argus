@@ -110,6 +110,33 @@ def _seed_record(connection: Any, owner_id: str) -> str:
     return record_id
 
 
+def _database_now() -> datetime:
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        row = connection.execute("select statement_timestamp()").fetchone()
+    assert row is not None
+    database_time = row[0]
+    assert isinstance(database_time, datetime)
+    return database_time
+
+
+def _expire_claim_by_database_time(
+    *,
+    owner: RegisteredMemoryOwner,
+    record_id: str,
+) -> None:
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        connection.execute("select pg_sleep(0.15)")
+        row = connection.execute(
+            """
+            select lease_expires_at <= statement_timestamp()
+              from public.memory_reconciliations
+             where owner_id=%s and record_id=%s and generation=1
+            """,
+            (owner.owner_id, record_id),
+        ).fetchone()
+    assert row == (True,)
+
+
 @pytest.fixture
 def database() -> Iterator[dict[str, Any]]:
     pool = ConnectionPool(
@@ -302,45 +329,53 @@ def test_terminal_outcome_erases_claim_bearer_state(
     assert row == (expected_status, None, None)
 
 
-def test_expired_exact_claim_cannot_finish(database: dict[str, Any]) -> None:
-    effective_time = [datetime.now(timezone.utc)]
+def test_database_expired_exact_claim_cannot_finish_with_backdated_evidence(
+    database: dict[str, Any],
+) -> None:
+    lagging_process_time = _database_now()
     store = PostgresCanonicalMemoryStore(
         database["pool"],
-        reconciliation_clock=lambda: effective_time[0],
-        reconciliation_token_factory=lambda: "expired-finish-exact",
-        reconciliation_lease=timedelta(minutes=1),
+        reconciliation_clock=lambda: lagging_process_time,
+        reconciliation_token_factory=lambda: "database-expired-finish",
+        reconciliation_lease=timedelta(milliseconds=100),
     )
     claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
     assert claim is not None
-    effective_time[0] += timedelta(minutes=2)
+    _expire_claim_by_database_time(
+        owner=database["owner"],
+        record_id=database["record_id"],
+    )
 
     assert not store.finish_reconciliation_claim(
         database["owner"],
         claim,
         succeeded=True,
         error_code=None,
-        completed_at=effective_time[0],
+        completed_at=lagging_process_time,
     )
     assert store.inflight_reconciliation_generations(
         database["owner"], database["record_id"]
     ) == (1,)
 
 
-def test_expired_exact_claim_cannot_commit_provider_ref(
+def test_database_expired_exact_claim_cannot_commit_with_lagging_process_clock(
     database: dict[str, Any],
 ) -> None:
-    effective_time = [datetime.now(timezone.utc)]
+    lagging_process_time = _database_now()
     store = PostgresCanonicalMemoryStore(
         database["pool"],
-        reconciliation_clock=lambda: effective_time[0],
-        reconciliation_token_factory=lambda: "expired-cas-exact",
-        reconciliation_lease=timedelta(minutes=1),
+        reconciliation_clock=lambda: lagging_process_time,
+        reconciliation_token_factory=lambda: "database-expired-cas",
+        reconciliation_lease=timedelta(milliseconds=100),
     )
     record = store.get_record(database["owner"], database["record_id"])
     assert record is not None
     claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
     assert claim is not None
-    effective_time[0] += timedelta(minutes=2)
+    _expire_claim_by_database_time(
+        owner=database["owner"],
+        record_id=database["record_id"],
+    )
 
     assert not store.compare_and_set_provider_ref(
         database["owner"],

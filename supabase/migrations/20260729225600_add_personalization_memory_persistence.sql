@@ -880,7 +880,7 @@ begin
         and new.status in ('succeeded', 'failed') then
     if old.lease_expires_at is null
        or new.completed_at is null
-       or old.lease_expires_at <= new.completed_at then
+       or old.lease_expires_at <= statement_timestamp() then
       raise exception 'expired reconciliation claim cannot finish'
         using errcode = '23514';
     end if;
