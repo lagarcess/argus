@@ -360,7 +360,7 @@ create table public.memory_reconciliations (
   constraint memory_reconciliations_record_fkey
     foreign key (owner_id, record_id)
     references public.memory_records(owner_id, id)
-    on delete restrict,
+    on delete cascade,
   constraint memory_reconciliations_terminal_shape
     check (
       (
@@ -647,6 +647,48 @@ $$;
 revoke all on function argus_private.protect_memory_child_identity()
   from public, anon, authenticated, service_role;
 
+create or replace function argus_private.guard_memory_record_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op <> 'DELETE'
+     or tg_table_schema <> 'public'
+     or tg_table_name <> 'memory_records' then
+    raise exception
+      'unsupported memory record delete target: %.% %',
+      tg_table_schema,
+      tg_table_name,
+      tg_op
+      using errcode = '23514';
+  end if;
+
+  if exists (
+    select 1
+      from public.profiles
+     where id = old.owner_id
+  )
+  and exists (
+    select 1
+      from public.memory_reconciliations
+     where owner_id = old.owner_id
+       and record_id = old.id
+       and status in ('pending', 'running')
+  ) then
+    raise exception
+      'memory record deletion requires unfinished provider reconciliation to complete'
+      using errcode = '23514';
+  end if;
+
+  return old;
+end;
+$$;
+
+revoke all on function argus_private.guard_memory_record_delete()
+  from public, anon, authenticated, service_role;
+
 create or replace function argus_private.guard_guest_memory_zero_state()
 returns trigger
 language plpgsql
@@ -779,6 +821,10 @@ for each row execute function argus_private.protect_memory_child_identity();
 create trigger protect_memory_provider_cleanup_identity
 before update on public.memory_provider_cleanup
 for each row execute function argus_private.protect_memory_child_identity();
+
+create trigger guard_memory_record_delete
+before delete on public.memory_records
+for each row execute function argus_private.guard_memory_record_delete();
 
 create trigger guard_guest_memory_zero_state
 before update on public.guest_workspaces
