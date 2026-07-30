@@ -559,7 +559,6 @@ def _set_cleanup(
     generation: int,
     status: str = "pending",
 ) -> None:
-    resolved_at = NOW if status == "resolved" else None
     with psycopg.connect(DSN, autocommit=True) as connection:
         connection.execute(
             """
@@ -567,18 +566,35 @@ def _set_cleanup(
               owner_id, record_id, provider_ref, generation,
               status, created_at, resolved_at
             )
-            values (%s, %s, %s, %s, %s, %s, %s)
+            values (%s, %s, %s, %s, 'pending', %s, null)
             """,
             (
                 owner.owner_id,
                 record_id,
                 provider_ref,
                 generation,
-                status,
                 NOW,
-                resolved_at,
             ),
         )
+        if status == "resolved":
+            connection.execute(
+                """
+                update public.memory_provider_cleanup
+                   set status = 'resolved',
+                       resolved_at = %s
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = %s
+                   and generation = %s
+                """,
+                (
+                    NOW,
+                    owner.owner_id,
+                    record_id,
+                    provider_ref,
+                    generation,
+                ),
+            )
 
 
 def test_reads_are_bounded_newest_first_exact_and_inspectable_when_disabled(

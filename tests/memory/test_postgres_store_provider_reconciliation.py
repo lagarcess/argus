@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from argus.memory.postgres_store import PostgresCanonicalMemoryStore
-from argus.memory.store import ReconciliationClaim
+from argus.memory.store import ProviderCleanupTarget, ReconciliationClaim
 from argus.memory.subject import RegisteredMemoryOwner
 from psycopg_pool import ConnectionPool
 
@@ -152,6 +152,7 @@ def database() -> Iterator[dict[str, Any]]:
         owner_id = _seed_owner(connection)
         other_owner_id = _seed_owner(connection)
         record_id = _seed_record(connection, owner_id)
+        second_record_id = _seed_record(connection, owner_id)
         other_record_id = _seed_record(connection, other_owner_id)
     try:
         yield {
@@ -159,6 +160,7 @@ def database() -> Iterator[dict[str, Any]]:
             "owner": RegisteredMemoryOwner(owner_id=owner_id),
             "other_owner": RegisteredMemoryOwner(owner_id=other_owner_id),
             "record_id": record_id,
+            "second_record_id": second_record_id,
             "other_record_id": other_record_id,
         }
     finally:
@@ -542,3 +544,226 @@ def test_provider_projection_cas_requires_exact_claim(
         store.get_provider_ref(database["owner"], database["record_id"])
         == "provider-current"
     )
+
+
+def test_provider_projection_admin_seam_is_restart_durable_and_owner_scoped(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+
+    assert store.set_provider_ref(
+        database["owner"],
+        database["record_id"],
+        "provider-shared-across-owners",
+    )
+    assert (
+        store.get_provider_ref(database["other_owner"], database["other_record_id"])
+        is None
+    )
+    restarted = PostgresCanonicalMemoryStore(database["pool"])
+    assert (
+        restarted.get_provider_ref(database["owner"], database["record_id"])
+        == "provider-shared-across-owners"
+    )
+    assert restarted.set_provider_ref(
+        database["other_owner"],
+        database["other_record_id"],
+        "provider-shared-across-owners",
+    )
+
+
+def test_provider_projection_admin_replacement_tracks_old_ref_once(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-admin-old"
+    )
+
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-admin-new"
+    )
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-admin-new"
+    )
+
+    assert (
+        store.get_provider_ref(database["owner"], database["record_id"])
+        == "provider-admin-new"
+    )
+    assert store.list_provider_cleanup_targets(
+        database["owner"], database["record_id"]
+    ) == (
+        ProviderCleanupTarget(
+            record_id=database["record_id"],
+            provider_ref="provider-admin-old",
+        ),
+    )
+
+
+def test_same_owner_provider_ref_collision_is_rejected_without_mutation(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-owner-unique"
+    )
+
+    assert not store.set_provider_ref(
+        database["owner"],
+        database["second_record_id"],
+        "provider-owner-unique",
+    )
+
+    assert (
+        store.get_provider_ref(database["owner"], database["record_id"])
+        == "provider-owner-unique"
+    )
+    assert store.get_provider_ref(database["owner"], database["second_record_id"]) is None
+    assert store.list_provider_cleanup_targets(database["owner"]) == ()
+
+
+def test_cleanup_tracking_rejects_ref_projected_by_different_record(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-reused"
+    )
+
+    assert not store.track_provider_cleanup_target(
+        database["owner"],
+        database["second_record_id"],
+        "provider-reused",
+    )
+    assert store.list_provider_cleanup_targets(database["owner"]) == ()
+
+
+def test_provider_projection_cas_replacement_tracks_prior_ref_idempotently(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: "replace-cas",
+    )
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-cas-old"
+    )
+    record = store.get_record(database["owner"], database["record_id"])
+    assert record is not None
+    claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert claim is not None
+
+    assert store.compare_and_set_provider_ref(
+        database["owner"],
+        database["record_id"],
+        expected_record=record,
+        expected_provider_ref="provider-cas-old",
+        reconciliation_claim=claim,
+        provider_ref="provider-cas-new",
+    )
+
+    assert store.list_provider_cleanup_targets(
+        database["owner"], database["record_id"]
+    ) == (
+        ProviderCleanupTarget(
+            record_id=database["record_id"],
+            provider_ref="provider-cas-old",
+        ),
+    )
+
+
+def test_cleanup_list_is_bounded_unique_deterministic_pending_and_restart_durable(
+    database: dict[str, Any],
+) -> None:
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        for index in range(101):
+            connection.execute(
+                """
+                insert into public.memory_provider_cleanup (
+                  owner_id,record_id,provider_ref,generation,status,created_at
+                )
+                values (%s,%s,%s,1,'pending',%s)
+                """,
+                (
+                    database["owner"].owner_id,
+                    database["record_id"],
+                    f"provider-list-{index:03d}",
+                    datetime(2026, 7, 29, tzinfo=timezone.utc) + timedelta(seconds=index),
+                ),
+            )
+        connection.execute(
+            """
+            insert into public.memory_provider_cleanup (
+              owner_id,record_id,provider_ref,generation,status,created_at
+            )
+            values (%s,%s,'provider-list-resolved',1,'pending',now())
+            """,
+            (database["owner"].owner_id, database["record_id"]),
+        )
+        connection.execute(
+            """
+            update public.memory_provider_cleanup
+               set status='resolved',resolved_at=now()
+             where owner_id=%s
+               and record_id=%s
+               and provider_ref='provider-list-resolved'
+            """,
+            (database["owner"].owner_id, database["record_id"]),
+        )
+        connection.execute(
+            """
+            insert into public.memory_provider_cleanup (
+              owner_id,record_id,provider_ref,generation,status,created_at
+            )
+            values (%s,%s,'provider-list-100',2,'pending',now())
+            """,
+            (database["owner"].owner_id, database["record_id"]),
+        )
+    restarted = PostgresCanonicalMemoryStore(database["pool"])
+
+    targets = restarted.list_provider_cleanup_targets(
+        database["owner"], database["record_id"]
+    )
+
+    assert len(targets) == 100
+    assert targets[0] == ProviderCleanupTarget(
+        record_id=database["record_id"],
+        provider_ref="provider-list-100",
+    )
+    assert targets[-1] == ProviderCleanupTarget(
+        record_id=database["record_id"],
+        provider_ref="provider-list-001",
+    )
+    assert len(set(targets)) == 100
+    assert all(target.provider_ref != "provider-list-resolved" for target in targets)
+    assert restarted.list_provider_cleanup_targets(database["other_owner"]) == ()
+
+
+def test_cleanup_resolution_is_idempotent_and_removes_only_matching_projection(
+    database: dict[str, Any],
+) -> None:
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    assert store.set_provider_ref(
+        database["owner"], database["record_id"], "provider-resolve"
+    )
+    assert store.track_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-resolve"
+    )
+    assert store.set_provider_ref(
+        database["owner"], database["second_record_id"], "provider-keep"
+    )
+
+    assert store.resolve_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-resolve"
+    )
+    assert not store.resolve_provider_cleanup_target(
+        database["owner"], database["record_id"], "provider-resolve"
+    )
+
+    assert store.get_provider_ref(database["owner"], database["record_id"]) is None
+    assert (
+        store.get_provider_ref(database["owner"], database["second_record_id"])
+        == "provider-keep"
+    )
+    assert store.list_provider_cleanup_targets(database["owner"]) == ()

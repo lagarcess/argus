@@ -33,6 +33,7 @@ from argus.memory.store import (
     CanonicalOwnerReset,
     CanonicalRecordMutation,
     ProposalHistorySnapshot,
+    ProviderCleanupTarget,
     ReconciliationClaim,
 )
 from argus.memory.subject import (
@@ -1593,6 +1594,17 @@ class PostgresCanonicalMemoryStore:
                 )
                 if current_provider_ref != expected_provider_ref:
                     return False
+                if (
+                    current_provider_ref is not None
+                    and current_provider_ref != provider_ref
+                ):
+                    self._insert_provider_cleanup_target(
+                        cursor,
+                        owner_id,
+                        record_id,
+                        current_provider_ref,
+                        minimum_generation=reconciliation_claim.generation,
+                    )
                 if projection_row is None:
                     cursor.execute(
                         """
@@ -1642,41 +1654,105 @@ class PostgresCanonicalMemoryStore:
     ) -> bool:
         if not provider_ref or len(provider_ref) > 1_024:
             raise ValueError("provider ref must contain 1 to 1024 characters")
-        with self._confirmation_transaction(owner) as (cursor, owner_id):
-            self._lock_record(cursor, owner_id, record_id)
-            cursor.execute(
-                """
-                insert into public.memory_provider_projections (
-                  owner_id,
-                  record_id,
-                  provider_ref,
-                  generation,
-                  updated_at
+        if not record_id.strip() or len(record_id) > 128:
+            raise ValueError("record id must contain 1 to 128 characters")
+        try:
+            with self._confirmation_transaction(owner) as (cursor, owner_id):
+                self._lock_record(cursor, owner_id, record_id)
+                cursor.execute(
+                    """
+                    select 1
+                      from public.memory_records
+                     where owner_id = %s and id = %s
+                    """,
+                    (owner_id, record_id),
                 )
-                select %s, %s, %s, coalesce(max(reconciliation.generation), 1), %s
-                  from public.memory_records as record
-                  left join public.memory_reconciliations as reconciliation
-                    on reconciliation.owner_id = record.owner_id
-                   and reconciliation.record_id = record.id
-                 where record.owner_id = %s and record.id = %s
-                 group by record.owner_id, record.id
-                on conflict (owner_id, record_id)
-                do update set
-                  provider_ref = excluded.provider_ref,
-                  generation = excluded.generation,
-                  updated_at = excluded.updated_at
-                returning 1
-                """,
-                (
-                    owner_id,
-                    record_id,
-                    provider_ref,
-                    self._reconciliation_clock(),
-                    owner_id,
-                    record_id,
-                ),
-            )
-            return cursor.fetchone() is not None
+                if cursor.fetchone() is None:
+                    return False
+                cursor.execute(
+                    """
+                    select provider_ref,generation
+                      from public.memory_provider_projections
+                     where owner_id = %s and record_id = %s
+                     for update
+                    """,
+                    (owner_id, record_id),
+                )
+                projection = cursor.fetchone()
+                if projection is not None and projection[0] == provider_ref:
+                    return True
+                cursor.execute(
+                    """
+                    select record_id
+                      from public.memory_provider_projections
+                     where owner_id = %s
+                       and provider_ref = %s
+                       and record_id <> %s
+                     for update
+                    """,
+                    (owner_id, provider_ref, record_id),
+                )
+                if cursor.fetchone() is not None:
+                    return False
+                cursor.execute(
+                    """
+                    select coalesce(max(generation), 1)
+                      from public.memory_reconciliations
+                     where owner_id = %s and record_id = %s
+                    """,
+                    (owner_id, record_id),
+                )
+                generation_row = cursor.fetchone()
+                assert generation_row is not None
+                generation = int(generation_row[0])
+                if projection is not None:
+                    generation = max(generation, int(projection[1]))
+                    self._insert_provider_cleanup_target(
+                        cursor,
+                        owner_id,
+                        record_id,
+                        str(projection[0]),
+                        minimum_generation=generation,
+                    )
+                    cursor.execute(
+                        """
+                        update public.memory_provider_projections
+                           set provider_ref = %s,
+                               generation = %s,
+                               updated_at = %s
+                         where owner_id = %s and record_id = %s
+                        """,
+                        (
+                            provider_ref,
+                            generation,
+                            self._reconciliation_clock(),
+                            owner_id,
+                            record_id,
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        insert into public.memory_provider_projections (
+                          owner_id,
+                          record_id,
+                          provider_ref,
+                          generation,
+                          updated_at
+                        )
+                        values (%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            owner_id,
+                            record_id,
+                            provider_ref,
+                            generation,
+                            self._reconciliation_clock(),
+                        ),
+                    )
+                return True
+        except errors.UniqueViolation:
+            return False
 
     def get_provider_ref(
         self,
@@ -1694,6 +1770,201 @@ class PostgresCanonicalMemoryStore:
             )
             row = cursor.fetchone()
             return None if row is None else row[0]
+
+    def track_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool:
+        if not record_id.strip() or len(record_id) > 128:
+            raise ValueError("record id must contain 1 to 128 characters")
+        if not provider_ref or len(provider_ref) > 1_024:
+            raise ValueError("provider ref must contain 1 to 1024 characters")
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                select record_id
+                  from public.memory_provider_projections
+                 where owner_id = %s and provider_ref = %s
+                 for update
+                """,
+                (owner_id, provider_ref),
+            )
+            projected = cursor.fetchone()
+            if projected is not None and projected[0] != record_id:
+                return False
+            self._insert_provider_cleanup_target(
+                cursor,
+                owner_id,
+                record_id,
+                provider_ref,
+                minimum_generation=(
+                    1
+                    if projected is None
+                    else self._provider_projection_generation(
+                        cursor,
+                        owner_id,
+                        record_id,
+                    )
+                ),
+            )
+            return True
+
+    def resolve_provider_cleanup_target(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        provider_ref: str,
+    ) -> bool:
+        if not record_id.strip() or len(record_id) > 128:
+            raise ValueError("record id must contain 1 to 128 characters")
+        if not provider_ref or len(provider_ref) > 1_024:
+            raise ValueError("provider ref must contain 1 to 1024 characters")
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                update public.memory_provider_cleanup
+                   set status = 'resolved',
+                       resolved_at = statement_timestamp()
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = %s
+                   and status = 'pending'
+             returning 1
+                """,
+                (owner_id, record_id, provider_ref),
+            )
+            resolved = cursor.fetchall()
+            if not resolved:
+                return False
+            cursor.execute(
+                """
+                delete from public.memory_provider_projections
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = %s
+                """,
+                (owner_id, record_id, provider_ref),
+            )
+            return True
+
+    def list_provider_cleanup_targets(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str | None = None,
+    ) -> tuple[ProviderCleanupTarget, ...]:
+        if record_id is not None and (not record_id.strip() or len(record_id) > 128):
+            raise ValueError("record id must contain 1 to 128 characters")
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            if record_id is None:
+                cursor.execute(
+                    """
+                    select record_id,provider_ref,max(created_at) as newest_created_at
+                      from public.memory_provider_cleanup
+                     where owner_id = %s
+                       and status = 'pending'
+                     group by record_id,provider_ref
+                     order by newest_created_at desc,record_id,provider_ref
+                     limit %s
+                    """,
+                    (owner_id, _CONTROL_READ_LIMIT),
+                )
+            else:
+                cursor.execute(
+                    """
+                    select record_id,provider_ref,max(created_at) as newest_created_at
+                      from public.memory_provider_cleanup
+                     where owner_id = %s
+                       and status = 'pending'
+                       and record_id = %s
+                     group by record_id,provider_ref
+                     order by newest_created_at desc,record_id,provider_ref
+                     limit %s
+                    """,
+                    (owner_id, record_id, _CONTROL_READ_LIMIT),
+                )
+            return tuple(
+                ProviderCleanupTarget(record_id=row[0], provider_ref=row[1])
+                for row in cursor.fetchall()
+            )
+
+    @staticmethod
+    def _provider_projection_generation(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+    ) -> int:
+        cursor.execute(
+            """
+            select generation
+              from public.memory_provider_projections
+             where owner_id = %s and record_id = %s
+            """,
+            (owner_id, record_id),
+        )
+        row = cursor.fetchone()
+        return 1 if row is None else int(row[0])
+
+    @staticmethod
+    def _insert_provider_cleanup_target(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+        provider_ref: str,
+        *,
+        minimum_generation: int,
+    ) -> None:
+        cursor.execute(
+            """
+            select 1
+              from public.memory_provider_cleanup
+             where owner_id = %s
+               and record_id = %s
+               and provider_ref = %s
+               and status = 'pending'
+             limit 1
+            """,
+            (owner_id, record_id, provider_ref),
+        )
+        if cursor.fetchone() is not None:
+            return
+        cursor.execute(
+            """
+            select greatest(
+              %s,
+              coalesce(max(generation) + 1, 1)
+            )
+              from public.memory_provider_cleanup
+             where owner_id = %s
+               and record_id = %s
+               and provider_ref = %s
+            """,
+            (minimum_generation, owner_id, record_id, provider_ref),
+        )
+        generation_row = cursor.fetchone()
+        assert generation_row is not None
+        cursor.execute(
+            """
+            insert into public.memory_provider_cleanup (
+              owner_id,
+              record_id,
+              provider_ref,
+              generation,
+              status,
+              created_at
+            )
+            values (%s, %s, %s, %s, 'pending', statement_timestamp())
+            """,
+            (
+                owner_id,
+                record_id,
+                provider_ref,
+                int(generation_row[0]),
+            ),
+        )
 
     def inflight_reconciliation_generations(
         self,

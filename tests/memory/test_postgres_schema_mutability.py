@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Iterator
+from datetime import timedelta
 
 import pytest
 
@@ -449,6 +450,71 @@ def test_provider_cleanup_resolution_fields_are_mutable(
                 (memory_graph["owner_id"], memory_graph["record_id"]),
             )
             assert cursor.fetchone() == ("resolved", True)
+
+
+def test_provider_cleanup_terminal_state_cannot_reopen_or_change_resolution_time(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="must begin pending",
+        ):
+            connection.execute(
+                """
+                insert into public.memory_provider_cleanup (
+                  owner_id,record_id,provider_ref,generation,status,resolved_at
+                )
+                values (%s,%s,'provider-terminal-insert',1,'resolved',now())
+                """,
+                (memory_graph["owner_id"], memory_graph["record_id"]),
+            )
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                update public.memory_provider_cleanup
+                   set status = 'resolved',
+                       resolved_at = now()
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = 'provider-cleanup'
+                   and generation = 1
+             returning resolved_at
+                """,
+                (memory_graph["owner_id"], memory_graph["record_id"]),
+            )
+            resolved_at = cursor.fetchone()[0]
+    with _connect() as connection:
+        with pytest.raises(psycopg.errors.CheckViolation, match="terminal"):
+            connection.execute(
+                """
+                update public.memory_provider_cleanup
+                   set status = 'pending',
+                       resolved_at = null
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = 'provider-cleanup'
+                   and generation = 1
+                """,
+                (memory_graph["owner_id"], memory_graph["record_id"]),
+            )
+        with pytest.raises(psycopg.errors.CheckViolation, match="terminal"):
+            connection.execute(
+                """
+                update public.memory_provider_cleanup
+                   set resolved_at = %s
+                 where owner_id = %s
+                   and record_id = %s
+                   and provider_ref = 'provider-cleanup'
+                   and generation = 1
+                """,
+                (
+                    resolved_at + timedelta(seconds=1),
+                    memory_graph["owner_id"],
+                    memory_graph["record_id"],
+                ),
+            )
 
 
 def test_prompt_history_owner_and_category_remain_immutable(

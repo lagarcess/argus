@@ -268,7 +268,7 @@ class CanonicalMemoryStore(Protocol):
         owner: RegisteredMemoryOwner,
         record_id: str,
         provider_ref: str,
-    ) -> None: ...
+    ) -> bool: ...
 
     def resolve_provider_cleanup_target(
         self,
@@ -885,7 +885,21 @@ class InMemoryCanonicalMemoryStore:
         with self._lock:
             if record_id not in self._records.get(owner.owner_id, {}):
                 return False
-            self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
+            owner_refs = self._provider_refs.setdefault(owner.owner_id, {})
+            if any(
+                other_record_id != record_id and other_ref == provider_ref
+                for other_record_id, other_ref in owner_refs.items()
+            ):
+                return False
+            current_provider_ref = owner_refs.get(record_id)
+            if current_provider_ref == provider_ref:
+                return True
+            if current_provider_ref is not None:
+                self._cleanup_targets.setdefault(
+                    (owner.owner_id, record_id),
+                    set(),
+                ).add(current_provider_ref)
+            owner_refs[record_id] = provider_ref
             return True
 
     def get_provider_ref(
@@ -926,6 +940,13 @@ class InMemoryCanonicalMemoryStore:
                 or reconciliation_claim != self._reconciliation_claims.get(claim_key)
                 or reconciliation_claim.generation
                 not in self._inflight_reconciliations.get(reconciliation_key, set())
+            ):
+                return False
+            if any(
+                other_record_id != record_id and other_ref == provider_ref
+                for other_record_id, other_ref in self._provider_refs.get(
+                    owner.owner_id, {}
+                ).items()
             ):
                 return False
             targets = self._cleanup_targets.get(reconciliation_key)
@@ -1033,14 +1054,22 @@ class InMemoryCanonicalMemoryStore:
         owner: RegisteredMemoryOwner,
         record_id: str,
         provider_ref: str,
-    ) -> None:
+    ) -> bool:
         if not provider_ref:
             raise ValueError("provider ref must not be empty")
         with self._lock:
+            if any(
+                projected_record_id != record_id and projected_ref == provider_ref
+                for projected_record_id, projected_ref in self._provider_refs.get(
+                    owner.owner_id, {}
+                ).items()
+            ):
+                return False
             self._cleanup_targets.setdefault(
                 (owner.owner_id, record_id),
                 set(),
             ).add(provider_ref)
+            return True
 
     def resolve_provider_cleanup_target(
         self,
@@ -1056,6 +1085,11 @@ class InMemoryCanonicalMemoryStore:
             targets.remove(provider_ref)
             if not targets:
                 self._cleanup_targets.pop(key, None)
+            owner_refs = self._provider_refs.get(owner.owner_id)
+            if owner_refs is not None and owner_refs.get(record_id) == provider_ref:
+                owner_refs.pop(record_id, None)
+                if not owner_refs:
+                    self._provider_refs.pop(owner.owner_id, None)
             return True
 
     def list_provider_cleanup_targets(
@@ -1075,4 +1109,4 @@ class InMemoryCanonicalMemoryStore:
                 if owner_id == owner.owner_id
                 and (record_id is None or target_record_id == record_id)
                 for provider_ref in sorted(provider_refs)
-            )
+            )[:100]

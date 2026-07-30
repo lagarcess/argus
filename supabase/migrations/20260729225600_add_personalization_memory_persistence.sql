@@ -660,7 +660,8 @@ begin
     if new.owner_id is distinct from old.owner_id
        or new.record_id is distinct from old.record_id
        or new.provider_ref is distinct from old.provider_ref
-       or new.generation is distinct from old.generation then
+       or new.generation is distinct from old.generation
+       or new.created_at is distinct from old.created_at then
       raise exception '% identity is immutable', tg_table_name
         using errcode = '23514';
     end if;
@@ -674,6 +675,51 @@ end;
 $$;
 
 revoke all on function argus_private.protect_memory_child_identity()
+  from public, anon, authenticated, service_role;
+
+create or replace function argus_private.protect_memory_provider_cleanup_lifecycle()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.status <> 'pending' or new.resolved_at is not null then
+      raise exception 'memory provider cleanup must begin pending'
+        using errcode = '23514';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'resolved'
+     and (
+       new.status is distinct from old.status
+       or new.resolved_at is distinct from old.resolved_at
+     ) then
+    raise exception 'memory provider cleanup terminal state is immutable'
+      using errcode = '23514';
+  end if;
+  if old.status = 'pending'
+     and not (
+       (
+         new.status = 'pending'
+         and new.resolved_at is null
+       )
+       or (
+         new.status = 'resolved'
+         and new.resolved_at is not null
+       )
+     ) then
+    raise exception 'memory provider cleanup transition is invalid'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function
+  argus_private.protect_memory_provider_cleanup_lifecycle()
   from public, anon, authenticated, service_role;
 
 create or replace function argus_private.lock_memory_record_lifecycle()
@@ -1060,6 +1106,11 @@ for each row execute function argus_private.protect_memory_child_identity();
 create trigger protect_memory_provider_cleanup_identity
 before update on public.memory_provider_cleanup
 for each row execute function argus_private.protect_memory_child_identity();
+
+create trigger validate_memory_provider_cleanup_lifecycle
+before insert or update on public.memory_provider_cleanup
+for each row execute function
+  argus_private.protect_memory_provider_cleanup_lifecycle();
 
 create trigger a_lock_memory_record_lifecycle_delete
 before delete on public.memory_records

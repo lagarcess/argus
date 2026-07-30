@@ -1147,6 +1147,12 @@ class MemoryService:
         provider_ref: str,
         correlation_id: str | None,
     ) -> ProviderReconciliationStatus:
+        if not self._store.track_provider_cleanup_target(
+            owner,
+            record_id,
+            provider_ref,
+        ):
+            return ProviderReconciliationStatus.RECONCILIATION_REQUIRED
         cleanup_call = self._call_provider_delete(
             owner,
             provider_ref,

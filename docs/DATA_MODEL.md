@@ -954,10 +954,17 @@ store.
   the same record, while other owners remain independent. Unfinished work
   restricts record deletion so derivative cleanup cannot disappear silently.
 - `memory_provider_projections`: the current derivative provider pointer and
-  positive generation for a canonical record.
-- `memory_provider_cleanup`: durable pending/resolved cleanup targets that
-  survive canonical record deletion. Provider pointers are never canonical
-  memory content.
+  positive generation for a canonical record. A provider pointer is unique per
+  owner but may be reused independently by another owner. Replacements are
+  atomic with a durable cleanup snapshot of the prior pointer.
+- `memory_provider_cleanup`: durable, owner-scoped cleanup targets that survive
+  canonical record deletion and process restarts. Rows begin pending, may move
+  only once to resolved, and never reopen; a successful resolution also removes
+  the matching same-record projection when it still exists. Bounded reads
+  return at most 100 unique pending targets in deterministic newest-first
+  order. Cleanup scheduling refuses a pointer currently projected by another
+  record for the same owner, preventing deletion of live reused provider state.
+  Provider pointers are derivative identifiers, never canonical memory content.
 
 Composite foreign keys include `owner_id` at every live relationship so a
 candidate, consent action, record, provenance row, reconciliation, or provider

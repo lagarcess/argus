@@ -458,6 +458,26 @@ def test_provider_is_not_called_without_an_exact_reconciliation_claim() -> None:
     assert provider.delete_calls == []
 
 
+def test_reused_provider_ref_is_never_deleted_for_a_different_record() -> None:
+    """Catches failed projection cleanup deleting another record's live ref."""
+    store = InMemoryCanonicalMemoryStore()
+    provider = _ProviderSpy(
+        projection=ProviderProjectionResult(
+            status=ProviderReconciliationStatus.SYNCHRONIZED,
+            provider_ref="provider-reused",
+        ),
+        cleanup=ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED),
+    )
+    service = _service(store, provider)
+    first = _confirm_one(service, label="First", value="First decision.")
+
+    second = _confirm_one(service, label="Second", value="Second decision.")
+
+    assert store.get_provider_ref(OWNER, first.id) == "provider-reused"
+    assert store.get_provider_ref(OWNER, second.id) is None
+    assert provider.delete_calls == []
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (
