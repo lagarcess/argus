@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from argus.memory.contracts import (
 from argus.memory.store import (
     CanonicalConfirmationMutation,
     CanonicalEnableMutation,
+    CanonicalOwnerReset,
+    CanonicalRecordMutation,
     ProposalHistorySnapshot,
 )
 from argus.memory.subject import (
@@ -38,8 +41,15 @@ from argus.memory.subject import (
 
 _ALL_MEMORY_CATEGORIES = tuple(sorted(MemoryCategory, key=lambda item: item.value))
 _CANDIDATE_CAS_ATTEMPTS = 2
+_CONTROL_READ_LIMIT = 100
+_RECONCILIATION_WAIT_ATTEMPTS = 20
+_RECONCILIATION_WAIT_SECONDS = 0.05
 _READ_COMMITTED = "set transaction isolation level read committed"
 _SERIALIZABLE = "set transaction isolation level serializable"
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class PostgresCanonicalMemoryStore:
@@ -116,6 +126,21 @@ class PostgresCanonicalMemoryStore:
     ) -> None:
         for category in _ALL_MEMORY_CATEGORIES:
             cls._lock_category(cursor, owner_id, category)
+
+    @staticmethod
+    def _lock_record(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+    ) -> None:
+        cursor.execute(
+            """
+            select pg_advisory_xact_lock(
+              pg_catalog.hashtextextended(%s, 0)
+            )
+            """,
+            (f"argus:memory-record:{owner_id}:{record_id}",),
+        )
 
     @staticmethod
     def _read_settings(
@@ -959,6 +984,617 @@ class PostgresCanonicalMemoryStore:
             created_at=row[7],
             updated_at=row[8],
         )
+
+    def list_consent_receipts(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> tuple[MemoryConsentActionReceipt, ...]:
+        with self._transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select id
+                  from public.memory_consent_actions
+                 where owner_id = %s
+                 order by recorded_at desc, id desc
+                 limit %s
+                """,
+                (owner_id, _CONTROL_READ_LIMIT),
+            )
+            receipt_ids = tuple(row[0] for row in cursor.fetchall())
+            return tuple(
+                self._read_consent_receipt(cursor, owner_id, receipt_id)
+                for receipt_id in receipt_ids
+            )
+
+    def list_records(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> tuple[MemoryRecord, ...]:
+        with self._transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select id, consent_action_id
+                  from public.memory_records
+                 where owner_id = %s
+                 order by created_at desc, id desc
+                 limit %s
+                """,
+                (owner_id, _CONTROL_READ_LIMIT),
+            )
+            identities = tuple(cursor.fetchall())
+            return tuple(
+                self._read_record(
+                    cursor,
+                    owner_id,
+                    record_id,
+                    consent_receipt=self._read_consent_receipt(
+                        cursor,
+                        owner_id,
+                        consent_action_id,
+                    ),
+                )
+                for record_id, consent_action_id in identities
+            )
+
+    def get_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> MemoryRecord | None:
+        with self._transaction(owner) as (cursor, owner_id):
+            return self._read_record_if_present(cursor, owner_id, record_id)
+
+    @classmethod
+    def _read_record_if_present(
+        cls,
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+    ) -> MemoryRecord | None:
+        cursor.execute(
+            """
+            select consent_action_id
+              from public.memory_records
+             where owner_id = %s and id = %s
+            """,
+            (owner_id, record_id),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return cls._read_record(
+            cursor,
+            owner_id,
+            record_id,
+            consent_receipt=cls._read_consent_receipt(
+                cursor,
+                owner_id,
+                row[0],
+            ),
+        )
+
+    def edit_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        *,
+        value: str | None,
+        label: str | None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> CanonicalRecordMutation | None:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                select consent_action_id
+                  from public.memory_records
+                 where owner_id = %s and id = %s
+                 for update
+                """,
+                (owner_id, record_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            current = self._read_record(
+                cursor,
+                owner_id,
+                record_id,
+                consent_receipt=self._read_consent_receipt(
+                    cursor,
+                    owner_id,
+                    row[0],
+                ),
+            )
+            next_value = current.value if value is None else value
+            next_label = current.label if label is None else label
+            if next_value == current.value and next_label == current.label:
+                raise ValueError("memory edit must change value or label")
+            if not next_value or len(next_value) > 4_096:
+                raise ValueError(
+                    "memory value must contain between 1 and 4096 characters"
+                )
+            if not next_label.strip() or len(next_label) > 120:
+                raise ValueError("memory label must contain between 1 and 120 characters")
+            updated_at = (clock or _utc_now)()
+            if updated_at <= current.updated_at:
+                raise ValueError(
+                    "memory edit time must be later than the current update time"
+                )
+            updated = MemoryRecord.model_validate(
+                {
+                    **current.model_dump(),
+                    "label": next_label,
+                    "value": next_value,
+                    "revision": current.revision + 1,
+                    "updated_at": updated_at,
+                }
+            )
+            cursor.execute(
+                """
+                update public.memory_records
+                   set label = %s,
+                       value = %s,
+                       revision = %s,
+                       updated_at = %s
+                 where owner_id = %s and id = %s
+                """,
+                (
+                    updated.label,
+                    updated.value,
+                    updated.revision,
+                    updated.updated_at,
+                    owner_id,
+                    record_id,
+                ),
+            )
+            generation = self._next_reconciliation_generation(
+                cursor,
+                owner_id,
+                record_id,
+            )
+            cursor.execute(
+                """
+                insert into public.memory_reconciliations (
+                  owner_id,
+                  record_id,
+                  generation,
+                  operation,
+                  status,
+                  created_at
+                )
+                values (%s, %s, %s, 'update', 'pending', %s)
+                """,
+                (owner_id, record_id, generation, updated.updated_at),
+            )
+            cursor.execute(
+                """
+                select provider_ref
+                  from public.memory_provider_projections
+                 where owner_id = %s and record_id = %s
+                """,
+                (owner_id, record_id),
+            )
+            projection = cursor.fetchone()
+            return CanonicalRecordMutation(
+                before=current,
+                after=updated,
+                provider_ref=None if projection is None else projection[0],
+                reconciliation_generation=generation,
+            )
+
+    def delete_record(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> CanonicalRecordMutation | None:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select 1
+                  from public.memory_records
+                 where owner_id = %s and id = %s
+                """,
+                (owner_id, record_id),
+            )
+            if cursor.fetchone() is None:
+                return None
+        self._wait_for_record_reconciliation(owner, record_id)
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_record(cursor, owner_id, record_id)
+            cursor.execute(
+                """
+                select consent_action_id
+                  from public.memory_records
+                 where owner_id = %s and id = %s
+                 for update
+                """,
+                (owner_id, record_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            if self._has_pending_reconciliation(cursor, owner_id, record_id):
+                raise TimeoutError(
+                    "memory control timed out waiting for provider reconciliation"
+                )
+            current = self._read_record(
+                cursor,
+                owner_id,
+                record_id,
+                consent_receipt=self._read_consent_receipt(
+                    cursor,
+                    owner_id,
+                    row[0],
+                ),
+            )
+            cursor.execute(
+                """
+                select provider_ref, generation
+                  from public.memory_provider_projections
+                 where owner_id = %s and record_id = %s
+                """,
+                (owner_id, record_id),
+            )
+            projection = cursor.fetchone()
+            provider_ref = None if projection is None else projection[0]
+            cursor.execute(
+                """
+                select distinct provider_ref
+                  from public.memory_provider_cleanup
+                 where owner_id = %s
+                   and record_id = %s
+                   and status = 'pending'
+                 order by provider_ref
+                """,
+                (owner_id, record_id),
+            )
+            cleanup_refs = {item[0] for item in cursor.fetchall()}
+            if projection is not None and provider_ref not in cleanup_refs:
+                cursor.execute(
+                    """
+                    select coalesce(max(generation), 0)
+                      from public.memory_provider_cleanup
+                     where owner_id = %s
+                       and record_id = %s
+                       and provider_ref = %s
+                    """,
+                    (owner_id, record_id, provider_ref),
+                )
+                prior_cleanup_row = cursor.fetchone()
+                assert prior_cleanup_row is not None
+                prior_cleanup_generation = prior_cleanup_row[0]
+                cleanup_generation = max(
+                    projection[1],
+                    prior_cleanup_generation + 1,
+                )
+                cursor.execute(
+                    """
+                    insert into public.memory_provider_cleanup (
+                      owner_id,
+                      record_id,
+                      provider_ref,
+                      generation,
+                      status,
+                      created_at
+                    )
+                    values (%s, %s, %s, %s, 'pending', %s)
+                    """,
+                    (
+                        owner_id,
+                        record_id,
+                        provider_ref,
+                        cleanup_generation,
+                        _utc_now(),
+                    ),
+                )
+                cleanup_refs.add(provider_ref)
+            generation = self._next_reconciliation_generation(
+                cursor,
+                owner_id,
+                record_id,
+            )
+            cursor.execute(
+                """
+                delete from public.memory_records
+                 where owner_id = %s and id = %s
+                """,
+                (owner_id, record_id),
+            )
+            cursor.execute(
+                """
+                insert into public.memory_reconciliations (
+                  owner_id,
+                  record_id,
+                  generation,
+                  operation,
+                  status,
+                  created_at
+                )
+                values (%s, %s, %s, 'delete', 'pending', %s)
+                """,
+                (owner_id, record_id, generation, _utc_now()),
+            )
+            return CanonicalRecordMutation(
+                before=current,
+                after=None,
+                provider_ref=provider_ref,
+                reconciliation_generation=generation,
+                cleanup_refs=tuple(sorted(cleanup_refs)),
+            )
+
+    def disable(self, owner: RegisteredMemoryOwner) -> bool:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_all_categories(cursor, owner_id)
+            changed = False
+            for table in (
+                "memory_settings",
+                "memory_candidates",
+                "memory_prompt_history",
+            ):
+                cursor.execute(
+                    f"delete from public.{table} where owner_id = %s",
+                    (owner_id,),
+                )
+                changed = changed or cursor.rowcount > 0
+            return changed
+
+    def reset(self, owner: RegisteredMemoryOwner) -> CanonicalOwnerReset:
+        self._wait_for_owner_reconciliation(owner)
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            self._lock_all_categories(cursor, owner_id)
+            record_ids = self._logical_record_ids(cursor, owner_id)
+            for record_id in record_ids:
+                self._lock_record(cursor, owner_id, record_id)
+            if self._owner_has_pending_reconciliation(cursor, owner_id):
+                raise TimeoutError(
+                    "memory control timed out waiting for provider reconciliation"
+                )
+            counts = self._owner_memory_counts(cursor, owner_id)
+            cursor.execute(
+                """
+                select exists (
+                  select 1
+                    from public.memory_provider_projections
+                   where owner_id = %s
+                )
+                or exists (
+                  select 1
+                    from public.memory_provider_cleanup
+                   where owner_id = %s and status = 'pending'
+                )
+                """,
+                (owner_id, owner_id),
+            )
+            provider_state_row = cursor.fetchone()
+            assert provider_state_row is not None
+            provider_state_existed = provider_state_row[0]
+            changed = any(counts)
+            cursor.execute(
+                """
+                insert into public.memory_provider_cleanup (
+                  owner_id,
+                  record_id,
+                  provider_ref,
+                  generation,
+                  status,
+                  created_at
+                )
+                select
+                  projection.owner_id,
+                  projection.record_id,
+                  projection.provider_ref,
+                  greatest(
+                    projection.generation,
+                    coalesce(
+                      (
+                        select max(cleanup.generation) + 1
+                          from public.memory_provider_cleanup as cleanup
+                         where cleanup.owner_id = projection.owner_id
+                           and cleanup.record_id = projection.record_id
+                           and cleanup.provider_ref = projection.provider_ref
+                      ),
+                      1
+                    )
+                  ),
+                  'pending',
+                  %s
+                  from public.memory_provider_projections as projection
+                 where projection.owner_id = %s
+                on conflict do nothing
+                """,
+                (_utc_now(), owner_id),
+            )
+            cursor.execute(
+                "delete from public.memory_records where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_candidates where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_settings where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_prompt_history where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_reconciliations where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                "delete from public.memory_consent_actions where owner_id = %s",
+                (owner_id,),
+            )
+            cursor.execute(
+                """
+                delete from public.memory_provider_cleanup
+                 where owner_id = %s and status = 'resolved'
+                """,
+                (owner_id,),
+            )
+            return CanonicalOwnerReset(
+                changed=changed,
+                provider_state_existed=provider_state_existed,
+            )
+
+    @staticmethod
+    def _next_reconciliation_generation(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+    ) -> int:
+        cursor.execute(
+            """
+            select coalesce(max(generation), 0) + 1
+              from public.memory_reconciliations
+             where owner_id = %s and record_id = %s
+            """,
+            (owner_id, record_id),
+        )
+        generation_row = cursor.fetchone()
+        assert generation_row is not None
+        return int(generation_row[0])
+
+    @staticmethod
+    def _has_pending_reconciliation(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+    ) -> bool:
+        cursor.execute(
+            """
+            select exists (
+              select 1
+                from public.memory_reconciliations
+               where owner_id = %s
+                 and record_id = %s
+                 and status in ('pending', 'running')
+            )
+            """,
+            (owner_id, record_id),
+        )
+        pending_row = cursor.fetchone()
+        assert pending_row is not None
+        return bool(pending_row[0])
+
+    @staticmethod
+    def _owner_has_pending_reconciliation(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+    ) -> bool:
+        cursor.execute(
+            """
+            select exists (
+              select 1
+                from public.memory_reconciliations
+               where owner_id = %s
+                 and status in ('pending', 'running')
+            )
+            """,
+            (owner_id,),
+        )
+        pending_row = cursor.fetchone()
+        assert pending_row is not None
+        return bool(pending_row[0])
+
+    def _wait_for_record_reconciliation(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+    ) -> None:
+        for attempt in range(_RECONCILIATION_WAIT_ATTEMPTS):
+            with self._confirmation_transaction(owner) as (cursor, owner_id):
+                pending = self._has_pending_reconciliation(
+                    cursor,
+                    owner_id,
+                    record_id,
+                )
+            if not pending:
+                return
+            if attempt + 1 < _RECONCILIATION_WAIT_ATTEMPTS:
+                time.sleep(_RECONCILIATION_WAIT_SECONDS)
+        raise TimeoutError("memory control timed out waiting for provider reconciliation")
+
+    def _wait_for_owner_reconciliation(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> None:
+        for attempt in range(_RECONCILIATION_WAIT_ATTEMPTS):
+            with self._confirmation_transaction(owner) as (cursor, owner_id):
+                pending = self._owner_has_pending_reconciliation(cursor, owner_id)
+            if not pending:
+                return
+            if attempt + 1 < _RECONCILIATION_WAIT_ATTEMPTS:
+                time.sleep(_RECONCILIATION_WAIT_SECONDS)
+        raise TimeoutError("memory control timed out waiting for provider reconciliation")
+
+    @staticmethod
+    def _logical_record_ids(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+    ) -> tuple[str, ...]:
+        cursor.execute(
+            """
+            select record_id
+              from (
+                select id as record_id
+                  from public.memory_records
+                 where owner_id = %s
+                union
+                select record_id
+                  from public.memory_reconciliations
+                 where owner_id = %s
+                union
+                select record_id
+                  from public.memory_provider_projections
+                 where owner_id = %s
+                union
+                select record_id
+                  from public.memory_provider_cleanup
+                 where owner_id = %s
+              ) as logical_records
+             order by record_id
+            """,
+            (owner_id, owner_id, owner_id, owner_id),
+        )
+        return tuple(row[0] for row in cursor.fetchall())
+
+    @staticmethod
+    def _owner_memory_counts(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+    ) -> tuple[int, ...]:
+        cursor.execute(
+            """
+            select
+              (select count(*) from public.memory_settings
+                where owner_id = %s),
+              (select count(*) from public.memory_candidates
+                where owner_id = %s),
+              (select count(*) from public.memory_consent_actions
+                where owner_id = %s),
+              (select count(*) from public.memory_records
+                where owner_id = %s),
+              (select count(*) from public.memory_provenance
+                where owner_id = %s),
+              (select count(*) from public.memory_prompt_history
+                where owner_id = %s),
+              (select count(*) from public.memory_reconciliations
+                where owner_id = %s),
+              (select count(*) from public.memory_provider_projections
+                where owner_id = %s),
+              (select count(*) from public.memory_provider_cleanup
+                where owner_id = %s)
+            """,
+            (owner_id,) * 9,
+        )
+        counts_row = cursor.fetchone()
+        assert counts_row is not None
+        return tuple(int(value) for value in counts_row)
 
     @classmethod
     def _confirmed_provenance(
