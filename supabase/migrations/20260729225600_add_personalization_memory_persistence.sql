@@ -644,6 +644,81 @@ $$;
 revoke all on function argus_private.protect_memory_child_identity()
   from public, anon, authenticated, service_role;
 
+create or replace function argus_private.lock_memory_record_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner_id uuid;
+  v_record_id text;
+begin
+  if tg_table_schema = 'public'
+     and tg_table_name = 'memory_records'
+     and tg_op = 'INSERT' then
+    v_owner_id := new.owner_id;
+    v_record_id := new.id;
+  elsif tg_table_schema = 'public'
+        and tg_table_name = 'memory_records'
+        and tg_op = 'DELETE' then
+    if not exists (
+      select 1
+        from public.profiles
+       where id = old.owner_id
+    ) then
+      return old;
+    end if;
+    v_owner_id := old.owner_id;
+    v_record_id := old.id;
+  elsif tg_table_schema = 'public'
+        and tg_table_name = 'memory_reconciliations'
+        and tg_op in ('INSERT', 'UPDATE') then
+    v_owner_id := new.owner_id;
+    v_record_id := new.record_id;
+  else
+    raise exception
+      'unsupported memory record lifecycle target: %.% %',
+      tg_table_schema,
+      tg_table_name,
+      tg_op
+      using errcode = '23514';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'argus:memory-record:'
+      || v_owner_id::text
+      || ':'
+      || v_record_id,
+      0
+    )
+  );
+
+  if tg_table_name = 'memory_records'
+     and tg_op = 'INSERT'
+     and exists (
+       select 1
+         from public.memory_reconciliations
+        where owner_id = v_owner_id
+          and record_id = v_record_id
+          and operation = 'delete'
+     ) then
+    raise exception
+      'memory record insert rejected by existing delete reconciliation'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.lock_memory_record_lifecycle()
+  from public, anon, authenticated, service_role;
+
 create or replace function argus_private.guard_memory_record_delete()
 returns trigger
 language plpgsql
@@ -892,9 +967,21 @@ create trigger protect_memory_provider_cleanup_identity
 before update on public.memory_provider_cleanup
 for each row execute function argus_private.protect_memory_child_identity();
 
+create trigger a_lock_memory_record_lifecycle_delete
+before delete on public.memory_records
+for each row execute function argus_private.lock_memory_record_lifecycle();
+
+create trigger lock_memory_record_lifecycle_insert
+before insert on public.memory_records
+for each row execute function argus_private.lock_memory_record_lifecycle();
+
 create trigger guard_memory_record_delete
 before delete on public.memory_records
 for each row execute function argus_private.guard_memory_record_delete();
+
+create trigger lock_memory_record_reconciliation_lifecycle
+before insert or update on public.memory_reconciliations
+for each row execute function argus_private.lock_memory_record_lifecycle();
 
 create trigger validate_memory_reconciliation_lifecycle
 before insert or update on public.memory_reconciliations
