@@ -1392,30 +1392,22 @@ def _conversation_match_ctes(
             if cursor_relative
             else sql.SQL("")
         )
-        window_order_sql = (
-            sql.SQL(
-                """
-                conversation.pinned::integer desc,
-                {exact_rank_sql} desc,
-                {symbol_rank_sql} desc,
-                source_winner.layer_rank desc,
-                {activity_sql} desc,
-                {text_rank_sql} desc,
-                conversation.id desc,
-                source_winner.source_id desc
-                """
-            ).format(
-                exact_rank_sql=conversation_exact_rank,
-                symbol_rank_sql=conversation_symbol_rank,
-                activity_sql=conversation_activity_sql,
-                text_rank_sql=text_rank_sql,
-            )
-            if cursor_relative
-            else sql.SQL(
-                "{activity_sql} desc, source_winner.source_id desc"
-            ).format(
-                activity_sql=conversation_activity_sql,
-            )
+        window_order_sql = sql.SQL(
+            """
+            conversation.pinned::integer desc,
+            {exact_rank_sql} desc,
+            {symbol_rank_sql} desc,
+            source_winner.layer_rank desc,
+            {activity_sql} desc,
+            {text_rank_sql} desc,
+            conversation.id desc,
+            source_winner.source_id desc
+            """
+        ).format(
+            exact_rank_sql=conversation_exact_rank,
+            symbol_rank_sql=conversation_symbol_rank,
+            activity_sql=conversation_activity_sql,
+            text_rank_sql=text_rank_sql,
         )
         return sql.SQL(
             """

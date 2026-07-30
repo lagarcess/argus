@@ -986,6 +986,52 @@ def test_conversation_cursor_reaches_message_after_source_candidate_cap(
     assert seen == [*newer_pinned, str(last_pinned_id), str(unpinned_id)]
 
 
+def test_initial_source_cap_keeps_old_pinned_conversation_reachable(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 27, 18, 15, tzinfo=timezone.utc)
+    recent_unpinned: list[str] = []
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset in range(10):
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=offset),
+                title=f"Recent unpinned conversation {offset}",
+            )
+            recent_unpinned.append(str(conversation_id))
+        old_pinned_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now - timedelta(days=1),
+            title="Old pinned conversation",
+            pinned=True,
+        )
+
+    reader, _ = _reader()
+    seen: list[str] = []
+    cursor_at = None
+    cursor_id = None
+    for _ in range(12):
+        result = reader.search_rows(
+            user_id=str(owner_id),
+            query="",
+            source_limit=1,
+            cursor_updated_at=cursor_at,
+            cursor_id=cursor_id,
+        )
+        page = _ranked(result.rows, "")[:1]
+        if not page:
+            break
+        item = page[0][1]
+        seen.append(item.id)
+        cursor_at = item.updated_at
+        cursor_id = item.id
+
+    assert seen == [str(old_pinned_id), *recent_unpinned]
+
+
 def test_message_source_cap_collapses_conversation_before_limit(
     search_identities,
 ) -> None:

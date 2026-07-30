@@ -1068,6 +1068,14 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     assert (
         base_matches.count("select max(source_activity.activity_at)") == 6
     )
+    assert (
+        base_matches.count(
+            "order by conversation.pinned::integer desc"
+        )
+        == 6
+    )
+    assert base_matches.count("source_winner.layer_rank desc") == 6
+    assert base_matches.count("conversation.id desc") >= 6
     assert cursor_matches.count("limit (select match_limit from input)") == 6
     bounded_cursor_windows = cursor_matches
     assert (
