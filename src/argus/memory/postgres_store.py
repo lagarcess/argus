@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +13,7 @@ from psycopg.rows import tuple_row
 from psycopg_pool import ConnectionPool
 
 from argus.memory.contracts import (
+    ConfirmationResult,
     MemoryCandidate,
     MemoryCategory,
     MemoryConsentActionReceipt,
@@ -20,11 +21,13 @@ from argus.memory.contracts import (
     MemoryOperationContext,
     MemoryProposalTrigger,
     MemoryProvenance,
+    MemoryRecord,
     MemorySourceKind,
     SavedDecisionSource,
     SensitivityAssessment,
 )
 from argus.memory.store import (
+    CanonicalConfirmationMutation,
     CanonicalEnableMutation,
     ProposalHistorySnapshot,
 )
@@ -35,6 +38,7 @@ from argus.memory.subject import (
 
 _ALL_MEMORY_CATEGORIES = tuple(sorted(MemoryCategory, key=lambda item: item.value))
 _CANDIDATE_CAS_ATTEMPTS = 2
+_READ_COMMITTED = "set transaction isolation level read committed"
 _SERIALIZABLE = "set transaction isolation level serializable"
 
 
@@ -54,6 +58,19 @@ class PostgresCanonicalMemoryStore:
             with connection.transaction():
                 with connection.cursor(row_factory=tuple_row) as cursor:
                     cursor.execute(_SERIALIZABLE)
+                    self._require_registered_owner(cursor, owner_id)
+                    yield cursor, owner_id
+
+    @contextmanager
+    def _confirmation_transaction(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> Iterator[tuple[Cursor[Any], UUID]]:
+        owner_id = self._owner_uuid(owner)
+        with self._pool.connection() as connection:
+            with connection.transaction():
+                with connection.cursor(row_factory=tuple_row) as cursor:
+                    cursor.execute(_READ_COMMITTED)
                     self._require_registered_owner(cursor, owner_id)
                     yield cursor, owner_id
 
@@ -566,6 +583,596 @@ class PostgresCanonicalMemoryStore:
                 (owner_id, candidate_id),
             )
             return cursor.fetchone() is not None
+
+    def confirm_candidate(
+        self,
+        owner: RegisteredMemoryOwner,
+        candidate_id: str,
+        *,
+        clock: Callable[[], datetime],
+        id_factory: Callable[[], str],
+    ) -> CanonicalConfirmationMutation:
+        try:
+            with self._confirmation_transaction(owner) as (cursor, owner_id):
+                self._lock_all_categories(cursor, owner_id)
+                cursor.execute(
+                    """
+                    select 1
+                      from public.memory_candidates
+                     where owner_id = %s and id = %s
+                     for update
+                    """,
+                    (owner_id, candidate_id),
+                )
+                if cursor.fetchone() is None:
+                    return self._unchanged_confirmation()
+
+                candidate = self._read_candidate(cursor, owner_id, candidate_id)
+                if candidate is None:
+                    return self._unchanged_confirmation()
+                confirmed_provenance = self._confirmed_provenance(
+                    cursor,
+                    owner_id,
+                    candidate,
+                )
+                if confirmed_provenance is None:
+                    return self._unchanged_confirmation()
+
+                cursor.execute(
+                    """
+                    select 1
+                      from public.memory_consent_actions
+                     where owner_id = %s
+                       and candidate_id = %s
+                       and action = 'candidate_confirmation'
+                    """,
+                    (owner_id, candidate.id),
+                )
+                if cursor.fetchone() is not None:
+                    return self._unchanged_confirmation()
+
+                current = self._read_settings(cursor, owner_id)
+                requested_scope = candidate.opt_in_scope | frozenset({candidate.category})
+                granted_scope = requested_scope - current.enabled_categories
+                effective_scope = current.enabled_categories | requested_scope
+
+                confirmed_at = clock()
+                receipt = MemoryConsentActionReceipt(
+                    id=id_factory(),
+                    action="candidate_confirmation",
+                    owner_id=str(owner_id),
+                    candidate_id=candidate.id,
+                    requested_scope=requested_scope,
+                    granted_scope=granted_scope,
+                    effective_scope=effective_scope,
+                    recorded_at=confirmed_at,
+                    idempotency_key=candidate.id,
+                )
+                record = MemoryRecord(
+                    id=id_factory(),
+                    owner_id=str(owner_id),
+                    candidate_id=candidate.id,
+                    category=candidate.category,
+                    label=candidate.source.label,
+                    value=candidate.source.value,
+                    provenance=confirmed_provenance[0],
+                    provenance_refs=confirmed_provenance,
+                    consent_receipt=receipt,
+                    created_at=confirmed_at,
+                    updated_at=confirmed_at,
+                )
+
+                self._insert_confirmation_receipt(cursor, owner_id, receipt)
+                for category in sorted(
+                    receipt.granted_scope,
+                    key=lambda item: item.value,
+                ):
+                    cursor.execute(
+                        """
+                        insert into public.memory_settings (owner_id, category)
+                        values (%s, %s)
+                        on conflict (owner_id, category) do nothing
+                        """,
+                        (owner_id, category.value),
+                    )
+                self._insert_record(cursor, owner_id, record, receipt.id)
+                self._copy_record_provenance(cursor, owner_id, record)
+                cursor.execute(
+                    """
+                    insert into public.memory_reconciliations (
+                      owner_id,
+                      record_id,
+                      generation,
+                      operation,
+                      status,
+                      created_at
+                    )
+                    values (%s, %s, 1, 'create', 'pending', %s)
+                    """,
+                    (owner_id, record.id, confirmed_at),
+                )
+                cursor.execute(
+                    """
+                    delete from public.memory_candidates
+                     where owner_id = %s and id = %s
+                    returning id
+                    """,
+                    (owner_id, candidate.id),
+                )
+                consumed = cursor.fetchone()
+                if consumed is None or consumed[0] != candidate.id:
+                    raise RuntimeError("confirmed memory candidate was not consumed")
+
+                persisted_receipt = self._read_consent_receipt(
+                    cursor,
+                    owner_id,
+                    receipt.id,
+                )
+                persisted_record = self._read_record(
+                    cursor,
+                    owner_id,
+                    record.id,
+                    consent_receipt=persisted_receipt,
+                )
+                if persisted_receipt != receipt or persisted_record != record:
+                    raise RuntimeError("confirmed memory readback did not round-trip")
+                return CanonicalConfirmationMutation(
+                    result=ConfirmationResult(
+                        created=True,
+                        record=persisted_record,
+                        consent_receipt=persisted_receipt,
+                    ),
+                    reconciliation_generation=1,
+                )
+        except errors.UniqueViolation as exc:
+            raise ValueError("confirmation identity already exists") from exc
+
+    @staticmethod
+    def _unchanged_confirmation() -> CanonicalConfirmationMutation:
+        return CanonicalConfirmationMutation(
+            result=ConfirmationResult(created=False),
+        )
+
+    @staticmethod
+    def _insert_confirmation_receipt(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        receipt: MemoryConsentActionReceipt,
+    ) -> None:
+        cursor.execute(
+            """
+            insert into public.memory_consent_actions (
+              id,
+              owner_id,
+              schema_version,
+              policy_version,
+              action,
+              candidate_id,
+              requested_scope,
+              granted_scope,
+              effective_scope,
+              recorded_at,
+              idempotency_key
+            )
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                receipt.id,
+                owner_id,
+                receipt.schema_version,
+                receipt.policy_version,
+                receipt.action,
+                receipt.candidate_id,
+                [
+                    category.value
+                    for category in sorted(
+                        receipt.requested_scope,
+                        key=lambda item: item.value,
+                    )
+                ],
+                [
+                    category.value
+                    for category in sorted(
+                        receipt.granted_scope,
+                        key=lambda item: item.value,
+                    )
+                ],
+                [
+                    category.value
+                    for category in sorted(
+                        receipt.effective_scope,
+                        key=lambda item: item.value,
+                    )
+                ],
+                receipt.recorded_at,
+                receipt.idempotency_key,
+            ),
+        )
+
+    @staticmethod
+    def _insert_record(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record: MemoryRecord,
+        consent_action_id: str,
+    ) -> None:
+        cursor.execute(
+            """
+            insert into public.memory_records (
+              id,
+              owner_id,
+              candidate_id,
+              consent_action_id,
+              category,
+              label,
+              value,
+              revision,
+              created_at,
+              updated_at
+            )
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                record.id,
+                owner_id,
+                record.candidate_id,
+                consent_action_id,
+                record.category.value,
+                record.label,
+                record.value,
+                record.revision,
+                record.created_at,
+                record.updated_at,
+            ),
+        )
+
+    @staticmethod
+    def _copy_record_provenance(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record: MemoryRecord,
+    ) -> None:
+        for ordinal, provenance in enumerate(record.provenance_refs):
+            cursor.execute(
+                """
+                insert into public.memory_provenance (
+                  owner_id,
+                  candidate_id,
+                  record_id,
+                  ordinal,
+                  source_kind,
+                  source_id,
+                  source_version
+                )
+                values (%s, null, %s, %s, %s, %s, %s)
+                """,
+                (
+                    owner_id,
+                    record.id,
+                    ordinal,
+                    provenance.source_kind.value,
+                    provenance.source_id,
+                    provenance.source_version,
+                ),
+            )
+
+    @staticmethod
+    def _read_consent_receipt(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        receipt_id: str,
+    ) -> MemoryConsentActionReceipt:
+        cursor.execute(
+            """
+            select
+              id,
+              schema_version,
+              policy_version,
+              action,
+              owner_id::text,
+              candidate_id,
+              requested_scope,
+              granted_scope,
+              effective_scope,
+              recorded_at,
+              idempotency_key
+              from public.memory_consent_actions
+             where owner_id = %s and id = %s
+            """,
+            (owner_id, receipt_id),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("confirmed consent receipt readback is missing")
+        return MemoryConsentActionReceipt(
+            id=row[0],
+            schema_version=row[1],
+            policy_version=row[2],
+            action=row[3],
+            owner_id=row[4],
+            candidate_id=row[5],
+            requested_scope=frozenset(MemoryCategory(item) for item in row[6]),
+            granted_scope=frozenset(MemoryCategory(item) for item in row[7]),
+            effective_scope=frozenset(MemoryCategory(item) for item in row[8]),
+            recorded_at=row[9],
+            idempotency_key=row[10],
+        )
+
+    @staticmethod
+    def _read_record(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        record_id: str,
+        *,
+        consent_receipt: MemoryConsentActionReceipt,
+    ) -> MemoryRecord:
+        cursor.execute(
+            """
+            select
+              id,
+              owner_id::text,
+              candidate_id,
+              category,
+              label,
+              value,
+              revision,
+              created_at,
+              updated_at
+              from public.memory_records
+             where owner_id = %s and id = %s
+            """,
+            (owner_id, record_id),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("confirmed memory record readback is missing")
+        cursor.execute(
+            """
+            select source_kind, source_id, source_version
+              from public.memory_provenance
+             where owner_id = %s and record_id = %s
+             order by ordinal
+            """,
+            (owner_id, record_id),
+        )
+        provenance_refs = tuple(
+            MemoryProvenance(
+                source_kind=MemorySourceKind(item[0]),
+                source_id=item[1],
+                source_version=item[2],
+            )
+            for item in cursor.fetchall()
+        )
+        if not provenance_refs:
+            raise RuntimeError("confirmed memory record provenance readback is missing")
+        return MemoryRecord(
+            id=row[0],
+            owner_id=row[1],
+            candidate_id=row[2],
+            category=MemoryCategory(row[3]),
+            label=row[4],
+            value=row[5],
+            provenance=provenance_refs[0],
+            provenance_refs=provenance_refs,
+            consent_receipt=consent_receipt,
+            revision=row[6],
+            created_at=row[7],
+            updated_at=row[8],
+        )
+
+    @classmethod
+    def _confirmed_provenance(
+        cls,
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        candidate: MemoryCandidate,
+    ) -> tuple[MemoryProvenance, ...] | None:
+        linked_decision: tuple[UUID, UUID, UUID, UUID | None, datetime] | None = None
+        canonical_evidence: MemoryProvenance | None = None
+        if candidate.trigger is MemoryProposalTrigger.SAVED_DECISION:
+            primary = candidate.source.provenance
+            if primary.source_kind is not MemorySourceKind.DECISION_NOTE:
+                return None
+            decision_id = cls._source_uuid(primary)
+            if decision_id is None:
+                return None
+            cursor.execute(
+                """
+                select evidence_artifact_id
+                  from public.decision_notes
+                 where id = %s and user_id = %s
+                """,
+                (decision_id, owner_id),
+            )
+            decision_hint = cursor.fetchone()
+            if decision_hint is None:
+                return None
+            evidence_id = decision_hint[0]
+            cursor.execute(
+                """
+                select idea_id, idea_version_id, updated_at
+                  from public.evidence_artifacts
+                 where id = %s and user_id = %s
+                 for update
+                """,
+                (evidence_id, owner_id),
+            )
+            evidence_row = cursor.fetchone()
+            if evidence_row is None:
+                return None
+            canonical_evidence = MemoryProvenance(
+                source_kind=MemorySourceKind.EVIDENCE_ARTIFACT,
+                source_id=str(evidence_id),
+                source_version=cls._stable_source_revision(evidence_row[2]),
+            )
+            cursor.execute(
+                """
+                select
+                  idea_id,
+                  idea_version_id,
+                  evidence_artifact_id,
+                  source_conversation_id,
+                  updated_at
+                  from public.decision_notes
+                 where id = %s and user_id = %s
+                 for update
+                """,
+                (decision_id, owner_id),
+            )
+            decision_row = cursor.fetchone()
+            if decision_row is None:
+                return None
+            linked_decision = (
+                decision_row[0],
+                decision_row[1],
+                decision_row[2],
+                decision_row[3],
+                decision_row[4],
+            )
+            if linked_decision[2] != evidence_id:
+                return None
+            if (linked_decision[0], linked_decision[1]) != (
+                evidence_row[0],
+                evidence_row[1],
+            ):
+                return None
+            source_revision = cls._parse_source_revision(primary.source_version)
+            if source_revision is None or source_revision != linked_decision[4]:
+                return None
+            cursor.execute(
+                """
+                select 1
+                  from public.ideas
+                 where id = %s and user_id = %s
+                """,
+                (linked_decision[0], owner_id),
+            )
+            if cursor.fetchone() is None:
+                return None
+            cursor.execute(
+                """
+                select 1
+                  from public.idea_versions
+                 where id = %s
+                   and user_id = %s
+                   and idea_id = %s
+                """,
+                (linked_decision[1], owner_id, linked_decision[0]),
+            )
+            if cursor.fetchone() is None:
+                return None
+
+        confirmed_refs: list[MemoryProvenance] = []
+        for provenance in candidate.provenance_refs:
+            source_id = cls._source_uuid(provenance)
+            if source_id is None:
+                return None
+            if linked_decision is not None:
+                if provenance.source_kind is MemorySourceKind.EVIDENCE_ARTIFACT:
+                    if (
+                        canonical_evidence is None
+                        or source_id != linked_decision[2]
+                        or provenance != canonical_evidence
+                    ):
+                        return None
+                    continue
+                elif (
+                    provenance.source_kind is MemorySourceKind.IDEA
+                    and source_id != linked_decision[0]
+                ):
+                    return None
+                elif (
+                    provenance.source_kind is MemorySourceKind.IDEA_VERSION
+                    and source_id != linked_decision[1]
+                ):
+                    return None
+            if not cls._source_is_owned(
+                cursor,
+                owner_id,
+                provenance.source_kind,
+                source_id,
+            ):
+                return None
+            confirmed_refs.append(provenance)
+        if canonical_evidence is not None:
+            confirmed_refs.insert(1, canonical_evidence)
+        return tuple(confirmed_refs)
+
+    @staticmethod
+    def _source_uuid(provenance: MemoryProvenance) -> UUID | None:
+        try:
+            return UUID(provenance.source_id)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_source_revision(value: str) -> datetime | None:
+        if "T" not in value:
+            return None
+        normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _stable_source_revision(value: datetime) -> str:
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _source_is_owned(
+        cursor: Cursor[Any],
+        owner_id: UUID,
+        source_kind: MemorySourceKind,
+        source_id: UUID,
+    ) -> bool:
+        statements = {
+            MemorySourceKind.EVIDENCE_ARTIFACT: """
+                select 1
+                  from public.evidence_artifacts
+                 where id = %s and user_id = %s
+            """,
+            MemorySourceKind.DECISION_NOTE: """
+                select 1
+                  from public.decision_notes
+                 where id = %s and user_id = %s
+            """,
+            MemorySourceKind.IDEA: """
+                select 1
+                  from public.ideas
+                 where id = %s and user_id = %s
+            """,
+            MemorySourceKind.IDEA_VERSION: """
+                select 1
+                  from public.idea_versions
+                 where id = %s and user_id = %s
+            """,
+            MemorySourceKind.CONVERSATION: """
+                select 1
+                  from public.conversations
+                 where id = %s and user_id = %s
+            """,
+            MemorySourceKind.MESSAGE: """
+                select 1
+                  from public.messages as message
+                  join public.conversations as conversation
+                    on conversation.id = message.conversation_id
+                 where message.id = %s
+                   and message.user_id = %s
+                   and conversation.user_id = %s
+            """,
+        }
+        statement = statements[source_kind]
+        parameters: tuple[object, ...]
+        if source_kind is MemorySourceKind.MESSAGE:
+            parameters = (source_id, owner_id, owner_id)
+        else:
+            parameters = (source_id, owner_id)
+        cursor.execute(statement, parameters)
+        return cursor.fetchone() is not None
 
     def decline_candidate_with_history(
         self,
