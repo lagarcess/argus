@@ -362,6 +362,7 @@ def _seed_record(
             """
             update public.memory_reconciliations
                set status='succeeded',
+                   claim_token=null,
                    lease_expires_at=null,
                    completed_at=%s
              where owner_id=%s and record_id=%s and generation=1

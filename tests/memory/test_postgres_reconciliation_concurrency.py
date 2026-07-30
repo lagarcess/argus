@@ -144,6 +144,7 @@ def _seed_lifecycle_state(connection) -> _LifecycleState:
             """
             update public.memory_reconciliations
                set status='succeeded',
+                   claim_token=null,
                    lease_expires_at=null,
                    completed_at=now()
              where owner_id=%s and record_id=%s and generation=1

@@ -64,15 +64,25 @@ class PostgresCanonicalMemoryStore:
         reconciliation_clock: Callable[[], datetime] = _utc_now,
         reconciliation_token_factory: Callable[[], str] | None = None,
         reconciliation_lease: timedelta = _DEFAULT_RECONCILIATION_LEASE,
+        reconciliation_wait_attempts: int = _RECONCILIATION_WAIT_ATTEMPTS,
+        reconciliation_wait_seconds: float = _RECONCILIATION_WAIT_SECONDS,
+        reconciliation_sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         if reconciliation_lease <= timedelta(0):
             raise ValueError("reconciliation lease must be positive")
+        if reconciliation_wait_attempts < 1:
+            raise ValueError("reconciliation wait attempts must be positive")
+        if reconciliation_wait_seconds < 0:
+            raise ValueError("reconciliation wait seconds must not be negative")
         self._pool = pool
         self._reconciliation_clock = reconciliation_clock
         self._reconciliation_token_factory = reconciliation_token_factory or (
             lambda: str(uuid4())
         )
         self._reconciliation_lease = reconciliation_lease
+        self._reconciliation_wait_attempts = reconciliation_wait_attempts
+        self._reconciliation_wait_seconds = reconciliation_wait_seconds
+        self._reconciliation_sleeper = reconciliation_sleeper
 
     @contextmanager
     def _transaction(
@@ -1349,6 +1359,25 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("reconciliation record id must not be blank")
         if reconciliation_generation < 1:
             raise ValueError("reconciliation generation must be positive")
+        self._owner_uuid(owner)
+        for attempt in range(self._reconciliation_wait_attempts):
+            claim, prior_unfinished = self._claim_reconciliation_once(
+                owner,
+                record_id,
+                reconciliation_generation,
+            )
+            if claim is not None or not prior_unfinished:
+                return claim
+            if attempt + 1 < self._reconciliation_wait_attempts:
+                self._reconciliation_sleeper(self._reconciliation_wait_seconds)
+        return None
+
+    def _claim_reconciliation_once(
+        self,
+        owner: RegisteredMemoryOwner,
+        record_id: str,
+        reconciliation_generation: int,
+    ) -> tuple[ReconciliationClaim | None, bool]:
         now = self._reconciliation_clock()
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("reconciliation clock must return an aware datetime")
@@ -1369,7 +1398,7 @@ class PostgresCanonicalMemoryStore:
             )
             row = cursor.fetchone()
             if row is None or row[1] in ("succeeded", "failed"):
-                return None
+                return None, False
             cursor.execute(
                 """
                 select exists (
@@ -1386,7 +1415,7 @@ class PostgresCanonicalMemoryStore:
             prior_row = cursor.fetchone()
             assert prior_row is not None
             if prior_row[0]:
-                return None
+                return None, True
 
             operation, status, old_claim_token, old_lease_expires_at = row
             if (
@@ -1394,7 +1423,7 @@ class PostgresCanonicalMemoryStore:
                 and old_lease_expires_at is not None
                 and old_lease_expires_at > now
             ):
-                return None
+                return None, False
             claim_token = self._reconciliation_token_factory()
             if not isinstance(claim_token, str):
                 raise ValueError("reconciliation claim token must be text")
@@ -1433,12 +1462,15 @@ class PostgresCanonicalMemoryStore:
             )
             updated = cursor.fetchone()
             if updated is None:
-                return None
-            return ReconciliationClaim(
-                record_id=record_id,
-                generation=reconciliation_generation,
-                operation=operation,
-                claim_token=claim_token,
+                return None, False
+            return (
+                ReconciliationClaim(
+                    record_id=record_id,
+                    generation=reconciliation_generation,
+                    operation=operation,
+                    claim_token=claim_token,
+                ),
+                False,
             )
 
     def finish_reconciliation_claim(
@@ -1468,6 +1500,7 @@ class PostgresCanonicalMemoryStore:
                 """
                 update public.memory_reconciliations
                    set status = %s,
+                       claim_token = null,
                        lease_expires_at = null,
                        error_code = %s,
                        completed_at = %s
@@ -1477,6 +1510,7 @@ class PostgresCanonicalMemoryStore:
                    and operation = %s
                    and status = 'running'
                    and claim_token = %s
+                   and lease_expires_at > %s
              returning 1
                 """,
                 (
@@ -1488,6 +1522,7 @@ class PostgresCanonicalMemoryStore:
                     claim.generation,
                     claim.operation,
                     claim.claim_token,
+                    completed_at,
                 ),
             )
             return cursor.fetchone() is not None
@@ -1506,6 +1541,9 @@ class PostgresCanonicalMemoryStore:
             raise ValueError("provider ref must not be empty")
         if len(provider_ref) > 1_024:
             raise ValueError("provider ref must not exceed 1024 characters")
+        effective_at = self._reconciliation_clock()
+        if effective_at.tzinfo is None or effective_at.utcoffset() is None:
+            raise ValueError("reconciliation clock must return an aware datetime")
         try:
             with self._confirmation_transaction(owner) as (cursor, owner_id):
                 self._lock_record(cursor, owner_id, record_id)
@@ -1519,6 +1557,7 @@ class PostgresCanonicalMemoryStore:
                        and operation = %s
                        and status = 'running'
                        and claim_token = %s
+                       and lease_expires_at > %s
                     """,
                     (
                         owner_id,
@@ -1526,6 +1565,7 @@ class PostgresCanonicalMemoryStore:
                         reconciliation_claim.generation,
                         reconciliation_claim.operation,
                         reconciliation_claim.claim_token,
+                        effective_at,
                     ),
                 )
                 if (
@@ -1572,7 +1612,7 @@ class PostgresCanonicalMemoryStore:
                             record_id,
                             provider_ref,
                             reconciliation_claim.generation,
-                            self._reconciliation_clock(),
+                            effective_at,
                         ),
                     )
                 else:
@@ -1587,7 +1627,7 @@ class PostgresCanonicalMemoryStore:
                         (
                             provider_ref,
                             reconciliation_claim.generation,
-                            self._reconciliation_clock(),
+                            effective_at,
                             owner_id,
                             record_id,
                         ),

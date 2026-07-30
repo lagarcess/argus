@@ -243,6 +243,7 @@ def test_reconciliation_outcome_fields_are_mutable(
                 update public.memory_reconciliations
                    set status = 'failed',
                        error_code = 'provider_timeout',
+                       claim_token = null,
                        lease_expires_at = null,
                        completed_at = now()
                  where owner_id = %s
@@ -360,6 +361,44 @@ def test_failed_reconciliation_requires_bounded_error_code(
                     update public.memory_reconciliations
                        set status = 'failed',
                            completed_at = now()
+                     where owner_id = %s
+                       and record_id = %s
+                       and generation = 1
+                    """,
+                    (memory_graph["owner_id"], memory_graph["record_id"]),
+                )
+
+
+def test_running_reconciliation_cannot_finish_after_its_effective_lease(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                update public.memory_reconciliations
+                   set status = 'running',
+                       claim_token = 'expired-terminal-claim',
+                       lease_expires_at = now() + interval '1 hour',
+                       attempt_count = 1
+                 where owner_id = %s
+                   and record_id = %s
+                   and generation = 1
+                """,
+                (memory_graph["owner_id"], memory_graph["record_id"]),
+            )
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="expired",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    update public.memory_reconciliations
+                       set status = 'succeeded',
+                           claim_token = null,
+                           lease_expires_at = null,
+                           completed_at = now() + interval '2 hours'
                      where owner_id = %s
                        and record_id = %s
                        and generation = 1

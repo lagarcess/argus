@@ -386,7 +386,7 @@ create table public.memory_reconciliations (
       )
       or (
         status = 'succeeded'
-        and claim_token is not null
+        and claim_token is null
         and lease_expires_at is null
         and attempt_count >= 1
         and error_code is null
@@ -394,7 +394,7 @@ create table public.memory_reconciliations (
       )
       or (
         status = 'failed'
-        and claim_token is not null
+        and claim_token is null
         and lease_expires_at is null
         and attempt_count >= 1
         and error_code is not null
@@ -878,10 +878,15 @@ begin
     end if;
   elsif old.status = 'running'
         and new.status in ('succeeded', 'failed') then
-    if new.claim_token is distinct from old.claim_token
+    if old.lease_expires_at is null
+       or new.completed_at is null
+       or old.lease_expires_at <= new.completed_at then
+      raise exception 'expired reconciliation claim cannot finish'
+        using errcode = '23514';
+    end if;
+    if new.claim_token is not null
        or new.attempt_count <> old.attempt_count
        or new.lease_expires_at is not null
-       or new.completed_at is null
        or (new.status = 'succeeded' and new.error_code is not null)
        or (new.status = 'failed' and new.error_code is null) then
       raise exception 'invalid % reconciliation terminal transition', new.status

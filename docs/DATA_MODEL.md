@@ -948,10 +948,11 @@ store.
   running before reaching immutable succeeded/failed terminal state. The claim
   token, expiry, and attempt count make restart recovery inspectable: a live
   lease cannot be stolen, an expired lease may be reclaimed with a new token,
-  and only the exact current claim may commit a provider pointer or terminal
-  outcome. Lower unfinished generations block later work for the same record,
-  while other owners remain independent. Unfinished work restricts record
-  deletion so derivative cleanup cannot disappear silently.
+  and only the exact, unexpired current claim may commit a provider pointer or
+  terminal outcome. Terminal rows erase the bearer token and lease. Lower
+  unfinished generations cause a bounded, lock-free wait before later work for
+  the same record, while other owners remain independent. Unfinished work
+  restricts record deletion so derivative cleanup cannot disappear silently.
 - `memory_provider_projections`: the current derivative provider pointer and
   positive generation for a canonical record.
 - `memory_provider_cleanup`: durable pending/resolved cleanup targets that

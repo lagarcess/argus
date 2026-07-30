@@ -6,7 +6,9 @@ import os
 import time
 import uuid
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from threading import Event
 from typing import Any
 
 import pytest
@@ -261,6 +263,96 @@ def test_stale_claim_cannot_finish_reclaimed_work(database: dict[str, Any]) -> N
     )
 
 
+@pytest.mark.parametrize(
+    ("succeeded", "error_code", "expected_status"),
+    (
+        (True, None, "succeeded"),
+        (False, "provider_reconciliation_required", "failed"),
+    ),
+)
+def test_terminal_outcome_erases_claim_bearer_state(
+    database: dict[str, Any],
+    succeeded: bool,
+    error_code: str | None,
+    expected_status: str,
+) -> None:
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: "terminal-bearer",
+    )
+    claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert claim is not None
+
+    assert store.finish_reconciliation_claim(
+        database["owner"],
+        claim,
+        succeeded=succeeded,
+        error_code=error_code,
+        completed_at=datetime.now(timezone.utc),
+    )
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        row = connection.execute(
+            """
+            select status,claim_token,lease_expires_at
+              from public.memory_reconciliations
+             where owner_id=%s and record_id=%s and generation=1
+            """,
+            (database["owner"].owner_id, database["record_id"]),
+        ).fetchone()
+    assert row == (expected_status, None, None)
+
+
+def test_expired_exact_claim_cannot_finish(database: dict[str, Any]) -> None:
+    effective_time = [datetime.now(timezone.utc)]
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_clock=lambda: effective_time[0],
+        reconciliation_token_factory=lambda: "expired-finish-exact",
+        reconciliation_lease=timedelta(minutes=1),
+    )
+    claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert claim is not None
+    effective_time[0] += timedelta(minutes=2)
+
+    assert not store.finish_reconciliation_claim(
+        database["owner"],
+        claim,
+        succeeded=True,
+        error_code=None,
+        completed_at=effective_time[0],
+    )
+    assert store.inflight_reconciliation_generations(
+        database["owner"], database["record_id"]
+    ) == (1,)
+
+
+def test_expired_exact_claim_cannot_commit_provider_ref(
+    database: dict[str, Any],
+) -> None:
+    effective_time = [datetime.now(timezone.utc)]
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_clock=lambda: effective_time[0],
+        reconciliation_token_factory=lambda: "expired-cas-exact",
+        reconciliation_lease=timedelta(minutes=1),
+    )
+    record = store.get_record(database["owner"], database["record_id"])
+    assert record is not None
+    claim = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert claim is not None
+    effective_time[0] += timedelta(minutes=2)
+
+    assert not store.compare_and_set_provider_ref(
+        database["owner"],
+        database["record_id"],
+        expected_record=record,
+        expected_provider_ref=None,
+        reconciliation_claim=claim,
+        provider_ref="provider-must-not-commit",
+    )
+    assert store.get_provider_ref(database["owner"], database["record_id"]) is None
+
+
 def test_prior_unfinished_generation_blocks_next_claim(
     database: dict[str, Any],
 ) -> None:
@@ -300,6 +392,62 @@ def test_prior_unfinished_generation_blocks_next_claim(
     second = store.claim_reconciliation_turn(database["owner"], database["record_id"], 2)
     assert second is not None
     assert second.claim_token == "generation-two"
+
+
+def test_next_generation_bounded_wait_obtains_claim_after_prior_finishes(
+    database: dict[str, Any],
+) -> None:
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        connection.execute(
+            """
+            insert into public.memory_reconciliations (
+              owner_id,record_id,generation,operation,status
+            )
+            values (%s,%s,2,'update','pending')
+            """,
+            (database["owner"].owner_id, database["record_id"]),
+        )
+    polling = Event()
+    resume_polling = Event()
+
+    def _wait_for_prior(_seconds: float) -> None:
+        polling.set()
+        if not resume_polling.wait(timeout=2):
+            raise TimeoutError("test did not release reconciliation polling")
+
+    tokens = iter(("bounded-first", "bounded-second"))
+    store = PostgresCanonicalMemoryStore(
+        database["pool"],
+        reconciliation_token_factory=lambda: next(tokens),
+        reconciliation_wait_attempts=3,
+        reconciliation_wait_seconds=0.0,
+        reconciliation_sleeper=_wait_for_prior,
+    )
+    first = store.claim_reconciliation_turn(database["owner"], database["record_id"], 1)
+    assert first is not None
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        second_future = executor.submit(
+            store.claim_reconciliation_turn,
+            database["owner"],
+            database["record_id"],
+            2,
+        )
+        assert polling.wait(timeout=1)
+        assert not second_future.done()
+        assert store.finish_reconciliation_claim(
+            database["owner"],
+            first,
+            succeeded=True,
+            error_code=None,
+            completed_at=datetime.now(timezone.utc),
+        )
+        resume_polling.set()
+        second = second_future.result(timeout=2)
+
+    assert second is not None
+    assert second.generation == 2
+    assert second.claim_token == "bounded-second"
 
 
 def test_claim_ordering_is_independent_across_owners(

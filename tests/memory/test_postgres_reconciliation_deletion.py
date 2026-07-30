@@ -244,6 +244,7 @@ def _seed_complete_memory_state(
                 """
                 update public.memory_reconciliations
                    set status=%s,
+                       claim_token=null,
                        lease_expires_at=null,
                        error_code=%s,
                        completed_at=now()
@@ -328,6 +329,7 @@ def _insert_reconciliation(
                 """
                 update public.memory_reconciliations
                    set status=%s,
+                       claim_token=null,
                        lease_expires_at=null,
                        error_code=%s,
                        completed_at=now()
@@ -524,6 +526,7 @@ def test_delete_generation_starts_after_record_absence_and_finishes_later(
                 """
                 update public.memory_reconciliations
                    set status='succeeded',
+                       claim_token=null,
                        lease_expires_at=null,
                        completed_at=now()
                  where owner_id=%s
