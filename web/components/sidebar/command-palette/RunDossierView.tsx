@@ -36,10 +36,31 @@ type RunDossierViewProps = {
   runFreshDisabled?: boolean;
 };
 
-type DecisionDraft = {
+export type DecisionDraft = {
   state: DecisionState;
   note: string;
 };
+
+export type DecisionSaveLifecycleOutcome = {
+  draft: DecisionDraft | null;
+  error: boolean;
+  saved: boolean;
+};
+
+export async function resolveDecisionSaveLifecycle({
+  draft,
+  commit,
+}: {
+  draft: DecisionDraft;
+  commit: () => Promise<void>;
+}): Promise<DecisionSaveLifecycleOutcome> {
+  try {
+    await commit();
+    return { draft: null, error: false, saved: true };
+  } catch {
+    return { draft, error: true, saved: false };
+  }
+}
 
 function formatCompletedAt(value: string, locale: string) {
   const date = new Date(value);
@@ -115,16 +136,21 @@ export function RunDossierView({
   ) => {
     if (saving) return;
     const runId = dossier.run_id;
+    const lifecycleDraft = {
+      state: nextDraft.decision_state,
+      note: nextDraft.note,
+    };
     setSaving(true);
     setSaveFailed(false);
     try {
-      await onSaveDecision(action, nextDraft);
+      const outcome = await resolveDecisionSaveLifecycle({
+        draft: lifecycleDraft,
+        commit: () => onSaveDecision(action, nextDraft),
+      });
       if (activeRunIdRef.current !== runId) return;
-      setDraft(null);
-      setSaved(true);
-    } catch {
-      if (activeRunIdRef.current !== runId) return;
-      setSaveFailed(true);
+      setDraft(outcome.draft);
+      setSaveFailed(outcome.error);
+      setSaved(outcome.saved);
     } finally {
       if (activeRunIdRef.current === runId) setSaving(false);
     }

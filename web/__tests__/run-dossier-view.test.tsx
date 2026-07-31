@@ -5,7 +5,11 @@ import {
   DecisionEditor,
   decisionEditorKeyboardAction,
 } from "../components/sidebar/command-palette/DecisionEditor";
-import { RunDossierView } from "../components/sidebar/command-palette/RunDossierView";
+import {
+  resolveDecisionSaveLifecycle,
+  RunDossierView,
+} from "../components/sidebar/command-palette/RunDossierView";
+import { refreshCanonicalMutation } from "../lib/canonical-mutation-refresh";
 import type {
   RunDossier,
   SearchDecisionAction,
@@ -170,6 +174,79 @@ describe("single-run dossier view", () => {
 });
 
 describe("decision editor", () => {
+  const draft = {
+    state: "watching" as const,
+    note: "First line\nSecond line",
+  };
+
+  test("collapses and acknowledges only after mutation and canonical refresh succeed", async () => {
+    const events: string[] = [];
+
+    const outcome = await resolveDecisionSaveLifecycle({
+      draft,
+      commit: async () => {
+        events.push("mutation");
+        await Promise.resolve();
+        events.push("canonical_refresh");
+      },
+    });
+
+    expect(events).toEqual(["mutation", "canonical_refresh"]);
+    expect(outcome).toEqual({ draft: null, error: false, saved: true });
+  });
+
+  test("preserves the exact draft and reports error when mutation rejects", async () => {
+    const events: string[] = [];
+
+    const outcome = await resolveDecisionSaveLifecycle({
+      draft,
+      commit: async () => {
+        events.push("mutation");
+        throw new Error("mutation failed");
+      },
+    });
+
+    expect(events).toEqual(["mutation"]);
+    expect(outcome).toEqual({ draft, error: true, saved: false });
+  });
+
+  test("preserves the exact draft and reports error when canonical refresh rejects", async () => {
+    const events: string[] = [];
+
+    const outcome = await resolveDecisionSaveLifecycle({
+      draft,
+      commit: async () => {
+        events.push("mutation");
+        await Promise.resolve();
+        events.push("canonical_refresh");
+        throw new Error("canonical refresh failed");
+      },
+    });
+
+    expect(events).toEqual(["mutation", "canonical_refresh"]);
+    expect(outcome).toEqual({ draft, error: true, saved: false });
+  });
+
+  test("canonical refresh error treatment preserves the rejected promise", async () => {
+    let readErrorWasMarked = false;
+    let rejected = false;
+    try {
+      await refreshCanonicalMutation({
+        refresh: async () => {
+          throw new Error("canonical refresh failed");
+        },
+        onFailure: () => {
+          readErrorWasMarked = true;
+        },
+      });
+    } catch {
+      rejected = true;
+    }
+
+    expect(readErrorWasMarked).toBe(true);
+    expect(rejected).toBe(true);
+  });
+
   test("reserves save and prevent-default for modified Enter", () => {
     expect(
       decisionEditorKeyboardAction({

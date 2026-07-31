@@ -26,6 +26,7 @@ import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierV
 import { Tooltip } from "@/components/ui/Tooltip";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
+import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
 import {
   deleteConversation as apiDeleteConversation,
   createEvidenceDecision,
@@ -639,22 +640,25 @@ export default function ChatCommandPalette({
         boolean,
         DecisionState | null,
       ];
-      try {
-        await refreshCanonicalSearch(currentSignature, mutationId);
-      } catch {
-        if (
-          mutationId === canonicalMutationIdRef.current &&
-          currentSignature === searchSignatureRef.current
-        ) {
-          setReadError(
-            currentLedgerMode
-              ? "ledger"
-              : currentQuery
-                ? "search"
-                : "history",
-          );
-        }
-      }
+      await refreshCanonicalMutation({
+        refresh: async () => {
+          await refreshCanonicalSearch(currentSignature, mutationId);
+        },
+        onFailure: () => {
+          if (
+            mutationId === canonicalMutationIdRef.current &&
+            currentSignature === searchSignatureRef.current
+          ) {
+            setReadError(
+              currentLedgerMode
+                ? "ledger"
+                : currentQuery
+                  ? "search"
+                  : "history",
+            );
+          }
+        },
+      });
     },
     [refreshCanonicalSearch],
   );
@@ -917,7 +921,11 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
-      await refreshAfterCanonicalMutation(mutationId);
+      try {
+        await refreshAfterCanonicalMutation(mutationId);
+      } catch {
+        // The canonical refresh already published the scoped read error.
+      }
     } finally {
       setIsDeleting(false);
     }
