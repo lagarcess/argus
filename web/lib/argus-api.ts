@@ -678,10 +678,7 @@ export async function signupWithEmail(payload: {
     },
   );
   await persistBrowserSession(response);
-  return {
-    response,
-    needsEmailConfirmation: !response.session,
-  };
+  return { response, needsEmailConfirmation: !response.session };
 }
 
 export async function loginWithEmail(payload: {
