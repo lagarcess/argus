@@ -23,6 +23,8 @@ export type ConversationRailTick = {
   messageIndex: number;
   kind: ConversationRailTickKind;
   strategyTitle: string | null;
+  /** Run symbols, capped at 5 by product constraint; identity during a glide. */
+  symbols: string[];
   periodDisplay: string | null;
   /** Display-ready metric rows copied from the result card payload. */
   metrics: ConversationRailMetric[];
@@ -58,6 +60,7 @@ export function deriveConversationRailTicks(
         messageIndex: index,
         kind: result.decisionState ? "decision_saved" : "backtest_completed",
         strategyTitle: result.strategyLabel ?? result.strategyName ?? null,
+        symbols: (result.symbols ?? []).slice(0, 5),
         periodDisplay: result.dateRange?.display ?? result.period ?? null,
         metrics: (result.metrics ?? []).slice(0, RAIL_PREVIEW_METRIC_LIMIT),
         decisionState: result.decisionState ?? null,
@@ -74,6 +77,7 @@ export function deriveConversationRailTicks(
           messageIndex: index,
           kind: "error_recovery",
           strategyTitle: null,
+          symbols: [],
           periodDisplay: null,
           metrics: [],
           decisionState: null,
@@ -93,6 +97,7 @@ export function deriveConversationRailTicks(
         messageIndex: index,
         kind: "error_recovery",
         strategyTitle: null,
+        symbols: [],
         periodDisplay: null,
         metrics: [],
         decisionState: null,

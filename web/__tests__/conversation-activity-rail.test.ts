@@ -35,6 +35,7 @@ function resultPayload(
   return {
     strategyName: "DCA BTC",
     strategyLabel: "DCA — BTC weekly",
+    symbols: ["BTC", "ETH"],
     period: "2020 – 2024",
     metrics: [
       { label: "Total return", value: "+120%" },
@@ -109,9 +110,15 @@ describe("conversation rail tick derivation", () => {
 
     const backtestTick = ticks[0];
     expect(backtestTick.strategyTitle).toBe("DCA — BTC weekly");
+    expect(backtestTick.symbols).toEqual(["BTC", "ETH"]);
     expect(backtestTick.periodDisplay).toBe("2020 – 2024");
     expect(backtestTick.metrics).toHaveLength(3);
     expect(backtestTick.messageIndex).toBe(2);
+
+    const recoveryTicksCarryNoSymbols = ticks
+      .filter((tick) => tick.kind === "error_recovery")
+      .every((tick) => tick.symbols.length === 0);
+    expect(recoveryTicksCarryNoSymbols).toBe(true);
 
     const decisionTick = ticks[1];
     expect(decisionTick.decisionState).toBe("promising");
@@ -372,6 +379,13 @@ describe("rail source discipline", () => {
   test("rail sits on the right edge and hides on small screens", () => {
     expect(componentSource).toMatch(/absolute bottom-40 right-0 top-24/);
     expect(componentSource).toContain("hidden md:block");
+  });
+
+  test("preview and aria carry run symbols for identity during a glide", () => {
+    expect(componentSource).toContain("openTick.symbols.join(\" · \")");
+    expect(componentSource).toMatch(
+      /\[tick\.symbols\[0\], tick\.strategyTitle\]/,
+    );
   });
 
   test("preview popover is a passive preview, not an action surface", () => {

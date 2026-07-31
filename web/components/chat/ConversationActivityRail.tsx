@@ -175,7 +175,10 @@ export default function ConversationActivityRail({
 
   const tickAriaLabel = (tick: ConversationRailTick): string => {
     const label = kindLabel(tick.kind);
-    return tick.strategyTitle ? `${label} — ${tick.strategyTitle}` : label;
+    const identity = [tick.symbols[0], tick.strategyTitle]
+      .filter(Boolean)
+      .join(" · ");
+    return identity ? `${label} — ${identity}` : label;
   };
 
   const errorBody = (tick: ConversationRailTick): string => {
@@ -263,6 +266,11 @@ export default function ConversationActivityRail({
             {openTick.strategyTitle && (
               <div className="mt-1 truncate text-[13px] font-medium text-black/80 dark:text-white/80">
                 {openTick.strategyTitle}
+              </div>
+            )}
+            {openTick.symbols.length > 0 && (
+              <div className="mt-0.5 text-[11px] font-medium tracking-[0.04em] text-black/45 dark:text-white/45">
+                {openTick.symbols.join(" · ")}
               </div>
             )}
             {openTick.periodDisplay && (
