@@ -283,7 +283,7 @@ export default function ChatCommandPalette({
   const historyRequestIdRef = useRef(0);
   const ledgerBrowseRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
-  const decisionMutationIdRef = useRef(0);
+  const canonicalMutationIdRef = useRef(0);
   const searchSignatureRef = useRef(RECENTS_SEARCH_SIGNATURE);
   const isRecentsMode =
     query.trim() === "" &&
@@ -680,7 +680,7 @@ export default function ChatCommandPalette({
       ledgerBrowseRequestIdRef.current += 1;
       const requestId = ++searchRequestIdRef.current;
       const isStale = () =>
-        mutationId !== decisionMutationIdRef.current ||
+        mutationId !== canonicalMutationIdRef.current ||
         requestId !== searchRequestIdRef.current ||
         capturedSignature !== searchSignatureRef.current;
       const response =
@@ -720,11 +720,41 @@ export default function ChatCommandPalette({
     [isGuest, recentItems],
   );
 
+  const refreshAfterCanonicalMutation = useCallback(
+    async (mutationId: number) => {
+      const currentSignature = searchSignatureRef.current;
+      const [currentQuery, currentLedgerMode] = JSON.parse(
+        currentSignature,
+      ) as [
+        string,
+        boolean,
+        DecisionState | null,
+      ];
+      try {
+        await refreshCanonicalSearch(currentSignature, mutationId);
+      } catch {
+        if (
+          mutationId === canonicalMutationIdRef.current &&
+          currentSignature === searchSignatureRef.current
+        ) {
+          setReadError(
+            currentLedgerMode
+              ? "ledger"
+              : currentQuery
+                ? "search"
+                : "history",
+          );
+        }
+      }
+    },
+    [refreshCanonicalSearch],
+  );
+
   const saveDecision = useCallback(
     async (action: DecisionAction) => {
       if (!decisionDraft || isSavingDecision) return;
       if (decisionDraft.artifactId !== action.evidence_artifact_id) return;
-      const mutationId = ++decisionMutationIdRef.current;
+      const mutationId = ++canonicalMutationIdRef.current;
       setIsSavingDecision(true);
       setDecisionSaveFailed(false);
       try {
@@ -734,40 +764,17 @@ export default function ChatCommandPalette({
             note: decisionDraft.note,
           });
         } catch {
-          if (mutationId === decisionMutationIdRef.current) {
+          if (mutationId === canonicalMutationIdRef.current) {
             setDecisionSaveFailed(true);
           }
           return;
         }
-        if (mutationId !== decisionMutationIdRef.current) return;
+        if (mutationId !== canonicalMutationIdRef.current) return;
         setDecisionDraft(null);
         onMutated?.();
-        const currentSignature = searchSignatureRef.current;
-        const [currentQuery, currentLedgerMode] = JSON.parse(
-          currentSignature,
-        ) as [
-          string,
-          boolean,
-          DecisionState | null,
-        ];
-        try {
-          await refreshCanonicalSearch(currentSignature, mutationId);
-        } catch {
-          if (
-            mutationId === decisionMutationIdRef.current &&
-            currentSignature === searchSignatureRef.current
-          ) {
-            setReadError(
-              currentLedgerMode
-                ? "ledger"
-                : currentQuery
-                  ? "search"
-                  : "history",
-            );
-          }
-        }
+        await refreshAfterCanonicalMutation(mutationId);
       } finally {
-        if (mutationId === decisionMutationIdRef.current) {
+        if (mutationId === canonicalMutationIdRef.current) {
           setIsSavingDecision(false);
         }
       }
@@ -776,7 +783,7 @@ export default function ChatCommandPalette({
       decisionDraft,
       isSavingDecision,
       onMutated,
-      refreshCanonicalSearch,
+      refreshAfterCanonicalMutation,
     ],
   );
 
@@ -1006,6 +1013,7 @@ export default function ChatCommandPalette({
     if (!pendingDeleteItem || isDeleting) return;
     if (!pendingDeleteItem.conversationId) return;
 
+    const mutationId = ++canonicalMutationIdRef.current;
     setIsDeleting(true);
     removeLocalConversation(pendingDeleteItem.conversationId);
     onConversationRemoved?.(pendingDeleteItem.conversationId);
@@ -1013,6 +1021,7 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
+      await refreshAfterCanonicalMutation(mutationId);
     } finally {
       setIsDeleting(false);
     }
@@ -1022,6 +1031,7 @@ export default function ChatCommandPalette({
     onConversationRemoved,
     onMutated,
     pendingDeleteItem,
+    refreshAfterCanonicalMutation,
     removeLocalConversation,
   ]);
 

@@ -1468,7 +1468,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(contract).toContain('type: "decision"');
     expect(palette).toContain("createEvidenceDecision");
     expect(palette).toContain("onRunFresh");
-    expect(palette).toContain("decisionMutationIdRef");
+    expect(palette).toContain("canonicalMutationIdRef");
     expect(palette).toContain("searchRequestIdRef");
     expect(palette).toContain("includeLedgerGroups: true");
     expect(chat).toContain("const handleOmnisearchRunFresh = async");
@@ -1947,21 +1947,18 @@ describe("Argus Alpha frontend contract", () => {
       saveDecision.indexOf("setDecisionDraft(null)"),
     );
     expect(saveDecision.indexOf("setDecisionDraft(null)")).toBeLessThan(
-      saveDecision.indexOf("await refreshCanonicalSearch"),
+      saveDecision.indexOf("await refreshAfterCanonicalMutation"),
     );
     expect(
-      saveDecision.slice(saveDecision.indexOf("await refreshCanonicalSearch")),
+      saveDecision.slice(
+        saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+      ),
     ).not.toContain("setDecisionSaveFailed(true)");
-    expect(saveDecision).toContain(': currentQuery');
-    expect(saveDecision).toContain('? "search"');
-    expect(saveDecision).toContain(': "history"');
+    expect(refreshCanonicalSearch).toContain(': currentQuery');
+    expect(refreshCanonicalSearch).toContain('? "search"');
+    expect(refreshCanonicalSearch).toContain(': "history"');
     expect(saveDecision).not.toContain("capturedSignature");
-    expect(saveDecision.indexOf("await createEvidenceDecision")).toBeLessThan(
-      saveDecision.indexOf("const currentSignature"),
-    );
-    expect(saveDecision.indexOf("setDecisionDraft(null)")).toBeLessThan(
-      saveDecision.indexOf("const currentSignature"),
-    );
+    expect(saveDecision).not.toContain("const currentSignature");
     expect(refreshCanonicalSearch).toContain(
       "JSON.parse(capturedSignature)",
     );
@@ -2015,6 +2012,38 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("ChatMessage");
     expect(palette).not.toContain("streamChatMessage");
     expect(palette).not.toContain("handleAction");
+  });
+
+  test("successful search-result deletion refreshes backend-owned aggregates", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const confirmDeleteStart = palette.indexOf("const handleConfirmDelete");
+    const confirmDelete = palette.slice(
+      confirmDeleteStart,
+      palette.indexOf("useEffect(() =>", confirmDeleteStart),
+    );
+    const refreshAfterMutation = palette.slice(
+      palette.indexOf("const refreshAfterCanonicalMutation"),
+      palette.indexOf("const saveDecision"),
+    );
+
+    expect(confirmDelete).toContain(
+      "const mutationId = ++canonicalMutationIdRef.current",
+    );
+    expect(confirmDelete.indexOf("await apiDeleteConversation")).toBeLessThan(
+      confirmDelete.indexOf("onMutated?.()"),
+    );
+    expect(confirmDelete.indexOf("onMutated?.()")).toBeLessThan(
+      confirmDelete.indexOf(
+        "await refreshAfterCanonicalMutation(mutationId)",
+      ),
+    );
+    expect(refreshAfterMutation).toContain(
+      "await refreshCanonicalSearch(currentSignature, mutationId)",
+    );
+    expect(refreshAfterMutation).toContain("setReadError(");
   });
 
   test("failed More keeps loaded results visible and isolates its retry state", () => {
