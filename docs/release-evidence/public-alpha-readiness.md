@@ -58,9 +58,124 @@ Starter remains the proportional choice for `argus-app` because the paid-tier
 requirement there is no spin-down, and no load evidence supports buying four
 times the RAM. This would produce a $32/month fixed service floor ($25 API + $7
 app), plus metered Workflow compute and any overage. The founder selected this
-tier split in Render on 2026-07-31. Render applies the instance-type changes on
-the next successful deploy, so the dashboard selection is not live-tier proof;
-control-plane readback after that deploy remains mandatory.
+tier split in Render on 2026-07-31. Render applies instance-type changes on the
+next successful deploy, so the dashboard selection was not treated as proof.
+The post-deploy control-plane and metrics readbacks are recorded below.
+
+## Hosted exact-SHA release proof
+
+The final public-alpha candidate
+`c76d4d9251a09984971807a3d310685bc326043d` reached all three hosted surfaces:
+
+| Surface | Render identifier | Terminal evidence |
+| --- | --- | --- |
+| `argus-api` | `dep-d9mia55aeets73a31jgg` | `live`, exact commit, finished 2026-07-31 22:44:49 UTC |
+| `argus-app` | `dep-d9mia56417fc73bg1ju0` | `live`, exact commit, finished 2026-07-31 22:45:14 UTC |
+| `argus-backtests` Workflow | `wfv-d9mia5fqj5pc73d33320` | `ready`, version name `c76d4d9`, exact commit |
+
+Before deployment, the release-config audit found the live API missing the
+declared non-secret `ARGUS_APP_ORIGIN`. It was synced to
+`https://argus-app-suz5.onrender.com`; the repeated audit returned `ready` with
+fingerprint
+`73aaf1690d4aa2d030878a6a251160a84e9a03d7a5e6c774fcbdd5b9b3392387`.
+
+After the successful deploys, Render's service readback showed `argus-api` on
+`standard` and `argus-app` on `starter`. The service-metrics limits confirmed
+that these were active runtime shapes, not pending dashboard selections:
+
+- API CPU limit: `1 CPU`.
+- API memory limit: `2,147,483,600 bytes` (approximately 2 GiB).
+- app CPU limit: `0.5 CPU`.
+- app memory limit: `536,870,900 bytes` (approximately 512 MiB).
+
+The resulting fixed service floor is $32/month: $25/month for the Standard API
+plus $7/month for the Starter app, before Workflow compute or overage.
+
+### Paid maintenance and private-health controls
+
+Render accepted maintenance mode on the paid API and the control plane read
+back `maintenanceMode.enabled=true`. The only configured public API domain,
+`https://argus-ohr5.onrender.com`, returned HTTP `503` with the default
+`Under Maintenance` page and body SHA-256
+`af51f998b76af7e25f45b40bc730c0acd965285ecb9a427655fdecb7193f365d`.
+The service had no configured custom domains.
+
+While the public surface was closed, the paid app service reached
+`http://argus-ohr5:10000/health` through Render's private network. The
+post-deploy exact-SHA probe job `job-d9mib9942hec73dqtlhg` succeeded with log
+marker `private_health_exact_sha status=200`.
+
+Maintenance was disabled only after the migration and hosted probes below.
+The control plane then read back `maintenanceMode.enabled=false`; public
+`/health` returned HTTP `200` with body SHA-256
+`311fc3f1eed2fa039ba185510cc96adcbfabd1d89d3c6ac13a57a16dd1ae0b41`.
+
+### Requested-role migration and hosted endpoint
+
+The exact file
+`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql`
+(SHA-256
+`917772c9a654727c8f69720bd3b591b02156ed2bcc979c4b758866928810897e`)
+was applied to production project `lgdhvepyrzbnscqssgqq` in one explicit
+transaction under a transaction-scoped advisory lock. Two earlier CLI wrapper
+attempts failed before execution, so neither changed schema or ledger state.
+
+Independent readback confirmed the exact migration ledger hash; the required
+`language` default and EN/es-419 check; the `requested` role constraint; RLS
+enabled; no anonymous or authenticated DML; and service-role DML retained.
+The endpoint was then exercised privately on the exact deployed API by job
+`job-d9mic0navr4c73efapb0`, which logged
+`access_request_probe status=202 accepted=true`. Its temporary row was deleted
+and the separate cleanup readback returned zero.
+
+### Approval email delivery
+
+The exact deployed protected approval route was exercised by API job
+`job-d9midlfavr4c73efe2pg`, which logged
+`approval_email_probe status=200`. The single-purpose stdlib SMTP helper sent
+to Resend's test inbox without creating an Auth user. Resend recorded:
+
+- email ID `14c92439-e50f-4e3f-846c-228196808349`;
+- recipient `delivered@resend.dev`;
+- sender `"Argus" <noreply@get-argus.com>`;
+- subject `Your Argus access is approved`;
+- status `delivered` at 2026-07-31 22:51:27 UTC;
+- existing signup-form link
+  `https://argus-app-suz5.onrender.com/?auth=signup`;
+- provider message ID
+  `<0100019fba60171c-666a1d47-1241-49e5-aced-54eec5daec1e-000000@email.amazonses.com>`.
+
+The captured, secret-free Resend readback is attached as
+[public-alpha-approval-email-delivery.json](artifacts/public-alpha-approval-email-delivery.json).
+
+Database readback showed the approval changed the allowlist role to `user`,
+retained the requested language, and created zero Auth users. The test row was
+then deleted. Final cleanup returned zero temporary allowlist rows and zero
+temporary Auth users.
+
+### Hosted localized UI evidence
+
+The exact hosted app completed real request submissions in English and
+es-419. Both response states were visually inspected after their transitions
+settled, with zero browser console errors and zero warnings:
+
+- [English request form](screenshots/public-alpha-readiness/hosted-en-desktop-request-access.png)
+- [English request received](screenshots/public-alpha-readiness/hosted-en-desktop-request-accepted.png)
+- [Spanish request form](screenshots/public-alpha-readiness/hosted-es-419-desktop-request-access.png)
+- [Spanish request received](screenshots/public-alpha-readiness/hosted-es-419-desktop-request-accepted.png)
+
+All screenshot-probe addresses were removed afterward. Independent cleanup
+readback found zero temporary allowlist rows and zero temporary Auth users.
+
+The sessionless confirmed-signup state was also exercised deterministically in
+the exact frontend component flow at desktop and mobile sizes. It stayed on the
+auth surface and rendered the localized confirmation instruction instead of
+falling through to `/chat`:
+
+- [English check-email desktop](screenshots/public-alpha-readiness/en-desktop-check-email.png)
+- [English check-email mobile](screenshots/public-alpha-readiness/en-mobile-check-email.png)
+- [Spanish check-email desktop](screenshots/public-alpha-readiness/es-419-desktop-check-email.png)
+- [Spanish check-email mobile](screenshots/public-alpha-readiness/es-419-mobile-check-email.png)
 
 ## Production migration lineage repair
 
@@ -81,8 +196,8 @@ RLS enablement and policies, RPC grants, and relevant table grants were read
 back after the batch. One hosted temporary-user probe passed and its Auth user
 and allowlist row were deleted, with a zero-match cleanup read-back.
 
-This repair did not apply the new requested-role migration. That file remains
-behind the separate paid-control precondition below.
+The later requested-role migration was deliberately excluded from this legacy
+repair and applied only after the separate paid-control proof documented above.
 
 ### Post-batch Omnisearch migrations
 
@@ -111,10 +226,8 @@ magic-link session: `GET /me` returned 200, conversation creation returned
 200, message insertion returned 201, and the owner-scoped conversation-message
 read returned exactly the seeded message with HTTP 200. Cleanup deleted the
 Auth user and allowlist entry, and independent read-back found zero matching
-Auth, profile, allowlist, conversation, or message rows. The currently deployed
-API SHA predates the merged Omnisearch reader, so exact hosted recall behavior
-remains an exact-candidate deploy proof rather than migration-application
-proof.
+Auth, profile, allowlist, conversation, or message rows. The final exact-SHA
+deploy recorded above includes the merged Omnisearch reader.
 
 The checked-in Blueprint declares `argus-api` as `plan: standard` and
 `argus-app` as `plan: starter`, matching the founder's selected tier split.
@@ -129,18 +242,14 @@ service. The value was copied from the locally resolved Resend credential only
 after verifying that interpolation produced an actual `re_...` credential, not
 the literal `${RESEND_API_KEY}` reference. A redacted Render control-plane
 read-back matched the local credential exactly. Setting the secret did not
-trigger a deploy; the latest API deploy remained the live load-test candidate
-`17098b8173d845aa5033036244a71cdcc3283ddb`.
+itself trigger a deploy. The later exact-candidate deploy loaded it
+successfully, and the backend-originated delivery proof is recorded above.
 
-The required backend-originated approval send to `delivered@resend.dev` and
-Resend accepted/delivered log remain pending until the paid-control gate,
-requested-role migration, and exact Phase 2 deploy are complete.
-
-## Waitlist paid-control precondition
+## Waitlist paid-control precondition (completed)
 
 The checked-in Render Blueprint declares `argus-api` as `plan: standard` and
 `argus-app` as `plan: starter`. A checked-in plan or dashboard selection is not
-proof of the live instance type, and it is not yet safe by itself for the
+proof of the live instance type, so the following gate was enforced before the
 requested-role migration or waitlist exposure. Render documents that
 [maintenance mode is available only on paid web
 services](https://render.com/docs/maintenance-mode), [Free web services cannot
@@ -149,13 +258,14 @@ receive private-network traffic](https://render.com/docs/private-network), and
 access](https://render.com/docs/ssh). Render's [Free instance
 limitations](https://render.com/docs/free) confirm the same operational gaps.
 
-Do not apply
+The gating rule was: Do not apply
 `supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` or
 accept access-request traffic until the paid-control readbacks below are
 complete. Rollback below `061ba50e` remains forbidden until verified
 maintenance, worker quiescence, and private route-absence proof are available.
 
-Before applying that migration or exposing the route:
+Before applying that migration or exposing the route, the release captain had
+to complete these steps in order:
 
 1. Use an out-of-band service readback to read back a paid API instance type
    from Render's control plane for `argus-api`. Record the returned plan and
@@ -176,7 +286,8 @@ The selected API tier satisfies the planned paid-instance transition only if
 these capability checks also pass. If any paid capability is absent, stop: do
 not apply the migration and do not expose the route. Only after every paid-control
 check passes may the requested-role migration be applied and access-request
-traffic be exposed.
+traffic be exposed. Those checks passed, and the resulting live evidence is
+recorded in "Hosted exact-SHA release proof" above.
 
 ## Waitlist rollback floor
 

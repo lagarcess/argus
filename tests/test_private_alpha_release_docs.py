@@ -16,10 +16,9 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "docs/specs/private-alpha-next-decision-memo.md" in runbook
     assert "later-context document, not part of this release gate" in runbook
     assert ".github/local-smoke.sh --expected-sha" in runbook
-    assert "ARGUS_CANARY_SHA=\"$(git rev-parse HEAD)\"" in runbook
+    assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in runbook
     assert (
-        "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json"
-        in runbook
+        "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json" in runbook
     )
     assert (
         "ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json"
@@ -53,10 +52,7 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "prefer a forward fix" in evidence_text.lower()
     assert "out-of-band Render control-plane readback" in evidence_text
     assert "serviceDetails.maintenanceMode.enabled=true" in evidence_text
-    assert (
-        "https://argus-ohr5.onrender.com/api/v1/auth/access-requests"
-        in evidence_text
-    )
+    assert "https://argus-ohr5.onrender.com/api/v1/auth/access-requests" in evidence_text
     assert "every configured custom API domain" in evidence_text
     assert "exact HTTP `503` maintenance-mode status" in evidence_text
     assert "configured maintenance page marker or SHA-256 fingerprint" in evidence_text
@@ -97,10 +93,7 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     )
     assert "Disable maintenance last" in evidence_text
     assert "public invalid-body readback" in evidence_text
-    assert (
-        "Do not execute this SQL as part of repository verification."
-        in evidence_text
-    )
+    assert "Do not execute this SQL as part of repository verification." in evidence_text
     for official_reference in (
         "https://render.com/docs/maintenance-mode",
         "https://render.com/docs/deploys#zero-downtime-deploys",
@@ -109,9 +102,7 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     ):
         assert official_reference in evidence_text
 
-    maintenance_index = evidence_text.index(
-        "out-of-band Render control-plane readback"
-    )
+    maintenance_index = evidence_text.index("out-of-band Render control-plane readback")
     signature_index = evidence_text.index(
         "configured maintenance page marker or SHA-256 fingerprint"
     )
@@ -221,11 +212,65 @@ def test_waitlist_exposure_waits_for_paid_render_rollback_controls() -> None:
     )
     assert paid_plan_index < maintenance_index < private_surface_index < exposure_index
 
-    assert "The checked-in `argus-api` plan is `starter`" in runbook
-    assert "migration and access-request exposure remain blocked" in runbook
+    assert "The live `argus-api` plan is `standard`" in runbook
+    assert "The live `argus-app` plan is `starter`" in runbook
+    assert "requested-role migration and access-request exposure are complete" in runbook
     assert "paid API instance type" in runbook
     assert "maintenance and private/SSH/local verification controls" in runbook
     assert "rollback below `061ba50e` remains forbidden" in runbook
+
+
+def test_public_alpha_hosted_release_proof_is_durable() -> None:
+    evidence = " ".join(
+        _source("docs/release-evidence/public-alpha-readiness.md").split()
+    )
+    approval_delivery = _source(
+        "docs/release-evidence/artifacts/public-alpha-approval-email-delivery.json"
+    )
+
+    for expected in (
+        "`c76d4d9251a09984971807a3d310685bc326043d`",
+        "`dep-d9mia55aeets73a31jgg`",
+        "`dep-d9mia56417fc73bg1ju0`",
+        "`wfv-d9mia5fqj5pc73d33320`",
+        "API CPU limit: `1 CPU`",
+        "API memory limit: `2,147,483,600 bytes`",
+        "app CPU limit: `0.5 CPU`",
+        "app memory limit: `536,870,900 bytes`",
+        "`maintenanceMode.enabled=true`",
+        "`af51f998b76af7e25f45b40bc730c0acd965285ecb9a427655fdecb7193f365d`",
+        "`private_health_exact_sha status=200`",
+        "`job-d9mib9942hec73dqtlhg`",
+        "`917772c9a654727c8f69720bd3b591b02156ed2bcc979c4b758866928810897e`",
+        "`access_request_probe status=202 accepted=true`",
+        "`job-d9mic0navr4c73efapb0`",
+        "`14c92439-e50f-4e3f-846c-228196808349`",
+        "`approval_email_probe status=200`",
+        "`job-d9midlfavr4c73efe2pg`",
+        "`https://argus-app-suz5.onrender.com/?auth=signup`",
+        "`maintenanceMode.enabled=false`",
+        "`311fc3f1eed2fa039ba185510cc96adcbfabd1d89d3c6ac13a57a16dd1ae0b41`",
+        "hosted-en-desktop-request-access.png",
+        "hosted-en-desktop-request-accepted.png",
+        "hosted-es-419-desktop-request-access.png",
+        "hosted-es-419-desktop-request-accepted.png",
+        "en-desktop-check-email.png",
+        "en-mobile-check-email.png",
+        "es-419-desktop-check-email.png",
+        "es-419-mobile-check-email.png",
+        "zero browser console errors and zero warnings",
+        "zero temporary allowlist rows",
+        "zero temporary Auth users",
+    ):
+        assert expected in evidence
+
+    for expected in (
+        '"id": "14c92439-e50f-4e3f-846c-228196808349"',
+        '"status": "delivered"',
+        '"to": "delivered@resend.dev"',
+        '"signup_url": "https://argus-app-suz5.onrender.com/?auth=signup"',
+    ):
+        assert expected in approval_delivery
 
 
 def test_public_alpha_load_and_cost_evidence_is_durable() -> None:
@@ -266,7 +311,7 @@ def test_public_alpha_spec_drops_superseded_inference_footer() -> None:
 
     assert "### Inference" not in spec
     assert "exact exit-criterion number" not in spec
-    assert "Confirm email\" setting is currently" not in spec
+    assert 'Confirm email" setting is currently' not in spec
 
 
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
@@ -341,12 +386,8 @@ def test_dated_release_manifest_distinguishes_workflow_tasks() -> None:
         "docs/release-manifests/2026-07-14-private-alpha-release-integrity.md"
     )
 
-    assert (
-        "- Workflow proof task: `argus-backtests/workflow_proof`" in manifest
-    )
-    assert (
-        "- Real workflow task: `argus-backtests/run_backtest_job`" in manifest
-    )
+    assert "- Workflow proof task: `argus-backtests/workflow_proof`" in manifest
+    assert "- Real workflow task: `argus-backtests/run_backtest_job`" in manifest
 
 
 def test_private_alpha_integration_doc_points_to_current_gate_and_later_memo() -> None:

@@ -393,16 +393,17 @@ persistence, allowances, and conversion policy, not through onboarding.
 
 ### Paid waitlist rollback controls
 
-The checked-in `argus-api` plan is `starter`, but the requested-role migration
-and access-request exposure remain blocked until the live paid-plan readback
-and rollback-control probes pass. Before either action, use Render's control
-plane to read back a paid API instance type and prove the maintenance and
-private/SSH/local verification controls described in
-`docs/release-evidence/public-alpha-readiness.md`.
+The live `argus-api` plan is `standard`. The live `argus-app` plan is
+`starter`. The requested-role migration and access-request exposure are
+complete after the paid-plan readback and maintenance/private-health probes in
+`docs/release-evidence/public-alpha-readiness.md`. Public account creation is
+still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+The evidence records the paid API instance type plus the maintenance and
+private/SSH/local verification controls.
 
-If any paid control is unavailable, stop and do not migrate or expose the
-route. In particular, rollback below `061ba50e` remains forbidden until the
-maintenance, quiescence, and private route-absence proof can be completed.
+The paid controls must remain available for rollback. If any control becomes
+unavailable, rollback below `061ba50e` remains forbidden until the maintenance,
+quiescence, and private route-absence proof can be completed.
 
 ### Waitlist rollback floor
 
