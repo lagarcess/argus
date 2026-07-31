@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import {
   commandPaletteAssetRollupFromSearch,
@@ -14,7 +12,6 @@ import {
   commandPaletteItemsInRenderedOrder,
   commandPaletteKeyboardAction,
   commandPaletteOpenMessageId,
-  commandPalettePreviewFields,
   commandPaletteRequestIsCurrent,
   commandPaletteSelectedRenderedPreview,
   commandPaletteSelectedPreview,
@@ -40,50 +37,23 @@ const conversationDossier = {
     message_id: "message-7",
   },
   decision_states: ["watching"],
-  actions: [
-    {
-      type: "run_fresh",
-      source_run_id: "run-2",
-      run_label: "Weekly GLD pullback",
-      canonical_setup: {
-        strategy_type: "buy_and_hold",
-        symbols: ["GLD"],
-        asset_class: "equity",
-        timeframe: "1D",
-        date_range: { start: "2025-07-29", end: "2026-07-29" },
-        sizing_mode: "capital_amount",
-        capital_amount: 10_000,
-        position_size: null,
-        cadence: null,
-        recurring_contribution: null,
-        starting_principal: null,
-        benchmark_symbol: "SPY",
-        entry_rule: { type: "start_of_period" },
-        exit_rule: { type: "end_of_period" },
-        rule_spec: null,
-        parameters: {},
-        execution_realism: null,
-      },
-      send_text: "Test this exact supported setup again.",
-    },
-    {
-      type: "decision",
-      evidence_artifact_id: "evidence-2",
-      decision_state: null,
-      note: null,
-      run_label: "Weekly GLD pullback",
-    },
-  ],
+  total_runs: 2,
+  decided_runs: 1,
   dossier: {
+    run_id: "run-2",
+    run_label: "Weekly GLD pullback",
+    completed_at: "2026-07-29T17:00:00.000Z",
+    result_message_id: "message-7",
     decision: {
       state: "watching",
       note: "Hold through earnings.\nReview risk first.",
-      run_label: "Monthly GLD buys",
+      run_label: "Weekly GLD pullback",
     },
     tested: {
       symbols: ["GLD"],
-      strategy_families: ["dca"],
-      run_count: 2,
+      strategy_family: "buy_and_hold",
+      cadence: null,
+      timeframe: "1D",
       start_date: "2025-01-01",
       end_date: "2026-07-29",
     },
@@ -94,11 +64,40 @@ const conversationDossier = {
       quick_take: "GLD held up better than SPY.",
       metrics: [{ name: "total_return_pct", value: 8.4 }],
     },
-    left_off: {
-      run_label: "Weekly GLD pullback",
-      completed_at: "2026-07-29T17:00:00.000Z",
-      nudge: "undecided",
-    },
+    actions: [
+      {
+        type: "run_fresh",
+        source_run_id: "run-2",
+        run_label: "Weekly GLD pullback",
+        canonical_setup: {
+          strategy_type: "buy_and_hold",
+          symbols: ["GLD"],
+          asset_class: "equity",
+          timeframe: "1D",
+          date_range: { start: "2025-07-29", end: "2026-07-29" },
+          sizing_mode: "capital_amount",
+          capital_amount: 10_000,
+          position_size: null,
+          cadence: null,
+          recurring_contribution: null,
+          starting_principal: null,
+          benchmark_symbol: "SPY",
+          entry_rule: { type: "start_of_period" },
+          exit_rule: { type: "end_of_period" },
+          rule_spec: null,
+          parameters: {},
+          execution_realism: null,
+        },
+        send_text: "Test this exact supported setup again.",
+      },
+      {
+        type: "decision",
+        evidence_artifact_id: "evidence-2",
+        decision_state: null,
+        note: null,
+        run_label: "Weekly GLD pullback",
+      },
+    ],
   },
 } satisfies SearchItem;
 
@@ -161,15 +160,16 @@ describe("command palette conversation dossier", () => {
       decisionState: "watching",
       decisionStates: ["watching"],
       dossier: conversationDossier.dossier,
-      actions: conversationDossier.actions,
+      totalRuns: 2,
+      decidedRuns: 1,
     });
-    expect(commandPalettePreviewFields(display[0])).toHaveLength(5);
     expect(display[0].snippet).not.toBe(conversationDossier.matched_text);
     expect(display[1]).toMatchObject({
       id: "history-row-2",
       source: "recent",
       dossier: null,
-      actions: [],
+      totalRuns: 0,
+      decidedRuns: 0,
     });
   });
 
@@ -232,7 +232,7 @@ describe("command palette conversation dossier", () => {
     );
   });
 
-  test("renders the fixed dossier order and preserves the note newlines", () => {
+  test("maps the exact selected-run dossier, counts, and anchored actions", () => {
     const display = commandPaletteItemFromSearch(conversationDossier);
 
     expect(display).toMatchObject({
@@ -242,98 +242,12 @@ describe("command palette conversation dossier", () => {
       matchCount: 2,
       matchMessageId: "message-7",
       canManageConversation: true,
-      actions: conversationDossier.actions,
+      dossier: conversationDossier.dossier,
+      totalRuns: 2,
+      decidedRuns: 1,
     });
-    expect(commandPalettePreviewFields(display!)).toEqual([
-      expect.objectContaining({
-        id: "decision",
-        value: "Watching · on Monthly GLD buys",
-      }),
-      expect.objectContaining({
-        id: "note",
-        value: "Hold through earnings.\nReview risk first.",
-      }),
-      expect.objectContaining({
-        id: "tested",
-        value: "GLD · Recurring buys · 2 runs · 2025-01-01–2026-07-29",
-      }),
-      expect.objectContaining({
-        id: "outcome",
-        value: "GLD held up better than SPY. · Total return 8.4%",
-      }),
-      expect.objectContaining({
-        id: "left_off",
-        value: "Weekly GLD pullback · 2026-07-29 · No decision yet",
-      }),
-    ]);
-  });
-
-  test("ships all dossier labels in English and Spanish", () => {
-    const root = process.cwd().endsWith("/web")
-      ? process.cwd()
-      : join(process.cwd(), "web");
-    const en = JSON.parse(
-      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
-    );
-    const es = JSON.parse(
-      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
-    );
-
-    for (const key of ["decision", "note", "tested", "outcome", "left_off"]) {
-      expect(en.command_palette.preview_fields[key]).toBeTruthy();
-      expect(es.command_palette.preview_fields[key]).toBeTruthy();
-    }
-    for (const key of [
-      "run_fresh",
-      "add_decision",
-      "change_decision",
-      "save_decision",
-      "open_at_match",
-      "open_at_left_off",
-      "read_error",
-      "try_searching",
-    ]) {
-      expect(en.command_palette[key]).toBeTruthy();
-      expect(es.command_palette[key]).toBeTruthy();
-    }
-    expect(en.command_palette.asset_rollup.heading).toBeTruthy();
-    expect(en.command_palette.asset_rollup.runs_involving_other).toContain(
-      "involving",
-    );
-    expect(en.command_palette.asset_rollup.last_touched).toBeTruthy();
-    expect(es.command_palette.asset_rollup.heading).toBeTruthy();
-    expect(es.command_palette.asset_rollup.runs_involving_other).toContain(
-      "incluyen",
-    );
-    expect(es.command_palette.asset_rollup.last_touched).toBeTruthy();
-  });
-
-  test("localizes every Spanish dossier value without leaking raw codes", () => {
-    const display = commandPaletteItemFromSearch(conversationDossier);
-    const fields = commandPalettePreviewFields(display, {
-      decisionStateLabel: () => "En observación",
-      decisionAttribution: (state, run) => `${state} · en ${run}`,
-      runCountLabel: (count) => `${count} ejecuciones`,
-      strategyFamilyLabel: () => "Compras periódicas",
-      dateLabel: (value) =>
-        ({
-          "2025-01-01": "1 ene 2025",
-          "2026-07-29": "29 jul 2026",
-          "2026-07-29T17:00:00.000Z": "29 jul 2026",
-        })[value] ?? value,
-      nudgeLabel: () => "Sin decisión",
-      metricLabel: () => "Retorno total",
-    });
-
-    expect(fields.map((field) => field.value)).toEqual([
-      "En observación · en Monthly GLD buys",
+    expect(display.dossier?.decision?.note).toBe(
       "Hold through earnings.\nReview risk first.",
-      "GLD · Compras periódicas · 2 ejecuciones · 1 ene 2025–29 jul 2026",
-      "GLD held up better than SPY. · Retorno total 8.4%",
-      "Weekly GLD pullback · 29 jul 2026 · Sin decisión",
-    ]);
-    expect(fields.map((field) => field.value).join(" ")).not.toMatch(
-      /\bon\b|\bruns?\b|rsi_mean_reversion|undecided|2026-07-29/,
     );
   });
 
@@ -673,7 +587,7 @@ describe("command palette conversation dossier", () => {
 
   test("names add versus change from the anchored action state", () => {
     const display = commandPaletteItemFromSearch(conversationDossier);
-    const decision = display.actions.find(
+    const decision = display.dossier?.actions.find(
       (action) => action.type === "decision",
     );
     expect(decision?.type).toBe("decision");

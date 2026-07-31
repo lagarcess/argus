@@ -26,13 +26,9 @@ function conversationItem(id: string): SearchConversationItem {
       message_id: null,
     },
     decision_states: [],
-    dossier: {
-      decision: null,
-      tested: null,
-      outcome: null,
-      left_off: null,
-    },
-    actions: [],
+    dossier: null,
+    total_runs: 0,
+    decided_runs: 0,
   };
 }
 
