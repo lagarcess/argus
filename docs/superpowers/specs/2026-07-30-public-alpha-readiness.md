@@ -77,13 +77,19 @@ who walk through it.
    prod key's usage graph is the first clean production-cost metric
    separated from dev burn.
 4. **Registration stays allowlist-gated through this lane.** The signup form
-   in `GuestConversionModal.tsx` already exists and already works end to end
-   for allowlisted emails (`POST /auth/signup`, gated by
-   `permanent_account_access_allowed()` in `src/argus/api/guest_access.py`);
-   the gap is that a non-allowlisted visitor can fill it out and gets
-   rejected with no explanation or path forward. The copy changes from that
-   silent-rejection form to an honest "request access" prompt for
-   non-allowlisted visitors. Nothing about
+   in `GuestConversionModal.tsx` already exists (`POST /auth/signup`, gated
+   by `permanent_account_access_allowed()` in
+   `src/argus/api/guest_access.py`) — the UI and endpoint are not being
+   rebuilt. **Correction (2026-07-31): this form was NOT actually working
+   end to end against production before decision 11 fixed it** — the
+   original "already works for allowlisted emails" claim was based on
+   reading the code, not exercising it live, and production's CAPTCHA
+   requirement was silently rejecting every signup attempt regardless of
+   allowlist status. See decision 11 for the fix. The gap this decision
+   still addresses is separate: a non-allowlisted visitor can fill the
+   form out and gets rejected with no explanation or path forward. The
+   copy changes from that silent-rejection form to an honest
+   "request access" prompt for non-allowlisted visitors. Nothing about
    `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` changes here.
 5. **Waitlist requests reuse the existing `private_alpha_allowlist` table**
    (a pending/requested state on the same table, same `role`-column
@@ -170,6 +176,44 @@ who walk through it.
     "check your email to confirm," driven off the signup response's
     session-presence — not a new page, not new backend account
     infrastructure, just a missing state in a flow that already exists.
+11. **Production hosted Supabase Auth had three settings mismatched
+    against this spec's assumptions — proven via Management API against
+    the confirmed production project ref (`lgdhvepyrzbnscqssgqq`, no
+    preview branch exists for this lane), fixed as follows:**
+    - **Native anonymous sign-ins were disabled — turn ON.** Proven load-
+      bearing, not assumed: `POST /auth/guest`
+      (`src/argus/api/routers/auth.py:142`) calls
+      `supabase_gateway.sign_in_anonymously()`, which calls Supabase's
+      `auth.sign_in_anonymously()`
+      (`src/argus/domain/supabase_guest_accounts.py:44`) — hosted guest
+      bootstrap cannot function without this. This corrects and replaces
+      any earlier assumption in this spec that guest mode's mechanism was
+      independent of Supabase's native anonymous auth.
+    - **Turnstile/CAPTCHA is enabled project-wide, and the existing
+      signup/login flow was never wired to supply a token — this was a
+      pre-existing gap, not something this lane broke.** Fix: reuse the
+      existing `acquireGuestCaptchaToken` mechanism
+      (`web/lib/guest-captcha.ts`, already built for guest mode) in the
+      signup/login submission too. This is reuse, not new CAPTCHA
+      infrastructure, and stays in scope. Do not disable CAPTCHA
+      project-wide to work around this —
+      `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` already documents it as a
+      guardrail. First confirm Supabase has no per-flow CAPTCHA scoping
+      option (quick dashboard check) before building the token-wiring, in
+      case a simpler toggle exists.
+    - **`mailer_autoconfirm=true` on the live Management API contradicts
+      decision 8 — set it to `false` via the Management API directly and
+      confirm it holds.** Treat this specific API field as ground truth
+      over the dashboard's "Confirm email" toggle, which was visually
+      confirmed ON earlier but does not conclusively explain this
+      discrepancy; don't spend time debugging why they disagree, just set
+      the authoritative value.
+    **Authorization:** the agent may make all three of these production
+    Supabase Auth changes itself via the Management API — these are
+    configuration toggles, not credential entry, and the founder has
+    already granted equivalent infra authority for Render CLI changes
+    (decision 3). Report the before/after state of all three for the
+    record once changed.
 
 ## 3. Reserved / parked scope
 
