@@ -911,7 +911,7 @@
       "open_recents": "Abrir recientes",
       "delete_focused_chat": "Eliminar chat actual",
       "rename_focused_chat": "Cambiar nombre del chat actual",
-      "expand_sidebar_recents": "Expandir la barra lateral y Recientes",
+      "expand_sidebar_recents": "Alternar barra lateral y Recientes",
       "open_settings": "Abrir configuración",
       "toggle_pin_focused_chat": "Fijar o desfijar el chat actual",
       "quick_jump": "Saltar a elementos visibles"

@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import KeyboardShortcutsOverlay from "@/components/sidebar/KeyboardShortcutsOverlay";
 import RecentsQuickPeek from "@/components/sidebar/RecentsQuickPeek";
+import { nextSidebarRecentsState } from "@/lib/sidebar-shortcuts";
 import ChatSidebar, {
   type SidebarMode,
 } from "@/components/sidebar/ChatSidebar";
@@ -2199,8 +2200,12 @@ export default function ChatInterface() {
       if (matchesKeyboardShortcut("expand_sidebar_recents", event)) {
         event.preventDefault();
         setIsRecentsQuickPeekOpen(false);
-        setIsSidebarOpen(true);
-        setIsRecentsExpanded(true);
+        const nextState = nextSidebarRecentsState(
+          isSidebarOpen,
+          isRecentsExpanded,
+        );
+        setIsSidebarOpen(nextState.sidebarOpen);
+        setIsRecentsExpanded(nextState.recentsExpanded);
         return;
       }
       if (matchesKeyboardShortcut("open_settings", event) && !isGuest) {
@@ -2237,7 +2242,9 @@ export default function ChatInterface() {
     handleStartHeaderRename,
     handleToggleHeaderPin,
     isGuest,
+    isRecentsExpanded,
     isRecentsQuickPeekOpen,
+    isSidebarOpen,
     keyboardShortcutsOpen,
     pendingHeaderDeleteId,
     requestNewChat,

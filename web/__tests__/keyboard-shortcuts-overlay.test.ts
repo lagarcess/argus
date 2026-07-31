@@ -53,13 +53,16 @@ describe("keyboard shortcuts overlay", () => {
       open_recents: "Open Recents",
       delete_focused_chat: "Delete current chat",
       rename_focused_chat: "Rename current chat",
-      expand_sidebar_recents: "Expand sidebar and Recents",
+      expand_sidebar_recents: "Toggle sidebar and Recents",
       open_settings: "Open Settings",
       toggle_pin_focused_chat: "Pin or unpin current chat",
       quick_jump: "Quick-jump visible items",
     });
     expect(es.keyboard_shortcuts.shortcuts.quick_jump).toBe(
       "Saltar a elementos visibles",
+    );
+    expect(es.keyboard_shortcuts.shortcuts.expand_sidebar_recents).toBe(
+      "Alternar barra lateral y Recientes",
     );
     expect(en.recents_quick_peek.title).toBe("Recents");
     expect(es.recents_quick_peek.empty).toBe("Aún no hay chats recientes.");
