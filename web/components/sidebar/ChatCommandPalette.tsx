@@ -22,11 +22,22 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
+import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
 import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
+import {
+  commitDossierDecision,
+  DEFAULT_DOSSIER_PANE_STATE,
+  dossierPaneKeyboardAction,
+  dossierPaneTransition,
+  openSelectedDossierConversation,
+  selectedDossierForPane,
+  type DossierPaneState,
+} from "@/lib/command-palette-dossier-integration";
 import {
   deleteConversation as apiDeleteConversation,
   createEvidenceDecision,
@@ -261,6 +272,9 @@ export default function ChatCommandPalette({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
+  const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
+    DEFAULT_DOSSIER_PANE_STATE,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyRequestIdRef = useRef(0);
@@ -574,6 +588,61 @@ export default function ChatCommandPalette({
       activeConversationId,
       targetConversationId: selectedPreview?.conversationId ?? null,
     });
+  const dossierContextKey = JSON.stringify([
+    query.trim(),
+    isLedgerMode,
+    decisionStateFilter,
+    selectedPreview?.source ?? null,
+    selectedPreview?.type ?? null,
+    selectedPreview?.id ?? null,
+    selectedPreview?.conversationId ?? null,
+  ]);
+  const history = useRunDossierHistory(
+    selectedPreview?.conversationId ?? "",
+    dossierContextKey,
+  );
+  const selectedDossier = selectedPreview?.dossier
+    ? selectedDossierForPane({
+        latestDossier: selectedPreview.dossier,
+        historyItems: history.items,
+        state: dossierPaneState,
+      })
+    : null;
+  const historyHasCanonicalCounts = history.status !== "idle";
+  const dossierTotalRuns = historyHasCanonicalCounts
+    ? history.totalRuns
+    : (selectedPreview?.totalRuns ?? 0);
+  const dossierDecidedRuns = historyHasCanonicalCounts
+    ? history.decidedRuns
+    : (selectedPreview?.decidedRuns ?? 0);
+
+  useEffect(() => {
+    setDossierPaneState((current) =>
+      dossierPaneTransition(current, {
+        type: "reset",
+        reason: "selection",
+      }),
+    );
+  }, [dossierContextKey]);
+
+  useEffect(() => {
+    if (
+      history.status !== "ready" ||
+      !dossierPaneState.historicalRunId ||
+      history.items.some(
+        (item) => item.run_id === dossierPaneState.historicalRunId,
+      )
+    ) {
+      return;
+    }
+    setDossierPaneState((current) =>
+      dossierPaneTransition(current, { type: "restore_latest" }),
+    );
+  }, [
+    dossierPaneState.historicalRunId,
+    history.items,
+    history.status,
+  ]);
 
   const refreshCanonicalSearch = useCallback(
     async (capturedSignature: string, mutationId: number) => {
@@ -665,6 +734,7 @@ export default function ChatCommandPalette({
 
   const saveDecision = useCallback(
     async (
+      selectedRunId: string,
       action: SearchDecisionAction,
       draft: { decision_state: RunDossierDecisionState; note: string },
     ) => {
@@ -675,16 +745,35 @@ export default function ChatCommandPalette({
       const mutationId = ++canonicalMutationIdRef.current;
       setIsSavingDecision(true);
       try {
-        await createEvidenceDecision(action.evidence_artifact_id, draft);
+        const reboundDossier = await commitDossierDecision({
+          selectedRunId,
+          mutate: async () => {
+            await createEvidenceDecision(action.evidence_artifact_id, draft);
+            if (mutationId !== canonicalMutationIdRef.current) {
+              throw new Error("Decision mutation context changed.");
+            }
+            onMutated?.();
+          },
+          refreshCanonicalSearch: () =>
+            refreshAfterCanonicalMutation(mutationId),
+          refreshLoadedHistory: async () => {
+            await history.refresh();
+            return history.getCurrentState();
+          },
+        });
         if (mutationId !== canonicalMutationIdRef.current) return;
-        onMutated?.();
-        await refreshAfterCanonicalMutation(mutationId);
+        setDossierPaneState((current) => {
+          if (current.historicalRunId !== selectedRunId) return current;
+          return reboundDossier
+            ? current
+            : dossierPaneTransition(current, { type: "restore_latest" });
+        });
       } finally {
         decisionMutationInFlightRef.current = false;
         setIsSavingDecision(false);
       }
     },
-    [onMutated, refreshAfterCanonicalMutation],
+    [history, onMutated, refreshAfterCanonicalMutation],
   );
 
   const updateLocalTitle = useCallback(
@@ -941,6 +1030,32 @@ export default function ChatCommandPalette({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const eventTarget =
+        event.target instanceof HTMLElement ? event.target : null;
+      const targetIsDossierControl = Boolean(
+        eventTarget?.closest("[data-dossier-pane]") &&
+          (isEditableKeyboardTarget(eventTarget) ||
+            eventTarget.closest("button")),
+      );
+      const dossierKeyboardAction = dossierPaneKeyboardAction({
+        key: event.key,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        targetIsDossierControl,
+        state: dossierPaneState,
+      });
+      if (dossierKeyboardAction === "restore_latest") {
+        event.preventDefault();
+        setDossierPaneState((current) =>
+          dossierPaneTransition(current, { type: "restore_latest" }),
+        );
+        return;
+      }
+      if (dossierKeyboardAction === "suppress_navigation") {
+        event.preventDefault();
+        return;
+      }
+      if (dossierKeyboardAction === "allow_control") return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (editingId) {
@@ -981,6 +1096,7 @@ export default function ChatCommandPalette({
   }, [
     activateItem,
     cancelRename,
+    dossierPaneState,
     editingId,
     keyboardItems,
     onClose,
@@ -1540,7 +1656,12 @@ export default function ChatCommandPalette({
           {layoutMode === "expanded" && (
             <div className="flex max-h-[42%] w-full shrink-0 flex-col overflow-y-auto bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:overflow-visible md:p-6">
               {selectedPreview ? (
-                <div className="flex h-full flex-col">
+                <div
+                  className="flex h-full flex-col"
+                  data-dossier-pane={
+                    selectedPreview.dossier ? "true" : undefined
+                  }
+                >
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
                       {(selectedPreview.type === "chat" ||
@@ -1569,41 +1690,81 @@ export default function ChatCommandPalette({
                       )}
                     </p>
                   </div>
-                  {selectedPreview.dossier ? (
-                    <RunDossierView
-                      key={selectedPreview.dossier.run_id}
-                      dossier={selectedPreview.dossier}
-                      totalRuns={selectedPreview.totalRuns}
-                      decidedRuns={selectedPreview.decidedRuns}
-                      openConversationDisabled={
-                        !selectedPreview.conversationId ||
-                        selectedNavigationDisabled
-                      }
-                      runFreshDisabled={turnInFlight}
-                      onOpenConversation={() => {
-                        const conversationId =
-                          selectedPreview.conversationId;
-                        const messageId =
-                          selectedPreview.dossier?.result_message_id;
-                        if (
-                          !conversationId ||
-                          !messageId ||
-                          selectedNavigationDisabled
-                        ) {
-                          return;
+                  {selectedPreview.dossier && selectedDossier ? (
+                    dossierPaneState.view === "history" ? (
+                      <DecisionHistoryView
+                        items={history.items}
+                        nextCursor={history.nextCursor}
+                        status={history.status}
+                        onBack={() =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "restore_latest",
+                            }),
+                          )
                         }
-                        onOpenConversation(conversationId, messageId);
-                        onClose();
-                      }}
-                      onRunFresh={(action) => {
-                        if (!selectedPreview.conversationId) return;
-                        return onRunFresh(
-                          selectedPreview.conversationId,
-                          action.send_text,
-                        );
-                      }}
-                      onSaveDecision={saveDecision}
-                    />
+                        onLoadOlder={history.loadOlder}
+                        onRetry={history.retry}
+                        onSelectRun={(dossier) =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "select_run",
+                              runId: dossier.run_id,
+                            }),
+                          )
+                        }
+                      />
+                    ) : (
+                      <RunDossierView
+                        key={selectedDossier.run_id}
+                        dossier={selectedDossier}
+                        totalRuns={dossierTotalRuns}
+                        decidedRuns={dossierDecidedRuns}
+                        onBackToLatest={
+                          dossierPaneState.historicalRunId
+                            ? () =>
+                                setDossierPaneState((current) =>
+                                  dossierPaneTransition(current, {
+                                    type: "restore_latest",
+                                  }),
+                                )
+                            : undefined
+                        }
+                        onOpenHistory={() => {
+                          void history.open();
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "open_history",
+                            }),
+                          );
+                        }}
+                        openConversationDisabled={
+                          !selectedPreview.conversationId ||
+                          selectedNavigationDisabled
+                        }
+                        runFreshDisabled={turnInFlight}
+                        onOpenConversation={() => {
+                          openSelectedDossierConversation({
+                            conversationId: selectedPreview.conversationId,
+                            dossier: selectedDossier,
+                            navigationDisabled: selectedNavigationDisabled,
+                            onOpenConversation: (conversationId, messageId) =>
+                              onOpenConversation(conversationId, messageId),
+                            onClose,
+                          });
+                        }}
+                        onRunFresh={(action) => {
+                          if (!selectedPreview.conversationId) return;
+                          return onRunFresh(
+                            selectedPreview.conversationId,
+                            action.send_text,
+                          );
+                        }}
+                        onSaveDecision={(action, draft) =>
+                          saveDecision(selectedDossier.run_id, action, draft)
+                        }
+                      />
+                    )
                   ) : (
                     <>
                       <div

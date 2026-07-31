@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, FileText, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileText, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ type RunDossierViewProps = {
   dossier: RunDossier;
   totalRuns: number;
   decidedRuns: number;
+  onBackToLatest?: () => void;
   onOpenHistory?: () => void;
   onOpenConversation: () => void;
   onRunFresh: (action: SearchRunFreshAction) => Promise<void> | void;
@@ -75,6 +76,7 @@ export function RunDossierView({
   dossier,
   totalRuns,
   decidedRuns,
+  onBackToLatest,
   onOpenHistory,
   onOpenConversation,
   onRunFresh,
@@ -161,6 +163,17 @@ export function RunDossierView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {onBackToLatest ? (
+        <button
+          type="button"
+          aria-label={t("command_palette.dossier_back", "Dossier")}
+          onClick={onBackToLatest}
+          className="mb-3 inline-flex min-h-11 w-fit items-center gap-2 rounded-full px-2 text-[12px] font-medium text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t("command_palette.dossier_back", "Dossier")}
+        </button>
+      ) : null}
       <div className="rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">

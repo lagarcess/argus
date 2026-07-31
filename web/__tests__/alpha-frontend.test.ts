@@ -1871,6 +1871,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
+    const dossierIntegration = readFileSync(
+      join(root, "lib/command-palette-dossier-integration.ts"),
+      "utf-8",
+    );
     const initialHistoryFetch = palette.slice(
       palette.indexOf("const requestId = ++historyRequestIdRef.current"),
       palette.indexOf("const clearSearchAndLedger"),
@@ -1963,12 +1967,16 @@ describe("Argus Alpha frontend contract", () => {
       saveDecision.indexOf("onMutated?.()"),
     );
     expect(saveDecision.indexOf("onMutated?.()")).toBeLessThan(
-      saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+      saveDecision.indexOf("refreshCanonicalSearch:"),
+    );
+    expect(saveDecision).toContain("refreshLoadedHistory:");
+    expect(dossierIntegration).toMatch(
+      /Promise\.all\(\[\s*refreshCanonicalSearch\(\),\s*refreshLoadedHistory\(\),\s*\]\)/,
     );
     expect(saveDecision).not.toContain("setDecisionDraft");
     expect(
       saveDecision.slice(
-        saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+        saveDecision.indexOf("refreshCanonicalSearch:"),
       ),
     ).not.toContain("setDecisionSaveFailed(true)");
     expect(refreshCanonicalSearch).toContain(': currentQuery');

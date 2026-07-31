@@ -13,18 +13,22 @@ export type UseRunDossierHistoryResult = RunDossierHistoryState & {
   loadOlder: () => Promise<void>;
   retry: () => Promise<void>;
   refresh: () => Promise<void>;
+  getCurrentState: () => RunDossierHistoryState;
 };
 
 export function useRunDossierHistory(
   conversationId: string,
+  resetKey: string = conversationId,
 ): UseRunDossierHistoryResult {
   const controller = useMemo(
-    () =>
-      createRunDossierHistoryController({
+    () => {
+      void resetKey;
+      return createRunDossierHistoryController({
         conversationId,
         listRunDossiers,
-      }),
-    [conversationId],
+      });
+    },
+    [conversationId, resetKey],
   );
   const state = useSyncExternalStore(
     controller.subscribe,
@@ -39,6 +43,7 @@ export function useRunDossierHistory(
       loadOlder: controller.loadOlder,
       retry: controller.retry,
       refresh: controller.refresh,
+      getCurrentState: controller.getState,
     }),
     [controller, state],
   );

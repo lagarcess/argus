@@ -171,6 +171,24 @@ describe("single-run dossier view", () => {
       /<button[^>]*aria-label="Open in conversation"[^>]*disabled=""/,
     );
   });
+
+  test("shows a visible return to the latest dossier for a historical anchor", () => {
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={dossierWithWatchingDecisionAndMultilineNote}
+        totalRuns={7}
+        decidedRuns={5}
+        onBackToLatest={() => {}}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+    expect(visibleText(html)).toContain("Dossier");
+    expect(html).toContain('aria-label="Dossier"');
+  });
 });
 
 describe("decision editor", () => {
