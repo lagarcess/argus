@@ -790,13 +790,13 @@
         "label": "Color del monograma",
         "save_error": "No pudimos actualizar el color de tu monograma todavía.",
         "themes": {
-          "ocean": "Océano",
-          "plum": "Ciruela",
-          "teal": "Verde azulado",
           "ember": "Brasa",
           "gold": "Dorado",
+          "slate": "Musgo",
+          "teal": "Verde azulado",
+          "ocean": "Océano",
           "indigo": "Índigo",
-          "slate": "Pizarra"
+          "plum": "Ciruela"
         }
       },
       "close": "Cerrar perfil",

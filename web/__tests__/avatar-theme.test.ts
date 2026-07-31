@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   AVATAR_THEMES,
   avatarThemeClassName,
+  avatarThemeStyle,
   type AvatarTheme,
 } from "@/lib/avatar-theme";
 
@@ -12,20 +13,27 @@ describe("avatar monogram themes", () => {
   test("uses a curated token set with a deterministic ocean fallback", () => {
     expect(AVATAR_THEMES).toHaveLength(7);
     expect(AVATAR_THEMES.map((theme) => theme.token)).toEqual([
-      "ocean",
-      "plum",
-      "teal",
       "ember",
       "gold",
-      "indigo",
       "slate",
+      "teal",
+      "ocean",
+      "indigo",
+      "plum",
     ] satisfies AvatarTheme[]);
     expect(avatarThemeClassName(undefined)).toBe(avatarThemeClassName("ocean"));
   });
 
-  test("keeps every monogram readable with one of two foreground tokens", () => {
-    for (const theme of AVATAR_THEMES) {
-      expect(theme.className).toMatch(/text-(white|\[#191c1f\])/);
+  test("derives evenly spaced rich gradients from the shared hue formula", () => {
+    const hueStep = 360 / AVATAR_THEMES.length;
+
+    for (const [index, theme] of AVATAR_THEMES.entries()) {
+      expect(theme.hue).toBeCloseTo(index * hueStep);
+      expect(theme.className).toBe("text-white");
+      expect(avatarThemeStyle(theme.token)).toEqual({
+        backgroundImage:
+          `linear-gradient(145deg, hsl(${theme.hue} 42% 39%), hsl(${theme.hue} 42% 29%))`,
+      });
     }
   });
 
@@ -57,5 +65,7 @@ describe("avatar monogram themes", () => {
     expect(Object.keys(es.settings.profile.avatar_theme.themes)).toEqual(
       AVATAR_THEMES.map((theme) => theme.token),
     );
+    expect(en.settings.profile.avatar_theme.themes.slate).toBe("Moss");
+    expect(es.settings.profile.avatar_theme.themes.slate).toBe("Musgo");
   });
 });

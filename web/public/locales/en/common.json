@@ -790,13 +790,13 @@
         "label": "Monogram color",
         "save_error": "Could not update your monogram color yet.",
         "themes": {
-          "ocean": "Ocean",
-          "plum": "Plum",
-          "teal": "Teal",
           "ember": "Ember",
           "gold": "Gold",
+          "slate": "Moss",
+          "teal": "Teal",
+          "ocean": "Ocean",
           "indigo": "Indigo",
-          "slate": "Slate"
+          "plum": "Plum"
         }
       },
       "close": "Close profile",

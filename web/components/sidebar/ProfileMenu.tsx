@@ -31,6 +31,7 @@ import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
 import {
   AVATAR_THEMES,
   avatarThemeClassName,
+  avatarThemeStyle,
   type AvatarTheme,
 } from "@/lib/avatar-theme";
 import {
@@ -324,6 +325,10 @@ export default function ProfileMenu({
     accountKind === "registered"
       ? avatarThemeClassName(profile?.avatar_theme)
       : "bg-[#191c1f] text-white dark:bg-white/10";
+  const avatarStyle =
+    accountKind === "registered"
+      ? avatarThemeStyle(profile?.avatar_theme)
+      : undefined;
   const handleLanguageSelect = useCallback(
     async (code: string) => {
       const nextLanguage = normalizeEnabledLanguage(code);
@@ -758,6 +763,7 @@ export default function ProfileMenu({
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                  style={avatarStyle}
                 >
                   {profileInitial(profile)}
                 </div>
@@ -887,6 +893,7 @@ export default function ProfileMenu({
                         >
                           <span
                             className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${theme.className}`}
+                            style={avatarThemeStyle(theme.token)}
                             aria-hidden="true"
                           >
                             {profileInitial(profile)}
