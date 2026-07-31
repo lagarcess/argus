@@ -394,6 +394,21 @@ def test_logout_openapi_declares_browser_origin_rejection() -> None:
     assert "untrusted browser origin" in responses["403"]["description"].lower()
 
 
+def test_password_auth_openapi_requires_bounded_captcha_tokens() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    for schema_name in ("SignupRequest", "LoginRequest"):
+        schema = openapi["components"]["schemas"][schema_name]
+        assert "captcha_token" in schema["required"]
+        assert schema["properties"]["captcha_token"] == {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+        }
+
+
 def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 

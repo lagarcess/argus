@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Eye, EyeClosed } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -13,11 +13,17 @@ export type AuthFormSubmission = {
   password: string;
 };
 
+export type AuthFormSubmissionResult = {
+  status: "email_confirmation_required";
+};
+
 type AuthFormProps = {
   mode: AuthFormMode;
   allowModeSwitch?: boolean;
   onModeChange?: (mode: AuthFormMode) => void;
-  onSubmit: (submission: AuthFormSubmission) => Promise<void>;
+  onSubmit: (
+    submission: AuthFormSubmission,
+  ) => Promise<AuthFormSubmissionResult | void>;
 };
 
 export default function AuthForm({
@@ -33,22 +39,46 @@ export default function AuthForm({
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
   const isSignup = mode === "signup";
+
+  useEffect(() => {
+    setNeedsEmailConfirmation(false);
+  }, [mode]);
+
+  useEffect(() => {
+    if (needsEmailConfirmation) {
+      confirmationHeadingRef.current?.focus();
+    }
+  }, [needsEmailConfirmation]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthError(null);
     setIsSubmitting(true);
     try {
-      await onSubmit({
+      const result = await onSubmit({
         mode,
         displayName: displayName.trim(),
         email: email.trim(),
         password,
       });
+      setNeedsEmailConfirmation(
+        Boolean(result && result.status === "email_confirmation_required"),
+      );
     } catch (error) {
+      const errorCode =
+        error instanceof Error && "code" in error
+          ? String((error as Error & { code?: unknown }).code ?? "")
+          : "";
       setAuthError(
-        error instanceof Error
+        errorCode === "captcha_unavailable"
+          ? t(
+              "auth.errors.captcha_unavailable",
+              "We couldn’t complete the security check. Please try again.",
+            )
+          : error instanceof Error
           ? error.message
           : t("auth.errors.generic", "Something went wrong. Please try again."),
       );
@@ -56,6 +86,31 @@ export default function AuthForm({
       setIsSubmitting(false);
     }
   };
+
+  if (needsEmailConfirmation) {
+    return (
+      <div
+        data-testid="auth-check-email"
+        role="status"
+        aria-live="polite"
+        className="w-full rounded-[28px] border border-black/10 bg-black/[0.025] px-6 py-7 text-center dark:border-white/10 dark:bg-white/[0.04]"
+      >
+        <h2
+          ref={confirmationHeadingRef}
+          tabIndex={-1}
+          className="font-display text-[24px] font-medium tracking-tight text-black outline-none dark:text-white"
+        >
+          {t("auth.signup.confirmation_title", "Check your email")}
+        </h2>
+        <p className="mt-3 text-[15px] leading-relaxed text-black/60 dark:text-white/60">
+          {t(
+            "auth.signup.confirmation_description",
+            "Use the confirmation link we sent to finish creating your account. Then return here to sign in.",
+          )}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

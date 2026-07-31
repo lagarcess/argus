@@ -269,6 +269,7 @@ class SupabaseGateway(
         self,
         email: str,
         password: str,
+        captcha_token: str,
         display_name: str | None = None,
         username: str | None = None,
         language: Language = "en",
@@ -284,7 +285,8 @@ class SupabaseGateway(
                             "display_name": display_name,
                             "username": username,
                             "language": language,
-                        }
+                        },
+                        "captcha_token": captcha_token,
                     },
                 }
             )
@@ -311,11 +313,20 @@ class SupabaseGateway(
     def private_alpha_email_allowed(self, email: str) -> bool:
         return self.private_alpha_role_for_email(email) is not None
 
-    def login(self, email: str, password: str) -> dict[str, Any]:
+    def login(
+        self,
+        email: str,
+        password: str,
+        captcha_token: str,
+    ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
             response = auth_client.auth.sign_in_with_password(
-                {"email": email, "password": password}
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"captcha_token": captcha_token},
+                }
             )
             if not response.session:
                 raise RuntimeError("Login failed: No session returned.")

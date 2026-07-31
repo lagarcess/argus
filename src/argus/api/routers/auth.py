@@ -668,6 +668,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
         result = api_state.supabase_gateway.signup(
             email=body.email,
             password=body.password,
+            captcha_token=body.captcha_token,
             display_name=body.display_name,
             username=body.username,
             language=body.language,
@@ -693,7 +694,9 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         raise _login_auth_problem(request)
     try:
         result = api_state.supabase_gateway.login(
-            email=body.email, password=body.password
+            email=body.email,
+            password=body.password,
+            captcha_token=body.captcha_token,
         )
     except Exception:
         raise _login_auth_problem(request) from None

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import AuthForm, {
   type AuthFormMode,
   type AuthFormSubmission,
+  type AuthFormSubmissionResult,
 } from "@/components/auth/AuthForm";
 import {
   guestConversionBenefitKey,
@@ -19,7 +20,9 @@ type GuestConversionModalProps = {
   initialMode: GuestConversionMode;
   publicAccountAccessEnabled: boolean;
   onClose: () => void;
-  onAuthenticate: (submission: AuthFormSubmission) => Promise<void>;
+  onAuthenticate: (
+    submission: AuthFormSubmission,
+  ) => Promise<AuthFormSubmissionResult | void>;
 };
 
 export default function GuestConversionModal({

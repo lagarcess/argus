@@ -95,8 +95,14 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     assert 'page.goto("/?auth=signup"' in browser_source
     assert 'isApiResponse(response, "/auth/signup", "POST")' in browser_source
     assert "signupPayload.language !== canaryLanguage" in browser_source
-    assert "expect(signupResponse.status()).toBe(400)" in browser_source
+    assert "signupPayload.captcha_token" in browser_source
+    assert "Signup CAPTCHA token was missing or unbounded" in browser_source
+    assert "expect(signupResponse.status()).toBe(200)" in browser_source
+    assert 'page.getByTestId("auth-check-email")' in browser_source
+    assert "Signup unexpectedly returned an authenticated session" in browser_source
     assert 'page.goto("/?auth=login"' in browser_source
+    assert "loginRequestPayload.captcha_token" in browser_source
+    assert "Login CAPTCHA token was missing or unbounded" in browser_source
     assert "signupResponse.request().postDataJSON()).toMatchObject" not in browser_source
     assert "Spanish signup request omitted the canonical language" in browser_source
 
@@ -183,13 +189,16 @@ def test_browser_exports_private_identity_handoff_and_shell_deletes_it() -> None
     assert "mode: 0o600" in browser_source
     assert 'source: "playwright"' in browser_source
     assert "schema_version: 1" in browser_source
+    assert "access_token: accessToken" in browser_source
+    assert '"access_token"' in shell_source
+    assert 'BROWSER_ACCESS_TOKEN \\' in shell_source
     assert "BROWSER_IDENTITY_HANDOFF" not in workflow
 
 
-def test_shell_only_consumes_browser_ids_for_read_only_api_postconditions() -> None:
+def test_shell_reuses_private_browser_session_for_read_only_api_postconditions() -> None:
     source = _source(".github/canary-render.sh")
 
-    assert "login_for_read_only_api_postconditions" in source
+    assert "require_browser_session_for_read_only_api_postconditions" in source
     assert "verify_api_postconditions" in source
     assert "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" in source
     assert "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" in source
@@ -197,7 +206,9 @@ def test_shell_only_consumes_browser_ids_for_read_only_api_postconditions() -> N
         "${API_URL}/api/v1/search?q=${encoded_search_query}&include_ledger_groups=true"
         in source
     )
-    assert '"${API_URL}/api/v1/auth/login"' in source
+    assert '-H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}"' in source
+    assert '"${API_URL}/api/v1/auth/login"' not in source
+    assert 'CANARY_PASSWORD="$PASSWORD"' not in source
     assert '"${API_URL}/api/v1/conversations"' not in source
     assert "/api/v1/evidence-artifacts/" not in source
 
@@ -511,8 +522,10 @@ def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None
     assert "run_id" not in receipt_query
     assert "id," not in receipt_query
     receipt_probe = recovery_body.index("route_receipts?select=task,outcome,failure_mode")
-    read_only_login = recovery_body.index("login_for_read_only_api_postconditions")
-    assert receipt_probe < read_only_login
+    browser_session_check = recovery_body.index(
+        "require_browser_session_for_read_only_api_postconditions"
+    )
+    assert receipt_probe < browser_session_check
 
 
 def test_failed_browser_run_is_reported_as_failed_not_not_run() -> None:

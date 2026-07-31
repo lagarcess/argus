@@ -96,12 +96,15 @@ export default function LandingPage() {
     }
 
     if (submission.mode === "signup") {
-      await signupWithEmail({
+      const result = await signupWithEmail({
         email: submission.email,
         password: submission.password,
         language: normalizeApiLanguage(i18n.resolvedLanguage ?? i18n.language),
         display_name: submission.displayName || null,
       });
+      if (result.needsEmailConfirmation) {
+        return { status: "email_confirmation_required" as const };
+      }
     } else {
       await loginWithEmail({
         email: submission.email,

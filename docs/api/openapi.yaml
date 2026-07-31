@@ -2384,10 +2384,15 @@ components:
           type: string
         password:
           type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
       type: object
       required:
       - email
       - password
+      - captcha_token
     Message:
       properties:
         id:
@@ -2646,6 +2651,10 @@ components:
           type: string
         password:
           type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
         language:
           type: string
           enum:
@@ -2664,6 +2673,7 @@ components:
       required:
       - email
       - password
+      - captcha_token
     StarterPromptsResponse:
       properties:
         prompts:

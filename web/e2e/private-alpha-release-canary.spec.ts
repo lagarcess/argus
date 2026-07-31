@@ -67,7 +67,7 @@ function isApiResponse(response: Response, suffix: string, method: string): bool
 async function loginThroughRenderedUi(
   page: Page,
   verifySignup = false,
-): Promise<string> {
+): Promise<{ userId: string; accessToken: string }> {
   const canaryEmail = requireConfig(email, "email");
   const canaryPassword = requireConfig(password, "password");
   const canaryLanguage = requireConfig(language, "language");
@@ -100,7 +100,23 @@ async function loginThroughRenderedUi(
     if (signupPayload.language !== canaryLanguage) {
       throw new Error("Spanish signup request omitted the canonical language");
     }
-    expect(signupResponse.status()).toBe(400);
+    const signupCaptchaToken = signupPayload.captcha_token;
+    if (
+      typeof signupCaptchaToken !== "string" ||
+      signupCaptchaToken.length < 1 ||
+      signupCaptchaToken.length > 4096
+    ) {
+      throw new Error("Signup CAPTCHA token was missing or unbounded");
+    }
+    expect(signupResponse.status()).toBe(200);
+    const signupResponsePayload = record(
+      await signupResponse.json(),
+      "signup payload",
+    );
+    if (signupResponsePayload.session) {
+      throw new Error("Signup unexpectedly returned an authenticated session");
+    }
+    await expect(page.getByTestId("auth-check-email")).toBeVisible();
     await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
   }
 
@@ -118,9 +134,23 @@ async function loginThroughRenderedUi(
   await page.getByRole("button", { name: label("auth.login.submit") }).click();
 
   const loginResponse = await loginResponsePromise;
+  const loginRequestPayload =
+    loginResponse.request().postDataJSON() as JsonRecord;
+  const loginCaptchaToken = loginRequestPayload.captcha_token;
+  if (
+    typeof loginCaptchaToken !== "string" ||
+    loginCaptchaToken.length < 1 ||
+    loginCaptchaToken.length > 4096
+  ) {
+    throw new Error("Login CAPTCHA token was missing or unbounded");
+  }
   if (!loginResponse.ok()) throw new Error("Rendered login failed");
   const loginPayload = record(await loginResponse.json(), "login payload");
   const userId = privateId(record(loginPayload.user, "login user").id, "user identity");
+  const accessToken = privateId(
+    record(loginPayload.session, "login session").access_token,
+    "browser access token",
+  );
 
   await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
   const profileResponse = await profileResponsePromise;
@@ -135,7 +165,7 @@ async function loginThroughRenderedUi(
     throw new Error("Rendered profile hydration did not preserve Spanish identity");
   }
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  return userId;
+  return { userId, accessToken };
 }
 
 function captureBrowserErrors(page: Page) {
@@ -293,7 +323,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       }
     });
 
-    const userId = await loginThroughRenderedUi(page);
+    const { userId, accessToken } = await loginThroughRenderedUi(page);
     const conversationResponsePromise = page.waitForResponse((response) =>
       isApiResponse(response, "/conversations", "POST"),
     );
@@ -317,6 +347,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "conversation_created",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
     });
 
@@ -369,6 +400,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "result_captured",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,
@@ -542,6 +574,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "complete",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,

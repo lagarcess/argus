@@ -39,7 +39,6 @@ if [ -z "$CANDIDATE_SHA" ]; then
 fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
-COOKIE_JAR="$(mktemp)"
 API_JOB_RESPONSE="$(mktemp)"
 API_MESSAGES_RESPONSE="$(mktemp)"
 API_SEARCH_RESPONSE="$(mktemp)"
@@ -56,7 +55,6 @@ chmod 600 "$BROWSER_IDENTITY_HANDOFF"
 cleanup() {
   rm -f "$BROWSER_IDENTITY_HANDOFF"
   rm -f \
-    "$COOKIE_JAR" \
     "$API_JOB_RESPONSE" \
     "$API_MESSAGES_RESPONSE" \
     "$API_SEARCH_RESPONSE" \
@@ -92,6 +90,7 @@ WORKFLOW_VERSION_ID=""
 WORKFLOW_VERSION_STATUS=""
 WORKFLOW_EXPECTED_VERSION_ID=""
 USER_ID=""
+BROWSER_ACCESS_TOKEN=""
 CONVERSATION_ID=""
 BACKTEST_JOB_ID=""
 BACKTEST_RUN_ID=""
@@ -689,6 +688,7 @@ if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
 
 keys = (
     "user_id",
+    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -735,6 +735,7 @@ PY
 
   IFS=$'\t' read -r \
     USER_ID \
+    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
@@ -780,11 +781,12 @@ except json.JSONDecodeError as exc:
     raise SystemExit(1) from exc
 if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
     raise SystemExit(1)
-required = ("user_id", "conversation_id")
+required = ("user_id", "access_token", "conversation_id")
 if any(not isinstance(payload.get(key), str) or not payload[key].strip() for key in required):
     raise SystemExit(1)
 keys = (
     "user_id",
+    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -800,6 +802,7 @@ PY
 
   IFS='|' read -r \
     USER_ID \
+    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
@@ -823,10 +826,10 @@ PY
     "${SUPABASE_URL}/rest/v1/route_receipts?select=task,outcome,failure_mode&conversation_id=eq.${CONVERSATION_ID}&user_id=eq.${USER_ID}&order=created_at.desc&limit=20" \
     "$RECEIPT_ROWS" || true
 
-  if ! login_for_read_only_api_postconditions; then
+  if ! require_browser_session_for_read_only_api_postconditions; then
     return 0
   fi
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS -H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" \
     "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" \
     > "$API_MESSAGES_RESPONSE" || true
   if [ -z "$BACKTEST_JOB_ID" ]; then
@@ -864,7 +867,7 @@ PY
     done
   fi
   if [ -n "$BACKTEST_JOB_ID" ]; then
-    curl -fsS -b "$COOKIE_JAR" \
+    curl -fsS -H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" \
       "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" \
       > "$API_JOB_RESPONSE" || true
     if [ -z "$BACKTEST_RUN_ID" ] && [ -s "$API_JOB_RESPONSE" ]; then
@@ -889,19 +892,8 @@ PY
   echo "canary_failed_browser_capture_inputs=collected"
 }
 
-login_for_read_only_api_postconditions() {
-  local login_body
-  login_body="$(CANARY_EMAIL="$EMAIL" CANARY_PASSWORD="$PASSWORD" python3 - <<'PY'
-import json
-import os
-print(json.dumps({"email": os.environ["CANARY_EMAIL"], "password": os.environ["CANARY_PASSWORD"]}))
-PY
-  )"
-  curl -fsS \
-    -c "$COOKIE_JAR" \
-    -H "Content-Type: application/json" \
-    -d "$login_body" \
-    "${API_URL}/api/v1/auth/login" >/dev/null
+require_browser_session_for_read_only_api_postconditions() {
+  [ -n "$BROWSER_ACCESS_TOKEN" ]
 }
 
 verify_api_postconditions() {
@@ -912,11 +904,11 @@ import urllib.parse
 print(urllib.parse.quote(os.environ["CANARY_SEARCH_QUERY"], safe=""))
 PY
   )"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS -H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" \
     "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" > "$API_JOB_RESPONSE"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS -H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" \
     "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" > "$API_MESSAGES_RESPONSE"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS -H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" \
     "${API_URL}/api/v1/search?q=${encoded_search_query}&include_ledger_groups=true" > "$API_SEARCH_RESPONSE"
 
   CANARY_JOB_FILE="$API_JOB_RESPONSE" \
@@ -1224,8 +1216,8 @@ fi
 if ! verify_browser_identity_handoff; then
   fail_canary "browser_identity" "private_identity_handoff_failed"
 fi
-if ! login_for_read_only_api_postconditions; then
-  fail_canary "api_postconditions" "read_only_login_failed"
+if ! require_browser_session_for_read_only_api_postconditions; then
+  fail_canary "api_postconditions" "browser_session_missing"
 fi
 if ! verify_api_postconditions; then
   fail_canary "api_postconditions" "canonical_api_postconditions_failed"

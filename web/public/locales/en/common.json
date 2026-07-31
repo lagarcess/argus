@@ -978,7 +978,9 @@
       "name_placeholder": "Name",
       "submit": "Sign up",
       "loading": "Creating account...",
-      "new_account": "new to argus?"
+      "new_account": "new to argus?",
+      "confirmation_title": "Check your email",
+      "confirmation_description": "Use the confirmation link we sent to finish creating your account. Then return here to sign in."
     },
     "legal": {
       "continuing_prefix": "By continuing, you agree to our"
@@ -1017,7 +1019,8 @@
       "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "captcha_unavailable": "We couldn’t complete the security check. Please try again."
     }
   },
   "account_security": {

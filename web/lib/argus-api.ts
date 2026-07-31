@@ -19,6 +19,7 @@ import {
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
+import { acquireGuestCaptchaToken } from "./guest-captcha";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -668,6 +669,22 @@ export async function getStarterPrompts() {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+async function acquirePasswordAuthCaptchaToken(): Promise<string> {
+  try {
+    const token = (await acquireGuestCaptchaToken()).trim();
+    if (!token || token.length > 4096) {
+      throw new Error("captcha_token_out_of_bounds");
+    }
+    return token;
+  } catch {
+    const error = new Error(
+      "The browser security check could not be completed.",
+    ) as Error & { code: string };
+    error.code = "captcha_unavailable";
+    throw error;
+  }
+}
+
 export async function signupWithEmail(payload: {
   email: string;
   password: string;
@@ -675,26 +692,31 @@ export async function signupWithEmail(payload: {
   display_name?: string | null;
   username?: string | null;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/signup",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
-  return response;
+  return {
+    response,
+    needsEmailConfirmation: !response.session,
+  };
 }
 
 export async function loginWithEmail(payload: {
   email: string;
   password: string;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/login",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);

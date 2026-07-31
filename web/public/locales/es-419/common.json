@@ -978,7 +978,9 @@
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
-      "new_account": "¿nuevo en argus?"
+      "new_account": "¿nuevo en argus?",
+      "confirmation_title": "Revisa tu correo",
+      "confirmation_description": "Usa el enlace de confirmación que enviamos para terminar de crear tu cuenta. Luego vuelve aquí para iniciar sesión."
     },
     "legal": {
       "continuing_prefix": "Al continuar, aceptas nuestros"
@@ -1017,7 +1019,8 @@
       "cleanup_warning": "Las sesiones fueron revocadas, pero este navegador no pudo confirmar la limpieza de cookies. Aún necesitas iniciar sesión de nuevo."
     },
     "errors": {
-      "generic": "Algo salio mal. Intentalo de nuevo."
+      "generic": "Algo salio mal. Intentalo de nuevo.",
+      "captcha_unavailable": "No pudimos completar la verificación de seguridad. Inténtalo de nuevo."
     }
   },
   "account_security": {

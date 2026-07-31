@@ -224,7 +224,11 @@ def test_login_reconciles_cookie_bound_handoff_before_returning_session() -> Non
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 200
@@ -276,7 +280,11 @@ def test_login_handoff_reconciliation_does_not_duplicate_completion_events() -> 
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 200
@@ -320,7 +328,11 @@ def test_terminal_login_handoff_failure_keeps_login_and_clears_stale_cookies(
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == expected_status
@@ -366,7 +378,11 @@ def test_retryable_login_handoff_failure_keeps_login_and_handoff_cookie() -> Non
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 503

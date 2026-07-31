@@ -697,6 +697,7 @@ def _context_depth(value: Any) -> int:
 class SignupRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
     language: Language = "en"
     display_name: str | None = None
     username: str | None = None
@@ -705,6 +706,7 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
 
 
 class GuestBootstrapRequest(BaseModel):

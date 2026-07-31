@@ -1597,11 +1597,18 @@ Create account.
 {
   "email": "user@email.com",
   "password": "string",
+  "captcha_token": "bounded-turnstile-token",
   "display_name": "Lucas",
   "username": "lucas",
   "language": "es-419"
 }
 ```
+
+**CAPTCHA:**
+- `captcha_token` is required and must contain 1–4,096 characters.
+- The browser acquires a fresh token for each signup submission through the
+  existing Turnstile boundary. Argus passes it to Supabase Auth and never logs
+  or persists it.
 
 **Language persistence:**
 - The private-alpha web client sends its selected `language` (`en` or `es-419`)
@@ -1645,10 +1652,15 @@ listed emails that fail provider signup.
 ```json
 {
   "identifier": "user@email.com",
-  "password": "string"
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token"
 }
 ```
 *Note: `identifier` may be email. Username login is deferred unless explicitly implemented.*
+
+`captcha_token` is required and bounded to 1–4,096 characters. The browser
+acquires a fresh token for each password-login submission; Argus forwards it to
+Supabase Auth without logging or persistence.
 
 **Response:**
 ```json
