@@ -670,6 +670,25 @@ def _mock_harness_boundaries(
     return service_client, session_clients
 
 
+def _mock_successful_cases(
+    module: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        module,
+        "_run_public_case",
+        lambda **kwargs: (
+            _completed_case(module, kwargs["case_id"]),
+            {"id": "seed"},
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "_run_probe_case",
+        lambda **kwargs: _completed_case(module, kwargs["case_id"]),
+    )
+
+
 def test_run_harness_completes_all_mocked_boundaries(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -677,25 +696,71 @@ def test_run_harness_completes_all_mocked_boundaries(
     module = _load_module()
     config = _config(module, tmp_path)
     service_client, session_clients = _mock_harness_boundaries(module, monkeypatch)
+    _mock_successful_cases(module, monkeypatch)
+    pending_path = tmp_path / "public-alpha-render-load.pending.json"
+    lifecycle: list[str] = []
 
-    def _public_case(**kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-        return _completed_case(module, kwargs["case_id"]), {"id": "seed"}
+    def _cleanup(**_: Any) -> dict[str, Any]:
+        assert pending_path.exists()
+        pending = json.loads(pending_path.read_text(encoding="utf-8"))
+        assert pending["status"] == "measured"
+        assert pending["completeness"] == "complete_measurements_pending_cleanup"
+        assert pending["cleanup"]["status"] == "pending"
+        with pytest.raises(ValueError, match="succeeded"):
+            module.validate_report(pending)
+        lifecycle.append("cleanup")
+        return _completed_cleanup()
 
-    monkeypatch.setattr(module, "_run_public_case", _public_case)
-    monkeypatch.setattr(
-        module,
-        "_run_probe_case",
-        lambda **kwargs: _completed_case(module, kwargs["case_id"]),
-    )
+    monkeypatch.setattr(module, "_cleanup_temporary_identities", _cleanup)
 
     report = module.run_harness(config)
 
+    assert lifecycle == ["cleanup"]
     assert report["status"] == "succeeded"
     assert [case["case_id"] for case in report["cases"]] == list(module.CASE_MANIFEST)
     assert (tmp_path / "public-alpha-render-load.json").exists()
+    assert not pending_path.exists()
     assert service_client.close_calls == 1
     assert len(session_clients) == 18
     assert all(client.close_calls == 1 for client in session_clients)
+
+
+def test_final_success_write_failure_preserves_pre_cleanup_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    config = _config(module, tmp_path)
+    _mock_harness_boundaries(module, monkeypatch)
+    _mock_successful_cases(module, monkeypatch)
+    cleanup_calls: list[bool] = []
+
+    def _cleanup(**_: Any) -> dict[str, Any]:
+        cleanup_calls.append(True)
+        return _completed_cleanup()
+
+    monkeypatch.setattr(module, "_cleanup_temporary_identities", _cleanup)
+    monkeypatch.setattr(
+        module,
+        "write_report",
+        lambda **_: (_ for _ in ()).throw(OSError("final promotion failed")),
+    )
+
+    with pytest.raises(OSError, match="final promotion failed"):
+        module.run_harness(config)
+
+    pending_path = tmp_path / "public-alpha-render-load.pending.json"
+    assert cleanup_calls == [True]
+    assert pending_path.exists()
+    pending = json.loads(pending_path.read_text(encoding="utf-8"))
+    assert pending["status"] == "measured"
+    assert pending["completeness"] == "complete_measurements_pending_cleanup"
+    assert pending["cleanup"]["status"] == "pending"
+    assert [case["case_id"] for case in pending["cases"]] == list(
+        module.CASE_MANIFEST
+    )
+    with pytest.raises(ValueError, match="succeeded"):
+        module.validate_report(pending)
 
 
 def test_run_harness_persists_partial_before_cleanup_and_returns_failure(

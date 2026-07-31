@@ -96,6 +96,38 @@ def validate_report(report: Mapping[str, Any]) -> None:
         raise ValueError("successful artifact status must be succeeded")
     if report.get("completeness") != "complete":
         raise ValueError("successful artifact completeness must be complete")
+    _validate_complete_measurements(report)
+    validate_cleanup(report.get("cleanup"), require_completed=True)
+
+
+def validate_measured_report(report: Mapping[str, Any]) -> None:
+    _reject_forbidden_artifact_data(report)
+    if report.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("unexpected public-alpha load artifact schema")
+    if report.get("status") != "measured":
+        raise ValueError("pre-cleanup artifact status must be measured")
+    if report.get("completeness") != "complete_measurements_pending_cleanup":
+        raise ValueError("pre-cleanup artifact must remain non-final")
+    _validate_complete_measurements(report)
+    cleanup = report.get("cleanup")
+    validate_cleanup(cleanup, require_completed=False)
+    if not isinstance(cleanup, Mapping) or cleanup.get("status") != "pending":
+        raise ValueError("pre-cleanup artifact requires pending cleanup")
+    auth = cleanup["auth"]
+    allowlist = cleanup["allowlist"]
+    if (
+        auth["targets"] != 15
+        or auth["deleted"] != 0
+        or auth["already_absent"] != 0
+        or auth["failed"] != 0
+        or allowlist["targets"] != 15
+        or allowlist["completed"] != 0
+        or allowlist["failed"] != 0
+    ):
+        raise ValueError("pre-cleanup artifact must precede all cleanup attempts")
+
+
+def _validate_complete_measurements(report: Mapping[str, Any]) -> None:
     if report.get("source") != CAPACITY_LOAD_SOURCE:
         raise ValueError("unexpected public-alpha load artifact source")
     candidate_sha = str(report.get("candidate_sha") or "")
@@ -122,7 +154,6 @@ def validate_report(report: Mapping[str, Any]) -> None:
         if not isinstance(case, Mapping):
             raise ValueError("case entries must be objects")
         _validate_case(case)
-    validate_cleanup(report.get("cleanup"), require_completed=True)
 
 
 def write_report(
@@ -136,6 +167,21 @@ def write_report(
     serialized = json.dumps(report, indent=2, sort_keys=True) + "\n"
     json_path.write_text(serialized, encoding="utf-8")
     return {"json": json_path}
+
+
+def write_measured_report(
+    *,
+    report: Mapping[str, Any],
+    output_dir: Path,
+) -> Path:
+    validate_measured_report(report)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "public-alpha-render-load.pending.json"
+    output_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return output_path
 
 
 def write_partial_report(report: Mapping[str, Any], output_path: Path) -> None:

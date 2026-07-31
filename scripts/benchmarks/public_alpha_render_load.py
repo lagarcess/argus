@@ -98,6 +98,9 @@ try:
         validate_partial_report as _validate_partial_report,
     )
     from scripts.benchmarks.public_alpha_render_load_evidence import (
+        write_measured_report as _write_measured_report,
+    )
+    from scripts.benchmarks.public_alpha_render_load_evidence import (
         write_partial_report as _write_partial_report,
     )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
@@ -113,6 +116,9 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     )
     from public_alpha_render_load_evidence import (
         validate_partial_report as _validate_partial_report,
+    )
+    from public_alpha_render_load_evidence import (
+        write_measured_report as _write_measured_report,
     )
     from public_alpha_render_load_evidence import (
         write_partial_report as _write_partial_report,
@@ -198,6 +204,7 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
     failing_case: dict[str, Any] | None = None
     partial_report: dict[str, Any] | None = None
     partial_write_error: Exception | None = None
+    measured_path: Path | None = None
     try:
         _create_temporary_identities(
             config=config,
@@ -306,6 +313,14 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
                 mode="upstream_transient_once",
             )
         )
+        measured_path = _write_measured_report(
+            report=_build_measured_report(
+                config=config,
+                cases=cases,
+                cleanup=_pending_cleanup(config, created_user_ids),
+            ),
+            output_dir=config.output_dir,
+        )
     except CapacityEnvelopeStop as exc:
         failing_case = {
             "case_id": exc.case_id,
@@ -384,6 +399,14 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
 
     report = _build_report(config=config, cases=cases, cleanup=cleanup)
     write_report(report=report, output_dir=config.output_dir)
+    if measured_path is not None:
+        try:
+            measured_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning(
+                "Public-alpha pre-cleanup checkpoint retained",
+                failure_code="checkpoint_cleanup_failed",
+            )
     return report
 
 
@@ -961,6 +984,32 @@ def _build_report(
     }
     validate_report(report)
     return report
+
+
+def _build_measured_report(
+    *,
+    config: HarnessConfig,
+    cases: list[dict[str, Any]],
+    cleanup: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "measured",
+        "completeness": "complete_measurements_pending_cleanup",
+        "candidate_sha": config.candidate_sha,
+        "generated_at": _utcnow_iso(),
+        "api_url": config.api_url,
+        "app_url": config.app_url,
+        "source": CAPACITY_LOAD_SOURCE,
+        "workflow": {
+            "task": config.workflow_task,
+            "plan": "standard",
+            "max_retries": 1,
+        },
+        "limits": dict(LIMITS),
+        "cases": cases,
+        "cleanup": cleanup,
+    }
 
 
 def _build_partial_report(
