@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
-from datetime import date
+from contextlib import asynccontextmanager, contextmanager
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import prepare_message
+from argus.domain.store import utcnow
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 
@@ -119,17 +121,31 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
     ]
 
 
+@pytest.mark.parametrize("account_kind", ["guest", "registered"])
 @pytest.mark.parametrize("threaded", [False, True])
 def test_inline_and_threaded_streams_use_one_scope(
     monkeypatch: pytest.MonkeyPatch,
     threaded: bool,
+    account_kind: Literal["guest", "registered"],
 ) -> None:
     from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.dependencies import current_user
+    from argus.api.guest_access import (
+        AccountContext,
+        guest_capabilities,
+        registered_capabilities,
+        store_account_context,
+    )
     from argus.api.routers import agent as agent_router
-    from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
+    from argus.llm.openrouter_key_policy import (
+        OpenRouterTrafficClass,
+        openrouter_traffic_class,
+        resolve_openrouter_api_key,
+    )
 
     observed_contexts: list[object | None] = []
     observed_openrouter_keys: list[str] = []
+    observed_scope_cleanup: list[bool] = []
     persisted_receipt_metadata: list[dict[str, Any]] = []
 
     async def _fake_stream_agent_turn_events(**_: Any):
@@ -171,6 +187,14 @@ def test_inline_and_threaded_streams_use_one_scope(
     def _capture_receipts(**kwargs: Any) -> None:
         persisted_receipt_metadata.append(dict(kwargs["metadata"]))
 
+    @contextmanager
+    def _observed_openrouter_scope(kind: OpenRouterTrafficClass):
+        with openrouter_traffic_class(kind):
+            yield
+        with pytest.raises(RuntimeError, match="traffic class"):
+            resolve_openrouter_api_key()
+        observed_scope_cleanup.append(True)
+
     monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: threaded)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
@@ -187,22 +211,60 @@ def test_inline_and_threaded_streams_use_one_scope(
         _isolated_workflow,
     )
     monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+    monkeypatch.setattr(
+        agent_router,
+        "openrouter_traffic_class",
+        _observed_openrouter_scope,
+    )
 
     client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "Test buy and hold AAPL.",
-            "language": "en",
-        },
-    )
+    user = api_state.store.get_or_create_dev_user()
+
+    def _verified_current_user(request: Request):
+        store_account_context(
+            request,
+            AccountContext(
+                kind=account_kind,
+                user_id=user.id,
+                expires_at=(
+                    utcnow() + timedelta(days=7)
+                    if account_kind == "guest"
+                    else None
+                ),
+                capabilities=(
+                    guest_capabilities()
+                    if account_kind == "guest"
+                    else registered_capabilities()
+                ),
+            ),
+        )
+        return user
+
+    app.dependency_overrides[current_user] = _verified_current_user
+    try:
+        conversation = client.post("/api/v1/conversations", json={}).json()[
+            "conversation"
+        ]
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation["id"],
+                "message": "Test buy and hold AAPL.",
+                "language": "en",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(current_user, None)
 
     assert response.status_code == 200
     assert len(observed_contexts) == 1
     assert observed_contexts[0] is not None
-    assert observed_openrouter_keys == ["registered-key"]
+    assert observed_openrouter_keys == [
+        "guest-key" if account_kind == "guest" else "registered-key"
+    ]
+    assert observed_scope_cleanup == [True]
+    with pytest.raises(RuntimeError, match="traffic class"):
+        resolve_openrouter_api_key()
     assert len(persisted_receipt_metadata) == 1
     summary = persisted_receipt_metadata[0]["turn_execution"]
     assert summary["terminal"] == "clarification"

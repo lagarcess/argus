@@ -108,6 +108,26 @@ def test_hosted_guest_never_falls_back_to_dev_key(
         resolve_openrouter_api_key("guest")
 
 
+def test_hosted_configuration_rejects_shared_traffic_credential(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.llm.openrouter_key_policy import (
+        validate_hosted_openrouter_configuration,
+    )
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "shared-secret")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "shared-secret")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        validate_hosted_openrouter_configuration()
+
+    message = str(exc_info.value)
+    assert "ARGUS_PROD_OPENROUTER_API_KEY" in message
+    assert "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY" in message
+    assert "shared-secret" not in message
+
+
 def test_openrouter_traffic_class_nested_scope_resets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

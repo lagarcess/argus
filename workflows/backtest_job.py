@@ -154,9 +154,23 @@ def run_backtest_job(
             job_id=job_id,
             workflow_run_id=workflow_run_id,
         )
-    traffic_class = _openrouter_traffic_class_from_job(row)
 
     user_id = _required_str(row, "user_id")
+    try:
+        traffic_class = _openrouter_traffic_class_from_job(row)
+    except WorkflowBacktestJobError:
+        return _mark_failed(
+            gateway,
+            row=row,
+            job_id=job_id,
+            user_id=user_id,
+            failure_code="invalid_job_contract",
+            failure_detail="execution_failed",
+            retryable=False,
+            workflow_run_id=workflow_run_id,
+            failure_category="invalid_job_contract",
+            timings=timings,
+        )
     conversation_id = _required_str(row, "conversation_id")
     request = _request_payload(row)
     started_at = utcnow_iso()

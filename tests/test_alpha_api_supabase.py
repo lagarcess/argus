@@ -25,6 +25,7 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
+from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.postgres_history_reader import (
     HistoryCursorError,
@@ -1036,6 +1037,69 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
     ] == {
         "source": "api_direct",
         "openrouter_traffic_class": "registered",
+    }
+
+
+def test_guest_run_backtest_supabase_persists_guest_traffic_class(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api.routers import backtest as backtest_router
+
+    profile = _mock_profile().model_copy(
+        update={
+            "email": None,
+            "username": None,
+            "display_name": None,
+            "is_admin": False,
+        }
+    )
+    workspace = GuestWorkspace(
+        user_id=profile.id,
+        conversation_id=None,
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": profile.id,
+        "email": None,
+        "is_anonymous": True,
+    }
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = profile
+    mock_gateway.get_active_guest_workspace.return_value = workspace
+    mock_gateway.client = object()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(
+        backtest_router,
+        "visitor_within_limits",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        backtest_router,
+        "settle_visitor_usage",
+        lambda *_args, **_kwargs: None,
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer guest-token",
+            "Idempotency-Key": "guest-supabase-traffic-class",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "guest",
     }
 
 

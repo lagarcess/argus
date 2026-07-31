@@ -294,6 +294,51 @@ def test_run_backtest_job_rejects_proof_payloads() -> None:
     assert gateway.transitions == []
 
 
+@pytest.mark.parametrize(
+    "execution_metadata",
+    [
+        pytest.param({}, id="legacy-missing"),
+        pytest.param(
+            {"openrouter_traffic_class": "unexpected"},
+            id="malformed-literal",
+        ),
+    ],
+)
+def test_run_backtest_job_terminalizes_invalid_traffic_class_metadata(
+    execution_metadata: dict[str, object],
+) -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"] = execution_metadata
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="invalid-envelope-run",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "invalid_job_contract"
+    assert result["failure_detail"] == "execution_failed"
+    assert result["retryable"] is False
+    assert gateway.transitions == ["failed"]
+    assert tool.calls == []
+    workflow_metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert workflow_metadata["failure_category"] == "invalid_job_contract"
+    assert "source_error_type" not in workflow_metadata
+    assert "source_traceback" not in workflow_metadata
+
+
 def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

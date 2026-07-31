@@ -47,8 +47,14 @@ def resolve_openrouter_api_key(
 def validate_hosted_openrouter_configuration() -> None:
     if not _hosted_environment():
         return
-    resolve_openrouter_api_key("registered")
-    resolve_openrouter_api_key("guest")
+    registered_key = resolve_openrouter_api_key("registered")
+    guest_key = resolve_openrouter_api_key("guest")
+    if registered_key == guest_key:
+        raise RuntimeError(
+            "ARGUS_PROD_OPENROUTER_API_KEY and "
+            "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY must use distinct "
+            "credentials in hosted environments."
+        )
 
 
 def _hosted_environment() -> bool:

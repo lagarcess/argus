@@ -428,6 +428,72 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history(
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
 
 
+def test_memory_direct_admission_persists_guest_traffic_class(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import timedelta
+
+    from argus.api.guest_access import (
+        AccountContext,
+        guest_capabilities,
+        store_account_context,
+    )
+    from argus.api.routers import backtest as backtest_router
+    from fastapi import Request
+
+    api_state.store.reset()
+    user = api_state.store.get_or_create_dev_user()
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/backtests/run",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 50000),
+        }
+    )
+    store_account_context(
+        request,
+        AccountContext(
+            kind="guest",
+            user_id=user.id,
+            expires_at=utcnow() + timedelta(days=7),
+            capabilities=guest_capabilities(),
+        ),
+    )
+    monkeypatch.setattr(
+        backtest_router,
+        "emit_guest_funnel_event",
+        lambda **_: None,
+    )
+
+    decision, job = backtest_router._admit_direct_run(
+        request,
+        user=user,
+        idempotency_key="guest-memory-admission",
+        identity_hash=f"sha256:{'a' * 64}",
+        payload_hash=f"sha256:{'b' * 64}",
+        launch_payload={
+            "kind": "run_backtest_job",
+            "request": {"template": "buy_and_hold", "symbols": ["AAPL"]},
+        },
+        conversation_id=None,
+    )
+
+    assert decision == "admitted"
+    assert job is not None
+    assert job["execution_metadata"] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "guest",
+    }
+    assert api_state.store.backtest_jobs[job["id"]]["execution_metadata"] == (
+        job["execution_metadata"]
+    )
+
+
 def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
     client = _client()
 

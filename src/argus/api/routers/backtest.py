@@ -429,7 +429,7 @@ def _admit_direct_run(
             conversation_id=conversation_id,
             execution_metadata={
                 "source": "api_direct",
-                "openrouter_traffic_class": "registered",
+                "openrouter_traffic_class": account.kind,
             },
             allowance_limits=allowance_windows(
                 account,
@@ -467,7 +467,7 @@ def _admit_direct_run(
             conversation_id=conversation_id,
             execution_metadata={
                 "source": "api_direct",
-                "openrouter_traffic_class": "registered",
+                "openrouter_traffic_class": account.kind,
             },
             allowance_limits=allowance_windows(
                 account,
