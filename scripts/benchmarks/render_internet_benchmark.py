@@ -635,6 +635,7 @@ def _poll_backtest_job(
     job_id: str,
     timeout_seconds: float,
     poll_sleep_seconds: float,
+    require_llm_result_voice: bool = True,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     deadline = time.perf_counter() + timeout_seconds
@@ -667,7 +668,9 @@ def _poll_backtest_job(
                 raise RuntimeError("backtest job succeeded without linked run")
             source = payload.get("result_readout_source")
             fallback_used = payload.get("result_readout_fallback_used")
-            if source != "llm_explain_stage" or fallback_used is not False:
+            if require_llm_result_voice and (
+                source != "llm_explain_stage" or fallback_used is not False
+            ):
                 raise RuntimeError(
                     "backtest job did not preserve LLM result readout voice: "
                     f"source={source!r} fallback_used={fallback_used!r}"

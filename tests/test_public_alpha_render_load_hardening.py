@@ -432,6 +432,30 @@ def test_duration_measurements_accept_postgres_variable_fractional_precision() -
     assert duration_ms == 1000.0
 
 
+def test_capacity_poll_ignores_unrelated_result_voice_gate(monkeypatch: Any) -> None:
+    module = _load_module()
+    captured: dict[str, Any] = {}
+
+    def _poll(**kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {"run_id": "run-123"}
+
+    monkeypatch.setattr(module, "_poll_backtest_job", _poll)
+
+    completed = module._poll_submitted_run(
+        config=SimpleNamespace(
+            api_url="https://api.example.test",
+            timeout_seconds=1.0,
+            poll_seconds=0.0,
+        ),
+        prepared=SimpleNamespace(client=object()),
+        run=module.SubmittedRun(job_id="job-123", started_monotonic=0.0),
+    )
+
+    assert completed.job_id == "job-123"
+    assert captured["require_llm_result_voice"] is False
+
+
 def test_partial_report_is_sanitized_and_cannot_validate_as_success(
     tmp_path: Path,
 ) -> None:

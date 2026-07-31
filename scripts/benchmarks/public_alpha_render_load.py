@@ -644,6 +644,7 @@ def _poll_submitted_run(
         job_id=run.job_id,
         timeout_seconds=config.timeout_seconds,
         poll_sleep_seconds=config.poll_seconds,
+        require_llm_result_voice=False,
     )
     return CompletedRun(
         job_id=run.job_id,
