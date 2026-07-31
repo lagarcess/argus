@@ -43,6 +43,8 @@ const dossierWithWatchingDecisionAndMultilineNote: RunDossier = {
     quick_take: "GLD held up better than SPY.",
     metrics: [
       { name: "total_return_pct", value: 8.4 },
+      { name: "benchmark_return_pct", value: 6.1 },
+      { name: "delta_vs_benchmark_pct", value: 2.3 },
       { name: "max_drawdown_pct", value: -6.2 },
     ],
   },
@@ -93,6 +95,48 @@ function visibleText(html: string): string {
 }
 
 describe("single-run dossier view", () => {
+  test("makes the desktop dossier body the scroll region", () => {
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={dossierWithWatchingDecisionAndMultilineNote}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+    expect(html).toMatch(
+      /data-dossier-scroll-region="true"[^>]*class="[^"]*md:overflow-y-auto/,
+    );
+  });
+
+  test("keeps all metrics in one compact separator-based definition grid", () => {
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={dossierWithWatchingDecisionAndMultilineNote}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+    const metricsMarkup = html.match(
+      /<dl[^>]*data-dossier-metrics-layout="compact"[^>]*>[\s\S]*?<\/dl>/,
+    )?.[0];
+
+    expect(metricsMarkup).toBeDefined();
+    expect(metricsMarkup?.match(/<dt/g)).toHaveLength(4);
+    expect(metricsMarkup?.match(/<dd/g)).toHaveLength(4);
+    expect(metricsMarkup).toContain("border-l");
+    expect(metricsMarkup).toContain("border-t");
+    expect(metricsMarkup).not.toContain("bg-black/[0.025]");
+  });
+
   test("shows one run decision beside its verbatim note without repeated headings", () => {
     const html = renderToStaticMarkup(
       <RunDossierView

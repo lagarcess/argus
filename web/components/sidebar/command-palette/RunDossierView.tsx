@@ -162,7 +162,10 @@ export function RunDossierView({
     openConversationDisabled || dossier.result_message_id === null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      data-dossier-scroll-region="true"
+      className="flex min-h-0 flex-1 flex-col md:overflow-y-auto"
+    >
       {onBackToLatest ? (
         <button
           type="button"
@@ -204,16 +207,27 @@ export function RunDossierView({
               </p>
             )}
             {metrics.length > 0 && (
-              <dl className="mt-3 grid grid-cols-2 gap-2">
-                {metrics.map((metric) => (
+              <dl
+                data-dossier-metrics-layout="compact"
+                className="mt-3 grid grid-cols-2 border-y border-black/[0.06] dark:border-white/[0.08]"
+              >
+                {metrics.map((metric, index) => (
                   <div
                     key={metric.name}
-                    className="rounded-[10px] bg-black/[0.025] px-3 py-2 dark:bg-white/[0.035]"
+                    className={`flex min-w-0 items-baseline justify-between gap-2 py-2 ${
+                      index % 2 === 0
+                        ? "pr-3"
+                        : "border-l border-black/[0.06] pl-3 dark:border-white/[0.08]"
+                    } ${
+                      index >= 2
+                        ? "border-t border-black/[0.06] dark:border-white/[0.08]"
+                        : ""
+                    }`}
                   >
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-black/30 dark:text-white/30">
+                    <dt className="min-w-0 text-[9px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
                       {metric.name}
                     </dt>
-                    <dd className="mt-1 text-[13px] font-medium text-black/70 dark:text-white/70">
+                    <dd className="shrink-0 text-[13px] font-medium text-black/70 dark:text-white/70">
                       {metric.value}
                     </dd>
                   </div>
