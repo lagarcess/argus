@@ -27,6 +27,40 @@ The run used 26 task runs and 28 attempts. Render reported 1,466 seconds
 [$0.20/hour Standard rate](https://render.com/docs/workflows-limits), the
 measured compute cost was $0.081444, before Render's Workflow monthly minimum.
 
+### Web-service resource headroom
+
+The fifteen-user case ran from 2026-07-31 13:30:14 UTC through 13:32:12 UTC.
+Render's 30-second service metrics for `argus-api` reported the following
+peaks inside that exact window:
+
+| Resource | Peak | Live Free-instance limit | Utilization | Remaining headroom |
+| --- | --- | --- | --- | --- |
+| CPU | 0.15 CPU | 0.15 CPU | 100% | 0 CPU |
+| Memory | 450,351,100 bytes (450.35 MB / 429.49 MiB) | 536,870,900 bytes (536.87 MB / 512 MiB) | 83.88% | 86,519,800 bytes (86.52 MB / 82.51 MiB) |
+
+The CPU series reached the reported limit for the final two 30-second buckets.
+The observed CPU limit was 0.15 even though Render's public instance table
+currently labels Free as 0.1 CPU; both values are retained here instead of
+silently normalizing the live control-plane evidence. Memory remained near its
+loaded high-water mark after the test: the last post-load sample at 13:47 UTC
+was 432,001,020 bytes (411.99 MiB), or 80.47% of the same limit.
+
+These are `argus-api` web-service metrics. The five concurrently running
+backtests executed on separate Standard Workflow task instances (2 GB RAM and
+1 CPU each), so their compute ceiling must not be mistaken for API-process
+headroom. `argus-app` returned no CPU or memory samples for this window because
+the capacity harness exercised the API and Workflow path, not the web UI.
+
+The evidence therefore supports Standard for `argus-api`: Starter would reduce
+the observed CPU peak to 30% of its 0.5-CPU allowance, but it would preserve the
+same 512-MiB RAM ceiling and leave only 82.51 MiB of measured peak headroom.
+Starter remains the proportional choice for `argus-app` because the paid-tier
+requirement there is no spin-down, and no load evidence supports buying four
+times the RAM. This would produce a $32/month fixed service floor ($25 API + $7
+app), plus metered Workflow compute and any overage. The founder has not yet
+selected or applied this tier split; both live services remain Free and no plan
+change is authorized until that selection is made.
+
 ## Production migration lineage repair
 
 The production Supabase project was confirmed as
@@ -81,15 +115,11 @@ API SHA predates the merged Omnisearch reader, so exact hosted recall behavior
 remains an exact-candidate deploy proof rather than migration-application
 proof.
 
-The selected web-service tier is Starter: 512 MB RAM and 0.5 CPU at
-[$7/month per service](https://render.com/pricing). `argus-api` and `argus-app`
-therefore have a $14/month total fixed Render service cost. The checked-in
-Blueprint declares both services as `plan: starter`; live control-plane
-readback remains a separate deployment gate. Supabase stays on its free tier
-for this lane: there are no real users or customer data to protect yet, and the
-2026-07-31 spec correction explicitly defers a Pro decision until that changes.
-The fixed platform floor for this lane is therefore $14/month, plus metered
-Workflow compute and any overage.
+The checked-in Blueprint still declares both services as `plan: starter`; it
+predates the resource-headroom readback above and is not evidence of a selected
+or live instance type. Supabase stays on its free tier for this lane: there are
+no real users or customer data to protect yet, and the 2026-07-31 spec
+correction explicitly defers a Pro decision until that changes.
 
 ## Approval SMTP secret
 
