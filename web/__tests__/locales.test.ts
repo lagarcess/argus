@@ -106,6 +106,26 @@ const dossierCopy = {
     en: "Search starts with a 2-character ticker or a 3-character word.",
     es419: "La búsqueda comienza con un ticker de 2 caracteres o una palabra de 3 caracteres.",
   },
+  "command_palette.dossier_values.cadences.daily": {
+    en: "Daily",
+    es419: "Diaria",
+  },
+  "command_palette.dossier_values.cadences.weekly": {
+    en: "Weekly",
+    es419: "Semanal",
+  },
+  "command_palette.dossier_values.cadences.biweekly": {
+    en: "Biweekly",
+    es419: "Quincenal",
+  },
+  "command_palette.dossier_values.cadences.monthly": {
+    en: "Monthly",
+    es419: "Mensual",
+  },
+  "command_palette.dossier_values.cadences.quarterly": {
+    en: "Quarterly",
+    es419: "Trimestral",
+  },
   "command_palette.dossier_values.strategy_families.indicator_threshold": {
     en: "RSI threshold",
     es419: "Umbral RSI",

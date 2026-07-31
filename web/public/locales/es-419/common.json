@@ -978,6 +978,13 @@
       "decision_on": "{{state}} · en {{run}}",
       "run_count_one": "{{count}} ejecución",
       "run_count_other": "{{count}} ejecuciones",
+      "cadences": {
+        "daily": "Diaria",
+        "weekly": "Semanal",
+        "biweekly": "Quincenal",
+        "monthly": "Mensual",
+        "quarterly": "Trimestral"
+      },
       "strategy_families": {
         "buy_and_hold": "Comprar y mantener",
         "buy_hold": "Comprar y mantener",
