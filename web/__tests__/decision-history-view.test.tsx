@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   DecisionHistoryView,
+  attemptDecisionHistoryListboxFocus,
   decisionHistoryKeyboardAction,
-  focusDecisionHistoryListbox,
 } from "../components/sidebar/command-palette/DecisionHistoryView";
 import type { RunDossier } from "../lib/run-dossier-contract";
 
@@ -166,10 +166,12 @@ describe("decision history view", () => {
     ).toEqual({ activeIndex: 1, selectedIndex: null, back: false, handled: false });
   });
 
-  test("focuses the listbox after the initial async history response", () => {
+  test("focuses and consumes the first ready history attempt from BODY", () => {
     let focusCalls = 0;
     let focusOptions: FocusOptions | undefined;
+    const body = {};
     const listbox = {
+      ownerDocument: { activeElement: body, body },
       focus(options?: FocusOptions) {
         focusCalls += 1;
         focusOptions = options;
@@ -177,41 +179,86 @@ describe("decision history view", () => {
     };
 
     expect(
-      focusDecisionHistoryListbox({
+      attemptDecisionHistoryListboxFocus({
         listbox,
         status: "ready",
         itemCount: 3,
-        hasFocused: false,
+        hasAttempted: false,
       }),
     ).toBe(true);
     expect(focusCalls).toBe(1);
     expect(focusOptions).toEqual({ preventScroll: true });
+  });
+
+  test("consumes the first ready attempt without stealing deliberate focus", () => {
+    let focusCalls = 0;
+    const body = {};
+    const deliberateTarget = {};
+    const ownerDocument = { activeElement: deliberateTarget, body };
+    const listbox = {
+      ownerDocument,
+      focus() {
+        focusCalls += 1;
+      },
+    };
+
+    const skipped = attemptDecisionHistoryListboxFocus({
+      listbox,
+      status: "ready",
+      itemCount: 3,
+      hasAttempted: false,
+    });
+
+    expect(skipped).toBe(true);
+    expect(focusCalls).toBe(0);
+
+    ownerDocument.activeElement = body;
+    expect(
+      attemptDecisionHistoryListboxFocus({
+        listbox,
+        status: "ready",
+        itemCount: 3,
+        hasAttempted: skipped,
+      }),
+    ).toBe(false);
+    expect(focusCalls).toBe(0);
+  });
+
+  test("does not consume the focus attempt before ready non-empty history", () => {
+    let focusCalls = 0;
+    const body = {};
+    const listbox = {
+      ownerDocument: { activeElement: body, body },
+      focus() {
+        focusCalls += 1;
+      },
+    };
 
     expect(
-      focusDecisionHistoryListbox({
+      attemptDecisionHistoryListboxFocus({
         listbox,
         status: "loading",
         itemCount: 3,
-        hasFocused: false,
+        hasAttempted: false,
       }),
     ).toBe(false);
     expect(
-      focusDecisionHistoryListbox({
+      attemptDecisionHistoryListboxFocus({
         listbox,
         status: "ready",
         itemCount: 0,
-        hasFocused: false,
+        hasAttempted: false,
       }),
     ).toBe(false);
     expect(
-      focusDecisionHistoryListbox({
+      attemptDecisionHistoryListboxFocus({
         listbox,
         status: "ready",
         itemCount: 3,
-        hasFocused: true,
+        hasAttempted: true,
       }),
     ).toBe(false);
-    expect(focusCalls).toBe(1);
+    expect(focusCalls).toBe(0);
   });
 
   test("renders the listbox keyboard target so ArrowDown then Enter selects the second run", () => {

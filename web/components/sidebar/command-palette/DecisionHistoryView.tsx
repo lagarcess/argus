@@ -33,6 +33,10 @@ export type DecisionHistoryKeyboardAction = {
 };
 
 type DecisionHistoryFocusTarget = {
+  ownerDocument: {
+    activeElement: unknown;
+    body: unknown;
+  };
   focus: (options?: FocusOptions) => void;
 };
 
@@ -40,19 +44,26 @@ type DecisionHistoryFocusInput = {
   listbox: DecisionHistoryFocusTarget | null;
   status: RunDossierHistoryState["status"];
   itemCount: number;
-  hasFocused: boolean;
+  hasAttempted: boolean;
 };
 
-export function focusDecisionHistoryListbox({
+export function attemptDecisionHistoryListboxFocus({
   listbox,
   status,
   itemCount,
-  hasFocused,
+  hasAttempted,
 }: DecisionHistoryFocusInput): boolean {
-  if (listbox === null || status !== "ready" || itemCount === 0 || hasFocused) {
+  if (
+    listbox === null ||
+    status !== "ready" ||
+    itemCount === 0 ||
+    hasAttempted
+  ) {
     return false;
   }
-  listbox.focus({ preventScroll: true });
+  const shouldFocus =
+    listbox.ownerDocument.activeElement === listbox.ownerDocument.body;
+  if (shouldFocus) listbox.focus({ preventScroll: true });
   return true;
 }
 
@@ -130,7 +141,7 @@ export function DecisionHistoryView({
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const [activeIndex, setActiveIndex] = useState(0);
   const listboxRef = useRef<HTMLDivElement>(null);
-  const hasFocusedListboxRef = useRef(false);
+  const hasAttemptedListboxFocusRef = useRef(false);
   const boundedActiveIndex =
     items.length > 0 ? Math.min(activeIndex, items.length - 1) : 0;
   const activeDescendant =
@@ -139,13 +150,13 @@ export function DecisionHistoryView({
       : undefined;
 
   useEffect(() => {
-    const focused = focusDecisionHistoryListbox({
+    const attempted = attemptDecisionHistoryListboxFocus({
       listbox: listboxRef.current,
       status,
       itemCount: items.length,
-      hasFocused: hasFocusedListboxRef.current,
+      hasAttempted: hasAttemptedListboxFocusRef.current,
     });
-    if (focused) hasFocusedListboxRef.current = true;
+    if (attempted) hasAttemptedListboxFocusRef.current = true;
   }, [items.length, status]);
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
