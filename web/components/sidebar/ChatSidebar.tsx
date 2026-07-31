@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
+import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
@@ -95,6 +97,7 @@ export type ChatSidebarProps = {
   /** Sidebar preference handler */
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
+  settingsOpenRequest?: number;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
   canManageConversation?: boolean;
@@ -136,6 +139,7 @@ export default function ChatSidebar({
   onFeedback,
   onOpenSidebarPreference,
   onOpenKeyboardShortcuts,
+  settingsOpenRequest = 0,
   strategiesEnabled = false,
   omnisearchEnabled = false,
   canManageConversation = true,
@@ -155,7 +159,9 @@ export default function ChatSidebar({
   const [expandedRecentGroups, setExpandedRecentGroups] = useState<
     Set<RecentChatGroupKey>
   >(() => new Set());
+  const [usesCommandKey, setUsesCommandKey] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
+  const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPointerInsideSidebarRef = useRef(false);
 
@@ -208,6 +214,18 @@ export default function ChatSidebar({
     };
   }, [isProfileMenuOpen, isOpen, mode, onToggle]);
 
+  useEffect(() => {
+    setUsesCommandKey(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (settingsOpenRequest === previousSettingsOpenRequestRef.current) return;
+    previousSettingsOpenRequestRef.current = settingsOpenRequest;
+    setIsProfileMenuOpen(true);
+  }, [settingsOpenRequest]);
+
   // ── Filter to chats only ────────────────────────────────────────────────
   const chatItems = useMemo(
     () => historyItems.filter((item) => item.type === "chat"),
@@ -231,6 +249,40 @@ export default function ChatSidebar({
       return next;
     });
   }, []);
+
+  const visibleRecentItems = useMemo(
+    () =>
+      groupedHistory.flatMap((group) =>
+        getVisibleRecentChats(group, {
+          expanded: expandedRecentGroups.has(group.key),
+          selectedConversationId: conversationId,
+        }),
+      ),
+    [conversationId, expandedRecentGroups, groupedHistory],
+  );
+  const quickJumpRecentItems = useMemo(
+    () =>
+      visibleRecentItems.map((item) => ({
+        id: historyConversationId(item),
+        pinned: item.pinned,
+      })),
+    [visibleRecentItems],
+  );
+  const handleQuickJumpRecent = useCallback(
+    (id: string) => {
+      const item = visibleRecentItems.find(
+        (candidate) => historyConversationId(candidate) === id,
+      );
+      if (item) onOpenItem(item);
+    },
+    [onOpenItem, visibleRecentItems],
+  );
+  const { isQuickJumpActive, numberFor } = useQuickJump({
+    enabled: isOpen && isRecentsExpanded && renamingId === null,
+    items: quickJumpRecentItems,
+    onSelect: handleQuickJumpRecent,
+    usesCommandKey,
+  });
 
   // ── Chat actions ────────────────────────────────────────────────────────
   const handlePin = useCallback(async (id: string, pinned: boolean) => {
@@ -544,7 +596,14 @@ export default function ChatSidebar({
                           {hasConversationAttention && (
                             <span className="sr-only">{attentionLabel}</span>
                           )}
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                            {isQuickJumpActive &&
+                            numberFor(itemConversationId) !== null ? (
+                              <QuickJumpBadge
+                                number={numberFor(itemConversationId)!}
+                              />
+                            ) : null}
+                          </div>
                           <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (
                               <>

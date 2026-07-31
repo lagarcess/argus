@@ -48,4 +48,19 @@ describe("keyboard shortcuts overlay", () => {
       "Mostrar atajos de teclado",
     );
   });
+
+  test("shares numbered quick-jump behavior between Recents and Settings", () => {
+    const sidebar = source("components/sidebar/ChatSidebar.tsx");
+    const profileMenu = source("components/sidebar/ProfileMenu.tsx");
+    const quickPeekPath = join(
+      root,
+      "components/sidebar/RecentsQuickPeek.tsx",
+    );
+
+    expect(sidebar).toContain("useQuickJump");
+    expect(sidebar).toContain("QuickJumpBadge");
+    expect(profileMenu).toContain("useQuickJump");
+    expect(profileMenu).toContain("QuickJumpBadge");
+    expect(existsSync(quickPeekPath)).toBe(true);
+  });
 });

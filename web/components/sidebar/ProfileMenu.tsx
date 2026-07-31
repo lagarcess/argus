@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
@@ -40,6 +40,8 @@ import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import UsageModal from "@/components/settings/UsageModal";
+import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
+import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,11 @@ type ActiveModal =
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
 type DeleteRequestState = "idle" | "submitting" | "success" | "error";
+
+type ProfileQuickJumpItem = {
+  id: string;
+  onSelect: () => void;
+};
 
 const SUPPORT_EMAIL =
   process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
@@ -121,6 +128,7 @@ export default function ProfileMenu({
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
+  const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch profile on open
@@ -140,6 +148,12 @@ export default function ProfileMenu({
       // Don't clear submenu here — preserve for re-open persistence
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    setUsesCommandKey(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
+    );
+  }, []);
 
   // Close on click-outside
   useEffect(() => {
@@ -350,6 +364,122 @@ export default function ProfileMenu({
     setDeleteRequestState("idle");
     setIsDeleteRequestOpen(true);
   }, []);
+
+  const quickJumpItems = useMemo<ProfileQuickJumpItem[]>(() => {
+    if (activeSubmenu === "data") {
+      return [
+        { id: "archived", onSelect: () => openModal("archived") },
+        { id: "deleted", onSelect: () => openModal("deleted") },
+        {
+          id: "security",
+          onSelect: () => {
+            onClose();
+            window.location.href = "/account/security";
+          },
+        },
+        { id: "usage", onSelect: () => openModal("usage") },
+        { id: "delete-all", onSelect: handleDeleteAllConversations },
+        { id: "delete-account", onSelect: handleOpenDeleteRequest },
+      ];
+    }
+    if (activeSubmenu === "settings") {
+      return [
+        { id: "appearance", onSelect: () => openModal("appearance") },
+        { id: "language", onSelect: () => openModal("language") },
+        ...(onOpenSidebarPreference
+          ? [
+              {
+                id: "sidebar",
+                onSelect: () => {
+                  onOpenSidebarPreference();
+                  onClose();
+                },
+              },
+            ]
+          : []),
+      ];
+    }
+    if (activeSubmenu === "help") {
+      return [
+        {
+          id: "keyboard-shortcuts",
+          onSelect: handleOpenKeyboardShortcuts,
+        },
+        {
+          id: "terms",
+          onSelect: () => {
+            window.location.href = "/terms";
+          },
+        },
+        {
+          id: "privacy",
+          onSelect: () => {
+            window.location.href = "/privacy";
+          },
+        },
+      ];
+    }
+    if (activeSubmenu === "feedback") {
+      return [
+        {
+          id: "feedback-bug",
+          onSelect: () => {
+            onFeedback?.("bug");
+            onClose();
+          },
+        },
+        {
+          id: "feedback-feature",
+          onSelect: () => {
+            onFeedback?.("feature");
+            onClose();
+          },
+        },
+        {
+          id: "feedback-general",
+          onSelect: () => {
+            onFeedback?.("general");
+            onClose();
+          },
+        },
+      ];
+    }
+    return [
+      { id: "profile", onSelect: () => openModal("profile") },
+      { id: "data", onSelect: () => handleSubmenuToggle("data") },
+      { id: "settings", onSelect: () => handleSubmenuToggle("settings") },
+      { id: "help", onSelect: () => handleSubmenuToggle("help") },
+      { id: "feedback", onSelect: () => handleSubmenuToggle("feedback") },
+    ];
+  }, [
+    activeSubmenu,
+    handleDeleteAllConversations,
+    handleOpenDeleteRequest,
+    handleOpenKeyboardShortcuts,
+    handleSubmenuToggle,
+    onClose,
+    onFeedback,
+    onOpenSidebarPreference,
+    openModal,
+  ]);
+  const handleQuickJump = useCallback(
+    (id: string) => {
+      quickJumpItems.find((item) => item.id === id)?.onSelect();
+    },
+    [quickJumpItems],
+  );
+  const { isQuickJumpActive, numberFor } = useQuickJump({
+    enabled: isOpen && !activeModal && !isDeleteRequestOpen,
+    items: quickJumpItems,
+    onSelect: handleQuickJump,
+    usesCommandKey,
+  });
+  const quickJumpBadge = (id: string) => {
+    const number = numberFor(id);
+    return isQuickJumpActive && number !== null ? (
+      <QuickJumpBadge number={number} />
+    ) : null;
+  };
 
   const handleSubmitDeleteRequest = useCallback(async () => {
     if (deleteRequestState === "submitting" || deleteRequestState === "success") {
@@ -759,6 +889,7 @@ export default function ProfileMenu({
       >
         <User className="h-4 w-4 text-black/50 dark:text-white/50" />
         {t("settings.profile.title", "Profile")}
+        <span className="ml-auto flex shrink-0">{quickJumpBadge("profile")}</span>
       </button>
 
       {/* Data */}
@@ -775,6 +906,7 @@ export default function ProfileMenu({
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.data.title", "Data Controls")}
           </div>
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("data")}</span>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
         {activeSubmenu === "data" && (
@@ -790,6 +922,7 @@ export default function ProfileMenu({
             >
               <Archive className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.archived_chats", "Archived chats")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("archived")}</span>
             </button>
             <button
               onClick={() => openModal("deleted")}
@@ -797,6 +930,7 @@ export default function ProfileMenu({
             >
               <Trash2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.recently_deleted", "Recently Deleted")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("deleted")}</span>
             </button>
             <button
               onClick={() => {
@@ -807,6 +941,7 @@ export default function ProfileMenu({
             >
               <Shield className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.security", "Security")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("security")}</span>
             </button>
             <button
               onClick={() => openModal("usage")}
@@ -814,6 +949,7 @@ export default function ProfileMenu({
             >
               <Activity className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.usage", "Usage")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("usage")}</span>
             </button>
             <button
               onClick={handleDeleteAllConversations}
@@ -823,15 +959,17 @@ export default function ProfileMenu({
               <span className="whitespace-nowrap">
                 {t("settings.data.delete_all_conversations", "Delete all conversations")}
               </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("delete-all")}</span>
             </button>
             <button
               type="button"
               onClick={handleOpenDeleteRequest}
               className="flex w-full flex-col items-start gap-1 px-3.5 py-2 text-left text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25 dark:hover:bg-[#d66d75]/10"
             >
-              <span className="flex items-center gap-2.5 text-[13px] font-medium">
+              <span className="flex w-full items-center gap-2.5 text-[13px] font-medium">
                 <Trash2 className="h-3.5 w-3.5" />
                 {t("settings.profile.delete_account", "Delete account")}
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("delete-account")}</span>
               </span>
               <span className="pl-6 text-[11px] leading-snug text-black/35 dark:text-white/35">
                 {t(
@@ -858,6 +996,7 @@ export default function ProfileMenu({
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.preferences.title", "Preferences")}
           </div>
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("settings")}</span>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
         {activeSubmenu === "settings" && (
@@ -874,6 +1013,7 @@ export default function ProfileMenu({
             >
               <Palette className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.app.appearance", "Appearance")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("appearance")}</span>
             </button>
             <button
               onClick={() => openModal("language")}
@@ -881,6 +1021,7 @@ export default function ProfileMenu({
             >
               <Globe className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.app.language", "Language")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("language")}</span>
             </button>
             {onOpenSidebarPreference && (
               <button
@@ -892,6 +1033,7 @@ export default function ProfileMenu({
               >
                 <PanelLeft className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
                 {t("settings.app.sidebar", "Sidebar")}
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("sidebar")}</span>
               </button>
             )}
           </div>
@@ -912,6 +1054,7 @@ export default function ProfileMenu({
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.help.title", "Help & Legal")}
           </div>
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("help")}</span>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
         {activeSubmenu === "help" && (
@@ -928,14 +1071,17 @@ export default function ProfileMenu({
             >
               <Keyboard className="h-3.5 w-3.5" />
               {t("keyboard_shortcuts.menu_item", "Keyboard shortcuts")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("keyboard-shortcuts")}</span>
             </button>
             <a href="/terms" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <FileText className="h-3.5 w-3.5" />
               {t("settings.help.terms", "Terms of Use")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("terms")}</span>
             </a>
             <a href="/privacy" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <Shield className="h-3.5 w-3.5" />
               {t("settings.help.privacy", "Privacy Policy")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("privacy")}</span>
             </a>
             <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
               <BookOpen className="h-3.5 w-3.5" />
@@ -959,6 +1105,7 @@ export default function ProfileMenu({
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("feedback.eyebrow", "Feedback")}
           </div>
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback")}</span>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
         {activeSubmenu === "feedback" && (
@@ -977,6 +1124,7 @@ export default function ProfileMenu({
             >
               <Bug className="h-3.5 w-3.5" />
               {t("feedback.type.bug", "Report a bug")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-bug")}</span>
             </button>
             <button
               onClick={() => {
@@ -987,6 +1135,7 @@ export default function ProfileMenu({
             >
               <Lightbulb className="h-3.5 w-3.5" />
               {t("feedback.type.feature", "Request a feature")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-feature")}</span>
             </button>
             <button
               onClick={() => {
@@ -997,6 +1146,7 @@ export default function ProfileMenu({
             >
               <MessageCircle className="h-3.5 w-3.5" />
               {t("feedback.type.general", "General feedback")}
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-general")}</span>
             </button>
           </div>
         )}
