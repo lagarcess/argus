@@ -49,14 +49,61 @@ and allowlist row were deleted, with a zero-match cleanup read-back.
 This repair did not apply the new requested-role migration. That file remains
 behind the separate paid-control precondition below.
 
+### Post-batch Omnisearch migrations
+
+After the integration branch advanced, three additional checked-in Omnisearch
+migrations were found absent from both the production ledger and live schema.
+The founder authorized them separately from the legacy 29-file repair. On
+2026-07-31 they were applied in timestamp order under one session advisory
+lock, with one top-level transaction and matching exact ledger insert per file:
+
+| Version | Migration | Checked-in SQL SHA-256 |
+| --- | --- | --- |
+| `20260729221458` | `add_message_recall_index` | `4f051fc867a1ff3bf43bb1381d3299c70b1220ab8b30e25e8e789b0a146dd933` |
+| `20260730042500` | `add_decision_recall_index` | `cbd22dd513bc21e2eb21607facccf264e56736ac7331135fc57d5da976cd5669` |
+| `20260730070000` | `add_asset_symbol_prefix_indexes` | `dfd2c16ca9b776dbb022c12a0cd805d4a63a4dfae80d7d8b32e6a81a010b2540` |
+
+All three files committed with zero database failures. Independent read-back
+confirmed the three ledger rows, the two GIN recall indexes, all five btree
+symbol-prefix indexes, and `argus_search_symbol_casefold(text)`. Every index
+was valid and ready; the casefold function was immutable, strict,
+parallel-safe, and not security-definer. RLS remained enabled on `messages`,
+`decision_notes`, `backtest_runs`, and `private_alpha_allowlist`; the
+user-data policies retained their `auth.uid()` ownership predicates.
+
+One hosted temporary-user lifecycle probe then passed with a real Supabase
+magic-link session: `GET /me` returned 200, conversation creation returned
+200, message insertion returned 201, and the owner-scoped conversation-message
+read returned exactly the seeded message with HTTP 200. Cleanup deleted the
+Auth user and allowlist entry, and independent read-back found zero matching
+Auth, profile, allowlist, conversation, or message rows. The currently deployed
+API SHA predates the merged Omnisearch reader, so exact hosted recall behavior
+remains an exact-candidate deploy proof rather than migration-application
+proof.
+
 The selected web-service tier is Starter: 512 MB RAM and 0.5 CPU at
 [$7/month per service](https://render.com/pricing). `argus-api` and `argus-app`
 therefore have a $14/month total fixed Render service cost. The checked-in
 Blueprint declares both services as `plan: starter`; live control-plane
-readback remains a separate deployment gate. Supabase Pro is also selected at
-[$25/month](https://supabase.com/pricing), including daily backups retained for
-seven days. The combined fixed platform floor is $39/month, plus metered
+readback remains a separate deployment gate. Supabase stays on its free tier
+for this lane: there are no real users or customer data to protect yet, and the
+2026-07-31 spec correction explicitly defers a Pro decision until that changes.
+The fixed platform floor for this lane is therefore $14/month, plus metered
 Workflow compute and any overage.
+
+## Approval SMTP secret
+
+`ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD` is present on the live `argus-api` Render
+service. The value was copied from the locally resolved Resend credential only
+after verifying that interpolation produced an actual `re_...` credential, not
+the literal `${RESEND_API_KEY}` reference. A redacted Render control-plane
+read-back matched the local credential exactly. Setting the secret did not
+trigger a deploy; the latest API deploy remained the live load-test candidate
+`17098b8173d845aa5033036244a71cdcc3283ddb`.
+
+The required backend-originated approval send to `delivered@resend.dev` and
+Resend accepted/delivered log remain pending until the paid-control gate,
+requested-role migration, and exact Phase 2 deploy are complete.
 
 ## Waitlist paid-control precondition
 
