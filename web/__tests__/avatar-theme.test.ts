@@ -28,15 +28,15 @@ describe("avatar monogram themes", () => {
     const hueStep = 360 / AVATAR_THEMES.length;
 
     for (const [index, theme] of AVATAR_THEMES.entries()) {
-      expect(theme.hue).toBeCloseTo(index * hueStep);
+      expect(theme.hue).toBeCloseTo(28.5 + index * hueStep);
       expect(theme.className).toBe("text-white");
       expect(avatarThemeStyle(theme.token, "picker")).toEqual({
         backgroundImage:
-          `linear-gradient(145deg, hsl(${theme.hue} 42% 39%), hsl(${theme.hue} 42% 29%))`,
+          `linear-gradient(145deg, hsl(${theme.hue} 36% 35%), hsl(${theme.hue} 36% 27%))`,
       });
       expect(avatarThemeStyle(theme.token, "ambient")).toEqual({
         backgroundImage:
-          `linear-gradient(145deg, hsl(${theme.hue} 24% 35%), hsl(${theme.hue} 24% 30%))`,
+          `linear-gradient(145deg, hsl(${theme.hue} 22% 32%), hsl(${theme.hue} 22% 29%))`,
       });
     }
   });
@@ -73,7 +73,9 @@ describe("avatar monogram themes", () => {
     expect(Object.keys(es.settings.profile.avatar_theme.themes)).toEqual(
       AVATAR_THEMES.map((theme) => theme.token),
     );
-    expect(en.settings.profile.avatar_theme.themes.slate).toBe("Moss");
-    expect(es.settings.profile.avatar_theme.themes.slate).toBe("Musgo");
+    expect(en.settings.profile.avatar_theme.themes.ember).toBe("Sienna");
+    expect(en.settings.profile.avatar_theme.themes.ocean).toBe("Cobalt");
+    expect(es.settings.profile.avatar_theme.themes.ember).toBe("Siena");
+    expect(es.settings.profile.avatar_theme.themes.ocean).toBe("Cobalto");
   });
 });

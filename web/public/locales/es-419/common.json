@@ -792,13 +792,13 @@
         "close": "Cerrar colores del monograma",
         "save_error": "No pudimos actualizar el color de tu monograma todavía.",
         "themes": {
-          "ember": "Brasa",
-          "gold": "Dorado",
-          "slate": "Musgo",
-          "teal": "Verde azulado",
-          "ocean": "Océano",
-          "indigo": "Índigo",
-          "plum": "Ciruela"
+          "ember": "Siena",
+          "gold": "Liquen",
+          "slate": "Enebro",
+          "teal": "Laguna",
+          "ocean": "Cobalto",
+          "indigo": "Iris",
+          "plum": "Morera"
         }
       },
       "close": "Cerrar perfil",

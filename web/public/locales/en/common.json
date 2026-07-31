@@ -792,13 +792,13 @@
         "close": "Close monogram colors",
         "save_error": "Could not update your monogram color yet.",
         "themes": {
-          "ember": "Ember",
-          "gold": "Gold",
-          "slate": "Moss",
-          "teal": "Teal",
-          "ocean": "Ocean",
-          "indigo": "Indigo",
-          "plum": "Plum"
+          "ember": "Sienna",
+          "gold": "Lichen",
+          "slate": "Juniper",
+          "teal": "Lagoon",
+          "ocean": "Cobalt",
+          "indigo": "Iris",
+          "plum": "Mulberry"
         }
       },
       "close": "Close profile",

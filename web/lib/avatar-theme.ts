@@ -10,10 +10,11 @@ const AVATAR_THEME_TOKENS = [
 
 export type AvatarTheme = (typeof AVATAR_THEME_TOKENS)[number];
 
+const HUE_PHASE = 28.5;
 const HUE_STEP = 360 / AVATAR_THEME_TOKENS.length;
 const AVATAR_THEME_SURFACES = {
-  picker: { saturation: 42, tintLightness: 39, baseLightness: 29 },
-  ambient: { saturation: 24, tintLightness: 35, baseLightness: 30 },
+  picker: { saturation: 36, tintLightness: 35, baseLightness: 27 },
+  ambient: { saturation: 22, tintLightness: 32, baseLightness: 29 },
 } as const;
 
 type AvatarThemeDefinition = {
@@ -25,7 +26,7 @@ type AvatarThemeDefinition = {
 export const AVATAR_THEMES: AvatarThemeDefinition[] = AVATAR_THEME_TOKENS.map(
   (token, index) => ({
     token,
-    hue: index * HUE_STEP,
+    hue: HUE_PHASE + index * HUE_STEP,
     className: "text-white",
   }),
 );
