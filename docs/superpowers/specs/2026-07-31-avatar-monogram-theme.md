@@ -45,15 +45,27 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
      which read as louder/candy-like and less sophisticated.
    - Render and screenshot the new set before finalizing — this is a
      visual quality bar, verify it visually, don't just describe it.
-9. **Correction (superseded the original decision 9): not a relocation
-   issue.** "App language" already lived in this same Profile modal
-   before this lane touched anything — the founder's concern was that
-   inserting the new palette row above it pushed it further down the
-   layout, not that it moved to a different surface. No access-path
-   problem, just a layout-ordering question: once the palette itself
-   reads as intentional (per decision 8, not generic swatches), confirm
-   with the founder whether "App language" should stay above the palette
-   row or the current order is fine.
+9. **Superseded, resolved: the picker moves out of the Profile modal
+   entirely, into Settings.** Decided 2026-07-31 — the Profile modal
+   should stay a lightweight glance (name, handle, email, language), not
+   grow into a settings panel. The avatar-theme picker belongs in the
+   fuller Settings surface (the same one the keyboard-shortcuts lane's
+   nested-subsettings quick-jump already covers), alongside other
+   preferences. This also resolves the earlier layout-push concern —
+   nothing new gets added to the Profile modal, so nothing pushes "App
+   language" down.
+10. **Ambient badge vs. active-selection swatches get different visual
+    intensity, not identical treatment.** The persistent avatar badge
+    (wherever it renders throughout the app — sidebar, header, message
+    attribution) is ambient chrome seen constantly; it should read as
+    quiet and restrained, not compete for attention. The picker's own
+    swatches in Settings are active-selection UI — you're comparing
+    options, so bold and clearly distinct between each other is correct
+    there. Same underlying theme/color system (decision 8) drives both,
+    but apply it with less saturation/contrast (or reduced intensity some
+    other way — agent's call on the exact mechanism) for the persistent
+    badge specifically. Same restraint principle already locked for the
+    activity rail lane's default state.
 
 ## Left to the agent's taste
 
