@@ -40,6 +40,13 @@ except ModuleNotFoundError:  # pragma: no cover - supports `python workflows/mai
 
 REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 WORKFLOW_METADATA_KEY = "workflow_backtest"
+CAPACITY_LOAD_SOURCE = "public_alpha_capacity_load"
+CAPACITY_LOAD_AUTHORITY = "service_role"
+CAPACITY_PROBE_MODES = {
+    "invalid_envelope",
+    "upstream_transient_once",
+}
+CAPACITY_PROBE_MAX_ATTEMPTS = 2
 
 
 class WorkflowBacktestJobError(RuntimeError):
@@ -190,6 +197,34 @@ def run_backtest_job(
         started_at=started_at,
     )
     timings.record_elapsed("mark_running", phase_started)
+    attempt = int(running.get("attempts") or 0)
+    probe_mode = capacity_probe_mode(running)
+    if probe_mode == "invalid_envelope":
+        return _mark_failed(
+            gateway,
+            row=running,
+            job_id=job_id,
+            user_id=user_id,
+            failure_code="invalid_job_contract",
+            failure_detail="execution_failed",
+            retryable=attempt < CAPACITY_PROBE_MAX_ATTEMPTS,
+            workflow_run_id=workflow_run_id,
+            failure_category="invalid_job_contract",
+            timings=timings,
+        )
+    if probe_mode == "upstream_transient_once" and attempt == 1:
+        return _mark_failed(
+            gateway,
+            row=running,
+            job_id=job_id,
+            user_id=user_id,
+            failure_code="failed_upstream",
+            failure_detail="execution_failed",
+            retryable=True,
+            workflow_run_id=workflow_run_id,
+            failure_category="failed_upstream",
+            timings=timings,
+        )
 
     if backtest_tool is None:
         phase_started = time.perf_counter()
@@ -579,8 +614,14 @@ def _assert_real_job(row: Mapping[str, Any]) -> None:
         and row.get("failure_code") == "finalization_failed"
         and bool(row.get("retryable"))
     )
+    retryable_capacity_probe = (
+        status == "failed"
+        and bool(row.get("retryable"))
+        and int(row.get("attempts") or 0) < CAPACITY_PROBE_MAX_ATTEMPTS
+        and capacity_probe_mode(row) in CAPACITY_PROBE_MODES
+    )
     if status not in {"queued", "running", "succeeded"} and not (
-        retryable_finalization_failure
+        retryable_finalization_failure or retryable_capacity_probe
     ):
         raise WorkflowBacktestJobError(
             f"run_backtest_job cannot execute job in status {status!r}."
@@ -591,7 +632,10 @@ def _assert_real_job(row: Mapping[str, Any]) -> None:
             "run_backtest_job can only execute launch_payload.kind="
             f"{REAL_BACKTEST_JOB_KIND!r} jobs."
         )
-    if not isinstance(payload.get("request"), dict):
+    if (
+        not isinstance(payload.get("request"), dict)
+        and capacity_probe_mode(row) != "invalid_envelope"
+    ):
         raise WorkflowBacktestJobError(
             "run_backtest_job requires a JSON object launch_payload.request."
         )
@@ -621,6 +665,30 @@ def _job_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {}
     return dict(raw)
+
+
+def capacity_probe_mode(row: Mapping[str, Any]) -> str | None:
+    """Return a controlled probe mode only from service-role ops metadata."""
+
+    metadata = _job_metadata(row)
+    if metadata.get("source") != CAPACITY_LOAD_SOURCE:
+        return None
+    if metadata.get("ops_authority") != CAPACITY_LOAD_AUTHORITY:
+        return None
+    probe = metadata.get("capacity_probe")
+    if not isinstance(probe, dict):
+        return None
+    mode = probe.get("mode")
+    return str(mode) if mode in CAPACITY_PROBE_MODES else None
+
+
+def capacity_probe_should_raise(result: Mapping[str, Any]) -> bool:
+    """Tell the Render task wrapper when a controlled probe needs task failure."""
+
+    return (
+        result.get("status") == "failed"
+        and capacity_probe_mode(result) in CAPACITY_PROBE_MODES
+    )
 
 
 def _openrouter_traffic_class_from_job(
@@ -946,6 +1014,17 @@ class PostgresBacktestJobGateway:
                           status = 'failed'
                           and failure_code = 'finalization_failed'
                           and retryable = true
+                        )
+                        or (
+                          status = 'failed'
+                          and retryable = true
+                          and attempts < 2
+                          and execution_metadata ->> 'source'
+                            = 'public_alpha_capacity_load'
+                          and execution_metadata ->> 'ops_authority'
+                            = 'service_role'
+                          and execution_metadata -> 'capacity_probe' ->> 'mode'
+                            in ('invalid_envelope', 'upstream_transient_once')
                         )
                       )
                     returning *

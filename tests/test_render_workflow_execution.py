@@ -1499,9 +1499,159 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
     monkeypatch.setitem(sys.modules, "render_sdk", fake_render_sdk)
     sys.modules.pop("workflows.main", None)
 
-    importlib.import_module("workflows.main")
+    module = importlib.import_module("workflows.main")
 
     assert boot_events[:2] == ["validate", "construct"]
     assert {"workflow_proof", "run_backtest_job"}.issubset(tasks)
     assert tasks["workflow_proof"]["kwargs"]["timeout_seconds"] == 60
     assert tasks["run_backtest_job"]["kwargs"]["timeout_seconds"] >= 300
+    assert tasks["run_backtest_job"]["kwargs"]["plan"] == "standard"
+    retry = tasks["run_backtest_job"]["kwargs"]["retry"]
+    assert isinstance(retry, FakeRetry)
+    assert retry.kwargs == {"max_retries": 1, "wait_duration_ms": 1000}
+
+    class FakeGatewayContext:
+        def __enter__(self) -> FakeGatewayContext:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        @classmethod
+        def from_env(cls) -> FakeGatewayContext:
+            return cls()
+
+    monkeypatch.setattr(module, "PostgresBacktestJobGateway", FakeGatewayContext)
+    monkeypatch.setattr(
+        module,
+        "run_backtest_job_workflow",
+        lambda *_args, **_kwargs: {
+            "status": "failed",
+            "execution_metadata": {
+                "source": "public_alpha_capacity_load",
+                "ops_authority": "service_role",
+                "capacity_probe": {"mode": "invalid_envelope"},
+            },
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Controlled public-alpha capacity probe"):
+        module.run_backtest_job("opaque-job")
+
+
+def test_capacity_probe_marker_is_never_read_from_public_launch_payload() -> None:
+    from workflows.backtest_job import capacity_probe_mode
+
+    assert (
+        capacity_probe_mode(
+            {
+                "launch_payload": {
+                    "source": "public_alpha_capacity_load",
+                    "capacity_probe": {"mode": "upstream_transient_once"},
+                },
+                "execution_metadata": {
+                    "source": "api_chat",
+                    "ops_authority": "service_role",
+                },
+            }
+        )
+        is None
+    )
+
+
+def test_controlled_upstream_probe_fails_once_then_runs_normally() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        capacity_probe_should_raise,
+        run_backtest_job,
+    )
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"] = {
+        "source": "public_alpha_capacity_load",
+        "ops_authority": "service_role",
+        "openrouter_traffic_class": "registered",
+        "capacity_probe": {"mode": "upstream_transient_once"},
+    }
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-1",
+    )
+
+    assert first["status"] == "failed"
+    assert first["failure_code"] == "failed_upstream"
+    assert first["retryable"] is True
+    assert gateway.row["attempts"] == 1
+    assert capacity_probe_should_raise(first) is True
+    assert tool.calls == []
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-2",
+    )
+
+    assert second["status"] == "succeeded"
+    assert gateway.row["attempts"] == 2
+    assert capacity_probe_should_raise(second) is False
+    assert tool.calls == [_request_payload()]
+
+
+def test_invalid_capacity_probe_records_two_attempts_and_terminal_failure() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        capacity_probe_should_raise,
+        run_backtest_job,
+    )
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": "not-an-object",
+        }
+    )
+    job["execution_metadata"] = {
+        "source": "public_alpha_capacity_load",
+        "ops_authority": "service_role",
+        "openrouter_traffic_class": "registered",
+        "capacity_probe": {"mode": "invalid_envelope"},
+    }
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-1",
+    )
+
+    assert first["failure_code"] == "invalid_job_contract"
+    assert first["retryable"] is True
+    assert capacity_probe_should_raise(first) is True
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-2",
+    )
+
+    assert second["failure_code"] == "invalid_job_contract"
+    assert second["retryable"] is False
+    assert gateway.row["attempts"] == 2
+    assert capacity_probe_should_raise(second) is True
+    assert tool.calls == []
