@@ -20,7 +20,8 @@ import {
   RAIL_PREVIEW_DWELL_MS,
   railDwellReducer,
   railRevealProgress,
-  railTickOffsets,
+  railTickExtension,
+  railTickStackOffsetPx,
 } from "@/lib/conversation-rail";
 import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import type { Message } from "@/components/chat/types";
@@ -51,6 +52,7 @@ export default function ConversationActivityRail({
   const totalMessages = messages.length;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const columnRef = useRef<HTMLElement | null>(null);
+  const tickElementRefs = useRef(new Map<string, HTMLButtonElement>());
   const awakeRef = useRef(false);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const dwellTimerRef = useRef<number | null>(null);
@@ -60,14 +62,16 @@ export default function ConversationActivityRail({
   );
 
   const offsets = useMemo(
-    () => railTickOffsets(ticks, totalMessages),
-    [ticks, totalMessages],
+    () => ticks.map((_, index) => railTickStackOffsetPx(index, ticks.length)),
+    [ticks],
   );
 
   const visible = conversationRailVisible(totalMessages, ticks.length);
 
   // Magnetic reveal: track pointer proximity and ramp the rail awake through
-  // a CSS variable instead of firing the instant the strip is touched.
+  // CSS variables instead of firing the instant the strip is touched. Each
+  // tick additionally slides out on its own distance to the pointer, so the
+  // stack moves like piano keys under a gliding finger.
   useEffect(() => {
     if (!visible) {
       return;
@@ -86,6 +90,13 @@ export default function ConversationActivityRail({
       const dy = Math.max(rect.top - pointer.y, pointer.y - rect.bottom, 0);
       const reveal = railRevealProgress(Math.hypot(dx, dy));
       node.style.setProperty("--rail-reveal", reveal.toFixed(3));
+      for (const element of tickElementRefs.current.values()) {
+        const tickRect = element.getBoundingClientRect();
+        const tickCenter = tickRect.top + tickRect.height / 2;
+        const extension =
+          reveal * railTickExtension(Math.abs(pointer.y - tickCenter));
+        element.style.setProperty("--tick-extend", extension.toFixed(3));
+      }
       const awake = reveal > 0;
       if (awake !== awakeRef.current) {
         awakeRef.current = awake;
@@ -136,6 +147,11 @@ export default function ConversationActivityRail({
   const handleTickLeave = useCallback(() => {
     clearDwellTimer();
     dispatch({ type: "tick_leave" });
+  }, [clearDwellTimer]);
+
+  const handleRailReset = useCallback(() => {
+    clearDwellTimer();
+    dispatch({ type: "rail_exit" });
   }, [clearDwellTimer]);
 
   if (!visible) {
@@ -193,27 +209,39 @@ export default function ConversationActivityRail({
         ref={columnRef}
         aria-label={t("chat.activity_rail.aria_label", "Conversation activity")}
         className="pointer-events-auto relative h-full w-9"
-        onPointerLeave={handleTickLeave}
+        onPointerLeave={handleRailReset}
       >
         {ticks.map((tick, index) => (
           <button
             key={tick.messageId}
             type="button"
             aria-label={tickAriaLabel(tick)}
+            ref={(element) => {
+              if (element) {
+                tickElementRefs.current.set(tick.messageId, element);
+              } else {
+                tickElementRefs.current.delete(tick.messageId);
+              }
+            }}
             onPointerEnter={() => handleTickEnter(tick.messageId)}
             onPointerLeave={handleTickLeave}
             onFocus={() => dispatch({ type: "focus_open", tickId: tick.messageId })}
-            onBlur={handleTickLeave}
+            onBlur={handleRailReset}
             onClick={() => {
-              handleTickLeave();
+              handleRailReset();
               onSelectTick(tick.messageId);
             }}
-            className="absolute right-1.5 flex h-5 w-7 -translate-y-1/2 items-center justify-end rounded-full outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:focus-visible:ring-white/30"
-            style={{ top: `${(offsets[index] * 100).toFixed(2)}%` }}
+            className="absolute right-1.5 flex h-3 w-8 -translate-y-1/2 items-center justify-end rounded-full outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:focus-visible:ring-white/30"
+            style={
+              {
+                top: `calc(50% + ${offsets[index]}px)`,
+                "--tick-extend": "0",
+              } as CSSProperties
+            }
           >
             <span
               aria-hidden="true"
-              className={`h-[3px] w-[calc(10px+8px*var(--rail-reveal))] rounded-full opacity-[calc(0.35+0.65*var(--rail-reveal))] transition-[width,opacity] duration-150 motion-reduce:transition-none ${TICK_BAR_KIND_CLASSES[tick.kind]}`}
+              className={`h-[3px] w-[calc(10px+2px*var(--rail-reveal)+12px*var(--tick-extend))] rounded-full opacity-[calc(0.35+0.45*var(--rail-reveal)+0.2*var(--tick-extend))] transition-[width,opacity] duration-100 motion-reduce:transition-none ${TICK_BAR_KIND_CLASSES[tick.kind]}`}
             />
           </button>
         ))}
@@ -224,7 +252,7 @@ export default function ConversationActivityRail({
             data-testid="conversation-activity-rail-preview"
             className="pointer-events-none absolute right-[calc(100%+10px)] w-64 -translate-y-1/2 rounded-[14px] border border-black/10 bg-white/[0.97] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur dark:border-white/10 dark:bg-[#1d2023]/[0.97]"
             style={{
-              top: `clamp(76px, ${(offsets[openIndex] * 100).toFixed(2)}%, calc(100% - 76px))`,
+              top: `clamp(76px, calc(50% + ${offsets[openIndex]}px), calc(100% - 76px))`,
             }}
           >
             <div

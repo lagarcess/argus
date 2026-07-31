@@ -11,9 +11,12 @@ import {
   RAIL_MIN_TRANSCRIPT_MESSAGES,
   RAIL_PREVIEW_DWELL_MS,
   RAIL_PROXIMITY_RADIUS_PX,
+  RAIL_TICK_MAGNET_RADIUS_PX,
+  RAIL_TICK_STACK_PITCH_PX,
   railDwellReducer,
   railRevealProgress,
-  railTickOffsets,
+  railTickExtension,
+  railTickStackOffsetPx,
 } from "@/lib/conversation-rail";
 
 const root = join(import.meta.dir, "..");
@@ -212,7 +215,29 @@ describe("dwell gating", () => {
     expect(state.openTickId).toBeNull();
   });
 
-  test("crossing to a new tick restarts the dwell clock", () => {
+  test("cold crossing between ticks stays closed until a dwell lands", () => {
+    let state = railDwellReducer(INITIAL_RAIL_DWELL_STATE, {
+      type: "tick_enter",
+      tickId: "m1",
+      at: 1_000,
+    });
+    state = railDwellReducer(state, { type: "tick_leave" });
+    state = railDwellReducer(state, {
+      type: "tick_enter",
+      tickId: "m2",
+      at: 1_050,
+    });
+    expect(state.openTickId).toBeNull();
+    state = railDwellReducer(state, { type: "elapse", at: 1_060 });
+    expect(state.openTickId).toBeNull();
+    state = railDwellReducer(state, {
+      type: "elapse",
+      at: 1_050 + RAIL_PREVIEW_DWELL_MS,
+    });
+    expect(state.openTickId).toBe("m2");
+  });
+
+  test("gliding with a preview open switches ticks instantly", () => {
     let state = railDwellReducer(INITIAL_RAIL_DWELL_STATE, {
       type: "tick_enter",
       tickId: "m1",
@@ -222,19 +247,17 @@ describe("dwell gating", () => {
       type: "elapse",
       at: 1_000 + RAIL_PREVIEW_DWELL_MS,
     });
+    expect(state.openTickId).toBe("m1");
+    state = railDwellReducer(state, { type: "tick_leave" });
+    expect(state.openTickId).toBe("m1");
     state = railDwellReducer(state, {
       type: "tick_enter",
       tickId: "m2",
       at: 2_000,
     });
-    expect(state.openTickId).toBeNull();
-    state = railDwellReducer(state, { type: "elapse", at: 2_010 });
-    expect(state.openTickId).toBeNull();
-    state = railDwellReducer(state, {
-      type: "elapse",
-      at: 2_000 + RAIL_PREVIEW_DWELL_MS,
-    });
     expect(state.openTickId).toBe("m2");
+    state = railDwellReducer(state, { type: "rail_exit" });
+    expect(state).toEqual(INITIAL_RAIL_DWELL_STATE);
   });
 
   test("leaving the rail resets everything; focus opens deliberately", () => {
@@ -248,32 +271,48 @@ describe("dwell gating", () => {
   });
 });
 
-describe("rail tick offsets", () => {
-  test("positions are proportional to transcript position", () => {
-    const ticks = deriveConversationRailTicks([
-      resultMessage("a1"),
-      ...Array.from({ length: 18 }, (_, i) => textMessage(`t${i}`, "ai")),
-      resultMessage("a2"),
-    ]);
-    const offsets = railTickOffsets(ticks, 20);
-    expect(offsets[0]).toBe(0);
-    expect(offsets[1]).toBe(1);
+describe("rail tick stack", () => {
+  test("ticks form a fixed-pitch queue centered on the rail", () => {
+    expect(railTickStackOffsetPx(0, 1)).toBe(0);
+    expect(railTickStackOffsetPx(0, 3)).toBe(-RAIL_TICK_STACK_PITCH_PX);
+    expect(railTickStackOffsetPx(1, 3)).toBe(0);
+    expect(railTickStackOffsetPx(2, 3)).toBe(RAIL_TICK_STACK_PITCH_PX);
+    for (let i = 1; i < 8; i += 1) {
+      expect(railTickStackOffsetPx(i, 8) - railTickStackOffsetPx(i - 1, 8)).toBe(
+        RAIL_TICK_STACK_PITCH_PX,
+      );
+    }
   });
 
-  test("adjacent ticks are nudged apart and clamped to the rail", () => {
-    const messages: Message[] = [
+  test("spacing never encodes transcript distance", () => {
+    const nearMessages: Message[] = [
       resultMessage("a1"),
       resultMessage("a2"),
-      resultMessage("a3"),
-      ...Array.from({ length: 37 }, (_, i) => textMessage(`t${i}`, "ai")),
     ];
-    const ticks = deriveConversationRailTicks(messages);
-    const offsets = railTickOffsets(ticks, messages.length);
-    for (let i = 1; i < offsets.length; i += 1) {
-      expect(offsets[i] - offsets[i - 1]).toBeGreaterThanOrEqual(0.049);
-    }
-    expect(offsets[0]).toBeGreaterThanOrEqual(0);
-    expect(offsets[offsets.length - 1]).toBeLessThanOrEqual(1);
+    const farMessages: Message[] = [
+      resultMessage("b1"),
+      ...Array.from({ length: 48 }, (_, i) => textMessage(`t${i}`, "ai")),
+      resultMessage("b2"),
+    ];
+    const near = deriveConversationRailTicks(nearMessages);
+    const far = deriveConversationRailTicks(farMessages);
+    expect(railTickStackOffsetPx(1, near.length) - railTickStackOffsetPx(0, near.length)).toBe(
+      railTickStackOffsetPx(1, far.length) - railTickStackOffsetPx(0, far.length),
+    );
+  });
+});
+
+describe("per-tick magnetization", () => {
+  test("extension peaks under the pointer and falls off over neighbors", () => {
+    expect(railTickExtension(0)).toBe(1);
+    expect(railTickExtension(-3)).toBe(1);
+    expect(railTickExtension(RAIL_TICK_MAGNET_RADIUS_PX)).toBe(0);
+    expect(railTickExtension(Number.POSITIVE_INFINITY)).toBe(0);
+    const neighbor = railTickExtension(RAIL_TICK_STACK_PITCH_PX);
+    const nextNeighbor = railTickExtension(RAIL_TICK_STACK_PITCH_PX * 2);
+    expect(neighbor).toBeGreaterThan(0);
+    expect(neighbor).toBeLessThan(1);
+    expect(nextNeighbor).toBeLessThan(neighbor);
   });
 });
 
@@ -320,6 +359,14 @@ describe("rail source discipline", () => {
     expect(componentSource).toContain("railRevealProgress");
     expect(componentSource).toContain("--rail-reveal");
     expect(componentSource).toContain("data-rail-awake");
+  });
+
+  test("ticks stack at fixed pitch and magnetize individually", () => {
+    expect(componentSource).toContain("railTickStackOffsetPx");
+    expect(componentSource).toContain("railTickExtension");
+    expect(componentSource).toContain("--tick-extend");
+    expect(componentSource).toContain("calc(50% + ${offsets[index]}px)");
+    expect(componentSource).not.toContain("railTickOffsets");
   });
 
   test("rail sits on the right edge and hides on small screens", () => {

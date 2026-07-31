@@ -131,9 +131,11 @@ export function railRevealProgress(distancePx: number): number {
 }
 
 /**
- * Dwell gating: a preview opens only after the pointer has rested on a tick,
- * never on first contact. Keyboard focus opens immediately because focusing a
- * tick is already a deliberate act.
+ * Dwell gating: on cold entry a preview opens only after the pointer has
+ * rested on a tick, never on first contact. Once a preview is open, gliding
+ * to a neighboring tick switches it instantly — the accident being guarded
+ * against is the first unintended opening, not deliberate browsing. Keyboard
+ * focus opens immediately because focusing a tick is already a deliberate act.
  */
 export const RAIL_PREVIEW_DWELL_MS = 180;
 
@@ -162,6 +164,13 @@ export function railDwellReducer(
 ): RailDwellState {
   switch (event.type) {
     case "tick_enter":
+      if (state.openTickId !== null) {
+        return {
+          hoveredTickId: event.tickId,
+          hoverStartedAt: null,
+          openTickId: event.tickId,
+        };
+      }
       return {
         hoveredTickId: event.tickId,
         hoverStartedAt: event.at,
@@ -181,6 +190,7 @@ export function railDwellReducer(
       return { ...state, openTickId: state.hoveredTickId };
     }
     case "tick_leave":
+      return { ...state, hoveredTickId: null, hoverStartedAt: null };
     case "rail_exit":
       return INITIAL_RAIL_DWELL_STATE;
     case "focus_open":
@@ -195,30 +205,38 @@ export function railDwellReducer(
 }
 
 /**
- * Vertical placement: proportional to transcript position (a true minimap),
- * nudged apart so adjacent ticks never overlap. Returned values are fractions
- * of the rail height in [0, 1], in tick order.
+ * Vertical placement: a compact queue stack at fixed pitch, centered on the
+ * rail. Order carries sequence and the preview carries identity — spacing
+ * deliberately does not encode transcript distance, so every tick stays one
+ * small glide away.
  */
-export const RAIL_TICK_MIN_GAP_FRACTION = 0.05;
+export const RAIL_TICK_STACK_PITCH_PX = 12;
 
-export function railTickOffsets(
-  ticks: ConversationRailTick[],
-  totalMessages: number,
-  minGap: number = RAIL_TICK_MIN_GAP_FRACTION,
-): number[] {
-  if (ticks.length === 0) {
-    return [];
+export function railTickStackOffsetPx(
+  index: number,
+  count: number,
+  pitch: number = RAIL_TICK_STACK_PITCH_PX,
+): number {
+  return (index - (count - 1) / 2) * pitch;
+}
+
+/**
+ * Per-tick magnetization: how far a tick slides out given the pointer's
+ * vertical distance to its center. The falloff spans about two neighbors so
+ * the stack moves like piano keys under a gliding finger.
+ */
+export const RAIL_TICK_MAGNET_RADIUS_PX = 30;
+
+export function railTickExtension(distancePx: number): number {
+  if (
+    !Number.isFinite(distancePx) ||
+    distancePx >= RAIL_TICK_MAGNET_RADIUS_PX
+  ) {
+    return 0;
   }
-  const lastIndex = Math.max(totalMessages - 1, 1);
-  const offsets = ticks.map((tick) =>
-    Math.min(Math.max(tick.messageIndex / lastIndex, 0), 1),
-  );
-  for (let i = 1; i < offsets.length; i += 1) {
-    offsets[i] = Math.max(offsets[i], offsets[i - 1] + minGap);
+  if (distancePx <= 0) {
+    return 1;
   }
-  offsets[offsets.length - 1] = Math.min(offsets[offsets.length - 1], 1);
-  for (let i = offsets.length - 2; i >= 0; i -= 1) {
-    offsets[i] = Math.min(offsets[i], offsets[i + 1] - minGap);
-  }
-  return offsets;
+  const linear = 1 - distancePx / RAIL_TICK_MAGNET_RADIUS_PX;
+  return linear * linear;
 }
