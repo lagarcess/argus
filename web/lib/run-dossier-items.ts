@@ -39,24 +39,20 @@ function localizedNumber(
   locale: string,
   maximumFractionDigits: number,
 ): string {
-  return new Intl.NumberFormat(numberFormatLocale(locale), {
+  return new Intl.NumberFormat(locale, {
     maximumFractionDigits,
     minimumFractionDigits: 0,
   }).format(value);
 }
 
 function localizedPercent(value: number, locale: string): string {
-  return new Intl.NumberFormat(numberFormatLocale(locale), {
+  return new Intl.NumberFormat(locale, {
     style: "percent",
     maximumFractionDigits: 1,
     minimumFractionDigits: 0,
   })
     .format(value / 100)
     .replaceAll("\u00a0", " ");
-}
-
-function numberFormatLocale(locale: string) {
-  return locale.toLowerCase() === "es-419" ? "es-ES" : locale;
 }
 
 export function formatRunDossierSetup(

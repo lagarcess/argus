@@ -87,9 +87,9 @@ describe("single-run dossier formatting", () => {
     ]);
 
     expect(formatRunDossierMetrics(dossier, t, "es-419")).toEqual([
-      { name: "Total return", value: "8,4 %" },
-      { name: "Worst drop", value: "-6,2 %" },
-      { name: "Sharpe", value: "1,23" },
+      { name: "Total return", value: "8.4%" },
+      { name: "Worst drop", value: "-6.2%" },
+      { name: "Sharpe", value: "1.23" },
     ]);
   });
 });
