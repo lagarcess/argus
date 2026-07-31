@@ -58,6 +58,13 @@ Named explicitly here so the size increase is a decision, not drift.
     at whatever depth you're currently at — holding Cmd at the top level
     numbers top-level categories, drilling into one and holding Cmd again
     numbers that category's own subitems.
+    - **On Recents specifically: pinned chats get numbered first**,
+      regardless of interleaved recency — all pinned chats take 1, 2, 3…
+      before any unpinned recent chat gets a number. Not strict visual
+      top-to-bottom order if that would ever put an unpinned chat ahead of
+      a pinned one; pin status determines number priority, not just
+      position. Depends on confirming decision 10's existing pinned-group
+      mechanics before implementing the numbering on top of it.
 12. **Build the quick-jump behavior once, as a shared primitive both
     Recents and Settings consume — not two independently-built copies.**
     This is the same lesson as the failure-class-visual-consistency lane:
