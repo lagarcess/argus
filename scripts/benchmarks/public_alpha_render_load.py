@@ -5,17 +5,14 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import sys
 import time
 from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from math import ceil
 from pathlib import Path
 from typing import Any, Mapping
-from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
@@ -59,31 +56,70 @@ from workflows.backtest_job import (  # noqa: E402
     capacity_probe_mode,
 )
 
-__all__ = ["capacity_probe_mode"]
+try:
+    from scripts.benchmarks.public_alpha_render_load_auth import (
+        LoadIdentity,
+    )
+    from scripts.benchmarks.public_alpha_render_load_auth import (
+        cleanup_temporary_identities as _cleanup_temporary_identities,
+    )
+    from scripts.benchmarks.public_alpha_render_load_auth import (
+        create_service_role_session_client as _create_service_role_session_client,
+    )
+    from scripts.benchmarks.public_alpha_render_load_auth import (
+        create_temporary_identities as _create_temporary_identities_impl,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from public_alpha_render_load_auth import (
+        LoadIdentity,
+    )
+    from public_alpha_render_load_auth import (
+        cleanup_temporary_identities as _cleanup_temporary_identities,
+    )
+    from public_alpha_render_load_auth import (
+        create_service_role_session_client as _create_service_role_session_client,
+    )
+    from public_alpha_render_load_auth import (
+        create_temporary_identities as _create_temporary_identities_impl,
+    )
 
-SCHEMA_VERSION = "argus_public_alpha_render_load/v1"
-CASE_MANIFEST = (
-    "idle_one",
-    "global_five",
-    "same_user_one_running_two_queued",
-    "global_five_running_ten_queued",
-    "invalid_envelope_retry",
-    "upstream_transient_retry",
-)
-CASE_ADMISSIONS = {
-    "idle_one": 1,
-    "global_five": 5,
-    "same_user_one_running_two_queued": 3,
-    "global_five_running_ten_queued": 15,
-    "invalid_envelope_retry": 1,
-    "upstream_transient_retry": 1,
-}
-LIMITS = {
-    "user_running": 1,
-    "user_queued": 2,
-    "global_running": 5,
-    "global_queued": 10,
-}
+try:
+    from scripts.benchmarks.public_alpha_render_load_evidence import (
+        ALLOWED_FAILURE_CODES,
+        CASE_ADMISSIONS,
+        CASE_MANIFEST,
+        LIMITS,
+        SCHEMA_VERSION,
+        build_case_result,
+        validate_report,
+        write_report,
+    )
+    from scripts.benchmarks.public_alpha_render_load_evidence import (
+        validate_partial_report as _validate_partial_report,
+    )
+    from scripts.benchmarks.public_alpha_render_load_evidence import (
+        write_partial_report as _write_partial_report,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from public_alpha_render_load_evidence import (
+        ALLOWED_FAILURE_CODES,
+        CASE_ADMISSIONS,
+        CASE_MANIFEST,
+        LIMITS,
+        SCHEMA_VERSION,
+        build_case_result,
+        validate_report,
+        write_report,
+    )
+    from public_alpha_render_load_evidence import (
+        validate_partial_report as _validate_partial_report,
+    )
+    from public_alpha_render_load_evidence import (
+        write_partial_report as _write_partial_report,
+    )
+
+__all__ = ["CASE_MANIFEST", "capacity_probe_mode"]
+
 TERMINAL_JOB_STATUSES = {"succeeded", "failed", "canceled", "expired"}
 TERMINAL_TASK_STATUSES = {
     "completed",
@@ -93,37 +129,10 @@ TERMINAL_TASK_STATUSES = {
     "cancelled",
     "expired",
 }
-FORBIDDEN_ARTIFACT_FIELDS = {
-    "access_token",
-    "authorization",
-    "conversation_id",
-    "email",
-    "idempotency_key",
-    "job_id",
-    "message",
-    "password",
-    "refresh_token",
-    "service_role_key",
-    "user_id",
-}
-ALLOWED_FAILURE_CODES = {
-    "backtest_capacity_exceeded",
-    "failed_upstream",
-    "invalid_job_contract",
-    "workflow_task_failed",
-    "workflow_task_timeout",
-}
 DEFAULT_PROMPT = (
     "Test an equal-weight AAPL and MSFT buy-and-hold strategy from "
     "January 1, 2025 through June 5, 2026 with 10,000 dollars"
 )
-
-
-@dataclass(frozen=True)
-class LoadIdentity:
-    label: str
-    email: str
-    password: str
 
 
 @dataclass(frozen=True)
@@ -162,86 +171,22 @@ class CompletedRun:
     wall_time_ms: float
 
 
+class CapacityEnvelopeStop(RuntimeError):
+    def __init__(
+        self,
+        *,
+        case_id: str,
+        reason: str,
+        observed_capacity: dict[str, int],
+    ) -> None:
+        super().__init__(reason)
+        self.case_id = case_id
+        self.reason = reason
+        self.observed_capacity = dict(observed_capacity)
+
+
 def default_output_dir(repo_root: Path) -> Path:
     return repo_root / "temp" / "benchmarks" / "public-alpha-render-load"
-
-
-def build_case_result(
-    *,
-    case_id: str,
-    started_at: str,
-    finished_at: str,
-    admitted: int,
-    rejected: int,
-    wall_times_ms: list[float],
-    queue_to_start_ms: list[float],
-    start_to_finish_ms: list[float],
-    terminal_statuses: list[str],
-    task_run_ids: list[str],
-    retry_attempts: list[int],
-    failure_codes: list[str],
-    observed_capacity: dict[str, int],
-) -> dict[str, Any]:
-    return {
-        "case_id": case_id,
-        "started_at": started_at,
-        "finished_at": finished_at,
-        "admitted": admitted,
-        "rejected": rejected,
-        "wall_time_ms": _percentiles(wall_times_ms),
-        "queue_to_start_ms": _percentiles(queue_to_start_ms),
-        "start_to_finish_ms": _percentiles(start_to_finish_ms),
-        "terminal_statuses": dict(sorted(Counter(terminal_statuses).items())),
-        "render_task_run_ids": list(task_run_ids),
-        "retry_attempts": list(retry_attempts),
-        "failure_codes": sorted(set(failure_codes)),
-        "observed_capacity": dict(observed_capacity),
-    }
-
-
-def validate_report(report: Mapping[str, Any]) -> None:
-    _reject_forbidden_artifact_data(report)
-    if report.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError("unexpected public-alpha load artifact schema")
-    if report.get("source") != CAPACITY_LOAD_SOURCE:
-        raise ValueError("unexpected public-alpha load artifact source")
-    candidate_sha = str(report.get("candidate_sha") or "")
-    if re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None:
-        raise ValueError("candidate_sha must be one full lowercase Git SHA")
-    _validate_artifact_url(report.get("api_url"), field="api_url")
-    _validate_artifact_url(report.get("app_url"), field="app_url")
-    workflow = report.get("workflow")
-    if not isinstance(workflow, Mapping):
-        raise ValueError("workflow contract is required")
-    if workflow.get("plan") != "standard" or workflow.get("max_retries") != 1:
-        raise ValueError("workflow contract must use standard plan and one retry")
-    if report.get("limits") != LIMITS:
-        raise ValueError("capacity limits do not match the locked envelope")
-    cases = report.get("cases")
-    if not isinstance(cases, list):
-        raise ValueError("cases must be a list")
-    case_ids = tuple(
-        str(case.get("case_id")) for case in cases if isinstance(case, Mapping)
-    )
-    if case_ids != CASE_MANIFEST:
-        raise ValueError("artifact must contain the exact locked case manifest")
-    for case in cases:
-        if not isinstance(case, Mapping):
-            raise ValueError("case entries must be objects")
-        _validate_case(case)
-
-
-def write_report(
-    *,
-    report: Mapping[str, Any],
-    output_dir: Path,
-) -> dict[str, Path]:
-    validate_report(report)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "public-alpha-render-load.json"
-    serialized = json.dumps(report, indent=2, sort_keys=True) + "\n"
-    json_path.write_text(serialized, encoding="utf-8")
-    return {"json": json_path}
 
 
 def run_harness(config: HarnessConfig) -> dict[str, Any]:
@@ -249,20 +194,27 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
     created_user_ids: list[str] = []
     load_clients: list[httpx.Client] = []
     cases: list[dict[str, Any]] = []
-    report: dict[str, Any] | None = None
-    cleanup_completed = False
+    active_case = "identity_setup"
+    failing_case: dict[str, Any] | None = None
+    partial_report: dict[str, Any] | None = None
+    partial_write_error: Exception | None = None
     try:
         _create_temporary_identities(
             config=config,
             client=service_client,
             user_ids=created_user_ids,
         )
-        runtimes = []
+        runtimes: list[httpx.Client] = []
         for identity in config.identities:
-            runtime = _login_identity(config=config, identity=identity)
+            runtime = _create_service_role_session_client(
+                config,
+                service_client,
+                identity,
+            )
             runtimes.append(runtime)
             load_clients.append(runtime)
 
+        active_case = "idle_one"
         idle_run = _prepare_run(
             config=config,
             client=runtimes[0],
@@ -276,6 +228,7 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
         )
         cases.append(idle_case)
 
+        active_case = "global_five"
         global_five = [
             _prepare_run(
                 config=config,
@@ -292,11 +245,13 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
         )
         cases.append(case)
 
+        active_case = "same_user_one_running_two_queued"
         same_user = []
         for _ in range(3):
-            runtime = _login_identity(
-                config=config,
-                identity=config.identities[0],
+            runtime = _create_service_role_session_client(
+                config,
+                service_client,
+                config.identities[0],
             )
             load_clients.append(runtime)
             same_user.append(
@@ -314,6 +269,7 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
         )
         cases.append(case)
 
+        active_case = "global_five_running_ten_queued"
         global_fifteen = [
             _prepare_run(
                 config=config,
@@ -330,6 +286,7 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
         )
         cases.append(case)
 
+        active_case = "invalid_envelope_retry"
         cases.append(
             _run_probe_case(
                 config=config,
@@ -339,6 +296,7 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
                 mode="invalid_envelope",
             )
         )
+        active_case = "upstream_transient_retry"
         cases.append(
             _run_probe_case(
                 config=config,
@@ -348,30 +306,85 @@ def run_harness(config: HarnessConfig) -> dict[str, Any]:
                 mode="upstream_transient_once",
             )
         )
-        report = _build_report(
-            config=config,
-            cases=cases,
-            cleanup={"status": "pending", "deleted_identities": 0},
-        )
-        write_report(report=report, output_dir=config.output_dir)
-        deleted_count = _cleanup_temporary_identities(
-            config=config,
-            client=service_client,
-            user_ids=created_user_ids,
-        )
-        report["cleanup"] = {
-            "status": "completed",
-            "deleted_identities": deleted_count,
+    except CapacityEnvelopeStop as exc:
+        failing_case = {
+            "case_id": exc.case_id,
+            "status": "failed",
+            "observed_capacity": exc.observed_capacity,
+            "stop_reason": exc.reason,
         }
-        cleanup_completed = True
-        write_report(report=report, output_dir=config.output_dir)
-        return report
+    except Exception as exc:
+        failing_case = {
+            "case_id": active_case,
+            "status": "failed",
+            "observed_capacity": {},
+            "stop_reason": _stable_stop_reason(exc),
+        }
     finally:
+        if failing_case is not None:
+            partial_report = _build_partial_report(
+                config,
+                completed_cases=cases,
+                failing_case=failing_case,
+                cleanup=_pending_cleanup(config, created_user_ids),
+            )
+            try:
+                _write_partial_report(
+                    partial_report,
+                    config.output_dir / "public-alpha-render-load.partial.json",
+                )
+            except Exception as exc:
+                partial_write_error = exc
         for client in load_clients:
-            client.close()
+            try:
+                client.close()
+            except Exception:
+                logger.error(
+                    "Public-alpha load session close failed",
+                    failure_code="session_close_failed",
+                )
+        cleanup = (
+            _cleanup_temporary_identities(
+                config=config,
+                client=service_client,
+                user_ids=created_user_ids,
+            )
+            if created_user_ids
+            else _empty_cleanup()
+        )
         service_client.close()
-        if not cleanup_completed and created_user_ids:
-            _best_effort_cleanup(config=config, user_ids=created_user_ids)
+        if partial_write_error is not None:
+            raise partial_write_error
+
+    if partial_report is not None:
+        partial_report["cleanup"] = cleanup
+        _write_partial_report(
+            partial_report,
+            config.output_dir / "public-alpha-render-load.partial.json",
+        )
+        return partial_report
+
+    if cleanup.get("status") != "completed":
+        partial_report = _build_partial_report(
+            config,
+            completed_cases=cases,
+            failing_case={
+                "case_id": "cleanup",
+                "status": "failed",
+                "observed_capacity": {},
+                "stop_reason": "cleanup_incomplete",
+            },
+            cleanup=cleanup,
+        )
+        _write_partial_report(
+            partial_report,
+            config.output_dir / "public-alpha-render-load.partial.json",
+        )
+        return partial_report
+
+    report = _build_report(config=config, cases=cases, cleanup=cleanup)
+    write_report(report=report, output_dir=config.output_dir)
+    return report
 
 
 def _run_public_case(
@@ -401,43 +414,50 @@ def _run_public_case(
                     failures.append(result)
             job_ids = {run.job_id for _, run in submitted}
             rows = _fetch_jobs(service_client, job_ids)
-            _merge_capacity_peak(observed, rows)
+            _observe_capacity_sample(case_id, observed, rows)
             if group_index < len(submission_groups) - 1:
                 target_running = 1 if case_id.startswith("same_user") else 5
                 _wait_for_capacity(
                     config=config,
                     client=service_client,
+                    case_id=case_id,
                     job_ids=job_ids,
-                    peak=observed,
+                    observed=observed,
                     running=target_running,
                     queued=0,
                 )
         job_ids = {run.job_id for _, run in submitted}
-        if case_id == "same_user_one_running_two_queued":
-            _wait_for_capacity(
-                config=config,
-                client=service_client,
-                job_ids=job_ids,
-                peak=observed,
-                running=1,
-                queued=2,
-            )
+        if case_id == "idle_one":
+            target = (1, 0)
+        elif case_id == "global_five":
+            target = (5, 0)
+        elif case_id == "same_user_one_running_two_queued":
+            target = (1, 2)
         elif case_id == "global_five_running_ten_queued":
-            _wait_for_capacity(
-                config=config,
-                client=service_client,
-                job_ids=job_ids,
-                peak=observed,
-                running=5,
-                queued=10,
-            )
+            target = (5, 10)
+        else:
+            target = None
+        if target is not None:
+            if (
+                observed.get("running"),
+                observed.get("queued"),
+            ) != target:
+                _wait_for_capacity(
+                    config=config,
+                    client=service_client,
+                    case_id=case_id,
+                    job_ids=job_ids,
+                    observed=observed,
+                    running=target[0],
+                    queued=target[1],
+                )
         poll_futures = [
             pool.submit(_poll_submitted_run, config=config, prepared=item, run=run)
             for item, run in submitted
         ]
         while not all(future.done() for future in poll_futures):
             rows = _fetch_jobs(service_client, job_ids)
-            _merge_capacity_peak(observed, rows)
+            _observe_capacity_sample(case_id, observed, rows)
             time.sleep(config.poll_seconds)
         for future in poll_futures:
             result = _completed_future_value(future)
@@ -450,7 +470,7 @@ def _run_public_case(
     rows = _fetch_jobs(service_client, {item.job_id for item in completed})
     _mark_capacity_jobs(service_client, rows)
     rows = _fetch_jobs(service_client, {item.job_id for item in completed})
-    _merge_capacity_peak(observed, rows)
+    _observe_capacity_sample(case_id, observed, rows)
     case = _case_from_rows(
         case_id=case_id,
         started_at=started_at,
@@ -481,22 +501,36 @@ def _wait_for_capacity(
     *,
     config: HarnessConfig,
     client: httpx.Client,
+    case_id: str,
     job_ids: set[str],
-    peak: dict[str, int],
+    observed: dict[str, int],
     running: int,
     queued: int,
 ) -> None:
     deadline = time.monotonic() + config.timeout_seconds
+    best_sample = _normalized_capacity_sample(observed)
     while True:
         rows = _fetch_jobs(client, job_ids)
-        _merge_capacity_peak(peak, rows)
-        counts = Counter(str(row.get("status") or "") for row in rows)
-        if counts["running"] >= running and counts["queued"] >= queued:
+        sample = _capacity_sample(rows)
+        _enforce_capacity_bounds(case_id, sample)
+        if _capacity_rank(sample) > _capacity_rank(best_sample):
+            best_sample = sample
+        if sample["running"] == running and sample["queued"] == queued:
+            observed.clear()
+            observed.update({"running": running, "queued": queued})
             return
         if any(str(row.get("status") or "") in TERMINAL_JOB_STATUSES for row in rows):
-            raise RuntimeError("capacity phase finished before the locked peak")
+            raise CapacityEnvelopeStop(
+                case_id=case_id,
+                reason="capacity_peak_not_reached",
+                observed_capacity=best_sample,
+            )
         if time.monotonic() >= deadline:
-            raise RuntimeError("capacity phase did not reach the locked peak")
+            raise CapacityEnvelopeStop(
+                case_id=case_id,
+                reason="capacity_peak_timeout",
+                observed_capacity=best_sample,
+            )
         time.sleep(config.poll_seconds)
 
 
@@ -754,70 +788,12 @@ def _create_temporary_identities(
     client: httpx.Client,
     user_ids: list[str],
 ) -> None:
-    for identity in config.identities:
-        existing = client.get(
-            "/rest/v1/private_alpha_allowlist",
-            params={"select": "email", "email": f"eq.{identity.email}", "limit": "1"},
-        )
-        existing.raise_for_status()
-        if existing.json():
-            raise RuntimeError("dedicated load identity is not temporary and unused")
-    for identity in config.identities:
-        response = client.post(
-            "/auth/v1/admin/users",
-            json={
-                "email": identity.email,
-                "password": identity.password,
-                "email_confirm": True,
-                "user_metadata": {"source": CAPACITY_LOAD_SOURCE},
-            },
-        )
-        response.raise_for_status()
-        body = response.json()
-        user_id = str(body.get("id") or "").strip()
-        if not user_id:
-            raise RuntimeError("temporary identity creation returned no user")
-        user_ids.append(user_id)
-        allowlist = client.post(
-            "/rest/v1/private_alpha_allowlist",
-            headers={"Prefer": "return=minimal"},
-            json={"email": identity.email, "role": "user"},
-        )
-        allowlist.raise_for_status()
-
-
-def _cleanup_temporary_identities(
-    *,
-    config: HarnessConfig,
-    client: httpx.Client,
-    user_ids: list[str],
-) -> int:
-    deleted = 0
-    for user_id in user_ids:
-        response = client.delete(f"/auth/v1/admin/users/{user_id}")
-        response.raise_for_status()
-        deleted += 1
-    for identity in config.identities:
-        response = client.delete(
-            "/rest/v1/private_alpha_allowlist",
-            params={"email": f"eq.{identity.email}"},
-        )
-        response.raise_for_status()
-    return deleted
-
-
-def _best_effort_cleanup(*, config: HarnessConfig, user_ids: list[str]) -> None:
-    client = _service_role_client(config)
-    try:
-        _cleanup_temporary_identities(
-            config=config,
-            client=client,
-            user_ids=user_ids,
-        )
-    except Exception:
-        logger.error("Public-alpha load cleanup failed", failure_code="cleanup_failed")
-    finally:
-        client.close()
+    _create_temporary_identities_impl(
+        config=config,
+        client=client,
+        user_ids=user_ids,
+        source=CAPACITY_LOAD_SOURCE,
+    )
 
 
 def _service_role_client(config: HarnessConfig) -> httpx.Client:
@@ -829,28 +805,6 @@ def _service_role_client(config: HarnessConfig) -> httpx.Client:
         },
         timeout=httpx.Timeout(config.timeout_seconds, connect=20.0),
     )
-
-
-def _login_identity(
-    *,
-    config: HarnessConfig,
-    identity: LoadIdentity,
-) -> httpx.Client:
-    client = httpx.Client(
-        follow_redirects=True,
-        timeout=httpx.Timeout(config.timeout_seconds, connect=20.0),
-    )
-    try:
-        _timed_json_request(
-            client,
-            "POST",
-            f"{config.api_url}/api/v1/auth/login",
-            json_body={"email": identity.email, "password": identity.password},
-        )
-    except Exception:
-        client.close()
-        raise
-    return client
 
 
 def _fetch_jobs(
@@ -895,13 +849,81 @@ def _mark_capacity_jobs(
         response.raise_for_status()
 
 
-def _merge_capacity_peak(
-    peak: dict[str, int],
-    rows: list[dict[str, Any]],
-) -> None:
+def _capacity_sample(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts = Counter(str(row.get("status") or "") for row in rows)
-    peak["running"] = max(peak["running"], counts["running"])
-    peak["queued"] = max(peak["queued"], counts["queued"])
+    user_counts: dict[str, Counter[str]] = {}
+    for row in rows:
+        user_ref = str(row.get("user_id") or "")
+        per_user = user_counts.setdefault(user_ref, Counter())
+        per_user[str(row.get("status") or "")] += 1
+    return {
+        "running": counts["running"],
+        "queued": counts["queued"],
+        "max_user_running": max(
+            (counts["running"] for counts in user_counts.values()),
+            default=0,
+        ),
+        "max_user_queued": max(
+            (counts["queued"] for counts in user_counts.values()),
+            default=0,
+        ),
+    }
+
+
+def _observe_capacity_sample(
+    case_id: str,
+    observed: dict[str, int],
+    rows: list[dict[str, Any]],
+) -> dict[str, int]:
+    sample = _capacity_sample(rows)
+    _enforce_capacity_bounds(case_id, sample)
+    expected = {
+        "idle_one": (1, 0),
+        "global_five": (5, 0),
+        "same_user_one_running_two_queued": (1, 2),
+        "global_five_running_ten_queued": (5, 10),
+    }.get(case_id)
+    if expected == (sample["running"], sample["queued"]):
+        observed.clear()
+        observed.update({"running": expected[0], "queued": expected[1]})
+    elif _capacity_rank(sample) > _capacity_rank(observed):
+        observed.clear()
+        observed.update(sample)
+    return sample
+
+
+def _normalized_capacity_sample(sample: Mapping[str, int]) -> dict[str, int]:
+    return {
+        "running": int(sample.get("running", 0)),
+        "queued": int(sample.get("queued", 0)),
+        "max_user_running": int(sample.get("max_user_running", 0)),
+        "max_user_queued": int(sample.get("max_user_queued", 0)),
+    }
+
+
+def _capacity_rank(sample: Mapping[str, int]) -> tuple[int, int, int]:
+    running = int(sample.get("running", 0))
+    queued = int(sample.get("queued", 0))
+    return running + queued, running, queued
+
+
+def _enforce_capacity_bounds(
+    case_id: str,
+    sample: dict[str, int],
+) -> None:
+    checks = (
+        ("global_running_exceeded", "running", LIMITS["global_running"]),
+        ("global_queued_exceeded", "queued", LIMITS["global_queued"]),
+        ("same_user_running_exceeded", "max_user_running", LIMITS["user_running"]),
+        ("same_user_queued_exceeded", "max_user_queued", LIMITS["user_queued"]),
+    )
+    for reason, field, limit in checks:
+        if sample[field] > limit:
+            raise CapacityEnvelopeStop(
+                case_id=case_id,
+                reason=reason,
+                observed_capacity=sample,
+            )
 
 
 def _completed_future_value(
@@ -921,6 +943,8 @@ def _build_report(
 ) -> dict[str, Any]:
     report = {
         "schema_version": SCHEMA_VERSION,
+        "status": "succeeded",
+        "completeness": "complete",
         "candidate_sha": config.candidate_sha,
         "generated_at": _utcnow_iso(),
         "api_url": config.api_url,
@@ -939,122 +963,73 @@ def _build_report(
     return report
 
 
-def _validate_case(case: Mapping[str, Any]) -> None:
-    case_id = str(case.get("case_id") or "")
-    required_fields = {
-        "started_at",
-        "finished_at",
-        "admitted",
-        "rejected",
-        "wall_time_ms",
-        "queue_to_start_ms",
-        "start_to_finish_ms",
-        "terminal_statuses",
-        "render_task_run_ids",
-        "retry_attempts",
-        "failure_codes",
+def _build_partial_report(
+    config: HarnessConfig,
+    *,
+    completed_cases: list[dict[str, Any]],
+    failing_case: dict[str, Any],
+    cleanup: dict[str, Any],
+) -> dict[str, Any]:
+    report = {
+        "schema_version": SCHEMA_VERSION,
+        "status": "failed",
+        "completeness": "partial",
+        "candidate_sha": config.candidate_sha,
+        "generated_at": _utcnow_iso(),
+        "api_url": config.api_url,
+        "app_url": config.app_url,
+        "source": CAPACITY_LOAD_SOURCE,
+        "workflow": {
+            "task": config.workflow_task,
+            "plan": "standard",
+            "max_retries": 1,
+        },
+        "limits": dict(LIMITS),
+        "completed_cases": list(completed_cases),
+        "failing_case": dict(failing_case),
+        "cleanup": cleanup,
     }
-    missing = required_fields.difference(case)
-    if missing:
-        raise ValueError(f"{case_id} is missing required measured fields")
-    if case.get("admitted") != CASE_ADMISSIONS[case_id]:
-        raise ValueError(f"{case_id} did not admit the locked job count")
-    if case.get("rejected") != 0:
-        raise ValueError(f"{case_id} rejected a locked-envelope job")
-    retries = case.get("retry_attempts")
-    if not isinstance(retries, list):
-        raise ValueError(f"{case_id} retry_attempts must be a list")
-    expected_retry = 1 if case_id.endswith("_retry") else 0
-    if any(value != expected_retry for value in retries):
-        raise ValueError(f"{case_id} retry evidence does not match the contract")
-    admitted = int(case["admitted"])
-    if len(retries) != admitted:
-        raise ValueError(f"{case_id} lacks per-job retry evidence")
-    task_run_ids = case.get("render_task_run_ids")
-    if not isinstance(task_run_ids, list) or len(task_run_ids) != admitted:
-        raise ValueError(f"{case_id} lacks per-job Render task-run evidence")
-    if any(
-        not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) is None
-        for value in task_run_ids
-    ):
-        raise ValueError(f"{case_id} contains an unsafe Render task-run id")
-    terminal_statuses = case.get("terminal_statuses")
-    if not isinstance(terminal_statuses, Mapping):
-        raise ValueError(f"{case_id} terminal_statuses must be an object")
-    if sum(int(value) for value in terminal_statuses.values()) != admitted:
-        raise ValueError(f"{case_id} lacks one terminal status per admitted job")
-    for field in ("wall_time_ms", "queue_to_start_ms", "start_to_finish_ms"):
-        summary = case.get(field)
-        if not isinstance(summary, Mapping):
-            raise ValueError(f"{case_id} {field} must be an object")
-        if not all(
-            isinstance(summary.get(percentile), (int, float))
-            for percentile in ("p50", "p95")
-        ):
-            raise ValueError(f"{case_id} {field} lacks measured percentiles")
-    failure_codes = case.get("failure_codes")
-    if not isinstance(failure_codes, list):
-        raise ValueError(f"{case_id} failure_codes must be a list")
-    if any(code not in ALLOWED_FAILURE_CODES for code in failure_codes):
-        raise ValueError(f"{case_id} contains an unsanitized failure code")
-    if case_id == "invalid_envelope_retry":
-        if "invalid_job_contract" not in failure_codes:
-            raise ValueError("invalid-envelope case lacks its terminal failure code")
-    if case_id == "upstream_transient_retry":
-        if "failed_upstream" not in failure_codes:
-            raise ValueError("transient case lacks its first-attempt failure code")
-    observed = case.get("observed_capacity")
-    if not isinstance(observed, Mapping):
-        raise ValueError(f"{case_id} observed_capacity must be an object")
-    if case_id == "same_user_one_running_two_queued":
-        if observed.get("running", 0) < 1 or observed.get("queued", 0) < 2:
-            raise ValueError("same-user case did not observe one running and two queued")
-    if case_id == "global_five_running_ten_queued":
-        if observed.get("running", 0) < 5 or observed.get("queued", 0) < 10:
-            raise ValueError("global case did not observe five running and ten queued")
+    _validate_partial_report(report)
+    return report
 
 
-def _reject_forbidden_artifact_data(value: Any) -> None:
-    if isinstance(value, Mapping):
-        for key, item in value.items():
-            normalized = str(key).strip().lower()
-            if normalized in FORBIDDEN_ARTIFACT_FIELDS:
-                raise ValueError(f"forbidden artifact field: {normalized}")
-            _reject_forbidden_artifact_data(item)
-        return
-    if isinstance(value, list):
-        for item in value:
-            _reject_forbidden_artifact_data(item)
-        return
-    if isinstance(value, str) and "@" in value:
-        raise ValueError("forbidden artifact field: raw identity value")
+def _pending_cleanup(
+    config: HarnessConfig,
+    user_ids: list[str],
+) -> dict[str, Any]:
+    return {
+        "status": "pending",
+        "auth": {
+            "targets": len(user_ids),
+            "deleted": 0,
+            "already_absent": 0,
+            "failed": 0,
+        },
+        "allowlist": {
+            "targets": len(config.identities) if user_ids else 0,
+            "completed": 0,
+            "failed": 0,
+        },
+    }
 
 
-def _validate_artifact_url(value: Any, *, field: str) -> None:
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be an HTTPS URL")
-    parsed = urlsplit(value)
-    if (
-        parsed.scheme != "https"
-        or not parsed.hostname
-        or parsed.username
-        or parsed.password
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise ValueError(f"{field} must not contain credentials or query data")
+def _empty_cleanup() -> dict[str, Any]:
+    return {
+        "status": "completed",
+        "auth": {
+            "targets": 0,
+            "deleted": 0,
+            "already_absent": 0,
+            "failed": 0,
+        },
+        "allowlist": {"targets": 0, "completed": 0, "failed": 0},
+    }
 
 
-def _percentiles(values: list[float]) -> dict[str, float | None]:
-    cleaned = sorted(max(0.0, float(value)) for value in values)
-    if not cleaned:
-        return {"p50": None, "p95": None}
-
-    def nearest_rank(percentile: float) -> float:
-        index = max(0, ceil(percentile * len(cleaned)) - 1)
-        return round(cleaned[index], 3)
-
-    return {"p50": nearest_rank(0.50), "p95": nearest_rank(0.95)}
+def _stable_stop_reason(exc: Exception) -> str:
+    if isinstance(exc, ValueError) and "timestamp" in str(exc).lower():
+        return "measurement_timestamp_invalid"
+    return "harness_case_failed"
 
 
 def _task_run_id(row: Mapping[str, Any]) -> str | None:
@@ -1080,7 +1055,7 @@ def _duration_ms(started_at: Any, finished_at: Any) -> float:
     started = _timestamp(started_at)
     finished = _timestamp(finished_at)
     if started is None or finished is None:
-        return 0.0
+        raise ValueError("required measurement timestamp is missing or malformed")
     return round(max(0.0, (finished - started) * 1000.0), 3)
 
 
@@ -1125,12 +1100,11 @@ def _parse_identities(raw: str) -> tuple[LoadIdentity, ...]:
             raise ValueError("each load identity must be an object")
         label = str(value.get("label") or "")
         email = str(value.get("email") or "")
-        password = str(value.get("password") or "")
         if label != f"public-alpha-load-{index + 1:02d}":
             raise ValueError("load identity labels must use the locked dedicated names")
-        if not email or not password or value.get("temporary") is not True:
-            raise ValueError("load identities must be explicit temporary credentials")
-        identities.append(LoadIdentity(label=label, email=email, password=password))
+        if not email or value.get("temporary") is not True:
+            raise ValueError("load identities must be explicit temporary users")
+        identities.append(LoadIdentity(label=label, email=email))
     return tuple(identities)
 
 
@@ -1186,9 +1160,20 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = _repo_root()
     load_dotenv(repo_root / ".env", override=False)
     try:
-        config = _config_from_env(_parse_args(argv or sys.argv[1:]))
+        config = _config_from_env(
+            _parse_args(argv if argv is not None else sys.argv[1:])
+        )
         report = run_harness(config)
-        output = write_report(report=report, output_dir=config.output_dir)
+        if report.get("status") != "succeeded":
+            logger.error(
+                "Public-alpha Render capacity harness stopped",
+                failure_code=str(
+                    report.get("failing_case", {}).get("stop_reason")
+                    or "capacity_harness_failed"
+                ),
+            )
+            return 1
+        output = {"json": config.output_dir / "public-alpha-render-load.json"}
         logger.info(
             "Public-alpha Render capacity artifact written",
             artifact_path=str(output["json"]),

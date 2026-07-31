@@ -64,10 +64,14 @@ def _valid_cases(module: Any) -> list[dict[str, Any]]:
             * count,
             retry_attempts=([1] * count if case_id.endswith("_retry") else [0] * count),
         )
-        if case_id == "same_user_one_running_two_queued":
-            case["observed_capacity"] = {"running": 1, "queued": 2}
-        elif case_id == "global_five_running_ten_queued":
-            case["observed_capacity"] = {"running": 5, "queued": 10}
+        case["observed_capacity"] = {
+            "idle_one": {"running": 1, "queued": 0},
+            "global_five": {"running": 5, "queued": 0},
+            "same_user_one_running_two_queued": {"running": 1, "queued": 2},
+            "global_five_running_ten_queued": {"running": 5, "queued": 10},
+            "invalid_envelope_retry": {"running": 1, "queued": 0},
+            "upstream_transient_retry": {"running": 1, "queued": 0},
+        }[case_id]
         if case_id == "invalid_envelope_retry":
             case["failure_codes"] = ["invalid_job_contract"]
         elif case_id == "upstream_transient_retry":
@@ -150,6 +154,8 @@ def test_report_validation_requires_every_locked_case_and_retry_shape() -> None:
 
     report = {
         "schema_version": "argus_public_alpha_render_load/v1",
+        "status": "succeeded",
+        "completeness": "complete",
         "candidate_sha": "a" * 40,
         "generated_at": "2026-07-31T12:02:00+00:00",
         "api_url": "https://argus.example",
@@ -167,7 +173,16 @@ def test_report_validation_requires_every_locked_case_and_retry_shape() -> None:
             "global_queued": 10,
         },
         "cases": cases,
-        "cleanup": {"status": "completed", "deleted_identities": 15},
+        "cleanup": {
+            "status": "completed",
+            "auth": {
+                "targets": 15,
+                "deleted": 15,
+                "already_absent": 0,
+                "failed": 0,
+            },
+            "allowlist": {"targets": 15, "completed": 15, "failed": 0},
+        },
     }
 
     module.validate_report(report)
@@ -177,6 +192,8 @@ def test_report_validation_rejects_raw_identity_and_secret_fields() -> None:
     module = _load_module()
     report = {
         "schema_version": "argus_public_alpha_render_load/v1",
+        "status": "succeeded",
+        "completeness": "complete",
         "email": "capacity@example.invalid",
         "access_token": "secret-token",
     }
@@ -189,6 +206,8 @@ def test_write_report_never_serializes_raw_identity_values(tmp_path: Path) -> No
     module = _load_module()
     report = {
         "schema_version": "argus_public_alpha_render_load/v1",
+        "status": "succeeded",
+        "completeness": "complete",
         "candidate_sha": "b" * 40,
         "generated_at": "2026-07-31T12:02:00+00:00",
         "api_url": "https://argus.example",
@@ -206,7 +225,16 @@ def test_write_report_never_serializes_raw_identity_values(tmp_path: Path) -> No
             "global_queued": 10,
         },
         "cases": _valid_cases(module),
-        "cleanup": {"status": "completed", "deleted_identities": 15},
+        "cleanup": {
+            "status": "completed",
+            "auth": {
+                "targets": 15,
+                "deleted": 15,
+                "already_absent": 0,
+                "failed": 0,
+            },
+            "allowlist": {"targets": 15, "completed": 15, "failed": 0},
+        },
     }
 
     paths = module.write_report(report=report, output_dir=tmp_path)
