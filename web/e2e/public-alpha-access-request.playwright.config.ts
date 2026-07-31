@@ -38,7 +38,7 @@ export default defineConfig({
       NEXT_PUBLIC_ENABLE_SPANISH: "true",
       NEXT_PUBLIC_GUEST_ACCESS_ENABLED: "false",
       NEXT_PUBLIC_ARGUS_API_URL: "http://127.0.0.1:3999/api/v1",
-      NEXT_PUBLIC_SUPABASE_URL: appOrigin,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
     },
   },

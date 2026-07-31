@@ -1550,9 +1550,11 @@ defaults to `true` and controls presentation only. The independent
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
   update to add verified email/password credentials to the current anonymous
   identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. It is
-  available only when the server enables public account access and preserves
-  the Auth UUID.
+  the original bootstrap cookie is only a backward-compatible fallback. The
+  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
+  its sole permanent-account gate: when public account access is disabled,
+  only active allowlisted roles may link; when enabled, any email not explicitly
+  disabled may link.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action to a ten-minute handoff without resolving whether that account

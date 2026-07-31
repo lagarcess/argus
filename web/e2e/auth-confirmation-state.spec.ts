@@ -65,6 +65,41 @@ test("sessionless signup focuses check-email state without navigating", async ({
   await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
 });
 
+test("Spanish sessionless signup renders and focuses the localized check-email state", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("i18nextLng", "es-419");
+  });
+  await page.route("**/api/v1/auth/signup", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders(page) });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: corsHeaders(page),
+      body: JSON.stringify({
+        user: { id: "user-pending-es", email: signupEmail },
+        session: null,
+      }),
+    });
+  });
+
+  await page.goto("/?auth=signup");
+  await page.getByPlaceholder("Nombre").fill("Estado de confirmación");
+  await page.getByPlaceholder("Correo electronico").fill(signupEmail);
+  await page.getByPlaceholder("Contrasena").fill(password);
+  await page.getByRole("button", { name: "Registrarse" }).click();
+
+  const state = page.getByTestId("auth-check-email");
+  await expect(state).toBeVisible();
+  await expect(state.getByRole("heading", { name: "Revisa tu correo" }))
+    .toBeFocused();
+  await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
+});
+
 test("session-bearing signup keeps the existing chat redirect", async ({
   page,
 }) => {

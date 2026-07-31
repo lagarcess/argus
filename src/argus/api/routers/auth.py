@@ -530,14 +530,6 @@ def link_guest_identity(
     user: User = Depends(current_user),  # noqa: B008
 ) -> JSONResponse:
     _enforce_browser_auth_origin(request)
-    if not public_account_access_enabled():
-        raise problem(
-            request,
-            status_code=403,
-            code="public_account_access_unavailable",
-            title="Account Creation Unavailable",
-            detail="Public account creation is not available.",
-        )
     if api_state.supabase_gateway is None:
         raise problem(
             request,

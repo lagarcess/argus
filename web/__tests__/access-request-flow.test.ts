@@ -67,7 +67,7 @@ describe("public alpha access request client", () => {
     expect(en.auth.access_request).toEqual({
       title: "Request access to Argus",
       description:
-        "Argus is in public alpha. Share your email and we’ll let you know when you can create an account.",
+        "Argus is in public alpha. Share your email to request access. If approved, we’ll email you when you can create an account.",
       email_label: "Email address",
       submit: "Request access",
       submitting: "Requesting access...",
@@ -84,7 +84,7 @@ describe("public alpha access request client", () => {
     expect(es.auth.access_request).toEqual({
       title: "Solicita acceso a Argus",
       description:
-        "Argus está en alfa pública. Comparte tu correo y te avisaremos cuando puedas crear una cuenta.",
+        "Argus está en alfa pública. Comparte tu correo para solicitar acceso. Si se aprueba, te enviaremos un correo cuando puedas crear una cuenta.",
       email_label: "Correo electrónico",
       submit: "Solicitar acceso",
       submitting: "Solicitando acceso...",
