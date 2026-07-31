@@ -1372,6 +1372,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("hidden w-[44%]");
     expect(palette).toContain('"command_palette.search_placeholder"');
     expect(palette).toContain('"Search Argus..."');
+    expect(palette).toContain("maxLength={512}");
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
     expect(api).toContain("decisionState?: DecisionState | null");

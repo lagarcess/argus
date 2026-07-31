@@ -238,6 +238,14 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             responses["503"] = copy.deepcopy(_AUTH_SESSION_UNAVAILABLE_RESPONSE_REF)
             responses["500"] = _error_response("An unexpected server error occurred.")
 
+    search_op = spec.get("paths", {}).get(f"{API_PREFIX}/search", {}).get("get")
+    if search_op is not None:
+        search_op.setdefault("responses", {})["503"] = _error_response(
+            "Search temporarily unavailable because exact bounded recall could "
+            "not be completed, or authentication-session verification is "
+            "temporarily unavailable."
+        )
+
     return spec
 
 

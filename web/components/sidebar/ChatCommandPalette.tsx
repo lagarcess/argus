@@ -1092,6 +1092,7 @@ export default function ChatCommandPalette({
             ref={inputRef}
             type="text"
             value={query}
+            maxLength={512}
             onChange={(event) => {
               const nextQuery = event.target.value;
               const nextSignature = JSON.stringify([

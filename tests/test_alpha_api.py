@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
+from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
 from argus.api.message_store import memory_conversation, memory_message
 from argus.api.schemas import (
     BacktestRun,
@@ -1742,6 +1743,40 @@ def test_search_memory_mode_defers_queries_without_an_indexable_token(
         "next_cursor": None,
         "ledger_groups": None,
     }
+
+
+def test_search_rejects_query_above_512_code_points() -> None:
+    response = _client().get(
+        "/api/v1/search",
+        params={"q": "x" * 513},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
+def test_search_maps_memory_ledger_work_limit_to_typed_problem(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import search as search_router
+
+    def _fail_bounded_ledger(**_: Any) -> None:
+        raise MemoryLedgerWorkLimitExceeded
+
+    monkeypatch.setattr(search_router, "memory_search_read", _fail_bounded_ledger)
+
+    response = _client().get(
+        "/api/v1/search",
+        params={"q": "broadanchor", "include_ledger_groups": "true"},
+    )
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["code"] == "search_temporarily_unavailable"
+    assert payload["type"].endswith("/search-temporarily-unavailable")
+    assert payload["status"] == 503
+    assert "SQLite" not in payload["detail"]
+    assert "10,000" not in payload["detail"]
 
 
 def test_search_memory_mode_recalls_user_message_with_typed_match_anchor() -> None:

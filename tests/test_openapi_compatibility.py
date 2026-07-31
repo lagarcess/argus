@@ -39,6 +39,11 @@ def test_search_declares_bounded_visible_conversation_recall(
         parameter["name"]: parameter for parameter in operation["parameters"]
     }
 
+    query = parameters["q"]
+    assert query["in"] == "query"
+    assert query["required"] is True
+    assert query["schema"]["maxLength"] == 512
+
     conversation_ids = parameters["conversation_id"]
     assert conversation_ids["in"] == "query"
     assert conversation_ids["required"] is False
@@ -60,6 +65,11 @@ def test_search_declares_bounded_visible_conversation_recall(
         "title": "Archived",
     }
     assert "archived" in search_item["required"]
+    unavailable = operation["responses"]["503"]
+    assert "search temporarily unavailable" in unavailable["description"].lower()
+    assert unavailable["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/Error"
+    }
 
 
 def test_prefix_appears_exactly_once_per_public_operation(

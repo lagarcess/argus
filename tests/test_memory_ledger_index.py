@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from argus.api import memory_ledger_index, memory_search_candidates
 from argus.api import state as api_state
+from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
 from argus.api.schemas import Conversation, DecisionNote, DecisionState, Message
 
 
@@ -68,7 +69,7 @@ def test_memory_ledger_index_uses_fts5_and_excludes_undecided_candidates() -> No
     )
     sql, parameters = memory_ledger_index._matching_counts_query(
         tokens=("needle",),
-        anchored_tokens=("needle",),
+        fts_query='"needle"',
         eligible_conversation_id=None,
     )
 
@@ -113,6 +114,43 @@ def test_memory_ledger_index_serializes_shared_connection_queries() -> None:
         )
 
     assert results == (expected,) * 64
+
+
+@pytest.mark.parametrize("query", ("broadanchor", "broadanchor zz"))
+def test_memory_ledger_rejects_anchored_work_above_fixed_limit(
+    query: str,
+) -> None:
+    candidate_count = 10_001
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=(
+            (f"conversation-{candidate_index}", "broadanchor searchable text")
+            for candidate_index in range(candidate_count)
+        ),
+        decision_states_by_conversation={
+            f"conversation-{candidate_index}": {"watching"}
+            for candidate_index in range(candidate_count)
+        },
+    )
+
+    with pytest.raises(MemoryLedgerWorkLimitExceeded):
+        index.counts(query=query, eligible_conversation_id=None)
+
+
+def test_memory_ledger_registered_empty_counts_are_revision_precomputed() -> None:
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=(("conversation-decided", "unused searchable text"),),
+        decision_states_by_conversation={
+            "conversation-decided": {"watching"},
+        },
+    )
+    index._connection.close()
+
+    assert index.counts(query="", eligible_conversation_id=None) == {
+        "promising": 0,
+        "watching": 1,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
 
 
 def test_memory_ledger_counts_broad_matches_without_python_exact_scan(

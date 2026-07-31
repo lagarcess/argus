@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
+from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     DecisionState,
@@ -45,7 +46,7 @@ LEDGER_DECISION_STATE_ORDER: tuple[DecisionState, ...] = (
 
 @router.get("/search", response_model=PaginatedSearch)
 def search(
-    q: str,
+    q: Annotated[str, Query(max_length=512)],
     request: Request,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
@@ -182,25 +183,37 @@ def search(
             )
         )
     else:
-        memory_read = memory_search_read(
-            user=user,
-            query=query,
-            source_limit=(
-                len(requested_conversation_ids)
-                if id_scoped_recall
-                else limit + 1
-            ),
-            allow_decision_action=context.capabilities.can_save_decision,
-            include_conversation_rows=text_search_enabled,
-            cursor_updated_at=cursor_dt,
-            cursor_id=cursor_id,
-            decision_state=decision_state,
-            include_ledger_groups=include_ledger_groups,
-            guest_conversation_id=workspace_conversation_id,
-            conversation_ids=(
-                requested_conversation_ids if id_scoped_recall else None
-            ),
-        )
+        try:
+            memory_read = memory_search_read(
+                user=user,
+                query=query,
+                source_limit=(
+                    len(requested_conversation_ids)
+                    if id_scoped_recall
+                    else limit + 1
+                ),
+                allow_decision_action=context.capabilities.can_save_decision,
+                include_conversation_rows=text_search_enabled,
+                cursor_updated_at=cursor_dt,
+                cursor_id=cursor_id,
+                decision_state=decision_state,
+                include_ledger_groups=include_ledger_groups,
+                guest_conversation_id=workspace_conversation_id,
+                conversation_ids=(
+                    requested_conversation_ids if id_scoped_recall else None
+                ),
+            )
+        except MemoryLedgerWorkLimitExceeded:
+            raise problem(
+                request,
+                status_code=503,
+                code="search_temporarily_unavailable",
+                title="Search Temporarily Unavailable",
+                detail=(
+                    "Search is temporarily unavailable. Please refine your "
+                    "query and try again."
+                ),
+            ) from None
         scored_items.extend(memory_read.scored_items)
         asset_rollup = memory_read.asset_rollup
         memory_ledger_counts = memory_read.ledger_counts

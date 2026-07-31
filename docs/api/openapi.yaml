@@ -1210,6 +1210,7 @@ paths:
         required: true
         schema:
           type: string
+          maxLength: 512
       - name: limit
         in: query
         required: false
@@ -1269,7 +1270,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+          description: Search temporarily unavailable because exact bounded recall could not
+            be completed, or authentication-session verification is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected server error occurred.
           content:
