@@ -215,7 +215,15 @@ changing its one-run ownership rule:
 - Search retains the three-character text-index threshold, while a single
   canonical symbol-shaped query becomes eligible at two characters. This
   enables symbols such as `BA` without permitting broad two-character text
-  search or adding a provider lookup.
+  search or adding a provider lookup. When the query exactly matches a stored
+  canonical symbol, Search returns both the asset rollup and the bounded,
+  cursor-safe conversation rows whose completed runs contain that symbol.
+- Every canonical strategy family rendered in the dossier has natural EN and
+  es-419 copy. An unknown future family falls back to a readable code label;
+  the setup line must never render an empty segment or doubled separator.
+- The provider-free visual-QA gallery does not append `Run <number>` to card
+  titles. Production continues to render the canonical result-card title
+  verbatim; the fixture must not imply that sequence numbers are product copy.
 - Historical-view Back controls use an accessible arrow-only treatment.
 
 The chat result card continues to expose decision capture only when its result
@@ -308,6 +316,13 @@ hydration, or retry semantics.
 - Search/Recents behavior, left-row match highlighting, decision filters,
   asset rollups, conversation isolation, and jump-to-match from PR #306 do not
   regress.
+- A two-character exact symbol such as `BA` returns its asset rollup and its
+  matching conversation row, while two-character ordinary text remains
+  deferred.
+- Saving a new note long enough to exceed the five-line preview immediately
+  returns to the collapsed dossier with functional `Show full note` / `Show
+  less` controls after canonical refresh.
+- Dossier setup lines never contain an empty strategy slot in EN or es-419.
 - Memory and Supabase/Postgres modes return equivalent typed results.
 - EN and es-419 behave equivalently on desktop and mobile.
 - Hover, focus, disclosure, history loading, decision save, and navigation make
