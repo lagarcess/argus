@@ -212,6 +212,23 @@ export function commandPaletteOpenMessageId(
   return openAtLeftOff ? null : item.matchMessageId;
 }
 
+export function commandPaletteConversationNavigationDisabled({
+  turnInFlight,
+  activeConversationId,
+  targetConversationId,
+}: {
+  turnInFlight: boolean;
+  activeConversationId: string | null;
+  targetConversationId: string | null;
+}) {
+  return Boolean(
+    turnInFlight &&
+    activeConversationId &&
+    targetConversationId &&
+    activeConversationId === targetConversationId,
+  );
+}
+
 export function commandPaletteDigitSelectionIndex(
   key: string,
   itemCount: number,

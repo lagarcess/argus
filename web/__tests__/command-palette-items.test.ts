@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   commandPaletteAssetRollupFromSearch,
   commandPaletteCanonicalRecallLimit,
+  commandPaletteConversationNavigationDisabled,
   commandPaletteDecisionVerb,
   commandPaletteDigitSelectionIndex,
   commandPaletteGroupsByLedgerState,
@@ -450,6 +451,44 @@ describe("command palette conversation dossier", () => {
     expect(commandPaletteDigitSelectionIndex("3", 3, false)).toBe(2);
     expect(commandPaletteDigitSelectionIndex("4", 3, false)).toBeNull();
     expect(commandPaletteDigitSelectionIndex("1", 3, true)).toBeNull();
+  });
+
+  test("blocks only stream-owning conversation navigation", () => {
+    expect(
+      commandPaletteConversationNavigationDisabled({
+        turnInFlight: true,
+        activeConversationId: "conversation-a",
+        targetConversationId: "conversation-a",
+      }),
+    ).toBe(true);
+    expect(
+      commandPaletteConversationNavigationDisabled({
+        turnInFlight: true,
+        activeConversationId: "conversation-a",
+        targetConversationId: "conversation-b",
+      }),
+    ).toBe(false);
+    expect(
+      commandPaletteConversationNavigationDisabled({
+        turnInFlight: false,
+        activeConversationId: "conversation-a",
+        targetConversationId: "conversation-a",
+      }),
+    ).toBe(false);
+    expect(
+      commandPaletteConversationNavigationDisabled({
+        turnInFlight: true,
+        activeConversationId: null,
+        targetConversationId: "conversation-a",
+      }),
+    ).toBe(false);
+    expect(
+      commandPaletteConversationNavigationDisabled({
+        turnInFlight: true,
+        activeConversationId: "conversation-a",
+        targetConversationId: null,
+      }),
+    ).toBe(false);
   });
 
   test("opens from the focused search input but suppresses numeric and editable shortcuts", () => {

@@ -43,6 +43,7 @@ import {
 import {
   commandPaletteAssetRollupFromSearch,
   commandPaletteCanonicalRecallLimit,
+  commandPaletteConversationNavigationDisabled,
   commandPaletteDecisionVerb,
   commandPaletteDecisionStateFallback,
   commandPaletteGroupsByLedgerState,
@@ -81,7 +82,7 @@ type ChatCommandPaletteProps = {
     openAtLeftOff?: boolean,
   ) => void;
   onRunFresh: (conversationId: string, sendText: string) => Promise<void> | void;
-  runFreshDisabled?: boolean;
+  turnInFlight?: boolean;
   activeConversationId: string | null;
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
@@ -239,7 +240,7 @@ export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
   onRunFresh,
-  runFreshDisabled = false,
+  turnInFlight = false,
   activeConversationId,
   isGuest = false,
   groundedDiscoveryAvailable = true,
@@ -649,6 +650,12 @@ export default function ChatCommandPalette({
   const selectedDecisionAction = selectedPreview?.actions.find(
     (action): action is DecisionAction => action.type === "decision",
   );
+  const selectedNavigationDisabled =
+    commandPaletteConversationNavigationDisabled({
+      turnInFlight,
+      activeConversationId,
+      targetConversationId: selectedPreview?.conversationId ?? null,
+    });
 
   useEffect(() => {
     setDecisionDraft(null);
@@ -888,6 +895,15 @@ export default function ChatCommandPalette({
   const openSourceConversation = useCallback(
     (item: CommandPaletteDisplayItem, openAtLeftOff = false) => {
       if (!item.conversationId) return;
+      if (
+        commandPaletteConversationNavigationDisabled({
+          turnInFlight,
+          activeConversationId,
+          targetConversationId: item.conversationId,
+        })
+      ) {
+        return;
+      }
       const messageId = commandPaletteOpenMessageId(item, openAtLeftOff);
       onOpenConversation(
         item.conversationId,
@@ -896,7 +912,7 @@ export default function ChatCommandPalette({
       );
       onClose();
     },
-    [onClose, onOpenConversation],
+    [activeConversationId, onClose, onOpenConversation, turnInFlight],
   );
 
   const activateItem = useCallback(
@@ -1341,6 +1357,12 @@ export default function ChatCommandPalette({
                               item.type === "conversation") &&
                             activeConversationId === item.conversationId;
                           const isEditing = editingId === item.conversationId;
+                          const isNavigationDisabled =
+                            commandPaletteConversationNavigationDisabled({
+                              turnInFlight,
+                              activeConversationId,
+                              targetConversationId: item.conversationId,
+                            });
                           const statusLabelKey =
                             commandPaletteStatusLabelKey(item);
                           const statusFallback =
@@ -1365,6 +1387,11 @@ export default function ChatCommandPalette({
                               key={`${item.source}:${item.id}`}
                               data-palette-row-index={rowIndex}
                               onClick={() => {
+                                if (isNavigationDisabled) {
+                                  setPreviewItem(item);
+                                  setLayoutMode("expanded");
+                                  return;
+                                }
                                 if (
                                   window.matchMedia("(pointer: coarse)").matches
                                 ) {
@@ -1379,6 +1406,7 @@ export default function ChatCommandPalette({
                               onFocus={() => setPreviewItem(item)}
                               role="button"
                               tabIndex={0}
+                              aria-disabled={isNavigationDisabled}
                               className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
@@ -1560,11 +1588,12 @@ export default function ChatCommandPalette({
                                     >
                                       <button
                                         type="button"
+                                        disabled={isNavigationDisabled}
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           openSourceConversation(item);
                                         }}
-                                        className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                        className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
                                         aria-label={t(
                                           "command_palette.open_source_conversation",
                                           "Open source conversation",
@@ -1682,7 +1711,7 @@ export default function ChatCommandPalette({
                           selectedPreview.conversationId && (
                             <button
                               type="button"
-                              disabled={runFreshDisabled}
+                              disabled={turnInFlight}
                               onClick={() =>
                                 void onRunFresh(
                                   selectedPreview.conversationId!,
@@ -1821,7 +1850,10 @@ export default function ChatCommandPalette({
                   <button
                     type="button"
                     onClick={() => openSourceConversation(selectedPreview)}
-                    disabled={!selectedPreview.conversationId}
+                    disabled={
+                      !selectedPreview.conversationId ||
+                      selectedNavigationDisabled
+                    }
                     title={
                       selectedPreview.conversationId
                         ? undefined

@@ -1492,11 +1492,37 @@ describe("Argus Alpha frontend contract", () => {
       palette.indexOf("{selectedDecisionAction &&"),
     );
 
-    expect(chat).toContain("runFreshDisabled={turnInFlight}");
-    expect(palette).toContain("runFreshDisabled?: boolean");
-    expect(runFreshButton).toContain("disabled={runFreshDisabled}");
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(palette).toContain("turnInFlight?: boolean");
+    expect(runFreshButton).toContain("disabled={turnInFlight}");
     expect(runFreshButton).toContain("disabled:cursor-not-allowed");
     expect(runFreshButton).toContain("disabled:opacity-50");
+  });
+
+  test("omnisearch preserves the active turn when its conversation is selected", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const openSourceConversation = palette.slice(
+      palette.indexOf("const openSourceConversation = useCallback"),
+      palette.indexOf("const activateItem = useCallback"),
+    );
+
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(palette).toContain("turnInFlight?: boolean");
+    expect(openSourceConversation).toContain(
+      "commandPaletteConversationNavigationDisabled",
+    );
+    expect(openSourceConversation).toContain("activeConversationId");
+    expect(openSourceConversation).toContain("return;");
+    expect(palette).toContain("aria-disabled={isNavigationDisabled}");
+    expect(palette).toContain("!selectedPreview.conversationId ||");
+    expect(palette).toContain("selectedNavigationDisabled");
   });
 
   test("debounced omnisearch synchronizes rows and ledger counts under one request owner", () => {
