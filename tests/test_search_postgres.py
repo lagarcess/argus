@@ -1691,6 +1691,54 @@ def test_asset_rollup_pair_symbol_normalization_matches_memory_contract(
     assert provider_calls == []
 
 
+def test_conversation_rank_casefolds_stored_symbols_like_memory(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 7, 29, 22, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        symbol_conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Unrelated symbol conversation",
+        )
+        _insert_run(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Expanding casefold result",
+            conversation_id=symbol_conversation_id,
+            symbols=["ẞ/EUR"],
+        )
+        object_conversation_id = _insert_conversation(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Unrelated object conversation",
+        )
+        _insert_idea_spine(
+            cursor,
+            user_id=owner_id,
+            timestamp=now,
+            title="Ordinary evidence",
+            summary="Ordinary object match",
+            conversation_id=object_conversation_id,
+            evidence_digest="Review ss/eur in this artifact.",
+        )
+
+    result = _reader()[0].search_rows(
+        user_id=str(owner_id),
+        query="ss/eur",
+        source_limit=2,
+    )
+
+    assert [item.id for _, item in _ranked(result.rows, "ss/eur")] == [
+        str(symbol_conversation_id),
+        str(object_conversation_id),
+    ]
+
+
 def test_ledger_counts_distinct_conversations_across_all_match_layers(
     search_identities,
 ) -> None:

@@ -1269,9 +1269,11 @@ def _conversation_match_ctes(
             where symbol_run.user_id = input.user_id
               and symbol_run.conversation_id = conversation.id
               and symbol_run.status = 'completed'
-              and input.symbol_query = lower(symbol)
+              and input.symbol_query = btrim({normalized_symbol})
         )::integer
         """
+    ).format(
+        normalized_symbol=symbol_index_expression(sql.SQL("symbol")),
     )
     conversation_activity_query = sql.SQL(
         """

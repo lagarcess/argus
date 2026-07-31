@@ -588,6 +588,24 @@ def test_search_groups_all_matching_layers_before_conversation_limit() -> None:
     assert rendered.count("conversation.deleted_at is null") >= 7
 
 
+def test_conversation_symbol_rank_uses_canonical_expanding_casefold() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ss/eur",
+        source_limit=2,
+    )
+
+    rendered = pool.cursor.executions[0][0].as_string()
+    assert (
+        "input.symbol_query = "
+        "btrim(public.argus_search_symbol_casefold(symbol))"
+    ) in rendered
+    assert "input.symbol_query = lower(symbol)" not in rendered
+
+
 def test_asset_rollup_is_one_bounded_owner_scoped_row_outside_conversation_limit() -> (
     None
 ):
