@@ -1,15 +1,33 @@
 import { describe, expect, test } from "bun:test";
-import {
+import * as keyboardShortcuts from "../lib/keyboard-shortcuts";
+
+const {
   KEYBOARD_SHORTCUTS,
   keyboardShortcutDisplay,
   matchesKeyboardShortcut,
-} from "../lib/keyboard-shortcuts";
+} = keyboardShortcuts;
+const quickJumpIndexForEvent = (
+  keyboardShortcuts as typeof keyboardShortcuts & {
+    quickJumpIndexForEvent?: (
+      event: Parameters<typeof matchesKeyboardShortcut>[1],
+      usesCommandKey: boolean,
+    ) => number | null;
+  }
+).quickJumpIndexForEvent;
 
 describe("keyboard shortcut registry", () => {
   test("defines the searchable actions once for handlers and the overlay", () => {
     expect(KEYBOARD_SHORTCUTS.map((shortcut) => shortcut.id)).toEqual([
       "omnisearch",
       "keyboard_shortcuts",
+      "open_recents",
+      "expand_sidebar_recents",
+      "open_settings",
+      "new_chat",
+      "delete_focused_chat",
+      "rename_focused_chat",
+      "toggle_pin_focused_chat",
+      "quick_jump",
     ]);
     expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.labelKey)).toBe(true);
   });
@@ -18,29 +36,41 @@ describe("keyboard shortcut registry", () => {
     expect(
       matchesKeyboardShortcut("omnisearch", {
         key: "k",
+        code: "KeyK",
         metaKey: true,
         ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
       }),
     ).toBe(true);
     expect(
       matchesKeyboardShortcut("omnisearch", {
         key: "K",
+        code: "KeyK",
         metaKey: false,
         ctrlKey: true,
+        shiftKey: false,
+        altKey: false,
       }),
     ).toBe(true);
     expect(
       matchesKeyboardShortcut("keyboard_shortcuts", {
         key: "/",
+        code: "Slash",
         metaKey: false,
         ctrlKey: true,
+        shiftKey: false,
+        altKey: false,
       }),
     ).toBe(true);
     expect(
       matchesKeyboardShortcut("keyboard_shortcuts", {
         key: "Control",
+        code: "ControlLeft",
         metaKey: false,
         ctrlKey: true,
+        shiftKey: false,
+        altKey: false,
       }),
     ).toBe(false);
   });
@@ -54,5 +84,92 @@ describe("keyboard shortcut registry", () => {
       "Ctrl",
       "K",
     ]);
+    expect(keyboardShortcutDisplay("open_recents", true)).toEqual([
+      "⌘",
+      "Shift",
+      ",",
+    ]);
+    expect(keyboardShortcutDisplay("quick_jump", false)).toEqual([
+      "Ctrl",
+      "Shift",
+      "1–9",
+    ]);
+  });
+
+  test("matches finalized action bindings by physical key code", () => {
+    expect(
+      matchesKeyboardShortcut("open_recents", {
+        key: "<",
+        code: "Comma",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      matchesKeyboardShortcut("open_recents", {
+        key: ",",
+        code: "Comma",
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: false,
+        altKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      matchesKeyboardShortcut("rename_focused_chat", {
+        key: "F2",
+        code: "F2",
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+      }),
+    ).toBe(true);
+  });
+
+  test("matches quick-jump digits by code across shifted layouts", () => {
+    expect(quickJumpIndexForEvent).toBeTypeOf("function");
+    if (!quickJumpIndexForEvent) return;
+    expect(
+      quickJumpIndexForEvent(
+        {
+          key: "1",
+          code: "Digit1",
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: true,
+        },
+        true,
+      ),
+    ).toBe(0);
+    expect(
+      quickJumpIndexForEvent(
+        {
+          key: "@",
+          code: "Digit2",
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: true,
+          altKey: false,
+        },
+        false,
+      ),
+    ).toBe(1);
+    expect(
+      quickJumpIndexForEvent(
+        {
+          key: "@",
+          code: "Digit2",
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: true,
+          altKey: true,
+        },
+        false,
+      ),
+    ).toBeNull();
   });
 });

@@ -1,26 +1,128 @@
-export type KeyboardShortcutId = "omnisearch" | "keyboard_shortcuts";
+export type KeyboardShortcutId =
+  | "omnisearch"
+  | "keyboard_shortcuts"
+  | "new_chat"
+  | "open_recents"
+  | "delete_focused_chat"
+  | "rename_focused_chat"
+  | "expand_sidebar_recents"
+  | "open_settings"
+  | "toggle_pin_focused_chat"
+  | "quick_jump";
+
+export type KeyboardShortcutGroup = "navigation" | "chat" | "quick_jump";
 
 export type KeyboardShortcutEvent = Pick<
   KeyboardEvent,
-  "ctrlKey" | "key" | "metaKey"
+  "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey"
 >;
+
+type KeyboardShortcutMatch =
+  | "primary_key"
+  | "primary_shift_code"
+  | "code"
+  | "quick_jump";
 
 export type KeyboardShortcutDefinition = {
   id: KeyboardShortcutId;
+  group: KeyboardShortcutGroup;
   labelKey: string;
-  key: string;
+  match: KeyboardShortcutMatch;
+  key?: string;
+  code?: string;
+  macDisplay: readonly string[];
+  otherDisplay: readonly string[];
 };
 
 export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
   {
     id: "omnisearch",
+    group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.omnisearch",
+    match: "primary_key",
     key: "k",
+    macDisplay: ["⌘", "K"],
+    otherDisplay: ["Ctrl", "K"],
   },
   {
     id: "keyboard_shortcuts",
+    group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.keyboard_shortcuts",
+    match: "primary_key",
     key: "/",
+    macDisplay: ["⌘", "/"],
+    otherDisplay: ["Ctrl", "/"],
+  },
+  {
+    id: "open_recents",
+    group: "navigation",
+    labelKey: "keyboard_shortcuts.shortcuts.open_recents",
+    match: "primary_shift_code",
+    code: "Comma",
+    macDisplay: ["⌘", "Shift", ","],
+    otherDisplay: ["Ctrl", "Shift", ","],
+  },
+  {
+    id: "expand_sidebar_recents",
+    group: "navigation",
+    labelKey: "keyboard_shortcuts.shortcuts.expand_sidebar_recents",
+    match: "primary_shift_code",
+    code: "Backslash",
+    macDisplay: ["⌘", "Shift", "\\"],
+    otherDisplay: ["Ctrl", "Shift", "\\"],
+  },
+  {
+    id: "open_settings",
+    group: "navigation",
+    labelKey: "keyboard_shortcuts.shortcuts.open_settings",
+    match: "primary_shift_code",
+    code: "Semicolon",
+    macDisplay: ["⌘", "Shift", ";"],
+    otherDisplay: ["Ctrl", "Shift", ";"],
+  },
+  {
+    id: "new_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.new_chat",
+    match: "primary_shift_code",
+    code: "Period",
+    macDisplay: ["⌘", "Shift", "."],
+    otherDisplay: ["Ctrl", "Shift", "."],
+  },
+  {
+    id: "delete_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.delete_focused_chat",
+    match: "primary_shift_code",
+    code: "KeyX",
+    macDisplay: ["⌘", "Shift", "X"],
+    otherDisplay: ["Ctrl", "Shift", "X"],
+  },
+  {
+    id: "rename_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.rename_focused_chat",
+    match: "code",
+    code: "F2",
+    macDisplay: ["F2"],
+    otherDisplay: ["F2"],
+  },
+  {
+    id: "toggle_pin_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.toggle_pin_focused_chat",
+    match: "primary_shift_code",
+    code: "Quote",
+    macDisplay: ["⌘", "Shift", "'"],
+    otherDisplay: ["Ctrl", "Shift", "'"],
+  },
+  {
+    id: "quick_jump",
+    group: "quick_jump",
+    labelKey: "keyboard_shortcuts.shortcuts.quick_jump",
+    match: "quick_jump",
+    macDisplay: ["⌘", "⌥", "1–9"],
+    otherDisplay: ["Ctrl", "Shift", "1–9"],
   },
 ];
 
@@ -32,21 +134,67 @@ function keyboardShortcut(id: KeyboardShortcutId): KeyboardShortcutDefinition {
   return shortcut;
 }
 
+function hasPrimaryModifier(event: KeyboardShortcutEvent): boolean {
+  return event.metaKey || event.ctrlKey;
+}
+
 export function matchesKeyboardShortcut(
   id: KeyboardShortcutId,
   event: KeyboardShortcutEvent,
 ): boolean {
   const shortcut = keyboardShortcut(id);
+  if (shortcut.match === "quick_jump") return false;
+
+  if (shortcut.match === "primary_key") {
+    return (
+      hasPrimaryModifier(event) &&
+      event.key.toLowerCase() === shortcut.key?.toLowerCase()
+    );
+  }
+
+  if (shortcut.match === "primary_shift_code") {
+    return (
+      hasPrimaryModifier(event) &&
+      event.shiftKey &&
+      !event.altKey &&
+      event.code === shortcut.code
+    );
+  }
+
   return (
-    (event.metaKey || event.ctrlKey) &&
-    event.key.toLowerCase() === shortcut.key
+    event.code === shortcut.code &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
   );
 }
 
 export function keyboardShortcutDisplay(
   id: KeyboardShortcutId,
   usesCommandKey: boolean,
-): readonly [string, string] {
+): readonly string[] {
   const shortcut = keyboardShortcut(id);
-  return [usesCommandKey ? "⌘" : "Ctrl", shortcut.key.toUpperCase()];
+  return usesCommandKey ? shortcut.macDisplay : shortcut.otherDisplay;
+}
+
+export function isQuickJumpModifierActive(
+  event: KeyboardShortcutEvent,
+  usesCommandKey: boolean,
+): boolean {
+  if (usesCommandKey) {
+    return event.metaKey && !event.ctrlKey;
+  }
+  return event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;
+}
+
+export function quickJumpIndexForEvent(
+  event: KeyboardShortcutEvent,
+  usesCommandKey: boolean,
+): number | null {
+  const modifierMatches = usesCommandKey
+    ? event.metaKey && event.altKey && !event.ctrlKey && !event.shiftKey
+    : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;
+  const match = /^Digit([1-9])$/.exec(event.code);
+  return modifierMatches && match ? Number(match[1]) - 1 : null;
 }
