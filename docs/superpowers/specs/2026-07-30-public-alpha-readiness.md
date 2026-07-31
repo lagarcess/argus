@@ -37,23 +37,35 @@ who walk through it.
    roughly $7/mo per service at the entry paid tier (verify current Render
    pricing at change time) plus usage-based Workflow compute; the PR
    records the chosen tiers and the actual monthly number. **The same
-   forced-move logic applies to Supabase, discovered 2026-07-31 during
-   the 29-migration production repair:** the production project sits on
-   Supabase's free tier, which has zero backup/PITR capability
-   (`pitr_enabled=false`, no completed backups). A production database
-   with no restore point is the same category of gap as an API on a
-   spin-down tier — incompatible with real production readiness, not a
-   one-off cost tied to this single migration. Upgrade to Supabase Pro
-   (roughly $25/mo, verify current pricing at change time) and record a
-   completed managed backup before public-alpha exposure. **Founder amendment
-   (2026-07-31):** the backup was explicitly waived as a prerequisite for the
-   exact 29-file legacy migration repair because this project still held no
-   real users or customer data. The accepted safety proof was an exact-state
-   disposable mirror, 124/124 database tests, file-scoped transactions,
-   fail-fast application, signature/RLS read-back, and one cleaned temporary-
-   user probe. This waiver does not waive the Supabase Pro readiness move and
-   does not authorize the later requested-role migration before its separate
-   paid Render control checks pass.
+   forced-move logic was initially thought to apply to Supabase the same
+   way it applies to Render — it does not, and this decision is now
+   corrected (2026-07-31, second amendment) rather than just narrowly
+   waived.** The production project sits on Supabase's free tier, zero
+   backup/PITR capability. That's a real gap eventually, but eventually
+   is the operative word: with no real users or customer data today,
+   there is nothing for a restore point to protect right now, and
+   Supabase Pro (~$25/mo, more than 3x Render's per-service bump) is real
+   recurring spend with no current beneficiary. Same principle already
+   applied to the domain purchase this cycle: don't front-load
+   infrastructure spend before it's actually needed. **Supabase stays on
+   free tier for the remainder of this lane.** Revisit the Pro upgrade
+   as its own decision closer to actual promotion/real user exposure —
+   it is explicitly NOT part of this lane's required scope, not a
+   blocker for anything below, and not something the builder should ask
+   the founder to authorize again absent new information (e.g. real user
+   data actually existing). The 29-file legacy migration repair already
+   completed under the narrower waiver recorded below; that waiver is now
+   superseded by this broader correction — nothing about Supabase's plan
+   tier gates any remaining work in this lane.
+   **Prior (now-superseded) waiver, kept for the record:** the backup was
+   explicitly waived as a prerequisite for the exact 29-file legacy
+   migration repair because this project held no real users or customer
+   data. The accepted safety proof was an exact-state disposable mirror,
+   124/124 database tests, file-scoped transactions, fail-fast
+   application, signature/RLS read-back, and one cleaned temporary-user
+   probe — that standard applies to any future production migration on
+   this project regardless of plan tier, including the requested-role and
+   post-batch omnisearch migrations below.
 2. **The load test runs on real infrastructure, not local/synthetic, before
    any tier decision.** Concurrency envelope, already scoped in the archived
    capacity doc: 1 job idle, 5 simultaneous globally, 2 queued same-user, 10
@@ -170,8 +182,11 @@ who walk through it.
    locally (2026-07-30):** the founder added `RESEND_API_KEY` and
    `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD=${RESEND_API_KEY}` to the shared
    integration `.env`, for local dev/testing only — this is NOT the
-   hosted Render secret, which is a separate, later value set via CLI per
-   section 4's ordering rule. Before relying on the local value, confirm
+   hosted Render secret, which is a separate, later value. **Explicit
+   authorization (2026-07-31): the builder may set this on Render via CLI
+   itself, same authority already granted for the OpenRouter keys in
+   decision 3 — this is not a founder-only action.** Copy the value from
+   the already-authorized local `.env` resolution. Before relying on the local value, confirm
    the `${RESEND_API_KEY}` reference actually resolved (value starts with
    `re_`) rather than trusting the literal string blindly — `.env`
    interpolation depends on the loader supporting it. (b) Autonomous
