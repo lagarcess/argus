@@ -28,7 +28,15 @@ who walk through it.
    horizontally through Workflows (already wired:
    `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`); the API only moves up a
    tier once it is lean and orchestration itself is the proven bottleneck —
-   never as a substitute for fixing the in-process coupling.
+   never as a substitute for fixing the in-process coupling. One move is
+   forced, not chosen: both services sit on Render's `free` plan today,
+   which spins down on idle — that spin-down IS the current
+   warm-up-per-session behavior. Standing 24/7 availability therefore
+   requires moving both `argus-api` and `argus-app` off `free` in this
+   lane; the load test decides WHICH paid tier, not whether. Expect
+   roughly $7/mo per service at the entry paid tier (verify current Render
+   pricing at change time) plus usage-based Workflow compute; the PR
+   records the chosen tiers and the actual monthly number.
 2. **The load test runs on real infrastructure, not local/synthetic, before
    any tier decision.** Concurrency envelope, already scoped in the archived
    capacity doc: 1 job idle, 5 simultaneous globally, 2 queued same-user, 10
@@ -108,6 +116,20 @@ who walk through it.
    deliberate friction floor: enough to filter typo/throwaway addresses on
    both the waitlist request and eventual registration, not enough to be a
    real barrier to a genuinely interested tester.
+9. **Email delivery must be provable without the founder in the loop.**
+   The founder will not be available to check an inbox during the build.
+   Two rules follow. (a) Send mechanism: the approval notification goes
+   through the already-configured Supabase→Resend SMTP path (prefer
+   Supabase's built-in admin invite email) — do not introduce a new
+   Resend API integration, SDK, or secret into the backend for this; if
+   the invite path genuinely cannot carry the approval flow, stop and
+   report rather than adding a send path. (b) Autonomous proof: verify
+   delivery by sending to Resend's test inbox (`delivered@resend.dev`)
+   and capturing the Resend dashboard/API email log showing the send
+   accepted and delivered — screenshot or API response attached to the
+   PR. This same recipe satisfies section 4's deferred live test-send;
+   no human inbox is part of the acceptance loop, and the founder
+   spot-checks the Resend log afterward at their leisure.
 
 ## 3. Reserved / parked scope
 
@@ -129,12 +151,14 @@ who walk through it.
 
 ## 4. Contract gates
 
-- `render.yaml` — `argus-api` plan/tier change once lean is verified; Render
-  Workflow concurrency settings documented alongside the change that sets
-  them (not necessarily in this same file, but recorded somewhere durable);
-  the two new OpenRouter env vars added (`sync: false`), replacing hosted
-  use of `OPENROUTER_API_KEY` per decision 3's topology — dashboard values
-  set before the deploy that reads them.
+- `render.yaml` — both services move off `free` (idle spin-down is
+  incompatible with 24/7 — decision 1), tier per service chosen from the
+  load-test numbers, monthly cost recorded in the PR; Render Workflow
+  concurrency settings documented alongside the change that sets them (not
+  necessarily in this same file, but recorded somewhere durable); the two
+  new OpenRouter env vars added (`sync: false`), replacing hosted use of
+  `OPENROUTER_API_KEY` per decision 3's topology — dashboard values set
+  before the deploy that reads them.
 - `.env.example` — document the three-var OpenRouter scheme so a fresh
   checkout knows `OPENROUTER_API_KEY` is dev-only.
 - Hosted Supabase Auth dashboard — explicitly confirm/set "Confirm email";
