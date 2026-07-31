@@ -28,6 +28,7 @@ const conversationDossier = {
   type: "conversation",
   id: "conversation-1",
   title: "Gold pullback ideas",
+  archived: false,
   matched_text: "Hold through earnings.",
   updated_at: "2026-07-29T18:00:00.000Z",
   conversation_id: "conversation-1",

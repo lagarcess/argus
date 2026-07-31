@@ -3123,7 +3123,10 @@ the `/search` contract.
 - `conversation_id`: optional repeated conversation id for bounded Recents
   dossier hydration. At most 50 ids are accepted. This mode requires empty
   `q`, no `cursor` or `decision_state`, and `limit` greater than or equal to
-  the number of unique requested ids.
+  the number of unique requested ids. Returned conversation rows include
+  canonical `archived` state so an already-open Recents surface can remove a
+  conversation archived elsewhere without hiding archived conversations from
+  ordinary Omnisearch.
 
 **Response:**
 ```json
@@ -3145,6 +3148,7 @@ the `/search` contract.
       "type": "conversation",
       "id": "uuid",
       "title": "Gold pullback ideas",
+      "archived": false,
       "matched_text": "Hold through earnings.",
       "updated_at": "timestamp",
       "conversation_id": "uuid",

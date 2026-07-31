@@ -681,6 +681,7 @@ class SearchItem(BaseModel):
     type: Literal["conversation"]
     id: str
     title: str
+    archived: bool
     matched_text: str
     updated_at: datetime
     conversation_id: str

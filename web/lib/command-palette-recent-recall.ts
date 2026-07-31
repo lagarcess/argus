@@ -93,7 +93,8 @@ export async function loadCommandPaletteRecentRecall({
   for (const item of response.items) {
     if (
       item.type === "conversation" &&
-      targetIds.has(item.conversation_id)
+      targetIds.has(item.conversation_id) &&
+      !item.archived
     ) {
       recalledById.set(item.conversation_id, item);
     }

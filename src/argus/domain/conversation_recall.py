@@ -439,6 +439,7 @@ def project_conversation_recall(
             type="conversation",
             id=conversation_id,
             title=title,
+            archived=bool(conversation.get("archived")),
             matched_text=match_fragment,
             updated_at=updated_at,
             conversation_id=conversation_id,

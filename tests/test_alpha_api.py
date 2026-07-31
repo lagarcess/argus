@@ -2527,6 +2527,14 @@ def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() 
         updated_at=now,
         deleted_at=now,
     )
+    archived_id = "00000000-0000-0000-0000-000000000780"
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id=archived_id,
+        title="Remotely archived conversation",
+        updated_at=now + timedelta(minutes=102),
+        archived=True,
+    )
     _store_search_conversation(
         user_id="00000000-0000-0000-0000-000000000999",
         conversation_id=foreign_id,
@@ -2552,8 +2560,13 @@ def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() 
         "/api/v1/search",
         params={
             "q": "",
-            "limit": 3,
-            "conversation_id": [target_id, deleted_id, foreign_id],
+            "limit": 4,
+            "conversation_id": [
+                target_id,
+                archived_id,
+                deleted_id,
+                foreign_id,
+            ],
             "include_ledger_groups": "true",
         },
     )
@@ -2562,12 +2575,15 @@ def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() 
     assert target_id not in {item["id"] for item in ranked.json()["items"]}
     assert recalled.status_code == 200
     payload = recalled.json()
-    assert [item["id"] for item in payload["items"]] == [target_id]
-    assert payload["items"][0]["title"] == "Visible active conversation"
-    assert payload["items"][0]["dossier"]["decision"] is None
-    assert payload["items"][0]["dossier"]["tested"]["run_count"] == 0
-    assert payload["items"][0]["dossier"]["outcome"] is None
-    assert payload["items"][0]["dossier"]["left_off"] is None
+    items_by_id = {item["id"]: item for item in payload["items"]}
+    assert set(items_by_id) == {target_id, archived_id}
+    assert items_by_id[target_id]["archived"] is False
+    assert items_by_id[archived_id]["archived"] is True
+    assert items_by_id[target_id]["title"] == "Visible active conversation"
+    assert items_by_id[target_id]["dossier"]["decision"] is None
+    assert items_by_id[target_id]["dossier"]["tested"]["run_count"] == 0
+    assert items_by_id[target_id]["dossier"]["outcome"] is None
+    assert items_by_id[target_id]["dossier"]["left_off"] is None
     assert payload["next_cursor"] is None
     assert len(payload["ledger_groups"]) == 4
 

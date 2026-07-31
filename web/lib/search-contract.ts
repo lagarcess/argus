@@ -42,6 +42,7 @@ export type SearchConversationItem<TDecision extends string> = {
   type: "conversation";
   id: string;
   title: string;
+  archived: boolean;
   matched_text: string;
   updated_at: string;
   conversation_id: string;

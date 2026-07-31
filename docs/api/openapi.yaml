@@ -2805,6 +2805,8 @@ components:
           type: string
         title:
           type: string
+        archived:
+          type: boolean
         matched_text:
           type: string
         updated_at:
@@ -2843,6 +2845,7 @@ components:
       - type
       - id
       - title
+      - archived
       - matched_text
       - updated_at
       - conversation_id

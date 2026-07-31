@@ -54,6 +54,12 @@ def test_search_declares_bounded_visible_conversation_recall(
         ],
         "title": "Conversation Id",
     }
+    search_item = generated["components"]["schemas"]["SearchItem"]
+    assert search_item["properties"]["archived"] == {
+        "type": "boolean",
+        "title": "Archived",
+    }
+    assert "archived" in search_item["required"]
 
 
 def test_prefix_appears_exactly_once_per_public_operation(

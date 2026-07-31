@@ -15,6 +15,7 @@ function conversationItem(id: string): SearchConversationItem {
     type: "conversation",
     id,
     title: `Conversation ${id}`,
+    archived: false,
     matched_text: `Preview ${id}`,
     updated_at: "2026-07-30T12:00:00.000Z",
     conversation_id: id,
@@ -205,6 +206,45 @@ describe("command palette Recent dossier recall", () => {
         item.type === "conversation" ? item.conversation_id : item.type,
       ),
     ).toEqual(["recent-a", "recent-b"]);
+  });
+
+  test("reconciles a concurrently archived Recent without hiding it from ordinary search", async () => {
+    const archived = {
+      ...conversationItem("archived-in-another-tab"),
+      archived: true,
+    };
+    const result = await loadCommandPaletteRecentRecall({
+      recentItems: [
+        historyItem("recent-a"),
+        historyItem("archived-in-another-tab"),
+        historyItem("recent-b"),
+      ],
+      fetchRecall: async () => ({
+        items: [
+          conversationItem("recent-b"),
+          archived,
+          conversationItem("recent-a"),
+        ],
+        next_cursor: null,
+        ledger_groups: [
+          { decision_state: "watching", count: 1 },
+        ],
+      }),
+    });
+
+    expect(result?.recentItems.map((item) => item.conversation_id)).toEqual([
+      "recent-a",
+      "recent-b",
+    ]);
+    expect(
+      result?.items.map((item) =>
+        item.type === "conversation" ? item.conversation_id : item.type,
+      ),
+    ).toEqual(["recent-a", "recent-b"]);
+    expect(result?.recalledConversationIds).toEqual(["recent-a", "recent-b"]);
+    expect(result?.ledger_groups).toEqual([
+      { decision_state: "watching", count: 1 },
+    ]);
   });
 
   test("decision refresh retains current rows instead of restoring a locally removed row", () => {
