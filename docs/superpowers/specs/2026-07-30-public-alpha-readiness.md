@@ -126,42 +126,56 @@ who walk through it.
   literal acceptance signal for locked decision 3.
 - `private_alpha_allowlist` — migration for whatever pending/requested state
   the waitlist needs; no new table.
+- `docs/API_CONTRACT.md` + OpenAPI artifact — the waitlist "request access"
+  capture needs a new public endpoint. The existing `POST /auth/signup`
+  creates a full Supabase auth user and rejects non-allowlisted emails
+  outright; a request-access flow instead needs to record a pending row on
+  `private_alpha_allowlist` without creating an auth account, for a visitor
+  who isn't allowlisted yet. That's a new endpoint, not a repurposing of
+  `/auth/signup` — document it and regenerate the OpenAPI artifact as part
+  of this lane. This was missing from the original contract-gates pass and
+  is the one real API-contract item this spec introduces.
 - Frontend conversion-wall copy — EN/es-419, screenshots required before the
   PR counts as ready.
 
 ## 5. Execution contract
 
-This is infrastructure and product surface together, not one feature — it
-ships as two phases, not one PR:
+**PR shape: one PR delivering the whole spec.** Phase 1 and Phase 2 land as
+separate commits inside it, not separate PRs — matching how the other lanes
+this cycle shipped (spec as first commit, slices as commits, one PR).
 
-**Phase 1 — independent, can run and land in any order:**
+**Phase 1 commits — independent of Phase 2, can land in any commit order:**
 - Load test execution against real infra + written-up results.
 - Capacity split configuration (API tier + Workflow concurrency).
 - Spend cap configuration (OpenRouter dashboard + the two-key code change,
   or the documented single-key interim).
 
-Each of these can be its own PR or dashboard change; none blocks the others.
-
-**Phase 2 — depends on Phase 1's spend cap being live:**
+**Phase 2 commits — sequenced after Phase 1's spend cap is live** (a real
+OpenRouter dashboard state, not a code dependency, but still a genuine
+safety ordering: don't widen the door before the spend cap exists):
+- New `POST` endpoint for waitlist request capture (see the API-contract
+  gate above) + `private_alpha_allowlist` migration.
 - Conversion-wall copy change (request-access framing ahead of the existing
   `AuthForm`/`GuestConversionModal` signup form for non-allowlisted
   visitors — the form itself is not being rebuilt, it already works for
   allowlisted emails).
-- Waitlist request capture (the `private_alpha_allowlist` pending state).
-- Approval notification (requires Phase 1's Resend SMTP configuration).
+- Approval notification (Resend SMTP is already configured — see section 4).
 
-This is the smaller of the two phases and can likely be one PR — smaller
-still than originally scoped, since the account-creation backend and UI
-already exist end to end for allowlisted users.
+This is the smaller of the two phases in surface area, since the
+account-creation backend and UI already exist end to end for allowlisted
+users — but it does add one new endpoint, which is why the API-contract
+gate above matters.
 
-**Proof required before either phase's PR counts as ready:** whichever
-gates from section 4 it touches are actually done (dashboard settings
-verified, not assumed); EN/es-419 for anything user-facing; screenshots for
-the conversion-wall change; the load test's actual numbers written up
-(section 2) for Phase 1.
+**Proof required before the PR counts as ready:** every gate from section 4
+actually done (dashboard settings verified, not assumed; OpenAPI
+regenerated); EN/es-419 for anything user-facing; screenshots for the
+conversion-wall change; the load test's actual numbers written up
+(section 2); the live test-send (section 4) confirmed against a running
+instance before this PR is called done, even though it isn't a
+precondition to starting the work.
 
-**Where it stops:** a Draft or posted PR per phase, same as every other lane
-this cycle. The founder merges. The founder alone flips
+**Where it stops:** a Draft or posted PR, same as every other lane this
+cycle. The founder merges. The founder alone flips
 `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` later, manually, once locked decision 6's
 criterion is actually observed — this is never something a PR, a script, or
 an agent decides on its own.
