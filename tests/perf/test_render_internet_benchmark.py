@@ -124,6 +124,19 @@ def test_extract_confirmation_run_action_uses_backend_action_shape() -> None:
     assert action == {"type": "run_backtest", "payload": {"symbol": "AAPL"}}
 
 
+def test_run_action_headers_bind_idempotency_to_confirmation() -> None:
+    module = _load_benchmark_module()
+
+    headers = module._run_action_headers(
+        {
+            "type": "run_backtest",
+            "payload": {"confirmation_id": "confirmation-123"},
+        }
+    )
+
+    assert headers == {"Idempotency-Key": "confirmation-123"}
+
+
 def test_extract_run_reference_prefers_async_backtest_job() -> None:
     module = _load_benchmark_module()
 

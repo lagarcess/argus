@@ -627,6 +627,53 @@ def test_wait_for_capacity_lower_ceiling_preserves_best_observed_sample(
     }
 
 
+def test_public_case_stops_immediately_when_no_submission_is_admitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+
+    def _submission_failure(**_: Any) -> module.SubmittedRun:
+        raise httpx.HTTPStatusError(
+            "request failed",
+            request=httpx.Request("POST", "https://api.example.test/api/v1/chat/stream"),
+            response=httpx.Response(
+                400,
+                request=httpx.Request(
+                    "POST", "https://api.example.test/api/v1/chat/stream"
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(module, "_submit_run", _submission_failure)
+    monkeypatch.setattr(
+        module,
+        "_wait_for_capacity",
+        lambda **_: pytest.fail("zero admitted submissions must not enter capacity wait"),
+    )
+
+    with pytest.raises(
+        module.CapacityEnvelopeStop, match="submission_failed"
+    ) as exc_info:
+        module._run_public_case(
+            config=SimpleNamespace(timeout_seconds=600.0, poll_seconds=0.25),
+            service_client=object(),
+            case_id="idle_one",
+            prepared=[
+                module.PreparedRun(
+                    client=object(),
+                    conversation_id="conversation-1",
+                    action={
+                        "type": "run_backtest",
+                        "payload": {"confirmation_id": "confirmation-1"},
+                    },
+                )
+            ],
+        )
+
+    assert exc_info.value.reason == "submission_failed"
+    assert exc_info.value.observed_capacity == {"running": 0, "queued": 0}
+
+
 def test_probe_case_polls_task_and_job_to_retry_terminal_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

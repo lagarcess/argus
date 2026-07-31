@@ -27,6 +27,7 @@ try:
     from scripts.benchmarks.render_internet_benchmark import (
         _conversation_id,
         _poll_backtest_job,
+        _run_action_headers,
         _stream_chat,
         _timed_json_request,
         extract_confirmation_run_action,
@@ -37,6 +38,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from render_internet_benchmark import (
         _conversation_id,
         _poll_backtest_job,
+        _run_action_headers,
         _stream_chat,
         _timed_json_request,
         extract_confirmation_run_action,
@@ -437,6 +439,12 @@ def _run_public_case(
                     submitted.append((item, result))
                 else:
                     failures.append(result)
+            if not submitted and failures:
+                raise CapacityEnvelopeStop(
+                    case_id=case_id,
+                    reason="submission_failed",
+                    observed_capacity={"running": 0, "queued": 0},
+                )
             job_ids = {run.job_id for _, run in submitted}
             rows = _fetch_jobs(service_client, job_ids)
             _observe_capacity_sample(case_id, observed, rows)
@@ -608,6 +616,7 @@ def _submit_run(
             "language": "en",
         },
         timeout_seconds=config.timeout_seconds,
+        headers=_run_action_headers(prepared.action),
     )
     parsed = parse_sse_events(stream["text"])
     if not parsed.done:
