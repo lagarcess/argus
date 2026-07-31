@@ -124,7 +124,11 @@ export function DecisionEditor({
           </button>
         ))}
       </div>
+      <label htmlFor="command-palette-decision-note" className="sr-only">
+        {t("command_palette.decision_note_editor_label", "Decision note")}
+      </label>
       <textarea
+        id="command-palette-decision-note"
         value={note}
         maxLength={2000}
         disabled={saving}

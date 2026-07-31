@@ -319,4 +319,27 @@ describe("decision editor", () => {
     // the two-character escape sequence; the controlled value is unchanged.
     expect(html).toContain("First line\\nSecond line");
   });
+
+  test("associates the decision note textarea with an explicit label", () => {
+    const html = renderToStaticMarkup(
+      <DecisionEditor
+        action={decisionAction}
+        decisionState="watching"
+        note=""
+        saving={false}
+        error={false}
+        onDecisionStateChange={() => {}}
+        onNoteChange={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(html).toContain(
+      '<label for="command-palette-decision-note" class="sr-only">Decision note</label>',
+    );
+    expect(html).toMatch(
+      /<textarea[^>]*id="command-palette-decision-note"[^>]*placeholder="Optional note for future you"/,
+    );
+  });
 });

@@ -15,6 +15,7 @@
     "src/argus/agent_runtime/stages/interpret.py": 3159,
     "web/components/chat/ChatInterface.tsx": 2523,
     "src/argus/domain/supabase_gateway.py": 2038,
+    "web/components/sidebar/ChatCommandPalette.tsx": 1910,
     "src/argus/agent_runtime/stages/explain.py": 1574,
     "src/argus/api/routers/agent.py": 1393,
     "src/argus/agent_runtime/stages/interpret_internal/asset_resolution.py": 1302,
