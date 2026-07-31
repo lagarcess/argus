@@ -121,6 +121,82 @@ def test_memory_asset_prefix_resolution_uses_a_bounded_sorted_window() -> None:
         assert symbols.lookups <= max_lookups
 
 
+def test_memory_asset_rollup_is_precomputed_once_per_search_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+    conversation_id = "conversation-popular-asset-history"
+    _owned_conversation(
+        conversation_id=conversation_id,
+        title="Popular asset history",
+    )
+
+    def _store_run(index: int) -> None:
+        run = BacktestRun(
+            id=f"run-popular-asset-{index:03d}",
+            conversation_id=conversation_id,
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["AAPL"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={},
+            conversation_result_card={"title": f"AAPL result {index}"},
+            created_at=now + timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user.id
+
+    for index in range(200):
+        _store_run(index)
+
+    first = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="AAPL",
+        source_limit=1,
+        include_conversation_rows=False,
+    )
+    assert first.asset_rollup is not None
+    assert first.asset_rollup.run_count == 200
+
+    def _fail_if_lineage_is_revisited(_: object) -> datetime:
+        raise AssertionError("asset lineage was traversed again at query time")
+
+    with monkeypatch.context() as query_patch:
+        query_patch.setattr(
+            memory_search_candidates,
+            "_mapping_activity",
+            _fail_if_lineage_is_revisited,
+        )
+        second = memory_search_candidates.bounded_memory_search_snapshot(
+            store=api_state.store,
+            user=user,
+            query="AAP",
+            source_limit=1,
+            include_conversation_rows=False,
+        )
+
+    assert second.asset_rollup is not None
+    assert second.asset_rollup.symbol == "AAPL"
+    assert second.asset_rollup.run_count == 200
+
+    _store_run(200)
+    refreshed = memory_search_candidates.bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query="AAP",
+        source_limit=1,
+        include_conversation_rows=False,
+    )
+
+    assert refreshed.asset_rollup is not None
+    assert refreshed.asset_rollup.run_count == 201
+
+
 def test_memory_search_bounds_message_candidates_and_copies_outside_finalization_lock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -159,7 +235,6 @@ def test_memory_search_bounds_message_candidates_and_copies_outside_finalization
         return []
 
     monkeypatch.setattr(search_assembly, "_project_rows", _capture_rows)
-    monkeypatch.setattr(search_assembly, "project_asset_rollup", lambda **_: None)
     original_builder = memory_search_candidates._build_memory_search_index
 
     def _counted_builder(**kwargs: Any) -> Any:

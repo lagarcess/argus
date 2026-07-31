@@ -9,7 +9,6 @@ from argus.api import state as api_state
 from argus.api.memory_search_candidates import bounded_memory_search_snapshot
 from argus.api.schemas import SearchAssetRollup, SearchItem, User
 from argus.domain.conversation_recall import (
-    project_asset_rollup,
     project_conversation_recall,
 )
 
@@ -67,12 +66,7 @@ def memory_search_read(
             if include_conversation_rows
             else []
         ),
-        asset_rollup=project_asset_rollup(
-            runs=snapshot.asset_runs,
-            evidence=snapshot.asset_evidence,
-            decisions=snapshot.asset_decisions,
-            query=query,
-        ),
+        asset_rollup=snapshot.asset_rollup,
         ledger_counts=snapshot.ledger_counts,
     )
 

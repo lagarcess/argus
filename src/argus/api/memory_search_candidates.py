@@ -24,10 +24,11 @@ from argus.api.memory_search_postings import (
     posting_candidate_might_match,
     ranked_groups,
 )
-from argus.api.schemas import User
+from argus.api.schemas import SearchAssetRollup, User
 from argus.api.search_utils import score_search_item, search_rank_key
 from argus.domain.conversation_recall import (
     conversation_has_untaken_suggestion,
+    project_asset_rollup,
     valid_next_experiments_metadata,
 )
 from argus.domain.search_text import (
@@ -57,9 +58,7 @@ class MemorySearchSnapshot:
     evidence: list[dict[str, Any]]
     decisions: list[dict[str, Any]]
     messages: list[dict[str, Any]]
-    asset_runs: list[dict[str, Any]]
-    asset_evidence: list[dict[str, Any]]
-    asset_decisions: list[dict[str, Any]]
+    asset_rollup: SearchAssetRollup | None
     ledger_counts: dict[str, int] | None
 
 
@@ -102,11 +101,8 @@ class _MemorySearchIndex:
     conversation_ids_by_title: dict[str, RankedGroups]
     conversation_ids_by_symbol: dict[str, RankedGroups]
     conversation_ids_by_decision_state: dict[str, RankedGroups]
-    run_by_id: dict[str, dict[str, Any]]
-    evidence_by_run: dict[str, list[dict[str, Any]]]
-    decisions_by_evidence: dict[str, list[dict[str, Any]]]
     asset_symbols: tuple[str, ...]
-    asset_run_ids: dict[str, frozenset[str]]
+    asset_rollups_by_symbol: dict[str, SearchAssetRollup]
     conversation_activity_by_id: dict[str, datetime]
     conversation_symbols_by_id: dict[str, frozenset[str]]
     ledger_index: MemoryLedgerIndex
@@ -197,17 +193,6 @@ def bounded_memory_search_snapshot(
             )
 
     resolved_symbol = _resolve_asset_symbol(index, query=query)
-    asset_run_ids = (
-        index.asset_run_ids.get(resolved_symbol, frozenset())
-        if resolved_symbol is not None
-        else frozenset()
-    )
-    asset_evidence = [
-        artifact
-        for run_id in asset_run_ids
-        for artifact in index.evidence_by_run.get(run_id, [])
-    ]
-    asset_evidence_ids = {str(artifact["id"]) for artifact in asset_evidence}
     ledger_counts = (
         _ledger_counts(
             index,
@@ -252,21 +237,11 @@ def bounded_memory_search_snapshot(
             for message_id in selected_message_ids
             if message_id in index.messages_by_id
         ],
-        asset_runs=sorted(
-            (
-                index.run_by_id[run_id]
-                for run_id in asset_run_ids
-                if run_id in index.run_by_id
-            ),
-            key=_mapping_activity,
-            reverse=True,
+        asset_rollup=(
+            index.asset_rollups_by_symbol.get(resolved_symbol)
+            if resolved_symbol is not None
+            else None
         ),
-        asset_evidence=asset_evidence,
-        asset_decisions=[
-            decision
-            for evidence_id in asset_evidence_ids
-            for decision in index.decisions_by_evidence.get(evidence_id, [])
-        ],
         ledger_counts=ledger_counts,
     )
 
@@ -471,7 +446,6 @@ def _build_memory_search_index(
     run_by_id = {str(row["id"]): row for row in runs}
     evidence_by_run = _group_rows(evidence, field="source_run_id")
     decisions_by_evidence = _group_rows(decisions, field="evidence_artifact_id")
-    asset_display_symbol: dict[str, str] = {}
     asset_run_ids: defaultdict[str, set[str]] = defaultdict(set)
     for run in sorted(runs, key=_mapping_activity, reverse=True):
         if run.get("status") != "completed":
@@ -480,8 +454,32 @@ def _build_memory_search_index(
             normalized = normalize_search_symbol(symbol)
             if normalized is None:
                 continue
-            asset_display_symbol.setdefault(normalized, str(symbol))
             asset_run_ids[normalized].add(str(run["id"]))
+    asset_rollups_by_symbol: dict[str, SearchAssetRollup] = {}
+    for symbol, run_ids in asset_run_ids.items():
+        asset_runs = sorted(
+            (run_by_id[run_id] for run_id in run_ids if run_id in run_by_id),
+            key=_mapping_activity,
+            reverse=True,
+        )
+        asset_evidence = [
+            artifact
+            for run_id in run_ids
+            for artifact in evidence_by_run.get(run_id, [])
+        ]
+        asset_evidence_ids = {str(artifact["id"]) for artifact in asset_evidence}
+        rollup = project_asset_rollup(
+            runs=asset_runs,
+            evidence=asset_evidence,
+            decisions=[
+                decision
+                for evidence_id in asset_evidence_ids
+                for decision in decisions_by_evidence.get(evidence_id, [])
+            ],
+            query=symbol,
+        )
+        if rollup is not None:
+            asset_rollups_by_symbol[symbol] = rollup
     decision_states_by_conversation: defaultdict[str, set[str]] = defaultdict(set)
     for decision in decisions:
         conversation_id = decision.get("source_conversation_id")
@@ -615,14 +613,8 @@ def _build_memory_search_index(
             state: ranked_groups(conversation_ids)
             for state, conversation_ids in conversation_ids_by_decision_state.items()
         },
-        run_by_id=run_by_id,
-        evidence_by_run=evidence_by_run,
-        decisions_by_evidence=decisions_by_evidence,
-        asset_symbols=tuple(sorted(asset_display_symbol)),
-        asset_run_ids={
-            symbol: frozenset(run_ids)
-            for symbol, run_ids in asset_run_ids.items()
-        },
+        asset_symbols=tuple(sorted(asset_rollups_by_symbol)),
+        asset_rollups_by_symbol=asset_rollups_by_symbol,
         conversation_activity_by_id=conversation_activity_by_id,
         conversation_symbols_by_id=conversation_symbols_by_id,
         ledger_index=ledger_index,
