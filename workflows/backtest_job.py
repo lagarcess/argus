@@ -1513,7 +1513,7 @@ class PostgresBacktestJobGateway:
                     where id = %(job_id)s
                       and user_id = %(user_id)s
                       and (
-                        %(expected_status)s is null
+                        %(expected_status)s::text is null
                         or status = %(expected_status)s
                       )
                     returning *

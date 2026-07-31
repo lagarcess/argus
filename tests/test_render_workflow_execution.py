@@ -428,6 +428,57 @@ def test_postgres_backtest_job_gateway_disables_pooled_prepared_statements(
     assert captured["prepare_threshold"] is None
 
 
+def test_postgres_failed_update_types_nullable_expected_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            captured["query"] = " ".join(query.split())
+            captured["params"] = params
+
+        def fetchone(self) -> dict[str, object]:
+            return {"id": "job-1", "status": "failed"}
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    row = gateway.mark_backtest_job_failed(
+        user_id="user-1",
+        job_id="job-1",
+        failure_code="invalid_job_contract",
+        failure_detail="execution_failed",
+        retryable=False,
+        expected_status=None,
+    )
+
+    assert row["status"] == "failed"
+    assert "%(expected_status)s::text is null" in str(captured["query"])
+
+
 def test_postgres_backtest_job_gateway_waits_for_capacity_before_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
