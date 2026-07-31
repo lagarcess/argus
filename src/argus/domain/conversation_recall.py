@@ -4,7 +4,7 @@ import json
 import re
 from collections import deque
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 from argus.api.schemas import (
@@ -29,6 +29,7 @@ from argus.domain.evidence import (
     decision_recall_preview,
     evidence_preview_from_payload,
 )
+from argus.domain.retest_setup import retest_setup_from_run
 from argus.domain.search_text import (
     normalize_search_symbol,
     normalize_search_text,
@@ -55,28 +56,6 @@ _LAYER_BY_RANK: dict[int, SearchMatchLayer] = {
     6: "decision",
 }
 _NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
-_RUN_FRESH_STRATEGIES = {
-    "buy_and_hold",
-    "dca_accumulation",
-    "indicator_threshold",
-    "signal_strategy",
-}
-_RUN_FRESH_CADENCES = {
-    "daily",
-    "weekly",
-    "biweekly",
-    "monthly",
-    "quarterly",
-}
-_RUN_FRESH_PARAMETER_KEYS = (
-    "indicator",
-    "indicator_period",
-    "entry_threshold",
-    "exit_threshold",
-    "fast_period",
-    "slow_period",
-    "moving_average_type",
-)
 _ISO_FRACTION_RE = re.compile(
     r"^(?P<prefix>.*\d{2}:\d{2}:\d{2}\.)"
     r"(?P<fraction>\d{1,6})"
@@ -701,129 +680,34 @@ def _run_fresh_action(
     run: Mapping[str, Any] | None,
     language: str,
 ) -> SearchRunFreshAction | None:
-    if run is None:
-        return None
-    run_id = _text(run.get("id"))
-    config = _config(run)
-    resolved_strategy = _mapping(config.get("resolved_strategy"))
-    resolved_parameters = _mapping(config.get("resolved_parameters"))
-    resolved_engine_config = _mapping(resolved_parameters.get("engine_config"))
-    snapshot_engine_config = _mapping(config.get("engine_config"))
-    strategy_type = _text(
-        resolved_strategy.get("strategy_type") or config.get("template")
-    )
-    if strategy_type not in _RUN_FRESH_STRATEGIES or run_id is None:
-        return None
-
-    symbols = _run_symbols(run)
-    asset_class = _text(
-        resolved_strategy.get("asset_class") or run.get("asset_class")
-    )
-    timeframe = _text(resolved_parameters.get("timeframe") or config.get("timeframe"))
-    benchmark_symbol = _text(
-        resolved_parameters.get("benchmark_symbol")
-        or config.get("benchmark_symbol")
-        or run.get("benchmark_symbol")
-    )
-    original_start, original_end = _run_date_span(run)
-    if (
-        not symbols
-        or asset_class not in {"equity", "crypto", "currency_pair"}
-        or timeframe is None
-        or benchmark_symbol is None
-        or original_start is None
-        or original_end is None
-        or original_end < original_start
-    ):
-        return None
-
-    sizing_mode = _text(resolved_parameters.get("sizing_mode"))
-    capital_amount = _number(
-        resolved_parameters.get("capital_amount")
-        or config.get("starting_capital")
-        or config.get("capital_amount")
-    )
-    position_size = _number(resolved_parameters.get("position_size"))
-    if sizing_mode is None:
-        sizing_mode = "position_size" if position_size is not None else "capital_amount"
-    if sizing_mode == "capital_amount":
-        position_size = None
-    elif sizing_mode == "position_size":
-        capital_amount = None
-    else:
-        return None
-    cadence = _text(resolved_parameters.get("cadence") or config.get("cadence"))
-    if strategy_type == "dca_accumulation":
-        if cadence not in _RUN_FRESH_CADENCES:
-            return None
-        recurring_contribution = _consistent_number(
-            resolved_parameters.get("recurring_contribution"),
-            resolved_engine_config.get("recurring_contribution"),
-            snapshot_engine_config.get("recurring_contribution"),
-        )
-        starting_principal = _consistent_number(
-            resolved_parameters.get("starting_principal"),
-            resolved_engine_config.get("starting_principal"),
-            snapshot_engine_config.get("starting_principal"),
-            allow_zero=True,
-        )
-        if (
-            recurring_contribution is None
-            or starting_principal != 0
-            or capital_amount != recurring_contribution
-        ):
-            return None
-    else:
-        cadence = None
-        recurring_contribution = None
-        starting_principal = None
-
-    today = date.today()
-    current_start = today - timedelta(days=(original_end - original_start).days)
-    parameters = {
-        key: resolved_parameters[key]
-        for key in _RUN_FRESH_PARAMETER_KEYS
-        if key in resolved_parameters
-        and isinstance(resolved_parameters[key], (str, int, float, bool))
-    }
-    execution_realism_valid, execution_realism = _consistent_mapping(
-        resolved_engine_config.get("_execution_realism"),
-        snapshot_engine_config.get("_execution_realism"),
-        resolved_parameters.get("_execution_realism"),
-        resolved_parameters.get("execution_realism"),
-        config.get("_execution_realism"),
-    )
-    if not execution_realism_valid:
+    setup = retest_setup_from_run(run, today=date.today())
+    if setup is None or run is None:
         return None
     try:
-        setup = SearchRunFreshSetup(
-            strategy_type=strategy_type,
-            symbols=symbols,
-            asset_class=asset_class,
-            timeframe=timeframe,
-            date_range={"start": current_start, "end": today},
-            sizing_mode=sizing_mode,
-            capital_amount=capital_amount,
-            position_size=position_size,
-            cadence=cadence,
-            recurring_contribution=recurring_contribution,
-            starting_principal=starting_principal,
-            benchmark_symbol=benchmark_symbol,
-            entry_rule=_mapping_or_none(resolved_strategy.get("entry_rule")),
-            exit_rule=_mapping_or_none(resolved_strategy.get("exit_rule")),
-            rule_spec=_mapping_or_none(
-                resolved_strategy.get("rule_spec")
-                or resolved_parameters.get("rule_spec")
-                or config.get("rule_spec")
-            ),
-            parameters=parameters,
-            execution_realism=execution_realism,
+        canonical_setup = SearchRunFreshSetup(
+            strategy_type=setup.strategy_type,
+            symbols=list(setup.symbols),
+            asset_class=setup.asset_class,
+            timeframe=setup.timeframe,
+            date_range={"start": setup.start, "end": setup.end},
+            sizing_mode=setup.sizing_mode,
+            capital_amount=setup.capital_amount,
+            position_size=setup.position_size,
+            cadence=setup.cadence,
+            recurring_contribution=setup.recurring_contribution,
+            starting_principal=setup.starting_principal,
+            benchmark_symbol=setup.benchmark_symbol,
+            entry_rule=setup.entry_rule,
+            exit_rule=setup.exit_rule,
+            rule_spec=setup.rule_spec,
+            parameters=setup.parameters,
+            execution_realism=setup.execution_realism,
         )
         return SearchRunFreshAction(
-            source_run_id=run_id,
+            source_run_id=setup.source_run_id,
             run_label=_run_label(run),
-            canonical_setup=setup,
-            send_text=_run_fresh_send_text(setup=setup, language=language),
+            canonical_setup=canonical_setup,
+            send_text=_run_fresh_send_text(setup=canonical_setup, language=language),
         )
     except ValueError:
         return None
@@ -993,51 +877,10 @@ def _mapping(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
-def _mapping_or_none(value: object) -> dict[str, Any] | None:
-    return dict(value) if isinstance(value, Mapping) else None
-
-
-def _consistent_mapping(*values: object) -> tuple[bool, dict[str, Any] | None]:
-    present = [value for value in values if value is not None]
-    if not present:
-        return True, None
-    if any(not isinstance(value, Mapping) for value in present):
-        return False, None
-    mappings = [dict(cast(Mapping[str, Any], value)) for value in present]
-    if any(value != mappings[0] for value in mappings[1:]):
-        return False, None
-    return True, mappings[0]
-
-
-def _consistent_number(
-    *values: object,
-    allow_zero: bool = False,
-) -> float | None:
-    present = [value for value in values if value is not None]
-    if not present:
-        return None
-    parsed = [
-        _nonnegative_number(value) if allow_zero else _number(value)
-        for value in present
-    ]
-    if any(value is None for value in parsed):
-        return None
-    numbers = cast(list[float], parsed)
-    if any(value != numbers[0] for value in numbers[1:]):
-        return None
-    return numbers[0]
-
-
 def _number(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return float(value) if value > 0 else None
-
-
-def _nonnegative_number(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value) if value >= 0 else None
 
 
 def _run_search_text(run: Mapping[str, Any]) -> str:
