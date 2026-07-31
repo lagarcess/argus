@@ -451,6 +451,13 @@
     "saved": "Saved",
     "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "activity_rail": {
+      "aria_label": "Conversation activity",
+      "backtest_completed": "Backtest finished",
+      "needs_attention": "Needed attention",
+      "needs_attention_body": "This turn hit an issue and offered a way forward.",
+      "jump_hint": "Click to jump to this turn"
+    },
     "backtest_job": {
       "queued_title": "Backtest queued",
       "queued_status": "Queued",

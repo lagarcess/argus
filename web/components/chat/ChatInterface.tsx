@@ -18,6 +18,7 @@ import ChatSidebar, {
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
@@ -53,6 +54,7 @@ import {
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
+import { deriveConversationRailTicks } from "@/lib/conversation-rail";
 import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
@@ -909,6 +911,20 @@ export default function ChatInterface() {
     shouldAutoScrollRef.current = true;
     setShowJumpToLatest(false);
   };
+
+  const activityRailTicks = useMemo(
+    () => deriveConversationRailTicks(messages),
+    [messages],
+  );
+
+  const handleActivityRailSelect = useCallback((messageId: string) => {
+    const element = messageElementRefs.current.get(messageId);
+    if (!element) return;
+    element.scrollIntoView({ block: "center", behavior: "smooth" });
+    element.focus({ preventScroll: true });
+    shouldAutoScrollRef.current = false;
+    setShowJumpToLatest(true);
+  }, []);
 
   useLayoutEffect(() => {
     const pendingAnchor = pendingMessageAnchorRef.current;
@@ -2506,6 +2522,12 @@ export default function ChatInterface() {
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
+
+                <ConversationActivityRail
+                  ticks={activityRailTicks}
+                  totalMessages={messages.length}
+                  onSelectTick={handleActivityRailSelect}
+                />
 
                 {/* Input fade + bar */}
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
