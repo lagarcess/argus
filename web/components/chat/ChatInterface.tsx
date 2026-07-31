@@ -54,7 +54,11 @@ import {
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
-import { deriveConversationRailTicks } from "@/lib/conversation-rail";
+import {
+  useTranscriptTurnAnchor,
+  type PendingMessageAnchor,
+  type PendingScrollRestore,
+} from "@/components/chat/useTranscriptTurnAnchor";
 import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
@@ -301,14 +305,8 @@ export default function ChatInterface() {
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
   const authenticatedUserIdRef = useRef<string | null>(null);
   const readyTranscriptConversationIdRef = useRef<string | null>(null);
-  const pendingScrollRestoreRef = useRef<{
-    conversationId: string;
-    scrollTop: number | null;
-  } | null>(null);
-  const pendingMessageAnchorRef = useRef<{
-    conversationId: string;
-    messageId: string;
-  } | null>(null);
+  const pendingScrollRestoreRef = useRef<PendingScrollRestore>(null);
+  const pendingMessageAnchorRef = useRef<PendingMessageAnchor>(null);
   const messageElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -912,57 +910,18 @@ export default function ChatInterface() {
     setShowJumpToLatest(false);
   };
 
-  const activityRailTicks = useMemo(
-    () => deriveConversationRailTicks(messages),
-    [messages],
-  );
-
-  const handleActivityRailSelect = useCallback((messageId: string) => {
-    const element = messageElementRefs.current.get(messageId);
-    if (!element) return;
-    element.scrollIntoView({ block: "center", behavior: "smooth" });
-    element.focus({ preventScroll: true });
-    shouldAutoScrollRef.current = false;
-    setShowJumpToLatest(true);
-  }, []);
-
-  useLayoutEffect(() => {
-    const pendingAnchor = pendingMessageAnchorRef.current;
-    if (
-      pendingAnchor &&
-      pendingAnchor.conversationId === conversationId &&
-      pendingAnchor.conversationId === activeConversationIdRef.current
-    ) {
-      const element = messageElementRefs.current.get(pendingAnchor.messageId);
-      if (element) {
-        element.scrollIntoView({ block: "center" });
-        element.focus({ preventScroll: true });
-        pendingMessageAnchorRef.current = null;
-        pendingScrollRestoreRef.current = null;
-        shouldAutoScrollRef.current = false;
-        setShowJumpToLatest(true);
-        return;
-      }
-    }
-    const pending = pendingScrollRestoreRef.current;
-    const container = scrollContainerRef.current;
-    if (
-      !pending ||
-      !container ||
-      pending.conversationId !== conversationId ||
-      pending.conversationId !== activeConversationIdRef.current
-    ) {
-      return;
-    }
-    container.scrollTop = pending.scrollTop ?? container.scrollHeight;
-    pendingScrollRestoreRef.current = null;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current =
-      pending.scrollTop === null ? true : isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  }, [conversationId, messages]);
+  const { anchorToTurn } = useTranscriptTurnAnchor({
+    conversationId,
+    messages,
+    jumpToLatestThresholdPx: JUMP_TO_LATEST_THRESHOLD_PX,
+    activeConversationIdRef,
+    pendingMessageAnchorRef,
+    pendingScrollRestoreRef,
+    messageElementRefs,
+    scrollContainerRef,
+    shouldAutoScrollRef,
+    setShowJumpToLatest,
+  });
 
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
@@ -2524,9 +2483,8 @@ export default function ChatInterface() {
                 </div>
 
                 <ConversationActivityRail
-                  ticks={activityRailTicks}
-                  totalMessages={messages.length}
-                  onSelectTick={handleActivityRailSelect}
+                  messages={messages}
+                  onSelectTick={anchorToTurn}
                 />
 
                 {/* Input fade + bar */}

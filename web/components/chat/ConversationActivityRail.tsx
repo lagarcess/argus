@@ -15,6 +15,7 @@ import type {
 } from "@/lib/conversation-rail";
 import {
   conversationRailVisible,
+  deriveConversationRailTicks,
   INITIAL_RAIL_DWELL_STATE,
   RAIL_PREVIEW_DWELL_MS,
   railDwellReducer,
@@ -22,10 +23,10 @@ import {
   railTickOffsets,
 } from "@/lib/conversation-rail";
 import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import type { Message } from "@/components/chat/types";
 
 type ConversationActivityRailProps = {
-  ticks: ConversationRailTick[];
-  totalMessages: number;
+  messages: Message[];
   onSelectTick: (messageId: string) => void;
 };
 
@@ -42,11 +43,12 @@ const KIND_LABEL_CLASSES: Record<ConversationRailTickKind, string> = {
 };
 
 export default function ConversationActivityRail({
-  ticks,
-  totalMessages,
+  messages,
   onSelectTick,
 }: ConversationActivityRailProps) {
   const { t } = useTranslation();
+  const ticks = useMemo(() => deriveConversationRailTicks(messages), [messages]);
+  const totalMessages = messages.length;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const columnRef = useRef<HTMLElement | null>(null);
   const awakeRef = useRef(false);

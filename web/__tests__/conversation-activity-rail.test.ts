@@ -283,13 +283,17 @@ describe("rail source discipline", () => {
     "utf-8",
   );
   const libSource = readFileSync(join(root, "lib/conversation-rail.ts"), "utf-8");
+  const anchorSource = readFileSync(
+    join(root, "components/chat/useTranscriptTurnAnchor.ts"),
+    "utf-8",
+  );
   const interfaceSource = readFileSync(
     join(root, "components/chat/ChatInterface.tsx"),
     "utf-8",
   );
 
   test("rail makes zero backend or provider calls", () => {
-    for (const source of [componentSource, libSource]) {
+    for (const source of [componentSource, libSource, anchorSource]) {
       expect(source).not.toContain("fetch(");
       expect(source).not.toContain("streamChatMessage");
       expect(source).not.toContain("openrouter");
@@ -334,9 +338,12 @@ describe("rail source discipline", () => {
 
   test("chat interface mounts the rail and jumps within the same transcript", () => {
     expect(interfaceSource).toContain("<ConversationActivityRail");
-    expect(interfaceSource).toContain("deriveConversationRailTicks(messages)");
-    expect(interfaceSource).toMatch(
-      /handleActivityRailSelect[\s\S]{0,400}messageElementRefs\.current\.get\(messageId\)[\s\S]{0,200}scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/,
+    expect(interfaceSource).toContain("onSelectTick={anchorToTurn}");
+    expect(interfaceSource).toContain("useTranscriptTurnAnchor({");
+    expect(interfaceSource).not.toContain("deriveConversationRailTicks");
+    expect(componentSource).toContain("deriveConversationRailTicks(messages)");
+    expect(anchorSource).toMatch(
+      /anchorToTurn[\s\S]{0,300}messageElementRefs\.current\.get\(messageId\)[\s\S]{0,200}scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/,
     );
   });
 });
