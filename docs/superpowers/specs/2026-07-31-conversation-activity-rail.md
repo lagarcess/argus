@@ -25,9 +25,17 @@ transcript to that turn.
    decision, does not browse other conversations' runs — that is
    Omnisearch/#309's job. This must not duplicate or compete with the
    dossier-history surface #309 is actively building.
-2. Ticks represent a small, fixed set of turn kinds — backtest completion,
-   decision saved, error/recovery — not a place for freeform annotation or
-   a new taxonomy.
+2. **Ticks represent a small, fixed set of turn kinds — but that exact set
+   is not locked here, and should not be invented.** Argus already has an
+   established typed-outcome taxonomy from #304 (Quick take, Explain
+   result, Try next, recoverable/retryable failure) plus the decision-
+   state concept from #253/#309. Before implementing, propose a tick
+   taxonomy grounded in what already exists — do not build against an
+   arbitrary guessed list, and do not turn this into a place for freeform
+   annotation or a brand-new taxonomy invented for this feature alone.
+   Report the proposed set before finalizing if it's not obvious which of
+   the existing typed outcomes deserve a tick versus being too frequent/
+   minor for a coarse-grained rail.
 3. Hover-preview must not fire on incidental contact — this is the exact
    bug Codex's own users are hitting (instant-fire on first touch, sitting
    in the normal path between two frequently-used regions). Two founder-
