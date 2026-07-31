@@ -67,6 +67,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
+import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
   clearActiveConversationPointer,
   isCurrentAnchoredConversationRequest,
@@ -703,21 +704,15 @@ export default function ChatInterface() {
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
-        const anchorMessage = snapshot.find(
-          (message) =>
-            message.id === requestedMessageId ||
-            message.transcriptAnchorIds?.includes(requestedMessageId),
-        );
-        if (!anchorMessage) {
-          throw new Error("Transcript anchor was not returned.");
-        }
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
         readyTranscriptConversationIdRef.current = targetConversationId;
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
-          messageId: anchorMessage.id,
+          messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
         setMessages(snapshot);

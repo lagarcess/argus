@@ -72,6 +72,19 @@ export function retireSupersededFailures(messages: Message[]): Message[] {
   return retired;
 }
 
+export function projectedTranscriptAnchorId(
+  messages: Message[],
+  requestedMessageId: string,
+): string | null {
+  return (
+    messages.find(
+      (message) =>
+        message.id === requestedMessageId ||
+        message.transcriptAnchorIds?.includes(requestedMessageId),
+    )?.id ?? null
+  );
+}
+
 function normalizedContent(message: Message): string {
   return (message.content ?? "").split(/\s+/).join(" ").trim().toLowerCase();
 }
