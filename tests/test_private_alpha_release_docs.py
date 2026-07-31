@@ -167,6 +167,71 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "HTTP `202`" not in runbook_text.split("### Waitlist rollback floor", 1)[1]
 
 
+def test_waitlist_exposure_waits_for_paid_render_rollback_controls() -> None:
+    evidence = " ".join(
+        _source("docs/release-evidence/public-alpha-readiness.md").split()
+    )
+    runbook = " ".join(_source("docs/PRIVATE_LAUNCH_RUNBOOK.md").split())
+    blueprint = _source("render.yaml")
+    api_service = blueprint.split("name: argus-api", 1)[1].split("\n  - type:", 1)[0]
+
+    assert "plan: free" in api_service
+    assert (
+        "The checked-in Render Blueprint still declares `argus-api` as "
+        "`plan: free`." in evidence
+    )
+    assert (
+        "Do not apply "
+        "`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` "
+        "and do not accept access-request traffic while `argus-api` is on "
+        "Render's Free instance type." in evidence
+    )
+    assert (
+        "Rollback below `061ba50e` is forbidden on the Free instance type"
+        in evidence
+    )
+    assert "read back a paid API instance type from Render's control plane" in evidence
+    assert "`serviceDetails.plan != free`" in evidence
+    assert "prove maintenance mode is available and can be enabled" in evidence
+    assert "private-network, SSH, or local-loopback verification capability" in evidence
+    assert "later load-test-selected API tier change" in evidence
+    assert (
+        "If any paid capability is absent, stop: do not apply the migration and "
+        "do not expose the route." in evidence
+    )
+    assert (
+        "Only after every paid-control check passes may the requested-role "
+        "migration be applied and access-request traffic be exposed." in evidence
+    )
+    for official_reference in (
+        "https://render.com/docs/free",
+        "https://render.com/docs/private-network",
+        "https://render.com/docs/ssh",
+    ):
+        assert official_reference in evidence
+
+    paid_plan_index = evidence.index(
+        "read back a paid API instance type from Render's control plane"
+    )
+    maintenance_index = evidence.index(
+        "prove maintenance mode is available and can be enabled"
+    )
+    private_surface_index = evidence.index(
+        "private-network, SSH, or local-loopback verification capability"
+    )
+    exposure_index = evidence.index(
+        "Only after every paid-control check passes may the requested-role migration"
+    )
+    assert paid_plan_index < maintenance_index < private_surface_index < exposure_index
+
+    assert "The checked-in `argus-api` plan remains `free`" in runbook
+    assert "migration and access-request exposure remain blocked" in runbook
+    assert "paid API instance type" in runbook
+    assert "maintenance and private/SSH/local verification controls" in runbook
+    assert "later load-test-selected API tier change" in runbook
+    assert "rollback below `061ba50e` is forbidden on `free`" in runbook
+
+
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     ownership = runbook.split("## Render Environment Ownership", 1)[1].split(

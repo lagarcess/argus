@@ -4,6 +4,49 @@ This file is the durable evidence index for the public-alpha candidate. Local
 checks recorded here do not claim a hosted launch. Exact-SHA Render canary and
 founder approval remain required before tester exposure.
 
+## Waitlist paid-control precondition
+
+The checked-in Render Blueprint still declares `argus-api` as `plan: free`.
+That remains intentional until load testing selects the API instance type, but
+it is not safe for the requested-role migration or waitlist exposure. Render
+documents that [maintenance mode is available only on paid web
+services](https://render.com/docs/maintenance-mode), [Free web services cannot
+receive private-network traffic](https://render.com/docs/private-network), and
+[Free web services do not support shell or SSH
+access](https://render.com/docs/ssh). Render's [Free instance
+limitations](https://render.com/docs/free) confirm the same operational gaps.
+
+Do not apply
+`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` and
+do not accept access-request traffic while `argus-api` is on Render's Free
+instance type. Rollback below `061ba50e` is forbidden on the Free instance type
+because verified maintenance, worker quiescence, and private route-absence
+proof are unavailable.
+
+Before applying that migration or exposing the route:
+
+1. Use an out-of-band service readback to read back a paid API instance type
+   from Render's control plane for `argus-api`. Record the returned plan and
+   require `serviceDetails.plan != free`.
+2. With access-request traffic still unexposed, prove maintenance mode is
+   available and can be enabled. Enable it, read back
+   `serviceDetails.maintenanceMode.enabled=true`, and require the exact HTTP
+   `503` plus configured maintenance-page marker or fingerprint on every public
+   API domain.
+3. Verify actual private-network, SSH, or local-loopback verification
+   capability. Either require HTTP `200` from `/health` through the paid
+   service's internal hostname, or open an authenticated Render shell/SSH
+   session and require HTTP `200` from the service's local `/health` endpoint.
+   Record the successful surface; a documented entitlement without a working
+   probe is not proof.
+
+The later load-test-selected API tier change will satisfy the planned
+paid-instance transition only if these capability checks also pass. It does
+not need to happen earlier solely for this repository checkpoint. If any paid
+capability is absent, stop: do not apply the migration and do not expose the
+route. Only after every paid-control check passes may the requested-role
+migration be applied and access-request traffic be exposed.
+
 ## Waitlist rollback floor
 
 Commit `061ba50e` is the fail-closed behavior and minimum safe rollback floor
