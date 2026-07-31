@@ -43,6 +43,24 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
    - Lean toward a **richer, slightly muted register** — deeper jewel
      tones rather than bright, fully-saturated primary-adjacent colors,
      which read as louder/candy-like and less sophisticated.
+   - **Ground the palette in Argus's actual documented design system,
+     not an invented standalone system.** `.agent/designs/argus/DESIGN.md`
+     section 2 already defines a "Semantic (Muted Alpha Palette)" — seven
+     desaturated tones (muted rose, clay red, muted teal, emerald mist,
+     soft blue, slate indigo, dusty gold), explicitly documented as
+     avoiding "casino-terminal vibrancy." This is close to exactly the
+     register already asked for above — use it as the grounding
+     reference, not a reason to invent something disconnected from
+     Argus's real brand.
+   - **Decided: do not reuse those seven tokens directly.** They carry
+     semantic meaning elsewhere (danger, warning, success, info, neutral)
+     — a "danger"-rose avatar reading as an error state to anyone who's
+     internalized that color's meaning in Argus is a real collision, not
+     a theoretical one. Derive a **new** avatar-specific set in the same
+     tonal family and desaturation register as the documented semantic
+     palette — same design language, distinct hues from anything that
+     already signifies a concrete state. Exact final count/list (6-8, per
+     decision 2) doesn't need to land in one shot; propose it and iterate.
    - Render and screenshot the new set before finalizing — this is a
      visual quality bar, verify it visually, don't just describe it.
 9. **Superseded again, final answer: a focused centered submodal reached
