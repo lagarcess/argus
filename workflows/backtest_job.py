@@ -1021,7 +1021,12 @@ class PostgresBacktestJobGateway:
         import psycopg
         from psycopg.rows import dict_row
 
-        return psycopg.connect(self.database_url, autocommit=True, row_factory=dict_row)
+        return psycopg.connect(
+            self.database_url,
+            autocommit=True,
+            prepare_threshold=None,
+            row_factory=dict_row,
+        )
 
     @contextmanager
     def _connection(self) -> Any:

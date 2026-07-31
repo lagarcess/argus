@@ -402,6 +402,32 @@ def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     assert connect_calls == 1
 
 
+def test_postgres_backtest_job_gateway_disables_pooled_prepared_statements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+    sentinel = object()
+
+    def fake_connect(database_url: str, **kwargs: object) -> object:
+        captured["database_url"] = database_url
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(psycopg, "connect", fake_connect)
+    gateway = PostgresBacktestJobGateway("postgres://pooled-example")
+
+    connection = gateway._connect()
+
+    assert connection is sentinel
+    assert captured["database_url"] == "postgres://pooled-example"
+    assert captured["autocommit"] is True
+    assert captured["prepare_threshold"] is None
+
+
 def test_postgres_backtest_job_gateway_waits_for_capacity_before_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
