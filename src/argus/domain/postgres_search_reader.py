@@ -2588,6 +2588,7 @@ select
     latest_run.payload as latest_run_payload,
     latest_evidence.payload as latest_evidence_payload,
     latest_run_decision.payload as latest_run_decision_payload,
+    latest_recall_decision.payload as latest_recall_decision_payload,
     latest_result_message.payload as latest_result_message_payload
 from public.conversations as conversation
 left join lateral (
@@ -2760,6 +2761,31 @@ left join lateral (
     order by offer.created_at desc, offer.id desc
     limit 1
 ) as latest_suggestion on true
+left join lateral (
+    select jsonb_build_object(
+        'id', decision.id,
+        'idea_id', decision.idea_id,
+        'idea_version_id', decision.idea_version_id,
+        'evidence_artifact_id', decision.evidence_artifact_id,
+        'source_conversation_id', decision.source_conversation_id,
+        'decision_state', decision.decision_state,
+        'note', decision.note,
+        'created_at', decision.created_at,
+        'updated_at', decision.updated_at,
+        'source_run_id', evidence.source_run_id,
+        'artifact_title', evidence.title,
+        'artifact_digest', evidence.digest,
+        'artifact_payload', evidence.payload
+    ) as payload
+    from public.decision_notes as decision
+    left join public.evidence_artifacts as evidence
+      on evidence.id = decision.evidence_artifact_id
+     and evidence.user_id = %(user_id)s
+    where decision.user_id = %(user_id)s
+      and decision.source_conversation_id = conversation.id
+    order by decision.updated_at desc, decision.id desc
+    limit 1
+) as latest_recall_decision on true
 left join lateral (
     select jsonb_build_object(
         'id', evidence.id,
@@ -3179,8 +3205,18 @@ def _hydrate_conversation_recall(
         latest_evidence = row.get("latest_evidence_payload")
         if isinstance(latest_evidence, dict):
             hydrated["evidence"].append(latest_evidence)
-        latest_decision = row.get("latest_run_decision_payload")
-        if isinstance(latest_decision, dict):
+        seen_decision_ids: set[str] = set()
+        for key in (
+            "latest_recall_decision_payload",
+            "latest_run_decision_payload",
+        ):
+            latest_decision = row.get(key)
+            if not isinstance(latest_decision, dict):
+                continue
+            decision_id = str(latest_decision.get("id") or "")
+            if not decision_id or decision_id in seen_decision_ids:
+                continue
+            seen_decision_ids.add(decision_id)
             hydrated["decisions"].append(latest_decision)
         latest_result_message = row.get("latest_result_message_payload")
         if isinstance(latest_result_message, dict):

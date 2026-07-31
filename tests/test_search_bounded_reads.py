@@ -236,6 +236,44 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
     assert pool.acquisition_timeouts == [2.0]
 
 
+def test_search_hydrates_latest_recall_decision_without_a_run_dossier() -> None:
+    reader_type, _ = _reader_types()
+    hydration = _hydration_row()
+    hydration["latest_run_payload"] = None
+    hydration["latest_evidence_payload"] = None
+    hydration["latest_run_decision_payload"] = None
+    hydration["latest_result_message_payload"] = None
+    hydration["latest_recall_decision_payload"] = {
+        "id": "00000000-0000-0000-0000-000000000501",
+        "source_conversation_id": CONVERSATION_ID,
+        "evidence_artifact_id": "00000000-0000-0000-0000-000000000302",
+        "decision_state": "promising",
+        "note": "Search decision.",
+        "artifact_digest": "Search decision evidence",
+        "updated_at": ACTIVITY_AT,
+    }
+    pool = _RecordingPool(
+        [
+            [_conversation_candidate()],
+            [hydration],
+        ]
+    )
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="search",
+        source_limit=4,
+    )
+
+    assert result.rows["runs"] == []
+    assert result.rows["evidence"] == []
+    assert result.rows["decisions"] == [
+        hydration["latest_recall_decision_payload"]
+    ]
+    hydration_sql = pool.cursor.executions[1][0]
+    assert "latest_recall_decision_payload" in str(hydration_sql)
+
+
 def test_search_visible_id_recall_is_one_bounded_hydration_and_one_ledger_read() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool(
