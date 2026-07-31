@@ -188,8 +188,12 @@ describe("guest conversion contract", () => {
       "utf-8",
     );
     expect(modal).toContain("publicAccountAccessEnabled");
-    expect(modal).toContain("mode=\"login\"");
-    expect(modal).toContain("mode=\"signup\"");
+    expect(modal).toContain(
+      'publicAccountAccessEnabled ? initialMode : "request"',
+    );
+    expect(modal).toContain("allowModeSwitch={publicAccountAccessEnabled}");
+    expect(modal).toContain("<RequestAccess");
+    expect(modal).toContain("mode={mode}");
   });
 
   test("derives the New-chat auth mode from server-owned public access truth", () => {

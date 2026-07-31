@@ -962,6 +962,20 @@
     "no_source_conversation": "Sin conversación de origen"
   },
   "auth": {
+    "access_request": {
+      "title": "Solicita acceso a Argus",
+      "description": "Argus está en alfa pública. Comparte tu correo y te avisaremos cuando puedas crear una cuenta.",
+      "email_label": "Correo electrónico",
+      "submit": "Solicitar acceso",
+      "submitting": "Solicitando acceso...",
+      "accepted_title": "Solicitud recibida",
+      "accepted_description": "Gracias. Recibimos tu solicitud. Si se aprueba el acceso, te enviaremos por correo el siguiente paso.",
+      "approved_prompt": "¿Ya recibiste aprobación?",
+      "approved_action": "Regístrate",
+      "existing_prompt": "¿Ya tienes una cuenta?",
+      "existing_action": "Inicia sesión",
+      "error": "No pudimos enviar tu solicitud. Inténtalo de nuevo."
+    },
     "login": {
       "brand": "argus",
       "subtitle": "Inicia sesion para continuar",

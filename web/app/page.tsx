@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthForm, {
   type AuthFormSubmission,
 } from "@/components/auth/AuthForm";
+import RequestAccess from "@/components/auth/RequestAccess";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import GuestEntry from "@/components/guest/GuestEntry";
 import { useTranslation } from "react-i18next";
@@ -21,12 +22,14 @@ import {
 } from "@/lib/landing-entry";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
 
-type AuthMode = "intro" | "signup" | "login";
+type AuthMode = "intro" | "request" | "signup" | "login";
 
 function authModeFromLocation(): AuthMode {
   if (typeof window === "undefined") return "intro";
   const mode = new URLSearchParams(window.location.search).get("auth");
-  return mode === "signup" || mode === "login" ? mode : "intro";
+  return mode === "request" || mode === "signup" || mode === "login"
+    ? mode
+    : "intro";
 }
 
 function skipAuthenticatedRedirect(): boolean {
@@ -35,6 +38,7 @@ function skipAuthenticatedRedirect(): boolean {
   const authMode = params.get("auth");
   return (
     params.get("preview") === "true" ||
+    authMode === "request" ||
     authMode === "signup" ||
     authMode === "login"
   );
@@ -85,6 +89,7 @@ export default function LandingPage() {
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", nextUrl);
   };
+  const showRequest = () => updateAuthMode("request");
   const showSignup = () => updateAuthMode("signup");
   const showLogin = () => updateAuthMode("login");
 
@@ -154,18 +159,25 @@ export default function LandingPage() {
           {authMode === "intro" ? (
             <button
               type="button"
-              onClick={showSignup}
+              onClick={showRequest}
               className="font-display flex w-full max-w-sm items-center justify-center rounded-[9999px] bg-black px-[32px] py-[14px] text-[16px] font-medium text-white transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:bg-white dark:text-black dark:focus-visible:ring-white"
             >
-              {t('landing.sign_up_email')}
+              {t("auth.access_request.submit")}
             </button>
           ) : (
             <div className="w-full max-w-sm">
-              <AuthForm
-                mode={isSignup ? "signup" : "login"}
-                onModeChange={(mode) => updateAuthMode(mode)}
-                onSubmit={handleAuthSubmit}
-              />
+              {authMode === "request" ? (
+                <RequestAccess
+                  onShowSignup={showSignup}
+                  onShowLogin={showLogin}
+                />
+              ) : (
+                <AuthForm
+                  mode={isSignup ? "signup" : "login"}
+                  onModeChange={(mode) => updateAuthMode(mode)}
+                  onSubmit={handleAuthSubmit}
+                />
+              )}
             </div>
           )}
 

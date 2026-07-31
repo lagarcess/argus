@@ -962,6 +962,20 @@
     "no_source_conversation": "No source conversation"
   },
   "auth": {
+    "access_request": {
+      "title": "Request access to Argus",
+      "description": "Argus is in public alpha. Share your email and we’ll let you know when you can create an account.",
+      "email_label": "Email address",
+      "submit": "Request access",
+      "submitting": "Requesting access...",
+      "accepted_title": "Request received",
+      "accepted_description": "Thanks — we received your request. If access is approved, we’ll email you with the next step.",
+      "approved_prompt": "Already approved?",
+      "approved_action": "Sign up",
+      "existing_prompt": "Already have an account?",
+      "existing_action": "Sign in",
+      "error": "We couldn’t send your request. Please try again."
+    },
     "login": {
       "brand": "argus",
       "subtitle": "Sign in to continue",
