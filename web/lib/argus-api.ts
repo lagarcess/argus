@@ -19,7 +19,7 @@ import {
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
-import { acquireGuestCaptchaToken } from "./guest-captcha";
+import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -668,22 +668,6 @@ export async function getStarterPrompts() {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-
-async function acquirePasswordAuthCaptchaToken(): Promise<string> {
-  try {
-    const token = (await acquireGuestCaptchaToken()).trim();
-    if (!token || token.length > 4096) {
-      throw new Error("captcha_token_out_of_bounds");
-    }
-    return token;
-  } catch {
-    const error = new Error(
-      "The browser security check could not be completed.",
-    ) as Error & { code: string };
-    error.code = "captcha_unavailable";
-    throw error;
-  }
-}
 
 export async function signupWithEmail(payload: {
   email: string;
