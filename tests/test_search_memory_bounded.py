@@ -454,6 +454,76 @@ def test_memory_search_preserves_text_rank_at_equal_conversation_activity() -> N
     assert ranked[0][1].id == target_id
 
 
+def test_memory_search_casefolds_stored_symbols_for_exact_rank() -> None:
+    user = api_state.store.get_or_create_dev_user()
+    now = datetime.now(timezone.utc)
+    symbol_conversation_id = "conversation-expanding-casefold-symbol"
+    object_conversation_id = "conversation-normal-object-match"
+
+    _owned_conversation(
+        conversation_id=symbol_conversation_id,
+        title="Unrelated symbol conversation",
+    )
+    _owned_conversation(
+        conversation_id=object_conversation_id,
+        title="Unrelated object conversation",
+    )
+
+    symbol_run = BacktestRun(
+        id="run-expanding-casefold-symbol",
+        conversation_id=symbol_conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class="currency_pair",
+        symbols=["ẞ/EUR"],
+        allocation_method="equal_weight",
+        benchmark_symbol="ẞ/EUR",
+        metrics={},
+        config_snapshot={},
+        conversation_result_card={"title": "Expanding casefold result"},
+        created_at=now,
+    )
+    api_state.store.backtest_runs[symbol_run.id] = symbol_run
+    api_state.store.backtest_run_owners[symbol_run.id] = user.id
+
+    object_match = EvidenceArtifact(
+        id="evidence-normal-object-match",
+        idea_id="idea-normal-object-match",
+        idea_version_id="version-normal-object-match",
+        source_conversation_id=object_conversation_id,
+        source_run_id="run-normal-object-match",
+        lifecycle="captured",
+        title="Ordinary evidence",
+        digest="Review ss/eur in this artifact.",
+        payload={},
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.evidence_artifacts[object_match.id] = object_match
+    api_state.store.evidence_artifact_owners[object_match.id] = user.id
+
+    read = search_assembly.memory_search_read(
+        user=user,
+        query="ss/eur",
+        source_limit=2,
+    )
+    ranked = sorted(
+        read.scored_items,
+        key=lambda pair: search_rank_key(
+            score=pair[0],
+            kind=pair[1].type,
+            updated_at=pair[1].updated_at,
+            item_id=pair[1].id,
+        ),
+        reverse=True,
+    )
+
+    assert [item.id for _, item in ranked] == [
+        symbol_conversation_id,
+        object_conversation_id,
+    ]
+
+
 def test_memory_search_counts_winning_layer_when_page_is_full() -> None:
     user = api_state.store.get_or_create_dev_user()
     now = datetime.now(timezone.utc)

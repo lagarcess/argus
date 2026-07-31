@@ -507,10 +507,14 @@ def _build_memory_search_index(
     }
     conversation_symbols_by_id = {
         conversation_id: frozenset(
-            symbol.lower()
+            normalized_symbol
             for run in runs_by_conversation.get(conversation_id, [])
             if run.get("status", "completed") == "completed"
             for symbol in _run_symbols(run)
+            if (
+                normalized_symbol := normalize_search_symbol(symbol)
+            )
+            is not None
         )
         for conversation_id in conversation_activity_by_id
     }
