@@ -37,6 +37,11 @@ from argus.llm.openrouter import (
     openrouter_profile_for_task,
     openrouter_structured_model_candidates,
 )
+from argus.llm.openrouter_key_policy import (
+    openrouter_traffic_class,
+    resolve_openrouter_api_key,
+)
+from fastapi import FastAPI
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -46,6 +51,148 @@ def _provider_fixture_mode(monkeypatch: pytest.MonkeyPatch):
     clear_asset_cache()
     yield
     clear_asset_cache()
+
+
+def test_local_openrouter_uses_dev_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-key")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "hosted-registered")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "hosted-guest")
+
+    assert resolve_openrouter_api_key("registered") == "dev-key"
+    assert resolve_openrouter_api_key("guest") == "dev-key"
+
+
+def test_hosted_registered_uses_registered_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+
+    assert resolve_openrouter_api_key("registered") == "registered-key"
+
+
+def test_hosted_guest_uses_guest_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "preview")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+
+    assert resolve_openrouter_api_key("guest") == "guest-key"
+
+
+def test_hosted_registered_never_falls_back_to_dev_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.delenv("ARGUS_PROD_OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="ARGUS_PROD_OPENROUTER_API_KEY"):
+        resolve_openrouter_api_key("registered")
+
+
+def test_hosted_guest_never_falls_back_to_dev_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.delenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
+    ):
+        resolve_openrouter_api_key("guest")
+
+
+def test_openrouter_traffic_class_nested_scope_resets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+
+    with openrouter_traffic_class("guest"):
+        assert resolve_openrouter_api_key() == "guest-key"
+        with openrouter_traffic_class("registered"):
+            assert resolve_openrouter_api_key() == "registered-key"
+        assert resolve_openrouter_api_key() == "guest-key"
+
+    with pytest.raises(RuntimeError, match="traffic class"):
+        resolve_openrouter_api_key()
+
+
+def test_openrouter_factory_uses_hosted_traffic_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeChatOpenRouter.calls.clear()
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "test/model")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    with openrouter_traffic_class("guest"):
+        model = openrouter.build_openrouter_model("interpretation")
+
+    assert model is not None
+    assert FakeChatOpenRouter.calls[-1]["openrouter_api_key"] == "guest-key"
+
+
+def test_provider_asset_preflight_uses_hosted_traffic_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.interpreter.asset_resolution_context import (
+        _provider_asset_context_preflight_enabled,
+    )
+
+    def invoke_schema() -> None:
+        return None
+
+    invoke_schema.__module__ = "argus.llm.openrouter"
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+
+    with openrouter_traffic_class("guest"):
+        assert _provider_asset_context_preflight_enabled(
+            "test/model",
+            invoke_schema=invoke_schema,
+        )
+
+
+@pytest.mark.asyncio
+async def test_api_lifespan_validates_openrouter_before_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import app_setup
+    from argus.api import state as api_state
+
+    events: list[str] = []
+    monkeypatch.setattr(
+        app_setup,
+        "validate_hosted_openrouter_configuration",
+        lambda: events.append("validate"),
+        raising=False,
+    )
+    monkeypatch.setattr(api_state, "CHECKPOINTER_MODE", "memory")
+    monkeypatch.setattr(api_state, "PERSISTENCE_MODE", "memory")
+    monkeypatch.setattr(
+        api_state,
+        "build_agent_runtime_checkpointer",
+        lambda: events.append("persistence") or object(),
+    )
+    app = FastAPI()
+
+    async with app_setup.lifespan(app):
+        pass
+
+    assert events == ["validate", "persistence"]
 
 
 def _structured_model_candidates(*_: Any, **__: Any) -> list[str]:

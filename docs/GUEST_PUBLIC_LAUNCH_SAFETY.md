@@ -44,7 +44,10 @@ because messages and simulations still reset with a new Guest UUID.
   and global backpressure.
 - Keep visitor-owned discovery metering and configure its global attempted-
   search ceiling.
-- Add a hard provider spending limit before public exposure.
+- Keep hosted OpenRouter traffic split across hard weekly key limits:
+  `$10/week` for registered production traffic and `$5/week` for Guest traffic.
+  The OpenRouter dashboard state is the live control; checked-in configuration
+  only enforces key separation and fail-loud startup.
 - Keep launch monitoring manual until traffic makes automation worthwhile.
 - Defer human deduplication, device fingerprinting, enterprise bot products,
   and a custom abuse platform.
@@ -108,7 +111,8 @@ message, refinement, feedback submission, or simulation.
 - Global backtest capacity and queue backpressure.
 - Bounded request bodies and typed server-side capability enforcement.
 - Complete-graph cleanup with converted/permanent-account protection.
-- A hard provider-key spending limit for the public environment.
+- Hard weekly OpenRouter key limits for both registered (`$10/week`) and Guest
+  (`$5/week`) hosted traffic; the OpenRouter dashboard remains the live control.
 - The visitor-owned discovery allowance, bounded retention, and global daily
   attempted-search circuit breaker.
 - Guest presentation and server kill switches with the preserved auth landing.
@@ -175,9 +179,9 @@ boundary ineffective.
       daily grounded searches.
 - [ ] Confirm the global ceiling stops further discovery with zero provider
       calls.
-- [ ] Use a dedicated provider key or public-environment key with a hard USD
-      spending limit.
-- [ ] Record the maximum acceptable unattended daily loss: `$________`.
+- [ ] Confirm the registered production key remains capped at `$10/week` and
+      the Guest key remains capped at `$5/week` in the live OpenRouter dashboard.
+- [ ] Record the maximum acceptable unattended weekly loss: `$15`.
 - [ ] Disable or bound automatic credit top-up for that key.
 - [ ] Confirm provider-limit exhaustion fails safely without inventing an
       Argus answer or settling successful usage.

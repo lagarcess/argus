@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from contextlib import ExitStack, contextmanager
 from datetime import date, datetime, timezone
 from math import isfinite
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from argus.api.schemas import BacktestRun, EvidenceArtifact, Idea, IdeaVersion
@@ -19,6 +19,10 @@ from argus.domain.backtest_finalization import (
     stable_backtest_run_id,
 )
 from argus.domain.evidence import CapturedEvidence
+from argus.llm.openrouter_key_policy import (
+    OpenRouterTrafficClass,
+    openrouter_traffic_class,
+)
 from argus.observability.cost_ledger import (
     normalize_cost_ledger_entry,
     persist_openrouter_cost_ledger_entries,
@@ -150,6 +154,7 @@ def run_backtest_job(
             job_id=job_id,
             workflow_run_id=workflow_run_id,
         )
+    traffic_class = _openrouter_traffic_class_from_job(row)
 
     user_id = _required_str(row, "user_id")
     conversation_id = _required_str(row, "conversation_id")
@@ -228,12 +233,15 @@ def run_backtest_job(
             dict(explanation_context) if isinstance(explanation_context, dict) else {}
         )
         phase_started = time.perf_counter()
-        result_readout, result_readout_receipts = _safe_result_readout_with_receipts(
-            request=request,
-            envelope=envelope,
-            result_card=result_card,
-            explanation_context=explanation_context_dict,
-        )
+        with openrouter_traffic_class(traffic_class):
+            result_readout, result_readout_receipts = (
+                _safe_result_readout_with_receipts(
+                    request=request,
+                    envelope=envelope,
+                    result_card=result_card,
+                    explanation_context=explanation_context_dict,
+                )
+            )
         timings.record_elapsed("result_readout_total", phase_started)
 
         from argus.domain.backtest_run_builder import build_backtest_run_from_result
@@ -599,6 +607,17 @@ def _job_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {}
     return dict(raw)
+
+
+def _openrouter_traffic_class_from_job(
+    row: Mapping[str, Any],
+) -> OpenRouterTrafficClass:
+    traffic_class = _job_metadata(row).get("openrouter_traffic_class")
+    if traffic_class not in {"guest", "registered"}:
+        raise WorkflowBacktestJobError(
+            "run_backtest_job requires execution_metadata.openrouter_traffic_class."
+        )
+    return cast(OpenRouterTrafficClass, traffic_class)
 
 
 def _merge_workflow_metadata(

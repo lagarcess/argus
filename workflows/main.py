@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+from argus.llm.openrouter_key_policy import validate_hosted_openrouter_configuration
+
 try:
     from render_sdk import Retry, Workflows
 except ModuleNotFoundError as exc:  # pragma: no cover - exercised in workflow env
@@ -38,6 +40,8 @@ def _positive_int_env(name: str, default: int) -> int:
     except ValueError:
         return default
 
+
+validate_hosted_openrouter_configuration()
 
 app = Workflows(
     default_retry=Retry(max_retries=0, wait_duration_ms=1000),

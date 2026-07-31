@@ -78,7 +78,9 @@ services:
         sync: false
       - key: RENDER_API_KEY
         sync: false
-      - key: OPENROUTER_API_KEY
+      - key: ARGUS_PROD_OPENROUTER_API_KEY
+        sync: false
+      - key: ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY
         sync: false
       - key: ARGUS_UTILITY_MODEL
         value: google/gemini-2.5-flash-lite

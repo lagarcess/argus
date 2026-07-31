@@ -193,7 +193,10 @@ def _job_row(*, launch_payload: dict[str, object]) -> dict[str, object]:
         "status": "queued",
         "attempts": 0,
         "launch_payload": launch_payload,
-        "execution_metadata": {"existing": "kept"},
+        "execution_metadata": {
+            "existing": "kept",
+            "openrouter_traffic_class": "registered",
+        },
         "result_run_id": None,
     }
 
@@ -873,6 +876,58 @@ def test_run_backtest_job_persists_backend_result_readout(
     assert metadata["result_readout_fallback_used"] is False
 
 
+def test_run_backtest_job_restores_guest_openrouter_scope_for_result_readout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
+
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    observed_keys: list[str] = []
+
+    def scoped_result_readout(**_: object) -> ResultReadout:
+        observed_keys.append(resolve_openrouter_api_key())
+        return ResultReadout(
+            text="Scoped guest readout.",
+            source="llm_explain_stage",
+            fallback_used=False,
+        )
+
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_with_metadata_from_backtest_payload",
+        scoped_result_readout,
+    )
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"]["openrouter_traffic_class"] = "guest"
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["result_readout"] == "Scoped guest readout."
+    assert observed_keys == ["guest-key"]
+    with pytest.raises(RuntimeError, match="traffic class"):
+        resolve_openrouter_api_key()
+
+
 def test_run_backtest_job_persists_result_summary_route_receipts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1361,7 +1416,15 @@ def test_backtest_workflow_json_safe_normalizes_postgres_scalars() -> None:
 def test_workflow_task_registration_includes_proof_and_real_backtest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.llm import openrouter_key_policy
+
     tasks: dict[str, dict[str, object]] = {}
+    boot_events: list[str] = []
+    monkeypatch.setattr(
+        openrouter_key_policy,
+        "validate_hosted_openrouter_configuration",
+        lambda: boot_events.append("validate"),
+    )
 
     class FakeRetry:
         def __init__(self, **kwargs: object) -> None:
@@ -1370,6 +1433,7 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
     class FakeWorkflows:
         def __init__(self, **kwargs: object) -> None:
             self.kwargs = kwargs
+            boot_events.append("construct")
 
         def task(self, fn: object | None = None, **kwargs: object):
             def decorate(inner: object) -> object:
@@ -1392,6 +1456,7 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
 
     importlib.import_module("workflows.main")
 
+    assert boot_events[:2] == ["validate", "construct"]
     assert {"workflow_proof", "run_backtest_job"}.issubset(tasks)
     assert tasks["workflow_proof"]["kwargs"]["timeout_seconds"] == 60
     assert tasks["run_backtest_job"]["kwargs"]["timeout_seconds"] >= 300

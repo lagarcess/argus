@@ -1031,6 +1031,12 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
         "fee_bps": 0.0,
         "slippage_bps": 0.0,
     }
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "registered",
+    }
 
 
 def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(

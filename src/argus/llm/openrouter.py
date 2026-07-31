@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from argus.agent_runtime import turn_execution
 from argus.env import load_project_dotenv
+from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 from argus.llm.openrouter_model_env import TIER_FALLBACK_ENV, TIER_PRIMARY_ENV
 from argus.llm.openrouter_tasks import (
     OPENROUTER_PROFILES,
@@ -192,7 +193,7 @@ def build_openrouter_model(
     """
     Builds a ChatOpenRouter instance for the given task.
     """
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = resolve_openrouter_api_key()
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         return None
@@ -399,7 +400,7 @@ async def invoke_openrouter_json_schema(
     context_packet_ids: list[str] | None = None,
 ) -> SchemaModelT | None:
     started_at = time.perf_counter()
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = resolve_openrouter_api_key()
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         record_openrouter_route_receipt(
@@ -510,7 +511,7 @@ async def invoke_openrouter_chat_completion(
     context_packet_ids: list[str] | None = None,
 ) -> str | None:
     started_at = time.perf_counter()
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = resolve_openrouter_api_key()
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         record_openrouter_route_receipt(
@@ -635,7 +636,7 @@ def invoke_openrouter_json_schema_sync(
     context_packet_ids: list[str] | None = None,
 ) -> SchemaModelT | None:
     started_at = time.perf_counter()
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = resolve_openrouter_api_key()
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         record_openrouter_route_receipt(

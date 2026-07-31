@@ -256,9 +256,10 @@ def _payload() -> dict[str, object]:
 
 
 def _context() -> BacktestJobShadowContext:
-    return BacktestJobShadowContext(
+    context = BacktestJobShadowContext(
         user_id="user-1",
         conversation_id="conversation-1",
+        account_kind="registered",
         request_message_id="message-1",
         idempotency_key="idem-1",
         request_id="request-1",
@@ -267,10 +268,12 @@ def _context() -> BacktestJobShadowContext:
             "payload": {"confirmation_id": "confirmation-1"},
         },
     )
+    return context
 
 
 def _guest_context() -> BacktestJobShadowContext:
     context = _context()
+    context.account_kind = "guest"
     context.allowance_limits = [
         {
             "period": "guest_session",
@@ -408,6 +411,10 @@ def test_guest_flag_off_admits_job_before_in_process_execution(monkeypatch) -> N
     assert events == ["job", "delegate"]
     assert len(gateway.jobs) == 1
     assert gateway.jobs[0]["allowance_limits"] == context.allowance_limits
+    assert (
+        gateway.jobs[0]["execution_metadata"]["openrouter_traffic_class"]
+        == "guest"
+    )
     assert context.created_job_id == "job-1"
     assert dispatcher.calls == []
     assert delegate.calls == [payload]
@@ -498,6 +505,7 @@ def test_shadow_backtest_job_tool_creates_job_before_in_process_execution(
         "source": "api_chat",
         "request_id": "request-1",
         "payload_hash": payload_hash(payload),
+        "openrouter_traffic_class": "registered",
     }
     assert delegate.calls == [payload]
 

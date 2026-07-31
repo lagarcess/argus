@@ -127,6 +127,7 @@ from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
 )
+from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
 router = APIRouter(tags=["agent"])
 RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
@@ -751,6 +752,7 @@ async def chat_stream(
             BacktestJobShadowContext(
                 user_id=user.id,
                 conversation_id=conversation.id,
+                account_kind=turn_account.kind,
                 request_message_id=(
                     request_message_record.id if request_message_record else None
                 ),
@@ -1326,7 +1328,10 @@ async def chat_stream(
             persist_turn_evidence()
 
     async def events() -> AsyncIterator[str]:
-        with turn_execution_scope(entry_state=checkpoint_values or {}):
+        with (
+            openrouter_traffic_class(turn_account.kind),
+            turn_execution_scope(entry_state=checkpoint_values or {}),
+        ):
             workflow_input_error: Exception | None = None
             try:
                 workflow_input = build_workflow_input(

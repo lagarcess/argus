@@ -126,12 +126,15 @@ def test_inline_and_threaded_streams_use_one_scope(
 ) -> None:
     from argus.agent_runtime.turn_execution import active_turn_execution
     from argus.api.routers import agent as agent_router
+    from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
     observed_contexts: list[object | None] = []
+    observed_openrouter_keys: list[str] = []
     persisted_receipt_metadata: list[dict[str, Any]] = []
 
     async def _fake_stream_agent_turn_events(**_: Any):
         observed_contexts.append(active_turn_execution())
+        observed_openrouter_keys.append(resolve_openrouter_api_key())
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
             "type": "final",
@@ -169,6 +172,10 @@ def test_inline_and_threaded_streams_use_one_scope(
         persisted_receipt_metadata.append(dict(kwargs["metadata"]))
 
     monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: threaded)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
     monkeypatch.setattr(
         agent_router,
         "stream_agent_turn_events",
@@ -195,6 +202,7 @@ def test_inline_and_threaded_streams_use_one_scope(
     assert response.status_code == 200
     assert len(observed_contexts) == 1
     assert observed_contexts[0] is not None
+    assert observed_openrouter_keys == ["registered-key"]
     assert len(persisted_receipt_metadata) == 1
     summary = persisted_receipt_metadata[0]["turn_execution"]
     assert summary["terminal"] == "clarification"
