@@ -786,6 +786,19 @@
       "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
       "language_save_error": "No pudimos actualizar el idioma todavía.",
+      "avatar_theme": {
+        "label": "Color del monograma",
+        "save_error": "No pudimos actualizar el color de tu monograma todavía.",
+        "themes": {
+          "ocean": "Océano",
+          "plum": "Ciruela",
+          "teal": "Verde azulado",
+          "ember": "Brasa",
+          "gold": "Dorado",
+          "indigo": "Índigo",
+          "slate": "Pizarra"
+        }
+      },
       "close": "Cerrar perfil",
       "title": "Perfil",
       "request_deletion": {

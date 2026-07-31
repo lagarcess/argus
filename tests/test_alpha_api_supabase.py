@@ -904,6 +904,91 @@ def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
     mock_gateway.update_user.assert_called_once()
 
 
+def test_patch_me_persists_a_curated_avatar_theme(mock_gateway):
+    before = _mock_profile()
+    mock_gateway.get_user.return_value = before
+
+    def _updated_user(_user_id: str, payload: dict) -> User:
+        return User.model_validate(payload)
+
+    mock_gateway.update_user.side_effect = _updated_user
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "plum"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["avatar_theme"] == "plum"
+    assert mock_gateway.update_user.call_args.args[1]["avatar_theme"] == "plum"
+
+
+def test_patch_me_rejects_an_unknown_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "arbitrary-hex"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_me_rejects_a_null_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": None},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
+    now = utcnow()
+    registered = UserResponse(
+        user=_mock_profile(),
+        account_kind="registered",
+        guest=None,
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=True,
+            can_manage_conversation=True,
+            can_save_decision=True,
+            can_manage_account=True,
+            can_use_omnisearch=True,
+            can_search_current_workspace=False,
+            can_use_grounded_discovery=True,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+    guest = UserResponse(
+        user=_mock_profile(),
+        account_kind="guest",
+        guest=GuestAccountSummary(
+            expires_at=now + timedelta(days=7),
+            conversation_limit=1,
+            message_limit=10,
+            simulation_limit=1,
+            feedback_limit=5,
+        ),
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=False,
+            can_manage_conversation=False,
+            can_save_decision=False,
+            can_manage_account=False,
+            can_use_omnisearch=False,
+            can_search_current_workspace=True,
+            can_use_grounded_discovery=False,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+
+    assert registered.model_dump(mode="json")["user"]["avatar_theme"] == "ocean"
+    assert "avatar_theme" not in guest.model_dump(mode="json")["user"]
+
+
 def test_feedback_accepts_account_deletion_request_and_enriches_context(mock_gateway):
     response = client.post(
         "/api/v1/feedback",

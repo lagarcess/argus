@@ -117,6 +117,7 @@ def test_verified_anonymous_auth_truth_owns_guest_status_and_capabilities(
     payload = response.json()
     assert payload["account_kind"] == "guest"
     assert payload["user"]["email"] is None
+    assert "avatar_theme" not in payload["user"]
     assert payload["guest"] == {
         "expires_at": workspace.expires_at.isoformat().replace("+00:00", "Z"),
         "conversation_limit": 1,

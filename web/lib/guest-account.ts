@@ -1,3 +1,5 @@
+import type { AvatarTheme } from "./avatar-theme";
+
 type LegacyOnboardingStage =
   | "language_selection"
   | "primary_goal_selection"
@@ -18,6 +20,7 @@ export type ApiUser = {
   display_name: string | null;
   language: "en" | "es-419";
   locale: "en-US" | "es-419";
+  avatar_theme?: AvatarTheme;
   onboarding: {
     completed: boolean;
     stage: LegacyOnboardingStage;

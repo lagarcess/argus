@@ -27,6 +27,7 @@ from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
+AvatarTheme = Literal["ocean", "plum", "teal", "ember", "gold", "indigo", "slate"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
 BacktestJobStatus = Literal[
@@ -122,6 +123,7 @@ class User(BaseModel):
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
+    avatar_theme: AvatarTheme = "ocean"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
@@ -151,14 +153,42 @@ class AccountCapabilities(BaseModel):
     can_submit_feedback: bool
 
 
+class GuestUser(BaseModel):
+    """Guest-safe profile projection without registered-only preferences."""
+
+    id: str
+    email: str | None
+    username: str | None = None
+    display_name: str | None = None
+    language: Language = "en"
+    locale: Locale = "en-US"
+    theme: Theme = "dark"
+    is_admin: bool = False
+    onboarding: OnboardingState = Field(default_factory=OnboardingState)
+    created_at: datetime
+    updated_at: datetime
+
+
+def guest_safe_user(user: User) -> GuestUser:
+    """Project a profile for a guest-facing response."""
+
+    return GuestUser.model_validate(user.model_dump())
+
+
 class UserResponse(BaseModel):
-    user: User
+    user: User | GuestUser
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
     public_account_access_enabled: bool = Field(
         description="Server-authoritative permission to expose ordinary account creation."
     )
+
+    @model_validator(mode="after")
+    def _hide_registered_preferences_from_guests(self) -> UserResponse:
+        if self.account_kind == "guest" and isinstance(self.user, User):
+            self.user = guest_safe_user(self.user)
+        return self
 
 
 class UsageWindow(BaseModel):
@@ -200,6 +230,7 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
+    avatar_theme: AvatarTheme = "ocean"
 
 
 class ConversationCreate(BaseModel):

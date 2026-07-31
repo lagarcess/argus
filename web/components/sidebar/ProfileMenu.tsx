@@ -29,6 +29,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
 import {
+  AVATAR_THEMES,
+  avatarThemeClassName,
+  type AvatarTheme,
+} from "@/lib/avatar-theme";
+import {
   ENABLED_LANGUAGES,
   languageDisplayAbbreviation,
   localeForLanguage,
@@ -118,6 +123,9 @@ export default function ProfileMenu({
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
+  const [accountKind, setAccountKind] = useState<"guest" | "registered" | null>(
+    null,
+  );
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -125,6 +133,8 @@ export default function ProfileMenu({
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isSavingAvatarTheme, setIsSavingAvatarTheme] = useState(false);
+  const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
@@ -137,7 +147,10 @@ export default function ProfileMenu({
       setNameError(null);
       setLanguageError(null);
       getMe()
-        .then(({ user }) => setProfile(user))
+        .then(({ user, account_kind }) => {
+          setProfile(user);
+          setAccountKind(account_kind);
+        })
         .catch(() => null);
     }
   }, [isOpen]);
@@ -307,6 +320,10 @@ export default function ProfileMenu({
   );
   const currentLanguageAbbreviation =
     languageDisplayAbbreviation(currentLanguage);
+  const avatarClassName =
+    accountKind === "registered"
+      ? avatarThemeClassName(profile?.avatar_theme)
+      : "bg-[#191c1f] text-white dark:bg-white/10";
   const handleLanguageSelect = useCallback(
     async (code: string) => {
       const nextLanguage = normalizeEnabledLanguage(code);
@@ -358,6 +375,38 @@ export default function ProfileMenu({
       }
     },
     [i18n, isSavingLanguage, profile, t],
+  );
+
+  const handleAvatarThemeSelect = useCallback(
+    async (avatarTheme: AvatarTheme) => {
+      if (!profile || accountKind !== "registered" || isSavingAvatarTheme) return;
+
+      const previousTheme = profile.avatar_theme;
+      setAvatarThemeError(null);
+      setIsSavingAvatarTheme(true);
+      setProfile((current) =>
+        current ? { ...current, avatar_theme: avatarTheme } : current,
+      );
+
+      try {
+        const { user } = await patchMe({ avatar_theme: avatarTheme });
+        setProfile(user);
+      } catch (err) {
+        console.error("Failed to update avatar theme", err);
+        setProfile((current) =>
+          current ? { ...current, avatar_theme: previousTheme } : current,
+        );
+        setAvatarThemeError(
+          t(
+            "settings.profile.avatar_theme.save_error",
+            "Could not update your monogram color yet.",
+          ),
+        );
+      } finally {
+        setIsSavingAvatarTheme(false);
+      }
+    },
+    [accountKind, isSavingAvatarTheme, profile, t],
   );
 
   const handleOpenDeleteRequest = useCallback(() => {
@@ -707,7 +756,9 @@ export default function ProfileMenu({
             <div className="flex flex-col gap-3">
               {/* Avatar + Name */}
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#191c1f] text-[16px] font-bold text-white dark:bg-white/10">
+                <div
+                  className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                >
                   {profileInitial(profile)}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -794,6 +845,63 @@ export default function ProfileMenu({
                   </span>
                 </div>
               </div>
+
+              {accountKind === "registered" && (
+                <fieldset className="border-t border-black/5 pt-3 dark:border-white/10">
+                  <legend className="text-[13px] text-black/50 dark:text-white/50">
+                    {t(
+                      "settings.profile.avatar_theme.label",
+                      "Monogram color",
+                    )}
+                  </legend>
+                  <div
+                    className="mt-2 flex flex-wrap gap-2"
+                    role="radiogroup"
+                    aria-label={t(
+                      "settings.profile.avatar_theme.label",
+                      "Monogram color",
+                    )}
+                  >
+                    {AVATAR_THEMES.map((theme) => {
+                      const selected =
+                        (profile?.avatar_theme ?? "ocean") === theme.token;
+                      const themeLabel = t(
+                        `settings.profile.avatar_theme.themes.${theme.token}`,
+                        theme.token,
+                      );
+                      return (
+                        <button
+                          key={theme.token}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          aria-label={themeLabel}
+                          title={themeLabel}
+                          disabled={isSavingAvatarTheme}
+                          onClick={() => void handleAvatarThemeSelect(theme.token)}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full outline-none transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 ${
+                            selected
+                              ? "ring-2 ring-black ring-offset-2 dark:ring-white dark:ring-offset-[#1b1d20]"
+                              : ""
+                          }`}
+                        >
+                          <span
+                            className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${theme.className}`}
+                            aria-hidden="true"
+                          >
+                            {profileInitial(profile)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {avatarThemeError && (
+                    <span className="mt-2 block text-[12px] text-[#d66d75]">
+                      {avatarThemeError}
+                    </span>
+                  )}
+                </fieldset>
+              )}
 
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">
