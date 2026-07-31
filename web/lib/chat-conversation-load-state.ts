@@ -12,6 +12,9 @@ export function conversationLoadFailureMessage(
     kind: "text",
     contentPresentation: "conversation_load_failure",
     content,
+    // Transport-level load failure is a retryable infrastructure failure;
+    // the code makes it wear the failure treatment instead of plain prose.
+    assistantRecoveryCode: "conversation_load_failure",
     actions: retryAction ? [retryAction] : undefined,
   };
 }

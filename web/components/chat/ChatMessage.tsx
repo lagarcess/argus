@@ -21,6 +21,7 @@ import {
 } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
+import FailureNotice from "./FailureNotice";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
@@ -31,7 +32,7 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
-  onToast?: (message: string) => void;
+  onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
@@ -193,7 +194,10 @@ export default function ChatMessage({
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
-    onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"));
+    onToast?.(
+      t(copied ? "chat.copy_success" : "chat.copy_failed"),
+      copied ? "neutral" : "error",
+    );
   };
 
   const getDisplayContent = () => {
@@ -383,6 +387,18 @@ export default function ChatMessage({
                 </button>
               ) : null}
             </div>
+          ) : !isUser &&
+            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
+            // A rejected/inactive action is still a failure statement; it
+            // must not read as an ordinary answer, only quieter than amber.
+            <FailureNotice
+              className="max-w-[min(100%,660px)]"
+              testId="artifact-action-failure-notice"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {displayContent}
+              </ReactMarkdown>
+            </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               {factHeadingLabel && (
