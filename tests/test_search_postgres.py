@@ -637,9 +637,21 @@ def test_search_projects_the_latest_run_result_message_anchor(
             conversation_id=conversation_id,
             timestamp=now + timedelta(minutes=2),
             role="assistant",
-            content="Here are supported next experiments.",
+            content="GLD result.",
             metadata={
                 "result_run_id": str(run_id),
+                "result_card": {"title": "GLD result"},
+            },
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=3),
+            role="assistant",
+            content="Here are supported next experiments.",
+            metadata={
+                "latest_run_id": str(run_id),
                 "next_experiments": {
                     "version": "argus_next_experiments/v1",
                     "rows": [
@@ -667,7 +679,7 @@ def test_search_projects_the_latest_run_result_message_anchor(
             cursor,
             user_id=owner_id,
             conversation_id=conversation_id,
-            timestamp=now + timedelta(minutes=3),
+            timestamp=now + timedelta(minutes=4),
             role="user",
             content="I will take a different path.",
         )

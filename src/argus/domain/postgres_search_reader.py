@@ -2846,7 +2846,15 @@ left join lateral (
           message.metadata->>'result_run_id' = latest_run.id::text
           or message.metadata->>'latest_run_id' = latest_run.id::text
       )
-    order by message.created_at desc, message.id desc
+    order by
+        case
+            when jsonb_typeof(message.metadata->'result_card') = 'object'
+             and message.metadata->'result_card' <> '{}'::jsonb
+                then 0
+            else 1
+        end,
+        message.created_at desc,
+        message.id desc
     limit 1
 ) as latest_result_message on true
 cross join lateral (

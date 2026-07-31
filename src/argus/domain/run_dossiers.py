@@ -235,7 +235,12 @@ def result_message_id_for(
     ]
     latest = max(
         candidates,
-        key=lambda row: (row_activity(row), text(row.get("id")) or ""),
+        key=lambda row: (
+            isinstance(message_metadata(row).get("result_card"), Mapping)
+            and bool(message_metadata(row).get("result_card")),
+            row_activity(row),
+            text(row.get("id")) or "",
+        ),
         default=None,
     )
     return text(latest.get("id")) if latest is not None else None

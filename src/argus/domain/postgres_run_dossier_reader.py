@@ -147,7 +147,15 @@ left join lateral (
           message.metadata->>'result_run_id' = br.id::text
           or message.metadata->>'latest_run_id' = br.id::text
       )
-    order by message.created_at desc, message.id desc
+    order by
+        case
+            when jsonb_typeof(message.metadata->'result_card') = 'object'
+             and message.metadata->'result_card' <> '{}'::jsonb
+                then 0
+            else 1
+        end,
+        message.created_at desc,
+        message.id desc
     limit 1
 ) as result_message on true
 where br.user_id = %(user_id)s

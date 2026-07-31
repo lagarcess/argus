@@ -231,6 +231,11 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "rejected": 0,
         "revisit_later": 0,
     }
+    hydration_sql = str(pool.cursor.executions[1][0])
+    assert "message.metadata->'result_card'" in hydration_sql
+    assert hydration_sql.index("message.metadata->'result_card'") < hydration_sql.index(
+        "message.created_at desc"
+    )
     assert len(pool.cursor.executions) == 3
     assert pool.cursor.executions[0][1]["source_limit"] == 4
     assert pool.acquisition_timeouts == [2.0]

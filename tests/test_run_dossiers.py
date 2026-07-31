@@ -139,7 +139,7 @@ def test_eligible_runs_exclude_incomplete_failed_and_evidence_less_rows() -> Non
     ]
 
 
-def test_result_message_id_uses_latest_assistant_pointer_for_the_run() -> None:
+def test_result_message_id_prefers_actual_result_card_over_later_pointer() -> None:
     run_dossiers = import_module("argus.domain.run_dossiers")
     created_at = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
     run = _run(run_id="run-1", created_at=created_at)
@@ -150,7 +150,10 @@ def test_result_message_id_uses_latest_assistant_pointer_for_the_run() -> None:
             {
                 "id": "older",
                 "role": "assistant",
-                "metadata": {"result_run_id": "run-1"},
+                "metadata": {
+                    "result_run_id": "run-1",
+                    "result_card": {"title": "Run result"},
+                },
                 "created_at": created_at,
             },
             {
@@ -164,6 +167,31 @@ def test_result_message_id_uses_latest_assistant_pointer_for_the_run() -> None:
                 "role": "user",
                 "metadata": {"result_run_id": "run-1"},
                 "created_at": created_at.replace(hour=14),
+            },
+        ],
+    )
+
+    assert result == "older"
+
+
+def test_result_message_id_uses_latest_pointer_as_legacy_fallback() -> None:
+    run_dossiers = import_module("argus.domain.run_dossiers")
+    created_at = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
+
+    result = run_dossiers.result_message_id_for(
+        _run(run_id="run-1", created_at=created_at),
+        [
+            {
+                "id": "older",
+                "role": "assistant",
+                "metadata": {"result_run_id": "run-1"},
+                "created_at": created_at,
+            },
+            {
+                "id": "newer",
+                "role": "assistant",
+                "metadata": {"latest_run_id": "run-1"},
+                "created_at": created_at.replace(hour=13),
             },
         ],
     )

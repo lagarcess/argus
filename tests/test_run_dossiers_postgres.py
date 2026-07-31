@@ -174,6 +174,10 @@ def test_postgres_reader_uses_scalar_counts_and_one_bounded_page_query() -> None
     page_sql, page_params = pool.cursor.executions[-1]
     assert "limit %(limit)s" in page_sql
     assert page_params["limit"] == 21
+    assert "message.metadata->'result_card'" in page_sql
+    assert page_sql.index("message.metadata->'result_card'") < page_sql.index(
+        "message.created_at desc"
+    )
     assert "order by coalesce(br.updated_at, br.created_at) desc, br.id desc" in page_sql
     assert pool.timeouts == [2.0]
 
