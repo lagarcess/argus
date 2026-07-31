@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
+from uuid import UUID
 
 from fastapi import Request
 
@@ -39,6 +40,9 @@ from argus.domain.retest_setup import (
 RETEST_ACTION_TYPE = "retest_run"
 RETEST_ACTION_LABEL_KEY = "command_palette.retest_current_data"
 _ENVELOPE_KEYS = frozenset({"source_run_id", "window_policy", "contract_version"})
+# The canonical finalizer refuses to complete a run whose result card lacks
+# these, so their presence is the durable marker of a finalized artifact.
+_EVIDENCE_IDENTITY_KEYS = ("evidence_artifact_id", "idea_id", "idea_version_id")
 _DAYS_PER_YEAR = 365
 _DAYS_PER_MONTH = 30
 
@@ -68,7 +72,15 @@ def retest_action_source_run_id(action_payload: Mapping[str, Any]) -> str | None
     source_run_id = action_payload.get("source_run_id")
     if not isinstance(source_run_id, str):
         return None
-    return source_run_id.strip() or None
+    cleaned = source_run_id.strip()
+    try:
+        # Run ids are UUIDs in both storage modes. Rejecting other shapes here
+        # keeps a tampered id on the uniform invalid-state path instead of
+        # reaching Postgres and surfacing a cast error as a 500.
+        UUID(cleaned)
+    except ValueError:
+        return None
+    return cleaned
 
 
 def sanitized_retest_action(source_run_id: str) -> dict[str, Any]:
@@ -267,12 +279,23 @@ def _owned_retest_setup(
         run is None
         or run.conversation_id != conversation_id
         or run.status != "completed"
-        or not run.conversation_result_card
+        or not _finalized_evidence_identity(run.conversation_result_card)
     ):
         # One uniform outcome for missing, foreign, unfinished, and
         # cross-conversation runs so the caller cannot probe object existence.
         return None
     return retest_setup_from_run(run.model_dump(mode="python"), today=today)
+
+
+def _finalized_evidence_identity(result_card: Mapping[str, Any] | None) -> bool:
+    """The finalizer attaches evidence identity last, so its absence means the
+    run/evidence tuple never completed and must not be replayed."""
+    if not isinstance(result_card, Mapping):
+        return False
+    return all(
+        isinstance(result_card.get(key), str) and result_card[key].strip()
+        for key in _EVIDENCE_IDENTITY_KEYS
+    )
 
 
 def _duration_descriptor(duration_days: int) -> dict[str, Any]:

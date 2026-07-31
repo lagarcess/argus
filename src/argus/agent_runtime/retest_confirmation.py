@@ -18,6 +18,7 @@ from argus.agent_runtime.confirmation_artifacts import (
 from argus.agent_runtime.presentation_i18n import confirmation_rule_display_value
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
+from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.retest_setup import RetestSetup
 
 _INDICATOR_PARAMETER_KEYS = (
@@ -50,6 +51,10 @@ def retest_confirmation_payload(
     Eligibility and admission call this same function, so an offered retest is
     always one the backend can actually confirm.
     """
+    if _costs_the_engine_would_drop(setup):
+        # The kill switch idealizes execution, so a costed source run cannot be
+        # replayed faithfully; offering it would confirm costs the run ignores.
+        return None
     rules = _rule_projection(setup)
     strategy = _strategy_payload(setup, rules=rules, language=language)
     optional_parameters = _optional_parameters(setup)
@@ -89,6 +94,15 @@ def retest_runtime_result(
         "stage_outcome": "await_approval",
         "confirmation_payload": confirmation_payload,
     }
+
+
+def _costs_the_engine_would_drop(setup: RetestSetup) -> bool:
+    realism = setup.execution_realism
+    if not isinstance(realism, dict) or not realism.get("enabled"):
+        return False
+    if _execution_realism_feature_enabled():
+        return False
+    return _rate(realism.get("fee_bps")) > 0.0 or _rate(realism.get("slippage_bps")) > 0.0
 
 
 def _rule_projection(setup: RetestSetup) -> _RuleProjection:

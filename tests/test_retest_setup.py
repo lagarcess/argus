@@ -288,3 +288,41 @@ def test_runs_above_the_symbol_ceiling_have_no_retest_setup(
     run["symbols"] = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META"]
 
     assert retest_setup_from_run(run, today=_TODAY) is None
+
+
+def test_costed_runs_are_not_offered_while_the_kill_switch_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    run = _persisted_run(
+        monkeypatch,
+        {
+            **_BUY_AND_HOLD,
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+        },
+    )
+    setup = retest_setup_from_run(run, today=_TODAY)
+    assert setup is not None
+    assert retest_confirmation_payload(setup, language="en") is not None
+
+    # The engine drops stored costs while the kill switch is off, so confirming
+    # this replay would promise costs the run would never apply.
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    assert retest_confirmation_payload(setup, language="en") is None
+
+
+def test_idealized_runs_stay_offered_while_the_kill_switch_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
+    setup = retest_setup_from_run(run, today=_TODAY)
+    assert setup is not None
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    assert retest_confirmation_payload(setup, language="en") is not None

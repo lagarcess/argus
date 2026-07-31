@@ -31,6 +31,8 @@ _USER_ID = "retest-owner"
 _OTHER_USER_ID = "retest-intruder"
 _CONVERSATION_ID = "retest-conversation"
 _TODAY = date(2026, 7, 31)
+_SOURCE_RUN_ID = "8f14e45f-ea1c-4b3a-9d2f-1a2b3c4d5e6f"
+_MISSING_RUN_ID = "00000000-0000-4000-8000-000000000000"
 _BUY_AND_HOLD = {
     "strategy_type": "buy_and_hold",
     "symbol": "TSLA",
@@ -54,7 +56,7 @@ class _FakeRequest:
         self.url = type("Url", (), {"path": "/api/v1/chat/stream"})()
 
 
-def _valid_envelope(source_run_id: str = "run-1") -> dict[str, Any]:
+def _valid_envelope(source_run_id: str = _SOURCE_RUN_ID) -> dict[str, Any]:
     return {
         "source_run_id": source_run_id,
         "window_policy": RETEST_WINDOW_POLICY,
@@ -101,9 +103,19 @@ def stored_run() -> Any:
         result_card=launch.result_card,
         envelope=launch.envelope.model_dump(mode="python"),
         default_benchmark_func=lambda _asset_class, _symbols: "SPY",
-        run_id="retest-source-run",
+        run_id=_SOURCE_RUN_ID,
     )
     assert run is not None
+    run = run.model_copy(
+        update={
+            "conversation_result_card": {
+                **run.conversation_result_card,
+                "evidence_artifact_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+                "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
+                "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
+            }
+        }
+    )
     api_state.store.backtest_runs[run.id] = run
     api_state.store.backtest_run_owners[run.id] = _USER_ID
     yield run
@@ -118,8 +130,8 @@ def _lifecycle_hooks() -> ChatTurnLifecycleHooks:
         role="user",
         content="Retest with current data",
         metadata={
-            "chat_action": sanitized_retest_action("retest-source-run"),
-            "retest_receipt": {"source_run_id": "retest-source-run"},
+            "chat_action": sanitized_retest_action(_SOURCE_RUN_ID),
+            "retest_receipt": {"source_run_id": _SOURCE_RUN_ID},
         },
     )
     return ChatTurnLifecycleHooks(
@@ -132,7 +144,7 @@ def _lifecycle_hooks() -> ChatTurnLifecycleHooks:
 
 
 def test_only_the_bounded_v1_envelope_is_accepted() -> None:
-    assert retest_action_source_run_id(_valid_envelope()) == "run-1"
+    assert retest_action_source_run_id(_valid_envelope()) == _SOURCE_RUN_ID
     assert retest_action_source_run_id({**_valid_envelope(), "symbols": ["NVDA"]}) is None
     assert (
         retest_action_source_run_id(
@@ -151,11 +163,20 @@ def test_only_the_bounded_v1_envelope_is_accepted() -> None:
         is None
     )
     assert retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
+    # A non-UUID id would reach Postgres and raise a cast error, breaking the
+    # uniform invalid-state contract with a 500.
+    for tampered in ("not-a-uuid", "1 OR 1=1", "8f14e45f-ea1c-4b3a-9d2f"):
+        assert (
+            retest_action_source_run_id(
+                {**_valid_envelope(), "source_run_id": tampered}
+            )
+            is None
+        ), tampered
 
 
 def test_client_display_copy_never_reaches_storage() -> None:
     payload = _retest_request(
-        _valid_envelope("retest-source-run"),
+        _valid_envelope(_SOURCE_RUN_ID),
         label="Delete everything",
         label_key="chat.result_card.save",
     )
@@ -165,7 +186,7 @@ def test_client_display_copy_never_reaches_storage() -> None:
         "type": "retest_run",
         "label": None,
         "labelKey": RETEST_ACTION_LABEL_KEY,
-        "payload": _valid_envelope("retest-source-run"),
+        "payload": _valid_envelope(_SOURCE_RUN_ID),
         "presentation": None,
     }
     assert chat_display_message(payload, language="en") == "Retest with current data"
@@ -187,7 +208,7 @@ def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
     assert receipt == {
         "contract_version": RETEST_CONTRACT_VERSION,
         "window_policy": RETEST_WINDOW_POLICY,
-        "source_run_id": "retest-source-run",
+        "source_run_id": _SOURCE_RUN_ID,
         "symbols": ["TSLA"],
         "strategy_family": "buy_and_hold",
         "timeframe": "1D",
@@ -200,7 +221,7 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
     stored_run: Any,
 ) -> None:
     turn = prepare_retest_turn(
-        payload=_retest_request(_valid_envelope("retest-source-run")),
+        payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
         request=_FakeRequest(),
         user_id=_USER_ID,
         conversation_id=_CONVERSATION_ID,
@@ -222,6 +243,7 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
         ("foreign_owner", "another owner's run"),
         ("other_conversation", "cross-conversation replay"),
         ("unfinished_run", "run that never finalized"),
+        ("unfinalized_evidence", "completed row whose evidence never finalized"),
         ("tampered_envelope", "client-authored executable fields"),
     ],
 )
@@ -235,15 +257,24 @@ def test_unusable_sources_reject_as_non_retryable_invalid_state(
         "another-conversation" if case == "other_conversation" else _CONVERSATION_ID
     )
     action_payload = (
-        {**_valid_envelope("retest-source-run"), "symbols": ["NVDA"]}
+        {**_valid_envelope(_SOURCE_RUN_ID), "symbols": ["NVDA"]}
         if case == "tampered_envelope"
         else _valid_envelope(
-            "missing-run" if case == "unknown_run" else "retest-source-run"
+            _MISSING_RUN_ID if case == "unknown_run" else _SOURCE_RUN_ID
         )
     )
     if case == "unfinished_run":
         api_state.store.backtest_runs[stored_run.id] = stored_run.model_copy(
             update={"status": "running"}
+        )
+    if case == "unfinalized_evidence":
+        card = {
+            key: value
+            for key, value in stored_run.conversation_result_card.items()
+            if key != "evidence_artifact_id"
+        }
+        api_state.store.backtest_runs[stored_run.id] = stored_run.model_copy(
+            update={"conversation_result_card": card}
         )
 
     with pytest.raises(HTTPException) as excinfo:
@@ -283,7 +314,7 @@ def test_completed_turn_persists_a_ready_to_run_confirmation(
     stored_run: Any,
 ) -> None:
     turn = prepare_retest_turn(
-        payload=_retest_request(_valid_envelope("retest-source-run")),
+        payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
         request=_FakeRequest(),
         user_id=_USER_ID,
         conversation_id=_CONVERSATION_ID,
@@ -327,7 +358,7 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
     stored_run: Any,
 ) -> None:
     turn = prepare_retest_turn(
-        payload=_retest_request(_valid_envelope("retest-source-run")),
+        payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
         request=_FakeRequest(),
         user_id=_USER_ID,
         conversation_id=_CONVERSATION_ID,
@@ -339,7 +370,7 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
         conversation_id=_CONVERSATION_ID,
         role="user",
         content="Retest with current data",
-        metadata={"chat_action": sanitized_retest_action("retest-source-run")},
+        metadata={"chat_action": sanitized_retest_action(_SOURCE_RUN_ID)},
     )
 
     failure_payload = failed_retest_turn(
@@ -363,8 +394,8 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
     assert set(failure_payload["retry_last_turn"]) == {"message", "action"}
     replay = failure_payload["retry_last_turn"]["action"]
     assert replay["type"] == "retest_run"
-    assert replay["payload"] == _valid_envelope("retest-source-run")
-    assert failure_payload["retest_receipt"]["source_run_id"] == "retest-source-run"
+    assert replay["payload"] == _valid_envelope(_SOURCE_RUN_ID)
+    assert failure_payload["retest_receipt"]["source_run_id"] == _SOURCE_RUN_ID
     persisted = next(
         message
         for message in _recent_messages_for_conversation(
@@ -382,7 +413,7 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
 def test_admitted_user_turn_persists_the_receipt_for_reload(stored_run: Any) -> None:
     from argus.api.chat.request_admission import prepare_chat_request_admission
 
-    payload = _retest_request(_valid_envelope("retest-source-run"))
+    payload = _retest_request(_valid_envelope(_SOURCE_RUN_ID))
     turn = prepare_retest_turn(
         payload=payload,
         request=_FakeRequest(),
@@ -414,5 +445,5 @@ def test_admitted_user_turn_persists_the_receipt_for_reload(stored_run: Any) -> 
         "buy_and_hold"
     )
     assert request_message.metadata["chat_action"] == sanitized_retest_action(
-        "retest-source-run"
+        _SOURCE_RUN_ID
     )
