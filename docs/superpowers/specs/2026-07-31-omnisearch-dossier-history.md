@@ -1,6 +1,6 @@
 # Omnisearch run dossiers — browse prior evidence and effective decisions without opening chat
 
-Status: **PROPOSED — awaiting founder lock**
+Status: **FOUNDER-LOCKED**
 
 Depends on the delivered Full Omnisearch contract in
 `docs/superpowers/specs/2026-07-29-omnisearch-memory-recall.md` and PR #306

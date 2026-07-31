@@ -268,6 +268,29 @@ def test_chat_stream_declares_the_approved_request_boundary_failures(
         }
 
 
+def test_openapi_contract_exposes_lazy_run_dossier_history(
+    generated: dict,
+) -> None:
+    operation = generated["paths"][
+        "/api/v1/conversations/{conversation_id}/run-dossiers"
+    ]["get"]
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/PaginatedRunDossiers"
+    }
+    parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+    assert parameters["limit"]["schema"]["default"] == 20
+    assert parameters["limit"]["schema"]["maximum"] == 100
+    search_item = generated["components"]["schemas"]["SearchItem"]
+    assert search_item["properties"]["dossier"]["anyOf"] == [
+        {"$ref": "#/components/schemas/RunDossier"},
+        {"type": "null"},
+    ]
+    assert {"dossier", "total_runs", "decided_runs"}.issubset(
+        search_item["required"]
+    )
+    assert "actions" not in search_item["properties"]
+
+
 def test_regeneration_script_matches_checked_artifact() -> None:
     from scripts.generate_openapi_artifact import build_artifact_document
 

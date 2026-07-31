@@ -95,14 +95,18 @@ def scored_supabase_search_items(
             if not isinstance(raw_item, dict):
                 continue
             item = SearchItem.model_validate(raw_item)
-            if not allow_decision_action:
+            if not allow_decision_action and item.dossier is not None:
                 item = item.model_copy(
                     update={
-                        "actions": [
-                            action
-                            for action in item.actions
-                            if action.type != "decision"
-                        ]
+                        "dossier": item.dossier.model_copy(
+                            update={
+                                "actions": [
+                                    action
+                                    for action in item.dossier.actions
+                                    if action.type != "decision"
+                                ]
+                            }
+                        )
                     }
                 )
             projected.append((int(row.get("score") or 0), item))

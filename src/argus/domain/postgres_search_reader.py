@@ -44,7 +44,7 @@ _CONVERSATION_ROW_GROUPS = tuple(
         for source, group in _ROW_GROUP_BY_SOURCE.items()
         if source != "asset_rollup"
     )
-)
+) + ("messages",)
 
 
 class SearchCursorError(ValueError):
@@ -2569,6 +2569,8 @@ select
         'deleted_at', conversation.deleted_at,
         '_recall_summary', jsonb_build_object(
             'run_count', coalesce(run_summary.run_count, 0),
+            'total_runs', coalesce(run_summary.run_count, 0),
+            'decided_runs', coalesce(run_summary.decided_runs, 0),
             'symbols', coalesce(run_summary.symbols, array[]::text[]),
             'strategy_families',
                 coalesce(run_summary.strategy_families, array[]::text[]),
@@ -2584,14 +2586,26 @@ select
         )
     ) as conversation_payload,
     latest_run.payload as latest_run_payload,
-    judged_run.payload as judged_run_payload,
     latest_evidence.payload as latest_evidence_payload,
     latest_run_decision.payload as latest_run_decision_payload,
-    latest_decision.payload as latest_decision_payload
+    latest_result_message.payload as latest_result_message_payload
 from public.conversations as conversation
 left join lateral (
     select
         count(*)::integer as run_count,
+        count(*) filter (
+            where exists (
+                select 1
+                from public.evidence_artifacts as decided_evidence
+                join public.decision_notes as decided
+                  on decided.evidence_artifact_id = decided_evidence.id
+                 and decided.user_id = %(user_id)s
+                where decided_evidence.user_id = %(user_id)s
+                  and decided_evidence.source_conversation_id = conversation.id
+                  and decided_evidence.source_run_id = run.id
+                  and decided.source_conversation_id = conversation.id
+            )
+        )::integer as decided_runs,
         (
             select (array_agg(symbol order by last_used desc, symbol))[1:5]
             from (
@@ -2652,6 +2666,13 @@ left join lateral (
     where run.user_id = %(user_id)s
       and run.conversation_id = conversation.id
       and run.status = 'completed'
+      and exists (
+          select 1
+          from public.evidence_artifacts as eligible_evidence
+          where eligible_evidence.user_id = %(user_id)s
+            and eligible_evidence.source_conversation_id = conversation.id
+            and eligible_evidence.source_run_id = run.id
+      )
 ) as run_summary on true
 left join lateral (
     select array_agg(
@@ -2683,7 +2704,8 @@ left join lateral (
             'config_snapshot', run.config_snapshot,
             'conversation_result_card', run.conversation_result_card,
             'created_at', run.created_at,
-            'updated_at', run.updated_at
+            'updated_at', run.updated_at,
+            'completed_at', coalesce(run.updated_at, run.created_at)
         ) as payload,
         run.id,
         exists (
@@ -2700,6 +2722,13 @@ left join lateral (
     where run.user_id = %(user_id)s
       and run.conversation_id = conversation.id
       and run.status = 'completed'
+      and exists (
+          select 1
+          from public.evidence_artifacts as eligible_evidence
+          where eligible_evidence.user_id = %(user_id)s
+            and eligible_evidence.source_conversation_id = conversation.id
+            and eligible_evidence.source_run_id = run.id
+      )
     order by coalesce(run.updated_at, run.created_at) desc, run.id desc
     limit 1
 ) as latest_run on true
@@ -2731,52 +2760,6 @@ left join lateral (
     order by offer.created_at desc, offer.id desc
     limit 1
 ) as latest_suggestion on true
-left join lateral (
-    select
-        jsonb_build_object(
-            'id', decision.id,
-            'idea_id', decision.idea_id,
-            'idea_version_id', decision.idea_version_id,
-            'evidence_artifact_id', decision.evidence_artifact_id,
-            'source_conversation_id', decision.source_conversation_id,
-            'decision_state', decision.decision_state,
-            'note', decision.note,
-            'created_at', decision.created_at,
-            'updated_at', decision.updated_at,
-            'source_run_id', evidence.source_run_id,
-            'artifact_title', evidence.title,
-            'artifact_digest', evidence.digest,
-            'artifact_payload', evidence.payload
-        ) as payload,
-        evidence.source_run_id
-    from public.decision_notes as decision
-    left join public.evidence_artifacts as evidence
-      on evidence.id = decision.evidence_artifact_id
-     and evidence.user_id = %(user_id)s
-    where decision.user_id = %(user_id)s
-      and decision.source_conversation_id = conversation.id
-    order by decision.updated_at desc, decision.id desc
-    limit 1
-) as latest_decision on true
-left join lateral (
-    select jsonb_build_object(
-        'id', run.id,
-        'conversation_id', run.conversation_id,
-        'status', run.status,
-        'asset_class', run.asset_class,
-        'symbols', run.symbols,
-        'benchmark_symbol', run.benchmark_symbol,
-        'config_snapshot', run.config_snapshot,
-        'conversation_result_card', run.conversation_result_card,
-        'created_at', run.created_at,
-        'updated_at', run.updated_at
-    ) as payload
-    from public.backtest_runs as run
-    where run.user_id = %(user_id)s
-      and run.conversation_id = conversation.id
-      and run.id = latest_decision.source_run_id
-    limit 1
-) as judged_run on true
 left join lateral (
     select jsonb_build_object(
         'id', evidence.id,
@@ -2820,6 +2803,26 @@ left join lateral (
     order by decision.updated_at desc, decision.id desc
     limit 1
 ) as latest_run_decision on true
+left join lateral (
+    select jsonb_build_object(
+        'id', message.id,
+        'conversation_id', message.conversation_id,
+        'role', message.role,
+        'content', message.content,
+        'metadata', message.metadata,
+        'created_at', message.created_at
+    ) as payload
+    from public.messages as message
+    where message.user_id = %(user_id)s
+      and message.conversation_id = conversation.id
+      and message.role = 'assistant'
+      and (
+          message.metadata->>'result_run_id' = latest_run.id::text
+          or message.metadata->>'latest_run_id' = latest_run.id::text
+      )
+    order by message.created_at desc, message.id desc
+    limit 1
+) as latest_result_message on true
 cross join lateral (
     select max(source_activity.activity_at) as activity_at
     from (
@@ -3170,29 +3173,18 @@ def _hydrate_conversation_recall(
             conversation_payload["_recall_match"] = recall_match
         hydrated["conversations"].append(conversation_payload)
 
-        seen_run_ids: set[str] = set()
-        for key in ("latest_run_payload", "judged_run_payload"):
-            payload = row.get(key)
-            if not isinstance(payload, dict):
-                continue
-            run_id = str(payload.get("id") or "")
-            if not run_id or run_id in seen_run_ids:
-                continue
-            seen_run_ids.add(run_id)
-            hydrated["runs"].append(payload)
+        latest_run = row.get("latest_run_payload")
+        if isinstance(latest_run, dict):
+            hydrated["runs"].append(latest_run)
         latest_evidence = row.get("latest_evidence_payload")
         if isinstance(latest_evidence, dict):
             hydrated["evidence"].append(latest_evidence)
-        seen_decision_ids: set[str] = set()
-        for key in ("latest_decision_payload", "latest_run_decision_payload"):
-            latest_decision = row.get(key)
-            if not isinstance(latest_decision, dict):
-                continue
-            decision_id = str(latest_decision.get("id") or "")
-            if not decision_id or decision_id in seen_decision_ids:
-                continue
-            seen_decision_ids.add(decision_id)
+        latest_decision = row.get("latest_run_decision_payload")
+        if isinstance(latest_decision, dict):
             hydrated["decisions"].append(latest_decision)
+        latest_result_message = row.get("latest_result_message_payload")
+        if isinstance(latest_result_message, dict):
+            hydrated["messages"].append(latest_result_message)
     return hydrated
 
 

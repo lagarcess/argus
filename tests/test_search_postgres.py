@@ -602,7 +602,7 @@ def test_visible_id_recall_is_one_owner_scoped_hydration(
     assert pool.tracker == {"query_count": 1, "row_counts": [1]}
 
 
-def test_search_projects_and_clears_the_untaken_suggestion_nudge(
+def test_search_projects_the_latest_run_result_message_anchor(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
@@ -631,7 +631,7 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
             conversation_id=conversation_id,
             source_run_id=run_id,
         )
-        _insert_message(
+        result_message_id = _insert_message(
             cursor,
             user_id=owner_id,
             conversation_id=conversation_id,
@@ -659,8 +659,8 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
         source_limit=4,
     )
     [(_, offered_item)] = _ranked(offered.rows, "GLD")
-    assert offered_item.dossier.left_off is not None
-    assert offered_item.dossier.left_off.nudge == "suggestion_untaken"
+    assert offered_item.dossier is not None
+    assert offered_item.dossier.result_message_id == str(result_message_id)
 
     with _connect() as connection, connection.cursor() as cursor:
         _insert_message(
@@ -678,8 +678,8 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
         source_limit=4,
     )
     [(_, followed_up_item)] = _ranked(followed_up.rows, "GLD")
-    assert followed_up_item.dossier.left_off is not None
-    assert followed_up_item.dossier.left_off.nudge is None
+    assert followed_up_item.dossier is not None
+    assert followed_up_item.dossier.result_message_id == str(result_message_id)
 
 
 def test_search_centers_fragment_on_late_user_message_match(
@@ -1424,29 +1424,36 @@ def test_full_lineage_aggregates_survive_more_than_five_children(
         )
         run_ids: list[UUID] = []
         for offset in range(7):
-            run_ids.append(
-                _insert_run(
-                    cursor,
-                    user_id=owner_id,
-                    timestamp=now - timedelta(days=7 - offset),
-                    title=f"Run {offset}",
-                    conversation_id=conversation_id,
-                    symbols=[f"S{offset}", "AAPL"],
-                    start_date=f"20{19 + offset}-01-01",
-                    end_date=f"20{19 + offset}-12-31",
-                )
+            run_id = _insert_run(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(days=7 - offset),
+                title=f"Run {offset}",
+                conversation_id=conversation_id,
+                symbols=[f"S{offset}", "AAPL"],
+                start_date=f"20{19 + offset}-01-01",
+                end_date=f"20{19 + offset}-12-31",
             )
-        _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now + timedelta(minutes=1),
-            title="Judged oldest run",
-            summary="Anchor decision",
-            decision_note="Anchor decision",
-            conversation_id=conversation_id,
-            source_run_id=run_ids[0],
-            decision_state="watching",
-        )
+            run_ids.append(run_id)
+            spine = _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(days=7 - offset)
+                + timedelta(minutes=1),
+                title=f"Run {offset} evidence",
+                summary=(
+                    "Anchor decision" if offset == 0 else f"Run {offset} evidence"
+                ),
+                decision_note=f"Decision {offset}",
+                conversation_id=conversation_id,
+                source_run_id=run_id,
+                decision_state="watching",
+            )
+            if offset >= 5:
+                cursor.execute(
+                    "delete from public.decision_notes where id = %s",
+                    (spine["decision"],),
+                )
 
     reader, _ = _reader()
     result = reader.search_rows(
@@ -1456,13 +1463,14 @@ def test_full_lineage_aggregates_survive_more_than_five_children(
     )
     item = _ranked(result.rows, "anchor")[0][1]
 
-    assert item.dossier.tested.run_count == 7
-    assert str(item.dossier.tested.start_date) == "2019-01-01"
+    assert item.total_runs == 7
+    assert item.decided_runs == 5
+    assert item.dossier is not None
+    assert item.dossier.run_id == str(run_ids[6])
+    assert str(item.dossier.tested.start_date) == "2025-01-01"
     assert str(item.dossier.tested.end_date) == "2025-12-31"
     assert item.decision_states == ("watching",)
-    assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Run 0"
-    assert item.dossier.outcome is not None
+    assert item.dossier.decision is None
     assert item.dossier.outcome.run_label == "Run 6"
 
 

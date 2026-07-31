@@ -272,9 +272,18 @@ def _bounded_memory_search_snapshot_for_index(
             for row in index.decisions_by_conversation.get(conversation_id, [])
         ],
         messages=[
-            index.messages_by_id[message_id]
-            for message_id in selected_message_ids
-            if message_id in index.messages_by_id
+            message
+            for message_id, message in index.messages_by_id.items()
+            if message_id in selected_message_ids
+            or (
+                str(message.get("conversation_id") or "")
+                in selected_conversation_ids
+                and message.get("role") == "assistant"
+                and (
+                    str((message.get("metadata") or {}).get("result_run_id") or "")
+                    or str((message.get("metadata") or {}).get("latest_run_id") or "")
+                )
+            )
         ],
         asset_rollup=(
             index.asset_rollups_by_symbol.get(resolved_symbol)
@@ -353,8 +362,20 @@ def _build_memory_search_index(
                 message.role == "user"
                 or (
                     message.role == "assistant"
-                    and valid_next_experiments_metadata(
-                        getattr(message, "metadata", None)
+                    and (
+                        valid_next_experiments_metadata(
+                            getattr(message, "metadata", None)
+                        )
+                        or bool(
+                            (
+                                getattr(message, "metadata", None) or {}
+                            ).get("result_run_id")
+                        )
+                        or bool(
+                            (
+                                getattr(message, "metadata", None) or {}
+                            ).get("latest_run_id")
+                        )
                     )
                 )
             )

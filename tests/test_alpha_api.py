@@ -2615,10 +2615,9 @@ def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() 
     assert items_by_id[target_id]["archived"] is False
     assert items_by_id[archived_id]["archived"] is True
     assert items_by_id[target_id]["title"] == "Visible active conversation"
-    assert items_by_id[target_id]["dossier"]["decision"] is None
-    assert items_by_id[target_id]["dossier"]["tested"]["run_count"] == 0
-    assert items_by_id[target_id]["dossier"]["outcome"] is None
-    assert items_by_id[target_id]["dossier"]["left_off"] is None
+    assert items_by_id[target_id]["dossier"] is None
+    assert items_by_id[target_id]["total_runs"] == 0
+    assert items_by_id[target_id]["decided_runs"] == 0
     assert payload["next_cursor"] is None
     assert len(payload["ledger_groups"]) == 4
 
@@ -2814,22 +2813,103 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
     assert "preview" not in item
 
     dossier = item["dossier"]
-    assert list(dossier) == ["decision", "tested", "outcome", "left_off"]
+    assert list(dossier) == [
+        "run_id",
+        "run_label",
+        "completed_at",
+        "result_message_id",
+        "tested",
+        "outcome",
+        "decision",
+        "actions",
+    ]
+    assert dossier["run_id"]
+    assert dossier["result_message_id"]
     assert dossier["decision"] == {
         "state": "watching",
         "note": "Track it.\nReview risk before the next run.",
-        "run_label": None,
+        "run_label": dossier["run_label"],
     }
     assert dossier["tested"]["symbols"] == ["TSLA"]
-    assert dossier["tested"]["strategy_families"] == ["rsi_mean_reversion"]
-    assert dossier["tested"]["run_count"] == 1
+    assert dossier["tested"]["strategy_family"] == "rsi_mean_reversion"
     assert dossier["outcome"]["run_label"]
     assert dossier["outcome"]["benchmark_symbol"] == "SPY"
     assert dossier["outcome"]["quick_take"] == "I tested that idea with TSLA."
     assert dossier["outcome"]["metrics"] == [{"name": "total_return_pct", "value": 12.5}]
-    assert dossier["left_off"]["run_label"] == dossier["outcome"]["run_label"]
-    assert dossier["left_off"]["completed_at"]
-    assert dossier["left_off"]["nudge"] is None
+    assert item["total_runs"] == 1
+    assert item["decided_runs"] == 1
+    assert "actions" not in item
+
+    history = client.get(
+        f"/api/v1/conversations/{conversation['id']}/run-dossiers?limit=20"
+    )
+    assert history.status_code == 200
+    assert history.json() == {
+        "items": [dossier],
+        "next_cursor": None,
+        "total_runs": 1,
+        "decided_runs": 1,
+    }
+
+
+def test_run_dossier_history_uses_non_leaking_ownership_and_cursor_errors() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="owned-dossier-history",
+        title="Owned history",
+        updated_at=now,
+    )
+    _store_search_conversation(
+        user_id="other-owner",
+        conversation_id="foreign-dossier-history",
+        title="Foreign history",
+        updated_at=now,
+    )
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="deleted-dossier-history",
+        title="Deleted history",
+        updated_at=now,
+        deleted_at=now,
+    )
+
+    owned = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers"
+    )
+    malformed = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers",
+        params={"cursor": "not-a-cursor"},
+    )
+    over_bound = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers",
+        params={"limit": 101},
+    )
+    hidden = [
+        client.get(f"/api/v1/conversations/{conversation_id}/run-dossiers")
+        for conversation_id in (
+            "missing-dossier-history",
+            "foreign-dossier-history",
+            "deleted-dossier-history",
+        )
+    ]
+
+    assert owned.status_code == 200
+    assert owned.json() == {
+        "items": [],
+        "next_cursor": None,
+        "total_runs": 0,
+        "decided_runs": 0,
+    }
+    assert malformed.status_code == 400
+    assert malformed.json()["detail"] == "Invalid cursor."
+    assert over_bound.status_code == 422
+    assert [response.status_code for response in hidden] == [404, 404, 404]
+    assert {response.json()["detail"] for response in hidden} == {
+        "Conversation not found."
+    }
 
 
 def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> None:
@@ -2918,7 +2998,7 @@ def test_search_dossier_accepts_postgres_trimmed_fractional_activity() -> None:
     )
 
 
-def test_search_dossier_marks_a_decided_old_result_stale() -> None:
+def test_search_dossier_keeps_an_old_decided_result_on_one_run() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
     now = utcnow()
@@ -2965,12 +3045,15 @@ def test_search_dossier_marks_a_decided_old_result_stale() -> None:
     )
 
     assert projected is not None
-    left_off = projected[1].dossier.left_off
-    assert left_off is not None
-    assert left_off.nudge == "stale_result"
+    dossier = projected[1].dossier
+    assert dossier is not None
+    assert dossier.run_id == run_id
+    assert dossier.completed_at == completed_at
+    assert dossier.decision is not None
+    assert dossier.decision.state == "watching"
 
 
-def test_search_dossier_marks_only_a_definitely_untaken_suggestion() -> None:
+def test_search_dossier_result_anchor_does_not_depend_on_later_user_copy() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
     now = utcnow()
@@ -3053,14 +3136,14 @@ def test_search_dossier_marks_only_a_definitely_untaken_suggestion() -> None:
     )
 
     assert offered is not None
-    assert offered[1].dossier.left_off is not None
-    assert offered[1].dossier.left_off.nudge == "suggestion_untaken"
+    assert offered[1].dossier is not None
+    assert offered[1].dossier.result_message_id == assistant_offer["id"]
     assert followed_up is not None
-    assert followed_up[1].dossier.left_off is not None
-    assert followed_up[1].dossier.left_off.nudge is None
+    assert followed_up[1].dossier is not None
+    assert followed_up[1].dossier.result_message_id == assistant_offer["id"]
 
 
-def test_search_decision_names_judged_run_when_latest_run_is_different() -> None:
+def test_search_default_dossier_does_not_mix_an_older_run_decision() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
     first_response = client.post(
@@ -3092,10 +3175,13 @@ def test_search_decision_names_judged_run_when_latest_run_is_different() -> None
     response = client.get("/api/v1/search?q=anchor&limit=20")
 
     assert response.status_code == 200
-    dossier = response.json()["items"][0]["dossier"]
-    assert dossier["decision"]["run_label"] == first["conversation_result_card"]["title"]
-    assert dossier["outcome"]["run_label"] == second["conversation_result_card"]["title"]
-    assert dossier["left_off"]["nudge"] == "undecided"
+    item = response.json()["items"][0]
+    dossier = item["dossier"]
+    assert dossier["run_id"] == second["id"]
+    assert dossier["run_label"] == second["conversation_result_card"]["title"]
+    assert dossier["decision"] is None
+    assert item["total_runs"] == 2
+    assert item["decided_runs"] == 1
 
 
 def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
@@ -3194,7 +3280,7 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
     conversation = next(
         item for item in response.json()["items"] if item["type"] == "conversation"
     )
-    run_fresh, change_decision = conversation["actions"]
+    run_fresh, change_decision = conversation["dossier"]["actions"]
     expected_end = date.today()
     expected_start = expected_end - timedelta(days=365)
     assert run_fresh == {
@@ -3312,12 +3398,12 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
 
     assert projected is not None
     _, item = projected
-    assert [action.type for action in item.actions] == ["run_fresh"]
-    assert item.actions[0].source_run_id == "latest-run"
-    assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Older AAPL run"
-    assert item.dossier.left_off is not None
-    assert item.dossier.left_off.nudge == "undecided"
+    assert item.dossier is not None
+    assert [action.type for action in item.dossier.actions] == ["run_fresh"]
+    assert item.dossier.actions[0].source_run_id == "latest-run"
+    assert item.dossier.decision is None
+    assert item.total_runs == 2
+    assert item.decided_runs == 1
 
 
 def _chat_persisted_run_fresh_fixture(
@@ -3357,15 +3443,31 @@ def _chat_persisted_run_fresh_fixture(
         },
         runs=[run.model_dump(mode="python")],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "action-fixture-evidence",
+                "source_conversation_id": run.conversation_id,
+                "source_run_id": run.id,
+                "title": "Action fixture evidence",
+                "digest": "Action fixture result.",
+                "payload": {},
+                "created_at": run.created_at,
+                "updated_at": run.created_at,
+            }
+        ],
         decisions=[],
         query="",
         language=language,
     )
     assert projected is not None
     _, item = projected
+    assert item.dossier is not None
     action = next(
-        (candidate for candidate in item.actions if candidate.type == "run_fresh"),
+        (
+            candidate
+            for candidate in item.dossier.actions
+            if candidate.type == "run_fresh"
+        ),
         None,
     )
     assert action is not None
@@ -3614,13 +3716,27 @@ def test_search_run_fresh_omits_unfaithful_dca_snapshot(
         },
         runs=[run],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "incomplete-dca-evidence",
+                "source_conversation_id": run["conversation_id"],
+                "source_run_id": run["id"],
+                "title": "Incomplete DCA",
+                "digest": "Incomplete DCA result.",
+                "payload": {},
+                "created_at": run["created_at"],
+                "updated_at": run["created_at"],
+            }
+        ],
         decisions=[],
         query="",
     )
     assert projected is not None
     _, item = projected
-    assert all(candidate.type != "run_fresh" for candidate in item.actions)
+    assert item.dossier is not None
+    assert all(
+        candidate.type != "run_fresh" for candidate in item.dossier.actions
+    )
 
 
 def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> None:
@@ -3676,7 +3792,18 @@ def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> Non
             }
         ],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "oversized-run-fresh-evidence",
+                "source_conversation_id": "oversized-run-fresh-conversation",
+                "source_run_id": "oversized-run-fresh-run",
+                "title": "Large signal result",
+                "digest": "Large signal result.",
+                "payload": {},
+                "created_at": now,
+                "updated_at": now,
+            }
+        ],
         decisions=[],
         query="",
     )
@@ -3684,8 +3811,11 @@ def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> Non
     assert projected is not None
     _, item = projected
     assert item.title == "Large signal strategy"
+    assert item.dossier is not None
     assert item.dossier.tested is not None
-    assert all(candidate.type != "run_fresh" for candidate in item.actions)
+    assert all(
+        candidate.type != "run_fresh" for candidate in item.dossier.actions
+    )
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

@@ -99,6 +99,8 @@ def _hydration_row() -> dict[str, Any]:
             "deleted_at": None,
             "_recall_summary": {
                 "run_count": 7,
+                "total_runs": 7,
+                "decided_runs": 5,
                 "symbols": ["AAPL", "MSFT"],
                 "strategy_families": ["buy_and_hold"],
                 "start_date": "2019-01-01",
@@ -170,6 +172,16 @@ def _hydration_row() -> dict[str, Any]:
             "note": "Latest-run decision.",
             "updated_at": "2026-07-26T13:00:00+00:00",
         },
+        "latest_result_message_payload": {
+            "id": "00000000-0000-0000-0000-000000000201",
+            "conversation_id": CONVERSATION_ID,
+            "role": "assistant",
+            "content": "Latest run result",
+            "metadata": {
+                "result_run_id": "00000000-0000-0000-0000-000000000401"
+            },
+            "created_at": ACTIVITY_AT,
+        },
     }
 
 
@@ -197,10 +209,11 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "conversations": 1,
         "strategies": 0,
         "collections": 0,
-        "runs": 2,
+        "runs": 1,
         "ideas": 0,
         "evidence": 1,
-        "decisions": 2,
+        "decisions": 1,
+        "messages": 1,
     }
     assert result.rows["conversations"][0]["_recall_match"] == {
         "matched_text": "Search decision evidence",
@@ -211,7 +224,7 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "symbol_exact_match": False,
         "activity_at": ACTIVITY_AT,
     }
-    assert result.rows["conversations"][0]["_recall_summary"]["run_count"] == 7
+    assert result.rows["conversations"][0]["_recall_summary"]["total_runs"] == 7
     assert result.ledger_counts == {
         "promising": 1,
         "watching": 1,
@@ -837,6 +850,8 @@ def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap()
 
     assert result.rows["conversations"][0]["_recall_summary"] == {
         "run_count": 7,
+        "total_runs": 7,
+        "decided_runs": 5,
         "symbols": ["AAPL", "MSFT"],
         "strategy_families": ["buy_and_hold"],
         "start_date": "2019-01-01",
@@ -847,8 +862,7 @@ def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap()
         "latest_activity": ACTIVITY_AT,
     }
     assert [row["conversation_id"] for row in result.rows["runs"]] == [
-        CONVERSATION_ID,
-        CONVERSATION_ID,
+        CONVERSATION_ID
     ]
     assert len(pool.cursor.executions) == 2
     hydration_sql, params = pool.cursor.executions[1]
@@ -930,15 +944,21 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     assert item.matched_text == "Search decision evidence"
     assert item.updated_at.isoformat() == ACTIVITY_AT
     assert item.decision_states == ("promising", "watching")
-    assert item.dossier.tested.run_count == 7
-    assert item.dossier.tested.symbols == ["AAPL", "MSFT"]
-    assert item.dossier.tested.start_date.isoformat() == "2019-01-01"
+    assert item.total_runs == 7
+    assert item.decided_runs == 5
+    assert item.dossier is not None
+    assert item.dossier.run_id == "00000000-0000-0000-0000-000000000401"
+    assert item.dossier.result_message_id == "00000000-0000-0000-0000-000000000201"
+    assert item.dossier.tested.symbols == ["AAPL"]
+    assert item.dossier.tested.start_date.isoformat() == "2025-01-01"
     assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Judged older run"
-    assert item.dossier.outcome is not None
+    assert item.dossier.decision.run_label == "Latest run"
     assert item.dossier.outcome.run_label == "Latest run"
-    assert [action.type for action in item.actions] == ["run_fresh", "decision"]
-    decision_action = item.actions[1]
+    assert [action.type for action in item.dossier.actions] == [
+        "run_fresh",
+        "decision",
+    ]
+    decision_action = item.dossier.actions[1]
     assert decision_action.type == "decision"
     assert decision_action.evidence_artifact_id == (
         "00000000-0000-0000-0000-000000000301"
