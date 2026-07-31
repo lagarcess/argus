@@ -344,9 +344,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain(
       "appendOrReplacePendingAssistantMessage(baseMessages",
     );
-    expect(chat).toContain(
-      "replacementAssistantId: failedAssistantId ?? undefined",
-    );
+    expect(chat).toContain("failedAssistantId");
+    expect(chat).toContain("renderUserMessage: false");
+    expect(chat).toContain("replacementAssistantId: failedAssistantId");
+    expect(chat).toContain("requestMessageId");
+    expect(chat).toContain("renderUserMessage: true");
     expect(chat).toContain(
       "const persistedErrorMessageId = event.data.message_id?.trim()",
     );

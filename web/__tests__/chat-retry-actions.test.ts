@@ -322,12 +322,12 @@ describe("failed-action retry UI contract", () => {
     expect(retryLoadConversationIdFromAction(undefined)).toBeNull();
   });
 
-  test("later work removes the owning retry but preserves historical recovery", () => {
+  test("later work removes the assistant retry but preserves historical recovery", () => {
     const recoveryOwner: Message = {
-      id: "request-message-1",
-      role: "user",
+      id: "assistant-failed-1",
+      role: "ai",
       kind: "text",
-      content: "Test AAPL",
+      content: "Something went wrong.",
       recoveryDisplay: { kind: "recovery_code", code: "runtime_failure" },
       actions: [
         {
@@ -357,7 +357,7 @@ describe("failed-action retry UI contract", () => {
     expect(later.id).toBe("later-user-message");
   });
 
-  test("coalesces linked durable recovery onto ordinary and action owners", () => {
+  test("keeps linked accepted-turn recovery on the assistant message", () => {
     const owners: Message[] = [
       {
         id: "request-message-1",
@@ -393,25 +393,21 @@ describe("failed-action retry UI contract", () => {
         code: "runtime_failure",
       };
 
+      const assistantFailure: Message = {
+        id: "assistant-failed-1",
+        role: "ai",
+        kind: "text",
+        content: "Something went wrong.",
+        recoveryDisplay,
+        assistantRecoveryCode: "runtime_failure",
+        actions: [retryAction],
+      };
       const normalized = normalizeDurableRetryActionHistory([
         owner,
-        {
-          id: "assistant-failed-1",
-          role: "ai",
-          kind: "text",
-          content: "Something went wrong.",
-          recoveryDisplay,
-          actions: [retryAction],
-        },
+        assistantFailure,
       ]);
 
-      expect(normalized).toEqual([
-        {
-          ...owner,
-          recoveryDisplay,
-          actions: [retryAction],
-        },
-      ]);
+      expect(normalized).toEqual([owner, assistantFailure]);
     }
   });
 });

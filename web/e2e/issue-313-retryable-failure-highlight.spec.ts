@@ -42,6 +42,7 @@ const copy = {
     nonRetryable:
       "I cannot look up current source-backed candidates yet, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
     retry: "Retry",
+    retrySuccess: "The retry completed without changing your original request.",
   },
   "es-419": {
     capability: "Puedo probar una clase de activo a la vez.",
@@ -49,6 +50,7 @@ const copy = {
     nonRetryable:
       "Todavía no puedo buscar candidatos respaldados por fuentes actuales, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
     retry: "Reintentar",
+    retrySuccess: "El reintento terminó sin cambiar tu solicitud original.",
   },
 } as const;
 
@@ -67,8 +69,8 @@ const producerCopy: Record<
       "es-419": "¿Cuál fue la peor caída?",
     },
     recovery: {
-      en: "I still have the latest result in this chat, but I could not safely answer that follow-up. Please retry in a moment.",
-      "es-419": "Todavía tengo el resultado más reciente en este chat, pero no pude responder ese seguimiento con confianza. Intenta de nuevo en un momento.",
+      en: "I couldn’t answer that follow-up. Your result is still here.",
+      "es-419": "No pude responder ese seguimiento. Tu resultado sigue aquí.",
     },
   },
   composition: {
@@ -241,13 +243,20 @@ function baselineMessages(locale: Locale): ApiMessage[] {
 async function installFixture(
   page: Page,
   qaCase: QaCase,
-): Promise<{ consoleErrors: string[]; requestUrls: string[]; unexpected: string[] }> {
+): Promise<{
+  apiOrigins: Set<string>;
+  consoleErrors: string[];
+  requestUrls: string[];
+  unexpected: string[];
+}> {
   const { locale, producer, theme } = qaCase;
   const producerFixture = producerCopy[producer];
   const messages = baselineMessages(locale);
   const consoleErrors: string[] = [];
   const requestUrls: string[] = [];
   const unexpected: string[] = [];
+  const apiOrigins = new Set<string>();
+  let streamAttempts = 0;
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -266,6 +275,7 @@ async function installFixture(
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    apiOrigins.add(url.origin);
     if (path.endsWith("/api/v1/me")) {
       return json(route, {
         user: {
@@ -309,6 +319,50 @@ async function installFixture(
     if (path.endsWith("/api/v1/chat/stream")) {
       const requestId = `request-${producer}`;
       const assistantId = `assistant-${producer}`;
+      streamAttempts += 1;
+      if (streamAttempts > 1) {
+        const failedAssistant = messages.find(
+          (message) => message.id === assistantId,
+        );
+        if (failedAssistant) {
+          failedAssistant.metadata = {
+            ...failedAssistant.metadata,
+            agent_runtime_failure_superseded: true,
+            recovery: {
+              code: producerFixture.code,
+              retryable: false,
+            },
+          };
+        }
+        const retryRequestId = `retry-request-${producer}`;
+        const retryAssistantId = `retry-assistant-${producer}`;
+        messages.push(
+          userMessage(
+            retryRequestId,
+            producerFixture.prompt[locale],
+            8,
+          ),
+          assistantMessage(
+            retryAssistantId,
+            copy[locale].retrySuccess,
+            9,
+            {
+              agent_runtime_turn: {
+                turn_id: retryRequestId,
+                request_id: `retry-correlation-${producer}`,
+                status: "completed",
+                terminal: true,
+                retryable: false,
+              },
+            },
+          ),
+        );
+        return sseFinal(route, {
+          stage_outcome: "ready_to_respond",
+          assistant_response: copy[locale].retrySuccess,
+          message_id: retryAssistantId,
+        });
+      }
       messages.push(
         userMessage(requestId, producerFixture.prompt[locale], 6),
         assistantMessage(
@@ -353,7 +407,7 @@ async function installFixture(
     return json(route, { detail: "Unexpected issue #313 QA request" }, 501);
   });
 
-  return { consoleErrors, requestUrls, unexpected };
+  return { apiOrigins, consoleErrors, requestUrls, unexpected };
 }
 
 async function visualTreatment(locator: Locator) {
@@ -385,7 +439,7 @@ for (const qaCase of cases) {
             : { width: 390, height: 844 },
       });
 
-      test("keeps the retryable failure equally visible live and after reload", async ({
+      test("keeps Argus failure ownership and retries without duplicating the user turn", async ({
         page,
       }, testInfo) => {
         const evidence = await installFixture(page, qaCase);
@@ -435,7 +489,18 @@ for (const qaCase of cases) {
 
         await page.reload({ waitUntil: "networkidle" });
 
-        const hydratedRecovery = page.getByTestId("user-turn-recovery");
+        const originalUserRow = page.locator(
+          `[data-message-id="request-${qaCase.producer}"]`,
+        );
+        const hydratedAssistantRow = page.locator(
+          `[data-message-id="assistant-${qaCase.producer}"]`,
+        );
+        const hydratedRecovery = hydratedAssistantRow.getByRole("status");
+        await expect(originalUserRow).toContainText(
+          fixture.prompt[qaCase.locale],
+        );
+        await expect(originalUserRow.getByRole("status")).toHaveCount(0);
+        await expect(page.getByTestId("user-turn-recovery")).toHaveCount(0);
         await expect(hydratedRecovery).toHaveCount(1);
         await expect(hydratedRecovery).toBeVisible();
         await expect(hydratedRecovery).toContainText(recoveryText);
@@ -449,12 +514,6 @@ for (const qaCase of cases) {
           hydratedRecovery.locator(".lucide-message-square-warning"),
         ).toHaveCount(1);
         expect(await visualTreatment(hydratedRecovery)).toEqual(liveTreatment);
-        expect(
-          await hydratedRecovery.evaluate(
-            (element) =>
-              element.previousElementSibling?.textContent?.trim() ?? null,
-          ),
-        ).toBe(fixture.prompt[qaCase.locale]);
 
         if (qaCase.screenshot) {
           await page.screenshot({
@@ -463,11 +522,65 @@ for (const qaCase of cases) {
           });
         }
 
+        const visibleUserTurn = page.getByText(
+          fixture.prompt[qaCase.locale],
+          { exact: true },
+        );
+        await expect(visibleUserTurn).toHaveCount(1);
+        const messageIdsBeforeRetry = await page
+          .locator("[data-message-id]")
+          .evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute("data-message-id")),
+          );
+        await hydratedRecovery
+          .getByRole("button", { name: retryLabel, exact: true })
+          .click();
+        await expect(
+          page.getByText(copy[qaCase.locale].retrySuccess, { exact: true }),
+        ).toBeVisible();
+        await expect(visibleUserTurn).toHaveCount(1);
+        await expect(hydratedAssistantRow).toHaveCount(0);
+        await expect(page.getByText(recoveryText, { exact: true })).toHaveCount(0);
+        const retryAssistantRow = page.locator(
+          `[data-message-id="retry-assistant-${qaCase.producer}"]`,
+        );
+        await expect(retryAssistantRow).toContainText(
+          copy[qaCase.locale].retrySuccess,
+        );
+        const expectedMessageIds = messageIdsBeforeRetry.map((messageId) =>
+          messageId === `assistant-${qaCase.producer}`
+            ? `retry-assistant-${qaCase.producer}`
+            : messageId,
+        );
+        expect(
+          await page.locator("[data-message-id]").evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute("data-message-id")),
+          ),
+        ).toEqual(expectedMessageIds);
+
+        await page.reload({ waitUntil: "networkidle" });
+
+        await expect(
+          page.getByText(copy[qaCase.locale].retrySuccess, { exact: true }),
+        ).toBeVisible();
+        await expect(visibleUserTurn).toHaveCount(1);
+        await expect(originalUserRow).toBeVisible();
+        await expect(
+          page.locator(
+            `[data-message-id="retry-request-${qaCase.producer}"]`,
+          ),
+        ).toHaveCount(0);
+        expect(
+          await page.locator("[data-message-id]").evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute("data-message-id")),
+          ),
+        ).toEqual(expectedMessageIds);
+
         expect(evidence.unexpected).toEqual([]);
         expect(evidence.consoleErrors).toEqual([]);
         const allowedOrigins = new Set([
-          "http://127.0.0.1:3313",
-          "http://127.0.0.1:4313",
+          new URL(page.url()).origin,
+          ...evidence.apiOrigins,
         ]);
         expect(
           evidence.requestUrls.filter(

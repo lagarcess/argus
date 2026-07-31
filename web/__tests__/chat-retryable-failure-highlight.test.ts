@@ -80,20 +80,19 @@ function retryLastTurn(
 function hydratedFailure({
   code,
   content,
-  kind = "text",
 }: {
   code: string;
   content: string;
-  kind?: "text" | "action";
 }): Message {
-  const id = `request-${code}-${kind}`;
+  const requestId = `request-${code}`;
   return {
-    id,
-    role: "user",
-    kind,
+    id: `assistant-${code}`,
+    role: "ai",
+    kind: "text",
     content,
     recoveryDisplay: { kind: "recovery_code", code },
-    actions: [retryLastTurn(id, content)],
+    assistantRecoveryCode: code,
+    actions: [retryLastTurn(requestId, content)],
   };
 }
 
@@ -103,12 +102,13 @@ function expectAmberRetry(markup: string, localizedLabel: string): void {
   }
   expect(markup).toContain('role="status"');
   expect(markup).toContain("lucide-message-square-warning");
-  expect(markup).toContain('data-testid="user-turn-retry"');
+  expect(markup).not.toContain('data-testid="user-turn-recovery"');
+  expect(markup).not.toContain('data-testid="user-turn-retry"');
   expect(markup).toContain(`>${localizedLabel}</button>`);
 }
 
 describe("retryable failure highlight consistency (issue #313)", () => {
-  test("hydrated failures stay amber for every retry producer in both locales", () => {
+  test("hydrated Argus failures stay assistant-side and amber for every producer", () => {
     const producers = [
       hydratedFailure({
         code: "latest_result_followup_unavailable",
@@ -125,7 +125,6 @@ describe("retryable failure highlight consistency (issue #313)", () => {
       hydratedFailure({
         code: "runtime_failure",
         content: "Retest with current data",
-        kind: "action",
       }),
     ];
 
@@ -149,12 +148,10 @@ describe("retryable failure highlight consistency (issue #313)", () => {
       assistantRecoveryCode: "latest_result_followup_unavailable",
       actions: [retry],
     });
-    const hydrated = renderMessage(
-      hydratedFailure({
-        code: "latest_result_followup_unavailable",
-        content: "What was the worst drawdown?",
-      }),
-    );
+    const hydrated = renderMessage(hydratedFailure({
+      code: "latest_result_followup_unavailable",
+      content: "I could not safely answer that follow-up.",
+    }));
 
     for (const className of amberTreatment) {
       expect(live).toContain(className);
@@ -197,6 +194,28 @@ describe("retryable failure highlight consistency (issue #313)", () => {
         expect(markup).not.toContain(className);
       }
       expect(markup).not.toContain("lucide-message-square-warning");
+    }
+  });
+
+  test("an unaccepted user-side retry keeps the existing muted treatment", () => {
+    const inputFailure = renderMessage({
+      id: "request-not-accepted",
+      role: "user",
+      kind: "text",
+      content: "Test AAPL",
+      recoveryDisplay: {
+        kind: "recovery_code",
+        code: "turn_abandoned",
+      },
+      actions: [retryLastTurn("request-not-accepted", "Test AAPL")],
+    });
+
+    expect(inputFailure).toContain('data-testid="user-turn-recovery"');
+    expect(inputFailure).toContain('data-testid="user-turn-retry"');
+    expect(inputFailure).toContain("lucide-rotate-ccw");
+    expect(inputFailure).not.toContain("lucide-message-square-warning");
+    for (const className of amberTreatment) {
+      expect(inputFailure).not.toContain(className);
     }
   });
 });

@@ -1967,12 +1967,14 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          requestMessageId
-            ? { renderUserMessage: true }
-            : {
+          failedAssistantId
+            ? {
                 renderUserMessage: false,
-                replacementAssistantId: failedAssistantId ?? undefined,
-              },
+                replacementAssistantId: failedAssistantId,
+              }
+            : requestMessageId
+              ? { renderUserMessage: true }
+              : { renderUserMessage: false },
         );
       }
       return;

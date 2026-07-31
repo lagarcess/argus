@@ -252,7 +252,7 @@
       "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
       "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
       "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
-      "latest_result_followup_unavailable": "Todavía tengo el resultado más reciente en este chat, pero no pude responder ese seguimiento con confianza. Intenta de nuevo en un momento.",
+      "latest_result_followup_unavailable": "No pude responder ese seguimiento. Tu resultado sigue aquí.",
       "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
       "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
       "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",

@@ -51,7 +51,9 @@ export function retireSupersededFailures(messages: Message[]): Message[] {
         normalizedContent(request) &&
         normalizedContent(request) === normalizedContent(duplicate)
       ) {
-        retired.pop();
+        // The durable retry stays append-only, while the transcript keeps the
+        // original user row and skips the replay copy.
+        index += 1;
       }
       continue;
     }
