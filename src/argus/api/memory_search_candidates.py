@@ -7,6 +7,10 @@ from threading import RLock
 from typing import Any, Callable, Iterable, Mapping
 
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
+from argus.api.memory_ledger_index import (
+    MemoryLedgerIndex,
+    build_memory_ledger_index,
+)
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.memory_search_postings import (
     BoundedRankedCandidates,
@@ -16,7 +20,6 @@ from argus.api.memory_search_postings import (
     bounded_ranked_candidate_indexes,
     build_ranked_postings,
     indexes_by_group,
-    matching_candidate_indexes,
     posting_candidate_might_match,
     ranked_groups,
 )
@@ -103,9 +106,9 @@ class _MemorySearchIndex:
     decisions_by_evidence: dict[str, list[dict[str, Any]]]
     asset_symbols: tuple[str, ...]
     asset_run_ids: dict[str, frozenset[str]]
-    decision_states_by_conversation: dict[str, frozenset[str]]
     conversation_activity_by_id: dict[str, datetime]
     conversation_symbols_by_id: dict[str, frozenset[str]]
+    ledger_index: MemoryLedgerIndex
 
 
 _INDEX_CACHE: dict[tuple[int, str], _MemorySearchIndex] = {}
@@ -208,11 +211,7 @@ def bounded_memory_search_snapshot(
         _ledger_counts(
             index,
             query=query,
-            eligible_conversation_ids=(
-                {guest_conversation_id}
-                if guest_conversation_id is not None
-                else set(index.conversations)
-            ),
+            eligible_conversation_id=guest_conversation_id,
         )
         if include_ledger_groups
         else None
@@ -552,6 +551,14 @@ def _build_memory_search_index(
         )
         for layer, rows in sorted_candidates.items()
     }
+    ledger_index = build_memory_ledger_index(
+        candidates=(
+            (candidate.conversation_id, candidate.text)
+            for layer in _SOURCE_LAYERS
+            for candidate in sorted_candidates[layer]
+        ),
+        decision_states_by_conversation=decision_states_by_conversation,
+    )
     conversation_ids_in_seek_order = tuple(
         str(row["id"])
         for row in sorted(
@@ -615,24 +622,9 @@ def _build_memory_search_index(
             symbol: frozenset(run_ids)
             for symbol, run_ids in asset_run_ids.items()
         },
-        decision_states_by_conversation={
-            conversation_id: frozenset(states)
-            for conversation_id, states in decision_states_by_conversation.items()
-        },
         conversation_activity_by_id=conversation_activity_by_id,
         conversation_symbols_by_id=conversation_symbols_by_id,
-    )
-
-
-def _matching_candidate_indexes(
-    index: _MemorySearchIndex,
-    *,
-    layer: str,
-    query: str,
-) -> frozenset[int] | set[int]:
-    return matching_candidate_indexes(
-        query=query,
-        postings=index.postings_by_layer[layer],
+        ledger_index=ledger_index,
     )
 
 
@@ -1093,49 +1085,12 @@ def _ledger_counts(
     index: _MemorySearchIndex,
     *,
     query: str,
-    eligible_conversation_ids: set[str],
+    eligible_conversation_id: str | None,
 ) -> dict[str, int]:
-    matching_conversation_ids = (
-        _all_matching_conversation_ids(index, query=query)
-        if query
-        else set(index.conversations)
+    return index.ledger_index.counts(
+        query=query,
+        eligible_conversation_id=eligible_conversation_id,
     )
-    matching_conversation_ids.intersection_update(eligible_conversation_ids)
-    return {
-        state: sum(
-            state
-            in index.decision_states_by_conversation.get(
-                conversation_id,
-                frozenset(),
-            )
-            for conversation_id in matching_conversation_ids
-        )
-        for state in ("promising", "watching", "rejected", "revisit_later")
-    }
-
-
-def _all_matching_conversation_ids(
-    index: _MemorySearchIndex,
-    *,
-    query: str,
-) -> set[str]:
-    conversation_ids: set[str] = set()
-    eligible_conversation_ids = set(index.conversations)
-    for layer in _SOURCE_LAYERS:
-        rows = index.candidates_by_layer[layer]
-        for candidate_index in _matching_candidate_indexes(
-            index,
-            layer=layer,
-            query=query,
-        ):
-            candidate = rows[candidate_index]
-            if (
-                candidate.conversation_id in eligible_conversation_ids
-                and candidate.conversation_id not in conversation_ids
-                and search_text_matches_query(query=query, text=candidate.text)
-            ):
-                conversation_ids.add(candidate.conversation_id)
-    return conversation_ids
 
 
 def _resolve_asset_symbol(

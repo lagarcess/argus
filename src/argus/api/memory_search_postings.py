@@ -294,28 +294,6 @@ def bounded_ranked_candidate_indexes(
     )
 
 
-def matching_candidate_indexes(
-    *,
-    query: str,
-    postings: dict[str, RankedPosting],
-) -> frozenset[int] | set[int]:
-    """Return complete membership only for exact ledger counts."""
-    required_postings = _required_postings(query=query, postings=postings)
-    if not required_postings:
-        return frozenset()
-    candidate_indexes: frozenset[int] | set[int] | None = None
-    for posting in required_postings:
-        candidate_indexes = (
-            posting.members
-            if candidate_indexes is None
-            else candidate_indexes.intersection(posting.members)
-        )
-        if not candidate_indexes:
-            return frozenset()
-    assert candidate_indexes is not None
-    return candidate_indexes
-
-
 def posting_candidate_might_match(
     *,
     query: str,

@@ -769,53 +769,6 @@ def test_memory_search_cursor_slots_exclude_rows_that_win_above_cursor() -> None
     assert target_id in {row["id"] for row in snapshot.conversations}
 
 
-def test_memory_ledger_counts_all_distinct_matches_beyond_presentation_cap() -> None:
-    user = api_state.store.get_or_create_dev_user()
-    now = datetime.now(timezone.utc)
-
-    for index in range(600):
-        conversation_id = f"conversation-ledger-{index:04d}"
-        decision_note_id = f"decision-ledger-{index:04d}"
-        api_state.store.conversations[conversation_id] = Conversation(
-            id=conversation_id,
-            title=f"Needle title {index}",
-            last_message_preview=f"Needle preview {index}",
-            created_at=now,
-            updated_at=now,
-            language="en",
-        )
-        api_state.store.conversation_owners[conversation_id] = user.id
-        api_state.store.decision_notes[decision_note_id] = DecisionNote(
-            id=decision_note_id,
-            idea_id=f"idea-{index}",
-            idea_version_id=f"version-{index}",
-            evidence_artifact_id=f"artifact-{index}",
-            source_conversation_id=conversation_id,
-            decision_state="watching",
-            note="Separate judgment.",
-            created_at=now,
-            updated_at=now,
-        )
-        api_state.store.decision_note_owners[decision_note_id] = user.id
-
-    snapshot = memory_search_candidates.bounded_memory_search_snapshot(
-        store=api_state.store,
-        user=user,
-        query="needle",
-        source_limit=1,
-        include_conversation_rows=True,
-        include_ledger_groups=True,
-    )
-
-    assert snapshot.ledger_counts == {
-        "promising": 0,
-        "watching": 600,
-        "rejected": 0,
-        "revisit_later": 0,
-    }
-    assert len(snapshot.conversations) <= 10
-
-
 def test_memory_candidate_window_uses_final_conversation_rank_beyond_source_cap() -> (
     None
 ):

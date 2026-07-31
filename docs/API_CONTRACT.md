@@ -3339,6 +3339,10 @@ only that symbol's indexed run lineage is aggregated. Memory mode mirrors this
 shape with a non-durable, revision-keyed in-process index over canonical
 records: canonical writes invalidate it, while consecutive palette keystrokes
 read bounded postings rather than copying or projecting the full transcript.
+Exact Idea Ledger counts use the same revision snapshot's non-durable SQLite
+FTS5 trigram index plus per-candidate normalized-token rechecks and pre-indexed
+conversation/decision-state membership. The query returns the four aggregate
+groups directly without a per-keystroke Python candidate scan.
 This cache is runtime acceleration only; it is not a durable recall model,
 summary, RAG surface, or alternate source of truth.
 
