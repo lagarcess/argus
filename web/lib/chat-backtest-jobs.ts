@@ -203,7 +203,9 @@ function confirmationStatusForJob(
     return "request_sent";
   }
   if (status === "failed") {
-    return "could_not_run";
+    // The job card owns the red failure signal; the settled confirmation
+    // reads quietly so one failure never paints two alarming pills.
+    return "not_completed";
   }
   if (status === "canceled" || status === "expired") {
     return "not_completed";

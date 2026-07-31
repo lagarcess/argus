@@ -1,8 +1,10 @@
 export type ArtifactStatusTone = "info" | "neutral" | "danger" | "success";
 
 const artifactStatusToneClasses = {
+  // Failure red, deliberately split from the value-negative rose #d66d75:
+  // losing money keeps the rose, broken infrastructure wears this.
   danger:
-    "border-[#d66d75]/25 bg-[#d66d75]/8 text-[#96505a] dark:border-[#d66d75]/30 dark:bg-[#d66d75]/12 dark:text-[#e0a1a7]",
+    "border-[#b3593f]/30 bg-[#b3593f]/[0.08] text-[#9c4a33] dark:border-[#e08d70]/30 dark:bg-[#e08d70]/10 dark:text-[#e5a48b]",
   info:
     "border-[#7da0ca]/25 bg-[#7da0ca]/8 text-[#4f6f95] dark:border-[#7da0ca]/30 dark:bg-[#7da0ca]/12 dark:text-[#a7bdd7]",
   neutral:

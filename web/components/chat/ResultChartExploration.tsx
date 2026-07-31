@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import type {
   ResultChartCustomError,
   ResultChartRangeKey,
@@ -232,7 +233,7 @@ export default function ResultChartExploration({
               <p
                 id={errorId}
                 data-testid="result-chart-custom-error"
-                className="text-[11px] leading-snug tracking-[0.16px] text-[#d66d75]"
+                className={`text-[11px] leading-snug tracking-[0.16px] ${inlineFailureTextClass}`}
               >
                 {t(CUSTOM_ERROR_COPY_KEY[customError])}
               </p>

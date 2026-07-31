@@ -19,6 +19,7 @@ import {
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
@@ -197,11 +198,18 @@ export default function StrategyResultCard({
           <p className="text-[14px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
             {view.hero.label}
           </p>
-          <p
-            className={`mt-1 font-display text-[38px] font-medium leading-none tracking-[-0.38px] sm:text-[46px] ${toneClassName}`}
-          >
-            {view.hero.value}
-          </p>
+          {view.hero.unavailable ? (
+            // Degraded data steps down: never a hero numeral, never a tone.
+            <p className={`mt-1 text-[20px] leading-snug ${degradedValueClass}`}>
+              {view.hero.value}
+            </p>
+          ) : (
+            <p
+              className={`mt-1 font-display text-[38px] font-medium leading-none tracking-[-0.38px] sm:text-[46px] ${toneClassName}`}
+            >
+              {view.hero.value}
+            </p>
+          )}
           <p className="mt-1.5 text-[15px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
             {view.hero.detail}
           </p>
@@ -302,7 +310,7 @@ export default function StrategyResultCard({
             className="mt-3 min-h-20 w-full resize-y rounded-[14px] border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-[#191c1f] outline-none transition-colors placeholder:text-[#8d969e] focus:border-black/24 focus:ring-2 focus:ring-black/8 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/20 dark:focus:ring-white/10"
           />
           {decisionSaveFailed && (
-            <p className="mt-2 text-[12px] text-[#d66d75]">
+            <p role="alert" className={`mt-2 text-[12px] ${inlineFailureTextClass}`}>
               {t(
                 "chat.error_generic",
                 "Something went wrong. Please try again.",
@@ -432,11 +440,16 @@ function StatItem({
   metric,
   variant = "default",
 }: {
-  metric?: { label: string; value: string };
+  metric?: { label: string; value: string; unavailable?: boolean };
   variant?: "default" | "benchmark";
 }) {
   if (!metric) return null;
   const isBenchmark = variant === "benchmark";
+  const valueClass = metric.unavailable
+    ? degradedValueClass
+    : isBenchmark
+      ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap"
+      : "text-[16px] font-medium text-[#191c1f] dark:text-white";
 
   return (
     <div className="min-w-0">
@@ -444,7 +457,7 @@ function StatItem({
         {metric.label}
       </dt>
       <dd
-        className={`mt-1.5 leading-snug tracking-[-0.08px] ${isBenchmark ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap" : "text-[16px] font-medium text-[#191c1f] dark:text-white"}`}
+        className={`mt-1.5 leading-snug tracking-[-0.08px] ${metric.unavailable ? "text-[15px] font-normal" : ""} ${valueClass}`}
       >
         {metric.value}
       </dd>
