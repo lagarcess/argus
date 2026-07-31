@@ -260,3 +260,31 @@ def test_window_shorter_than_the_indicator_warmup_is_not_confirmable(
 
 def _forbidden_provider_call(*args: Any, **kwargs: Any) -> Any:
     raise AssertionError("retest confirmation must not touch market data")
+
+
+def test_multi_symbol_runs_carry_every_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    symbols = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
+    run = _persisted_run(
+        monkeypatch,
+        {**_BUY_AND_HOLD, "symbol": symbols[0], "symbols": symbols},
+    )
+
+    setup = retest_setup_from_run(run, today=_TODAY)
+
+    assert setup is not None
+    assert list(setup.symbols) == symbols
+    payload = retest_confirmation_payload(setup, language="en")
+    assert payload is not None
+    assert payload["launch_payload"]["symbols"] == symbols
+    assert payload["strategy"]["asset_universe"] == symbols
+
+
+def test_runs_above_the_symbol_ceiling_have_no_retest_setup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
+    run["symbols"] = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META"]
+
+    assert retest_setup_from_run(run, today=_TODAY) is None
