@@ -774,7 +774,7 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     source_run_id=retest_turn.source_run_id,
                 )
-                error_payload = failed_retest_turn(
+                failure_payload = failed_retest_turn(
                     turn=retest_turn,
                     lifecycle_hooks=lifecycle_hooks,
                     request_message=request_message_record,
@@ -783,7 +783,7 @@ async def chat_stream(
                 claim_turn_terminal("recoverable_failed", "agent_runtime_failure")
                 record_control_exit("retest_run", "recoverable_failed")
                 persist_turn_evidence()
-                yield sse_data(error_payload)
+                yield sse_data({"type": "final", "payload": failure_payload})
                 yield sse_done()
                 return
             record_control_exit("retest_run", "finished")

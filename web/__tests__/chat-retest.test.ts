@@ -15,7 +15,15 @@ import {
 } from "../lib/chat-retest";
 import { hydrateMessagesFromApi } from "../components/chat/chat-message-projection";
 import { omnisearchActionHandlers } from "../components/chat/omnisearch-actions";
-import { retryLastTurnChatActionFromAction } from "../lib/chat-retry-actions";
+import {
+  normalizeDurableRetryActionHistory,
+  retryLastTurnActionFromMetadata,
+  retryLastTurnChatActionFromAction,
+} from "../lib/chat-retry-actions";
+import {
+  recoveryDisplayFromMetadata,
+  retryableAssistantRecoveryCode,
+} from "../lib/chat-recovery-display";
 import type { ChatActionOption, Message } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
@@ -208,6 +216,42 @@ describe("retest failure recovery", () => {
 
     expect(replay?.type).toBe("retest_run");
     expect(replay?.payload).toEqual(PERSISTED_ACTION.payload);
+  });
+
+  test("the live failure frame keeps the amber assistant recovery block", () => {
+    // Mirrors ChatInterface's `final` branch for the retest failure payload.
+    const finalPayload = {
+      stage_outcome: "ready_to_respond",
+      assistant_response:
+        "Something went wrong. Your conversation is saved. Please try again.",
+      message_id: "assistant-failed",
+      recovery: { code: "runtime_failure", retryable: true },
+      retry_last_turn: {
+        message: "Retest with current data",
+        action: PERSISTED_ACTION,
+      },
+    };
+    const retry = retryLastTurnActionFromMetadata(finalPayload, {
+      assistantMessageId: "assistant-failed",
+    });
+    const rendered = normalizeDurableRetryActionHistory([
+      { id: "user-retest-1", role: "user", kind: "action", content: "Retest with current data" },
+      {
+        id: "assistant-failed",
+        role: "ai",
+        kind: "text",
+        content: finalPayload.assistant_response,
+        recoveryDisplay: recoveryDisplayFromMetadata(finalPayload),
+        assistantRecoveryCode: retryableAssistantRecoveryCode(finalPayload.recovery),
+        actions: retry ? [retry] : undefined,
+      },
+    ]);
+
+    expect(rendered).toHaveLength(2);
+    expect(rendered[1].assistantRecoveryCode).toBe("runtime_failure");
+    expect(
+      retryLastTurnChatActionFromAction(rendered[1].actions?.[0])?.type,
+    ).toBe("retest_run");
   });
 
   test("a retried receipt turn stays a single visible receipt", () => {

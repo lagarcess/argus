@@ -342,7 +342,7 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
         metadata={"chat_action": sanitized_retest_action("retest-source-run")},
     )
 
-    error_payload = failed_retest_turn(
+    failure_payload = failed_retest_turn(
         turn=turn,
         lifecycle_hooks=ChatTurnLifecycleHooks(
             owner="message_only",
@@ -355,12 +355,28 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
         language="en",
     )
 
-    assert error_payload["code"] == "agent_runtime_failure"
-    assert error_payload["recovery"]["retryable"] is True
-    replay = error_payload["retry_last_turn"]["action"]
+    assert failure_payload["recovery"]["code"] == "runtime_failure"
+    assert failure_payload["recovery"]["retryable"] is True
+    assert failure_payload["assistant_response"]
+    # A live message-shaped retry keeps the amber assistant recovery block; the
+    # request-linked shape stays in metadata for the anchored reload rendering.
+    assert set(failure_payload["retry_last_turn"]) == {"message", "action"}
+    replay = failure_payload["retry_last_turn"]["action"]
     assert replay["type"] == "retest_run"
     assert replay["payload"] == _valid_envelope("retest-source-run")
-    assert error_payload["retest_receipt"]["source_run_id"] == "retest-source-run"
+    assert failure_payload["retest_receipt"]["source_run_id"] == "retest-source-run"
+    persisted = next(
+        message
+        for message in _recent_messages_for_conversation(
+            user_id=_USER_ID,
+            conversation_id=_CONVERSATION_ID,
+            limit=20,
+        )
+        if message.id == failure_payload["message_id"]
+    )
+    assert persisted.metadata["retry_last_turn"]["request_message_id"] == (
+        request_message.id
+    )
 
 
 def test_admitted_user_turn_persists_the_receipt_for_reload(stored_run: Any) -> None:

@@ -229,20 +229,30 @@ def failed_retest_turn(
         failure_code="agent_runtime_failure",
         retryable=True,
     )
-    retry_last_turn = (
+    durable_retry = (
         assistant_message.metadata.get("retry_last_turn")
         if isinstance(assistant_message.metadata, dict)
         else None
     )
-    return {
-        "type": "error",
-        "code": "agent_runtime_failure",
-        "message": assistant_text,
+    payload: dict[str, Any] = {
+        # `ready_to_respond` keeps an unrelated open confirmation intact; the
+        # failure belongs to this turn only.
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": assistant_text,
         "message_id": assistant_message.id,
         "recovery": recovery,
         "retest_receipt": dict(turn.receipt),
-        **({"retry_last_turn": retry_last_turn} if isinstance(retry_last_turn, dict) else {}),
     }
+    if isinstance(durable_retry, dict):
+        # Live frame carries the message-shaped retry so the amber assistant
+        # recovery block owns it; hydration rebuilds the anchored shape from
+        # the persisted request-linked metadata.
+        payload["retry_last_turn"] = {
+            key: durable_retry[key]
+            for key in ("message", "action")
+            if key in durable_retry
+        }
+    return payload
 
 
 def _owned_retest_setup(
