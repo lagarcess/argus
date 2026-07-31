@@ -44,6 +44,7 @@ BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
 SIGNUP_AUTH_USER_IDS="$(mktemp)"
+SIGNUP_ALLOWLIST_RESPONSE="$(mktemp)"
 API_JOB_RESPONSE="$(mktemp)"
 API_MESSAGES_RESPONSE="$(mktemp)"
 API_SEARCH_RESPONSE="$(mktemp)"
@@ -58,6 +59,7 @@ RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
+chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
 printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   > "$SERVICE_ROLE_CURL_CONFIG"
 printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
@@ -78,6 +80,7 @@ cleanup() {
     "$SERVICE_ROLE_CURL_CONFIG" \
     "$SIGNUP_AUTH_USERS_RESPONSE" \
     "$SIGNUP_AUTH_USER_IDS" \
+    "$SIGNUP_ALLOWLIST_RESPONSE" \
     "$API_JOB_RESPONSE" \
     "$API_MESSAGES_RESPONSE" \
     "$API_SEARCH_RESPONSE" \
@@ -687,10 +690,24 @@ validate_release_evidence_contract() {
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
 }
 
-run_browser_canary() {
-  if ! ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+run_browser_canary_phase() {
+  local phase="$1"
+  if ! env -u SUPABASE_SERVICE_ROLE_KEY \
+    -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
+    ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+    ARGUS_CANARY_BROWSER_PHASE="$phase" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh"; then
+    return 1
+  fi
+}
+
+run_requested_signup_denial_canary() {
+  run_browser_canary_phase "access-denial"
+}
+
+run_browser_canary() {
+  if ! run_browser_canary_phase "full"; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
@@ -1172,9 +1189,9 @@ delete_signup_allowlist() {
     >/dev/null
 }
 
-upsert_signup_allowlist() {
+insert_requested_signup_allowlist() {
   local signup_body
-  if ! signup_body="$(CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
+  if ! signup_body="$(CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
 import json
 import os
 
@@ -1182,7 +1199,8 @@ print(
     json.dumps(
         {
             "email": os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold(),
-            "role": "user",
+            "role": "requested",
+            "language": os.environ["CANARY_LANGUAGE"],
         }
     )
 )
@@ -1193,17 +1211,69 @@ PY
   service_role_curl \
     -X POST \
     -H "Content-Type: application/json" \
-    -H "Prefer: resolution=merge-duplicates,return=minimal" \
+    -H "Prefer: resolution=ignore-duplicates,return=representation" \
     -d "$signup_body" \
     "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?on_conflict=email" \
-    >/dev/null
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "requested"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("requested signup identity was not created exactly once")
+PY
+}
+
+verify_no_signup_auth_identity() {
+  collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
+}
+
+promote_requested_signup_allowlist() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=representation" \
+    -d '{"role":"user"}' \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.requested&disabled_at=is.null" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "user"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("requested signup identity promotion did not affect exactly one row")
+PY
 }
 
 prepare_signup_identity() {
   SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
   delete_signup_auth_identity &&
     delete_signup_allowlist &&
-    upsert_signup_allowlist
+    insert_requested_signup_allowlist
 }
 
 cleanup_signup_identity() {
@@ -1413,6 +1483,15 @@ prepare_capture_destination
 validate_release_evidence_contract
 if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
+fi
+if ! run_requested_signup_denial_canary; then
+  fail_canary "auth" "requested_signup_was_not_denied"
+fi
+if ! verify_no_signup_auth_identity; then
+  fail_canary "auth" "requested_signup_created_auth_identity"
+fi
+if ! promote_requested_signup_allowlist; then
+  fail_canary "auth" "requested_signup_promotion_failed"
 fi
 
 if ! run_browser_canary; then

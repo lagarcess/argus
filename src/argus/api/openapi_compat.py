@@ -225,6 +225,19 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             "Argus could not start a guest session. Please try again."
         )
 
+    access_request_op = (
+        spec.get("paths", {}).get("/api/v1/auth/access-requests", {}).get("post")
+    )
+    if access_request_op is not None:
+        responses = access_request_op.setdefault("responses", {})
+        responses["403"] = _error_response("Untrusted browser origin rejected.")
+        responses["429"] = _error_response(
+            "Too many access request attempts. Please wait before trying again."
+        )
+        responses["503"] = _error_response(
+            "Argus could not record this access request. Please try again."
+        )
+
     for path, path_item in spec.get("paths", {}).items():
         if not isinstance(path_item, dict) or path in _UNAUTHENTICATED_PATHS:
             continue

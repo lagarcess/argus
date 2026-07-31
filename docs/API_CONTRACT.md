@@ -1435,6 +1435,10 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   `en` or `es-419`. Every syntactically valid new, duplicate, approved,
   disabled, or concurrent request returns HTTP `202` with
   `{"accepted":true}`; it must not reveal allowlist state.
+- Access-request failures use RFC 9457 Problem Details: untrusted browser
+  origins return `403` / `csrf_origin_rejected`, rate limiting returns `429` /
+  `too_many_requests` with `Retry-After`, and unavailable persistence returns
+  `503` / `access_request_unavailable`.
 - An access request may insert only a missing `requested` row with normalized
   email and the requested language. It must never overwrite an existing
   requested, approved, privileged, or disabled row. `requested` and unknown

@@ -223,6 +223,36 @@ def test_public_access_request_uses_bounded_auth_attempt_limiter(
     )
 
 
+def test_public_access_request_missing_gateway_is_problem_details_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+
+    response = client.post(
+        "/api/v1/auth/access-requests",
+        json={"email": "person@example.com", "language": "en"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "access_request_unavailable"
+
+
+def test_public_access_request_persistence_failure_is_problem_details_503(
+    access_gateway: MagicMock,
+) -> None:
+    access_gateway.request_private_alpha_access.side_effect = RuntimeError(
+        "persistence unavailable"
+    )
+
+    response = client.post(
+        "/api/v1/auth/access-requests",
+        json={"email": "person@example.com", "language": "en"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "access_request_unavailable"
+
+
 def test_public_access_request_rejects_invalid_language_before_persistence(
     access_gateway: MagicMock,
 ) -> None:
@@ -267,3 +297,4 @@ def test_access_request_environment_contract_is_value_free() -> None:
         "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD="
         "your_resend_smtp_password_here" in env_example
     )
+    assert "ARGUS_APP_ORIGIN=http://localhost:3000" in env_example

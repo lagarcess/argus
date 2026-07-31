@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import os
 import time
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from pydantic import ValidationError
 
 from argus.api import state as api_state
 from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
@@ -27,6 +29,12 @@ def _require_ops_token(authorization: str | None) -> None:
     expected_header = f"Bearer {expected}"
     if authorization is None or not hmac.compare_digest(authorization, expected_header):
         raise HTTPException(status_code=404, detail="Not found")
+
+
+def _require_ops_authorization(
+    authorization: str | None = Header(default=None),
+) -> None:
+    _require_ops_token(authorization)
 
 
 def _check(name: str, status: str, duration_ms: int, **extra: Any) -> dict[str, Any]:
@@ -142,12 +150,13 @@ def _approval_signup_url() -> str:
 @router.post(
     "/internal/access-requests/approve",
     response_model=AccessApprovalResponse,
+    dependencies=[Depends(_require_ops_authorization)],
 )
-def approve_access_request(
-    body: AccessApprovalRequest,
-    authorization: str | None = Header(default=None),
-) -> AccessApprovalResponse:
-    _require_ops_token(authorization)
+async def approve_access_request(request: Request) -> AccessApprovalResponse:
+    try:
+        body = AccessApprovalRequest.model_validate(await request.json())
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError):
+        raise HTTPException(status_code=422, detail="Invalid request body.") from None
     if api_state.supabase_gateway is None:
         raise HTTPException(status_code=503, detail="Approval is unavailable.")
     try:

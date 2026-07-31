@@ -4,6 +4,7 @@ import hashlib
 import html
 import os
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -109,6 +110,7 @@ def send_access_approval_email(
         _SMTP_HOST,
         _SMTP_PORT,
         timeout=_SMTP_TIMEOUT_SECONDS,
+        context=ssl.create_default_context(),
     ) as smtp:
         smtp.login(_SMTP_USERNAME, password)
         mail_code, _ = smtp.mail(_SENDER_ADDRESS)

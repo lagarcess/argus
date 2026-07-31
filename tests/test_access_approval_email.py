@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import ssl
 from email import message_from_string
 from unittest.mock import MagicMock
 
@@ -13,10 +15,18 @@ client = TestClient(app)
 
 
 class _FakeSMTP:
-    def __init__(self, host: str, port: int, *, timeout: float) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.context = context
         self.login_args: tuple[str, str] | None = None
         self.mail_from: str | None = None
         self.recipient: str | None = None
@@ -59,8 +69,14 @@ def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
 ) -> None:
     instances: list[_FakeSMTP] = []
 
-    def _smtp(host: str, port: int, *, timeout: float) -> _FakeSMTP:
-        instance = _FakeSMTP(host, port, timeout=timeout)
+    def _smtp(
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> _FakeSMTP:
+        instance = _FakeSMTP(host, port, timeout=timeout, context=context)
         instances.append(instance)
         return instance
 
@@ -81,6 +97,8 @@ def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
     smtp = instances[0]
     assert (smtp.host, smtp.port) == ("smtp.resend.com", 465)
     assert smtp.login_args == ("resend", "re_test_password")
+    assert smtp.context.verify_mode == ssl.CERT_REQUIRED
+    assert smtp.context.check_hostname is True
     assert smtp.mail_from == "noreply@get-argus.com"
     assert smtp.recipient == "person@example.com"
     assert smtp.message is not None
@@ -110,8 +128,14 @@ def test_approval_email_hash_is_deterministic_for_normalized_recipient(
 ) -> None:
     instances: list[_FakeSMTP] = []
 
-    def _smtp(host: str, port: int, *, timeout: float) -> _FakeSMTP:
-        instance = _FakeSMTP(host, port, timeout=timeout)
+    def _smtp(
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> _FakeSMTP:
+        instance = _FakeSMTP(host, port, timeout=timeout, context=context)
         instances.append(instance)
         return instance
 
@@ -337,3 +361,42 @@ def test_internal_approval_invalid_ops_token_is_route_indistinguishable_404(
 
     assert response.status_code == 404
     gateway.get_requested_private_alpha_access.assert_not_called()
+
+
+@pytest.mark.parametrize("authorization", [None, "Bearer wrong-token"])
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"",
+        b"{",
+        json.dumps({"email": "not-an-email"}).encode(),
+        json.dumps({"email": f"{'a' * 321}@example.com"}).encode(),
+        json.dumps({"email": "person@example.com"}).encode(),
+    ],
+)
+def test_internal_approval_checks_ops_auth_before_parsing_any_body(
+    monkeypatch: pytest.MonkeyPatch,
+    authorization: str | None,
+    body: bytes,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = MagicMock()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_approval_email", sender)
+    headers = {"Content-Type": "application/json"}
+    if authorization is not None:
+        headers["Authorization"] = authorization
+
+    response = client.post(
+        "/internal/access-requests/approve",
+        content=body,
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    gateway.get_requested_private_alpha_access.assert_not_called()
+    gateway.approve_requested_private_alpha_access.assert_not_called()
+    sender.assert_not_called()

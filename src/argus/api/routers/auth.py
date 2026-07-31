@@ -718,7 +718,7 @@ def request_access(
             title="Access Request Unavailable",
             detail="Argus could not record this access request. Please try again.",
         ) from None
-    return AccessRequestAccepted()
+    return AccessRequestAccepted(accepted=True)
 
 
 @router.post("/auth/login")

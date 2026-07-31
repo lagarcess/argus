@@ -13,6 +13,7 @@ const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
 const decisionNote = process.env.ARGUS_CANARY_BROWSER_DECISION_NOTE;
 const searchQuery = process.env.ARGUS_CANARY_BROWSER_SEARCH_QUERY;
 const identityHandoff = process.env.ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF;
+const browserPhase = process.env.ARGUS_CANARY_BROWSER_PHASE ?? "full";
 const labels = JSON.parse(
   process.env.ARGUS_CANARY_STATIC_LABELS_JSON ?? "{}",
 ) as StaticLabels;
@@ -224,7 +225,59 @@ function successfulJobCapture(page: Page) {
   return capture;
 }
 
+test.describe("private-alpha requested-access denial canary", () => {
+  test.skip(
+    browserPhase !== "access-denial",
+    "Runs only before the shell promotes the requested access row.",
+  );
+
+  test("requested access cannot create an auth identity", async ({ page }) => {
+    test.setTimeout(90_000);
+    const canarySignupEmail = requireConfig(signupEmail, "signup email");
+    const canaryPassword = requireConfig(password, "password");
+    const canaryLanguage = requireConfig(language, "language");
+
+    await page.addInitScript((nextLanguage) => {
+      window.localStorage.setItem("i18nextLng", nextLanguage);
+    }, canaryLanguage);
+    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
+
+    const signupResponsePromise = page.waitForResponse((response) =>
+      isApiResponse(response, "/auth/signup", "POST"),
+    );
+    await page.locator('input[type="text"]').fill("Argus Release Canary");
+    await page.locator('input[type="email"]').fill(canarySignupEmail);
+    await page.locator('input[type="password"]').fill(canaryPassword);
+    await page
+      .getByRole("button", { name: label("auth.signup.submit") })
+      .click();
+    const signupResponse = await signupResponsePromise;
+    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
+    if (signupPayload.language !== canaryLanguage) {
+      throw new Error("Spanish denied signup omitted the canonical language");
+    }
+    const signupCaptchaToken = signupPayload.captcha_token;
+    if (
+      typeof signupCaptchaToken !== "string" ||
+      signupCaptchaToken.length < 1 ||
+      signupCaptchaToken.length > 4096
+    ) {
+      throw new Error("Denied signup CAPTCHA token was missing or unbounded");
+    }
+    expect(signupResponse.status()).toBe(400);
+    expect(record(await signupResponse.json(), "denied signup payload").code).toBe(
+      "auth_signup_failed",
+    );
+    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
+  });
+});
+
 test.describe.serial("private-alpha rendered release canary", () => {
+  test.skip(
+    browserPhase !== "full",
+    "Runs only after the shell promotes the requested access row.",
+  );
+
   test("deterministic/intercepted recovery is not deployed backend proof", async ({ page }) => {
     test.setTimeout(90_000);
     const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";

@@ -43,6 +43,26 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "approver" in runbook
 
 
+def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
+    evidence = _source("docs/release-evidence/public-alpha-readiness.md")
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+
+    assert "061ba50e" in evidence
+    assert "prefer a forward fix" in evidence.lower()
+    assert "role = 'requested'" in evidence
+    assert "disabled_at is null" in evidence
+    assert "active_requested_rows" in evidence
+    assert "Do not execute this SQL as part of repository verification." in evidence
+
+    disable_index = evidence.index("update public.private_alpha_allowlist")
+    readback_index = evidence.index("select count(*) as active_requested_rows")
+    rollback_index = evidence.index("roll back application code below `061ba50e`")
+    assert disable_index < readback_index < rollback_index
+
+    assert "release-evidence/public-alpha-readiness.md" in runbook
+    assert "061ba50e" in runbook
+
+
 def test_execution_realism_contract_is_consistent_across_canon_and_release_docs() -> None:
     for path in (
         "docs/PRODUCT.md",

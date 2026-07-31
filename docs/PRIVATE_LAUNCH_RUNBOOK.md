@@ -389,6 +389,16 @@ Authentication continues to land both guest and registered identities directly
 in ordinary chat. Guest behavior differs through verified identity,
 persistence, allowances, and conversion policy, not through onboarding.
 
+### Waitlist rollback floor
+
+The durable waitlist rollback procedure is
+`docs/release-evidence/public-alpha-readiness.md`. Commit `061ba50e` is the
+fail-closed floor while the schema can contain active `requested` rows. Prefer
+a forward fix. Before any authorized rollback below that commit, atomically
+disable every active requested row, read back zero active requested rows, and
+only then roll back application code. Never execute that production SQL during
+local repository verification.
+
 ## Smoke Test
 
 Use an allowlisted account and verify:

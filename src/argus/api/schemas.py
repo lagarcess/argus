@@ -732,7 +732,7 @@ class AccessRequestCreate(BaseModel):
 class AccessRequestAccepted(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    accepted: Literal[True] = True
+    accepted: Literal[True]
 
 
 class AccessApprovalRequest(BaseModel):

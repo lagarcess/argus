@@ -148,7 +148,7 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
     assert "delete_signup_auth_identity" in shell_source
-    assert "upsert_signup_allowlist" in shell_source
+    assert "insert_requested_signup_allowlist" in shell_source
     assert "cleanup_signup_identity" in shell_source
     assert "trap cleanup EXIT" in shell_source
 
@@ -156,7 +156,7 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
         "\n}", 1
     )[0]
     assert prepare_body.index("delete_signup_auth_identity") < prepare_body.index(
-        "upsert_signup_allowlist"
+        "insert_requested_signup_allowlist"
     )
 
     cleanup_body = shell_source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
@@ -172,6 +172,35 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     assert main_body.index("prepare_signup_identity") < main_body.index(
         "run_browser_canary"
     )
+
+
+def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    runner_source = _source(".github/canary-browser.sh")
+    main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
+
+    assert '"role": "requested"' in shell_source
+    assert "run_requested_signup_denial_canary" in shell_source
+    assert "verify_no_signup_auth_identity" in shell_source
+    assert "promote_requested_signup_allowlist" in shell_source
+    assert "role=eq.requested" in shell_source
+    assert "disabled_at=is.null" in shell_source
+    assert '"role":"user"' in shell_source
+
+    assert main_body.index("prepare_signup_identity") < main_body.index(
+        "run_requested_signup_denial_canary"
+    ) < main_body.index("verify_no_signup_auth_identity") < main_body.index(
+        "promote_requested_signup_allowlist"
+    ) < main_body.index("run_browser_canary")
+
+    assert "ARGUS_CANARY_BROWSER_PHASE" in runner_source
+    assert "access-denial" in runner_source
+    assert "full" in runner_source
+    assert "env -u SUPABASE_SERVICE_ROLE_KEY" in runner_source
+    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in runner_source
+    assert 'ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="' not in runner_source
+    assert "if ! env -u SUPABASE_SERVICE_ROLE_KEY" in shell_source
+    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
 
 
 def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:
