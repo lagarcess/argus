@@ -62,7 +62,11 @@ import {
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
-import { loadCommandPaletteRecentRecall } from "@/lib/command-palette-recent-recall";
+import {
+  isRecentRecallResponse,
+  loadCommandPaletteRecentRecall,
+  retainRecalledRecentItems,
+} from "@/lib/command-palette-recent-recall";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type DossierAction = SearchConversationItem["actions"][number];
@@ -359,13 +363,13 @@ export default function ChatCommandPalette({
         const { items } = await listHistory({ limit: 50 });
         if (!isCurrent()) return;
         const visibleRecents = items.filter((item) => item.type === "chat");
-        setRecentItems(visibleRecents);
         const response = await loadCommandPaletteRecentRecall({
-          conversationIds: visibleRecents.map(rawConversationId),
+          recentItems: visibleRecents,
           fetchRecall: searchGlobal,
           isCurrent,
         });
         if (!response || !isCurrent()) return;
+        setRecentItems(response.recentItems);
         setSearchResults(response.items);
         setSearchNextCursor(null);
         setLedgerGroups(isGuest ? [] : (response.ledger_groups ?? []));
@@ -675,7 +679,7 @@ export default function ChatCommandPalette({
       const response =
         currentQuery === "" && !currentLedgerMode
           ? await loadCommandPaletteRecentRecall({
-              conversationIds: recentItems.map(rawConversationId),
+              recentItems,
               fetchRecall: searchGlobal,
               isCurrent: () => !isStale(),
             })
@@ -689,6 +693,14 @@ export default function ChatCommandPalette({
               includeLedgerGroups: true,
             });
       if (!response || isStale()) return;
+      if (isRecentRecallResponse(response)) {
+        setRecentItems((current) =>
+          retainRecalledRecentItems(
+            current,
+            response.recalledConversationIds,
+          ),
+        );
+      }
       setSearchResults(response.items);
       setSearchNextCursor(response.next_cursor);
       setLedgerGroups(

@@ -3572,6 +3572,71 @@ def test_search_run_fresh_omits_unfaithful_dca_snapshot(
     assert all(candidate.type != "run_fresh" for candidate in item.actions)
 
 
+def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> None:
+    from argus.domain.conversation_recall import project_conversation_recall
+
+    now = utcnow()
+    oversized_rule_spec = {
+        "conditions": [
+            {
+                "indicator": "sma",
+                "operator": "above",
+                "threshold": index,
+                "description": "x" * 200,
+            }
+            for index in range(30)
+        ]
+    }
+    projected = project_conversation_recall(
+        conversation={
+            "id": "oversized-run-fresh-conversation",
+            "title": "Large signal strategy",
+            "updated_at": now,
+        },
+        runs=[
+            {
+                "id": "oversized-run-fresh-run",
+                "conversation_id": "oversized-run-fresh-conversation",
+                "status": "completed",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "signal_strategy",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    },
+                    "resolved_strategy": {
+                        "strategy_type": "signal_strategy",
+                        "asset_class": "equity",
+                        "rule_spec": oversized_rule_spec,
+                    },
+                    "resolved_parameters": {
+                        "timeframe": "1D",
+                        "sizing_mode": "capital_amount",
+                        "capital_amount": 10_000,
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+                "conversation_result_card": {"title": "Large signal result"},
+                "created_at": now,
+            }
+        ],
+        ideas=[],
+        evidence=[],
+        decisions=[],
+        query="",
+    )
+
+    assert projected is not None
+    _, item = projected
+    assert item.title == "Large signal strategy"
+    assert item.dossier.tested is not None
+    assert all(candidate.type != "run_fresh" for candidate in item.actions)
+
+
 def test_invalid_cursor_returns_problem_details() -> None:
     client = _client()
     response = client.get("/api/v1/search?q=tesla&limit=5&cursor=not-a-valid-cursor")

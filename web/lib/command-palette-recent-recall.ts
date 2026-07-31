@@ -1,4 +1,5 @@
 import type {
+  HistoryItem,
   SearchConversationItem,
   SearchResponse,
 } from "./argus-api";
@@ -13,17 +14,51 @@ export type RecentRecallRequest = {
 };
 
 type LoadRecentRecallParams = {
-  conversationIds: readonly string[];
+  recentItems: readonly HistoryItem[];
   fetchRecall: (params: RecentRecallRequest) => Promise<SearchResponse>;
   isCurrent?: () => boolean;
 };
 
+export type RecentRecallResponse = SearchResponse & {
+  recentItems: HistoryItem[];
+  recalledConversationIds: string[];
+};
+
+export function isRecentRecallResponse(
+  response: SearchResponse,
+): response is RecentRecallResponse {
+  return (
+    "recalledConversationIds" in response &&
+    Array.isArray(response.recalledConversationIds)
+  );
+}
+
+export function retainRecalledRecentItems(
+  items: readonly HistoryItem[],
+  recalledConversationIds: readonly string[],
+): HistoryItem[] {
+  const recalledIds = new Set(recalledConversationIds);
+  return items.filter(
+    (item) =>
+      item.type === "chat" &&
+      recalledIds.has(item.conversation_id ?? item.id),
+  );
+}
+
 export async function loadCommandPaletteRecentRecall({
-  conversationIds,
+  recentItems,
   fetchRecall,
   isCurrent = () => true,
-}: LoadRecentRecallParams): Promise<SearchResponse | null> {
-  const visibleIds = [...new Set(conversationIds.filter(Boolean))];
+}: LoadRecentRecallParams): Promise<RecentRecallResponse | null> {
+  const recentById = new Map<string, HistoryItem>();
+  for (const item of recentItems) {
+    if (item.type !== "chat") continue;
+    const conversationId = item.conversation_id ?? item.id;
+    if (conversationId && !recentById.has(conversationId)) {
+      recentById.set(conversationId, item);
+    }
+  }
+  const visibleIds = [...recentById.keys()];
   if (visibleIds.length > MAX_VISIBLE_RECENT_CONVERSATIONS) {
     throw new Error("Recent recall accepts at most 50 visible conversations.");
   }
@@ -39,6 +74,8 @@ export async function loadCommandPaletteRecentRecall({
       items: [],
       next_cursor: null,
       ledger_groups: ledgerResponse.ledger_groups ?? [],
+      recentItems: [],
+      recalledConversationIds: [],
     };
   }
   if (!isCurrent()) return null;
@@ -61,13 +98,13 @@ export async function loadCommandPaletteRecentRecall({
       recalledById.set(item.conversation_id, item);
     }
   }
-  if (recalledById.size !== targetIds.size) {
-    throw new Error("Recent recall is missing visible conversations.");
-  }
+  const recalledConversationIds = visibleIds.filter((id) => recalledById.has(id));
 
   return {
-    items: visibleIds.map((id) => recalledById.get(id)!),
+    items: recalledConversationIds.map((id) => recalledById.get(id)!),
     next_cursor: null,
     ledger_groups: response.ledger_groups ?? [],
+    recentItems: recalledConversationIds.map((id) => recentById.get(id)!),
+    recalledConversationIds,
   };
 }

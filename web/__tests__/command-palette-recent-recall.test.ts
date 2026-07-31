@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { loadCommandPaletteRecentRecall } from "../lib/command-palette-recent-recall";
+import {
+  loadCommandPaletteRecentRecall,
+  retainRecalledRecentItems,
+} from "../lib/command-palette-recent-recall";
 import { searchGlobal } from "../lib/argus-api";
 import type {
   SearchConversationItem,
@@ -29,6 +32,18 @@ function conversationItem(id: string): SearchConversationItem {
       left_off: null,
     },
     actions: [],
+  };
+}
+
+function historyItem(id: string) {
+  return {
+    type: "chat" as const,
+    id: `history-${id}`,
+    conversation_id: id,
+    title: `History ${id}`,
+    subtitle: `Preview ${id}`,
+    pinned: false,
+    created_at: "2026-07-30T12:00:00.000Z",
   };
 }
 
@@ -99,7 +114,11 @@ describe("command palette Recent dossier recall", () => {
     };
 
     const result = await loadCommandPaletteRecentRecall({
-      conversationIds: ["recent-a", "recent-b", "recent-a"],
+      recentItems: [
+        historyItem("recent-a"),
+        historyItem("recent-b"),
+        historyItem("recent-a"),
+      ],
       fetchRecall: async (params) => {
         requests.push(params);
         return response;
@@ -127,7 +146,7 @@ describe("command palette Recent dossier recall", () => {
     const requests: Array<Record<string, unknown>> = [];
 
     const result = await loadCommandPaletteRecentRecall({
-      conversationIds: [],
+      recentItems: [],
       fetchRecall: async (params) => {
         requests.push(params);
         return {
@@ -155,27 +174,58 @@ describe("command palette Recent dossier recall", () => {
         { decision_state: "rejected", count: 0 },
         { decision_state: "revisit_later", count: 0 },
       ],
+      recentItems: [],
+      recalledConversationIds: [],
     });
   });
 
-  test("rejects partial recall instead of rendering a visible row without its dossier", async () => {
-    expect(
-      loadCommandPaletteRecentRecall({
-        conversationIds: ["recent-a", "recent-b"],
-        fetchRecall: async () => ({
-          items: [conversationItem("recent-a")],
-          next_cursor: null,
-          ledger_groups: [],
-        }),
+  test("reconciles a concurrently deleted Recent without rejecting surviving dossiers", async () => {
+    const result = await loadCommandPaletteRecentRecall({
+      recentItems: [
+        historyItem("recent-a"),
+        historyItem("deleted-in-another-tab"),
+        historyItem("recent-b"),
+      ],
+      fetchRecall: async () => ({
+        items: [
+          conversationItem("recent-b"),
+          conversationItem("recent-a"),
+        ],
+        next_cursor: null,
+        ledger_groups: [],
       }),
-    ).rejects.toThrow("missing visible conversations");
+    });
+
+    expect(result?.recentItems.map((item) => item.conversation_id)).toEqual([
+      "recent-a",
+      "recent-b",
+    ]);
+    expect(
+      result?.items.map((item) =>
+        item.type === "conversation" ? item.conversation_id : item.type,
+      ),
+    ).toEqual(["recent-a", "recent-b"]);
+  });
+
+  test("decision refresh retains current rows instead of restoring a locally removed row", () => {
+    const renamedCurrent = {
+      ...historyItem("recent-b"),
+      title: "Renamed while refresh was pending",
+    };
+
+    expect(
+      retainRecalledRecentItems(
+        [renamedCurrent],
+        ["recent-a", "recent-b"],
+      ),
+    ).toEqual([renamedCurrent]);
   });
 
   test("ignores a late response after Recents loses request ownership", async () => {
     let current = true;
 
     const result = await loadCommandPaletteRecentRecall({
-      conversationIds: ["recent-a"],
+      recentItems: [historyItem("recent-a")],
       fetchRecall: async () => {
         current = false;
         return {
@@ -191,15 +241,15 @@ describe("command palette Recent dossier recall", () => {
   });
 
   test("enforces the visible History bound before making a request", async () => {
-    const conversationIds = Array.from(
+    const recentItems = Array.from(
       { length: 51 },
-      (_, index) => `recent-${index}`,
+      (_, index) => historyItem(`recent-${index}`),
     );
     let called = false;
 
     expect(
       loadCommandPaletteRecentRecall({
-        conversationIds,
+        recentItems,
         fetchRecall: async () => {
           called = true;
           return { items: [], next_cursor: null, ledger_groups: [] };

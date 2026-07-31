@@ -1942,6 +1942,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(refreshCanonicalSearch).toContain(
       "commandPaletteCanonicalRecallLimit(",
     );
+    expect(refreshCanonicalSearch).toContain("setRecentItems((current)");
+    expect(refreshCanonicalSearch).toContain("retainRecalledRecentItems(");
     expect(refreshCanonicalSearch).toContain("currentQuery,");
     expect(refreshCanonicalSearch).toContain("currentLedgerMode,");
     expect(palette).toContain(

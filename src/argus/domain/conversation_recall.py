@@ -818,14 +818,14 @@ def _run_fresh_action(
             parameters=parameters,
             execution_realism=execution_realism,
         )
+        return SearchRunFreshAction(
+            source_run_id=run_id,
+            run_label=_run_label(run),
+            canonical_setup=setup,
+            send_text=_run_fresh_send_text(setup=setup, language=language),
+        )
     except ValueError:
         return None
-    return SearchRunFreshAction(
-        source_run_id=run_id,
-        run_label=_run_label(run),
-        canonical_setup=setup,
-        send_text=_run_fresh_send_text(setup=setup, language=language),
-    )
 
 
 def _decision_action(
