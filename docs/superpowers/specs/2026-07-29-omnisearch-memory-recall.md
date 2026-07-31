@@ -1,5 +1,10 @@
 # Omnisearch is Argus's memory — conversation recall, asset rollups, and the actionable dossier
 
+Status: **DELIVERED** — PR #306 merged into `codex/private-alpha-next` as
+`b71f1eaf` on 2026-07-31. This document is retained as the accepted product
+contract and historical implementation evidence; do not redispatch it as an
+open lane.
+
 Founder-locked 2026-07-29, after PR #305 (`88ab906d`) landed decision-first
 previews. This spec is the shape that completes founder outcome 6
 ("Omnisearch lives up to its full capability") for the current product.

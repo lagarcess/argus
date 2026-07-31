@@ -1,5 +1,9 @@
 # Omnisearch Memory Recall Implementation Plan
 
+Status: **DELIVERED** — PR #306 merged into `codex/private-alpha-next` as
+`b71f1eaf` on 2026-07-31. This plan is retained as historical execution
+evidence and must not be restarted.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.

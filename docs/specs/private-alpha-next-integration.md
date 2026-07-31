@@ -2,11 +2,11 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-29
+Last reconciled: 2026-07-31
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #304 at `59a274c3`. Later commits may reconcile
+Latest product checkpoint: PR #306 at `b71f1eaf`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -36,7 +36,15 @@ bounded progressive Recents disclosure, and PR #303 reconciled catalog-valid
 benchmarks with explicit zero price bars before confirmation. PR #304 then
 completed distinct Quick take, Explain result, typed Try next, and recoverable
 failure ownership across live turns, durable jobs, reload, English, and
-Spanish.
+Spanish. PR #305 then completed issue #253's deterministic decision-first
+recall projection and panel as `88ab906d`. PR #306 completed the Full
+Omnisearch memory-inspector journey as `b71f1eaf`: one ranked conversation row,
+bounded object-first transcript recall, jump-to-match, deterministic dossiers
+and asset rollups, exact decision filtering and mutation refresh, and
+provider-free **Run it fresh** composition. The accepted implementation keeps
+the #232 pagination/cursor boundary and #252 navigation-race guarantees, adds
+no RAG/embeddings or durable recall model, and closes the Omnisearch product
+lane without claiming deployment or tester exposure.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
