@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
@@ -119,6 +120,68 @@ def test_memory_asset_prefix_resolution_uses_a_bounded_sorted_window() -> None:
             == expected
         )
         assert symbols.lookups <= max_lookups
+
+
+def test_memory_search_index_cache_evicts_and_closes_only_after_active_readers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Ledger:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        def close(self) -> None:
+            self.close_calls += 1
+
+    class _Index:
+        def __init__(self, revision: int) -> None:
+            self.revision = revision
+            self.ledger_index = _Ledger()
+
+    built: list[_Index] = []
+
+    def _build(*, store: Any, user: Any) -> _Index:
+        del user
+        index = _Index(store.search_revision)
+        built.append(index)
+        return index
+
+    monkeypatch.setattr(memory_search_candidates, "_INDEX_CACHE", OrderedDict())
+    monkeypatch.setattr(memory_search_candidates, "_INDEX_CACHE_MAX_ENTRIES", 2)
+    monkeypatch.setattr(
+        memory_search_candidates,
+        "_build_memory_search_index",
+        _build,
+    )
+    user = api_state.store.get_or_create_dev_user()
+    stores = [type(api_state.store)() for _ in range(3)]
+
+    with memory_search_candidates._memory_search_index(
+        store=stores[0],
+        user=user,
+    ):
+        with memory_search_candidates._memory_search_index(
+            store=stores[1],
+            user=user,
+        ):
+            pass
+        with memory_search_candidates._memory_search_index(
+            store=stores[2],
+            user=user,
+        ):
+            assert built[0].ledger_index.close_calls == 0
+
+    assert len(memory_search_candidates._INDEX_CACHE) == 2
+    assert built[0].ledger_index.close_calls == 1
+
+    stores[1].bump_search_revision()
+    with memory_search_candidates._memory_search_index(
+        store=stores[1],
+        user=user,
+    ):
+        pass
+
+    assert len(memory_search_candidates._INDEX_CACHE) == 2
+    assert built[1].ledger_index.close_calls == 1
 
 
 def test_memory_asset_rollup_is_precomputed_once_per_search_revision(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -115,6 +116,20 @@ def test_memory_ledger_index_serializes_shared_connection_queries() -> None:
         )
 
     assert results == (expected,) * 64
+
+
+def test_memory_ledger_index_close_releases_sqlite_connection() -> None:
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=(("conversation-decided", "shared needle"),),
+        decision_states_by_conversation={
+            "conversation-decided": {"watching"},
+        },
+    )
+
+    index.close()
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        index.counts(query="shared needle", eligible_conversation_id=None)
 
 
 @pytest.mark.parametrize("query", ("broadanchor", "broadanchor zz"))

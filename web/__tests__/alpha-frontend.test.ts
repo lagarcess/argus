@@ -1386,7 +1386,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain("export async function searchGlobal");
   });
 
-  test("transcript matches open through the bounded anchored read and focus the message", () => {
+  test("transcript matches load the complete thread before focusing the message", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1401,7 +1401,6 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain(
       'searchParams.append("anchor_message_id", options.anchorMessageId)',
     );
-    expect(chat).toContain("{ anchorMessageId: requestedMessageId }");
     expect(chat).toContain(
       "loadAllConversationMessagePages(\n          targetConversationId,",
     );
@@ -1414,6 +1413,12 @@ describe("Argus Alpha frontend contract", () => {
     const anchoredNavigation = chat.slice(
       chat.indexOf("if (options.messageId)"),
       chat.indexOf("let renderedStaleSnapshot"),
+    );
+    expect(anchoredNavigation).not.toContain(
+      "{ anchorMessageId: requestedMessageId }",
+    );
+    expect(anchoredNavigation).toContain(
+      "loadAllConversationMessagePages(\n          targetConversationId,\n        )",
     );
     expect(anchoredNavigation).toContain(
       "isCurrentAnchoredConversationRequest({",

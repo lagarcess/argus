@@ -72,6 +72,11 @@ class MemoryLedgerIndex:
             rows = self._connection.execute(sql, parameters).fetchall()
         return {str(state): int(count) for state, count in rows}
 
+    def close(self) -> None:
+        """Release the non-durable SQLite connection."""
+        with self._lock:
+            self._connection.close()
+
     def _guest_counts(self, conversation_id: str) -> dict[str, int]:
         with self._lock:
             rows = self._connection.execute(

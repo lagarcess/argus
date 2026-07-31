@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from bisect import bisect_left
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Iterator, Mapping
 
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.memory_ledger_index import (
@@ -108,7 +109,18 @@ class _MemorySearchIndex:
     ledger_index: MemoryLedgerIndex
 
 
-_INDEX_CACHE: dict[tuple[int, str], _MemorySearchIndex] = {}
+@dataclass
+class _MemorySearchIndexCacheEntry:
+    index: _MemorySearchIndex
+    active_readers: int = 0
+    retired: bool = False
+
+
+_INDEX_CACHE_MAX_ENTRIES = 8
+_INDEX_CACHE: OrderedDict[
+    tuple[int, str],
+    _MemorySearchIndexCacheEntry,
+] = OrderedDict()
 _INDEX_CACHE_LOCK = RLock()
 
 
@@ -127,6 +139,34 @@ def bounded_memory_search_snapshot(
     conversation_ids: Iterable[str] | None = None,
 ) -> MemorySearchSnapshot:
     """Read a bounded query page from a revision-keyed, non-durable index."""
+    with _memory_search_index(store=store, user=user) as index:
+        return _bounded_memory_search_snapshot_for_index(
+            index=index,
+            query=query,
+            source_limit=source_limit,
+            include_conversation_rows=include_conversation_rows,
+            cursor_updated_at=cursor_updated_at,
+            cursor_id=cursor_id,
+            decision_state=decision_state,
+            include_ledger_groups=include_ledger_groups,
+            guest_conversation_id=guest_conversation_id,
+            conversation_ids=conversation_ids,
+        )
+
+
+def _bounded_memory_search_snapshot_for_index(
+    *,
+    index: _MemorySearchIndex,
+    query: str,
+    source_limit: int,
+    include_conversation_rows: bool,
+    cursor_updated_at: datetime | None = None,
+    cursor_id: str | None = None,
+    decision_state: str | None = None,
+    include_ledger_groups: bool = False,
+    guest_conversation_id: str | None = None,
+    conversation_ids: Iterable[str] | None = None,
+) -> MemorySearchSnapshot:
     if source_limit < 1:
         raise ValueError("Memory search source limit must be positive.")
     requested_conversation_ids = tuple(
@@ -140,7 +180,6 @@ def bounded_memory_search_snapshot(
         max(source_limit * _MEMORY_MATCH_OVERSAMPLE, _MEMORY_MATCH_OVERSAMPLE),
         _MEMORY_MATCH_LIMIT_MAX,
     )
-    index = _memory_search_index(store=store, user=user)
     eligible_groups = index.all_conversation_ids
     if decision_state is not None:
         eligible_groups = index.conversation_ids_by_decision_state.get(
@@ -246,15 +285,42 @@ def bounded_memory_search_snapshot(
     )
 
 
-def _memory_search_index(*, store: AlphaStore, user: User) -> _MemorySearchIndex:
+@contextmanager
+def _memory_search_index(
+    *,
+    store: AlphaStore,
+    user: User,
+) -> Iterator[_MemorySearchIndex]:
     cache_key = (id(store), user.id)
     with _INDEX_CACHE_LOCK:
-        cached = _INDEX_CACHE.get(cache_key)
-        if cached is not None and cached.revision == store.search_revision:
-            return cached
-        built = _build_memory_search_index(store=store, user=user)
-        _INDEX_CACHE[cache_key] = built
-        return built
+        entry = _INDEX_CACHE.get(cache_key)
+        if entry is not None and entry.index.revision == store.search_revision:
+            _INDEX_CACHE.move_to_end(cache_key)
+        else:
+            stale_entry = _INDEX_CACHE.pop(cache_key, None)
+            if stale_entry is not None:
+                _retire_memory_search_index(stale_entry)
+            entry = _MemorySearchIndexCacheEntry(
+                index=_build_memory_search_index(store=store, user=user),
+            )
+            _INDEX_CACHE[cache_key] = entry
+            while len(_INDEX_CACHE) > _INDEX_CACHE_MAX_ENTRIES:
+                _, evicted_entry = _INDEX_CACHE.popitem(last=False)
+                _retire_memory_search_index(evicted_entry)
+        entry.active_readers += 1
+    try:
+        yield entry.index
+    finally:
+        with _INDEX_CACHE_LOCK:
+            entry.active_readers -= 1
+            if entry.retired and entry.active_readers == 0:
+                entry.index.ledger_index.close()
+
+
+def _retire_memory_search_index(entry: _MemorySearchIndexCacheEntry) -> None:
+    entry.retired = True
+    if entry.active_readers == 0:
+        entry.index.ledger_index.close()
 
 
 def _build_memory_search_index(

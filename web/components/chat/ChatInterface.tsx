@@ -700,8 +700,6 @@ export default function ChatInterface() {
       try {
         const items = await loadAllConversationMessagePages(
           targetConversationId,
-          undefined,
-          { anchorMessageId: requestedMessageId },
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
