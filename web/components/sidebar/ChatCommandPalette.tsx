@@ -17,11 +17,16 @@ import {
   Loader2,
   Maximize2,
   MessageSquare,
+  MessageSquareWarning,
   Minimize2,
   Search,
   Trash2,
   X,
 } from "lucide-react";
+import {
+  inlineFailureTextClass,
+  panelFailureIconClass,
+} from "@/lib/failure-treatment";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -1235,6 +1240,10 @@ export default function ChatCommandPalette({
                 className="flex flex-col items-center justify-center px-6 py-20 text-center"
                 role="alert"
               >
+                <MessageSquareWarning
+                  className={`mb-3 ${panelFailureIconClass}`}
+                  aria-hidden="true"
+                />
                 <p className="text-[14px] text-black/50 dark:text-white/50">
                   {t(
                     "command_palette.read_error",
@@ -1818,7 +1827,7 @@ export default function ChatCommandPalette({
                               className="mt-3 min-h-24 w-full resize-y rounded-[12px] border border-black/10 bg-white px-3 py-2 text-[16px] leading-relaxed text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/25"
                             />
                             {decisionSaveFailed && (
-                              <p className="mt-2 text-[12px] text-[#d66d75]">
+                              <p role="alert" className={`mt-2 text-[12px] ${inlineFailureTextClass}`}>
                                 {t(
                                   "chat.error_generic",
                                   "Something went wrong. Please try again.",
