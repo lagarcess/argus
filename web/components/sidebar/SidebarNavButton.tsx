@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
+import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -72,21 +73,15 @@ export default function SidebarNavButton({
       >
         {label}
       </span>
-      {shortcutHint && !collapsed && (
-        <span
-          aria-hidden="true"
-          className={`ml-auto select-none font-mono text-[11px] font-medium tracking-tight text-black/30 transition-all duration-150 dark:text-white/30 ${
-            showShortcutHint
-              ? "translate-x-0 opacity-100"
-              : "translate-x-1 opacity-0"
-          }`}
-        >
-          {shortcutHint}
-        </span>
-      )}
-      {trailing && !collapsed && (
-        <div className={`${shortcutHint ? "ml-2" : "ml-auto"} pr-4`}>
-          {trailing}
+      {!collapsed && (shortcutHint || trailing) && (
+        <div className="ml-auto flex h-[22px] shrink-0 items-center justify-end pr-4">
+          {showShortcutHint && shortcutHint ? (
+            <KeyboardShortcutKeycap className="select-none">
+              {shortcutHint}
+            </KeyboardShortcutKeycap>
+          ) : (
+            trailing
+          )}
         </div>
       )}
     </button>

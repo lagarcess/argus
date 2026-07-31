@@ -71,6 +71,9 @@ describe("keyboard shortcuts overlay", () => {
   test("shares numbered quick-jump behavior between Recents and Settings", () => {
     const sidebar = source("components/sidebar/ChatSidebar.tsx");
     const profileMenu = source("components/sidebar/ProfileMenu.tsx");
+    const sidebarNavButton = source("components/sidebar/SidebarNavButton.tsx");
+    const quickJumpBadge = source("components/keyboard/QuickJumpBadge.tsx");
+    const keycap = source("components/keyboard/KeyboardShortcutKeycap.tsx");
     const quickPeekPath = join(
       root,
       "components/sidebar/RecentsQuickPeek.tsx",
@@ -81,6 +84,27 @@ describe("keyboard shortcuts overlay", () => {
     expect(profileMenu).toContain("useQuickJump");
     expect(profileMenu).toContain("QuickJumpBadge");
     expect(profileMenu).toContain('presentation="shortcut_hint"');
+    expect(profileMenu).toContain("!isQuickJumpActive && (");
+    expect(profileMenu).toContain("min-w-[304px]");
+    expect(profileMenu).toContain("h-[294px]");
+    expect(profileMenu).toContain("min-h-[88px]");
+    expect(profileMenu).toContain("h-[22px] w-full");
+    expect(profileMenu.match(/min-w-\[248px\]/g)).toHaveLength(3);
+    expect(profileMenu).toContain("min-h-[38px]");
+    expect(profileMenu).toContain(
+      'button disabled className="flex min-h-[38px] w-full cursor-not-allowed',
+    );
+    expect(profileMenu).toContain('className="whitespace-nowrap"');
+    expect(sidebarNavButton).toContain("KeyboardShortcutKeycap");
+    expect(sidebarNavButton).toContain(
+      "showShortcutHint && shortcutHint ? (",
+    );
+    expect(quickJumpBadge).toContain("KeyboardShortcutKeycap");
+    expect(keycap).toContain("rounded-full");
+    expect(keycap).toContain("font-sans");
+    expect(keycap).toContain("gap-0.5");
+    expect(keycap).toContain("h-[22px]");
+    expect(keycap).toContain("text-[11px]");
     expect(existsSync(quickPeekPath)).toBe(true);
   });
 

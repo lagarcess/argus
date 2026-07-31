@@ -106,3 +106,55 @@ primitive — agent's call, name the shape before starting). Gates:
 EN/es-419, hermetic frontend suite, screenshots of the quick-jump overlay
 on both Recents and nested Settings, no backend/schema changes expected
 (flag if one turns out to be needed).
+
+## Addendum — founder-directed pivot and implementation variance (2026-07-31)
+
+This addendum preserves the original decisions above rather than rewriting
+them after implementation. It records the final product shape, the reasons
+for it, and the remaining gap for review.
+
+### Final product decision
+
+The initial reference overlay became a small keyboard navigation system: the
+registry remains the one source of truth, the overlay remains invoked rather
+than permanently visible, and Recents and Settings share one quick-jump
+primitive. The founder also approved passive shortcut foreshadowing: while
+the primary modifier is held in an already-expanded sidebar or Settings menu,
+compact keycaps reveal the available next command. This is a signpost, not a
+bare-modifier action; pressing Cmd or Ctrl alone still invokes nothing.
+
+The visual refinements are deliberate: keycaps use a compact pill treatment;
+submenu chevrons yield to a keycap while hints are visible; and the Recents
+chevron and its keycap use the same right-aligned slot. That keeps the normal
+and modifier-held states from appearing as two unrelated columns or changing
+row height.
+
+### Exact changes from the original wording
+
+1. **Recents is two actions, not one.** Inspection confirmed separately
+   controlled sidebar-open and Recents-expanded state. `Open Recents` is a
+   light, dismissible peek; `Expand sidebar and Recents` controls the
+   persistent sidebar accordion. This resolves decision 8 with the founder's
+   recommended distinction rather than silently merging the actions.
+2. **The persistent Recents command is a toggle.** Decision 7 originally
+   described only opening and expanding. Founder review added the reverse
+   behavior: when both sidebar and Recents are already open, the same command
+   closes both; from every other state, it opens and expands both. The result
+   is reversible and avoids a one-way navigation command.
+3. **Only actionable Settings rows receive numbers.** Decision 11 said to
+   number visible Settings items. The visible disabled Release Notes row is
+   intentionally excluded: a number must always lead somewhere. Enabled rows
+   at the current depth remain numbered, up to nine, so the shared primitive
+   never advertises an unavailable action.
+
+### Follow-up intentionally not represented as complete
+
+The later request to replace the `F2` rename binding has **not** been applied
+in this branch: the registry and overlay still show `F2`. It is not being
+silently treated as done. The browser-reserved `Cmd+R` / `Cmd+Shift+R` family
+is not a suitable replacement, and a new non-conflicting chord needs a final
+founder choice before this branch can claim that follow-up is complete.
+
+No backend/schema change, shortcut remapping UI, Omnisearch behavior change,
+or unconfirmed delete path was introduced. `Cmd+K` / `Ctrl+K` continues to
+open Omnisearch through the same shared registry match.

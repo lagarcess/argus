@@ -1,4 +1,5 @@
 import { quickJumpHintDisplay } from "@/lib/keyboard-shortcuts";
+import { KeyboardShortcutKeycap } from "./KeyboardShortcutKeycap";
 
 type QuickJumpBadgeProps = {
   number: number;
@@ -13,12 +14,9 @@ export function QuickJumpBadge({
 }: QuickJumpBadgeProps) {
   if (presentation === "shortcut_hint") {
     return (
-      <span
-        aria-hidden="true"
-        className="font-mono text-[11px] font-medium tracking-tight text-black/30 dark:text-white/30"
-      >
+      <KeyboardShortcutKeycap>
         {quickJumpHintDisplay(number, usesCommandKey)}
-      </span>
+      </KeyboardShortcutKeycap>
     );
   }
 
