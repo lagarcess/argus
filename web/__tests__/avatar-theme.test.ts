@@ -60,6 +60,12 @@ describe("avatar monogram themes", () => {
     expect(menu).toContain('avatarThemeStyle(theme.token, "picker")');
     expect(menu).toContain("openAvatarPicker");
     expect(menu).toContain("isAvatarPickerOpen &&");
+    expect(menu).toContain("avatarPickerDialogRef");
+    expect(menu).toContain("avatarPickerShouldRestoreFocusRef");
+    expect(menu).toContain("inert={isAvatarPickerOpen}");
+    expect(menu).toContain('document.addEventListener("keydown", handleKeyDown)');
+    expect(menu).toContain("avatarTriggerRef.current?.focus()");
+    expect(menu).toContain("h-11 w-11 items-center justify-center");
     expect(menu).not.toContain("<fieldset");
     expect(menu).toContain("bg-[#191c1f] text-white dark:bg-white/10");
     expect(menu).toContain("profile?.display_name?.trim() ||");

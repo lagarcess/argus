@@ -122,9 +122,11 @@ export default function ProfileMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
+  const avatarPickerDialogRef = useRef<HTMLDivElement>(null);
   const avatarPickerDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const avatarPickerShouldRestoreFocusRef = useRef(false);
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
@@ -162,10 +164,10 @@ export default function ProfileMenu({
 
     setIsAvatarPickerClosing(true);
     avatarPickerDismissTimerRef.current = setTimeout(() => {
+      avatarPickerShouldRestoreFocusRef.current = true;
       setIsAvatarPickerOpen(false);
       setIsAvatarPickerClosing(false);
       avatarPickerDismissTimerRef.current = null;
-      avatarTriggerRef.current?.focus();
     }, 180);
   }, [isAvatarPickerClosing, isAvatarPickerOpen]);
 
@@ -188,6 +190,50 @@ export default function ProfileMenu({
     },
     [],
   );
+
+  useEffect(() => {
+    if (isAvatarPickerOpen || !avatarPickerShouldRestoreFocusRef.current) {
+      return;
+    }
+    avatarPickerShouldRestoreFocusRef.current = false;
+    avatarTriggerRef.current?.focus();
+  }, [isAvatarPickerOpen]);
+
+  useEffect(() => {
+    if (!isAvatarPickerOpen) return;
+
+    const dialog = avatarPickerDialogRef.current;
+    if (!dialog) return;
+
+    const focusableElements = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLButtonElement>("button:not([disabled])"),
+      );
+    const selectedTheme = dialog.querySelector<HTMLButtonElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    (selectedTheme ?? focusableElements()[0])?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableElements();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isAvatarPickerOpen]);
 
   // Fetch profile on open
   useEffect(() => {
@@ -795,6 +841,7 @@ export default function ProfileMenu({
             aria-modal="true"
             aria-labelledby="argus-profile-modal-title"
             aria-hidden={isAvatarPickerOpen}
+            inert={isAvatarPickerOpen}
           >
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
@@ -1013,6 +1060,7 @@ export default function ProfileMenu({
             )}
           />
           <div
+            ref={avatarPickerDialogRef}
             className={`relative w-full max-w-[280px] rounded-[18px] border border-black/5 bg-white p-5 shadow-[0_20px_56px_rgba(0,0,0,0.2)] transition-all duration-200 dark:border-white/10 dark:bg-[#23262a] ${
               isAvatarPickerClosing
                 ? "translate-y-1 scale-[0.98] opacity-0"
@@ -1035,7 +1083,7 @@ export default function ProfileMenu({
               <button
                 type="button"
                 onClick={closeAvatarPicker}
-                className="rounded-full p-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
                 aria-label={t(
                   "settings.profile.avatar_theme.close",
                   "Close monogram colors",
