@@ -40,8 +40,16 @@ who walk through it.
    provider, fully isolating one segment's overspend from the other, though
    both still draw from one shared account credit balance. If the two-key
    code change (threading account type into the LLM client's key selection)
-   can't land in this window, ship a single account-wide cap as the interim
-   floor and say so explicitly — never ship with no cap at all.
+   can't land in this window, ship a single capped production key as the
+   interim floor and say so explicitly — never ship with no cap at all.
+   **Discovered key topology (2026-07-30):** the account's single active key
+   (`argus-dev-key`, uncapped) serves both the founder's local dev/live
+   evals and production. The cap goes on a NEW production-only key
+   (`argus-prod`, $10/week reset), swapped into Render's
+   `OPENROUTER_API_KEY` by the founder — never on the shared dev key, so
+   founder eval sessions can neither trip the production cap nor pollute
+   decision 6's zero-trip count, and the prod key's usage graph becomes the
+   first clean production-cost metric separated from dev burn.
 4. **Registration stays allowlist-gated through this lane.** The signup form
    in `GuestConversionModal.tsx` already exists and already works end to end
    for allowlisted emails (`POST /auth/signup`, gated by
