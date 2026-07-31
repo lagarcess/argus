@@ -330,8 +330,16 @@ conversion-wall change; the load test's actual numbers written up
 instance before this PR is called done, even though it isn't a
 precondition to starting the work.
 
-**Where it stops:** a Draft or posted PR, same as every other lane this
-cycle. The founder merges. The founder alone flips
+**Where it stops:** a Draft or posted PR against `codex/private-alpha-next`
+(integration) — same target as every other lane this cycle, and the
+branch's own actual fork point (`git merge-base` confirms `88ab906d` on
+integration, versus a far older point on `main`, which is still missing
+the six roadmap outcomes). Not `main` directly: `main` hasn't been
+promoted past the six-outcomes checkpoint yet, and merging ops/credential
+changes there first would fragment `main` into an inconsistent state.
+Integration is the one coherent staging ground where the six outcomes and
+this lane's changes both land and get a final combined check before
+promoting to `main` together. The founder merges. The founder alone flips
 `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` later, manually, once locked decision 6's
 criterion is actually observed — this is never something a PR, a script, or
 an agent decides on its own.
