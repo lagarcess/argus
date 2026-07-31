@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -1101,14 +1102,21 @@ def _resolve_asset_symbol(
     normalized_query = normalize_search_symbol(query)
     if normalized_query is None:
         return None
-    matches = [
-        symbol
-        for symbol in index.asset_symbols
-        if symbol.startswith(normalized_query)
-    ]
-    if normalized_query in matches:
+    match_index = bisect_left(index.asset_symbols, normalized_query)
+    if match_index >= len(index.asset_symbols):
+        return None
+    first_match = index.asset_symbols[match_index]
+    if not first_match.startswith(normalized_query):
+        return None
+    if first_match == normalized_query:
         return normalized_query
-    return matches[0] if len(matches) == 1 else None
+    next_index = match_index + 1
+    if (
+        next_index < len(index.asset_symbols)
+        and index.asset_symbols[next_index].startswith(normalized_query)
+    ):
+        return None
+    return first_match
 
 
 def _candidate(

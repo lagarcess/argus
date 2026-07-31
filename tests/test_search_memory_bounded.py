@@ -53,6 +53,25 @@ class _LockAwareMessage:
         }
 
 
+class _CountingSortedSymbols:
+    def __init__(self, values: list[str]) -> None:
+        self._values = tuple(sorted(values))
+        self.lookups = 0
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __getitem__(self, index: int) -> str:
+        self.lookups += 1
+        return self._values[index]
+
+    def __iter__(self):
+        raise AssertionError("asset-prefix lookup scanned the full symbol index")
+
+    def reset(self) -> None:
+        self.lookups = 0
+
+
 def _owned_conversation(*, conversation_id: str, title: str) -> None:
     now = datetime.now(timezone.utc)
     user = api_state.store.get_or_create_dev_user()
@@ -64,6 +83,42 @@ def _owned_conversation(*, conversation_id: str, title: str) -> None:
         language="en",
     )
     api_state.store.conversation_owners[conversation_id] = user.id
+
+
+def test_memory_asset_prefix_resolution_uses_a_bounded_sorted_window() -> None:
+    symbols = _CountingSortedSymbols(
+        [
+            *(f"asset{index:05d}" for index in range(10_000)),
+            "aapl",
+            "btc",
+            "btc/usd",
+            "msft",
+            "ss/eur",
+            "tsla",
+            "tsm",
+            "j\u030c/usd",
+        ]
+    )
+    index = type("_AssetIndex", (), {"asset_symbols": symbols})()
+    max_lookups = len(symbols).bit_length() + 2
+
+    for query, expected in (
+        ("AAPL", "aapl"),
+        ("BTC", "btc"),
+        ("btc/", "btc/usd"),
+        ("ts", None),
+        ("J\u030c/", "j\u030c/usd"),
+        ("ss/e", "ss/eur"),
+        ("zzzz", None),
+        ("", None),
+        ("BTC USD", None),
+    ):
+        symbols.reset()
+        assert (
+            memory_search_candidates._resolve_asset_symbol(index, query=query)
+            == expected
+        )
+        assert symbols.lookups <= max_lookups
 
 
 def test_memory_search_bounds_message_candidates_and_copies_outside_finalization_lock(
