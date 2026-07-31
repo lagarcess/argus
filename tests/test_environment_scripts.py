@@ -450,6 +450,7 @@ def test_render_blueprint_keeps_true_secrets_manual() -> None:
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
     ):
         assert api_env[key] == {"key": key, "sync": False}
     assert "OPENROUTER_API_KEY" not in api_env

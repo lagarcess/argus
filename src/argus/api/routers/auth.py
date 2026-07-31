@@ -30,6 +30,8 @@ from argus.api.guest_observability import (
 )
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import (
+    AccessRequestAccepted,
+    AccessRequestCreate,
     GuestBootstrapRequest,
     GuestHandoffClaimResponse,
     GuestHandoffCreateRequest,
@@ -45,10 +47,11 @@ router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 AUTH_LOGIN_ATTEMPT_LIMIT = 8
 AUTH_SIGNUP_ATTEMPT_LIMIT = 5
+AUTH_ACCESS_REQUEST_ATTEMPT_LIMIT = 5
 AUTH_GUEST_ATTEMPT_LIMIT = 5
 AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT = 5
 _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
-_AuthAction = Literal["login", "signup", "handoff"]
+_AuthAction = Literal["login", "signup", "access_request", "handoff"]
 _GUEST_HANDOFF_COOKIE = "argus-guest-handoff"
 _GUEST_HANDOFF_ID_COOKIE = "argus-guest-handoff-id"
 _GUEST_HANDOFF_MAX_AGE_SECONDS = 10 * 60
@@ -89,6 +92,7 @@ def _enforce_auth_attempt_limit(
     limits = {
         "login": AUTH_LOGIN_ATTEMPT_LIMIT,
         "signup": AUTH_SIGNUP_ATTEMPT_LIMIT,
+        "access_request": AUTH_ACCESS_REQUEST_ATTEMPT_LIMIT,
         "handoff": AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT,
     }
     limit = limits[action]
@@ -676,6 +680,45 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
         return auth_response(request, result)
     except Exception:
         raise _signup_auth_problem(request) from None
+
+
+@router.post(
+    "/auth/access-requests",
+    response_model=AccessRequestAccepted,
+    status_code=202,
+)
+def request_access(
+    request: Request,
+    body: AccessRequestCreate,
+) -> AccessRequestAccepted:
+    _enforce_browser_auth_origin(request)
+    _enforce_auth_attempt_limit(
+        request,
+        action="access_request",
+        email=body.email,
+    )
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=503,
+            code="access_request_unavailable",
+            title="Access Request Unavailable",
+            detail="Argus could not record this access request. Please try again.",
+        )
+    try:
+        api_state.supabase_gateway.request_private_alpha_access(
+            email=body.email,
+            language=body.language,
+        )
+    except Exception:
+        raise problem(
+            request,
+            status_code=503,
+            code="access_request_unavailable",
+            title="Access Request Unavailable",
+            detail="Argus could not record this access request. Please try again.",
+        ) from None
+    return AccessRequestAccepted()
 
 
 @router.post("/auth/login")

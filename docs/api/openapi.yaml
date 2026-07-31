@@ -39,6 +39,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/auth/access-requests:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestCreate'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/guest:
     post:
       tags:
@@ -1403,6 +1426,48 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
+    AccessApprovalRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+      additionalProperties: false
+      type: object
+      required:
+      - email
+    AccessApprovalResponse:
+      properties:
+        approved:
+          type: boolean
+          const: true
+          default: true
+      additionalProperties: false
+      type: object
+    AccessRequestAccepted:
+      properties:
+        accepted:
+          type: boolean
+          const: true
+          default: true
+      additionalProperties: false
+      type: object
+    AccessRequestCreate:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - language
     AccountCapabilities:
       properties:
         can_create_additional_conversation:

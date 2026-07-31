@@ -161,6 +161,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
         "`docs/api/openapi.yaml` is the checked compatibility artifact",
         "`GET /health`",
         "`GET /internal/readiness`",
+        "`POST /internal/access-requests/approve`",
         "`POST /api/v1/dev/reset`",
         "`POST /api/v1/chat/stream` 200 `text/event-stream` response body",
         "`/api/v1` appears exactly once",
@@ -175,6 +176,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
     assert excluded_operations == {
         "`GET /health`",
         "`GET /internal/readiness`",
+        "`POST /internal/access-requests/approve`",
         "`POST /api/v1/dev/reset`",
     }
 
@@ -419,6 +421,7 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
     unauthenticated_paths = {
         "/api/v1/auth/signup",
         "/api/v1/auth/login",
+        "/api/v1/auth/access-requests",
         "/api/v1/auth/guest",
         "/api/v1/auth/logout",
     }

@@ -9,6 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from argus.api import state as api_state
+from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
+from argus.domain.access_approval_email import send_access_approval_email
 from argus.domain.market_data import warm_asset_universe
 
 router = APIRouter(tags=["ops"])
@@ -128,3 +130,60 @@ async def readiness(
     if payload.get("status") != "ready":
         response.status_code = 503
     return payload
+
+
+def _approval_signup_url() -> str:
+    origin = (os.getenv("ARGUS_APP_ORIGIN") or "").strip().rstrip("/")
+    if not origin:
+        raise RuntimeError("Approval signup origin is unavailable.")
+    return f"{origin}/?auth=signup"
+
+
+@router.post(
+    "/internal/access-requests/approve",
+    response_model=AccessApprovalResponse,
+)
+def approve_access_request(
+    body: AccessApprovalRequest,
+    authorization: str | None = Header(default=None),
+) -> AccessApprovalResponse:
+    _require_ops_token(authorization)
+    if api_state.supabase_gateway is None:
+        raise HTTPException(status_code=503, detail="Approval is unavailable.")
+    try:
+        requested = api_state.supabase_gateway.get_requested_private_alpha_access(
+            body.email
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Approval is unavailable.") from None
+    if requested is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Access request is not eligible for approval.",
+        )
+
+    language: Language = (
+        "es-419" if requested.get("language") == "es-419" else "en"
+    )
+    try:
+        signup_url = _approval_signup_url()
+        send_access_approval_email(
+            recipient=body.email,
+            language=language,
+            signup_url=signup_url,
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Approval is unavailable.") from None
+
+    try:
+        approved = api_state.supabase_gateway.approve_requested_private_alpha_access(
+            email=body.email
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Approval is unavailable.") from None
+    if not approved:
+        raise HTTPException(
+            status_code=409,
+            detail="Access request is not eligible for approval.",
+        )
+    return AccessApprovalResponse()

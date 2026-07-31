@@ -16,7 +16,7 @@ authority. This module owns three things:
    from the approved #229 OpenAPI-authority contract.
 
 The comparison is structural, never textual, and the only excluded operations
-are the three individually named non-product operations from the contract.
+are the individually named non-product operations from the contract.
 """
 
 from __future__ import annotations
@@ -27,12 +27,13 @@ from typing import Any
 
 API_PREFIX = "/api/v1"
 
-# The approved #229 exclusion list. No public /api/v1 product route may hide
+# The approved exclusion list. No public /api/v1 product route may hide
 # behind a prefix or wildcard allowlist.
 EXCLUDED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("get", "/health"),
         ("get", "/internal/readiness"),
+        ("post", "/internal/access-requests/approve"),
         ("post", "/api/v1/dev/reset"),
     }
 )
@@ -48,6 +49,7 @@ _UNAUTHENTICATED_PATHS = frozenset(
     {
         "/api/v1/auth/signup",
         "/api/v1/auth/login",
+        "/api/v1/auth/access-requests",
         "/api/v1/auth/guest",
         "/api/v1/auth/logout",
     }

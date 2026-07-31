@@ -383,6 +383,7 @@ non-product operations:
 
 - `GET /health`
 - `GET /internal/readiness`
+- `POST /internal/access-requests/approve`
 - `POST /api/v1/dev/reset`
 
 No public `/api/v1` product route may be hidden by a prefix or wildcard
@@ -1429,7 +1430,27 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
 - `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
 - Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
-- The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
+- `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
+  `{"email":"person@example.com","language":"en"}` where `language` is exactly
+  `en` or `es-419`. Every syntactically valid new, duplicate, approved,
+  disabled, or concurrent request returns HTTP `202` with
+  `{"accepted":true}`; it must not reveal allowlist state.
+- An access request may insert only a missing `requested` row with normalized
+  email and the requested language. It must never overwrite an existing
+  requested, approved, privileged, or disabled row. `requested` and unknown
+  roles do not grant permanent access.
+- `POST /internal/access-requests/approve` is an ops-token-protected,
+  non-product operation excluded from the public OpenAPI artifact by exact
+  method and path. It loads one active requested row and its language, sends
+  one localized approval email linking to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`, then compare-and-sets
+  `role=requested AND disabled_at IS NULL` to `role=user`. Missing
+  configuration, missing or disabled state, SMTP failure, and a compare-and-set
+  miss do not return success. Missing or invalid ops authorization returns
+  `404`.
+- The allowlist remains intentionally narrow: `email`, `role`, `language`,
+  `disabled_at`, `created_at`, and `updated_at`. The approval notification does
+  not pre-create an Auth user or create an invite/password-setup flow.
 - Access is not controlled by a frontend flag or comma-separated deployed env var.
 
 **Browser session cookies:**

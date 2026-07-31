@@ -15,6 +15,7 @@
         "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS": "15",
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_MOCK_AUTH": "false",
+        "ARGUS_APP_ORIGIN": "https://argus-app-suz5.onrender.com",
         "ARGUS_STRATEGIES_ENABLED": "false",
         "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "true",
         "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
@@ -44,6 +45,7 @@
       "required_present": [
         "ARGUS_CORS_ALLOW_ORIGINS",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
         "DATABASE_URL",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
