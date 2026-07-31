@@ -10,6 +10,7 @@ export type RunDossierHistoryState = {
   nextCursor: string | null;
   totalRuns: number;
   decidedRuns: number;
+  hasLoadedData: boolean;
   status: "idle" | "loading" | "ready" | "error";
 };
 
@@ -38,6 +39,7 @@ function idleState(): RunDossierHistoryState {
     nextCursor: null,
     totalRuns: 0,
     decidedRuns: 0,
+    hasLoadedData: false,
     status: "idle",
   };
 }
@@ -123,6 +125,7 @@ export function createRunDossierHistoryController({
         nextCursor: response.next_cursor,
         totalRuns: response.total_runs,
         decidedRuns: response.decided_runs,
+        hasLoadedData: true,
         status: "ready",
       });
     } catch {
@@ -163,6 +166,7 @@ export function createRunDossierHistoryController({
         nextCursor: latestResponse.next_cursor,
         totalRuns: latestResponse.total_runs,
         decidedRuns: latestResponse.decided_runs,
+        hasLoadedData: true,
         status: "ready",
       });
     } catch {

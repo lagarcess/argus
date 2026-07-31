@@ -49,6 +49,29 @@ export function selectedDossierForPane({
   );
 }
 
+export function dossierCountsForHistory({
+  history,
+  fallbackTotalRuns,
+  fallbackDecidedRuns,
+}: {
+  history: Pick<
+    RunDossierHistoryState,
+    "totalRuns" | "decidedRuns" | "hasLoadedData"
+  >;
+  fallbackTotalRuns: number;
+  fallbackDecidedRuns: number;
+}): { totalRuns: number; decidedRuns: number } {
+  return history.hasLoadedData
+    ? {
+        totalRuns: history.totalRuns,
+        decidedRuns: history.decidedRuns,
+      }
+    : {
+        totalRuns: fallbackTotalRuns,
+        decidedRuns: fallbackDecidedRuns,
+      };
+}
+
 export type DossierPaneKeyboardAction =
   | "allow_control"
   | "delegate"
@@ -59,13 +82,17 @@ export function dossierPaneKeyboardAction({
   key,
   state,
   targetIsDossierControl = false,
+  targetIsEditable = false,
 }: {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
   targetIsDossierControl?: boolean;
+  targetIsEditable?: boolean;
   state: DossierPaneState;
 }): DossierPaneKeyboardAction {
+  const isDigitShortcut = /^[1-9]$/.test(key);
+  if (isDigitShortcut && targetIsEditable) return "allow_control";
   if (key === "Enter" && targetIsDossierControl) return "allow_control";
   const ownsKeyboard =
     state.view === "history" || state.historicalRunId !== null;
@@ -78,6 +105,7 @@ export function dossierPaneKeyboardAction({
     return "suppress_navigation";
   }
   if (key === "Enter") return "suppress_navigation";
+  if (isDigitShortcut) return "suppress_navigation";
   return "delegate";
 }
 

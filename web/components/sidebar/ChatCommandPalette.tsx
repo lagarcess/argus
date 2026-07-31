@@ -32,6 +32,7 @@ import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
 import {
   commitDossierDecision,
   DEFAULT_DOSSIER_PANE_STATE,
+  dossierCountsForHistory,
   dossierPaneKeyboardAction,
   dossierPaneTransition,
   openSelectedDossierConversation,
@@ -608,13 +609,11 @@ export default function ChatCommandPalette({
         state: dossierPaneState,
       })
     : null;
-  const historyHasCanonicalCounts = history.status !== "idle";
-  const dossierTotalRuns = historyHasCanonicalCounts
-    ? history.totalRuns
-    : (selectedPreview?.totalRuns ?? 0);
-  const dossierDecidedRuns = historyHasCanonicalCounts
-    ? history.decidedRuns
-    : (selectedPreview?.decidedRuns ?? 0);
+  const dossierCounts = dossierCountsForHistory({
+    history,
+    fallbackTotalRuns: selectedPreview?.totalRuns ?? 0,
+    fallbackDecidedRuns: selectedPreview?.decidedRuns ?? 0,
+  });
 
   useEffect(() => {
     setDossierPaneState((current) =>
@@ -1032,6 +1031,10 @@ export default function ChatCommandPalette({
     const onKeyDown = (event: KeyboardEvent) => {
       const eventTarget =
         event.target instanceof HTMLElement ? event.target : null;
+      const targetIsEditableDossierControl = Boolean(
+        eventTarget?.closest("[data-dossier-pane]") &&
+          isEditableKeyboardTarget(eventTarget),
+      );
       const targetIsDossierControl = Boolean(
         eventTarget?.closest("[data-dossier-pane]") &&
           (isEditableKeyboardTarget(eventTarget) ||
@@ -1042,6 +1045,7 @@ export default function ChatCommandPalette({
         metaKey: event.metaKey,
         ctrlKey: event.ctrlKey,
         targetIsDossierControl,
+        targetIsEditable: targetIsEditableDossierControl,
         state: dossierPaneState,
       });
       if (dossierKeyboardAction === "restore_latest") {
@@ -1718,8 +1722,8 @@ export default function ChatCommandPalette({
                       <RunDossierView
                         key={selectedDossier.run_id}
                         dossier={selectedDossier}
-                        totalRuns={dossierTotalRuns}
-                        decidedRuns={dossierDecidedRuns}
+                        totalRuns={dossierCounts.totalRuns}
+                        decidedRuns={dossierCounts.decidedRuns}
                         onBackToLatest={
                           dossierPaneState.historicalRunId
                             ? () =>

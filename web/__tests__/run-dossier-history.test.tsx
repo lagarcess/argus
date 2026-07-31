@@ -84,6 +84,7 @@ describe("lazy run dossier history state", () => {
       nextCursor: null,
       totalRuns: 0,
       decidedRuns: 0,
+      hasLoadedData: false,
       status: "idle",
     });
 
@@ -168,6 +169,61 @@ describe("lazy run dossier history state", () => {
       "5",
       "4",
     ]);
+  });
+
+  test("distinguishes first-load placeholders from preserved canonical totals", async () => {
+    const firstRead = deferred<PaginatedRunDossiers>();
+    const successfulRetry = deferred<PaginatedRunDossiers>();
+    const loadedPageFailure = deferred<PaginatedRunDossiers>();
+    const reads = [firstRead, successfulRetry, loadedPageFailure];
+    let readIndex = 0;
+    const history = createRunDossierHistoryController({
+      conversationId: "conversation-a",
+      listRunDossiers: () => reads[readIndex++].promise,
+    });
+
+    expect(history.getState()).toMatchObject({
+      status: "idle",
+      hasLoadedData: false,
+    });
+
+    const opening = history.open();
+    expect(history.getState()).toMatchObject({
+      status: "loading",
+      hasLoadedData: false,
+    });
+    firstRead.reject(new Error("first read failed"));
+    await opening;
+    expect(history.getState()).toMatchObject({
+      status: "error",
+      hasLoadedData: false,
+      totalRuns: 0,
+      decidedRuns: 0,
+    });
+
+    const retrying = history.retry();
+    expect(history.getState()).toMatchObject({
+      status: "loading",
+      hasLoadedData: false,
+    });
+    successfulRetry.resolve(page(["7"], "cursor-1", 7, 5));
+    await retrying;
+    expect(history.getState()).toMatchObject({
+      status: "ready",
+      hasLoadedData: true,
+      totalRuns: 7,
+      decidedRuns: 5,
+    });
+
+    const loadingOlder = history.loadOlder();
+    loadedPageFailure.reject(new Error("older page failed"));
+    await loadingOlder;
+    expect(history.getState()).toMatchObject({
+      status: "error",
+      hasLoadedData: true,
+      totalRuns: 7,
+      decidedRuns: 5,
+    });
   });
 
   test("refreshes only loaded pages with their stable request cursors", async () => {
@@ -258,6 +314,7 @@ describe("lazy run dossier history state", () => {
       nextCursor: null,
       totalRuns: 0,
       decidedRuns: 0,
+      hasLoadedData: false,
       status: "idle",
     });
 

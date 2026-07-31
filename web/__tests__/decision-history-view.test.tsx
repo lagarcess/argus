@@ -163,4 +163,32 @@ describe("decision history view", () => {
       decisionHistoryKeyboardAction({ key: "Tab", activeIndex: 1, count: 3 }),
     ).toEqual({ activeIndex: 1, selectedIndex: null, back: false, handled: false });
   });
+
+  test("requests listbox focus so ArrowDown then Enter selects the second run", () => {
+    const html = renderToStaticMarkup(
+      <DecisionHistoryView
+        items={[newest, middle, oldest]}
+        nextCursor={null}
+        status="ready"
+        onBack={() => {}}
+        onLoadOlder={() => {}}
+        onRetry={() => {}}
+        onSelectRun={() => {}}
+      />,
+    );
+    const moved = decisionHistoryKeyboardAction({
+      key: "ArrowDown",
+      activeIndex: 0,
+      count: 3,
+    });
+    const selected = decisionHistoryKeyboardAction({
+      key: "Enter",
+      activeIndex: moved.activeIndex,
+      count: 3,
+    });
+
+    expect(html).toContain('role="listbox"');
+    expect(html).toContain('autofocus=""');
+    expect(selected.selectedIndex).toBe(1);
+  });
 });

@@ -168,6 +168,7 @@ export function DecisionHistoryView({
           )}
           aria-activedescendant={activeDescendant}
           tabIndex={0}
+          autoFocus
           onKeyDown={handleKeyDown}
           className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/10"
         >

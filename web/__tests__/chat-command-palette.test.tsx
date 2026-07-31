@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import {
   commitDossierDecision,
+  dossierCountsForHistory,
   dossierPaneKeyboardAction,
   dossierPaneTransition,
   openSelectedDossierConversation,
@@ -99,6 +100,7 @@ function readyHistory(items: RunDossier[]): RunDossierHistoryState {
     nextCursor: null,
     totalRuns: items.length,
     decidedRuns: items.length,
+    hasLoadedData: true,
     status: "ready",
   };
 }
@@ -357,6 +359,49 @@ describe("command palette dossier integration", () => {
         state: { view: "dossier", historicalRunId: "historical" },
       }),
     ).toBe("allow_control");
+  });
+
+  test("history-owned digit shortcuts never select a left palette row", () => {
+    for (const state of [
+      { view: "history", historicalRunId: null },
+      { view: "dossier", historicalRunId: "historical" },
+    ] satisfies DossierPaneState[]) {
+      expect(
+        dossierPaneKeyboardAction({
+          key: "1",
+          metaKey: false,
+          ctrlKey: false,
+          state,
+        }),
+      ).toBe("suppress_navigation");
+      expect(
+        dossierPaneKeyboardAction({
+          key: "1",
+          metaKey: false,
+          ctrlKey: false,
+          targetIsDossierControl: true,
+          targetIsEditable: true,
+          state,
+        }),
+      ).toBe("allow_control");
+    }
+  });
+
+  test("history totals require successful canonical history provenance", () => {
+    expect(
+      dossierCountsForHistory({
+        history: { totalRuns: 0, decidedRuns: 0, hasLoadedData: false },
+        fallbackTotalRuns: 7,
+        fallbackDecidedRuns: 5,
+      }),
+    ).toEqual({ totalRuns: 7, decidedRuns: 5 });
+    expect(
+      dossierCountsForHistory({
+        history: { totalRuns: 8, decidedRuns: 6, hasLoadedData: true },
+        fallbackTotalRuns: 7,
+        fallbackDecidedRuns: 5,
+      }),
+    ).toEqual({ totalRuns: 8, decidedRuns: 6 });
   });
 
   test("the palette wires lazy history activation instead of opening on render", () => {
