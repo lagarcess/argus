@@ -984,8 +984,10 @@
         "buy_the_dip": "Comprar en caídas",
         "dca": "Compras periódicas",
         "dca_accumulation": "Compras periódicas",
+        "indicator_threshold": "Umbral RSI",
         "moving_average_crossover": "Cruce de medias móviles",
         "rsi_mean_reversion": "Umbral RSI",
+        "signal_strategy": "Cruce de medias móviles",
         "unknown": "Estrategia"
       },
       "nudges": {

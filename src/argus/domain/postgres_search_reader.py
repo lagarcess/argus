@@ -1201,6 +1201,7 @@ _CONVERSATION_LEDGER_INPUT_CTE = sql.SQL(
         select
             %(user_id)s::uuid as user_id,
             %(normalized_query)s::text as normalized_query,
+            %(symbol_query)s::text as symbol_query,
             %(text_search_enabled)s::boolean as text_search_enabled
     )
     """
@@ -1223,6 +1224,33 @@ _CONVERSATION_DECISION_FILTER = sql.SQL(
 )
 
 
+def _run_symbol_slot(run_alias: sql.Composable, slot: int) -> sql.Composed:
+    return sql.SQL("btrim({})").format(
+        symbol_index_expression(
+            sql.SQL("{}.symbols[{}]").format(run_alias, sql.Literal(slot))
+        )
+    )
+
+
+def _exact_run_symbol_predicate(run_alias: sql.Composable) -> sql.Composed:
+    return sql.SQL("\n or \n").join(
+        sql.SQL(
+            """
+            (
+                {run_alias}.symbols[{slot}] is not null
+                and input.symbol_query collate "C"
+                    = {normalized_symbol} collate "C"
+            )
+            """
+        ).format(
+            run_alias=run_alias,
+            slot=sql.Literal(slot),
+            normalized_symbol=_run_symbol_slot(run_alias, slot),
+        )
+        for slot in range(1, 6)
+    )
+
+
 def _conversation_match_ctes(
     *,
     has_anchor: bool,
@@ -1241,6 +1269,7 @@ def _conversation_match_ctes(
         "|| coalesce(run.config_snapshot->>'template', '') || ' ' "
         "|| coalesce(run.conversation_result_card->>'strategy_label', '')"
     )
+    run_symbol_predicate = _exact_run_symbol_predicate(sql.SQL("run"))
     idea_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
@@ -1265,15 +1294,14 @@ def _conversation_match_ctes(
         exists (
             select 1
             from public.backtest_runs as symbol_run
-            cross join unnest(symbol_run.symbols) as symbol
             where symbol_run.user_id = input.user_id
               and symbol_run.conversation_id = conversation.id
               and symbol_run.status = 'completed'
-              and input.symbol_query = btrim({normalized_symbol})
+              and ({symbol_predicate})
         )::integer
         """
     ).format(
-        normalized_symbol=symbol_index_expression(sql.SQL("symbol")),
+        symbol_predicate=_exact_run_symbol_predicate(sql.SQL("symbol_run")),
     )
     conversation_activity_query = sql.SQL(
         """
@@ -1614,13 +1642,20 @@ def _conversation_match_ctes(
              or conversation.id = input.guest_conversation_id
          )
          {decision_filter}
-        where input.text_search_enabled
-          and input.normalized_query <> ''
-          and ({run_predicate})
+        where input.normalized_query <> ''
+          and (
+              (input.text_search_enabled and ({run_predicate}))
+              or (
+                  not input.text_search_enabled
+                  and input.symbol_query is not null
+                  and ({run_symbol_predicate})
+              )
+          )
         """
     ).format(
         matched_text_sql=run_matched_text,
         run_predicate=run_predicate,
+        run_symbol_predicate=run_symbol_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
     idea_source = sql.SQL(
@@ -1929,11 +1964,7 @@ def _conversation_match_ctes(
 
 
 def _asset_symbol_slot(slot: int) -> sql.Composed:
-    return sql.SQL("btrim({})").format(
-        symbol_index_expression(
-            sql.SQL("run.symbols[{}]").format(sql.Literal(slot))
-        )
-    )
+    return _run_symbol_slot(sql.SQL("run"), slot)
 
 
 def _asset_symbol_candidate_branch(slot: int) -> sql.Composed:
@@ -2332,6 +2363,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
         "|| coalesce(run.config_snapshot->>'template', '') || ' ' "
         "|| coalesce(run.conversation_result_card->>'strategy_label', '')"
     )
+    run_symbol_predicate = _exact_run_symbol_predicate(sql.SQL("run"))
     idea_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
@@ -2479,9 +2511,15 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
               on conversation.id = run.conversation_id
              and conversation.user_id = input.user_id
              and conversation.deleted_at is null
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({run_predicate})
+            where input.normalized_query <> ''
+              and (
+                  (input.text_search_enabled and ({run_predicate}))
+                  or (
+                      not input.text_search_enabled
+                      and input.symbol_query is not null
+                      and ({run_symbol_predicate})
+                  )
+              )
 
             union
 
@@ -2548,6 +2586,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             run_haystack,
             _normalized(_RUN_INDEX_HAYSTACK),
         ),
+        run_symbol_predicate=run_symbol_predicate,
         idea_predicate=token_predicate(idea_haystack, idea_haystack),
         evidence_predicate=token_predicate(
             evidence_haystack,
@@ -3014,6 +3053,9 @@ class PostgresSearchReader:
         text_search_enabled = (
             not normalized_query or search_has_indexable_token(query)
         )
+        conversation_search_enabled = (
+            text_search_enabled or symbol_query is not None
+        )
         anchor_token = max(
             (token for token in normalized_tokens if len(token) >= 3),
             key=len,
@@ -3032,9 +3074,9 @@ class PostgresSearchReader:
                     else None
                 ),
             )
-        if has_cursor and not text_search_enabled:
+        if has_cursor and not conversation_search_enabled:
             raise SearchCursorError(
-                "A symbol-only search cannot continue from a conversation cursor."
+                "Deferred search cannot continue from a conversation cursor."
             )
         legacy_skip_message, legacy_goal_pattern = legacy_onboarding_sql_filters()
         params: dict[str, Any] = {
@@ -3118,7 +3160,7 @@ class PostgresSearchReader:
                             has_anchor=anchor_token is not None,
                             has_cursor=has_cursor,
                         )
-                        if text_search_enabled
+                        if conversation_search_enabled
                         else _asset_rollup_search_sql()
                     )
                     cursor.execute(search_sql, params)
@@ -3144,7 +3186,7 @@ class PostgresSearchReader:
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
                     ledger_counts = {state: 0 for state in _DECISION_STATES}
-                    if text_search_enabled:
+                    if conversation_search_enabled:
                         ledger_params = {
                             **params,
                             "decision_state": None,

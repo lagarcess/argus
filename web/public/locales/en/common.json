@@ -984,8 +984,10 @@
         "buy_the_dip": "Buy the dip",
         "dca": "Recurring buys",
         "dca_accumulation": "Recurring buys",
+        "indicator_threshold": "RSI threshold",
         "moving_average_crossover": "Moving-average crossover",
         "rsi_mean_reversion": "RSI threshold",
+        "signal_strategy": "Moving-average crossover",
         "unknown": "Strategy"
       },
       "nudges": {

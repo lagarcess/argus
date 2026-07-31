@@ -379,7 +379,7 @@ def test_search_defers_nonempty_queries_without_an_indexable_token(
 @pytest.mark.parametrize("symbol", ["GL", "ss/e"])
 def test_search_allows_symbol_only_queries_without_text_scans(symbol: str) -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[]])
+    pool = _RecordingPool([[], []])
 
     result = reader_type(pool).search_rows(
         user_id=OWNER_ID,
@@ -395,16 +395,21 @@ def test_search_allows_symbol_only_queries_without_text_scans(symbol: str) -> No
         "rejected": 0,
         "revisit_later": 0,
     }
-    assert len(pool.cursor.executions) == 1
+    assert len(pool.cursor.executions) == 2
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
     assert params["symbol_query"] == symbol.casefold()
     assert params["text_search_enabled"] is False
     assert "%(text_search_enabled)s::boolean as text_search_enabled" in sql_text
-    assert "conversation_page" not in sql_text
-    assert "decision_candidates" not in sql_text
-    assert "public.messages" not in sql_text
-    assert "public.ideas" not in sql_text
+    assert "not input.text_search_enabled" in sql_text
+    assert (
+        "btrim(public.argus_search_symbol_casefold("
+        'run.symbols[1])) collate "C"'
+    ) in sql_text
+    assert all(
+        execution_params["text_search_enabled"] is False
+        for _, execution_params in pool.cursor.executions
+    )
 
 
 def test_empty_search_keeps_recents_and_ledger_reads_enabled() -> None:
@@ -433,7 +438,8 @@ def test_conversation_search_sql_guards_all_text_match_sources() -> None:
 
     rendered = _conversation_search_sql(has_anchor=False).as_string()
 
-    assert rendered.count("input.text_search_enabled") == 6
+    assert rendered.count("input.text_search_enabled") == 7
+    assert "not input.text_search_enabled" in rendered
 
 
 def test_search_indexability_separates_two_character_symbols_from_text() -> None:
@@ -446,21 +452,63 @@ def test_search_indexability_separates_two_character_symbols_from_text() -> None
         assert search_query_is_indexable(deferred) is False
 
 
-def test_symbol_only_search_rejects_cursor_before_database_read() -> None:
-    reader_type, cursor_error = _reader_types()
-    pool = _RecordingPool([])
+def test_symbol_only_search_accepts_a_conversation_cursor() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], []])
 
-    with pytest.raises(cursor_error, match="symbol-only"):
-        reader_type(pool).search_rows(
-            user_id=OWNER_ID,
-            query="ss/e",
-            source_limit=4,
-            cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
-            cursor_id=CONVERSATION_ID,
-        )
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ba",
+        source_limit=4,
+        cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
+        cursor_id=CONVERSATION_ID,
+    )
 
-    assert pool.cursor.executions == []
-    assert pool.acquisition_timeouts == []
+    assert result.rows["conversations"] == []
+    assert len(pool.cursor.executions) == 2
+    assert pool.cursor.executions[0][1]["text_search_enabled"] is False
+    assert "public.backtest_runs" in pool.cursor.executions[0][0].as_string()
+
+
+def test_symbol_only_search_uses_exact_run_symbols_without_broad_text() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ba",
+        source_limit=4,
+    )
+
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert params["text_search_enabled"] is False
+    assert "conversation_page" in sql_text
+    assert "unnest(run.symbols)" not in sql_text
+    assert "unnest(symbol_run.symbols)" not in sql_text
+    for slot in range(1, 6):
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'run.symbols[{slot}])) collate "C"'
+        ) in sql_text
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'symbol_run.symbols[{slot}])) collate "C"'
+        ) in sql_text
+    assert "where input.text_search_enabled" in sql_text
+
+
+def test_symbol_only_ledger_uses_indexed_run_symbol_slots() -> None:
+    from argus.domain.postgres_search_reader import _conversation_ledger_sql
+
+    rendered = _conversation_ledger_sql(has_anchor=False).as_string()
+
+    assert "unnest(run.symbols)" not in rendered
+    for slot in range(1, 6):
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'run.symbols[{slot}])) collate "C"'
+        ) in rendered
 
 
 @pytest.mark.parametrize("pivot_rows", [[], [_conversation_candidate()] * 2])
@@ -658,8 +706,8 @@ def test_conversation_symbol_rank_uses_canonical_expanding_casefold() -> None:
 
     rendered = pool.cursor.executions[0][0].as_string()
     assert (
-        "input.symbol_query = "
-        "btrim(public.argus_search_symbol_casefold(symbol))"
+        "btrim(public.argus_search_symbol_casefold("
+        'symbol_run.symbols[1])) collate "C"'
     ) in rendered
     assert "input.symbol_query = lower(symbol)" not in rendered
 

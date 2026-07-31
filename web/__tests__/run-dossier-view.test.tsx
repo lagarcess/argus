@@ -11,6 +11,7 @@ import {
   RunDossierView,
 } from "../components/sidebar/command-palette/RunDossierView";
 import { refreshCanonicalMutation } from "../lib/canonical-mutation-refresh";
+import { formatRunDossierSetup } from "../lib/run-dossier-items";
 import type {
   RunDossier,
   SearchDecisionAction,
@@ -96,6 +97,29 @@ function visibleText(html: string): string {
 }
 
 describe("single-run dossier view", () => {
+  test("never inserts an empty strategy segment when a locale key is missing", () => {
+    const missingTranslation = (() => "") as Parameters<
+      typeof formatRunDossierSetup
+    >[1];
+    const setup = formatRunDossierSetup(
+      {
+        ...dossierWithWatchingDecisionAndMultilineNote,
+        tested: {
+          ...dossierWithWatchingDecisionAndMultilineNote.tested,
+          strategy_family: "future_signal_strategy",
+          cadence: null,
+          start_date: null,
+          end_date: null,
+        },
+      },
+      missingTranslation,
+      "en",
+    );
+
+    expect(setup).toEqual(["GLD", "Future signal strategy", "1D"]);
+    expect(setup).not.toContain("");
+  });
+
   test("makes the desktop dossier body the scroll region", () => {
     const html = renderToStaticMarkup(
       <RunDossierView

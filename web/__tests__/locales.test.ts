@@ -106,6 +106,14 @@ const dossierCopy = {
     en: "Search starts with a 2-character ticker or a 3-character word.",
     es419: "La búsqueda comienza con un ticker de 2 caracteres o una palabra de 3 caracteres.",
   },
+  "command_palette.dossier_values.strategy_families.indicator_threshold": {
+    en: "RSI threshold",
+    es419: "Umbral RSI",
+  },
+  "command_palette.dossier_values.strategy_families.signal_strategy": {
+    en: "Moving-average crossover",
+    es419: "Cruce de medias móviles",
+  },
 } as const;
 
 function translationAt(locale: LocaleTree, dottedKey: string): string | undefined {

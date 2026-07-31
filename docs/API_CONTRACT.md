@@ -3341,8 +3341,11 @@ activity on those runs or their evidence/decision lineage.
 Text recall requires at least one normalized token with three characters. A
 single symbol-shaped query is separately eligible at two characters so stored
 symbols such as `BA` can resolve through the bounded symbol index without
-opening broad two-character text search. One-character, whitespace-containing,
-and non-alphanumeric symbol queries remain deferred.
+opening broad two-character text search. An exact stored-symbol query returns
+the rollup plus the normal bounded, cursor-safe conversation rows whose
+completed runs contain that symbol. A merely unambiguous symbol prefix may
+still return only the rollup. One-character, whitespace-containing, and
+non-alphanumeric symbol queries remain deferred.
 
 The asset rollup is an additive presentation row. It is outside the
 conversation `limit`, ranking, decision filter, ledger grouping, and cursor
@@ -3465,10 +3468,11 @@ conversation dossiers and `next_cursor = null`. Missing, foreign, or deleted
 ids are omitted without revealing ownership. This is one bounded read for the
 at-most-50 chats already visible in History; clients must not replace it with
 one request per row or an automatic walk through unrelated ranked pages.
-For a non-empty query, recall begins only when at least one normalized token has
-three characters. One- and two-character partial input returns no search rows
-and does not read transcript or artifact haystacks; the palette asks the user to
-keep typing. This protects the bounded per-keystroke read contract.
+For a non-empty query, text recall begins only when at least one normalized
+token has three characters. One- and two-character ordinary or partial text
+does not read transcript or artifact haystacks; the palette asks the user to
+keep typing. The exact stored-symbol exception above reads only completed-run
+symbol lineage. This protects the bounded per-keystroke read contract.
 
 *Future semantic retrieval may extend this endpoint.*
 

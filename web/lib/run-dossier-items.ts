@@ -72,12 +72,13 @@ export function formatRunDossierSetup(
 
   const family = dossier.tested.strategy_family;
   if (family) {
-    parts.push(
+    const fallback = fallbackCodeLabel(family);
+    const label =
       t(
         `command_palette.dossier_values.strategy_families.${family}`,
-        fallbackCodeLabel(family),
-      ),
-    );
+        fallback,
+      ) || fallback;
+    if (label) parts.push(label);
   }
 
   const cadence = dossier.tested.cadence;

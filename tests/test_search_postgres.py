@@ -964,6 +964,114 @@ def test_conversation_cursor_pages_after_evidence_winner_without_gaps(
     assert set(seen) == inserted
 
 
+def test_exact_two_character_symbol_pages_filter_and_ledger_are_owner_scoped(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    other_id = search_identities["other"]
+    now = datetime(2026, 7, 27, 17, tzinfo=timezone.utc)
+    expected_counts: dict[str, int] = {}
+    promising_conversation_id: str | None = None
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset, decision_state in enumerate(("promising", "rejected")):
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=offset),
+                title=f"BA owner research {offset}",
+            )
+            run_count = 2 if offset == 0 else 1
+            expected_counts[str(conversation_id)] = run_count
+            if decision_state == "promising":
+                promising_conversation_id = str(conversation_id)
+            newest_run_id = None
+            for run_offset in range(run_count):
+                newest_run_id = _insert_run(
+                    cursor,
+                    user_id=owner_id,
+                    timestamp=(
+                        now
+                        - timedelta(minutes=offset)
+                        - timedelta(seconds=run_offset)
+                    ),
+                    title=f"BA owner result {offset}-{run_offset}",
+                    conversation_id=conversation_id,
+                    symbols=["BA"],
+                )
+            _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=offset),
+                title=f"BA owner idea {offset}",
+                summary=f"BA owner summary {offset}",
+                conversation_id=conversation_id,
+                decision_state=decision_state,
+                source_run_id=newest_run_id,
+            )
+
+        foreign_conversation = _insert_conversation(
+            cursor,
+            user_id=other_id,
+            timestamp=now + timedelta(hours=1),
+            title="BA foreign research",
+        )
+        _insert_run(
+            cursor,
+            user_id=other_id,
+            timestamp=now + timedelta(hours=1),
+            title="BA foreign result",
+            conversation_id=foreign_conversation,
+            symbols=["BA"],
+        )
+
+    reader, _ = _reader()
+    first_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="ba",
+        source_limit=2,
+        include_ledger_groups=True,
+    )
+    first_page = _ranked(first_result.rows, "ba")[:1]
+    assert len(first_page) == 1
+    assert first_result.asset_rollup is not None
+    assert first_result.asset_rollup.run_count == 3
+    assert first_result.ledger_counts == {
+        "promising": 1,
+        "watching": 0,
+        "rejected": 1,
+        "revisit_later": 0,
+    }
+
+    second_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="ba",
+        source_limit=2,
+        cursor_updated_at=first_page[0][1].updated_at,
+        cursor_id=first_page[0][1].id,
+    )
+    second_page = _ranked(second_result.rows, "ba")[:1]
+    pages = [*first_page, *second_page]
+    assert {item.id for _, item in pages} == set(expected_counts)
+    assert {
+        item.id: item.match.count
+        for _, item in pages
+    } == expected_counts
+    assert str(foreign_conversation) not in {item.id for _, item in pages}
+
+    promising = _ranked(
+        reader.search_rows(
+            user_id=str(owner_id),
+            query="ba",
+            source_limit=3,
+            decision_state="promising",
+        ).rows,
+        "ba",
+    )
+    assert len(promising) == 1
+    assert promising_conversation_id is not None
+    assert promising[0][1].id == promising_conversation_id
+
+
 def test_conversation_cursor_reaches_message_after_source_candidate_cap(
     search_identities,
 ) -> None:

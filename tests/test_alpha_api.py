@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from argus.api import memory_search_candidates
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
@@ -1718,13 +1719,135 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
     now = utcnow()
-    conversation = client.post(
+    conversation_ids: list[str] = []
+    expected_match_counts: dict[str, int] = {}
+    for index in range(2):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Aircraft research {index}"},
+        ).json()["conversation"]
+        conversation_ids.append(conversation["id"])
+        run_count = 3 if index == 0 else 1
+        expected_match_counts[conversation["id"]] = run_count
+        for run_index in range(run_count):
+            run = BacktestRun(
+                id=(
+                    "asset-rollup-two-character-symbol-"
+                    f"{index}-{run_index}"
+                ),
+                conversation_id=conversation["id"],
+                strategy_id=None,
+                status="completed",
+                asset_class="equity",
+                symbols=["BA"],
+                allocation_method="equal_weight",
+                benchmark_symbol="SPY",
+                metrics={},
+                config_snapshot={"template": "buy_and_hold"},
+                conversation_result_card={
+                    "title": f"BA result {index}-{run_index}"
+                },
+                created_at=(
+                    now
+                    - timedelta(minutes=index)
+                    - timedelta(seconds=run_index)
+                ),
+            )
+            api_state.store.backtest_runs[run.id] = run
+            api_state.store.backtest_run_owners[run.id] = user_id
+
+    distractor = client.post(
         "/api/v1/conversations",
-        json={"title": "Aircraft research"},
+        json={"title": "Balanced allocation without Boeing"},
     ).json()["conversation"]
-    run = BacktestRun(
-        id="asset-rollup-two-character-symbol",
-        conversation_id=conversation["id"],
+
+    first_page = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
+
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert first_payload["items"][0] == {
+        "type": "asset_rollup",
+        "symbol": "BA",
+        "run_count": 4,
+        "decision_counts": {
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+        "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+    }
+    first_conversations = [
+        item
+        for item in first_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(first_conversations) == 1
+    assert first_conversations[0]["match"]["layer"] == "run"
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        "/api/v1/search",
+        params={
+            "q": "ba",
+            "limit": 1,
+            "cursor": first_payload["next_cursor"],
+        },
+    )
+
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    second_conversations = [
+        item
+        for item in second_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(second_conversations) == 1
+    assert {
+        item["conversation_id"]
+        for item in first_conversations + second_conversations
+    } == set(conversation_ids)
+    assert distractor["id"] not in {
+        item["conversation_id"]
+        for item in first_conversations + second_conversations
+    }
+    assert {
+        item["title"] for item in first_conversations + second_conversations
+    } == {"Aircraft research 0", "Aircraft research 1"}
+    assert {
+        item["conversation_id"]: item["match"]["count"]
+        for item in first_conversations + second_conversations
+    } == expected_match_counts
+    assert second_payload["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    ("promoted_title", "pinned"),
+    (("BA", False), ("Pinned aircraft thesis", True)),
+)
+def test_two_character_symbol_search_preserves_rank_tiers_beyond_window(
+    promoted_title: str,
+    pinned: bool,
+) -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+
+    promoted = client.post(
+        "/api/v1/conversations",
+        json={"title": promoted_title},
+    ).json()["conversation"]
+    if pinned:
+        promoted = client.patch(
+            f"/api/v1/conversations/{promoted['id']}",
+            json={"pinned": True},
+        ).json()["conversation"]
+    promoted_run = BacktestRun(
+        id=f"promoted-ba-run-{pinned}",
+        conversation_id=promoted["id"],
         strategy_id=None,
         status="completed",
         asset_class="equity",
@@ -1733,29 +1856,111 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
         benchmark_symbol="SPY",
         metrics={},
         config_snapshot={"template": "buy_and_hold"},
-        conversation_result_card={"title": "BA result"},
-        created_at=now,
+        conversation_result_card={"title": "Promoted BA result"},
+        created_at=now - timedelta(days=1),
     )
-    api_state.store.backtest_runs[run.id] = run
-    api_state.store.backtest_run_owners[run.id] = user_id
+    api_state.store.backtest_runs[promoted_run.id] = promoted_run
+    api_state.store.backtest_run_owners[promoted_run.id] = user_id
 
-    response = client.get("/api/v1/search", params={"q": "ba"})
+    for index in range(25):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Recent aircraft research {index}"},
+        ).json()["conversation"]
+        run = BacktestRun(
+            id=f"recent-ba-run-{pinned}-{index}",
+            conversation_id=conversation["id"],
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["BA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"Recent BA result {index}"},
+            created_at=now + timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
 
     assert response.status_code == 200
-    assert response.json()["items"] == [
-        {
-            "type": "asset_rollup",
-            "symbol": "BA",
-            "run_count": 1,
-            "decision_counts": {
-                "promising": 0,
-                "watching": 0,
-                "rejected": 0,
-                "revisit_later": 0,
-            },
-            "last_touched_at": now.isoformat().replace("+00:00", "Z"),
-        }
+    conversations = [
+        item for item in response.json()["items"] if item["type"] == "conversation"
     ]
+    assert len(conversations) == 1
+    assert conversations[0]["conversation_id"] == promoted["id"]
+
+
+def test_two_character_symbol_search_bounds_run_detail_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+
+    for index in range(60):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Aircraft scale research {index}"},
+        ).json()["conversation"]
+        run = BacktestRun(
+            id=f"bounded-ba-run-{index}",
+            conversation_id=conversation["id"],
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["BA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"Bounded BA result {index}"},
+            created_at=now + timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    original = memory_search_candidates._symbol_query_match
+    detail_calls = 0
+
+    def counted_symbol_query_match(*args: object, **kwargs: object):
+        nonlocal detail_calls
+        detail_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        memory_search_candidates,
+        "_symbol_query_match",
+        counted_symbol_query_match,
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    assert detail_calls <= 20
+    assert response.json()["next_cursor"] is not None
+
+    detail_calls = 0
+    cursor_response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "ba",
+            "limit": 1,
+            "cursor": response.json()["next_cursor"],
+        },
+    )
+
+    assert cursor_response.status_code == 200
+    assert detail_calls <= 40
 
 
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:

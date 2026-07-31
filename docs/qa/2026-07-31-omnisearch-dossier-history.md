@@ -119,8 +119,8 @@ memory-checkpointer boundaries remained in force.
 Live English and es-419 checks confirmed:
 
 - one-character input stays deferred, while `BA` immediately returns the
-  bounded asset rollup without enabling two-character conversation-text
-  search;
+  bounded asset rollup and its matching conversation row without enabling
+  two-character conversation-text search;
 - the rollup explains that registered history spans the user's conversations;
 - the existing provider-free action is labeled `Retest setup` /
   `Volver a probar la configuración`, sits in the run-card header, and keeps
@@ -140,3 +140,48 @@ decision surface after a decision is saved; Omnisearch is the existing edit
 surface. Both existing authoring surfaces now share the 500-character cap.
 Read schemas retain the 2,000-character compatibility bound, so no stored note
 is truncated and no migration or new durable model is introduced.
+
+## Founder correction acceptance
+
+The same provider-free applications were restarted from the corrected source
+at `127.0.0.1:59272` and `127.0.0.1:59271`. Live browser checks confirmed:
+
+- `ba` returns both the three-run `BA` rollup and the `Boeing recovery
+  checkpoints` conversation; a conversation whose title merely begins with
+  “Balanced” is not eligible through broad two-character text recall;
+- the gallery result title is `BA recovery hold`, without a fixture-only
+  `Run <number>` suffix;
+- Spanish setup lines render `AMZN · Umbral RSI · 1D` and `EUR/USD · Cruce de
+  medias móviles · 4H`, with no empty strategy segment;
+- saving a newly authored 468-character, six-paragraph Spanish note refreshes
+  the canonical dossier and ledger count, then exposes `Mostrar nota completa`
+  with `aria-expanded=false`; it changes to `Mostrar menos` with
+  `aria-expanded=true` and collapses again;
+- the seeded English quick take remains English after a later UI-language
+  switch because dossier prose is the durable run artifact, while static
+  labels, metrics, and dates follow the current locale. Search performs no
+  translation, LLM, provider, or backtest work.
+
+Fresh correction-head verification passed:
+
+- hermetic backend suite: 3,254 passed and 210 skipped;
+- frontend suite: 806 passed;
+- production build and TypeScript: passed;
+- OpenAPI compatibility and Alpha artifact checks: 35 passed;
+- Ruff, modularity budget, worktree environment topology, and diff hygiene:
+  passed;
+- ESLint: zero errors and the existing `ChatInterface.tsx` unused-import
+  warning.
+
+The final review round also confirmed memory/Postgres parity for repeated
+matching runs, ranked old pinned and exact-title symbol conversations without
+depending on the general recents window, and replaced exact-symbol array
+expansion with the existing five indexed symbol slots. SQL-shape tests cover
+those predicates; the added live Postgres pagination, owner-isolation,
+decision-filter, ledger-count, and query-plan checks are included in the 210
+conditional skips when `ARGUS_DISPOSABLE_DATABASE_URL` is unavailable.
+
+The local canonical environment currently defines runtime event timeout
+values. The hermetic backend command blanked only those two variables for its
+process so the stream-contract tests could exercise their monkeypatched timing
+defaults; the shared linked environment files were not modified.
