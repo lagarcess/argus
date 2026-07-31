@@ -260,6 +260,14 @@ def test_guest_launch_safety_records_live_hard_provider_caps() -> None:
     assert "Guest key is not capped at `$5/week`" in safety
 
 
+def test_public_alpha_spec_drops_superseded_inference_footer() -> None:
+    spec = _source("docs/superpowers/specs/2026-07-30-public-alpha-readiness.md")
+
+    assert "### Inference" not in spec
+    assert "exact exit-criterion number" not in spec
+    assert "Confirm email\" setting is currently" not in spec
+
+
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     ownership = runbook.split("## Render Environment Ownership", 1)[1].split(

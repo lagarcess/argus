@@ -406,10 +406,3 @@ an agent decides on its own.
   <https://supabase.com/docs/guides/auth/auth-email>
 - Resend — Supabase SMTP integration guide:
   <https://resend.com/docs/send-with-supabase-smtp>
-
-### Inference
-- The exact exit-criterion number in locked decision 6 is not decided — it's
-  marked as a founder input, not invented.
-- Whether the hosted Supabase project's "Confirm email" setting is currently
-  on is inferred from Supabase's documented hosted-default (on) but not
-  independently verified against the live dashboard.
