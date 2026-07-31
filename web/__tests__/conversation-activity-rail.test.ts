@@ -104,6 +104,9 @@ describe("conversation rail tick derivation", () => {
       ["a3", "decision_saved"],
       ["a4", "error_recovery"],
       ["a5", "error_recovery"],
+      // Normalized retry history moves a coalesced assistant failure's
+      // recovery onto its owning user turn — still a "needed attention" tick.
+      ["u3", "error_recovery"],
       ["a8", "error_recovery"],
       ["a9", "error_recovery"],
     ]);
@@ -379,6 +382,23 @@ describe("rail source discipline", () => {
   test("rail sits on the right edge and hides on small screens", () => {
     expect(componentSource).toMatch(/absolute bottom-40 right-0 top-24/);
     expect(componentSource).toContain("hidden md:block");
+  });
+
+  test("saved decisions propagate to the transcript state immediately", () => {
+    const interfaceSrc = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const cardSrc = readFileSync(
+      join(root, "components/chat/StrategyResultCard.tsx"),
+      "utf-8",
+    );
+    expect(cardSrc).toContain(
+      "onDecisionSaved?.(response.decision.decision_state)",
+    );
+    expect(interfaceSrc).toContain(
+      "{ ...m, result: { ...m.result, decisionState } }",
+    );
   });
 
   test("preview and aria carry run symbols for identity during a glide", () => {

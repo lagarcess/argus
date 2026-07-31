@@ -2459,7 +2459,16 @@ export default function ChatInterface() {
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
                             onDecisionUnavailable={requestGuestDecision}
-                            onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
+                            onDecisionSaved={(decisionState) => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.result
+                                    ? { ...m, result: { ...m.result, decisionState } }
+                                    : m,
+                                ),
+                              );
+                              if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
+                            }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
                             resumeDecisionArtifactId={
                               msg.id === resumeDecisionMessageId

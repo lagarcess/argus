@@ -47,6 +47,23 @@ export function deriveConversationRailTicks(
   const ticks: ConversationRailTick[] = [];
   messages.forEach((message, index) => {
     if (message.role !== "ai") {
+      // Retry-history normalization can move a coalesced assistant failure's
+      // recovery onto its owning user turn — that turn is then the failure's
+      // only visible carrier.
+      if (message.recoveryDisplay) {
+        ticks.push({
+          messageId: message.id,
+          messageIndex: index,
+          kind: "error_recovery",
+          strategyTitle: null,
+          symbols: [],
+          periodDisplay: null,
+          metrics: [],
+          decisionState: null,
+          recovery: message.recoveryDisplay,
+          failedJobStatus: null,
+        });
+      }
       return;
     }
     if (

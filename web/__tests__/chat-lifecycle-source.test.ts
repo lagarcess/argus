@@ -414,13 +414,17 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(decisionSuccess).toContain(
       "setSavedDecisionState(response.decision.decision_state)",
     );
-    expect(decisionSuccess).toContain("onDecisionSaved?.()");
-    expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
-      decisionSuccess.indexOf("onDecisionSaved?.()"),
+    expect(decisionSuccess).toContain(
+      "onDecisionSaved?.(response.decision.decision_state)",
     );
-    expect(message).toContain("onDecisionSaved?: () => void");
+    expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
+      decisionSuccess.indexOf("onDecisionSaved?.("),
+    );
+    expect(message).toContain(
+      "onDecisionSaved?: (decisionState: DecisionState) => void",
+    );
     expect(message).toContain("onDecisionSaved={onDecisionSaved}");
-    expect(chat).toContain("onDecisionSaved={() =>");
+    expect(chat).toContain("onDecisionSaved={(decisionState) =>");
     expect(savedStrategySuccess).toContain("invalidateTranscriptForMutation(");
     expect(savedStrategySuccess).toContain("targetConversationId");
     expect(savedStrategySuccess).toContain('"durable_result_action"');
