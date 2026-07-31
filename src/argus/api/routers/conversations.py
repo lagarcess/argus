@@ -444,6 +444,24 @@ def delete_conversation(
 @router.get(
     "/conversations/{conversation_id}/run-dossiers",
     response_model=PaginatedRunDossiers,
+    responses={
+        400: {
+            "description": "The pagination cursor is invalid or stale.",
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/Error"}
+                }
+            },
+        },
+        404: {
+            "description": "The conversation was not found.",
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/Error"}
+                }
+            },
+        },
+    },
 )
 def list_run_dossiers(
     conversation_id: str,

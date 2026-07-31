@@ -78,6 +78,14 @@ def _artifact(*, run_id: str, created_at: datetime) -> dict[str, Any]:
     }
 
 
+class _UncopiedRecord:
+    def __init__(self, **fields: Any) -> None:
+        self.__dict__.update(fields)
+
+    def model_dump(self, **_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("unselected history payload must not be copied")
+
+
 def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
     run_dossiers = import_module("argus.domain.run_dossiers")
     created_at = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
@@ -240,6 +248,80 @@ def test_memory_history_is_newest_first_bounded_and_counts_only_eligible_rows() 
     }.intersection(row.run["id"] for row in second.rows)
     assert second.total_runs == 7
     assert second.decided_runs == 5
+
+
+def test_memory_history_copies_only_selected_page_payload_rows() -> None:
+    store = AlphaStore()
+    owner_id = "owner-1"
+    conversation_id = "conversation-1"
+    selected_at = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
+    unselected_at = datetime(2026, 7, 30, 12, tzinfo=timezone.utc)
+
+    selected_run = _run(run_id="selected-run", created_at=selected_at)
+    selected_artifact = _artifact(
+        run_id="selected-run",
+        created_at=selected_at,
+    )
+    store.backtest_runs["selected-run"] = selected_run
+    store.backtest_run_owners["selected-run"] = owner_id
+    store.evidence_artifacts[selected_artifact["id"]] = selected_artifact
+    store.evidence_artifact_owners[selected_artifact["id"]] = owner_id
+
+    store.backtest_runs["unselected-run"] = _UncopiedRecord(
+        id="unselected-run",
+        conversation_id=conversation_id,
+        status="completed",
+        created_at=unselected_at,
+    )
+    store.backtest_run_owners["unselected-run"] = owner_id
+    store.evidence_artifacts["unselected-artifact"] = _UncopiedRecord(
+        id="unselected-artifact",
+        source_conversation_id=conversation_id,
+        source_run_id="unselected-run",
+        created_at=unselected_at,
+        updated_at=unselected_at,
+    )
+    store.evidence_artifact_owners["unselected-artifact"] = owner_id
+    store.decision_notes["unselected-decision"] = _UncopiedRecord(
+        id="unselected-decision",
+        evidence_artifact_id="unselected-artifact",
+        source_conversation_id=conversation_id,
+        decision_state="watching",
+        created_at=unselected_at,
+        updated_at=unselected_at,
+    )
+    store.decision_note_owners["unselected-decision"] = owner_id
+    store.messages[conversation_id] = [
+        Message(
+            id="selected-message",
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Selected result",
+            created_at=selected_at,
+            metadata={"result_run_id": "selected-run"},
+        ),
+        _UncopiedRecord(
+            id="unselected-message",
+            conversation_id=conversation_id,
+            role="assistant",
+            created_at=unselected_at,
+            metadata={"result_run_id": "unselected-run"},
+        ),
+    ]
+
+    page = list_memory_run_dossier_source_rows(
+        store=store,
+        user_id=owner_id,
+        conversation_id=conversation_id,
+        limit=1,
+        cursor_completed_at=None,
+        cursor_run_id=None,
+    )
+
+    assert [row.run["id"] for row in page.rows] == ["selected-run"]
+    assert page.rows[0].result_message_id == "selected-message"
+    assert page.total_runs == 2
+    assert page.decided_runs == 1
 
 
 def test_memory_history_rejects_stale_or_foreign_cursor_pivots() -> None:

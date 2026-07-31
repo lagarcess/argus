@@ -961,6 +961,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedRunDossiers'
+        '400':
+          description: The pagination cursor is invalid or stale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:

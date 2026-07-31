@@ -277,6 +277,10 @@ def test_openapi_contract_exposes_lazy_run_dossier_history(
     assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/PaginatedRunDossiers"
     }
+    for status in ("400", "404"):
+        assert operation["responses"][status]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/Error"}
     parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
     assert parameters["limit"]["schema"]["default"] == 20
     assert parameters["limit"]["schema"]["maximum"] == 100

@@ -5,14 +5,20 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
+from argus.api.memory_run_dossiers import list_memory_run_dossier_source_rows
+from argus.api.schemas import Message, PaginatedRunDossiers
 from argus.domain.postgres_run_dossier_reader import (
     PostgresRunDossierReader,
     RunDossierCursorError,
+    RunDossierSourcePage,
 )
+from argus.domain.run_dossiers import project_run_dossier
+from argus.domain.store import AlphaStore
 
 OWNER_ID = "00000000-0000-0000-0000-000000000001"
 CONVERSATION_ID = "00000000-0000-0000-0000-000000000101"
 RUN_ID = "00000000-0000-0000-0000-000000000401"
+SECOND_RUN_ID = "00000000-0000-0000-0000-000000000402"
 COMPLETED_AT = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
 
 
@@ -82,6 +88,68 @@ def _source_row() -> dict[str, Any]:
     }
 
 
+@pytest.fixture
+def shared_adapter_rows() -> list[dict[str, Any]]:
+    older_at = datetime(2026, 7, 30, 12, tzinfo=timezone.utc)
+    return [
+        {
+            "run_payload": _source_row()["run_payload"],
+            "artifact_payload": _source_row()["artifact_payload"],
+            "decision_payload": {
+                "id": "00000000-0000-0000-0000-000000000501",
+                "evidence_artifact_id": (
+                    "00000000-0000-0000-0000-000000000301"
+                ),
+                "source_conversation_id": CONVERSATION_ID,
+                "decision_state": "watching",
+                "note": "Watch this result.",
+                "created_at": COMPLETED_AT,
+                "updated_at": COMPLETED_AT,
+            },
+            "result_message_id": (
+                "00000000-0000-0000-0000-000000000201"
+            ),
+        },
+        {
+            "run_payload": {
+                **_source_row()["run_payload"],
+                "id": SECOND_RUN_ID,
+                "created_at": older_at,
+                "completed_at": older_at,
+            },
+            "artifact_payload": {
+                **_source_row()["artifact_payload"],
+                "id": "00000000-0000-0000-0000-000000000302",
+                "source_run_id": SECOND_RUN_ID,
+                "created_at": older_at,
+                "updated_at": older_at,
+            },
+            "decision_payload": None,
+            "result_message_id": None,
+        },
+    ]
+
+
+def _serialized_response(page: RunDossierSourcePage) -> dict[str, Any]:
+    response = PaginatedRunDossiers(
+        items=[
+            project_run_dossier(
+                run=row.run,
+                artifact=row.artifact,
+                decision=row.decision,
+                result_message_id=row.result_message_id,
+                allow_decision_action=True,
+                language="en",
+            )
+            for row in page.rows
+        ],
+        next_cursor=None,
+        total_runs=page.total_runs,
+        decided_runs=page.decided_runs,
+    )
+    return response.model_dump(mode="json")
+
+
 def test_postgres_reader_uses_scalar_counts_and_one_bounded_page_query() -> None:
     pool = _Pool(
         [
@@ -138,3 +206,61 @@ def test_postgres_reader_accepts_only_canonical_uuid_cursor_ids() -> None:
         )
 
     assert pool.cursor.executions == []
+
+
+def test_memory_and_postgres_adapters_serialize_the_same_complete_page(
+    shared_adapter_rows: list[dict[str, Any]],
+) -> None:
+    store = AlphaStore()
+    for row in shared_adapter_rows:
+        run = row["run_payload"]
+        artifact = row["artifact_payload"]
+        store.backtest_runs[run["id"]] = run
+        store.backtest_run_owners[run["id"]] = OWNER_ID
+        store.evidence_artifacts[artifact["id"]] = artifact
+        store.evidence_artifact_owners[artifact["id"]] = OWNER_ID
+        decision = row["decision_payload"]
+        if decision is not None:
+            store.decision_notes[decision["id"]] = decision
+            store.decision_note_owners[decision["id"]] = OWNER_ID
+        if row["result_message_id"] is not None:
+            store.messages.setdefault(CONVERSATION_ID, []).append(
+                Message(
+                    id=row["result_message_id"],
+                    conversation_id=CONVERSATION_ID,
+                    role="assistant",
+                    content="Result",
+                    created_at=run["completed_at"],
+                    metadata={"result_run_id": run["id"]},
+                )
+            )
+
+    memory_page = list_memory_run_dossier_source_rows(
+        store=store,
+        user_id=OWNER_ID,
+        conversation_id=CONVERSATION_ID,
+        limit=20,
+        cursor_completed_at=None,
+        cursor_run_id=None,
+    )
+    postgres_page = PostgresRunDossierReader(
+        _Pool(
+            [
+                [{"total_runs": 2, "decided_runs": 1}],
+                shared_adapter_rows,
+            ]
+        )
+    ).list_source_rows(
+        user_id=OWNER_ID,
+        conversation_id=CONVERSATION_ID,
+        limit=20,
+        cursor_completed_at=None,
+        cursor_run_id=None,
+    )
+
+    memory_response = _serialized_response(memory_page)
+    postgres_response = _serialized_response(postgres_page)
+
+    assert memory_response == postgres_response
+    assert memory_response["items"][1]["decision"] is None
+    assert memory_response["items"][1]["result_message_id"] is None
