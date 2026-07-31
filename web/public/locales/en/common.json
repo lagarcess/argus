@@ -338,6 +338,22 @@
       "historical_period": "Test it over a historical period",
       "supported_symbol": "Use a supported stock or crypto symbol"
     },
+    "retest": {
+      "strategy_family": {
+        "buy_and_hold": "Buy and hold",
+        "dca_accumulation": "Recurring buys",
+        "indicator_threshold": "Indicator threshold",
+        "signal_strategy": "Signal rules"
+      },
+      "duration": {
+        "year_one": "same {{count}}-year duration",
+        "year_other": "same {{count}}-year duration",
+        "month_one": "same {{count}}-month duration",
+        "month_other": "same {{count}}-month duration",
+        "day_one": "same {{count}}-day duration",
+        "day_other": "same {{count}}-day duration"
+      }
+    },
     "result_readout": {
       "quick_take": "Quick take"
     },
@@ -924,6 +940,7 @@
     "open_source_conversation": "Open source conversation",
     "open_at_match": "Enter opens the match",
     "open_at_left_off": "⌘/Ctrl+Enter opens where you left off",
+    "retest_current_data": "Retest with current data",
     "run_fresh": "Run it fresh · {{run}}",
     "add_decision": "Add decision · {{run}}",
     "change_decision": "Change decision · {{run}}",

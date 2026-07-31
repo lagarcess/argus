@@ -381,7 +381,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("? t(action.labelKey, {");
     expect(message).toContain("defaultValue: action.label,");
     expect(message).toContain(
-      '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
+      '(message.selectedAction ? actionLabel(message.selectedAction) : "")',
     );
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
@@ -1476,10 +1476,19 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("canonicalMutationIdRef");
     expect(palette).toContain("searchRequestIdRef");
     expect(palette).toContain("includeLedgerGroups: true");
-    expect(chat).toContain("const handleOmnisearchRunFresh = async");
-    expect(chat).toContain("await loadConversation(conversationId");
-    expect(chat).toContain("await handleSend(sendText)");
-    expect(chat).not.toContain("await handleSend(sendText, action)");
+    const omnisearchActions = readFileSync(
+      join(root, "components/chat/omnisearch-actions.ts"),
+      "utf-8",
+    );
+    expect(chat).toContain("omnisearchActionHandlers(() => ({");
+    expect(chat).toContain("onRunFresh={omnisearch.runFresh}");
+    expect(omnisearchActions).toContain(
+      "await deps.loadConversation(conversationId, undefined, true)",
+    );
+    expect(omnisearchActions).toContain(
+      "if (!deps.isSourceConversationReady(conversationId)) return",
+    );
+    expect(omnisearchActions).toContain("void deps.send(sendText)");
     expect(palette).not.toContain("run_backtest");
   });
 

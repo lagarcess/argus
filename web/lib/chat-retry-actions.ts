@@ -22,6 +22,7 @@ const STRUCTURED_CHAT_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"
   "save_strategy",
   "retry_failed_action",
   "select_response_option",
+  "retest_run",
 ]);
 
 function structuredChatActionOrNull(value: unknown): ChatActionOption | null {
