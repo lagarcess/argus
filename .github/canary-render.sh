@@ -1054,13 +1054,20 @@ service_role_curl() {
   curl -fsS --config "$SERVICE_ROLE_CURL_CONFIG" "$@"
 }
 
-signup_identity_is_distinct() {
+signup_identity_is_safe() {
   CANARY_LOGIN_EMAIL="$EMAIL" CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
 import os
 
 login_email = os.environ["CANARY_LOGIN_EMAIL"].strip().casefold()
 signup_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
-raise SystemExit(0 if login_email and signup_email and login_email != signup_email else 1)
+pinned_signup_email = "delivered@resend.dev"
+raise SystemExit(
+    0
+    if login_email
+    and signup_email == pinned_signup_email
+    and login_email != signup_email
+    else 1
+)
 PY
 }
 
@@ -1395,8 +1402,8 @@ fi
 if [ -z "$SIGNUP_EMAIL" ]; then
   fail_canary "auth" "missing_canary_signup_email"
 fi
-if ! signup_identity_is_distinct; then
-  fail_canary "auth" "canary_signup_identity_not_distinct"
+if ! signup_identity_is_safe; then
+  fail_canary "auth" "canary_signup_identity_not_safe"
 fi
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"

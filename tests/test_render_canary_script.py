@@ -136,7 +136,7 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     assert "page.waitForURL(/\\/chat" in browser_source
 
 
-def test_canary_prepares_and_always_cleans_a_distinct_signup_identity() -> None:
+def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
 
@@ -145,7 +145,7 @@ def test_canary_prepares_and_always_cleans_a_distinct_signup_identity() -> None:
     )
     assert 'ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in shell_source
     assert 'ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in runner_source
-    assert "signup_identity_is_distinct" in shell_source
+    assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
     assert "delete_signup_auth_identity" in shell_source
     assert "upsert_signup_allowlist" in shell_source
@@ -166,12 +166,67 @@ def test_canary_prepares_and_always_cleans_a_distinct_signup_identity() -> None:
     )
 
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
-    assert main_body.index("signup_identity_is_distinct") < main_body.index(
+    assert main_body.index("signup_identity_is_safe") < main_body.index(
         "prepare_signup_identity"
     )
     assert main_body.index("prepare_signup_identity") < main_body.index(
         "run_browser_canary"
     )
+
+
+def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    function_body = shell_source.split("signup_identity_is_safe() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split(
+        "\nPY", 1
+    )[0]
+
+    def run_safety_check(*, login_email: str, signup_email: str) -> int:
+        env = os.environ.copy()
+        env.update(
+            {
+                "CANARY_LOGIN_EMAIL": login_email,
+                "CANARY_SIGNUP_EMAIL": signup_email,
+            }
+        )
+        return subprocess.run(
+            [sys.executable, "-c", python_source],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).returncode
+
+    assert (
+        run_safety_check(
+            login_email="confirmed@example.com",
+            signup_email=" delivered@RESEND.dev ",
+        )
+        == 0
+    )
+    assert (
+        run_safety_check(
+            login_email="confirmed@example.com",
+            signup_email="arbitrary@example.com",
+        )
+        != 0
+    )
+    assert (
+        run_safety_check(
+            login_email="delivered@resend.dev",
+            signup_email="delivered@resend.dev",
+        )
+        != 0
+    )
+
+    main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
+    safety_gate = main_body.index("signup_identity_is_safe")
+    prepare = main_body.index("prepare_signup_identity")
+    assert safety_gate < prepare
+    assert "delete_signup_auth_identity" not in main_body[:safety_gate]
 
 
 def test_rendered_browser_owns_the_authoritative_golden_path() -> None:
