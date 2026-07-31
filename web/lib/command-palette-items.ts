@@ -35,6 +35,7 @@ export type CommandPaletteLedgerDisplayGroup = {
 
 export type CommandPaletteAssetRollupCopy = {
   heading?: string;
+  scope?: string;
   runsInvolving?: (count: number, symbol: string) => string;
   decisionStateLabel?: (state: DecisionState) => string;
   dateLabel?: (value: string) => string;
@@ -43,6 +44,7 @@ export type CommandPaletteAssetRollupCopy = {
 
 export type CommandPaletteAssetRollup = {
   heading: string;
+  scope: string;
   symbol: string;
   runs: string;
   decisions: Array<{
@@ -153,7 +155,8 @@ export function commandPaletteAssetRollupFromSearch(
   const date =
     copy.dateLabel?.(item.last_touched_at) ?? item.last_touched_at.slice(0, 10);
   return {
-    heading: copy.heading ?? "Your history with this asset",
+    heading: copy.heading ?? "Your Argus history",
+    scope: copy.scope ?? "Across your conversations",
     symbol: item.symbol,
     runs:
       copy.runsInvolving?.(item.run_count, item.symbol) ??

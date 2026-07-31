@@ -106,3 +106,37 @@ The exact post-acceptance branch passed:
 
 Disposable-Postgres-only tests remain explicitly skipped when
 `ARGUS_DISPOSABLE_DATABASE_URL` is unavailable; no migration was added.
+
+## Founder refinement acceptance
+
+The founder-approved follow-up used the real Next.js application at
+`127.0.0.1:59272` and the same FastAPI memory-mode contract at
+`127.0.0.1:59271`. The fixture added a tenth conversation with three `BA`
+runs and two decisions, plus a 625-character legacy TSLA note. Provider keys
+remained blank and the synthetic market-data, memory-persistence, and
+memory-checkpointer boundaries remained in force.
+
+Live English and es-419 checks confirmed:
+
+- one-character input stays deferred, while `BA` immediately returns the
+  bounded asset rollup without enabling two-character conversation-text
+  search;
+- the rollup explains that registered history spans the user's conversations;
+- the existing provider-free action is labeled `Retest setup` /
+  `Volver a probar la configuración`, sits in the run-card header, and keeps
+  its existing typed transport;
+- the decision state and compact `Edit` / `Editar` action share one row;
+- the 625-character legacy note remains readable, starts behind a five-line
+  `Show full note` / `Mostrar nota completa` disclosure, expands and collapses
+  in the dossier's existing scroll flow, and does not create a nested note
+  scrollbar;
+- editing that legacy note reports `625 / 500`, keeps Cancel enabled, and
+  disables Save until the note satisfies the new 500-character write contract;
+- the historical-run and decision-history return controls are icon-only with
+  localized accessible names.
+
+The current source also confirms that the chat result card remains an add-only
+decision surface after a decision is saved; Omnisearch is the existing edit
+surface. Both existing authoring surfaces now share the 500-character cap.
+Read schemas retain the 2,000-character compatibility bound, so no stored note
+is truncated and no migration or new durable model is introduced.

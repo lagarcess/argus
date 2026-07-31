@@ -6,9 +6,13 @@ import es419 from "../public/locales/es-419/common.json";
 type LocaleTree = Record<string, unknown>;
 
 const dossierCopy = {
-  "command_palette.dossier_back": {
-    en: "Dossier",
-    es419: "Expediente",
+  "command_palette.back_to_latest_run": {
+    en: "Back to latest run",
+    es419: "Volver a la ejecución más reciente",
+  },
+  "command_palette.back_to_run_details": {
+    en: "Back to run details",
+    es419: "Volver a los detalles de la ejecución",
   },
   "command_palette.decision_history": {
     en: "Decision history",
@@ -27,8 +31,8 @@ const dossierCopy = {
     es419: "Agregar decisión",
   },
   "command_palette.change_decision_short": {
-    en: "Change decision",
-    es419: "Cambiar decisión",
+    en: "Edit",
+    es419: "Editar",
   },
   "command_palette.open_in_conversation": {
     en: "Open in conversation",
@@ -67,8 +71,40 @@ const dossierCopy = {
     es419: "Nota de decisión",
   },
   "command_palette.run_fresh_short": {
-    en: "Run it fresh",
-    es419: "Volver a probar",
+    en: "Retest setup",
+    es419: "Volver a probar la configuración",
+  },
+  "command_palette.run_fresh_tooltip": {
+    en: "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    es419: "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
+  },
+  "command_palette.show_full_note": {
+    en: "Show full note",
+    es419: "Mostrar nota completa",
+  },
+  "command_palette.show_less_note": {
+    en: "Show less",
+    es419: "Mostrar menos",
+  },
+  "command_palette.decision_note_count": {
+    en: "{{count}} / {{max}}",
+    es419: "{{count}} / {{max}}",
+  },
+  "command_palette.asset_rollup.heading": {
+    en: "Your Argus history",
+    es419: "Tu historial de Argus",
+  },
+  "command_palette.asset_rollup.scope_registered": {
+    en: "Across your conversations",
+    es419: "En todas tus conversaciones",
+  },
+  "command_palette.asset_rollup.scope_guest": {
+    en: "In this temporary conversation",
+    es419: "En esta conversación temporal",
+  },
+  "command_palette.keep_typing_detail": {
+    en: "Search starts with a 2-character ticker or a 3-character word.",
+    es419: "La búsqueda comienza con un ticker de 2 caracteres o una palabra de 3 caracteres.",
   },
 } as const;
 

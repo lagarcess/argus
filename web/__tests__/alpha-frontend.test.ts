@@ -1460,6 +1460,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("decisionChipClassName");
     expect(card).toContain("border-[#5ba897]/18 bg-transparent");
     expect(card).toContain("selectedDecisionState === state");
+    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(card).toContain("nextDecisionNoteValue(");
+    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
   });
 
   test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {

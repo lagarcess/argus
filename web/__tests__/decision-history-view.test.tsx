@@ -76,7 +76,10 @@ describe("decision history view", () => {
     );
     const text = visibleText(html);
 
-    expect(text).toContain("Dossier");
+    expect(text).not.toContain("Dossier");
+    expect(html).toMatch(
+      /<button[^>]*aria-label="Back to run details"[^>]*class="[^"]*h-11[^"]*w-11/,
+    );
     expect(text).toContain("Decision history");
     expect(text.indexOf("Run newest")).toBeLessThan(text.indexOf("Run middle"));
     expect(text.indexOf("Run middle")).toBeLessThan(text.indexOf("Run oldest"));

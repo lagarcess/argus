@@ -5,6 +5,7 @@ import {
   DecisionEditor,
   decisionEditorKeyboardAction,
 } from "../components/sidebar/command-palette/DecisionEditor";
+import { decisionNoteElementOverflows } from "../components/sidebar/command-palette/DecisionNoteDisplay";
 import {
   resolveDecisionSaveLifecycle,
   RunDossierView,
@@ -165,6 +166,92 @@ describe("single-run dossier view", () => {
     expect(text.lastIndexOf("Decision history")).toBeGreaterThan(
       text.lastIndexOf("Open in conversation"),
     );
+    expect(text).toContain("Edit");
+    expect(text).not.toContain("Change decision");
+    expect(html).toMatch(/data-decision-state-row="true"/);
+    expect(html).toMatch(/data-decision-edit="true"[^>]*class="[^"]*h-8/);
+  });
+
+  test("keeps a long note in panel flow behind an accessible disclosure", () => {
+    const longNote = `${"Review the downside before increasing conviction. ".repeat(9)}\nNext review: after earnings.`;
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={{
+          ...dossierWithWatchingDecisionAndMultilineNote,
+          decision: {
+            ...dossierWithWatchingDecisionAndMultilineNote.decision!,
+            note: longNote,
+          },
+        }}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+    expect(html).toContain(longNote);
+    expect(html).toContain("Show full note");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("line-clamp-5");
+    const noteMarkup = html.match(
+      /<p[^>]*data-decision-note="true"[^>]*>[\s\S]*?<\/p>/,
+    )?.[0];
+    expect(noteMarkup).toBeDefined();
+    expect(noteMarkup).not.toContain("overflow-y-auto");
+  });
+
+  test("clamps before measuring narrow-screen note overflow", () => {
+    const potentiallyWrappedNote = "Wide words can wrap on a narrow mobile dossier.";
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={{
+          ...dossierWithWatchingDecisionAndMultilineNote,
+          decision: {
+            ...dossierWithWatchingDecisionAndMultilineNote.decision!,
+            note: potentiallyWrappedNote,
+          },
+        }}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+    expect(html).toMatch(/data-decision-note="true"[^>]*line-clamp-5/);
+    expect(
+      decisionNoteElementOverflows({ scrollHeight: 101, clientHeight: 100 }),
+    ).toBeTrue();
+    expect(
+      decisionNoteElementOverflows({ scrollHeight: 100, clientHeight: 100 }),
+    ).toBeFalse();
+  });
+
+  test("puts the existing retest action in the card header with honest copy", () => {
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={dossierWithWatchingDecisionAndMultilineNote}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRunFresh={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+    const text = visibleText(html);
+
+    expect(text).toContain("Retest setup");
+    expect(text).not.toContain("Run it fresh");
+    expect(html.indexOf("Retest setup")).toBeLessThan(
+      html.indexOf("Weekly GLD pullback"),
+    );
+    expect(html).toContain('data-run-fresh-location="card-header"');
   });
 
   test("shows one quiet undecided state and an add action", () => {
@@ -216,7 +303,7 @@ describe("single-run dossier view", () => {
     );
   });
 
-  test("shows a visible return to the latest dossier for a historical anchor", () => {
+  test("uses an accessible icon-only return to the latest run", () => {
     const html = renderToStaticMarkup(
       <RunDossierView
         dossier={dossierWithWatchingDecisionAndMultilineNote}
@@ -230,8 +317,10 @@ describe("single-run dossier view", () => {
       />,
     );
 
-    expect(visibleText(html)).toContain("Dossier");
-    expect(html).toContain('aria-label="Dossier"');
+    expect(visibleText(html)).not.toContain("Dossier");
+    expect(html).toMatch(
+      /<button[^>]*aria-label="Back to latest run"[^>]*class="[^"]*h-11[^"]*w-11/,
+    );
   });
 });
 
@@ -362,6 +451,46 @@ describe("decision editor", () => {
     // React's server renderer serializes a controlled textarea newline as
     // the two-character escape sequence; the controlled value is unchanged.
     expect(html).toContain("First line\\nSecond line");
+  });
+
+  test("caps authored notes at 500 characters and shows a near-limit count", () => {
+    const html = renderToStaticMarkup(
+      <DecisionEditor
+        action={decisionAction}
+        decisionState="watching"
+        note={"x".repeat(480)}
+        saving={false}
+        error={false}
+        onDecisionStateChange={() => {}}
+        onNoteChange={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(html).not.toMatch(/<textarea[^>]*maxLength=/);
+    expect(visibleText(html)).toContain("480 / 500");
+  });
+
+  test("lets a legacy long note be canceled but not resaved unchanged", () => {
+    const html = renderToStaticMarkup(
+      <DecisionEditor
+        action={decisionAction}
+        decisionState="watching"
+        note={"x".repeat(501)}
+        saving={false}
+        error={false}
+        onDecisionStateChange={() => {}}
+        onNoteChange={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(html).toMatch(/<button[^>]*>Cancel<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Cancel<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>[\s\S]*Save decision/);
+    expect(visibleText(html)).toContain("501 / 500");
   });
 
   test("associates the decision note textarea with an explicit label", () => {

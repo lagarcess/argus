@@ -182,11 +182,14 @@ export function DecisionHistoryView({
       <div className="flex min-h-11 items-center justify-between border-b border-black/5 pb-3 dark:border-white/5">
         <button
           type="button"
+          aria-label={t(
+            "command_palette.back_to_run_details",
+            "Back to run details",
+          )}
           onClick={onBack}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full px-2 text-[12px] font-medium text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          {t("command_palette.dossier_back", "Dossier")}
         </button>
         <h3 className="font-display text-[16px] font-medium text-black dark:text-white">
           {t("command_palette.decision_history", "Decision history")}

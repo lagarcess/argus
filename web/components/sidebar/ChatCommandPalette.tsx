@@ -82,6 +82,7 @@ import {
   loadCommandPaletteRecentRecall,
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
+import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type ChatCommandPaletteProps = {
@@ -513,8 +514,17 @@ export default function ChatCommandPalette({
         ? commandPaletteAssetRollupFromSearch(assetRollup, {
             heading: t(
               "command_palette.asset_rollup.heading",
-              "Your history with this asset",
+              "Your Argus history",
             ),
+            scope: isGuest
+              ? t(
+                  "command_palette.asset_rollup.scope_guest",
+                  "In this temporary conversation",
+                )
+              : t(
+                  "command_palette.asset_rollup.scope_registered",
+                  "Across your conversations",
+                ),
             runsInvolving: (count, symbol) =>
               t("command_palette.asset_rollup.runs_involving", {
                 count,
@@ -540,7 +550,7 @@ export default function ChatCommandPalette({
               }),
           })
         : null,
-    [assetRollup, i18n.language, i18n.resolvedLanguage, t],
+    [assetRollup, i18n.language, i18n.resolvedLanguage, isGuest, t],
   );
   const displayItems = useMemo(() => {
     const items = isResultMode
@@ -1308,7 +1318,7 @@ export default function ChatCommandPalette({
                         ? "command_palette.keep_typing_detail"
                         : "command_palette.try_searching",
                       isWaitingForIndexableQuery
-                        ? "Search starts when one word has at least 3 characters."
+                        ? "Search starts with a 2-character ticker or a 3-character word."
                         : "Try a ticker, phrase, or note you remember.",
                     )}
                   </p>
@@ -1317,37 +1327,7 @@ export default function ChatCommandPalette({
             ) : (
               <div className="flex flex-col gap-3 p-3">
                 {assetRollupDisplay && (
-                  <section
-                    className="rounded-[14px] border border-[#5ba897]/20 bg-[#5ba897]/[0.06] px-4 py-3 dark:border-[#7bc1ad]/20 dark:bg-[#7bc1ad]/[0.06]"
-                    aria-label={assetRollupDisplay.heading}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                          {assetRollupDisplay.heading}
-                        </p>
-                        <p className="mt-1 font-display text-[18px] font-semibold text-black dark:text-white">
-                          {assetRollupDisplay.symbol}
-                        </p>
-                      </div>
-                      <p className="text-right text-[11px] text-black/35 dark:text-white/35">
-                        {assetRollupDisplay.lastTouched}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-[13px] text-black/60 dark:text-white/60">
-                      {assetRollupDisplay.runs}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {assetRollupDisplay.decisions.map((decision) => (
-                        <span
-                          key={decision.state}
-                          className="rounded-full border border-black/8 bg-white/55 px-2 py-1 text-[10px] font-semibold text-black/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
-                        >
-                          {decision.label}
-                        </span>
-                      ))}
-                    </div>
-                  </section>
+                  <AssetHistoryRollup rollup={assetRollupDisplay} />
                 )}
                 {groupedItems.map((group, groupIndex) => {
                   const groupRowStart = groupedItems

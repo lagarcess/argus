@@ -1,9 +1,15 @@
 "use client";
 
 import { Check, Loader2 } from "lucide-react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useId, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import {
+  DECISION_NOTE_MAX_LENGTH,
+  decisionNoteCharacterCount,
+  decisionNoteCountIsVisible,
+  nextDecisionNoteValue,
+} from "@/lib/decision-note";
 import type {
   DecisionState,
   SearchDecisionAction,
@@ -90,9 +96,13 @@ export function DecisionEditor({
   onSave,
 }: DecisionEditorProps) {
   const { t } = useTranslation();
+  const countId = useId();
+  const noteCount = decisionNoteCharacterCount(note);
+  const showNoteCount = decisionNoteCountIsVisible(note);
+  const noteTooLong = noteCount > DECISION_NOTE_MAX_LENGTH;
 
   const save = () => {
-    if (saving) return;
+    if (saving || noteTooLong) return;
     void onSave(action, { decision_state: decisionState, note });
   };
 
@@ -130,9 +140,11 @@ export function DecisionEditor({
       <textarea
         id="command-palette-decision-note"
         value={note}
-        maxLength={2000}
+        aria-describedby={showNoteCount ? countId : undefined}
         disabled={saving}
-        onChange={(event) => onNoteChange(event.target.value)}
+        onChange={(event) =>
+          onNoteChange(nextDecisionNoteValue(note, event.target.value))
+        }
         onKeyDown={handleKeyDown}
         placeholder={t(
           "chat.result_card.decision_note_placeholder",
@@ -140,6 +152,22 @@ export function DecisionEditor({
         )}
         className="mt-3 min-h-24 w-full resize-y rounded-[12px] border border-black/10 bg-white px-3 py-2 text-[16px] leading-relaxed text-black outline-none focus:border-black/25 disabled:opacity-60 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/25"
       />
+      {showNoteCount ? (
+        <p
+          id={countId}
+          className={`mt-1 text-right text-[11px] ${
+            noteTooLong
+              ? "text-[#d66d75]"
+              : "text-black/35 dark:text-white/35"
+          }`}
+        >
+          {t("command_palette.decision_note_count", {
+            count: noteCount,
+            max: DECISION_NOTE_MAX_LENGTH,
+            defaultValue: `${noteCount} / ${DECISION_NOTE_MAX_LENGTH}`,
+          })}
+        </p>
+      ) : null}
       {error && (
         <p className="mt-2 text-[12px] text-[#d66d75]" role="alert">
           {t(
@@ -159,7 +187,7 @@ export function DecisionEditor({
         </button>
         <button
           type="button"
-          disabled={saving}
+          disabled={saving || noteTooLong}
           onClick={save}
           className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white disabled:opacity-55 dark:bg-white dark:text-[#191c1f]"
         >

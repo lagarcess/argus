@@ -772,6 +772,9 @@ Constraints:
   user-owned evidence artifact.
 - Duplicate POST/retry semantics update the existing decision row and return the
   canonical current decision.
+- The public decision write contract accepts at most 500 note characters. The
+  durable column remains nullable `text` so previously accepted longer notes
+  stay readable; no migration or destructive truncation is introduced.
 
 ### Run dossier read projection
 

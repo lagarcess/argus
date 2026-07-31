@@ -175,7 +175,8 @@ describe("command palette conversation dossier", () => {
 
   test("renders an asset rollup with involving language and state counts", () => {
     expect(commandPaletteAssetRollupFromSearch(assetRollup)).toEqual({
-      heading: "Your history with this asset",
+      heading: "Your Argus history",
+      scope: "Across your conversations",
       symbol: "TSLA",
       runs: "2 runs involving TSLA",
       decisions: [
@@ -191,7 +192,8 @@ describe("command palette conversation dossier", () => {
 
   test("localizes the asset rollup fully in Spanish", () => {
     const display = commandPaletteAssetRollupFromSearch(assetRollup, {
-      heading: "Tu historial con este activo",
+      heading: "Tu historial de Argus",
+      scope: "En todas tus conversaciones",
       runsInvolving: (count, symbol) =>
         `${count} ejecuciones que incluyen ${symbol}`,
       decisionStateLabel: (state) =>
@@ -206,7 +208,8 @@ describe("command palette conversation dossier", () => {
     });
 
     expect(display).toEqual({
-      heading: "Tu historial con este activo",
+      heading: "Tu historial de Argus",
+      scope: "En todas tus conversaciones",
       symbol: "TSLA",
       runs: "2 ejecuciones que incluyen TSLA",
       decisions: [
@@ -223,6 +226,7 @@ describe("command palette conversation dossier", () => {
     });
     const visibleText = [
       display.heading,
+      display.scope,
       display.runs,
       ...display.decisions.map((decision) => decision.label),
       display.lastTouched,

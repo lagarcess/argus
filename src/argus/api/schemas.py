@@ -45,6 +45,8 @@ DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 
+DECISION_NOTE_WRITE_MAX_LENGTH = 500
+
 CHAT_STREAM_MAX_BODY_BYTES = 65_536
 CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
 CHAT_STREAM_MAX_MESSAGE_LENGTH = 16_000
@@ -463,7 +465,10 @@ class DecisionNote(BaseModel):
 
 class DecisionNoteCreate(BaseModel):
     decision_state: DecisionState
-    note: str | None = Field(default=None, max_length=2000)
+    note: str | None = Field(
+        default=None,
+        max_length=DECISION_NOTE_WRITE_MAX_LENGTH,
+    )
 
     @field_validator("note")
     @classmethod

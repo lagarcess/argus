@@ -14,6 +14,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { createEvidenceDecision, type DecisionState } from "@/lib/argus-api";
 import {
+  DECISION_NOTE_MAX_LENGTH,
+  decisionNoteCharacterCount,
+  decisionNoteCountIsVisible,
+  nextDecisionNoteValue,
+} from "@/lib/decision-note";
+import {
   type ResultCardDisplayCopy,
   displayResultActionLabel,
   heroDeltaEvidenceView,
@@ -71,6 +77,7 @@ export default function StrategyResultCard({
   const [decisionNote, setDecisionNote] = useState("");
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [decisionSaveFailed, setDecisionSaveFailed] = useState(false);
+  const decisionNoteCount = decisionNoteCharacterCount(decisionNote);
   useEffect(() => {
     setSavedDecisionState(result.decisionState ?? null);
     if (result.decisionState) {
@@ -294,13 +301,26 @@ export default function StrategyResultCard({
           </div>
           <textarea
             value={decisionNote}
-            onChange={(event) => setDecisionNote(event.target.value)}
+            onChange={(event) =>
+              setDecisionNote(
+                nextDecisionNoteValue(decisionNote, event.target.value),
+              )
+            }
             placeholder={t(
               "chat.result_card.decision_note_placeholder",
               "Optional note for future you",
             )}
             className="mt-3 min-h-20 w-full resize-y rounded-[14px] border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-[#191c1f] outline-none transition-colors placeholder:text-[#8d969e] focus:border-black/24 focus:ring-2 focus:ring-black/8 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/20 dark:focus:ring-white/10"
           />
+          {decisionNoteCountIsVisible(decisionNote) ? (
+            <p className="mt-1 text-right text-[11px] text-[#8d969e]">
+              {t("command_palette.decision_note_count", {
+                count: decisionNoteCount,
+                max: DECISION_NOTE_MAX_LENGTH,
+                defaultValue: `${decisionNoteCount} / ${DECISION_NOTE_MAX_LENGTH}`,
+              })}
+            </p>
+          ) : null}
           {decisionSaveFailed && (
             <p className="mt-2 text-[12px] text-[#d66d75]">
               {t(

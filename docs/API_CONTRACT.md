@@ -3079,6 +3079,11 @@ Server behavior:
 }
 ```
 
+`note` is optional and accepts at most 500 characters on every new or repeated
+write. Read projections continue to return previously accepted notes up to the
+existing 2,000-character transport bound so tightening authoring does not hide
+or corrupt legacy user text.
+
 `decision_state` enum:
 - `watching`
 - `promising`
@@ -3333,6 +3338,12 @@ owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
 run contributes to at most one decision state. `last_touched_at` is the latest
 activity on those runs or their evidence/decision lineage.
 
+Text recall requires at least one normalized token with three characters. A
+single symbol-shaped query is separately eligible at two characters so stored
+symbols such as `BA` can resolve through the bounded symbol index without
+opening broad two-character text search. One-character, whitespace-containing,
+and non-alphanumeric symbol queries remain deferred.
+
 The asset rollup is an additive presentation row. It is outside the
 conversation `limit`, ranking, decision filter, ledger grouping, and cursor
 sequence; it has no conversation id or management actions and cannot become a
@@ -3351,7 +3362,9 @@ evidence-backed run; in that case `total_runs = 0` and `decided_runs = 0`.
 Every present dossier anchors its run identity, tested setup, outcome, current
 decision, result-message anchor, and actions to the same run/evidence pair.
 Lists are bounded to five symbols and four typed metrics. A decision note is
-the user's exact bounded note with internal newlines preserved. `total_runs`
+the user's exact bounded note with internal newlines preserved. New writes are
+bounded to 500 characters, while read projections retain the existing 2,000-
+character compatibility bound for legacy notes. `total_runs`
 and `decided_runs` are backend-owned full-lineage counts, not page totals.
 
 `dossier.actions` is a bounded, backend-owned list. It contains at most one

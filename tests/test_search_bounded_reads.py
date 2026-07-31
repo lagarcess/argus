@@ -350,7 +350,7 @@ def test_search_rejects_nonpositive_bound_before_database_read() -> None:
     assert pool.cursor.executions == []
 
 
-@pytest.mark.parametrize("query", ["a", "GL", "__"])
+@pytest.mark.parametrize("query", ["a", "GL D", "__"])
 def test_search_defers_nonempty_queries_without_an_indexable_token(
     query: str,
 ) -> None:
@@ -376,13 +376,14 @@ def test_search_defers_nonempty_queries_without_an_indexable_token(
     assert pool.acquisition_timeouts == []
 
 
-def test_search_allows_long_punctuated_symbol_without_text_scans() -> None:
+@pytest.mark.parametrize("symbol", ["GL", "ss/e"])
+def test_search_allows_symbol_only_queries_without_text_scans(symbol: str) -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[]])
 
     result = reader_type(pool).search_rows(
         user_id=OWNER_ID,
-        query="ss/e",
+        query=symbol,
         source_limit=4,
         include_ledger_groups=True,
     )
@@ -397,7 +398,7 @@ def test_search_allows_long_punctuated_symbol_without_text_scans() -> None:
     assert len(pool.cursor.executions) == 1
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
-    assert params["symbol_query"] == "ss/e"
+    assert params["symbol_query"] == symbol.casefold()
     assert params["text_search_enabled"] is False
     assert "%(text_search_enabled)s::boolean as text_search_enabled" in sql_text
     assert "conversation_page" not in sql_text
@@ -435,12 +436,13 @@ def test_conversation_search_sql_guards_all_text_match_sources() -> None:
     assert rendered.count("input.text_search_enabled") == 6
 
 
-def test_search_indexability_includes_long_punctuated_symbols() -> None:
+def test_search_indexability_separates_two_character_symbols_from_text() -> None:
     from argus.domain.search_text import search_query_is_indexable
 
+    assert search_query_is_indexable("GL") is True
     assert search_query_is_indexable("ss/e") is True
     assert search_query_is_indexable("J\u030c/USD") is True
-    for deferred in ("GL", "__", "___", "\x00__", "/-.", "a"):
+    for deferred in ("G", "GL D", "__", "___", "\x00__", "/-."):
         assert search_query_is_indexable(deferred) is False
 
 

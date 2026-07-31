@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronRight, FileText, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronRight, PencilLine, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,8 +18,10 @@ import {
   formatRunDossierMetrics,
   formatRunDossierSetup,
 } from "@/lib/run-dossier-items";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 import { DecisionEditor } from "./DecisionEditor";
+import { DecisionNoteDisplay } from "./DecisionNoteDisplay";
 
 type RunDossierViewProps = {
   dossier: RunDossier;
@@ -169,24 +171,49 @@ export function RunDossierView({
       {onBackToLatest ? (
         <button
           type="button"
-          aria-label={t("command_palette.dossier_back", "Dossier")}
+          aria-label={t(
+            "command_palette.back_to_latest_run",
+            "Back to latest run",
+          )}
           onClick={onBackToLatest}
-          className="mb-3 inline-flex min-h-11 w-fit items-center gap-2 rounded-full px-2 text-[12px] font-medium text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white"
+          className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full text-black/55 transition-colors hover:bg-black/[0.03] hover:text-black dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          {t("command_palette.dossier_back", "Dossier")}
         </button>
       ) : null}
       <div className="rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-            {t("command_palette.type.backtest", "Backtest")}
-          </span>
-          {completedAt && (
-            <span className="text-[11px] text-black/35 dark:text-white/35">
-              {completedAt}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+              {t("command_palette.type.backtest", "Backtest")}
             </span>
-          )}
+            {completedAt && (
+              <span className="text-[11px] text-black/35 dark:text-white/35">
+                {completedAt}
+              </span>
+            )}
+          </div>
+          {runFreshAction ? (
+            <Tooltip
+              content={t(
+                "command_palette.run_fresh_tooltip",
+                "Reuse this setup with the latest available data. You’ll review it before it runs.",
+              )}
+              side="bottom"
+              delay={150}
+            >
+              <button
+                type="button"
+                data-run-fresh-location="card-header"
+                disabled={runFreshDisabled}
+                onClick={() => void onRunFresh(runFreshAction)}
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("command_palette.run_fresh_short", "Retest setup")}
+              </button>
+            </Tooltip>
+          ) : null}
         </div>
 
         <h3 className="mt-3 font-display text-[20px] font-medium leading-tight text-black dark:text-white">
@@ -264,30 +291,20 @@ export function RunDossierView({
               onSave={saveDecision}
             />
           ) : (
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+            <div className="min-w-0">
+              <div
+                data-decision-state-row="true"
+                className="flex min-h-8 items-center gap-2"
+              >
                 {dossier.decision ? (
-                  <>
-                    <span className="inline-flex rounded-full border border-black/8 px-2.5 py-1 text-[11px] font-semibold text-black/55 dark:border-white/10 dark:text-white/55">
-                      {t(
-                        `chat.result_card.decision_states.${dossier.decision.state}`,
-                        commandPaletteDecisionStateFallback(
-                          dossier.decision.state,
-                        ),
-                      )}
-                    </span>
-                    {dossier.decision.note && (
-                      <p className="mt-2 whitespace-pre-wrap border-l-2 border-black/15 pl-3 text-[13px] italic leading-relaxed text-black/70 dark:border-white/20 dark:text-white/70">
-                        <span className="sr-only">
-                          {t(
-                            "command_palette.decision_note_label",
-                            "Decision note: ",
-                          )}
-                        </span>
-                        {dossier.decision.note}
-                      </p>
+                  <span className="inline-flex h-8 items-center rounded-full border border-black/8 px-2.5 text-[11px] font-semibold text-black/55 dark:border-white/10 dark:text-white/55">
+                    {t(
+                      `chat.result_card.decision_states.${dossier.decision.state}`,
+                      commandPaletteDecisionStateFallback(
+                        dossier.decision.state,
+                      ),
                     )}
-                  </>
+                  </span>
                 ) : (
                   <p className="text-[13px] text-black/40 dark:text-white/40">
                     {t(
@@ -296,22 +313,29 @@ export function RunDossierView({
                     )}
                   </p>
                 )}
-              </div>
               {decisionAction && (
                 <button
                   type="button"
+                  data-decision-edit="true"
                   onClick={startDecisionEdit}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/60 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.05]"
+                  className="relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-black/10 px-2.5 text-[11px] font-medium text-black/60 transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 hover:bg-black/[0.03] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.05]"
                 >
-                  <FileText className="h-4 w-4" aria-hidden="true" />
+                  <PencilLine className="h-3.5 w-3.5" aria-hidden="true" />
                   {commandPaletteDecisionVerb(decisionAction) === "add"
                     ? t("command_palette.add_decision_short", "Add decision")
                     : t(
                         "command_palette.change_decision_short",
-                        "Change decision",
+                        "Edit",
                       )}
                 </button>
               )}
+              </div>
+              {dossier.decision?.note ? (
+                <DecisionNoteDisplay
+                  key={`${dossier.run_id}:${dossier.decision.note}`}
+                  note={dossier.decision.note}
+                />
+              ) : null}
             </div>
           )}
           {saved && (
@@ -323,20 +347,6 @@ export function RunDossierView({
             </p>
           )}
         </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {runFreshAction && (
-          <button
-            type="button"
-            disabled={runFreshDisabled}
-            onClick={() => void onRunFresh(runFreshAction)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            {t("command_palette.run_fresh_short", "Run it fresh")}
-          </button>
-        )}
       </div>
 
       <button

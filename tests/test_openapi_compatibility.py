@@ -72,6 +72,21 @@ def test_search_declares_bounded_visible_conversation_recall(
     }
 
 
+def test_decision_note_write_schema_caps_new_notes_without_narrowing_reads(
+    generated: dict,
+) -> None:
+    schemas = generated["components"]["schemas"]
+    create_note = schemas["DecisionNoteCreate"]["properties"]["note"]["anyOf"][0]
+    dossier_note = schemas["SearchDossierDecision"]["properties"]["note"][
+        "anyOf"
+    ][0]
+    action_note = schemas["SearchDecisionAction"]["properties"]["note"]["anyOf"][0]
+
+    assert create_note["maxLength"] == 500
+    assert dossier_note["maxLength"] == 2000
+    assert action_note["maxLength"] == 2000
+
+
 def test_prefix_appears_exactly_once_per_public_operation(
     generated: dict, checked: dict
 ) -> None:

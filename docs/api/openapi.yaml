@@ -2108,7 +2108,7 @@ components:
         note:
           anyOf:
           - type: string
-            maxLength: 2000
+            maxLength: 500
           - type: 'null'
       type: object
       required:

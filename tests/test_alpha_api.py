@@ -23,6 +23,7 @@ from argus.api.schemas import (
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 def _stream_events(stream: str) -> list[dict[str, Any]]:
@@ -1713,6 +1714,50 @@ def test_search_memory_mode_symbol_only_query_returns_only_asset_rollup() -> Non
     assert rejected.json()["code"] == "validation_error"
 
 
+def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "Aircraft research"},
+    ).json()["conversation"]
+    run = BacktestRun(
+        id="asset-rollup-two-character-symbol",
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["BA"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "buy_and_hold"},
+        conversation_result_card={"title": "BA result"},
+        created_at=now,
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+
+    response = client.get("/api/v1/search", params={"q": "ba"})
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [
+        {
+            "type": "asset_rollup",
+            "symbol": "BA",
+            "run_count": 1,
+            "decision_counts": {
+                "promising": 0,
+                "watching": 0,
+                "rejected": 0,
+                "revisit_later": 0,
+            },
+            "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+        }
+    ]
+
+
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     # Memory mode shares the Supabase matcher semantics: a multi-word query
     # matches when every token appears, not only as one contiguous substring.
@@ -1728,7 +1773,7 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     assert {item["type"] for item in items} == {"conversation"}
 
 
-@pytest.mark.parametrize("query", ["a", "GL", "__"])
+@pytest.mark.parametrize("query", ["a", "GL D", "__"])
 def test_search_memory_mode_defers_queries_without_an_indexable_token(
     query: str,
 ) -> None:
@@ -2776,6 +2821,27 @@ def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
     assert body["request_id"]
     assert isinstance(body["context"]["errors"], list)
     assert "decision_state" in str(body["context"]["errors"])
+
+
+def test_decision_note_write_limit_is_500_and_legacy_reads_remain_compatible() -> None:
+    from argus.api.schemas import DecisionNoteCreate, SearchDossierDecision
+
+    accepted = DecisionNoteCreate(decision_state="watching", note="x" * 500)
+    assert accepted.note == "x" * 500
+
+    with pytest.raises(ValidationError):
+        DecisionNoteCreate(decision_state="watching", note="x" * 501)
+
+    legacy = SearchDossierDecision(state="watching", note="x" * 2000)
+    assert legacy.note == "x" * 2000
+
+    client = _client()
+    rejected = client.post(
+        "/api/v1/evidence-artifacts/artifact-1/decision",
+        json={"decision_state": "watching", "note": "x" * 501},
+    )
+    assert rejected.status_code == 422
+    assert "note" in str(rejected.json()["context"]["errors"])
 
 
 def test_search_projects_one_typed_conversation_dossier() -> None:
