@@ -45,15 +45,22 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
      which read as louder/candy-like and less sophisticated.
    - Render and screenshot the new set before finalizing — this is a
      visual quality bar, verify it visually, don't just describe it.
-9. **Superseded, resolved: the picker moves out of the Profile modal
-   entirely, into Settings.** Decided 2026-07-31 — the Profile modal
-   should stay a lightweight glance (name, handle, email, language), not
-   grow into a settings panel. The avatar-theme picker belongs in the
-   fuller Settings surface (the same one the keyboard-shortcuts lane's
-   nested-subsettings quick-jump already covers), alongside other
-   preferences. This also resolves the earlier layout-push concern —
-   nothing new gets added to the Profile modal, so nothing pushes "App
-   language" down.
+9. **Superseded again, final answer: a focused centered submodal reached
+   by clicking the avatar, not a separate Settings destination.**
+   Decided 2026-07-31 — better than the prior "move to Settings" call:
+   solves the same problem (Profile modal stays lightweight, nothing new
+   added to it at rest) without sending the user away from where they
+   started. Shape: clicking the avatar/monogram within the Profile modal
+   opens a focused, centered submodal containing the palette picker, with
+   a smooth transition in; dismissing it (Escape/click-away/explicit
+   close) transitions back to the Profile modal, not out of the flow
+   entirely. Nothing added to the Profile modal's resting layout — the
+   picker only exists inside this drill-in submodal, triggered by direct
+   interaction with the thing you're changing. This also resolves the
+   layout-push concern the same way as before: nothing new sits in the
+   Profile modal by default, so "App language" stays exactly where it is.
+   Exact transition timing/easing is taste; that it IS a considered
+   transition, not an instant cut, is not.
 10. **Ambient badge vs. active-selection swatches get different visual
     intensity, not identical treatment.** The persistent avatar badge
     (wherever it renders throughout the app — sidebar, header, message
