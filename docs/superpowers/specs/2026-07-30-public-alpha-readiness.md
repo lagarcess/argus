@@ -119,28 +119,38 @@ who walk through it.
 9. **Email delivery must be provable without the founder in the loop, and
    approval must NOT use Supabase's admin invite mechanism.**
    The founder will not be available to check an inbox during the build.
-   Two rules follow. (a) Send mechanism: the approval notification is a
-   plain transactional email through the already-configured
-   Supabase→Resend SMTP path, linking the approved visitor back to the
-   EXISTING signup form (`AuthForm`/`GuestConversionModal`, decision 4) —
-   it does not pre-create an account. **Explicitly ruled out: Supabase's
-   `admin.inviteUserByEmail` / built-in invite email.** That mechanism
-   pre-creates an unconfirmed Auth user and sends a non-PKCE link that
-   Argus's frontend has no page built to complete (`detectSessionInUrl`
-   is off; the one email-link completion page expects a PKCE `code`,
-   built for password recovery, not invites) — completing it would
-   require a new invite-acceptance/password-setup flow, which is real new
-   account infrastructure and out of scope. Sending people back to the
-   form they can already use avoids that entirely. Do not introduce a new
-   Resend API integration, SDK, or secret into the backend for this; if
-   this mechanism genuinely cannot carry the approval flow, stop and
-   report rather than adding a send path. (b) Autonomous proof: verify
-   delivery by sending to Resend's test inbox (`delivered@resend.dev`)
-   and capturing the Resend dashboard/API email log showing the send
-   accepted and delivered — screenshot or API response attached to the
-   PR. This same recipe satisfies section 4's deferred live test-send;
-   no human inbox is part of the acceptance loop, and the founder
-   spot-checks the Resend log afterward at their leisure.
+   (a) Send mechanism: **direct SMTP from the Argus backend using Python's
+   standard library** (`smtplib`/`email.mime` — no third-party SDK, no new
+   dependency in `pyproject.toml`), connecting to `smtp.resend.com` with
+   the same Resend credentials already verified working for Supabase's
+   Auth emails. Supabase's own Auth SMTP is confirmed scoped to Auth
+   lifecycle emails only (signup/OTP/recovery/invite) with no arbitrary
+   transactional-email operation — so the approval notification cannot
+   ride that path as originally written; sending it directly is the
+   correct amendment, not a scope expansion. The email links the approved
+   visitor back to the EXISTING signup form (`AuthForm`/
+   `GuestConversionModal`, decision 4) — it does not pre-create an
+   account. **Explicitly ruled out: Supabase's `admin.inviteUserByEmail` /
+   built-in invite email.** That mechanism pre-creates an unconfirmed Auth
+   user and sends a non-PKCE link that Argus's frontend has no page built
+   to complete (`detectSessionInUrl` is off; the one email-link completion
+   page expects a PKCE `code`, built for password recovery, not invites)
+   — completing it would require a new invite-acceptance/password-setup
+   flow, real new account infrastructure and out of scope. **Scope guard:**
+   this stays a single-purpose helper for exactly this one email — it is
+   not the start of a general email-sending capability; do not generalize
+   it or add a template system, retry queue, or additional email types
+   beyond this one. The Resend SMTP password is duplicated as a new Argus
+   secret (e.g. `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`) — a credential
+   existing in two secret stores you already control (Supabase dashboard,
+   Render env), not a new external integration surface. (b) Autonomous
+   proof: verify delivery by sending to Resend's test inbox
+   (`delivered@resend.dev`) and capturing the Resend dashboard/API email
+   log showing the send accepted and delivered — screenshot or API
+   response attached to the PR. This same recipe satisfies section 4's
+   deferred live test-send; no human inbox is part of the acceptance
+   loop, and the founder spot-checks the Resend log afterward at their
+   leisure.
 10. **The existing confirmed-signup flow is missing a "check your email"
     state — fixing it is in scope.** Right now a sessionless signup
     response (expected when email confirmation is required) is treated as
@@ -180,9 +190,12 @@ who walk through it.
   necessarily in this same file, but recorded somewhere durable); the two
   new OpenRouter env vars added (`sync: false`), replacing hosted use of
   `OPENROUTER_API_KEY` per decision 3's topology — dashboard values set
-  before the deploy that reads them.
+  before the deploy that reads them; `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`
+  added (`sync: false`, decision 9) — same ordering rule, dashboard value
+  before the deploy that reads it.
 - `.env.example` — document the three-var OpenRouter scheme so a fresh
-  checkout knows `OPENROUTER_API_KEY` is dev-only.
+  checkout knows `OPENROUTER_API_KEY` is dev-only; document the new SMTP
+  password var.
 - Hosted Supabase Auth dashboard — explicitly confirm/set "Confirm email";
   configure Resend as the custom SMTP provider. Neither is a code change,
   both are real configuration that must be verified, not assumed from local
@@ -236,9 +249,10 @@ safety ordering: don't widen the door before the spend cap exists):
   `AuthForm`/`GuestConversionModal` signup form for non-allowlisted
   visitors — the form itself is not being rebuilt, it already works for
   allowlisted emails).
-- Approval notification: plain email linking back to the existing signup
-  form, NOT a Supabase admin invite (decision 9; Resend SMTP is already
-  configured — see section 4).
+- Approval notification: direct stdlib SMTP send from the Argus backend
+  to `smtp.resend.com`, linking back to the existing signup form — NOT a
+  Supabase admin invite, NOT a Resend SDK/API integration (decision 9).
+  New secret: `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD` in Render.
 - "Check your email" UI state on the existing signup form for the
   sessionless-response case (decision 10) — also fixes a live gap in
   today's flow, not just new-user copy.
