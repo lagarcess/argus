@@ -576,6 +576,19 @@ for (const qaCase of cases) {
           ),
         ).toEqual(expectedMessageIds);
 
+        await page.goto(
+          `/chat?conversation=${CONVERSATION_ID}&message=retry-request-${qaCase.producer}`,
+          { waitUntil: "networkidle" },
+        );
+
+        await expect(originalUserRow).toBeFocused();
+        await expect(visibleUserTurn).toHaveCount(1);
+        await expect(
+          page.locator(
+            `[data-message-id="retry-request-${qaCase.producer}"]`,
+          ),
+        ).toHaveCount(0);
+
         expect(evidence.unexpected).toEqual([]);
         expect(evidence.consoleErrors).toEqual([]);
         const allowedOrigins = new Set([

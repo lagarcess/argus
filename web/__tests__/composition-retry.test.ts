@@ -34,6 +34,7 @@ describe("composition-failure retry contract (issue #249)", () => {
 
     expect(retired.map((message) => message.id)).toEqual(["u1", "a2"]);
     expect(retired.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(retired[0].transcriptAnchorIds).toEqual(["u2"]);
   });
 
   test("an unsuperseded failure keeps rendering", () => {

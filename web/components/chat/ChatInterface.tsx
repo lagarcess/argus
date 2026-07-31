@@ -703,7 +703,12 @@ export default function ChatInterface() {
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
-        if (!snapshot.some((message) => message.id === requestedMessageId)) {
+        const anchorMessage = snapshot.find(
+          (message) =>
+            message.id === requestedMessageId ||
+            message.transcriptAnchorIds?.includes(requestedMessageId),
+        );
+        if (!anchorMessage) {
           throw new Error("Transcript anchor was not returned.");
         }
         clearColdTranscriptRetrieval();
@@ -712,7 +717,7 @@ export default function ChatInterface() {
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
-          messageId: requestedMessageId,
+          messageId: anchorMessage.id,
         };
         shouldAutoScrollRef.current = false;
         setMessages(snapshot);

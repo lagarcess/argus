@@ -52,7 +52,17 @@ export function retireSupersededFailures(messages: Message[]): Message[] {
         normalizedContent(request) === normalizedContent(duplicate)
       ) {
         // The durable retry stays append-only, while the transcript keeps the
-        // original user row and skips the replay copy.
+        // original user row and skips the replay copy. Keep the replay id as
+        // an anchor alias so Omnisearch can still focus the projected row.
+        retired[retired.length - 1] = {
+          ...request,
+          transcriptAnchorIds: [
+            ...new Set([
+              ...(request.transcriptAnchorIds ?? []),
+              duplicate.id,
+            ]),
+          ],
+        };
         index += 1;
       }
       continue;
