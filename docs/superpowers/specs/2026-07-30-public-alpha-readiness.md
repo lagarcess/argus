@@ -141,9 +141,17 @@ who walk through it.
    not the start of a general email-sending capability; do not generalize
    it or add a template system, retry queue, or additional email types
    beyond this one. The Resend SMTP password is duplicated as a new Argus
-   secret (e.g. `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`) — a credential
+   secret, `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD` — a credential
    existing in two secret stores you already control (Supabase dashboard,
-   Render env), not a new external integration surface. (b) Autonomous
+   Render env), not a new external integration surface. **Already set
+   locally (2026-07-30):** the founder added `RESEND_API_KEY` and
+   `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD=${RESEND_API_KEY}` to the shared
+   integration `.env`, for local dev/testing only — this is NOT the
+   hosted Render secret, which is a separate, later value set via CLI per
+   section 4's ordering rule. Before relying on the local value, confirm
+   the `${RESEND_API_KEY}` reference actually resolved (value starts with
+   `re_`) rather than trusting the literal string blindly — `.env`
+   interpolation depends on the loader supporting it. (b) Autonomous
    proof: verify delivery by sending to Resend's test inbox
    (`delivered@resend.dev`) and capturing the Resend dashboard/API email
    log showing the send accepted and delivered — screenshot or API
