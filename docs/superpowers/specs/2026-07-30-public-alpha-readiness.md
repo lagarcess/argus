@@ -116,13 +116,24 @@ who walk through it.
    deliberate friction floor: enough to filter typo/throwaway addresses on
    both the waitlist request and eventual registration, not enough to be a
    real barrier to a genuinely interested tester.
-9. **Email delivery must be provable without the founder in the loop.**
+9. **Email delivery must be provable without the founder in the loop, and
+   approval must NOT use Supabase's admin invite mechanism.**
    The founder will not be available to check an inbox during the build.
-   Two rules follow. (a) Send mechanism: the approval notification goes
-   through the already-configured Supabase→Resend SMTP path (prefer
-   Supabase's built-in admin invite email) — do not introduce a new
+   Two rules follow. (a) Send mechanism: the approval notification is a
+   plain transactional email through the already-configured
+   Supabase→Resend SMTP path, linking the approved visitor back to the
+   EXISTING signup form (`AuthForm`/`GuestConversionModal`, decision 4) —
+   it does not pre-create an account. **Explicitly ruled out: Supabase's
+   `admin.inviteUserByEmail` / built-in invite email.** That mechanism
+   pre-creates an unconfirmed Auth user and sends a non-PKCE link that
+   Argus's frontend has no page built to complete (`detectSessionInUrl`
+   is off; the one email-link completion page expects a PKCE `code`,
+   built for password recovery, not invites) — completing it would
+   require a new invite-acceptance/password-setup flow, which is real new
+   account infrastructure and out of scope. Sending people back to the
+   form they can already use avoids that entirely. Do not introduce a new
    Resend API integration, SDK, or secret into the backend for this; if
-   the invite path genuinely cannot carry the approval flow, stop and
+   this mechanism genuinely cannot carry the approval flow, stop and
    report rather than adding a send path. (b) Autonomous proof: verify
    delivery by sending to Resend's test inbox (`delivered@resend.dev`)
    and capturing the Resend dashboard/API email log showing the send
@@ -130,6 +141,17 @@ who walk through it.
    PR. This same recipe satisfies section 4's deferred live test-send;
    no human inbox is part of the acceptance loop, and the founder
    spot-checks the Resend log afterward at their leisure.
+10. **The existing confirmed-signup flow is missing a "check your email"
+    state — fixing it is in scope.** Right now a sessionless signup
+    response (expected when email confirmation is required) is treated as
+    success and the user is redirected straight to `/chat` instead of
+    being told to confirm their email. This is a live, user-facing gap
+    exposed the moment decision 8 turned "Confirm email" on — it directly
+    contradicts the spec's own goal of not dead-ending people who walk
+    through the door. Fix: a UI state on the existing signup form showing
+    "check your email to confirm," driven off the signup response's
+    session-presence — not a new page, not new backend account
+    infrastructure, just a missing state in a flow that already exists.
 
 ## 3. Reserved / parked scope
 
@@ -214,7 +236,12 @@ safety ordering: don't widen the door before the spend cap exists):
   `AuthForm`/`GuestConversionModal` signup form for non-allowlisted
   visitors — the form itself is not being rebuilt, it already works for
   allowlisted emails).
-- Approval notification (Resend SMTP is already configured — see section 4).
+- Approval notification: plain email linking back to the existing signup
+  form, NOT a Supabase admin invite (decision 9; Resend SMTP is already
+  configured — see section 4).
+- "Check your email" UI state on the existing signup form for the
+  sessionless-response case (decision 10) — also fixes a live gap in
+  today's flow, not just new-user copy.
 
 This is the smaller of the two phases in surface area, since the
 account-creation backend and UI already exist end to end for allowlisted
