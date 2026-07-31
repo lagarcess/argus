@@ -24,6 +24,7 @@ describe("keyboard shortcuts overlay", () => {
     const menu = source("components/sidebar/ProfileMenu.tsx");
 
     expect(overlay).toContain("KEYBOARD_SHORTCUTS.filter");
+    expect(overlay).toContain("max-h-[calc(100dvh-2rem)]");
     expect(chat).toContain('matchesKeyboardShortcut("keyboard_shortcuts", event)');
     expect(guestShellActions).toContain(
       'matchesKeyboardShortcut("omnisearch", event)',

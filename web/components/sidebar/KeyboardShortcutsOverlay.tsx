@@ -48,7 +48,7 @@ export default function KeyboardShortcutsOverlay({
         aria-label={t("keyboard_shortcuts.close", "Close keyboard shortcuts")}
       />
       <section
-        className="relative w-full max-w-md rounded-[18px] border border-black/10 bg-white p-5 text-black dark:border-white/10 dark:bg-[#1b1d20] dark:text-white"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-[18px] border border-black/10 bg-white p-5 text-black dark:border-white/10 dark:bg-[#1b1d20] dark:text-white"
         role="dialog"
         aria-modal="true"
         aria-labelledby="argus-keyboard-shortcuts-title"
