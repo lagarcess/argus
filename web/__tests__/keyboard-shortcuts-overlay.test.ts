@@ -23,7 +23,7 @@ describe("keyboard shortcuts overlay", () => {
     const guestShellActions = source("components/guest/useGuestShellActions.ts");
     const menu = source("components/sidebar/ProfileMenu.tsx");
 
-    expect(overlay).toContain("KEYBOARD_SHORTCUTS.map");
+    expect(overlay).toContain("KEYBOARD_SHORTCUTS.filter");
     expect(chat).toContain('matchesKeyboardShortcut("keyboard_shortcuts", event)');
     expect(guestShellActions).toContain(
       'matchesKeyboardShortcut("omnisearch", event)',
@@ -47,6 +47,21 @@ describe("keyboard shortcuts overlay", () => {
     expect(es.keyboard_shortcuts.shortcuts.keyboard_shortcuts).toBe(
       "Mostrar atajos de teclado",
     );
+    expect(en.keyboard_shortcuts.shortcuts).toMatchObject({
+      new_chat: "New chat",
+      open_recents: "Open Recents",
+      delete_focused_chat: "Delete current chat",
+      rename_focused_chat: "Rename current chat",
+      expand_sidebar_recents: "Expand sidebar and Recents",
+      open_settings: "Open Settings",
+      toggle_pin_focused_chat: "Pin or unpin current chat",
+      quick_jump: "Quick-jump visible items",
+    });
+    expect(es.keyboard_shortcuts.shortcuts.quick_jump).toBe(
+      "Saltar a elementos visibles",
+    );
+    expect(en.recents_quick_peek.title).toBe("Recents");
+    expect(es.recents_quick_peek.empty).toBe("Aún no hay chats recientes.");
   });
 
   test("shares numbered quick-jump behavior between Recents and Settings", () => {
@@ -62,5 +77,22 @@ describe("keyboard shortcuts overlay", () => {
     expect(profileMenu).toContain("useQuickJump");
     expect(profileMenu).toContain("QuickJumpBadge");
     expect(existsSync(quickPeekPath)).toBe(true);
+  });
+
+  test("routes every real action through the central registry", () => {
+    const chat = source("components/chat/ChatInterface.tsx");
+
+    for (const id of [
+      "new_chat",
+      "open_recents",
+      "delete_focused_chat",
+      "rename_focused_chat",
+      "expand_sidebar_recents",
+      "open_settings",
+      "toggle_pin_focused_chat",
+    ]) {
+      expect(chat).toContain(`matchesKeyboardShortcut("${id}", event)`);
+    }
+    expect(chat).toContain("<RecentsQuickPeek");
   });
 });

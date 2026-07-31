@@ -278,7 +278,11 @@ export default function ChatSidebar({
     [onOpenItem, visibleRecentItems],
   );
   const { isQuickJumpActive, numberFor } = useQuickJump({
-    enabled: isOpen && isRecentsExpanded && renamingId === null,
+    enabled:
+      isOpen &&
+      isRecentsExpanded &&
+      renamingId === null &&
+      !isProfileMenuOpen,
     items: quickJumpRecentItems,
     onSelect: handleQuickJumpRecent,
     usesCommandKey,

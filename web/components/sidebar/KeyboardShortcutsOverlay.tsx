@@ -84,38 +84,64 @@ export default function KeyboardShortcutsOverlay({
           </button>
         </div>
 
-        <div className="mt-6">
-          <p className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45">
-            {t("keyboard_shortcuts.groups.navigation", "Navigation")}
-          </p>
-          <div className="mt-2 overflow-hidden rounded-[14px] border border-black/[0.08] dark:border-white/[0.1]">
-            {KEYBOARD_SHORTCUTS.map((shortcut, index) => {
-              const [modifier, key] = keyboardShortcutDisplay(
-                shortcut.id,
-                showCommandKey,
-              );
-              return (
-                <div
-                  key={shortcut.id}
-                  className={`flex min-h-12 items-center justify-between gap-4 px-4 py-3 ${
-                    index > 0 ? "border-t border-black/[0.06] dark:border-white/[0.08]" : ""
-                  }`}
-                >
-                  <span className="text-[14px] text-black/75 dark:text-white/80">
-                    {t(shortcut.labelKey)}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
-                    <kbd className="rounded-md border border-black/10 bg-black/[0.035] px-2 py-1 font-sans text-[12px] font-medium text-black/65 dark:border-white/15 dark:bg-white/[0.08] dark:text-white/75">
-                      {modifier}
-                    </kbd>
-                    <kbd className="rounded-md border border-black/10 bg-black/[0.035] px-2 py-1 font-sans text-[12px] font-medium text-black/65 dark:border-white/15 dark:bg-white/[0.08] dark:text-white/75">
-                      {key}
-                    </kbd>
-                  </span>
+        <div className="mt-6 space-y-5">
+          {(["navigation", "chat", "quick_jump"] as const).map((group) => {
+            const shortcuts = KEYBOARD_SHORTCUTS.filter(
+              (shortcut) => shortcut.group === group,
+            );
+            return (
+              <div key={group}>
+                <p className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45">
+                  {t(
+                    `keyboard_shortcuts.groups.${group}`,
+                    group === "chat"
+                      ? "Chat"
+                      : group === "quick_jump"
+                        ? "Quick jump"
+                        : "Navigation",
+                  )}
+                </p>
+                <div className="mt-2 overflow-hidden rounded-[14px] border border-black/[0.08] dark:border-white/[0.1]">
+                  {shortcuts.map((shortcut, index) => {
+                    const keys = keyboardShortcutDisplay(
+                      shortcut.id,
+                      showCommandKey,
+                    );
+                    return (
+                      <div
+                        key={shortcut.id}
+                        className={`flex min-h-12 items-center justify-between gap-4 px-4 py-3 ${
+                          index > 0 ? "border-t border-black/[0.06] dark:border-white/[0.08]" : ""
+                        }`}
+                      >
+                        <span className="text-[14px] text-black/75 dark:text-white/80">
+                          {t(shortcut.labelKey)}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
+                          {keys.map((key) => (
+                            <kbd
+                              key={key}
+                              className="rounded-md border border-black/10 bg-black/[0.035] px-2 py-1 font-sans text-[12px] font-medium text-black/65 dark:border-white/15 dark:bg-white/[0.08] dark:text-white/75"
+                            >
+                              {key}
+                            </kbd>
+                          ))}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+                {group === "quick_jump" ? (
+                  <p className="mt-2 px-1 text-[12px] leading-relaxed text-black/50 dark:text-white/55">
+                    {t(
+                      "keyboard_shortcuts.quick_jump_description",
+                      "Hold the modifier keys to reveal numbers on visible items.",
+                    )}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>
