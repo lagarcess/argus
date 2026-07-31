@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
@@ -117,10 +118,10 @@ def test_memory_ledger_index_serializes_shared_connection_queries() -> None:
 
 
 @pytest.mark.parametrize("query", ("broadanchor", "broadanchor zz"))
-def test_memory_ledger_rejects_anchored_work_above_fixed_limit(
+def test_memory_ledger_rejects_corpus_above_fixed_limit(
     query: str,
 ) -> None:
-    candidate_count = 10_001
+    candidate_count = memory_ledger_index.MEMORY_LEDGER_CANDIDATE_LIMIT + 1
     index = memory_ledger_index.build_memory_ledger_index(
         candidates=(
             (f"conversation-{candidate_index}", "broadanchor searchable text")
@@ -134,6 +135,88 @@ def test_memory_ledger_rejects_anchored_work_above_fixed_limit(
 
     with pytest.raises(MemoryLedgerWorkLimitExceeded):
         index.counts(query=query, eligible_conversation_id=None)
+
+
+def test_memory_ledger_rejects_over_limit_disjoint_corpus_before_fts() -> None:
+    candidate_count = memory_ledger_index.MEMORY_LEDGER_CANDIDATE_LIMIT + 1
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=(
+            (
+                f"conversation-{candidate_index}",
+                "alpha only" if candidate_index % 2 == 0 else "beta only",
+            )
+            for candidate_index in range(candidate_count)
+        ),
+        decision_states_by_conversation={
+            f"conversation-{candidate_index}": {"watching"}
+            for candidate_index in range(candidate_count)
+        },
+    )
+
+    assert index.counts(query="", eligible_conversation_id=None) == {
+        "promising": 0,
+        "watching": candidate_count,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+    index._connection.close()
+
+    with pytest.raises(MemoryLedgerWorkLimitExceeded):
+        index.counts(query="alpha beta", eligible_conversation_id=None)
+
+
+def test_memory_ledger_accepts_exact_candidate_limit() -> None:
+    candidate_count = memory_ledger_index.MEMORY_LEDGER_CANDIDATE_LIMIT
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=(
+            (f"conversation-{candidate_index}", "bounded needle")
+            for candidate_index in range(candidate_count)
+        ),
+        decision_states_by_conversation={
+            f"conversation-{candidate_index}": {"watching"}
+            for candidate_index in range(candidate_count)
+        },
+    )
+
+    assert index.counts(query="needle", eligible_conversation_id=None) == {
+        "promising": 0,
+        "watching": candidate_count,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
+
+
+def test_memory_ledger_corpus_limit_ignores_ineligible_and_empty_candidates() -> None:
+    candidate_limit = memory_ledger_index.MEMORY_LEDGER_CANDIDATE_LIMIT
+    empty_ids = tuple(
+        f"empty-conversation-{candidate_index}"
+        for candidate_index in range(candidate_limit + 1)
+    )
+
+    def _candidates() -> Iterator[tuple[str, str]]:
+        for candidate_index in range(candidate_limit + 1):
+            yield (
+                f"undecided-conversation-{candidate_index}",
+                "undecided searchable text",
+            )
+        for conversation_id in empty_ids:
+            yield conversation_id, "  "
+        yield "eligible-conversation", "eligible needle"
+
+    index = memory_ledger_index.build_memory_ledger_index(
+        candidates=_candidates(),
+        decision_states_by_conversation={
+            **{conversation_id: {"watching"} for conversation_id in empty_ids},
+            "eligible-conversation": {"promising"},
+        },
+    )
+
+    assert index.counts(query="needle", eligible_conversation_id=None) == {
+        "promising": 1,
+        "watching": 0,
+        "rejected": 0,
+        "revisit_later": 0,
+    }
 
 
 def test_memory_ledger_registered_empty_counts_are_revision_precomputed() -> None:

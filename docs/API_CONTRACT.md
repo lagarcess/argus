@@ -3341,11 +3341,11 @@ records: canonical writes invalidate it, while consecutive palette keystrokes
 read bounded postings rather than copying or projecting the full transcript.
 Exact Idea Ledger counts use the same revision snapshot's non-durable SQLite
 FTS5 trigram index plus per-candidate normalized-token rechecks and pre-indexed
-conversation/decision-state membership. Non-empty queries aggregate only after
-their FTS-anchored candidate window is capped; the cap applies before exact or
-short-token rechecks, deduplication, and aggregation. If that fixed window is
-exceeded, the endpoint fails closed with
-`503 search_temporarily_unavailable` and returns no partial counts. Registered
+conversation/decision-state membership. Each revision indexes at most 20,000
+eligible, non-empty normalized ledger candidates. If a revision contains more,
+every non-empty indexable ledger query fails closed before FTS traversal,
+exact or short-token rechecks, deduplication, or aggregation, returning
+`503 search_temporarily_unavailable` with no partial counts. Registered
 empty-query counts are precomputed with the revision, while guest empty-query
 counts use the single keyed conversation membership. Under the cap, the query
 returns all four exact aggregate groups directly without a per-keystroke Python

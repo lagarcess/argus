@@ -12,7 +12,7 @@ LEDGER_DECISION_STATES = (
     "rejected",
     "revisit_later",
 )
-MEMORY_LEDGER_ANCHORED_CANDIDATE_LIMIT = 10_000
+MEMORY_LEDGER_CANDIDATE_LIMIT = 20_000
 
 _STATE_ROWS_SQL = """
 states(decision_state, position) AS (
@@ -24,19 +24,8 @@ states(decision_state, position) AS (
 )
 """
 
-_ANCHOR_COUNT_SQL = """
-SELECT COUNT(*)
-FROM (
-    SELECT rowid
-    FROM searchable_candidates
-    WHERE searchable_candidates MATCH ?
-    LIMIT ?
-)
-"""
-
-
 class MemoryLedgerWorkLimitExceeded(RuntimeError):
-    """The bounded ledger anchor window cannot produce exact counts."""
+    """The bounded ledger corpus cannot produce exact counts."""
 
 
 class MemoryLedgerIndex:
@@ -47,10 +36,12 @@ class MemoryLedgerIndex:
         connection: sqlite3.Connection,
         *,
         all_counts: Mapping[str, int],
+        work_limit_exceeded: bool,
     ) -> None:
         self._connection = connection
         self._lock = RLock()
         self._all_counts = dict(all_counts)
+        self._work_limit_exceeded = work_limit_exceeded
 
     def counts(
         self,
@@ -67,21 +58,12 @@ class MemoryLedgerIndex:
         anchored_tokens = tuple(token for token in tokens if len(token) >= 3)
         if not anchored_tokens:
             return _empty_counts()
+        if self._work_limit_exceeded:
+            raise MemoryLedgerWorkLimitExceeded
         fts_query = " AND ".join(
             _quoted_fts_token(token) for token in anchored_tokens
         )
         with self._lock:
-            anchor_count = int(
-                self._connection.execute(
-                    _ANCHOR_COUNT_SQL,
-                    (
-                        fts_query,
-                        MEMORY_LEDGER_ANCHORED_CANDIDATE_LIMIT + 1,
-                    ),
-                ).fetchone()[0]
-            )
-            if anchor_count > MEMORY_LEDGER_ANCHORED_CANDIDATE_LIMIT:
-                raise MemoryLedgerWorkLimitExceeded
             sql, parameters = _matching_counts_query(
                 tokens=tokens,
                 fts_query=fts_query,
@@ -123,6 +105,19 @@ def build_memory_ledger_index(
     all_counts = _empty_counts()
     for _, decision_state in memberships:
         all_counts[decision_state] += 1
+    candidate_rows: list[tuple[str, str]] = []
+    for conversation_id, text in candidates:
+        if conversation_id not in eligible_conversation_ids:
+            continue
+        normalized_text = normalize_search_text(text)
+        if not normalized_text:
+            continue
+        candidate_rows.append((normalized_text, conversation_id))
+        if len(candidate_rows) > MEMORY_LEDGER_CANDIDATE_LIMIT:
+            break
+    work_limit_exceeded = len(candidate_rows) > MEMORY_LEDGER_CANDIDATE_LIMIT
+    if work_limit_exceeded:
+        candidate_rows.clear()
     connection = sqlite3.connect(":memory:", check_same_thread=False)
     connection.execute(
         """
@@ -153,12 +148,7 @@ def build_memory_ledger_index(
         INSERT INTO searchable_candidates (normalized_text, conversation_id)
         VALUES (?, ?)
         """,
-        (
-            (normalized_text, conversation_id)
-            for conversation_id, text in candidates
-            if conversation_id in eligible_conversation_ids
-            if (normalized_text := normalize_search_text(text))
-        ),
+        candidate_rows,
     )
     connection.executemany(
         """
@@ -168,7 +158,11 @@ def build_memory_ledger_index(
         memberships,
     )
     connection.commit()
-    return MemoryLedgerIndex(connection, all_counts=all_counts)
+    return MemoryLedgerIndex(
+        connection,
+        all_counts=all_counts,
+        work_limit_exceeded=work_limit_exceeded,
+    )
 
 
 def _matching_counts_query(
@@ -214,7 +208,7 @@ def _matching_counts_query(
     """
     parameters = (
         fts_query,
-        MEMORY_LEDGER_ANCHORED_CANDIDATE_LIMIT + 1,
+        MEMORY_LEDGER_CANDIDATE_LIMIT,
         *tokens,
         *((eligible_conversation_id,) if eligible_conversation_id is not None else ()),
     )
