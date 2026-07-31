@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from argus.api.schemas import BacktestRun, EvidenceArtifact, Idea, IdeaVersion
+from argus.domain.backtest_admission import admission_limits
 from argus.domain.backtest_finalization import (
     BacktestFinalizationError,
     BacktestFinalizationInput,
@@ -47,10 +48,16 @@ CAPACITY_PROBE_MODES = {
     "upstream_transient_once",
 }
 CAPACITY_PROBE_MAX_ATTEMPTS = 2
+DEFAULT_WORKFLOW_CAPACITY_WAIT_SECONDS = 240.0
+DEFAULT_WORKFLOW_CAPACITY_POLL_SECONDS = 0.25
 
 
 class WorkflowBacktestJobError(RuntimeError):
     """Raised when a real backtest job cannot be executed safely."""
+
+
+class WorkflowCapacityTimeout(WorkflowBacktestJobError):
+    """Raised when a queued workflow cannot claim a bounded running slot."""
 
 
 class BacktestJobGateway(Protocol):
@@ -95,6 +102,7 @@ class BacktestJobGateway(Protocol):
         retryable: bool,
         execution_metadata: dict[str, Any] | None = None,
         finished_at: str | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, Any]:
         """Persist a structured workflow failure."""
 
@@ -180,23 +188,44 @@ def run_backtest_job(
         )
     conversation_id = _required_str(row, "conversation_id")
     request = _request_payload(row)
-    started_at = utcnow_iso()
     running_metadata = _merge_workflow_metadata(
         row,
         {
             "kind": REAL_BACKTEST_JOB_KIND,
             "workflow_run_id": workflow_run_id,
-            "started_at": started_at,
         },
     )
     phase_started = time.perf_counter()
-    running = gateway.mark_backtest_job_running(
-        user_id=user_id,
-        job_id=job_id,
-        execution_metadata=running_metadata,
-        started_at=started_at,
-    )
+    try:
+        running = gateway.mark_backtest_job_running(
+            user_id=user_id,
+            job_id=job_id,
+            execution_metadata=running_metadata,
+        )
+    except WorkflowCapacityTimeout:
+        timings.record_elapsed("mark_running", phase_started)
+        finalization_retry = (
+            row.get("status") == "failed"
+            and row.get("failure_code") == "finalization_failed"
+            and bool(row.get("retryable"))
+        )
+        return _mark_failed(
+            gateway,
+            row=row,
+            job_id=job_id,
+            user_id=user_id,
+            failure_code=(
+                "finalization_failed" if finalization_retry else "capacity_timeout"
+            ),
+            failure_detail="execution_failed",
+            retryable=finalization_retry,
+            workflow_run_id=workflow_run_id,
+            failure_category="capacity_timeout",
+            timings=timings,
+            expected_status=str(row.get("status") or "queued"),
+        )
     timings.record_elapsed("mark_running", phase_started)
+    started_at = _required_str(running, "started_at")
     attempt = int(running.get("attempts") or 0)
     probe_mode = capacity_probe_mode(running)
     if probe_mode == "invalid_envelope":
@@ -858,6 +887,7 @@ def _mark_failed(
     failure_category: str | None = None,
     source_error: Exception | None = None,
     timings: _WorkflowTimingRecorder | None = None,
+    expected_status: str | None = None,
 ) -> dict[str, Any]:
     finished_at = utcnow_iso()
     failure_patch: dict[str, Any] = {
@@ -877,15 +907,27 @@ def _mark_failed(
             source_error,
         )[-1].strip()
     metadata = _merge_workflow_metadata(row, failure_patch)
-    failed = gateway.mark_backtest_job_failed(
-        user_id=user_id,
-        job_id=job_id,
-        failure_code=failure_code,
-        failure_detail=failure_detail,
-        retryable=retryable,
-        execution_metadata=metadata,
-        finished_at=finished_at,
-    )
+    if expected_status is None:
+        failed = gateway.mark_backtest_job_failed(
+            user_id=user_id,
+            job_id=job_id,
+            failure_code=failure_code,
+            failure_detail=failure_detail,
+            retryable=retryable,
+            execution_metadata=metadata,
+            finished_at=finished_at,
+        )
+    else:
+        failed = gateway.mark_backtest_job_failed(
+            user_id=user_id,
+            job_id=job_id,
+            failure_code=failure_code,
+            failure_detail=failure_detail,
+            retryable=retryable,
+            execution_metadata=metadata,
+            finished_at=finished_at,
+            expected_status=expected_status,
+        )
     if timings is not None:
         failed = _persist_final_workflow_timings(
             gateway,
@@ -928,9 +970,32 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+def _workflow_start_candidate(row: Any) -> bool:
+    if not isinstance(row, Mapping):
+        return False
+    if row.get("status") == "queued":
+        return True
+    if row.get("status") != "failed" or not bool(row.get("retryable")):
+        return False
+    if row.get("failure_code") == "finalization_failed":
+        return True
+    return (
+        int(row.get("attempts") or 0) < CAPACITY_PROBE_MAX_ATTEMPTS
+        and capacity_probe_mode(row) in CAPACITY_PROBE_MODES
+    )
+
+
 class PostgresBacktestJobGateway:
-    def __init__(self, database_url: str) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        capacity_wait_seconds: float = DEFAULT_WORKFLOW_CAPACITY_WAIT_SECONDS,
+        capacity_poll_seconds: float = DEFAULT_WORKFLOW_CAPACITY_POLL_SECONDS,
+    ) -> None:
         self.database_url = database_url
+        self.capacity_wait_seconds = max(0.0, capacity_wait_seconds)
+        self.capacity_poll_seconds = max(0.01, capacity_poll_seconds)
         self._conn: Any | None = None
         self._exit_stack: ExitStack | None = None
 
@@ -989,59 +1054,121 @@ class PostgresBacktestJobGateway:
         execution_metadata: dict[str, Any],
         started_at: str | None = None,
     ) -> dict[str, Any]:
+        deadline = time.monotonic() + self.capacity_wait_seconds
+        waiting_logged = False
+        while True:
+            row = self._try_mark_backtest_job_running(
+                user_id=user_id,
+                job_id=job_id,
+                execution_metadata=execution_metadata,
+                started_at=started_at,
+            )
+            if row is not None:
+                return row
+            if time.monotonic() >= deadline:
+                raise WorkflowCapacityTimeout(
+                    f"Backtest job {job_id} timed out waiting for a running slot."
+                )
+            if not waiting_logged:
+                logger.info(
+                    "Backtest workflow waiting for a running slot",
+                    job_id=job_id,
+                )
+                waiting_logged = True
+            time.sleep(self.capacity_poll_seconds)
+
+    def _try_mark_backtest_job_running(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+        started_at: str | None = None,
+    ) -> dict[str, Any] | None:
         from psycopg.types.json import Jsonb
 
         with self._connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    update public.backtest_jobs
-                    set status = 'running',
-                        started_at = coalesce(started_at, %(started_at)s),
-                        attempts = attempts + 1,
-                        result_run_id = null,
-                        finished_at = null,
-                        failure_code = null,
-                        failure_detail = null,
-                        retryable = false,
-                        execution_metadata = %(execution_metadata)s,
-                        updated_at = %(updated_at)s
-                    where id = %(job_id)s
-                      and user_id = %(user_id)s
-                      and (
-                        status = 'queued'
-                        or (
-                          status = 'failed'
-                          and failure_code = 'finalization_failed'
-                          and retryable = true
-                        )
-                        or (
-                          status = 'failed'
-                          and retryable = true
-                          and attempts < 2
-                          and execution_metadata ->> 'source'
-                            = 'public_alpha_capacity_load'
-                          and execution_metadata ->> 'ops_authority'
-                            = 'service_role'
-                          and execution_metadata -> 'capacity_probe' ->> 'mode'
-                            in ('invalid_envelope', 'upstream_transient_once')
-                        )
-                      )
-                    returning *
-                    """,
-                    {
-                        "job_id": job_id,
-                        "user_id": user_id,
-                        "started_at": started_at or utcnow_iso(),
-                        "execution_metadata": Jsonb(execution_metadata),
-                        "updated_at": utcnow_iso(),
-                    },
-                )
-                row = cur.fetchone()
-                if row is None:
-                    raise WorkflowBacktestJobError(
-                        f"Backtest job {job_id} cannot be started or retried."
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "select pg_advisory_xact_lock(hashtext('backtest_admission'))"
                     )
+                    cur.execute(
+                        """
+                        select status, failure_code, retryable, attempts,
+                               execution_metadata
+                        from public.backtest_jobs
+                        where id = %(job_id)s
+                          and user_id = %(user_id)s
+                        for update
+                        """,
+                        {"job_id": job_id, "user_id": user_id},
+                    )
+                    candidate = cur.fetchone()
+                    if not _workflow_start_candidate(candidate):
+                        raise WorkflowBacktestJobError(
+                            f"Backtest job {job_id} cannot be started or retried."
+                        )
+                    limits = admission_limits()
+                    cur.execute(
+                        """
+                        select
+                          count(*) filter (
+                            where user_id = %(user_id)s
+                          )::integer as user_running,
+                          count(*)::integer as global_running
+                        from public.backtest_jobs
+                        where status = 'running'
+                        """,
+                        {"user_id": user_id},
+                    )
+                    counts = cur.fetchone() or {}
+                    if (
+                        int(counts.get("user_running") or 0) >= limits.user_running
+                        or int(counts.get("global_running") or 0)
+                        >= limits.global_running
+                    ):
+                        return None
+                    claim_started_at = started_at or utcnow_iso()
+                    claimed_metadata = dict(execution_metadata)
+                    workflow_metadata = claimed_metadata.get(WORKFLOW_METADATA_KEY)
+                    claimed_workflow_metadata = (
+                        dict(workflow_metadata)
+                        if isinstance(workflow_metadata, Mapping)
+                        else {}
+                    )
+                    claimed_workflow_metadata["started_at"] = claim_started_at
+                    claimed_metadata[WORKFLOW_METADATA_KEY] = claimed_workflow_metadata
+                    cur.execute(
+                        """
+                        update public.backtest_jobs
+                        set status = 'running',
+                            started_at = coalesce(started_at, %(started_at)s),
+                            attempts = attempts + 1,
+                            result_run_id = null,
+                            finished_at = null,
+                            failure_code = null,
+                            failure_detail = null,
+                            retryable = false,
+                            execution_metadata = %(execution_metadata)s,
+                            updated_at = %(updated_at)s
+                        where id = %(job_id)s
+                          and user_id = %(user_id)s
+                        returning *
+                        """,
+                        {
+                            "job_id": job_id,
+                            "user_id": user_id,
+                            "started_at": claim_started_at,
+                            "execution_metadata": Jsonb(claimed_metadata),
+                            "updated_at": utcnow_iso(),
+                        },
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        raise WorkflowBacktestJobError(
+                            f"Backtest job {job_id} cannot be started or retried."
+                        )
         return _json_safe(row)
 
     def merge_backtest_job_execution_metadata(
@@ -1361,6 +1488,7 @@ class PostgresBacktestJobGateway:
         retryable: bool,
         execution_metadata: dict[str, Any] | None = None,
         finished_at: str | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, Any]:
         from psycopg.types.json import Jsonb
 
@@ -1379,6 +1507,10 @@ class PostgresBacktestJobGateway:
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
                       and user_id = %(user_id)s
+                      and (
+                        %(expected_status)s is null
+                        or status = %(expected_status)s
+                      )
                     returning *
                     """,
                     {
@@ -1387,6 +1519,7 @@ class PostgresBacktestJobGateway:
                         "failure_code": failure_code,
                         "failure_detail": failure_detail,
                         "retryable": retryable,
+                        "expected_status": expected_status,
                         "finished_at": finished_at or utcnow_iso(),
                         "execution_metadata": Jsonb(execution_metadata or {}),
                         "updated_at": utcnow_iso(),
