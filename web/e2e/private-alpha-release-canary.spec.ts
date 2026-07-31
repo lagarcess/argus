@@ -6,6 +6,7 @@ type StaticLabels = Record<string, string>;
 
 const email = process.env.ARGUS_CANARY_BROWSER_EMAIL;
 const password = process.env.ARGUS_CANARY_BROWSER_PASSWORD;
+const signupEmail = process.env.ARGUS_CANARY_BROWSER_SIGNUP_EMAIL;
 const language = process.env.ARGUS_CANARY_BROWSER_LANGUAGE;
 const prompt = process.env.ARGUS_CANARY_BROWSER_PROMPT;
 const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
@@ -70,7 +71,14 @@ async function loginThroughRenderedUi(
 ): Promise<{ userId: string; accessToken: string }> {
   const canaryEmail = requireConfig(email, "email");
   const canaryPassword = requireConfig(password, "password");
+  const canarySignupEmail = requireConfig(signupEmail, "signup email");
   const canaryLanguage = requireConfig(language, "language");
+  if (
+    canarySignupEmail.trim().toLocaleLowerCase() ===
+    canaryEmail.trim().toLocaleLowerCase()
+  ) {
+    throw new Error("Dedicated signup identity must differ from login identity");
+  }
 
   await page.addInitScript((nextLanguage) => {
     window.localStorage.setItem("i18nextLng", nextLanguage);
@@ -90,7 +98,7 @@ async function loginThroughRenderedUi(
       isApiResponse(response, "/auth/signup", "POST"),
     );
     await page.locator('input[type="text"]').fill("Argus Release Canary");
-    await page.locator('input[type="email"]').fill(canaryEmail);
+    await page.locator('input[type="email"]').fill(canarySignupEmail);
     await page.locator('input[type="password"]').fill(canaryPassword);
     await page
       .getByRole("button", { name: label("auth.signup.submit") })
@@ -113,10 +121,19 @@ async function loginThroughRenderedUi(
       await signupResponse.json(),
       "signup payload",
     );
-    if (signupResponsePayload.session) {
-      throw new Error("Signup unexpectedly returned an authenticated session");
+    if (signupResponsePayload.session !== null) {
+      throw new Error("Fresh signup did not return a null session");
     }
-    await expect(page.getByTestId("auth-check-email")).toBeVisible();
+    const signupUser = record(signupResponsePayload.user, "signup user");
+    if (
+      String(signupUser.email ?? "").trim().toLocaleLowerCase() !==
+      canarySignupEmail.trim().toLocaleLowerCase()
+    ) {
+      throw new Error("Fresh signup response did not preserve its dedicated identity");
+    }
+    const checkEmailState = page.getByTestId("auth-check-email");
+    await expect(checkEmailState).toBeVisible();
+    await expect(checkEmailState.getByRole("heading")).toBeFocused();
     await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
   }
 

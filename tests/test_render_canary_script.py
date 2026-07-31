@@ -33,6 +33,10 @@ def test_canary_requires_auth_and_verifier_inputs_without_echoing_secrets() -> N
 
     assert 'EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"' in source
     assert 'PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"' in source
+    assert (
+        'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"'
+        in source
+    )
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
     assert 'fail_canary "auth" "missing_canary_email"' in source
     assert 'fail_canary "auth" "missing_canary_password"' in source
@@ -43,6 +47,24 @@ def test_canary_requires_auth_and_verifier_inputs_without_echoing_secrets() -> N
     assert "set -x" not in source
     assert 'echo "$EMAIL"' not in source
     assert 'echo "$PASSWORD"' not in source
+
+
+def test_canary_keeps_browser_and_service_role_secrets_out_of_curl_argv() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'BROWSER_AUTH_CURL_CONFIG="$(mktemp)"' in source
+    assert 'SERVICE_ROLE_CURL_CONFIG="$(mktemp)"' in source
+    assert 'chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"' in source
+    assert 'rm -f "$BROWSER_AUTH_CURL_CONFIG"' in source
+    assert '"$SERVICE_ROLE_CURL_CONFIG"' in source
+    assert '--config "$BROWSER_AUTH_CURL_CONFIG"' in source
+    assert '--config "$SERVICE_ROLE_CURL_CONFIG"' in source
+    assert "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}" not in source
+    assert "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" not in source
+    assert "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" not in source
+    assert '-H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}"' not in source
+    assert '-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"' not in source
+    assert '-H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"' not in source
 
 
 def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
@@ -92,6 +114,8 @@ def test_canary_language_and_inputs_are_profile_owned() -> None:
 def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
+    assert "ARGUS_CANARY_BROWSER_SIGNUP_EMAIL" in browser_source
+    assert "Dedicated signup identity must differ from login identity" in browser_source
     assert 'page.goto("/?auth=signup"' in browser_source
     assert 'isApiResponse(response, "/auth/signup", "POST")' in browser_source
     assert "signupPayload.language !== canaryLanguage" in browser_source
@@ -99,12 +123,55 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     assert "Signup CAPTCHA token was missing or unbounded" in browser_source
     assert "expect(signupResponse.status()).toBe(200)" in browser_source
     assert 'page.getByTestId("auth-check-email")' in browser_source
-    assert "Signup unexpectedly returned an authenticated session" in browser_source
+    assert "signupResponsePayload.session !== null" in browser_source
+    assert "Fresh signup response did not preserve its dedicated identity" in browser_source
     assert 'page.goto("/?auth=login"' in browser_source
     assert "loginRequestPayload.captcha_token" in browser_source
     assert "Login CAPTCHA token was missing or unbounded" in browser_source
     assert "signupResponse.request().postDataJSON()).toMatchObject" not in browser_source
     assert "Spanish signup request omitted the canonical language" in browser_source
+    assert "toBeFocused()" in browser_source
+    assert "page).not.toHaveURL(/\\/chat" in browser_source
+    assert "record(loginPayload.session, \"login session\")" in browser_source
+    assert "page.waitForURL(/\\/chat" in browser_source
+
+
+def test_canary_prepares_and_always_cleans_a_distinct_signup_identity() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    runner_source = _source(".github/canary-browser.sh")
+
+    assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"' in (
+        shell_source
+    )
+    assert 'ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in shell_source
+    assert 'ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in runner_source
+    assert "signup_identity_is_distinct" in shell_source
+    assert "prepare_signup_identity" in shell_source
+    assert "delete_signup_auth_identity" in shell_source
+    assert "upsert_signup_allowlist" in shell_source
+    assert "cleanup_signup_identity" in shell_source
+    assert "trap cleanup EXIT" in shell_source
+
+    prepare_body = shell_source.split("prepare_signup_identity() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    assert prepare_body.index("delete_signup_auth_identity") < prepare_body.index(
+        "upsert_signup_allowlist"
+    )
+
+    cleanup_body = shell_source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+    assert "cleanup_signup_identity" in cleanup_body
+    assert cleanup_body.index("cleanup_signup_identity") < cleanup_body.index(
+        'rm -f "$BROWSER_AUTH_CURL_CONFIG"'
+    )
+
+    main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
+    assert main_body.index("signup_identity_is_distinct") < main_body.index(
+        "prepare_signup_identity"
+    )
+    assert main_body.index("prepare_signup_identity") < main_body.index(
+        "run_browser_canary"
+    )
 
 
 def test_rendered_browser_owns_the_authoritative_golden_path() -> None:
@@ -206,7 +273,7 @@ def test_shell_reuses_private_browser_session_for_read_only_api_postconditions()
         "${API_URL}/api/v1/search?q=${encoded_search_query}&include_ledger_groups=true"
         in source
     )
-    assert '-H "Authorization: Bearer ${BROWSER_ACCESS_TOKEN}"' in source
+    assert '--config "$BROWSER_AUTH_CURL_CONFIG"' in source
     assert '"${API_URL}/api/v1/auth/login"' not in source
     assert 'CANARY_PASSWORD="$PASSWORD"' not in source
     assert '"${API_URL}/api/v1/conversations"' not in source
