@@ -893,6 +893,19 @@
       "confirm": "Delete conversation"
     }
   },
+  "keyboard_shortcuts": {
+    "title": "Keyboard shortcuts",
+    "description": "Quick ways to move through Argus.",
+    "close": "Close keyboard shortcuts",
+    "menu_item": "Keyboard shortcuts",
+    "groups": {
+      "navigation": "Navigation"
+    },
+    "shortcuts": {
+      "omnisearch": "Open search",
+      "keyboard_shortcuts": "Show keyboard shortcuts"
+    }
+  },
   "command_palette": {
     "close": "Close search",
     "search_placeholder": "Search Argus...",

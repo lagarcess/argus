@@ -12,6 +12,7 @@ import { ArrowDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
+import KeyboardShortcutsOverlay from "@/components/sidebar/KeyboardShortcutsOverlay";
 import ChatSidebar, {
   type SidebarMode,
 } from "@/components/sidebar/ChatSidebar";
@@ -53,6 +54,7 @@ import {
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
+import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
@@ -234,6 +236,7 @@ export default function ChatInterface() {
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<
     string | null
@@ -2138,6 +2141,16 @@ export default function ChatInterface() {
     isHydratingConversation ||
     failedConversationId === conversationId;
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!matchesKeyboardShortcut("keyboard_shortcuts", event)) return;
+      event.preventDefault();
+      setKeyboardShortcutsOpen((open) => !open);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isBootstrappingProfile) {
@@ -2198,6 +2211,7 @@ export default function ChatInterface() {
           });
         }}
         onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
+        onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={omnisearchEnabled}
@@ -2226,6 +2240,12 @@ export default function ChatInterface() {
             onConversationRemoved={handleConversationRemoved}
           />
         )}
+
+      {keyboardShortcutsOpen && (
+        <KeyboardShortcutsOverlay
+          onClose={() => setKeyboardShortcutsOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={Boolean(pendingHeaderDeleteId)}

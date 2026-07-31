@@ -893,6 +893,19 @@
       "confirm": "Eliminar conversación"
     }
   },
+  "keyboard_shortcuts": {
+    "title": "Atajos de teclado",
+    "description": "Formas rápidas de moverte por Argus.",
+    "close": "Cerrar atajos de teclado",
+    "menu_item": "Atajos de teclado",
+    "groups": {
+      "navigation": "Navegación"
+    },
+    "shortcuts": {
+      "omnisearch": "Abrir búsqueda",
+      "keyboard_shortcuts": "Mostrar atajos de teclado"
+    }
+  },
   "command_palette": {
     "close": "Cerrar búsqueda",
     "search_placeholder": "Buscar en Argus...",

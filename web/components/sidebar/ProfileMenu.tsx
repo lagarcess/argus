@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Database,
   HelpCircle,
+  Keyboard,
   LogOut,
   MessageSquareText,
   Palette,
@@ -50,6 +51,7 @@ type ProfileMenuProps = {
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
   onOpenSidebarPreference?: () => void;
+  onOpenKeyboardShortcuts?: () => void;
   /** Anchor position */
   anchorRef: React.RefObject<HTMLElement | null>;
   /** Whether the sidebar is collapsed (affects menu position) */
@@ -99,6 +101,7 @@ export default function ProfileMenu({
   onDeleteAllConversations,
   onHistoryMutated,
   onOpenSidebarPreference,
+  onOpenKeyboardShortcuts,
   anchorRef,
   sidebarCollapsed = false,
 }: ProfileMenuProps) {
@@ -246,6 +249,12 @@ export default function ProfileMenu({
     onClose();
     onDeleteAllConversations?.();
   }, [onClose, onDeleteAllConversations]);
+
+  const handleOpenKeyboardShortcuts = useCallback(() => {
+    setActiveSubmenu(null);
+    onClose();
+    onOpenKeyboardShortcuts?.();
+  }, [onClose, onOpenKeyboardShortcuts]);
 
   // Profile name editing
   const handleStartEditName = useCallback(() => {
@@ -912,6 +921,14 @@ export default function ProfileMenu({
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
+            <button
+              type="button"
+              onClick={handleOpenKeyboardShortcuts}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+            >
+              <Keyboard className="h-3.5 w-3.5" />
+              {t("keyboard_shortcuts.menu_item", "Keyboard shortcuts")}
+            </button>
             <a href="/terms" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <FileText className="h-3.5 w-3.5" />
               {t("settings.help.terms", "Terms of Use")}

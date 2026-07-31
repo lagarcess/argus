@@ -94,6 +94,7 @@ export type ChatSidebarProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   /** Sidebar preference handler */
   onOpenSidebarPreference?: () => void;
+  onOpenKeyboardShortcuts?: () => void;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
   canManageConversation?: boolean;
@@ -134,6 +135,7 @@ export default function ChatSidebar({
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
+  onOpenKeyboardShortcuts,
   strategiesEnabled = false,
   omnisearchEnabled = false,
   canManageConversation = true,
@@ -759,6 +761,7 @@ export default function ChatSidebar({
             onDeleteAllConversations={handleRequestDeleteAllConversations}
             onHistoryMutated={onHistoryMutated}
             onOpenSidebarPreference={onOpenSidebarPreference}
+            onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
             anchorRef={profileButtonRef}
             sidebarCollapsed={!isOpen}
           />
