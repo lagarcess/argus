@@ -1,6 +1,18 @@
 import type { Message } from "@/components/chat/types";
 import { conversationLoadRetryActionFromConversationId } from "./chat-retry-actions";
 
+/** Profile-unreachable fallback: one synthetic assistant message wearing the
+ * retryable failure treatment, with product copy owned by the caller. */
+export function offlineFallbackMessage(content: string): Message {
+  return {
+    id: "offline",
+    role: "ai",
+    kind: "text",
+    content,
+    assistantRecoveryCode: "profile_unreachable",
+  };
+}
+
 export function conversationLoadFailureMessage(
   conversationId: string,
   content: string,

@@ -19,7 +19,8 @@ import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
-import ChatToast, { type ChatToastVariant } from "@/components/chat/ChatToast";
+import ChatToast from "@/components/chat/ChatToast";
+import { useChatToast } from "@/components/chat/useChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
@@ -80,6 +81,7 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
+  offlineFallbackMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
@@ -270,10 +272,7 @@ export default function ChatInterface() {
   // browser cannot send starter prompts in the wrong language.
   const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    variant: ChatToastVariant;
-  } | null>(null);
+  const { toast, showToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
@@ -362,16 +361,6 @@ export default function ChatInterface() {
     canApplyConversationOwnedUpdate,
     setMessages,
     handleDurableJobCompletion,
-  );
-
-  // ── Toast helper ───────────────────────────────────────────────────────────
-
-  const showToast = useCallback(
-    (msg: string, variant: ChatToastVariant = "neutral") => {
-      setToast({ message: msg, variant });
-      setTimeout(() => setToast(null), 3000);
-    },
-    [],
   );
 
   const clearConversationAttention = useCallback(
@@ -833,15 +822,7 @@ export default function ChatInterface() {
         if (cancelled) return;
         setIsBootstrappingProfile(false);
         if (profileUnreachable) {
-          setMessages([
-            {
-              id: "offline",
-              role: "ai",
-              kind: "text",
-              content: t("chat.error_offline"),
-              assistantRecoveryCode: "profile_unreachable",
-            },
-          ]);
+          setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
           return;
         }
         const activeRoute = readActiveConversationRouteState();
@@ -869,15 +850,7 @@ export default function ChatInterface() {
       } catch {
         if (cancelled) return;
         setIsBootstrappingProfile(false);
-        setMessages([
-          {
-            id: "offline",
-            role: "ai",
-            kind: "text",
-            content: t("chat.error_offline"),
-            assistantRecoveryCode: "profile_unreachable",
-          },
-        ]);
+        setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
         setIsHydratingConversation(false);
       }
     })();
