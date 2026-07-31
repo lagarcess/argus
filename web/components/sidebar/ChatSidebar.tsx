@@ -30,6 +30,10 @@ import {
   renamePrefillTitle,
 } from "@/lib/chat-title-display";
 import {
+  isKeyboardShortcutHintModifierActive,
+  keyboardShortcutHintDisplay,
+} from "@/lib/keyboard-shortcuts";
+import {
   RECENTS_INITIAL_GROUP_LIMIT,
   getVisibleRecentChats,
   groupRecentChats,
@@ -160,6 +164,7 @@ export default function ChatSidebar({
     Set<RecentChatGroupKey>
   >(() => new Set());
   const [usesCommandKey, setUsesCommandKey] = useState(false);
+  const [showShortcutHints, setShowShortcutHints] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -219,6 +224,29 @@ export default function ChatSidebar({
       /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
     );
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowShortcutHints(false);
+      return;
+    }
+
+    const updateShortcutHints = (event: KeyboardEvent) => {
+      setShowShortcutHints(
+        isKeyboardShortcutHintModifierActive(event, usesCommandKey),
+      );
+    };
+    const hideShortcutHints = () => setShowShortcutHints(false);
+
+    document.addEventListener("keydown", updateShortcutHints);
+    document.addEventListener("keyup", updateShortcutHints);
+    window.addEventListener("blur", hideShortcutHints);
+    return () => {
+      document.removeEventListener("keydown", updateShortcutHints);
+      document.removeEventListener("keyup", updateShortcutHints);
+      window.removeEventListener("blur", hideShortcutHints);
+    };
+  }, [isOpen, usesCommandKey]);
 
   useEffect(() => {
     if (settingsOpenRequest === previousSettingsOpenRequestRef.current) return;
@@ -450,6 +478,8 @@ export default function ChatSidebar({
           icon={MessageCirclePlus}
           label={t("chat.new_chat")}
           collapsed={!isOpen}
+          shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
+          showShortcutHint={showShortcutHints}
           onClick={() => {
             onNewChat();
           }}
@@ -461,6 +491,8 @@ export default function ChatSidebar({
             icon={Search}
             label={t("common.search", "Search")}
             collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay("omnisearch", usesCommandKey)}
+            showShortcutHint={showShortcutHints}
             onClick={onOpenSearch}
             iconSize={20}
           />
@@ -482,6 +514,11 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay(
+              "expand_sidebar_recents",
+              usesCommandKey,
+            )}
+            showShortcutHint={showShortcutHints}
             onClick={() => {
               if (!isOpen) {
                 // When collapsed: expand sidebar + open recents
@@ -833,6 +870,11 @@ export default function ChatSidebar({
               icon={User}
               label={t("common.settings")}
               collapsed={!isOpen}
+              shortcutHint={keyboardShortcutHintDisplay(
+                "open_settings",
+                usesCommandKey,
+              )}
+              showShortcutHint={showShortcutHints}
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               iconSize={20}
             />

@@ -3,6 +3,8 @@ import * as keyboardShortcuts from "../lib/keyboard-shortcuts";
 
 const {
   KEYBOARD_SHORTCUTS,
+  isKeyboardShortcutHintModifierActive,
+  keyboardShortcutHintDisplay,
   keyboardShortcutDisplay,
   matchesKeyboardShortcut,
 } = keyboardShortcuts;
@@ -94,6 +96,50 @@ describe("keyboard shortcut registry", () => {
       "Shift",
       "1–9",
     ]);
+    expect(keyboardShortcutHintDisplay("new_chat", true)).toBe("⌘⇧.");
+    expect(keyboardShortcutHintDisplay("omnisearch", false)).toBe("Ctrl+K");
+  });
+
+  test("reveals shortcut hints while the platform primary modifier is held", () => {
+    expect(
+      isKeyboardShortcutHintModifierActive(
+        {
+          key: "Meta",
+          code: "MetaLeft",
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: false,
+        },
+        true,
+      ),
+    ).toBe(true);
+    expect(
+      isKeyboardShortcutHintModifierActive(
+        {
+          key: "Control",
+          code: "ControlLeft",
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: false,
+          altKey: false,
+        },
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      isKeyboardShortcutHintModifierActive(
+        {
+          key: "AltGraph",
+          code: "AltRight",
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: false,
+          altKey: true,
+        },
+        false,
+      ),
+    ).toBe(false);
   });
 
   test("matches finalized action bindings by physical key code", () => {

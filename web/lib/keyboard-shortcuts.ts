@@ -178,6 +178,31 @@ export function keyboardShortcutDisplay(
   return usesCommandKey ? shortcut.macDisplay : shortcut.otherDisplay;
 }
 
+export function keyboardShortcutHintDisplay(
+  id: KeyboardShortcutId,
+  usesCommandKey: boolean,
+): string {
+  const keys = keyboardShortcutDisplay(id, usesCommandKey);
+  if (!usesCommandKey) return keys.join("+");
+
+  return keys
+    .map((key) => {
+      if (key === "Shift") return "⇧";
+      if (key === "Alt") return "⌥";
+      if (key === "Ctrl") return "⌃";
+      return key;
+    })
+    .join("");
+}
+
+export function isKeyboardShortcutHintModifierActive(
+  event: KeyboardShortcutEvent,
+  usesCommandKey: boolean,
+): boolean {
+  if (usesCommandKey) return event.metaKey && !event.ctrlKey;
+  return event.ctrlKey && !event.metaKey && !event.altKey;
+}
+
 export function isQuickJumpModifierActive(
   event: KeyboardShortcutEvent,
   usesCommandKey: boolean,

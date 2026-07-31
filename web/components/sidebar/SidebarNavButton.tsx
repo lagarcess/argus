@@ -19,6 +19,10 @@ type SidebarNavButtonProps = {
   className?: string;
   /** Optional right-side content (e.g. chevron for accordion) */
   trailing?: ReactNode;
+  /** A compact keyboard hint shown while the primary modifier is held */
+  shortcutHint?: string;
+  /** Whether the keyboard hint is currently visible */
+  showShortcutHint?: boolean;
   /** Icon size override (default: 22) */
   iconSize?: number;
 };
@@ -38,6 +42,8 @@ export default function SidebarNavButton({
   onClick,
   className = "",
   trailing,
+  shortcutHint,
+  showShortcutHint = false,
   iconSize = 22,
 }: SidebarNavButtonProps) {
   const button = (
@@ -66,8 +72,20 @@ export default function SidebarNavButton({
       >
         {label}
       </span>
+      {shortcutHint && !collapsed && (
+        <span
+          aria-hidden="true"
+          className={`ml-auto select-none font-mono text-[11px] font-medium tracking-tight text-black/30 transition-all duration-150 dark:text-white/30 ${
+            showShortcutHint
+              ? "translate-x-0 opacity-100"
+              : "translate-x-1 opacity-0"
+          }`}
+        >
+          {shortcutHint}
+        </span>
+      )}
       {trailing && !collapsed && (
-        <div className="ml-auto pr-4">
+        <div className={`${shortcutHint ? "ml-2" : "ml-auto"} pr-4`}>
           {trailing}
         </div>
       )}
