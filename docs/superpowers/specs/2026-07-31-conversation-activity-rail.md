@@ -58,11 +58,42 @@ transcript to that turn.
 5. Zero LLM/provider calls to generate previews — preview content comes
    from already-existing structured turn data (result-card facts, decision
    state), same zero-LLM discipline used throughout Omnisearch/#309/#310.
+6. **Tick taxonomy: ship the 3-kind set** — Result turn (the
+   `strategy_result` message carrying Quick take), Decision saved (a
+   result turn whose artifact has a decision-state — supersedes kind 1
+   for that turn, not additive), Needed attention (typed
+   recoverable/retryable failure). Try next and Explain result are
+   deliberately excluded — both are attached to an existing result turn
+   rather than being a distinct turn, and ticking them too would
+   double-mark the same position in the conversation. One tick per
+   distinct turn, not one per typed outcome.
+7. **Visual quality bar, added after the avatar lane landed generic on
+   the same kind of undirected taste call — don't repeat it here.**
+   - Default state should read as ambient/quiet, not a bold attention-
+     grabbing bar sitting on screen at all times — subtle presence at
+     rest, richer only on proximity/interaction (the same restraint
+     VS Code's own minimap uses).
+   - The popover, when triggered, needs real visual hierarchy — not just
+     dumped text. A per-kind visual signal (color/icon) distinguishing
+     Result / Decision saved / Needed attention at a glance.
+   - **"Needed attention" reuses whatever shared amber/failure treatment
+     the failure-class-visual-consistency lane produces — do not invent
+     an independent color/style for it.** That lane exists specifically
+     to stop independently-built failure treatments from drifting apart;
+     inventing a fourth one here would recreate the exact problem it's
+     fixing. If that lane's shared component isn't ready yet, use a
+     clearly-marked placeholder and flag it for a follow-up swap — don't
+     finalize a bespoke treatment now that then needs reconciling later.
+   - Motion on reveal should be a single restrained transition, not
+     multiple stacked effects — matches Argus's existing zero-flash
+     discipline elsewhere in the UI.
+   - Render and screenshot before finalizing — this is a visual bar,
+     verify it visually.
 
 ## Left to the agent's taste
 
 - Visual density/spacing of ticks, fixed-width rail vs. proportional
-  minimap, exact popover styling.
+  minimap, exact popover layout within the hierarchy above.
 - Whether it's always present or only appears past some turn-count
   threshold (suggested default: only worth showing on longer
   conversations, not a hard lock).
