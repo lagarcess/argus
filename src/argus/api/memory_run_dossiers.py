@@ -168,7 +168,7 @@ def list_memory_run_dossier_source_rows(
     with store.conversation_message_lock:
         latest_message_by_run: dict[
             str,
-            tuple[datetime, str, object],
+            tuple[bool, datetime, str, object],
         ] = {}
         for message in store.messages.get(conversation_id, []):
             if _field(message, "role") != "assistant":
@@ -185,13 +185,19 @@ def list_memory_run_dossier_source_rows(
                 ) is not None
                 and run_id in selected_run_ids
             }
-            candidate = (_record_activity(message), message_id, message)
+            result_card = metadata.get("result_card")
+            candidate = (
+                isinstance(result_card, Mapping) and bool(result_card),
+                _record_activity(message),
+                message_id,
+                message,
+            )
             for run_id in referenced_run_ids:
                 current = latest_message_by_run.get(run_id)
-                if current is None or candidate[:2] > current[:2]:
+                if current is None or candidate[:3] > current[:3]:
                     latest_message_by_run[run_id] = candidate
         messages_by_run = {
-            run_id: [_row(candidate[2])]
+            run_id: [_row(candidate[3])]
             for run_id, candidate in latest_message_by_run.items()
         }
 

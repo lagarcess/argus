@@ -2077,12 +2077,14 @@ or no-longer-eligible cursor pivots return `400 validation_error` with
 }
 ```
 
-`result_message_id` is the latest owned assistant message whose metadata points
-to that exact run through `result_run_id` or `latest_run_id`; it is `null` when
-no canonical result anchor exists. Notes preserve internal whitespace and
-newlines within the existing 2,000-character bound. Actions are deterministic,
-bounded to two, and always target the same run/evidence pair as their row. The
-endpoint stores nothing and makes no LLM, provider, or market-data call.
+`result_message_id` prefers the latest owned assistant message whose metadata
+contains a non-empty `result_card` and points to that exact run through
+`result_run_id` or `latest_run_id`. When no such result-card message exists, it
+falls back to the latest owned assistant pointer for legacy history; it is
+`null` when neither exists. Notes preserve internal whitespace and newlines
+within the existing 2,000-character bound. Actions are deterministic, bounded
+to two, and always target the same run/evidence pair as their row. The endpoint
+stores nothing and makes no LLM, provider, or market-data call.
 
 ## `GET /conversations/{id}/messages`
 

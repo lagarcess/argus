@@ -199,6 +199,51 @@ def test_result_message_id_uses_latest_pointer_as_legacy_fallback() -> None:
     assert result == "newer"
 
 
+def test_memory_history_prefers_result_card_over_later_pointer() -> None:
+    store = AlphaStore()
+    owner_id = "owner-1"
+    conversation_id = "conversation-1"
+    created_at = datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
+    run = _run(run_id="run-1", created_at=created_at)
+    artifact = _artifact(run_id="run-1", created_at=created_at)
+    store.backtest_runs[run["id"]] = run
+    store.backtest_run_owners[run["id"]] = owner_id
+    store.evidence_artifacts[artifact["id"]] = artifact
+    store.evidence_artifact_owners[artifact["id"]] = owner_id
+    store.messages[conversation_id] = [
+        Message(
+            id="result-card-message",
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Run result",
+            created_at=created_at,
+            metadata={
+                "result_run_id": run["id"],
+                "result_card": {"title": "TSLA buy and hold"},
+            },
+        ),
+        Message(
+            id="later-pointer-message",
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Follow-up explanation",
+            created_at=created_at + timedelta(minutes=1),
+            metadata={"latest_run_id": run["id"]},
+        ),
+    ]
+
+    page = list_memory_run_dossier_source_rows(
+        store=store,
+        user_id=owner_id,
+        conversation_id=conversation_id,
+        limit=20,
+        cursor_completed_at=None,
+        cursor_run_id=None,
+    )
+
+    assert page.rows[0].result_message_id == "result-card-message"
+
+
 def test_memory_history_is_newest_first_bounded_and_counts_only_eligible_rows() -> None:
     store = AlphaStore()
     owner_id = "owner-1"

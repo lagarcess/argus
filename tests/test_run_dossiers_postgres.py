@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -235,7 +235,20 @@ def test_memory_and_postgres_adapters_serialize_the_same_complete_page(
                     role="assistant",
                     content="Result",
                     created_at=run["completed_at"],
-                    metadata={"result_run_id": run["id"]},
+                    metadata={
+                        "result_run_id": run["id"],
+                        "result_card": run["conversation_result_card"],
+                    },
+                )
+            )
+            store.messages[CONVERSATION_ID].append(
+                Message(
+                    id="00000000-0000-0000-0000-000000000209",
+                    conversation_id=CONVERSATION_ID,
+                    role="assistant",
+                    content="Later follow-up",
+                    created_at=run["completed_at"] + timedelta(minutes=1),
+                    metadata={"latest_run_id": run["id"]},
                 )
             )
 
