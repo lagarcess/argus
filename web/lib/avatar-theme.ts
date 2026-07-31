@@ -11,9 +11,10 @@ const AVATAR_THEME_TOKENS = [
 export type AvatarTheme = (typeof AVATAR_THEME_TOKENS)[number];
 
 const HUE_STEP = 360 / AVATAR_THEME_TOKENS.length;
-const SATURATION = 42;
-const TINT_LIGHTNESS = 39;
-const BASE_LIGHTNESS = 29;
+const AVATAR_THEME_SURFACES = {
+  picker: { saturation: 42, tintLightness: 39, baseLightness: 29 },
+  ambient: { saturation: 24, tintLightness: 35, baseLightness: 30 },
+} as const;
 
 type AvatarThemeDefinition = {
   token: AvatarTheme;
@@ -42,11 +43,16 @@ export function avatarThemeClassName(theme: AvatarTheme | undefined): string {
   return avatarTheme(theme).className;
 }
 
-export function avatarThemeStyle(theme: AvatarTheme | undefined) {
+export function avatarThemeStyle(
+  theme: AvatarTheme | undefined,
+  surface: keyof typeof AVATAR_THEME_SURFACES = "ambient",
+) {
   const { hue } = avatarTheme(theme);
+  const { saturation, tintLightness, baseLightness } =
+    AVATAR_THEME_SURFACES[surface];
 
   return {
     backgroundImage:
-      `linear-gradient(145deg, hsl(${hue} ${SATURATION}% ${TINT_LIGHTNESS}%), hsl(${hue} ${SATURATION}% ${BASE_LIGHTNESS}%))`,
+      `linear-gradient(145deg, hsl(${hue} ${saturation}% ${tintLightness}%), hsl(${hue} ${saturation}% ${baseLightness}%))`,
   };
 }

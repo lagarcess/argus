@@ -788,6 +788,8 @@
       "language_save_error": "Could not update language yet.",
       "avatar_theme": {
         "label": "Monogram color",
+        "change": "Change monogram color",
+        "close": "Close monogram colors",
         "save_error": "Could not update your monogram color yet.",
         "themes": {
           "ember": "Ember",

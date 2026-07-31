@@ -24,20 +24,24 @@ describe("avatar monogram themes", () => {
     expect(avatarThemeClassName(undefined)).toBe(avatarThemeClassName("ocean"));
   });
 
-  test("derives evenly spaced rich gradients from the shared hue formula", () => {
+  test("derives stronger picker and quieter ambient gradients from one hue system", () => {
     const hueStep = 360 / AVATAR_THEMES.length;
 
     for (const [index, theme] of AVATAR_THEMES.entries()) {
       expect(theme.hue).toBeCloseTo(index * hueStep);
       expect(theme.className).toBe("text-white");
-      expect(avatarThemeStyle(theme.token)).toEqual({
+      expect(avatarThemeStyle(theme.token, "picker")).toEqual({
         backgroundImage:
           `linear-gradient(145deg, hsl(${theme.hue} 42% 39%), hsl(${theme.hue} 42% 29%))`,
+      });
+      expect(avatarThemeStyle(theme.token, "ambient")).toEqual({
+        backgroundImage:
+          `linear-gradient(145deg, hsl(${theme.hue} 24% 35%), hsl(${theme.hue} 24% 30%))`,
       });
     }
   });
 
-  test("renders a registered-only picker without changing initials derivation", () => {
+  test("renders an avatar-triggered picker submodal without changing initials derivation", () => {
     const root = join(import.meta.dir, "..");
     const menu = readFileSync(
       join(root, "components/sidebar/ProfileMenu.tsx"),
@@ -52,7 +56,11 @@ describe("avatar monogram themes", () => {
 
     expect(menu).toContain("accountKind === \"registered\"");
     expect(menu).toContain("patchMe({ avatar_theme: avatarTheme })");
-    expect(menu).toContain("avatarThemeClassName(profile?.avatar_theme)");
+    expect(menu).toContain('avatarThemeStyle(profile?.avatar_theme, "ambient")');
+    expect(menu).toContain('avatarThemeStyle(theme.token, "picker")');
+    expect(menu).toContain("openAvatarPicker");
+    expect(menu).toContain("isAvatarPickerOpen &&");
+    expect(menu).not.toContain("<fieldset");
     expect(menu).toContain("bg-[#191c1f] text-white dark:bg-white/10");
     expect(menu).toContain("profile?.display_name?.trim() ||");
     expect(menu).toContain("profile?.username?.trim() ||");

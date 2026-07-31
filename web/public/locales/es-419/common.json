@@ -788,6 +788,8 @@
       "language_save_error": "No pudimos actualizar el idioma todavía.",
       "avatar_theme": {
         "label": "Color del monograma",
+        "change": "Cambiar el color del monograma",
+        "close": "Cerrar colores del monograma",
         "save_error": "No pudimos actualizar el color de tu monograma todavía.",
         "themes": {
           "ember": "Brasa",
