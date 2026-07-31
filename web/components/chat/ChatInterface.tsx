@@ -2218,6 +2218,7 @@ export default function ChatInterface() {
       }
       if (matchesKeyboardShortcut("rename_focused_chat", event)) {
         event.preventDefault();
+        setShowChatOptions(true);
         handleStartHeaderRename();
         return;
       }

@@ -93,6 +93,7 @@ describe("keyboard shortcuts overlay", () => {
     ]) {
       expect(chat).toContain(`matchesKeyboardShortcut("${id}", event)`);
     }
+    expect(chat).toContain("setShowChatOptions(true);");
     expect(chat).toContain("<RecentsQuickPeek");
   });
 });
