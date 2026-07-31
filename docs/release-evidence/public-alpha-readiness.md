@@ -4,12 +4,44 @@ This file is the durable evidence index for the public-alpha candidate. Local
 checks recorded here do not claim a hosted launch. Exact-SHA Render canary and
 founder approval remain required before tester exposure.
 
+## Live Render capacity and cost
+
+The locked load envelope passed against the real Render API, Render Workflow,
+and production Supabase project on candidate
+`17098b8173d845aa5033036244a71cdcc3283ddb`. The measured task window ran from
+2026-07-31 13:19:39 UTC through 13:33:04 UTC. All temporary identities were
+deleted afterward: 15/15 Auth users and 15/15 allowlist rows, with zero cleanup
+failures and zero matching identities on the final readback.
+
+| Case | Observed peak | Terminal result | Wall p50 / p95 | Queue p50 / p95 | Run p50 / p95 |
+| --- | --- | --- | --- | --- | --- |
+| Idle job | 1 running / 0 queued | 1 succeeded | 39.756s / 39.756s | 5.096s / 5.096s | 32.673s / 32.673s |
+| Five users | 5 running / 0 queued | 5 succeeded | 50.004s / 63.904s | 5.147s / 5.708s | 38.881s / 50.875s |
+| Three jobs, one user | 1 running / 2 queued | 3 succeeded | 68.657s / 101.652s | 36.436s / 66.800s | 32.588s / 37.540s |
+| Fifteen users | 5 running / 10 queued | 15 succeeded | 68.914s / 103.037s | 29.006s / 67.518s | 28.249s / 53.177s |
+| Invalid envelope | 1 running / 0 queued | 1 failed, `invalid_job_contract`, one retry | 10.018s / 10.018s | 4.292s / 4.292s | 4.803s / 4.803s |
+| Transient upstream | 1 running / 0 queued | 1 succeeded after `failed_upstream`, one retry | 43.221s / 43.221s | 4.283s / 4.283s | 38.217s / 38.217s |
+
+The run used 26 task runs and 28 attempts. Render reported 1,466 seconds
+(0.407222 hours) of Standard Workflow compute. At Render's current
+[$0.20/hour Standard rate](https://render.com/docs/workflows-limits), the
+measured compute cost was $0.081444, before Render's Workflow monthly minimum.
+
+The selected web-service tier is Starter: 512 MB RAM and 0.5 CPU at
+[$7/month per service](https://render.com/pricing). `argus-api` and `argus-app`
+therefore have a $14/month total fixed Render service cost. The checked-in
+Blueprint declares both services as `plan: starter`; live control-plane
+readback remains a separate deployment gate. Supabase Pro is also selected at
+[$25/month](https://supabase.com/pricing), including daily backups retained for
+seven days. The combined fixed platform floor is $39/month, plus metered
+Workflow compute and any overage.
+
 ## Waitlist paid-control precondition
 
-The checked-in Render Blueprint still declares `argus-api` as `plan: free`.
-That remains intentional until load testing selects the API instance type, but
-it is not safe for the requested-role migration or waitlist exposure. Render
-documents that [maintenance mode is available only on paid web
+The checked-in Render Blueprint declares both `argus-api` and `argus-app` as
+`plan: starter`. A checked-in plan is not proof of the live instance type, and
+it is not yet safe by itself for the requested-role migration or waitlist
+exposure. Render documents that [maintenance mode is available only on paid web
 services](https://render.com/docs/maintenance-mode), [Free web services cannot
 receive private-network traffic](https://render.com/docs/private-network), and
 [Free web services do not support shell or SSH
@@ -17,11 +49,10 @@ access](https://render.com/docs/ssh). Render's [Free instance
 limitations](https://render.com/docs/free) confirm the same operational gaps.
 
 Do not apply
-`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` and
-do not accept access-request traffic while `argus-api` is on Render's Free
-instance type. Rollback below `061ba50e` is forbidden on the Free instance type
-because verified maintenance, worker quiescence, and private route-absence
-proof are unavailable.
+`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` or
+accept access-request traffic until the paid-control readbacks below are
+complete. Rollback below `061ba50e` remains forbidden until verified
+maintenance, worker quiescence, and private route-absence proof are available.
 
 Before applying that migration or exposing the route:
 
@@ -40,12 +71,11 @@ Before applying that migration or exposing the route:
    Record the successful surface; a documented entitlement without a working
    probe is not proof.
 
-The later load-test-selected API tier change will satisfy the planned
-paid-instance transition only if these capability checks also pass. It does
-not need to happen earlier solely for this repository checkpoint. If any paid
-capability is absent, stop: do not apply the migration and do not expose the
-route. Only after every paid-control check passes may the requested-role
-migration be applied and access-request traffic be exposed.
+The selected API tier satisfies the planned paid-instance transition only if
+these capability checks also pass. If any paid capability is absent, stop: do
+not apply the migration and do not expose the route. Only after every paid-control
+check passes may the requested-role migration be applied and access-request
+traffic be exposed.
 
 ## Waitlist rollback floor
 

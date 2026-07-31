@@ -174,27 +174,24 @@ def test_waitlist_exposure_waits_for_paid_render_rollback_controls() -> None:
     runbook = " ".join(_source("docs/PRIVATE_LAUNCH_RUNBOOK.md").split())
     blueprint = _source("render.yaml")
     api_service = blueprint.split("name: argus-api", 1)[1].split("\n  - type:", 1)[0]
+    app_service = blueprint.split("name: argus-app", 1)[1]
 
-    assert "plan: free" in api_service
+    assert "plan: starter" in api_service
+    assert "plan: starter" in app_service
     assert (
-        "The checked-in Render Blueprint still declares `argus-api` as "
-        "`plan: free`." in evidence
+        "The checked-in Render Blueprint declares both `argus-api` and "
+        "`argus-app` as `plan: starter`." in evidence
     )
     assert (
         "Do not apply "
         "`supabase/migrations/20260731080154_add_requested_private_alpha_access.sql` "
-        "and do not accept access-request traffic while `argus-api` is on "
-        "Render's Free instance type." in evidence
-    )
-    assert (
-        "Rollback below `061ba50e` is forbidden on the Free instance type"
-        in evidence
+        "or accept access-request traffic until the paid-control readbacks below "
+        "are complete." in evidence
     )
     assert "read back a paid API instance type from Render's control plane" in evidence
     assert "`serviceDetails.plan != free`" in evidence
     assert "prove maintenance mode is available and can be enabled" in evidence
     assert "private-network, SSH, or local-loopback verification capability" in evidence
-    assert "later load-test-selected API tier change" in evidence
     assert (
         "If any paid capability is absent, stop: do not apply the migration and "
         "do not expose the route." in evidence
@@ -224,12 +221,35 @@ def test_waitlist_exposure_waits_for_paid_render_rollback_controls() -> None:
     )
     assert paid_plan_index < maintenance_index < private_surface_index < exposure_index
 
-    assert "The checked-in `argus-api` plan remains `free`" in runbook
+    assert "The checked-in `argus-api` plan is `starter`" in runbook
     assert "migration and access-request exposure remain blocked" in runbook
     assert "paid API instance type" in runbook
     assert "maintenance and private/SSH/local verification controls" in runbook
-    assert "later load-test-selected API tier change" in runbook
-    assert "rollback below `061ba50e` is forbidden on `free`" in runbook
+    assert "rollback below `061ba50e` remains forbidden" in runbook
+
+
+def test_public_alpha_load_and_cost_evidence_is_durable() -> None:
+    evidence = " ".join(
+        _source("docs/release-evidence/public-alpha-readiness.md").split()
+    )
+
+    assert "17098b8173d845aa5033036244a71cdcc3283ddb" in evidence
+    assert "1 running / 0 queued" in evidence
+    assert "5 running / 0 queued" in evidence
+    assert "1 running / 2 queued" in evidence
+    assert "5 running / 10 queued" in evidence
+    assert "invalid_job_contract" in evidence
+    assert "failed_upstream" in evidence
+    assert "26 task runs" in evidence
+    assert "28 attempts" in evidence
+    assert "1,466 seconds" in evidence
+    assert "0.407222 hours" in evidence
+    assert "$0.081444" in evidence
+    assert "Starter" in evidence
+    assert "$7/month per service" in evidence
+    assert "$14/month total" in evidence
+    assert "Standard Workflow compute" in evidence
+    assert "$0.20/hour" in evidence
 
 
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
