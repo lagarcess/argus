@@ -48,6 +48,12 @@ type ChatMessageProps = {
 
 const retryIconButtonClass =
   "inline-flex items-center justify-center rounded-full text-black/60 transition-all duration-200 hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white";
+const retryableFailureContainerClass =
+  "flex w-full items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]";
+const retryableFailureIconClass =
+  "mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70";
+const retryableFailureButtonClass =
+  "shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10";
 
 export default function ChatMessage({
   message,
@@ -362,10 +368,10 @@ export default function ChatMessage({
             // no normal-answer bubble (issue #249).
             <div
               role="status"
-              className="flex w-full max-w-[min(100%,660px)] items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]"
+              className={`${retryableFailureContainerClass} max-w-[min(100%,660px)]`}
             >
               <MessageSquareWarning
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
+                className={retryableFailureIconClass}
                 aria-hidden="true"
               />
               <div className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
@@ -377,7 +383,7 @@ export default function ChatMessage({
                 <button
                   type="button"
                   onClick={() => onAction?.(retryAction)}
-                  className="shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10"
+                  className={retryableFailureButtonClass}
                 >
                   {actionLabel(retryAction)}
                 </button>
@@ -724,6 +730,32 @@ function UserTurnRecovery({
 }) {
   if (!recoveryText && !retryAction) {
     return null;
+  }
+  if (recoveryText && retryAction) {
+    return (
+      <div
+        role="status"
+        data-testid="user-turn-recovery"
+        className={`${retryableFailureContainerClass} mt-2 max-w-[85%]`}
+      >
+        <MessageSquareWarning
+          className={retryableFailureIconClass}
+          aria-hidden="true"
+        />
+        <p className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+          {recoveryText}
+        </p>
+        <button
+          type="button"
+          data-testid="user-turn-retry"
+          aria-label={retryLabel}
+          onClick={() => onAction?.(retryAction)}
+          className={`${retryableFailureButtonClass} min-h-11 min-w-11`}
+        >
+          {retryLabel}
+        </button>
+      </div>
+    );
   }
   return (
     <div className="mt-2 flex max-w-[85%] flex-wrap items-center justify-end gap-2">

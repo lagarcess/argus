@@ -292,28 +292,6 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(retryButton).not.toContain("min-h-9");
   });
 
-  test("durable retry matches the assistant footer icon treatment without losing its label", () => {
-    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
-    const assistantRetryStart = message.indexOf(
-      "<Tooltip content={actionLabel(retryAction)}",
-    );
-    const assistantRetryEnd = message.indexOf("</button>", assistantRetryStart);
-    const assistantRetryButton = message.slice(
-      assistantRetryStart,
-      assistantRetryEnd,
-    );
-    const userRetryStart = message.indexOf('data-testid="user-turn-retry"');
-    const userRetryEnd = message.indexOf("</button>", userRetryStart);
-    const userRetryButton = message.slice(userRetryStart, userRetryEnd);
-
-    expect(message).toContain("const retryIconButtonClass");
-    expect(assistantRetryButton).toContain("retryIconButtonClass");
-    expect(userRetryButton).toContain("retryIconButtonClass");
-    expect(userRetryButton).toContain("aria-label={retryLabel}");
-    expect(message).toContain("<Tooltip content={retryLabel}");
-    expect(userRetryButton).not.toContain("\n          {retryLabel}\n");
-  });
-
   test("ordinary transport ambiguity follows durable pages and never builds composer retry", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
