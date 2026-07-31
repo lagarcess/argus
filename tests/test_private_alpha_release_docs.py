@@ -51,17 +51,31 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
 
     assert "061ba50e" in evidence_text
     assert "prefer a forward fix" in evidence_text.lower()
-    assert "Render API maintenance mode" in evidence_text
-    assert "block all public API traffic" in evidence_text
+    assert "out-of-band Render control-plane readback" in evidence_text
+    assert "serviceDetails.maintenanceMode.enabled=true" in evidence_text
     assert (
         "https://argus-ohr5.onrender.com/api/v1/auth/access-requests"
         in evidence_text
     )
     assert "every configured custom API domain" in evidence_text
-    assert "must not return HTTP `202`" in evidence_text
+    assert "exact HTTP `503` maintenance-mode status" in evidence_text
+    assert "configured maintenance page marker or SHA-256 fingerprint" in evidence_text
+    assert "An arbitrary `403`, `429`, or `503` is not maintenance proof." in (
+        evidence_text
+    )
+    assert "must not return HTTP `202`" not in evidence_text
     assert (
-        "If maintenance/write blocking cannot be verified, or any required probe "
-        "fails, stop the rollback." in evidence_text
+        "If the control-plane state or expected response signature cannot be "
+        "verified, stop and forward-fix." in evidence_text
+    )
+    assert "same-SHA Render service restart" in evidence_text
+    assert "restart deploy is terminal with `status=live`" in evidence_text
+    assert "non-empty `finishedAt`" in evidence_text
+    assert "pre-restart instance IDs" in evidence_text
+    assert "old-instance shutdown/drain is complete" in evidence_text
+    assert "no pre-maintenance API worker remains" in evidence_text
+    assert "The table lock does not drain a worker paused before its insert." in (
+        evidence_text
     )
     assert (
         "lock table public.private_alpha_allowlist in access exclusive mode;"
@@ -72,18 +86,40 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "disabled_at is null" in evidence_text
     assert "active_requested_rows" in evidence_text
     assert "keep maintenance enabled" in evidence_text
-    assert "verify the rollback SHA is live" in evidence_text
-    assert "access-request write route is absent or blocked" in evidence_text
-    assert "reopen API traffic" in evidence_text
+    assert "exact rollback SHA is live in Render deploy metadata" in evidence_text
+    assert "private network, SSH, or local loopback" in evidence_text
+    assert "non-mutating invalid-body probe" in evidence_text
+    assert "require HTTP `404` route absence" in evidence_text
+    assert "A present route, including HTTP `422`" in evidence_text
+    assert "If no private verification surface is available" in evidence_text
+    assert "re-read the maintenance configuration and response signature" in (
+        evidence_text
+    )
+    assert "Disable maintenance last" in evidence_text
+    assert "public invalid-body readback" in evidence_text
     assert (
         "Do not execute this SQL as part of repository verification."
         in evidence_text
     )
+    for official_reference in (
+        "https://render.com/docs/maintenance-mode",
+        "https://render.com/docs/deploys#zero-downtime-deploys",
+        "https://api-docs.render.com/reference/restart-service",
+        "https://api-docs.render.com/reference/list-instances",
+    ):
+        assert official_reference in evidence_text
 
-    maintenance_index = evidence_text.index("Render API maintenance mode")
-    probe_index = evidence_text.index(
-        "https://argus-ohr5.onrender.com/api/v1/auth/access-requests"
+    maintenance_index = evidence_text.index(
+        "out-of-band Render control-plane readback"
     )
+    signature_index = evidence_text.index(
+        "configured maintenance page marker or SHA-256 fingerprint"
+    )
+    restart_index = evidence_text.index("same-SHA Render service restart")
+    restart_live_index = evidence_text.index(
+        "restart deploy is terminal with `status=live`"
+    )
+    old_shutdown_index = evidence_text.index("old-instance shutdown/drain is complete")
     lock_index = evidence_text.lower().index(
         "lock table public.private_alpha_allowlist in access exclusive mode;"
     )
@@ -91,28 +127,44 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     readback_index = evidence_text.index("select count(*) as active_requested_rows")
     commit_index = evidence_text.index("commit;")
     rollback_index = evidence_text.index("deploy the rollback")
-    verify_index = evidence_text.index("verify the rollback SHA is live")
-    reopen_index = evidence_text.index("reopen API traffic")
+    exact_sha_index = evidence_text.index(
+        "exact rollback SHA is live in Render deploy metadata"
+    )
+    private_probe_index = evidence_text.index("non-mutating invalid-body probe")
+    maintenance_reread_index = evidence_text.index(
+        "re-read the maintenance configuration and response signature"
+    )
+    disable_maintenance_index = evidence_text.index("Disable maintenance last")
+    public_readback_index = evidence_text.index("public invalid-body readback")
     assert (
         maintenance_index
-        < probe_index
+        < signature_index
+        < restart_index
+        < restart_live_index
+        < old_shutdown_index
         < lock_index
         < disable_index
         < readback_index
         < commit_index
         < rollback_index
-        < verify_index
-        < reopen_index
+        < exact_sha_index
+        < private_probe_index
+        < maintenance_reread_index
+        < disable_maintenance_index
+        < public_readback_index
     )
 
     assert "release-evidence/public-alpha-readiness.md" in runbook_text
     assert "061ba50e" in runbook_text
-    assert "Render API maintenance mode" in runbook_text
+    assert "serviceDetails.maintenanceMode.enabled=true" in runbook_text
+    assert "exact maintenance status and page fingerprint" in runbook_text
+    assert "same-SHA restart" in runbook_text
+    assert "old-instance shutdown/drain" in runbook_text
     assert "ACCESS EXCLUSIVE" in runbook_text
-    assert (
-        "both the onrender API URL and every configured custom API domain"
-        in runbook_text
-    )
+    assert "private invalid-body route-absence probe" in runbook_text
+    assert "exact rollback SHA" in runbook_text
+    assert "disable maintenance last" in runbook_text
+    assert "HTTP `202`" not in runbook_text.split("### Waitlist rollback floor", 1)[1]
 
 
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:

@@ -398,19 +398,24 @@ The durable waitlist rollback procedure is
 fail-closed floor while the schema can contain active `requested` rows. Prefer
 a forward fix. Before any authorized rollback below that commit:
 
-1. enable Render API maintenance mode or otherwise block all public API
-   traffic;
-2. verify both the onrender API URL and every configured custom API domain
-   cannot accept the access-request write with HTTP `202`;
-3. keep writes blocked, take an `ACCESS EXCLUSIVE` lock, disable active
-   requested rows, read back and assert zero, then commit;
-4. deploy the rollback while maintenance remains enabled;
-5. verify the rollback SHA and the absent or blocked write route on every API
-   surface;
-6. only then reopen API traffic.
+1. read back `serviceDetails.maintenanceMode.enabled=true` out of band and
+   require the exact maintenance status and page fingerprint on the onrender
+   URL and every configured custom domain;
+2. complete a same-SHA restart and prove Render's old-instance shutdown/drain
+   finished with no pre-maintenance worker left;
+3. only then take the `ACCESS EXCLUSIVE` lock, disable active requested rows,
+   read back and assert zero, then commit;
+4. deploy under maintenance and verify the exact rollback SHA from Render
+   metadata;
+5. require a private invalid-body route-absence probe to return HTTP `404`;
+6. re-verify the maintenance configuration and response signature;
+7. disable maintenance last, then require the public invalid-body readback to
+   return HTTP `404` on every public API surface.
 
-If maintenance or the dual-surface probes cannot be verified, stop the
-rollback. Never execute the production cleanup SQL during local repository
+Generic error statuses are not maintenance proof. If control-plane state,
+response fingerprint, restart drain, exact SHA, or a private verification
+surface cannot be verified, rollback below the floor is forbidden; stop and
+forward-fix. Never execute the production cleanup SQL during local repository
 verification.
 
 ## Smoke Test
