@@ -135,6 +135,8 @@ services:
         value: "true"
       - key: NEXT_PUBLIC_ARGUS_API_URL
         value: https://argus-ohr5.onrender.com/api/v1
+      - key: NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY
+        sync: false
       - key: NEXT_PUBLIC_STRATEGIES_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_COLLECTIONS_ENABLED

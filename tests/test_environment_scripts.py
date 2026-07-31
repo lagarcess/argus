@@ -814,6 +814,30 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "postgres://workflow-db.example/argus" not in result.stdout
 
 
+def test_render_env_sync_audit_accepts_required_turnstile_site_key(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload(
+            "argus-app",
+            extra={
+                "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY": "fake-public-site-key",
+            },
+        ),
+        workflow_env_json=_workflow_env_payload(),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (
+        "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>"
+        in result.stdout
+    )
+    assert "status=ready" in result.stdout
+
+
 def test_render_env_sync_skips_workflow_env_gate_outside_real_workflow_mode(
     tmp_path: Path,
 ) -> None:
