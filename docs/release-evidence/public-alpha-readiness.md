@@ -27,6 +27,28 @@ The run used 26 task runs and 28 attempts. Render reported 1,466 seconds
 [$0.20/hour Standard rate](https://render.com/docs/workflows-limits), the
 measured compute cost was $0.081444, before Render's Workflow monthly minimum.
 
+## Production migration lineage repair
+
+The production Supabase project was confirmed as
+`lgdhvepyrzbnscqssgqq` (the main Argus project, not a preview branch). Its
+schema already matched the current application surface, but its migration
+ledger stopped before 29 checked-in legacy files. Before touching production,
+the exact gap was reproduced on a disposable stack mirroring that starting
+state; all 124 database tests passed there.
+
+The founder explicitly waived a backup prerequisite for this repair because
+the project held no real users or customer data. All 29 files were then applied
+in lexical order under one session advisory lock. Each file ran in its own
+transaction with its matching ledger insert, and the runner stopped on the
+first error; no file failed. The final ledger read-back matched the repository
+through `20260728120000_visitor_keyed_guest_settlement`. Function signatures,
+RLS enablement and policies, RPC grants, and relevant table grants were read
+back after the batch. One hosted temporary-user probe passed and its Auth user
+and allowlist row were deleted, with a zero-match cleanup read-back.
+
+This repair did not apply the new requested-role migration. That file remains
+behind the separate paid-control precondition below.
+
 The selected web-service tier is Starter: 512 MB RAM and 0.5 CPU at
 [$7/month per service](https://render.com/pricing). `argus-api` and `argus-app`
 therefore have a $14/month total fixed Render service cost. The checked-in

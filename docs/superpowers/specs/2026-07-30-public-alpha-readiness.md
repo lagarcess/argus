@@ -44,10 +44,16 @@ who walk through it.
    with no restore point is the same category of gap as an API on a
    spin-down tier — incompatible with real production readiness, not a
    one-off cost tied to this single migration. Upgrade to Supabase Pro
-   (roughly $25/mo, verify current pricing at change time) and wait for a
-   completed managed backup before applying the migration batch, rather
-   than a manual encrypted dump — the dataset is small (174MB) so the
-   first backup cycle should complete quickly.
+   (roughly $25/mo, verify current pricing at change time) and record a
+   completed managed backup before public-alpha exposure. **Founder amendment
+   (2026-07-31):** the backup was explicitly waived as a prerequisite for the
+   exact 29-file legacy migration repair because this project still held no
+   real users or customer data. The accepted safety proof was an exact-state
+   disposable mirror, 124/124 database tests, file-scoped transactions,
+   fail-fast application, signature/RLS read-back, and one cleaned temporary-
+   user probe. This waiver does not waive the Supabase Pro readiness move and
+   does not authorize the later requested-role migration before its separate
+   paid Render control checks pass.
 2. **The load test runs on real infrastructure, not local/synthetic, before
    any tier decision.** Concurrency envelope, already scoped in the archived
    capacity doc: 1 job idle, 5 simultaneous globally, 2 queued same-user, 10
