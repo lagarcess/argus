@@ -186,6 +186,44 @@ Guest access stays current-workspace and owner-scoped. Missing, deleted, or
 unauthorized conversations return the existing conversation ownership/not-found
 contract without leaking existence.
 
+### 2.6 Founder-approved dossier refinement
+
+The founder approved the following post-implementation refinement on July 31,
+2026. These decisions amend the illustrated hierarchy in section 2.1 without
+changing its one-run ownership rule:
+
+- New and edited decision notes accept at most 500 characters in both the chat
+  result-card editor and the Omnisearch editor. The API request schema is the
+  canonical write gate. Existing longer notes remain readable verbatim so the
+  refinement does not corrupt or hide previously accepted durable records.
+- A long note in the selected dossier initially shows a bounded five-line
+  preview with accessible `Show full note` / `Show less` controls. Expanding it
+  uses the dossier's existing scroll flow; the note never becomes a nested
+  scroll region.
+- The selected decision state and its compact `Edit` action share one row. The
+  visible edit control may be smaller than 44 pixels only when its effective
+  pointer target remains at least 44 pixels.
+- The existing provider-free `run_fresh` action moves into the selected
+  backtest card's top-right action slot and is labeled `Retest setup`. Its
+  tooltip explains that Argus reuses the setup with the latest available data
+  and shows confirmation before anything runs. This is presentation-only: the
+  action keeps the existing deterministic chat-send transport and does not
+  adopt sibling `retest_run` behavior.
+- Asset-rollup copy states that the registered-user aggregate spans Argus
+  conversations; guest copy states that it covers only the temporary
+  conversation. The response shape and aggregation rules remain unchanged.
+- Search retains the three-character text-index threshold, while a single
+  canonical symbol-shaped query becomes eligible at two characters. This
+  enables symbols such as `BA` without permitting broad two-character text
+  search or adding a provider lookup.
+- Historical-view Back controls use an accessible arrow-only treatment.
+
+The chat result card continues to expose decision capture only when its result
+has no current decision. Existing decisions are not editable there because the
+card does not hydrate the canonical note. Omnisearch remains the current-decision
+edit surface; adding a second chat edit workflow requires a separate explicit
+product decision and contract.
+
 ## 3. Architecture and ownership
 
 ### 3.1 Canonical truth

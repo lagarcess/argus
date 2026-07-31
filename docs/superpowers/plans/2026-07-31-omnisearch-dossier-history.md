@@ -545,7 +545,79 @@ git add -u
 git commit -m "test(search): close dossier history acceptance"
 ```
 
-### Task 5: Ready pull request and CI
+### Task 5: Founder-approved dossier refinement
+
+**Files:**
+- Create: `web/components/sidebar/command-palette/DecisionNoteDisplay.tsx`
+- Create: `web/lib/decision-note.ts`
+- Modify: `src/argus/api/schemas.py`
+- Modify: `src/argus/domain/search_text.py`
+- Modify: `web/lib/search-text.ts`
+- Modify: `web/components/chat/StrategyResultCard.tsx`
+- Modify: `web/components/sidebar/command-palette/DecisionEditor.tsx`
+- Modify: `web/components/sidebar/command-palette/RunDossierView.tsx`
+- Modify: `web/components/sidebar/ChatCommandPalette.tsx`
+- Modify: `web/components/sidebar/command-palette/DecisionHistoryView.tsx`
+- Modify: `docs/API_CONTRACT.md`
+- Modify: `docs/api/openapi.yaml`
+- Modify: `web/public/locales/en/common.json`
+- Modify: `web/public/locales/es-419/common.json`
+- Test: focused backend, OpenAPI, frontend projection, component, and locale suites.
+
+**Interfaces:**
+- Consumes: the existing `DecisionNoteCreate`, `search_query_is_indexable`,
+  `SearchRunFreshAction`, `SearchDecisionAction`, and canonical mutation refresh.
+- Produces: a 500-character write contract, two-character symbol-only search,
+  `DecisionNoteDisplay`, and the founder-approved dossier hierarchy/copy.
+
+- [ ] **Step 1: Lock write compatibility and symbol-only search in failing tests**
+
+Assert that `DecisionNoteCreate` accepts exactly 500 characters and rejects
+501, while response projections still accept a legacy note up to the existing
+2,000-character read bound. Assert that two-character symbol-shaped queries are
+eligible, two-character multi-word/text queries remain deferred, and the
+Postgres and memory paths return only the owner-scoped asset rollup for a
+symbol-only query.
+
+- [ ] **Step 2: Verify backend RED, then implement the minimal contract**
+
+Run the focused schema/search/OpenAPI tests and confirm failures are caused by
+the old 2,000-character request cap and shared three-character symbol gate.
+Introduce separate text-token and symbol-query minimums, change only the write
+schema to 500, regenerate OpenAPI, and rerun the focused tests to green.
+
+- [ ] **Step 3: Lock UI behavior in failing component and locale tests**
+
+Require the shared 500-character constant and near-limit counter in both
+existing editors; a five-line `DecisionNoteDisplay` with accessible expanded
+state; state and compact `Edit` action in one row; `Retest setup` in the card
+header with localized confirmation tooltip; registered/guest asset-rollup
+scope copy; two-character search helper copy; and arrow-only accessible backs.
+
+- [ ] **Step 4: Implement the extracted UI and verify focused GREEN**
+
+Create `DecisionNoteDisplay.tsx` rather than growing `RunDossierView.tsx`.
+Keep the note in normal document flow, retain exact whitespace in the DOM, and
+reset disclosure when the selected run/note changes. Move only the existing
+`run_fresh` control; do not change its action payload or handler. Use the shared
+note limit in the chat and Omnisearch editors and keep chat decision capture
+add-only.
+
+- [ ] **Step 5: Verify both locales in the browser**
+
+At desktop and mobile widths, exercise a 500-character multiline note, expand
+and collapse it, open the editor, confirm the compact target and counter, use a
+two-character stored symbol query, and inspect registered and guest scope copy.
+Confirm the panel alone scrolls and every interaction makes zero provider/LLM
+calls.
+
+- [ ] **Step 6: Commit the refinement as one reversible product slice**
+
+Stage only the approved spec, contract, implementation, tests, locales, and QA
+evidence. Use a conventional commit and keep the previously approved compact
+metrics/scroll commit independent.
+
+### Task 6: Ready pull request and CI
 
 **Files:**
 - Modify: no product files unless CI or review finds a confirmed in-scope defect.
