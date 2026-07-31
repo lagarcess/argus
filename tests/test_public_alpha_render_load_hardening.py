@@ -57,10 +57,8 @@ class _ServiceRoleSession:
             return _Response(
                 200,
                 {
-                    "properties": {
-                        "hashed_token": "hashed-secret",
-                        "verification_type": "magiclink",
-                    }
+                    "hashed_token": "hashed-secret",
+                    "verification_type": "magiclink",
                 },
             )
         if path == "/auth/v1/verify":
@@ -185,6 +183,88 @@ def test_service_role_session_uses_generate_link_and_verify(
             "follow_redirects": True,
         }
     ]
+
+
+def test_config_uses_locked_real_workflow_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    identities = tuple(
+        module.LoadIdentity(
+            label=f"public-alpha-load-{index + 1:02d}",
+            email=f"load-{index + 1}@example.test",
+        )
+        for index in range(15)
+    )
+    required = {
+        "ARGUS_PUBLIC_ALPHA_LOAD_IDENTITIES_JSON": "dedicated-identities",
+        "ARGUS_PUBLIC_ALPHA_API_URL": "https://api.example.test",
+        "ARGUS_PUBLIC_ALPHA_APP_URL": "https://app.example.test",
+        "RENDER_API_KEY": "render-secret",
+        "ARGUS_PUBLIC_ALPHA_SUPABASE_URL": "https://supabase.example.test",
+        "ARGUS_PUBLIC_ALPHA_SUPABASE_SERVICE_ROLE_KEY": "service-secret",
+        "ARGUS_PUBLIC_ALPHA_CANDIDATE_SHA": "d" * 40,
+    }
+    monkeypatch.setenv(
+        "ARGUS_BACKTEST_WORKFLOW_TASK",
+        "argus-backtests/workflow_proof",
+    )
+    monkeypatch.setattr(module, "_required_env", lambda name: required[name])
+    monkeypatch.setattr(module, "_parse_identities", lambda _: identities)
+
+    config = module._config_from_env(
+        SimpleNamespace(
+            output_dir=None,
+            timeout_seconds=30.0,
+            poll_seconds=0.1,
+        )
+    )
+
+    assert config.workflow_task == "argus-backtests/run_backtest_job"
+
+
+def test_all_evidence_states_reject_non_real_workflow_task(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    config = _config(module, tmp_path)
+
+    final_report = _successful_report(module)
+    final_report["workflow"]["task"] = "argus-backtests/workflow_proof"
+    with pytest.raises(ValueError, match="workflow task"):
+        module.validate_report(final_report)
+
+    measured_report = module._build_measured_report(
+        config=config,
+        cases=[
+            _completed_case(module, case_id) for case_id in module.CASE_MANIFEST
+        ],
+        cleanup=module._pending_cleanup(
+            config,
+            [f"user-{index}" for index in range(15)],
+        ),
+    )
+    measured_report["workflow"]["task"] = "argus-backtests/workflow_proof"
+    with pytest.raises(ValueError, match="workflow task"):
+        module._write_measured_report(
+            report=measured_report,
+            output_dir=tmp_path,
+        )
+
+    partial_report = module._build_partial_report(
+        config,
+        completed_cases=[],
+        failing_case={
+            "case_id": "identity_setup",
+            "status": "failed",
+            "observed_capacity": {},
+            "stop_reason": "harness_case_failed",
+        },
+        cleanup=module._empty_cleanup(),
+    )
+    partial_report["workflow"]["task"] = "argus-backtests/workflow_proof"
+    with pytest.raises(ValueError, match="workflow task"):
+        module._validate_partial_report(partial_report)
 
 
 @pytest.mark.parametrize(

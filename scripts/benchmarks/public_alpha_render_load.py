@@ -89,6 +89,7 @@ try:
         CASE_ADMISSIONS,
         CASE_MANIFEST,
         LIMITS,
+        LOCKED_WORKFLOW_TASK,
         SCHEMA_VERSION,
         build_case_result,
         validate_report,
@@ -109,6 +110,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
         CASE_ADMISSIONS,
         CASE_MANIFEST,
         LIMITS,
+        LOCKED_WORKFLOW_TASK,
         SCHEMA_VERSION,
         build_case_result,
         validate_report,
@@ -1194,10 +1196,7 @@ def _config_from_env(args: argparse.Namespace) -> HarnessConfig:
             "ARGUS_PUBLIC_ALPHA_SUPABASE_SERVICE_ROLE_KEY"
         ),
         candidate_sha=_required_env("ARGUS_PUBLIC_ALPHA_CANDIDATE_SHA"),
-        workflow_task=os.getenv(
-            "ARGUS_BACKTEST_WORKFLOW_TASK",
-            "argus-backtests/run_backtest_job",
-        ).strip(),
+        workflow_task=LOCKED_WORKFLOW_TASK,
         identities=identities,
         timeout_seconds=max(30.0, float(args.timeout_seconds)),
         poll_seconds=max(0.05, float(args.poll_seconds)),

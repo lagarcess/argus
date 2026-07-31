@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from workflows.backtest_job import CAPACITY_LOAD_SOURCE
 
 SCHEMA_VERSION = "argus_public_alpha_render_load/v1"
+LOCKED_WORKFLOW_TASK = "argus-backtests/run_backtest_job"
 CASE_MANIFEST = (
     "idle_one",
     "global_five",
@@ -138,8 +139,7 @@ def _validate_complete_measurements(report: Mapping[str, Any]) -> None:
     workflow = report.get("workflow")
     if not isinstance(workflow, Mapping):
         raise ValueError("workflow contract is required")
-    if workflow.get("plan") != "standard" or workflow.get("max_retries") != 1:
-        raise ValueError("workflow contract must use standard plan and one retry")
+    _validate_workflow_contract(workflow)
     if report.get("limits") != LIMITS:
         raise ValueError("capacity limits do not match the locked envelope")
     cases = report.get("cases")
@@ -209,8 +209,7 @@ def validate_partial_report(report: Mapping[str, Any]) -> None:
     workflow = report.get("workflow")
     if not isinstance(workflow, Mapping):
         raise ValueError("workflow contract is required")
-    if workflow.get("plan") != "standard" or workflow.get("max_retries") != 1:
-        raise ValueError("workflow contract must use standard plan and one retry")
+    _validate_workflow_contract(workflow)
     if report.get("limits") != LIMITS:
         raise ValueError("capacity limits do not match the locked envelope")
     completed = report.get("completed_cases")
@@ -239,6 +238,13 @@ def validate_partial_report(report: Mapping[str, Any]) -> None:
     if any(not isinstance(value, int) or value < 0 for value in observed.values()):
         raise ValueError("partial artifact capacity values must be non-negative")
     validate_cleanup(report.get("cleanup"), require_completed=False)
+
+
+def _validate_workflow_contract(workflow: Mapping[str, Any]) -> None:
+    if workflow.get("task") != LOCKED_WORKFLOW_TASK:
+        raise ValueError("workflow task must use the locked real backtest task")
+    if workflow.get("plan") != "standard" or workflow.get("max_retries") != 1:
+        raise ValueError("workflow contract must use standard plan and one retry")
 
 
 def validate_cleanup(value: Any, *, require_completed: bool) -> None:

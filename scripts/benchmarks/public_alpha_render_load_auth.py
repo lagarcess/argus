@@ -67,11 +67,8 @@ def create_service_role_session_client(
     )
     link_response.raise_for_status()
     link_body = link_response.json()
-    properties = link_body.get("properties")
-    if not isinstance(properties, dict):
-        raise RuntimeError("temporary identity link response lacked properties")
-    hashed_token = str(properties.get("hashed_token") or "").strip()
-    verification_type = str(properties.get("verification_type") or "").strip()
+    hashed_token = str(link_body.get("hashed_token") or "").strip()
+    verification_type = str(link_body.get("verification_type") or "").strip()
     if not hashed_token or not verification_type:
         raise RuntimeError("temporary identity link response lacked verification data")
 
