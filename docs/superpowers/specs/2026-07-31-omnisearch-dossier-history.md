@@ -232,6 +232,33 @@ card does not hydrate the canonical note. Omnisearch remains the current-decisio
 edit surface; adding a second chat edit workflow requires a separate explicit
 product decision and contract.
 
+### 2.7 Founder-approved final browser-QA addendum
+
+The founder approved the final desktop and mobile browser treatment on July 31,
+2026. These decisions supersede any earlier illustrative spacing or locale
+implications while preserving the behavior and ownership rules above:
+
+- Bounded outcome metrics render as one compact two-column definition table
+  with separator lines. They do not return to individually filled statistic
+  tiles; the table keeps the four canonical metrics readable without consuming
+  unnecessary vertical space.
+- The dossier body remains vertically scrollable so every selected-run fact,
+  decision control, transcript action, and history disclosure stays reachable
+  on desktop and mobile. The long-note disclosure continues to use that parent
+  scroll flow rather than introducing a nested note scrollbar.
+- Every supported cadence (`daily`, `weekly`, `biweekly`, `monthly`, and
+  `quarterly`) has natural EN and es-419 display copy. Unknown future cadence
+  codes retain the same readable fallback rule as unknown strategy families;
+  missing optional facts never render a `<missing>` placeholder or empty
+  separator segment.
+- Dossier numbers use the selected product locale directly. In particular,
+  `es-419` must be passed to `Intl.NumberFormat` without coercion to `es-ES`, so
+  the approved Latin American Spanish display uses values such as `6.7%` and
+  remains consistent with the chat result surface.
+
+This addendum records the approved shipped presentation. It adds no new API,
+runtime, durable model, provider call, or sibling typed-retest behavior.
+
 ## 3. Architecture and ownership
 
 ### 3.1 Canonical truth
@@ -323,6 +350,11 @@ hydration, or retry semantics.
   returns to the collapsed dossier with functional `Show full note` / `Show
   less` controls after canonical refresh.
 - Dossier setup lines never contain an empty strategy slot in EN or es-419.
+- The four bounded metrics use the compact separator-based table and remain
+  reachable through the dossier's parent scroll flow at desktop and mobile
+  sizes.
+- Supported cadence labels are natural in EN and es-419, and es-419 dossier
+  numbers use the approved Latin American format (`6.7%`, not `6,7 %`).
 - Memory and Supabase/Postgres modes return equivalent typed results.
 - EN and es-419 behave equivalently on desktop and mobile.
 - Hover, focus, disclosure, history loading, decision save, and navigation make
