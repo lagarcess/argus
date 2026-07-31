@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
+import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -284,25 +285,17 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchItem = {
-  type:
-    | "chat"
-    | "strategy"
-    | "collection"
-    | "run"
-    | "backtest"
-    | "evidence"
-    | "decision"
-    | "idea";
-  id: string;
-  title: string;
-  matched_text: string;
-  updated_at: string;
-  conversation_id?: string | null;
-  lifecycle?: ArtifactLifecycle | null;
-  decision_state?: DecisionState | null;
-  preview?: Record<string, unknown> | null;
+export type SearchConversationItem = SearchConversationContract<DecisionState>;
+
+export type SearchAssetRollupItem = {
+  type: "asset_rollup";
+  symbol: string;
+  run_count: number;
+  decision_counts: Record<DecisionState, number>;
+  last_touched_at: string;
 };
+
+export type SearchItem = SearchConversationItem | SearchAssetRollupItem;
 
 export type SearchLedgerGroup = {
   decision_state: DecisionState;
@@ -777,10 +770,16 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   cursor?: string,
-  options: Readonly<{ signal?: AbortSignal }> = {},
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ) {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (options.anchorMessageId) {
+    searchParams.append("anchor_message_id", options.anchorMessageId);
+  }
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
     { signal: options.signal },
@@ -904,6 +903,7 @@ export async function searchGlobal(params: {
   cursor?: string;
   decisionState?: DecisionState | null;
   includeLedgerGroups?: boolean;
+  conversationIds?: string[];
 }) {
   const {
     q,
@@ -911,6 +911,7 @@ export async function searchGlobal(params: {
     cursor,
     decisionState,
     includeLedgerGroups = false,
+    conversationIds,
   } = params;
   const searchParams = new URLSearchParams({
     q,
@@ -921,6 +922,8 @@ export async function searchGlobal(params: {
   if (includeLedgerGroups) {
     searchParams.append("include_ledger_groups", "true");
   }
+  for (const id of conversationIds ?? [])
+    searchParams.append("conversation_id", id);
   return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );

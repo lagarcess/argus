@@ -2,30 +2,111 @@ import type { ChatActionOption } from "@/components/chat/types";
 
 export type ActiveConversationRouteState = {
   conversationId: string | null;
+  messageId: string | null;
   isChatRoute: boolean;
   isNewChatRoute: boolean;
 };
 
+const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
+const ACTIVE_MESSAGE_QUERY_KEY = "message";
+
 export function activeConversationRouteStateFromUrl(
   href: string,
   queryKey = "conversation",
+  messageQueryKey = "message",
 ): ActiveConversationRouteState {
   try {
     const url = new URL(href);
     const conversationId = url.searchParams.get(queryKey)?.trim() || null;
+    const messageId = url.searchParams.get(messageQueryKey)?.trim() || null;
     const isChatRoute = url.pathname === "/chat";
     return {
       conversationId: isChatRoute ? conversationId : null,
+      messageId: isChatRoute && conversationId ? messageId : null,
       isChatRoute,
       isNewChatRoute: isChatRoute && conversationId === null,
     };
   } catch {
     return {
       conversationId: null,
+      messageId: null,
       isChatRoute: false,
       isNewChatRoute: false,
     };
   }
+}
+
+export function readActiveConversationRouteState(): ActiveConversationRouteState {
+  if (typeof window === "undefined") {
+    return activeConversationRouteStateFromUrl("");
+  }
+  return activeConversationRouteStateFromUrl(window.location.href);
+}
+
+export function rememberActiveConversationId(
+  conversationId: string,
+  messageId?: string,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return;
+    if (
+      url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY) === conversationId &&
+      (url.searchParams.get(ACTIVE_MESSAGE_QUERY_KEY) ?? undefined) === messageId
+    ) {
+      return;
+    }
+    url.searchParams.set(ACTIVE_CONVERSATION_QUERY_KEY, conversationId);
+    if (messageId) {
+      url.searchParams.set(ACTIVE_MESSAGE_QUERY_KEY, messageId);
+    } else {
+      url.searchParams.delete(ACTIVE_MESSAGE_QUERY_KEY);
+    }
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}`,
+    );
+  } catch {
+    // URL state is optional recovery metadata.
+  }
+}
+
+export function clearActiveConversationPointer(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return null;
+    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return null;
+    url.searchParams.delete(ACTIVE_CONVERSATION_QUERY_KEY);
+    url.searchParams.delete(ACTIVE_MESSAGE_QUERY_KEY);
+    const query = url.searchParams.toString();
+    const nextRoute = query ? `${url.pathname}?${query}` : url.pathname;
+    window.history.replaceState(window.history.state, "", nextRoute);
+    return nextRoute;
+  } catch {
+    return null;
+  }
+}
+
+export function isCurrentAnchoredConversationRequest({
+  activeConversationId,
+  targetConversationId,
+  routeState,
+  requestedMessageId,
+}: {
+  activeConversationId: string | null;
+  targetConversationId: string;
+  routeState: ActiveConversationRouteState;
+  requestedMessageId: string;
+}): boolean {
+  return (
+    activeConversationId === targetConversationId &&
+    routeState.isChatRoute &&
+    routeState.conversationId === targetConversationId &&
+    routeState.messageId === requestedMessageId
+  );
 }
 
 export function shouldStartConversationForVisibleEmptyChat({

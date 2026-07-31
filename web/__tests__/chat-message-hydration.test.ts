@@ -532,6 +532,42 @@ describe("chat message hydration", () => {
     });
   });
 
+  test("uses a transcript anchor only on the first page and follows its cursor", async () => {
+    const requestedPages: Array<{
+      cursor: string | undefined;
+      anchorMessageId: string | undefined;
+    }> = [];
+
+    const items = await loadAllConversationMessagePages(
+      "conversation-1",
+      async (_conversationId, _limit, cursor, options) => {
+        requestedPages.push({
+          cursor,
+          anchorMessageId: options?.anchorMessageId,
+        });
+        return cursor
+          ? {
+              items: [apiMessage({ id: "latest-message" })],
+              next_cursor: null,
+            }
+          : {
+              items: [apiMessage({ id: "matched-message" })],
+              next_cursor: "after-anchor-page",
+            };
+      },
+      { anchorMessageId: "matched-message" },
+    );
+
+    expect(requestedPages).toEqual([
+      { cursor: undefined, anchorMessageId: "matched-message" },
+      { cursor: "after-anchor-page", anchorMessageId: undefined },
+    ]);
+    expect(items.map((item) => item.id)).toEqual([
+      "matched-message",
+      "latest-message",
+    ]);
+  });
+
   test("passes one abort signal through every transcript page request", async () => {
     const controller = new AbortController();
     const observedSignals: Array<AbortSignal | undefined> = [];

@@ -57,6 +57,9 @@ from argus.domain.supabase_message_reads import (
     _unique_owned_rows_by_id,
 )
 from argus.domain.supabase_message_reads import (
+    MessageAnchorError as MessageAnchorError,
+)
+from argus.domain.supabase_message_reads import (
     MessageCursorError as MessageCursorError,
 )
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
@@ -436,9 +439,7 @@ class SupabaseGateway(
                 f"and(updated_at.eq.{timestamp},id.lt.{canonical_cursor_id}))"
             )
             if cursor_pinned:
-                keyset_filter = (
-                    f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
-                )
+                keyset_filter = f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
             else:
                 keyset_filter = f"and(pinned.eq.false,{within_tier})"
             query = query.or_(keyset_filter)
@@ -1540,19 +1541,25 @@ class SupabaseGateway(
         include_ledger_groups: bool = False,
         guest_scope: bool = False,
         guest_conversation_id: str | None = None,
+        conversation_ids: list[str] | None = None,
     ) -> SearchReadResult:
         if self.search_reader is None:
             raise RuntimeError("Persistent Search requires its Postgres reader.")
+        kwargs: dict[str, Any] = {
+            "user_id": user_id,
+            "query": query,
+            "source_limit": source_limit,
+            "cursor_updated_at": cursor_updated_at,
+            "cursor_id": cursor_id,
+            "decision_state": decision_state,
+            "include_ledger_groups": include_ledger_groups,
+            "guest_scope": guest_scope,
+            "guest_conversation_id": guest_conversation_id,
+        }
+        if conversation_ids is not None:
+            kwargs["conversation_ids"] = conversation_ids
         return self.search_reader.search_rows(
-            user_id=user_id,
-            query=query,
-            source_limit=source_limit,
-            cursor_updated_at=cursor_updated_at,
-            cursor_id=cursor_id,
-            decision_state=decision_state,
-            include_ledger_groups=include_ledger_groups,
-            guest_scope=guest_scope,
-            guest_conversation_id=guest_conversation_id,
+            **kwargs,
         )
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:

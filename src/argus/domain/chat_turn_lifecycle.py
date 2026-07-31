@@ -637,6 +637,7 @@ class MemoryChatTurnLifecycleGateway:
                     }
                 )
         messages.append(appended)
+        self.store.bump_search_revision()
         conversation = self.store.conversations.get(message.conversation_id)
         preview = (
             accepted_user_message_preview(message.content, max_length=180)

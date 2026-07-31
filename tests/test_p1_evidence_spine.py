@@ -214,6 +214,9 @@ def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> 
 
     store = AlphaStore()
     store.evidence_artifacts = PausingArtifactDict()
+    conversation = _conversation()
+    store.conversations[conversation.id] = conversation
+    store.conversation_owners[conversation.id] = _user().id
     monkeypatch.setattr(api_state, "store", store)
     run = _run()
     finalization = BacktestFinalizationInput(
@@ -258,8 +261,12 @@ def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> 
 
     assert not finalization_errors
     assert search_finished.is_set()
-    result_types = {item.type for _, item in search_results}
-    assert {"backtest", "idea", "evidence"}.issubset(result_types)
+    assert len(search_results) == 1
+    item = search_results[0][1]
+    assert item.type == "conversation"
+    assert item.id == conversation.id
+    assert item.dossier.tested.run_count == 1
+    assert item.dossier.outcome is not None
 
 
 def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:

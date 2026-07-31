@@ -507,25 +507,211 @@ class PaginatedHistory(BaseModel):
     next_cursor: str | None = None
 
 
+class SearchDossierDecision(BaseModel):
+    state: DecisionState
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str | None = Field(default=None, max_length=160)
+
+
+class SearchDossierTested(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+    strategy_families: list[str] = Field(default_factory=list, max_length=5)
+    run_count: int = Field(ge=0)
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class SearchDossierMetric(BaseModel):
+    name: str = Field(max_length=80)
+    value: str | int | float
+
+
+class SearchDossierOutcome(BaseModel):
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    benchmark_symbol: str | None = Field(default=None, max_length=24)
+    quick_take: str | None = Field(default=None, max_length=500)
+    metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
+
+
+SearchDossierNudge = Literal[
+    "undecided",
+    "suggestion_untaken",
+    "stale_result",
+]
+
+
+class SearchDossierLeftOff(BaseModel):
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    nudge: SearchDossierNudge | None = None
+
+
+class SearchDossier(BaseModel):
+    decision: SearchDossierDecision | None = None
+    tested: SearchDossierTested
+    outcome: SearchDossierOutcome | None = None
+    left_off: SearchDossierLeftOff | None = None
+
+
+SearchRunFreshStrategyType = Literal[
+    "buy_and_hold",
+    "dca_accumulation",
+    "indicator_threshold",
+    "signal_strategy",
+]
+SearchRunFreshSizingMode = Literal["capital_amount", "position_size"]
+SearchRunFreshCadence = Literal[
+    "daily",
+    "weekly",
+    "biweekly",
+    "monthly",
+    "quarterly",
+]
+
+
+class SearchRunFreshDateRange(BaseModel):
+    start: date
+    end: date
+
+
+class SearchRunFreshSetup(BaseModel):
+    strategy_type: SearchRunFreshStrategyType
+    symbols: list[str] = Field(min_length=1, max_length=5)
+    asset_class: AssetClass
+    timeframe: str = Field(min_length=1, max_length=24)
+    date_range: SearchRunFreshDateRange
+    sizing_mode: SearchRunFreshSizingMode
+    capital_amount: float | None = Field(default=None, gt=0)
+    position_size: float | None = Field(default=None, gt=0)
+    cadence: SearchRunFreshCadence | None = None
+    recurring_contribution: float | None = Field(default=None, gt=0)
+    starting_principal: float | None = Field(default=None, ge=0)
+    benchmark_symbol: str = Field(min_length=1, max_length=24)
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    execution_realism: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_setup_shape(self) -> SearchRunFreshSetup:
+        if self.sizing_mode == "capital_amount":
+            if self.capital_amount is None or self.position_size is not None:
+                raise ValueError("capital_amount sizing requires only capital_amount")
+        elif self.position_size is None or self.capital_amount is not None:
+            raise ValueError("position_size sizing requires only position_size")
+        if self.strategy_type == "dca_accumulation":
+            if self.cadence is None:
+                raise ValueError("cadence is required for dca_accumulation")
+            if (
+                self.sizing_mode != "capital_amount"
+                or self.recurring_contribution is None
+                or self.starting_principal != 0
+                or self.capital_amount != self.recurring_contribution
+            ):
+                raise ValueError(
+                    "dca_accumulation requires an exact recurring contribution "
+                    "and zero starting principal"
+                )
+        elif (
+            self.cadence is not None
+            or self.recurring_contribution is not None
+            or self.starting_principal is not None
+        ):
+            raise ValueError(
+                "cadence and DCA contribution fields are only for dca_accumulation"
+            )
+        return self
+
+
+class SearchRunFreshAction(BaseModel):
+    type: Literal["run_fresh"] = "run_fresh"
+    source_run_id: str
+    run_label: str = Field(max_length=160)
+    canonical_setup: SearchRunFreshSetup
+    send_text: str = Field(max_length=4000)
+
+
+class SearchDecisionAction(BaseModel):
+    type: Literal["decision"] = "decision"
+    evidence_artifact_id: str
+    decision_state: DecisionState | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str = Field(max_length=160)
+
+
+SearchDossierAction = Annotated[
+    SearchRunFreshAction | SearchDecisionAction,
+    Field(discriminator="type"),
+]
+
+
+SearchMatchLayer = Literal[
+    "conversation",
+    "message",
+    "run",
+    "idea",
+    "evidence",
+    "decision",
+]
+
+
+class SearchMatch(BaseModel):
+    layer: SearchMatchLayer
+    fragment: str = Field(max_length=500)
+    count: int = Field(ge=1)
+    message_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_message_anchor(self) -> SearchMatch:
+        if (self.layer == "message") != (self.message_id is not None):
+            raise ValueError("message_id must be present only for message matches")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_message_id(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if data.get("message_id") is None:
+            data.pop("message_id", None)
+        return data
+
+
 class SearchItem(BaseModel):
-    type: Literal[
-        "chat",
-        "strategy",
-        "collection",
-        "run",
-        "backtest",
-        "evidence",
-        "decision",
-        "idea",
-    ]
+    type: Literal["conversation"]
     id: str
     title: str
+    archived: bool
     matched_text: str
     updated_at: datetime
-    conversation_id: str | None = None
-    lifecycle: ArtifactLifecycle | None = None
-    decision_state: DecisionState | None = None
-    preview: dict[str, Any] | None = None
+    conversation_id: str
+    match: SearchMatch
+    dossier: SearchDossier
+    actions: list[SearchDossierAction] = Field(default_factory=list, max_length=2)
+    # Bounded conversation aggregate used for decision filters and counts.
+    # The dossier separately carries the latest decision.
+    decision_states: tuple[DecisionState, ...] = ()
+
+
+class SearchAssetDecisionCounts(BaseModel):
+    promising: int = Field(ge=0)
+    watching: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    revisit_later: int = Field(ge=0)
+
+
+class SearchAssetRollup(BaseModel):
+    type: Literal["asset_rollup"] = "asset_rollup"
+    symbol: str = Field(min_length=1, max_length=24)
+    run_count: int = Field(ge=1)
+    decision_counts: SearchAssetDecisionCounts
+    last_touched_at: datetime
+
+
+SearchResultItem = Annotated[
+    SearchItem | SearchAssetRollup,
+    Field(discriminator="type"),
+]
 
 
 class SearchLedgerGroup(BaseModel):
@@ -534,7 +720,7 @@ class SearchLedgerGroup(BaseModel):
 
 
 class PaginatedSearch(BaseModel):
-    items: list[SearchItem]
+    items: list[SearchResultItem]
     next_cursor: str | None = None
     ledger_groups: list[SearchLedgerGroup] | None = None
 

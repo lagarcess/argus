@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Any
+from typing import Any, Callable, TypeVar
 from uuid import uuid4
 
 from argus.api.schemas import (
@@ -17,6 +18,60 @@ from argus.api.schemas import (
     Strategy,
     User,
 )
+
+_Key = TypeVar("_Key")
+_Value = TypeVar("_Value")
+
+
+class _SearchRevisionDict(dict[_Key, _Value]):
+    """Dict that invalidates the non-durable memory recall projection."""
+
+    def __init__(
+        self,
+        values: dict[_Key, _Value],
+        *,
+        on_change: Callable[[], None],
+    ) -> None:
+        super().__init__(values)
+        self._on_change = on_change
+
+    def __setitem__(self, key: _Key, value: _Value) -> None:
+        super().__setitem__(key, value)
+        self._on_change()
+
+    def __delitem__(self, key: _Key) -> None:
+        super().__delitem__(key)
+        self._on_change()
+
+    def clear(self) -> None:
+        super().clear()
+        self._on_change()
+
+    def pop(self, key: _Key, default: Any = None) -> Any:
+        existed = key in self
+        value = super().pop(key, default)
+        if existed:
+            self._on_change()
+        return value
+
+    def popitem(self) -> tuple[_Key, _Value]:
+        value = super().popitem()
+        self._on_change()
+        return value
+
+    def setdefault(self, key: _Key, default: _Value | None = None) -> _Value:
+        existed = key in self
+        value = super().setdefault(key, default)  # type: ignore[arg-type]
+        if not existed:
+            self._on_change()
+        return value
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        super().update(*args, **kwargs)
+        self._on_change()
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> dict[_Key, _Value]:
+        return deepcopy(dict(self), memo)
 
 
 def utcnow() -> datetime:
@@ -73,11 +128,36 @@ class AlphaStore:
     backtest_job_reservations: dict[tuple[str, str, str], str] = field(
         default_factory=dict
     )
+    search_revision: int = field(default=0, repr=False, compare=False)
     backtest_admission_lock: Any = field(
         default_factory=RLock,
         repr=False,
         compare=False,
     )
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "conversations",
+            "conversation_owners",
+            "messages",
+            "backtest_runs",
+            "backtest_run_owners",
+            "ideas",
+            "idea_owners",
+            "evidence_artifacts",
+            "evidence_artifact_owners",
+            "decision_notes",
+            "decision_note_owners",
+        ):
+            values = getattr(self, field_name)
+            setattr(
+                self,
+                field_name,
+                _SearchRevisionDict(values, on_change=self.bump_search_revision),
+            )
+
+    def bump_search_revision(self) -> None:
+        self.search_revision += 1
 
     def reset(self) -> None:
         self.users.clear()

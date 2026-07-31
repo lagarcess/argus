@@ -7,12 +7,13 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from "react";
 import {
   Archive,
+  Check,
   ChevronRight,
   Edit2,
+  FileText,
   Loader2,
   Maximize2,
   MessageSquare,
@@ -24,35 +25,64 @@ import {
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
+import { searchQueryIsIndexable } from "@/lib/search-text";
 import {
   deleteConversation as apiDeleteConversation,
+  createEvidenceDecision,
   listHistory,
   patchConversation,
   searchGlobal,
   type DecisionState,
   type HistoryItem,
+  type SearchAssetRollupItem,
+  type SearchConversationItem,
   type SearchItem,
   type SearchLedgerGroup,
 } from "@/lib/argus-api";
 import {
+  commandPaletteAssetRollupFromSearch,
+  commandPaletteCanonicalRecallLimit,
+  commandPaletteConversationNavigationDisabled,
+  commandPaletteDecisionVerb,
   commandPaletteDecisionStateFallback,
   commandPaletteGroupsByLedgerState,
-  commandPaletteItemFromHistory,
   commandPaletteItemFromSearch,
+  commandPaletteItemsFromHistory,
+  commandPaletteItemsInRenderedOrder,
+  commandPaletteKeyboardAction,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
+  commandPaletteOpenMessageId,
   commandPalettePreviewFields,
-  commandPaletteSelectedPreview,
+  commandPaletteRequestIsCurrent,
+  commandPaletteSelectedRenderedPreview,
   commandPaletteStatusFallback,
   commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
+import {
+  isRecentRecallResponse,
+  loadCommandPaletteRecentRecall,
+  retainRecalledRecentItems,
+} from "@/lib/command-palette-recent-recall";
+import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
+
+type DossierAction = SearchConversationItem["actions"][number];
+type RunFreshAction = Extract<DossierAction, { type: "run_fresh" }>;
+type DecisionAction = Extract<DossierAction, { type: "decision" }>;
 
 type ChatCommandPaletteProps = {
   onClose: () => void;
-  onOpenConversation: (conversationId: string) => void;
+  onOpenConversation: (
+    conversationId: string,
+    messageId?: string,
+    openAtLeftOff?: boolean,
+  ) => void;
+  onRunFresh: (conversationId: string, sendText: string) => Promise<void> | void;
+  turnInFlight?: boolean;
   activeConversationId: string | null;
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
@@ -62,11 +92,36 @@ type ChatCommandPaletteProps = {
 };
 
 type LayoutMode = "expanded" | "collapsed";
+type SearchReadError = "history" | "search" | "ledger" | null;
+type DecisionDraft = {
+  artifactId: string;
+  state: DecisionState;
+  note: string;
+};
 type DateDisplayGroup = {
   id: string;
   label: string;
   items: CommandPaletteDisplayItem[];
 };
+
+const SEARCH_DEBOUNCE_MS = 200;
+const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
+const DECISION_STATES: readonly DecisionState[] = [
+  "watching",
+  "promising",
+  "rejected",
+  "revisit_later",
+];
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
 
 function formatRelativeDate(
   value: string,
@@ -88,6 +143,19 @@ function formatRelativeDate(
   return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
+  }).format(date);
+}
+
+function formatDossierDate(value: string, locale: string) {
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value,
+  );
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
   }).format(date);
 }
 
@@ -133,36 +201,25 @@ function groupItems(
   return groups;
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function isSearchConversationItem(
+  item: SearchItem,
+): item is SearchConversationItem {
+  return item.type === "conversation";
 }
 
-function highlightText(text: string, query: string): ReactNode {
-  const trimmed = query.trim();
-  if (!trimmed) return text;
-
-  const parts = text.split(new RegExp(`(${escapeRegExp(trimmed)})`, "gi"));
-  return parts.map((part, index) =>
-    part.toLowerCase() === trimmed.toLowerCase() ? (
-      <mark
-        key={`${part}-${index}`}
-        className="rounded-sm bg-[#c2a44d]/20 px-0.5 font-semibold text-[#c2a44d]"
-      >
-        {part}
-      </mark>
-    ) : (
-      <span key={`${part}-${index}`}>{part}</span>
-    ),
-  );
-}
-
-function rawConversationId(item: HistoryItem | SearchItem) {
+function rawConversationId(item: HistoryItem | SearchConversationItem) {
   return item.conversation_id ?? item.id;
+}
+
+function searchResultKey(item: SearchItem) {
+  return item.type === "asset_rollup"
+    ? `asset_rollup:${item.symbol}`
+    : `conversation:${item.id}`;
 }
 
 function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
   const base =
-    "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60 active:scale-[0.98]";
+    "min-h-11 shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60 active:scale-[0.98]";
   if (!selected) {
     return `${base} border-black/8 text-black/45 hover:bg-black/[0.03] focus-visible:ring-black/15 dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.04] dark:focus-visible:ring-white/15`;
   }
@@ -182,6 +239,8 @@ function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
 export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
+  onRunFresh,
+  turnInFlight = false,
   activeConversationId,
   isGuest = false,
   groundedDiscoveryAvailable = true,
@@ -202,6 +261,9 @@ export default function ChatCommandPalette({
   const [isSearching, setIsSearching] = useState(false);
   const [isLedgerLoading, setIsLedgerLoading] = useState(false);
   const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const [readError, setReadError] = useState<SearchReadError>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [previewItem, setPreviewItem] =
     useState<CommandPaletteDisplayItem | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -210,37 +272,131 @@ export default function ChatCommandPalette({
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<CommandPaletteDisplayItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [decisionDraft, setDecisionDraft] = useState<DecisionDraft | null>(
+    null,
+  );
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
+  const [decisionSaveFailed, setDecisionSaveFailed] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyRequestIdRef = useRef(0);
+  const ledgerBrowseRequestIdRef = useRef(0);
+  const searchRequestIdRef = useRef(0);
+  const canonicalMutationIdRef = useRef(0);
+  const searchSignatureRef = useRef(RECENTS_SEARCH_SIGNATURE);
+  const isRecentsMode =
+    query.trim() === "" &&
+    !isLedgerMode &&
+    decisionStateFilter === null;
+  const dossierCopy = useMemo(
+    () => ({
+      decisionStateLabel: (state: string) =>
+        t(
+          `chat.result_card.decision_states.${state}`,
+          commandPaletteDecisionStateFallback(state),
+        ),
+      decisionAttribution: (state: string, run: string) =>
+        t("command_palette.dossier_values.decision_on", {
+          state,
+          run,
+          defaultValue: `${state} · on ${run}`,
+        }),
+      runCountLabel: (count: number) =>
+        t("command_palette.dossier_values.run_count", {
+          count,
+          defaultValue: `${count} ${count === 1 ? "run" : "runs"}`,
+        }),
+      strategyFamilyLabel: (family: string) =>
+        t(
+          `command_palette.dossier_values.strategy_families.${family}`,
+          t(
+            "command_palette.dossier_values.strategy_families.unknown",
+            "Strategy",
+          ),
+        ),
+      dateLabel: (value: string) =>
+        formatDossierDate(
+          value,
+          i18n.resolvedLanguage ?? i18n.language ?? "en",
+        ),
+      nudgeLabel: (nudge: string) =>
+        t(
+          `command_palette.dossier_values.nudges.${nudge}`,
+          t("command_palette.dossier_values.nudges.unknown", "Next step saved"),
+        ),
+      metricLabel: (id: string, fallback: string) =>
+        t(`command_palette.metric_labels.${id}`, fallback),
+    }),
+    [i18n.language, i18n.resolvedLanguage, t],
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
     const saved = window.localStorage.getItem("argus:command_palette_layout");
-    if (saved === "expanded" || saved === "collapsed") setLayoutMode(saved);
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      setLayoutMode("expanded");
+    } else if (saved === "expanded" || saved === "collapsed") {
+      setLayoutMode(saved);
+    }
   }, []);
 
   useEffect(() => {
+    if (
+      !isRecentsMode ||
+      searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE
+    ) {
+      return;
+    }
+    const requestId = ++historyRequestIdRef.current;
+    const capturedSignature = RECENTS_SEARCH_SIGNATURE;
     setIsColdStartLoading(true);
-    listHistory({ limit: 50 })
-      .then(({ items }) => {
-        setRecentItems(items.filter((item) => item.type === "chat"));
-      })
-      .catch(() => setRecentItems([]))
-      .finally(() => setIsColdStartLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (isGuest) return;
-    searchGlobal({ q: "", limit: 100, includeLedgerGroups: true })
-      .then(({ ledger_groups }) => {
-        setLedgerGroups(ledger_groups ?? []);
-      })
-      .catch(() => setLedgerGroups([]));
-  }, [isGuest]);
+    setReadError(null);
+    const isCurrent = () =>
+      commandPaletteRequestIsCurrent({
+        capturedSignature,
+        capturedRequestId: requestId,
+        currentSignature: searchSignatureRef.current,
+        currentRequestId: historyRequestIdRef.current,
+      });
+    void (async () => {
+      try {
+        const { items } = await listHistory({ limit: 50 });
+        if (!isCurrent()) return;
+        const visibleRecents = items.filter((item) => item.type === "chat");
+        const response = await loadCommandPaletteRecentRecall({
+          recentItems: visibleRecents,
+          fetchRecall: searchGlobal,
+          isCurrent,
+        });
+        if (!response || !isCurrent()) return;
+        setRecentItems(response.recentItems);
+        setSearchResults(response.items);
+        setSearchNextCursor(null);
+        setLedgerGroups(isGuest ? [] : (response.ledger_groups ?? []));
+        setReadError(null);
+      } catch {
+        if (!isCurrent()) return;
+        setSearchResults([]);
+        setLedgerGroups([]);
+        setReadError("history");
+      } finally {
+        if (requestId === historyRequestIdRef.current) {
+          setIsColdStartLoading(false);
+        }
+      }
+    })();
+  }, [isGuest, isRecentsMode, retryNonce]);
 
   const clearSearchAndLedger = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE) {
+      historyRequestIdRef.current += 1;
+    }
+    searchSignatureRef.current = RECENTS_SEARCH_SIGNATURE;
+    ledgerBrowseRequestIdRef.current += 1;
+    searchRequestIdRef.current += 1;
+    setLedgerGroups([]);
     setQuery("");
     setIsLedgerMode(false);
     setDecisionStateFilter(null);
@@ -249,17 +405,39 @@ export default function ChatCommandPalette({
     setPreviewItem(null);
     setIsSearching(false);
     setIsLedgerLoading(false);
+    setIsLoadingMoreSearch(false);
+    setLoadMoreFailed(false);
+    setReadError(null);
   }, []);
 
   const loadLedgerBrowse = useCallback(
     async (nextDecisionState: DecisionState | null) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      const capturedSignature = JSON.stringify([
+        "",
+        true,
+        nextDecisionState,
+      ]);
+      searchSignatureRef.current = capturedSignature;
+      searchRequestIdRef.current += 1;
+      setLedgerGroups([]);
       setQuery("");
       setIsLedgerMode(true);
       setDecisionStateFilter(nextDecisionState);
       setPreviewItem(null);
       setIsSearching(false);
       setIsLedgerLoading(true);
+      setIsLoadingMoreSearch(false);
+      setLoadMoreFailed(false);
+      setReadError(null);
+      const requestId = ++ledgerBrowseRequestIdRef.current;
+      const isCurrent = () =>
+        commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId: requestId,
+          currentSignature: searchSignatureRef.current,
+          currentRequestId: ledgerBrowseRequestIdRef.current,
+        });
       try {
         const { items, next_cursor, ledger_groups } = await searchGlobal({
           q: "",
@@ -267,14 +445,18 @@ export default function ChatCommandPalette({
           decisionState: nextDecisionState,
           includeLedgerGroups: true,
         });
+        if (!isCurrent()) return;
         setSearchResults(items);
         setSearchNextCursor(next_cursor);
         setLedgerGroups(ledger_groups ?? []);
       } catch {
-        setSearchResults([]);
-        setSearchNextCursor(null);
+        if (isCurrent()) {
+          setReadError("ledger");
+        }
       } finally {
-        setIsLedgerLoading(false);
+        if (isCurrent()) {
+          setIsLedgerLoading(false);
+        }
       }
     },
     [],
@@ -284,51 +466,131 @@ export default function ChatCommandPalette({
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
+    const capturedSignature = JSON.stringify([
+      trimmed,
+      isLedgerMode,
+      decisionStateFilter,
+    ]);
+    searchSignatureRef.current = capturedSignature;
+    setIsLoadingMoreSearch(false);
+    setLoadMoreFailed(false);
     setPreviewItem(null);
     if (!trimmed) {
+      searchRequestIdRef.current += 1;
       if (!isLedgerMode) {
         setSearchResults([]);
         setSearchNextCursor(null);
       }
       setIsSearching(false);
+      if (!isLedgerMode) setReadError(null);
+      return;
+    }
+    if (!searchQueryIsIndexable(trimmed)) {
+      searchRequestIdRef.current += 1;
+      setSearchResults([]);
+      setSearchNextCursor(null);
+      setIsSearching(false);
+      setReadError(null);
       return;
     }
 
     setIsSearching(true);
+    setReadError(null);
     debounceRef.current = setTimeout(() => {
-      searchGlobal({ q: trimmed, limit: 30 })
-        .then(({ items, next_cursor }) => {
+      const requestId = ++searchRequestIdRef.current;
+      const isCurrent = () =>
+        commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId: requestId,
+          currentSignature: searchSignatureRef.current,
+          currentRequestId: searchRequestIdRef.current,
+        });
+      searchGlobal({
+        q: trimmed,
+        limit: 30,
+        includeLedgerGroups: true,
+      })
+        .then(({ items, next_cursor, ledger_groups }) => {
+          if (!isCurrent()) return;
           setSearchResults(items);
           setSearchNextCursor(next_cursor);
+          setLedgerGroups(ledger_groups ?? []);
         })
         .catch(() => {
-          setSearchResults([]);
-          setSearchNextCursor(null);
+          if (isCurrent()) {
+            setReadError("search");
+          }
         })
-        .finally(() => setIsSearching(false));
-    }, 200);
+        .finally(() => {
+          if (isCurrent()) {
+            setIsSearching(false);
+          }
+        });
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [isLedgerMode, query]);
+  }, [decisionStateFilter, isLedgerMode, query, retryNonce]);
 
   const isFiltering = query.trim().length > 0;
+  const isWaitingForIndexableQuery =
+    isFiltering && !searchQueryIsIndexable(query);
   const isResultMode = isFiltering || isLedgerMode;
-  const displayItems = useMemo(() => {
-    const items = isResultMode
-      ? searchResults.map((item) =>
-          commandPaletteItemFromSearch(item, {
+  const assetRollup = useMemo(
+    () =>
+      isFiltering
+        ? (searchResults.find(
+            (item): item is SearchAssetRollupItem =>
+              item.type === "asset_rollup",
+          ) ?? null)
+        : null,
+    [isFiltering, searchResults],
+  );
+  const assetRollupDisplay = useMemo(
+    () =>
+      assetRollup
+        ? commandPaletteAssetRollupFromSearch(assetRollup, {
+            heading: t(
+              "command_palette.asset_rollup.heading",
+              "Your history with this asset",
+            ),
+            runsInvolving: (count, symbol) =>
+              t("command_palette.asset_rollup.runs_involving", {
+                count,
+                symbol,
+                defaultValue: `${count} ${
+                  count === 1 ? "run" : "runs"
+                } involving ${symbol}`,
+              }),
             decisionStateLabel: (state) =>
               t(
                 `chat.result_card.decision_states.${state}`,
                 commandPaletteDecisionStateFallback(state),
               ),
-            metricLabel: (id, fallback) =>
-              t(`command_palette.metric_labels.${id}`, fallback),
-          }),
-        )
-      : recentItems.map(commandPaletteItemFromHistory);
+            dateLabel: (value) =>
+              formatDossierDate(
+                value,
+                i18n.resolvedLanguage ?? i18n.language ?? "en",
+              ),
+            lastTouched: (date) =>
+              t("command_palette.asset_rollup.last_touched", {
+                date,
+                defaultValue: `Last touched ${date}`,
+              }),
+          })
+        : null,
+    [assetRollup, i18n.language, i18n.resolvedLanguage, t],
+  );
+  const displayItems = useMemo(() => {
+    const items = isResultMode
+      ? searchResults
+          .filter(isSearchConversationItem)
+          .map((item) => commandPaletteItemFromSearch(item, dossierCopy))
+      : commandPaletteItemsFromHistory(
+          recentItems,
+          searchResults.filter(isSearchConversationItem),
+        );
     return items
       .filter((item): item is CommandPaletteDisplayItem => Boolean(item))
       .map((item) =>
@@ -341,7 +603,7 @@ export default function ChatCommandPalette({
     isResultMode,
     recentItems,
     searchResults,
-    t,
+    dossierCopy,
   ]);
   const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
@@ -361,21 +623,20 @@ export default function ChatCommandPalette({
     [displayItems, visibleLedgerGroups],
   );
   const groupedItems = isLedgerMode ? ledgerGroupedItems : dateGroupedItems;
-  const selectedPreview = commandPaletteSelectedPreview(previewItem, displayItems);
+  const keyboardItems = useMemo(
+    () => commandPaletteItemsInRenderedOrder(groupedItems),
+    [groupedItems],
+  );
+  const selectedPreview = commandPaletteSelectedRenderedPreview(
+    previewItem,
+    groupedItems,
+  );
   const selectedPreviewFields = useMemo(
     () =>
       selectedPreview
-        ? commandPalettePreviewFields(selectedPreview, {
-            decisionStateLabel: (state) =>
-              t(
-                `chat.result_card.decision_states.${state}`,
-                commandPaletteDecisionStateFallback(state),
-              ),
-            metricLabel: (id, fallback) =>
-              t(`command_palette.metric_labels.${id}`, fallback),
-          })
+        ? commandPalettePreviewFields(selectedPreview, dossierCopy)
         : [],
-    [selectedPreview, t],
+    [dossierCopy, selectedPreview],
   );
   const selectedPreviewStatusLabelKey = selectedPreview
     ? commandPaletteStatusLabelKey(selectedPreview)
@@ -383,6 +644,148 @@ export default function ChatCommandPalette({
   const selectedPreviewStatusFallback = selectedPreview
     ? commandPaletteStatusFallback(selectedPreview)
     : null;
+  const selectedRunFreshAction = selectedPreview?.actions.find(
+    (action): action is RunFreshAction => action.type === "run_fresh",
+  );
+  const selectedDecisionAction = selectedPreview?.actions.find(
+    (action): action is DecisionAction => action.type === "decision",
+  );
+  const selectedNavigationDisabled =
+    commandPaletteConversationNavigationDisabled({
+      turnInFlight,
+      activeConversationId,
+      targetConversationId: selectedPreview?.conversationId ?? null,
+    });
+
+  useEffect(() => {
+    setDecisionDraft(null);
+    setDecisionSaveFailed(false);
+  }, [
+    selectedPreview?.conversationId,
+    selectedDecisionAction?.evidence_artifact_id,
+  ]);
+
+  const refreshCanonicalSearch = useCallback(
+    async (capturedSignature: string, mutationId: number) => {
+      const [currentQuery, currentLedgerMode, currentDecisionState] =
+        JSON.parse(capturedSignature) as [
+          string,
+          boolean,
+          DecisionState | null,
+        ];
+      setIsLoadingMoreSearch(false);
+      setLoadMoreFailed(false);
+      setIsLedgerLoading(false);
+      historyRequestIdRef.current += 1;
+      ledgerBrowseRequestIdRef.current += 1;
+      const requestId = ++searchRequestIdRef.current;
+      const isStale = () =>
+        mutationId !== canonicalMutationIdRef.current ||
+        requestId !== searchRequestIdRef.current ||
+        capturedSignature !== searchSignatureRef.current;
+      const response =
+        currentQuery === "" && !currentLedgerMode
+          ? await loadCommandPaletteRecentRecall({
+              recentItems,
+              fetchRecall: searchGlobal,
+              isCurrent: () => !isStale(),
+            })
+          : await searchGlobal({
+              q: currentQuery,
+              limit: commandPaletteCanonicalRecallLimit(
+                currentQuery,
+                currentLedgerMode,
+              ),
+              decisionState: currentLedgerMode ? currentDecisionState : null,
+              includeLedgerGroups: true,
+            });
+      if (!response || isStale()) return;
+      if (isRecentRecallResponse(response)) {
+        setRecentItems((current) =>
+          retainRecalledRecentItems(
+            current,
+            response.recalledConversationIds,
+          ),
+        );
+      }
+      setSearchResults(response.items);
+      setSearchNextCursor(response.next_cursor);
+      setLedgerGroups(
+        currentQuery === "" && !currentLedgerMode && isGuest
+          ? []
+          : (response.ledger_groups ?? []),
+      );
+      setReadError(null);
+    },
+    [isGuest, recentItems],
+  );
+
+  const refreshAfterCanonicalMutation = useCallback(
+    async (mutationId: number) => {
+      const currentSignature = searchSignatureRef.current;
+      const [currentQuery, currentLedgerMode] = JSON.parse(
+        currentSignature,
+      ) as [
+        string,
+        boolean,
+        DecisionState | null,
+      ];
+      try {
+        await refreshCanonicalSearch(currentSignature, mutationId);
+      } catch {
+        if (
+          mutationId === canonicalMutationIdRef.current &&
+          currentSignature === searchSignatureRef.current
+        ) {
+          setReadError(
+            currentLedgerMode
+              ? "ledger"
+              : currentQuery
+                ? "search"
+                : "history",
+          );
+        }
+      }
+    },
+    [refreshCanonicalSearch],
+  );
+
+  const saveDecision = useCallback(
+    async (action: DecisionAction) => {
+      if (!decisionDraft || isSavingDecision) return;
+      if (decisionDraft.artifactId !== action.evidence_artifact_id) return;
+      const mutationId = ++canonicalMutationIdRef.current;
+      setIsSavingDecision(true);
+      setDecisionSaveFailed(false);
+      try {
+        try {
+          await createEvidenceDecision(action.evidence_artifact_id, {
+            decision_state: decisionDraft.state,
+            note: decisionDraft.note,
+          });
+        } catch {
+          if (mutationId === canonicalMutationIdRef.current) {
+            setDecisionSaveFailed(true);
+          }
+          return;
+        }
+        if (mutationId !== canonicalMutationIdRef.current) return;
+        setDecisionDraft(null);
+        onMutated?.();
+        await refreshAfterCanonicalMutation(mutationId);
+      } finally {
+        if (mutationId === canonicalMutationIdRef.current) {
+          setIsSavingDecision(false);
+        }
+      }
+    },
+    [
+      decisionDraft,
+      isSavingDecision,
+      onMutated,
+      refreshAfterCanonicalMutation,
+    ],
+  );
 
   const updateLocalTitle = useCallback(
     (conversationId: string, title: string) => {
@@ -395,6 +798,7 @@ export default function ChatCommandPalette({
       );
       setSearchResults((current) =>
         current.map((item) =>
+          isSearchConversationItem(item) &&
           rawConversationId(item) === conversationId
             ? { ...item, title }
             : item,
@@ -414,7 +818,11 @@ export default function ChatCommandPalette({
       current.filter((item) => rawConversationId(item) !== conversationId),
     );
     setSearchResults((current) =>
-      current.filter((item) => rawConversationId(item) !== conversationId),
+      current.filter(
+        (item) =>
+          !isSearchConversationItem(item) ||
+          rawConversationId(item) !== conversationId,
+      ),
     );
     setPreviewItem((current) =>
       current?.conversationId === conversationId ? null : current,
@@ -423,10 +831,18 @@ export default function ChatCommandPalette({
 
   const loadMoreSearch = async () => {
     const trimmed = query.trim();
-    if ((!trimmed && !isLedgerMode) || !searchNextCursor || isLoadingMoreSearch)
+    if (
+      (!trimmed && !isLedgerMode) ||
+      !searchNextCursor ||
+      isLoadingMoreSearch ||
+      isSavingDecision
+    )
       return;
 
+    const capturedSignature = searchSignatureRef.current;
+    const requestId = ++searchRequestIdRef.current;
     setIsLoadingMoreSearch(true);
+    setLoadMoreFailed(false);
     try {
       const { items, next_cursor } = await searchGlobal({
         q: trimmed,
@@ -435,11 +851,21 @@ export default function ChatCommandPalette({
         decisionState: isLedgerMode ? decisionStateFilter : null,
         includeLedgerGroups: isLedgerMode,
       });
+      if (
+        !commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId: requestId,
+          currentSignature: searchSignatureRef.current,
+          currentRequestId: searchRequestIdRef.current,
+        })
+      ) {
+        return;
+      }
       setSearchResults((current) => {
-        const seen = new Set(current.map((item) => `${item.type}:${item.id}`));
+        const seen = new Set(current.map(searchResultKey));
         const next = [...current];
         for (const item of items) {
-          const key = `${item.type}:${item.id}`;
+          const key = searchResultKey(item);
           if (!seen.has(key)) {
             seen.add(key);
             next.push(item);
@@ -448,34 +874,71 @@ export default function ChatCommandPalette({
         return next;
       });
       setSearchNextCursor(next_cursor);
+    } catch {
+      if (
+        commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId: requestId,
+          currentSignature: searchSignatureRef.current,
+          currentRequestId: searchRequestIdRef.current,
+        })
+      ) {
+        setLoadMoreFailed(true);
+      }
     } finally {
-      setIsLoadingMoreSearch(false);
+      if (
+        commandPaletteRequestIsCurrent({
+          capturedSignature,
+          capturedRequestId: requestId,
+          currentSignature: searchSignatureRef.current,
+          currentRequestId: searchRequestIdRef.current,
+        })
+      ) {
+        setIsLoadingMoreSearch(false);
+      }
     }
   };
 
   const openSourceConversation = useCallback(
-    (item: CommandPaletteDisplayItem) => {
+    (item: CommandPaletteDisplayItem, openAtLeftOff = false) => {
       if (!item.conversationId) return;
-      onOpenConversation(item.conversationId);
+      if (
+        commandPaletteConversationNavigationDisabled({
+          turnInFlight,
+          activeConversationId,
+          targetConversationId: item.conversationId,
+        })
+      ) {
+        return;
+      }
+      const messageId = commandPaletteOpenMessageId(item, openAtLeftOff);
+      onOpenConversation(
+        item.conversationId,
+        messageId ?? undefined,
+        openAtLeftOff,
+      );
       onClose();
     },
-    [onClose, onOpenConversation],
+    [activeConversationId, onClose, onOpenConversation, turnInFlight],
   );
 
   const activateItem = useCallback(
-    (item: CommandPaletteDisplayItem) => {
-      openSourceConversation(item);
+    (item: CommandPaletteDisplayItem, openAtLeftOff = false) => {
+      openSourceConversation(item, openAtLeftOff);
     },
     [openSourceConversation],
   );
 
-  const startRename = useCallback((item: CommandPaletteDisplayItem) => {
-    if (!canManageConversation) return;
-    if (!item.canManageConversation || !item.conversationId) return;
-    setEditingId(item.conversationId);
-    setEditingTitle(item.title.slice(0, 80));
-    setPreviewItem(item);
-  }, [canManageConversation]);
+  const startRename = useCallback(
+    (item: CommandPaletteDisplayItem) => {
+      if (!canManageConversation) return;
+      if (!item.canManageConversation || !item.conversationId) return;
+      setEditingId(item.conversationId);
+      setEditingTitle(item.title.slice(0, 80));
+      setPreviewItem(item);
+    },
+    [canManageConversation],
+  );
 
   const cancelRename = useCallback(() => {
     setEditingId(null);
@@ -532,11 +995,14 @@ export default function ChatCommandPalette({
     ],
   );
 
-  const handleDelete = useCallback((item: CommandPaletteDisplayItem) => {
-    if (!canManageConversation) return;
-    if (!item.canManageConversation) return;
-    setPendingDeleteItem(item);
-  }, [canManageConversation]);
+  const handleDelete = useCallback(
+    (item: CommandPaletteDisplayItem) => {
+      if (!canManageConversation) return;
+      if (!item.canManageConversation) return;
+      setPendingDeleteItem(item);
+    },
+    [canManageConversation],
+  );
 
   const handleCancelDelete = useCallback(() => {
     if (!isDeleting) setPendingDeleteItem(null);
@@ -547,6 +1013,7 @@ export default function ChatCommandPalette({
     if (!pendingDeleteItem || isDeleting) return;
     if (!pendingDeleteItem.conversationId) return;
 
+    const mutationId = ++canonicalMutationIdRef.current;
     setIsDeleting(true);
     removeLocalConversation(pendingDeleteItem.conversationId);
     onConversationRemoved?.(pendingDeleteItem.conversationId);
@@ -554,6 +1021,7 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
+      await refreshAfterCanonicalMutation(mutationId);
     } finally {
       setIsDeleting(false);
     }
@@ -563,6 +1031,7 @@ export default function ChatCommandPalette({
     onConversationRemoved,
     onMutated,
     pendingDeleteItem,
+    refreshAfterCanonicalMutation,
     removeLocalConversation,
   ]);
 
@@ -577,14 +1046,42 @@ export default function ChatCommandPalette({
         onClose();
         return;
       }
-      if (!editingId && event.key === "Enter" && selectedPreview) {
+      const action = commandPaletteKeyboardAction({
+        key: event.key,
+        itemCount: keyboardItems.length,
+        hasSelection: Boolean(selectedPreview),
+        targetIsEditable: isEditableKeyboardTarget(event.target),
+        targetIsSearchInput: event.target === inputRef.current,
+        isEditing: Boolean(editingId),
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+      });
+      if (action.type === "select") {
         event.preventDefault();
-        activateItem(selectedPreview);
+        const item = keyboardItems[action.index];
+        setPreviewItem(item);
+        document
+          .querySelector<HTMLElement>(
+            `[data-palette-row-index="${action.index}"]`,
+          )
+          ?.focus();
+        return;
+      }
+      if (action.type === "open" && selectedPreview) {
+        event.preventDefault();
+        activateItem(selectedPreview, action.openAtLeftOff);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [activateItem, cancelRename, editingId, onClose, selectedPreview]);
+  }, [
+    activateItem,
+    cancelRename,
+    editingId,
+    keyboardItems,
+    onClose,
+    selectedPreview,
+  ]);
 
   const toggleLayout = () => {
     setLayoutMode((current) => {
@@ -621,8 +1118,24 @@ export default function ChatCommandPalette({
             ref={inputRef}
             type="text"
             value={query}
+            maxLength={512}
             onChange={(event) => {
-              setQuery(event.target.value);
+              const nextQuery = event.target.value;
+              const nextSignature = JSON.stringify([
+                nextQuery.trim(),
+                false,
+                null,
+              ]);
+              if (nextSignature !== searchSignatureRef.current) {
+                historyRequestIdRef.current += 1;
+              }
+              searchSignatureRef.current = nextSignature;
+              ledgerBrowseRequestIdRef.current += 1;
+              searchRequestIdRef.current += 1;
+              setLedgerGroups([]);
+              setIsLedgerLoading(false);
+              setIsLoadingMoreSearch(false);
+              setQuery(nextQuery);
               if (isLedgerMode || decisionStateFilter) {
                 setIsLedgerMode(false);
                 setDecisionStateFilter(null);
@@ -630,14 +1143,17 @@ export default function ChatCommandPalette({
                 setSearchNextCursor(null);
               }
             }}
-            placeholder={t("command_palette.search_placeholder", "Search Argus...")}
-            className="w-full bg-transparent font-display text-[15px] font-medium text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
+            placeholder={t(
+              "command_palette.search_placeholder",
+              "Search Argus...",
+            )}
+            className="min-h-11 w-full bg-transparent font-display text-[16px] font-medium text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
           />
           {(query || isLedgerMode) && (
             <button
               type="button"
               onClick={clearSearchAndLedger}
-              className="shrink-0 rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
               aria-label={t("command_palette.clear_search", "Clear search")}
             >
               <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
@@ -714,265 +1230,404 @@ export default function ChatCommandPalette({
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-5 w-5 animate-spin text-black/20 dark:text-white/20" />
               </div>
-            ) : displayItems.length === 0 && !isLedgerMode ? (
+            ) : readError ? (
+              <div
+                className="flex flex-col items-center justify-center px-6 py-20 text-center"
+                role="alert"
+              >
+                <p className="text-[14px] text-black/50 dark:text-white/50">
+                  {t(
+                    "command_palette.read_error",
+                    "Argus couldn’t load these results.",
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (readError === "ledger" && isLedgerMode) {
+                      void loadLedgerBrowse(decisionStateFilter);
+                      return;
+                    }
+                    setRetryNonce((current) => current + 1);
+                  }}
+                  className="mt-3 min-h-11 rounded-full border border-black/10 px-4 text-[13px] font-medium text-black/65 dark:border-white/10 dark:text-white/65"
+                >
+                  {t("command_palette.retry_search", "Try searching again")}
+                </button>
+              </div>
+            ) : displayItems.length === 0 &&
+              !assetRollupDisplay &&
+              !isLedgerMode ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="mb-3 h-8 w-8 text-black/10 dark:text-white/10" />
                 <p className="text-[14px] text-black/30 dark:text-white/30">
                   {isFiltering
-                    ? t("command_palette.no_results", "No results found")
+                    ? t(
+                        isWaitingForIndexableQuery
+                          ? "command_palette.keep_typing"
+                          : "command_palette.no_results",
+                        isWaitingForIndexableQuery
+                          ? "Keep typing"
+                          : "No results found",
+                      )
                     : t(
                         "command_palette.no_conversations",
                         "No conversations yet",
                       )}
                 </p>
+                {isFiltering && (
+                  <p className="mt-2 max-w-xs text-[12px] leading-relaxed text-black/25 dark:text-white/25">
+                    {t(
+                      isWaitingForIndexableQuery
+                        ? "command_palette.keep_typing_detail"
+                        : "command_palette.try_searching",
+                      isWaitingForIndexableQuery
+                        ? "Search starts when one word has at least 3 characters."
+                        : "Try a ticker, phrase, or note you remember.",
+                    )}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-3 p-3">
-                {groupedItems.map((group) => {
+                {assetRollupDisplay && (
+                  <section
+                    className="rounded-[14px] border border-[#5ba897]/20 bg-[#5ba897]/[0.06] px-4 py-3 dark:border-[#7bc1ad]/20 dark:bg-[#7bc1ad]/[0.06]"
+                    aria-label={assetRollupDisplay.heading}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+                          {assetRollupDisplay.heading}
+                        </p>
+                        <p className="mt-1 font-display text-[18px] font-semibold text-black dark:text-white">
+                          {assetRollupDisplay.symbol}
+                        </p>
+                      </div>
+                      <p className="text-right text-[11px] text-black/35 dark:text-white/35">
+                        {assetRollupDisplay.lastTouched}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[13px] text-black/60 dark:text-white/60">
+                      {assetRollupDisplay.runs}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {assetRollupDisplay.decisions.map((decision) => (
+                        <span
+                          key={decision.state}
+                          className="rounded-full border border-black/8 bg-white/55 px-2 py-1 text-[10px] font-semibold text-black/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+                        >
+                          {decision.label}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {groupedItems.map((group, groupIndex) => {
+                  const groupRowStart = groupedItems
+                    .slice(0, groupIndex)
+                    .reduce(
+                      (count, priorGroup) => count + priorGroup.items.length,
+                      0,
+                    );
                   const isLedgerGroup = "decisionState" in group;
                   const groupLabel = isLedgerGroup
                     ? t(
                         `chat.result_card.decision_states.${group.decisionState}`,
-                        commandPaletteDecisionStateFallback(group.decisionState),
+                        commandPaletteDecisionStateFallback(
+                          group.decisionState,
+                        ),
                       )
                     : group.label;
                   return (
-                  <div key={group.id}>
-                    <div className="px-2 pb-1.5 pt-1">
-                      <span className="font-display text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                        {groupLabel}
-                        {isLedgerGroup && (
-                          <span className="ml-1 text-black/30 dark:text-white/30">
-                            {group.count}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    {group.items.length === 0 && isLedgerGroup && group.count === 0 ? (
-                      <p className="px-2 py-2 text-[12px] text-black/30 dark:text-white/30">
-                        {t(
-                          "command_palette.ledger.no_saved_ideas",
-                          "No saved ideas in this state",
-                        )}
-                      </p>
-                    ) : (
-                    group.items.map((item) => {
-                      const isCurrent =
-                        item.type === "chat" &&
-                        activeConversationId === item.conversationId;
-                      const isEditing = editingId === item.conversationId;
-                      const statusLabelKey = commandPaletteStatusLabelKey(item);
-                      const statusFallback = commandPaletteStatusFallback(item);
-                      const handleRowKeyDown = (
-                        event: ReactKeyboardEvent<HTMLDivElement>,
-                      ) => {
-                        if (isEditing) return;
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          activateItem(item);
-                        }
-                      };
-                      return (
-                        <div
-                          key={`${item.source}:${item.id}`}
-                          onClick={() => activateItem(item)}
-                          onKeyDown={handleRowKeyDown}
-                          onMouseEnter={() => setPreviewItem(item)}
-                          onFocus={() => setPreviewItem(item)}
-                          role="button"
-                          tabIndex={0}
-                          className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
-                            selectedPreview?.id === item.id &&
-                            selectedPreview.type === item.type
-                              ? "bg-black/5 dark:bg-white/5"
-                              : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1 pr-24">
-                            <div className="flex items-center gap-2">
-                              {isEditing ? (
-                                <input
-                                  autoFocus
-                                  value={editingTitle}
-                                  maxLength={80}
-                                  onChange={(event) =>
-                                    setEditingTitle(event.target.value)
-                                  }
-                                  onClick={(event) => event.stopPropagation()}
-                                  onFocus={(event) =>
-                                    event.currentTarget.select()
-                                  }
-                                  onBlur={() => {
-                                    void handleRenameSave(item);
-                                  }}
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      void handleRenameSave(item);
-                                    }
-                                    if (event.key === "Escape") {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      cancelRename();
-                                    }
-                                  }}
-                                  className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
-                                  aria-label={t(
-                                    "command_palette.rename_conversation",
-                                    "Rename conversation",
+                    <div key={group.id}>
+                      <div className="px-2 pb-1.5 pt-1">
+                        <span className="font-display text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+                          {groupLabel}
+                          {isLedgerGroup && (
+                            <span className="ml-1 text-black/30 dark:text-white/30">
+                              {group.count}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {group.items.length === 0 &&
+                      isLedgerGroup &&
+                      group.count === 0 ? (
+                        <p className="px-2 py-2 text-[12px] text-black/30 dark:text-white/30">
+                          {t(
+                            "command_palette.ledger.no_saved_ideas",
+                            "No saved ideas in this state",
+                          )}
+                        </p>
+                      ) : (
+                        group.items.map((item, itemIndex) => {
+                          const isCurrent =
+                            (item.type === "chat" ||
+                              item.type === "conversation") &&
+                            activeConversationId === item.conversationId;
+                          const isEditing = editingId === item.conversationId;
+                          const isNavigationDisabled =
+                            commandPaletteConversationNavigationDisabled({
+                              turnInFlight,
+                              activeConversationId,
+                              targetConversationId: item.conversationId,
+                            });
+                          const statusLabelKey =
+                            commandPaletteStatusLabelKey(item);
+                          const statusFallback =
+                            commandPaletteStatusFallback(item);
+                          const rowIndex = groupRowStart + itemIndex;
+                          const handleRowKeyDown = (
+                            event: ReactKeyboardEvent<HTMLDivElement>,
+                          ) => {
+                            if (isEditing) return;
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              activateItem(
+                                item,
+                                event.key === "Enter" &&
+                                  (event.metaKey || event.ctrlKey),
+                              );
+                            }
+                          };
+                          return (
+                            <div
+                              key={`${item.source}:${item.id}`}
+                              data-palette-row-index={rowIndex}
+                              onClick={() => {
+                                if (isNavigationDisabled) {
+                                  setPreviewItem(item);
+                                  setLayoutMode("expanded");
+                                  return;
+                                }
+                                if (
+                                  window.matchMedia("(pointer: coarse)").matches
+                                ) {
+                                  setPreviewItem(item);
+                                  setLayoutMode("expanded");
+                                  return;
+                                }
+                                activateItem(item);
+                              }}
+                              onKeyDown={handleRowKeyDown}
+                              onMouseEnter={() => setPreviewItem(item)}
+                              onFocus={() => setPreviewItem(item)}
+                              role="button"
+                              tabIndex={0}
+                              aria-disabled={isNavigationDisabled}
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
+                                selectedPreview?.id === item.id &&
+                                selectedPreview.type === item.type
+                                  ? "bg-black/5 dark:bg-white/5"
+                                  : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1 pr-24">
+                                <div className="flex items-center gap-2">
+                                  {isEditing ? (
+                                    <input
+                                      autoFocus
+                                      value={editingTitle}
+                                      maxLength={80}
+                                      onChange={(event) =>
+                                        setEditingTitle(event.target.value)
+                                      }
+                                      onClick={(event) =>
+                                        event.stopPropagation()
+                                      }
+                                      onFocus={(event) =>
+                                        event.currentTarget.select()
+                                      }
+                                      onBlur={() => {
+                                        void handleRenameSave(item);
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          void handleRenameSave(item);
+                                        }
+                                        if (event.key === "Escape") {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          cancelRename();
+                                        }
+                                      }}
+                                      className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
+                                      aria-label={t(
+                                        "command_palette.rename_conversation",
+                                        "Rename conversation",
+                                      )}
+                                    />
+                                  ) : (
+                                    <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
+                                      <SearchHighlight
+                                        text={item.title}
+                                        query={query}
+                                      />
+                                    </span>
                                   )}
-                                />
-                              ) : (
-                                <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
-                                  {highlightText(item.title, query)}
-                                </span>
-                              )}
-                              {isCurrent && (
-                                <span className="shrink-0 rounded-full bg-[#5ba897]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5ba897]">
-                                  {t("common.current", "Current")}
-                                </span>
-                              )}
-                              <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
-                                {t(
-                                  commandPaletteTypeLabelKey(item.type),
-                                  commandPaletteTypeFallback(item.type),
+                                  {isCurrent && (
+                                    <span className="shrink-0 rounded-full bg-[#5ba897]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5ba897]">
+                                      {t("common.current", "Current")}
+                                    </span>
+                                  )}
+                                  <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
+                                    {t(
+                                      commandPaletteTypeLabelKey(item.type),
+                                      commandPaletteTypeFallback(item.type),
+                                    )}
+                                  </span>
+                                  {!isCurrent &&
+                                    statusLabelKey &&
+                                    statusFallback && (
+                                      <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
+                                        {t(statusLabelKey, statusFallback)}
+                                      </span>
+                                    )}
+                                </div>
+                                {item.snippet && (
+                                  <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
+                                      <SearchHighlight
+                                        text={item.snippet}
+                                        query={query}
+                                      />
+                                    </span>
+                                    {item.matchCount > 1 && (
+                                      <span className="shrink-0 text-[10px] text-black/30 dark:text-white/30">
+                                        {t("command_palette.match_count", {
+                                          count: item.matchCount,
+                                          defaultValue: `${item.matchCount} matches`,
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
+                                {formatRelativeDate(
+                                  item.updatedAt,
+                                  t,
+                                  i18n.language,
                                 )}
                               </span>
-                              {!isCurrent && statusLabelKey && statusFallback && (
-                                <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
-                                  {t(statusLabelKey, statusFallback)}
-                                </span>
-                              )}
-                            </div>
-                            {item.snippet && (
-                              <span className="mt-0.5 line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
-                                {highlightText(item.snippet, query)}
-                              </span>
-                            )}
-                          </div>
-                          <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
-                            {formatRelativeDate(
-                              item.updatedAt,
-                              t,
-                              i18n.language,
-                            )}
-                          </span>
-                          {!isEditing && item.canManageConversation && (
-                            <div
-                              className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                              data-row-action
-                            >
-                              <Tooltip
-                                content={t("common.rename", "Rename")}
-                                side="top"
-                                delay={120}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    startRename(item);
-                                  }}
-                                  className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label={t(
-                                    "command_palette.rename_conversation",
-                                    "Rename conversation",
-                                  )}
+                              {!isEditing && item.canManageConversation && (
+                                <div
+                                  className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                  data-row-action
                                 >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                              </Tooltip>
-                              <Tooltip
-                                content={t("common.archive", "Archive")}
-                                side="top"
-                                delay={120}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleArchive(item);
-                                  }}
-                                  className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label={t(
-                                    "command_palette.archive_conversation",
-                                    "Archive conversation",
-                                  )}
-                                >
-                                  <Archive className="h-3.5 w-3.5" />
-                                </button>
-                              </Tooltip>
-                              <Tooltip
-                                content={t("common.delete", "Delete")}
-                                side="top"
-                                delay={120}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleDelete(item);
-                                  }}
-                                  className="rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
-                                  aria-label={t(
-                                    "command_palette.delete_conversation",
-                                    "Delete conversation",
-                                  )}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </Tooltip>
-                            </div>
-                          )}
-                          {!isEditing &&
-                            !item.canManageConversation &&
-                            item.conversationId && (
-                              <div
-                                className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                data-row-action
-                              >
-                                <Tooltip
-                                  content={t(
-                                    "command_palette.open_source_conversation",
-                                    "Open source conversation",
-                                  )}
-                                  side="top"
-                                  delay={120}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      openSourceConversation(item);
-                                    }}
-                                    className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                    aria-label={t(
-                                      "command_palette.open_source_conversation",
-                                      "Open source conversation",
-                                    )}
+                                  <Tooltip
+                                    content={t("common.rename", "Rename")}
+                                    side="top"
+                                    delay={120}
                                   >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                  </button>
-                                </Tooltip>
-                              </div>
-                            )}
-                        </div>
-                      );
-                    }))}
-                  </div>
-                );})}
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        startRename(item);
+                                      }}
+                                      className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                      aria-label={t(
+                                        "command_palette.rename_conversation",
+                                        "Rename conversation",
+                                      )}
+                                    >
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip
+                                    content={t("common.archive", "Archive")}
+                                    side="top"
+                                    delay={120}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleArchive(item);
+                                      }}
+                                      className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                      aria-label={t(
+                                        "command_palette.archive_conversation",
+                                        "Archive conversation",
+                                      )}
+                                    >
+                                      <Archive className="h-3.5 w-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip
+                                    content={t("common.delete", "Delete")}
+                                    side="top"
+                                    delay={120}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleDelete(item);
+                                      }}
+                                      className="rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
+                                      aria-label={t(
+                                        "command_palette.delete_conversation",
+                                        "Delete conversation",
+                                      )}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                </div>
+                              )}
+                              {!isEditing &&
+                                !item.canManageConversation &&
+                                item.conversationId && (
+                                  <div
+                                    className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                    data-row-action
+                                  >
+                                    <Tooltip
+                                      content={t(
+                                        "command_palette.open_source_conversation",
+                                        "Open source conversation",
+                                      )}
+                                      side="top"
+                                      delay={120}
+                                    >
+                                      <button
+                                        type="button"
+                                        disabled={isNavigationDisabled}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openSourceConversation(item);
+                                        }}
+                                        className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                        aria-label={t(
+                                          "command_palette.open_source_conversation",
+                                          "Open source conversation",
+                                        )}
+                                      >
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                      </button>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
                 {isResultMode && searchNextCursor && (
-                  <button
-                    type="button"
-                    onClick={() => void loadMoreSearch()}
-                    disabled={isLoadingMoreSearch}
-                    className="mx-2 rounded-[12px] border border-black/10 px-3 py-2 text-[12px] font-medium text-black/60 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
-                  >
-                    {isLoadingMoreSearch
-                      ? t("common.loading")
-                      : t("common.more", "More")}
-                  </button>
+                  <CommandPaletteLoadMoreControl
+                    failed={loadMoreFailed}
+                    loading={isLoadingMoreSearch}
+                    disabled={isLoadingMoreSearch || isSavingDecision}
+                    onLoadMore={() => void loadMoreSearch()}
+                  />
                 )}
               </div>
             )}
@@ -984,8 +1639,10 @@ export default function ChatCommandPalette({
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
-                      {selectedPreview.type === "chat" &&
-                        activeConversationId === selectedPreview.conversationId && (
+                      {(selectedPreview.type === "chat" ||
+                        selectedPreview.type === "conversation") &&
+                        activeConversationId ===
+                          selectedPreview.conversationId && (
                           <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
                             {t("common.current", "Current")}
                           </span>
@@ -998,13 +1655,13 @@ export default function ChatCommandPalette({
                       </span>
                       {selectedPreviewStatusLabelKey &&
                         selectedPreviewStatusFallback && (
-                        <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-                          {t(
-                            selectedPreviewStatusLabelKey,
-                            selectedPreviewStatusFallback,
-                          )}
-                        </span>
-                      )}
+                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                            {t(
+                              selectedPreviewStatusLabelKey,
+                              selectedPreviewStatusFallback,
+                            )}
+                          </span>
+                        )}
                     </div>
                     <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
                       {selectedPreview.title}
@@ -1050,17 +1707,163 @@ export default function ChatCommandPalette({
                     ) : (
                       <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
                         {selectedPreview.snippet ||
-                        t(
-                          "command_palette.preview_empty",
-                          "Select a result to preview its details.",
-                        )}
+                          t(
+                            "command_palette.preview_empty",
+                            "Select a result to preview its details.",
+                          )}
                       </p>
                     )}
                   </div>
+                  {(selectedRunFreshAction || selectedDecisionAction) && (
+                    <div className="mt-4 shrink-0 border-t border-black/5 pt-4 dark:border-white/5">
+                      <div className="flex flex-wrap gap-2">
+                        {selectedRunFreshAction &&
+                          selectedPreview.conversationId && (
+                            <button
+                              type="button"
+                              disabled={turnInFlight}
+                              onClick={() =>
+                                void onRunFresh(
+                                  selectedPreview.conversationId!,
+                                  selectedRunFreshAction.send_text,
+                                )
+                              }
+                              className="inline-flex min-h-11 items-center rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
+                            >
+                              {t(
+                                "command_palette.run_fresh",
+                                "Run it fresh · {{run}}",
+                                { run: selectedRunFreshAction.run_label },
+                              )}
+                            </button>
+                          )}
+                        {selectedDecisionAction && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDecisionSaveFailed(false);
+                              setDecisionDraft({
+                                artifactId:
+                                  selectedDecisionAction.evidence_artifact_id,
+                                state:
+                                  selectedDecisionAction.decision_state ??
+                                  "watching",
+                                note: selectedDecisionAction.note ?? "",
+                              });
+                            }}
+                            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 px-4 text-[13px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/65 dark:hover:bg-white/[0.05]"
+                          >
+                            <FileText className="h-4 w-4" />
+                            {commandPaletteDecisionVerb(
+                              selectedDecisionAction,
+                            ) === "add"
+                              ? t(
+                                  "command_palette.add_decision",
+                                  "Add decision · {{run}}",
+                                  { run: selectedDecisionAction.run_label },
+                                )
+                              : t(
+                                  "command_palette.change_decision",
+                                  "Change decision · {{run}}",
+                                  { run: selectedDecisionAction.run_label },
+                                )}
+                          </button>
+                        )}
+                      </div>
+                      {selectedDecisionAction &&
+                        decisionDraft?.artifactId ===
+                          selectedDecisionAction.evidence_artifact_id && (
+                          <div className="mt-3 rounded-[14px] border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.025]">
+                            <div className="flex flex-wrap gap-2">
+                              {DECISION_STATES.map((state) => (
+                                <button
+                                  key={state}
+                                  type="button"
+                                  onClick={() => {
+                                    setDecisionSaveFailed(false);
+                                    setDecisionDraft((current) =>
+                                      current ? { ...current, state } : current,
+                                    );
+                                  }}
+                                  className={ledgerDecisionChipClassName(
+                                    state,
+                                    decisionDraft.state === state,
+                                  )}
+                                >
+                                  {t(
+                                    `chat.result_card.decision_states.${state}`,
+                                    commandPaletteDecisionStateFallback(state),
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              value={decisionDraft.note}
+                              maxLength={2000}
+                              onChange={(event) => {
+                                setDecisionSaveFailed(false);
+                                setDecisionDraft((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        note: event.target.value,
+                                      }
+                                    : current,
+                                );
+                              }}
+                              placeholder={t(
+                                "chat.result_card.decision_note_placeholder",
+                                "Optional note for future you",
+                              )}
+                              className="mt-3 min-h-24 w-full resize-y rounded-[12px] border border-black/10 bg-white px-3 py-2 text-[16px] leading-relaxed text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/25"
+                            />
+                            {decisionSaveFailed && (
+                              <p className="mt-2 text-[12px] text-[#d66d75]">
+                                {t(
+                                  "chat.error_generic",
+                                  "Something went wrong. Please try again.",
+                                )}
+                              </p>
+                            )}
+                            <div className="mt-3 flex justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={isSavingDecision}
+                                onClick={() => setDecisionDraft(null)}
+                                className="min-h-11 rounded-full border border-black/10 px-4 text-[13px] font-medium text-black/55 dark:border-white/10 dark:text-white/55"
+                              >
+                                {t("common.cancel", "Cancel")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSavingDecision}
+                                onClick={() =>
+                                  void saveDecision(selectedDecisionAction)
+                                }
+                                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white disabled:opacity-55 dark:bg-white dark:text-[#191c1f]"
+                              >
+                                {isSavingDecision ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
+                                {t(
+                                  "command_palette.save_decision",
+                                  "Save decision",
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => openSourceConversation(selectedPreview)}
-                    disabled={!selectedPreview.conversationId}
+                    disabled={
+                      !selectedPreview.conversationId ||
+                      selectedNavigationDisabled
+                    }
                     title={
                       selectedPreview.conversationId
                         ? undefined
@@ -1069,7 +1872,7 @@ export default function ChatCommandPalette({
                             "No source conversation",
                           )
                     }
-                    className="mt-auto flex shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                    className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
                   >
                     <span>
                       {selectedPreview.conversationId
@@ -1084,6 +1887,17 @@ export default function ChatCommandPalette({
                     </span>
                     <ChevronRight className="h-4 w-4" />
                   </button>
+                  <p className="mt-1 text-[10px] text-black/25 dark:text-white/25">
+                    {t(
+                      "command_palette.open_at_match",
+                      "Enter opens the match",
+                    )}{" "}
+                    ·{" "}
+                    {t(
+                      "command_palette.open_at_left_off",
+                      "⌘/Ctrl+Enter opens where you left off",
+                    )}
+                  </p>
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center">

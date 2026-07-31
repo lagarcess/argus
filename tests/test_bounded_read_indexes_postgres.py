@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from argus.domain.search_sql_text import normalizer_expression
+from psycopg import sql
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 pytestmark = pytest.mark.skipif(
@@ -32,6 +34,13 @@ SEARCH_EXPECTED_INDEXES = {
     "idx_backtest_runs_search_norm_trgm",
     "idx_ideas_search_norm_trgm",
     "idx_evidence_search_norm_trgm",
+    "idx_messages_user_content_norm_trgm",
+    "idx_decision_notes_recall_norm_trgm",
+    "idx_backtest_runs_owner_symbol_1_prefix",
+    "idx_backtest_runs_owner_symbol_2_prefix",
+    "idx_backtest_runs_owner_symbol_3_prefix",
+    "idx_backtest_runs_owner_symbol_4_prefix",
+    "idx_backtest_runs_owner_symbol_5_prefix",
 }
 
 
@@ -167,6 +176,7 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
     owner_conversation_id = uuid4()
     other_conversation_id = uuid4()
     owner_message_id = uuid4()
+    owner_recall_message_id = uuid4()
     other_message_id = uuid4()
     with psycopg.connect(DSN, autocommit=True) as connection:
         with connection.cursor() as cursor:
@@ -198,10 +208,14 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
                         %s, %s, %s, 'assistant', 'Fixture',
                         '{"result_card":{"status":"complete"}}'::jsonb
                     ),
+                    (%s, %s, %s, 'user', 'Copper lantern fixture', '{}'::jsonb),
                     (%s, %s, %s, 'assistant', 'Fixture', '{}'::jsonb)
                 """,
                 (
                     owner_message_id,
+                    owner_conversation_id,
+                    owner_id,
+                    owner_recall_message_id,
                     owner_conversation_id,
                     owner_id,
                     other_message_id,
@@ -227,6 +241,7 @@ def bounded_index_rows() -> Iterator[dict[str, Any]]:
             "other_id": other_id,
             "owner_conversation_id": owner_conversation_id,
             "owner_message_id": owner_message_id,
+            "owner_recall_message_id": owner_recall_message_id,
             "owner_spine": owner_spine,
             "other_spine": other_spine,
         }
@@ -411,6 +426,35 @@ def test_current_read_predicates_select_each_forward_index(
                     """,
                     (owner_id, conversation_id),
                 ),
+                "idx_messages_user_content_norm_trgm": (
+                    sql.SQL(
+                        """
+                        explain (format json)
+                        select id
+                        from public.messages
+                        where role = 'user'
+                          and {} like %s
+                        limit 21
+                        """
+                    ).format(normalizer_expression(sql.Identifier("content"))),
+                    ("%copper%",),
+                ),
+                "idx_decision_notes_recall_norm_trgm": (
+                    sql.SQL(
+                        """
+                        explain (format json)
+                        select id
+                        from public.decision_notes
+                        where {} like %s
+                        limit 21
+                        """
+                    ).format(
+                        normalizer_expression(
+                            sql.SQL("decision_state || ' ' || coalesce(note, '')")
+                        )
+                    ),
+                    ("%fixture%",),
+                ),
                 "idx_decision_notes_idea_latest": (
                     """
                     explain (format json)
@@ -464,3 +508,28 @@ def test_current_read_predicates_select_each_forward_index(
                 cursor.execute(query, params)
                 plan = cursor.fetchone()[0][0]["Plan"]
                 assert expected_index in _plan_index_names(plan)
+
+            for slot in range(1, 6):
+                cursor.execute(
+                    f"""
+                    explain (format json)
+                    select id
+                    from public.backtest_runs
+                    where user_id = %s
+                      and status = 'completed'
+                      and symbols[{slot}] is not null
+                      and btrim(
+                          public.argus_search_symbol_casefold(symbols[{slot}])
+                      ) collate "C" >= %s collate "C"
+                      and btrim(
+                          public.argus_search_symbol_casefold(symbols[{slot}])
+                      ) collate "C" < %s collate "C"
+                    limit 2
+                    """,  # noqa: S608
+                    (owner_id, "aap", "aaq"),
+                )
+                plan = cursor.fetchone()[0][0]["Plan"]
+                assert (
+                    f"idx_backtest_runs_owner_symbol_{slot}_prefix"
+                    in _plan_index_names(plan)
+                )
