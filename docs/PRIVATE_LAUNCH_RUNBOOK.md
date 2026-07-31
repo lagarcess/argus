@@ -249,9 +249,10 @@ dispatch/execution and removes the Render API key from `argus-api`.
 public service URLs, public Supabase URL/anon key values, feature flags, paper
 trading mode, CORS origins, and model routing IDs.
 
-The `argus-app` service must also set the server-only `ARGUS_APP_ORIGIN` to the
-exact HTTPS app origin. It builds password-recovery redirects and must never use
-a `NEXT_PUBLIC_` name. Local development may use the documented localhost
+Both `argus-app` and `argus-api` must set the server-only `ARGUS_APP_ORIGIN` to
+the exact HTTPS app origin. The web service uses it for password-recovery
+redirects; the API uses it for approval signup links. It must never use a
+`NEXT_PUBLIC_` name. Local development may use the documented localhost
 origins; production must not use HTTP.
 
 Keep true secrets manual in Render:
@@ -263,6 +264,7 @@ Keep true secrets manual in Render:
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_OPS_TOKEN`
+- `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`
 - `POSTHOG_PROJECT_TOKEN`
 
 Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
@@ -394,10 +396,22 @@ persistence, allowances, and conversion policy, not through onboarding.
 The durable waitlist rollback procedure is
 `docs/release-evidence/public-alpha-readiness.md`. Commit `061ba50e` is the
 fail-closed floor while the schema can contain active `requested` rows. Prefer
-a forward fix. Before any authorized rollback below that commit, atomically
-disable every active requested row, read back zero active requested rows, and
-only then roll back application code. Never execute that production SQL during
-local repository verification.
+a forward fix. Before any authorized rollback below that commit:
+
+1. enable Render API maintenance mode or otherwise block all public API
+   traffic;
+2. verify both the onrender API URL and every configured custom API domain
+   cannot accept the access-request write with HTTP `202`;
+3. keep writes blocked, take an `ACCESS EXCLUSIVE` lock, disable active
+   requested rows, read back and assert zero, then commit;
+4. deploy the rollback while maintenance remains enabled;
+5. verify the rollback SHA and the absent or blocked write route on every API
+   surface;
+6. only then reopen API traffic.
+
+If maintenance or the dual-surface probes cannot be verified, stop the
+rollback. Never execute the production cleanup SQL during local repository
+verification.
 
 ## Smoke Test
 

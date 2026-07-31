@@ -46,21 +46,86 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
 def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     evidence = _source("docs/release-evidence/public-alpha-readiness.md")
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    evidence_text = " ".join(evidence.split())
+    runbook_text = " ".join(runbook.split())
 
-    assert "061ba50e" in evidence
-    assert "prefer a forward fix" in evidence.lower()
-    assert "role = 'requested'" in evidence
-    assert "disabled_at is null" in evidence
-    assert "active_requested_rows" in evidence
-    assert "Do not execute this SQL as part of repository verification." in evidence
+    assert "061ba50e" in evidence_text
+    assert "prefer a forward fix" in evidence_text.lower()
+    assert "Render API maintenance mode" in evidence_text
+    assert "block all public API traffic" in evidence_text
+    assert (
+        "https://argus-ohr5.onrender.com/api/v1/auth/access-requests"
+        in evidence_text
+    )
+    assert "every configured custom API domain" in evidence_text
+    assert "must not return HTTP `202`" in evidence_text
+    assert (
+        "If maintenance/write blocking cannot be verified, or any required probe "
+        "fails, stop the rollback." in evidence_text
+    )
+    assert (
+        "lock table public.private_alpha_allowlist in access exclusive mode;"
+        in evidence_text.lower()
+    )
+    assert "pre-block in-flight inserts" in evidence_text
+    assert "role = 'requested'" in evidence_text
+    assert "disabled_at is null" in evidence_text
+    assert "active_requested_rows" in evidence_text
+    assert "keep maintenance enabled" in evidence_text
+    assert "verify the rollback SHA is live" in evidence_text
+    assert "access-request write route is absent or blocked" in evidence_text
+    assert "reopen API traffic" in evidence_text
+    assert (
+        "Do not execute this SQL as part of repository verification."
+        in evidence_text
+    )
 
-    disable_index = evidence.index("update public.private_alpha_allowlist")
-    readback_index = evidence.index("select count(*) as active_requested_rows")
-    rollback_index = evidence.index("roll back application code below `061ba50e`")
-    assert disable_index < readback_index < rollback_index
+    maintenance_index = evidence_text.index("Render API maintenance mode")
+    probe_index = evidence_text.index(
+        "https://argus-ohr5.onrender.com/api/v1/auth/access-requests"
+    )
+    lock_index = evidence_text.lower().index(
+        "lock table public.private_alpha_allowlist in access exclusive mode;"
+    )
+    disable_index = evidence_text.index("update public.private_alpha_allowlist")
+    readback_index = evidence_text.index("select count(*) as active_requested_rows")
+    commit_index = evidence_text.index("commit;")
+    rollback_index = evidence_text.index("deploy the rollback")
+    verify_index = evidence_text.index("verify the rollback SHA is live")
+    reopen_index = evidence_text.index("reopen API traffic")
+    assert (
+        maintenance_index
+        < probe_index
+        < lock_index
+        < disable_index
+        < readback_index
+        < commit_index
+        < rollback_index
+        < verify_index
+        < reopen_index
+    )
 
-    assert "release-evidence/public-alpha-readiness.md" in runbook
-    assert "061ba50e" in runbook
+    assert "release-evidence/public-alpha-readiness.md" in runbook_text
+    assert "061ba50e" in runbook_text
+    assert "Render API maintenance mode" in runbook_text
+    assert "ACCESS EXCLUSIVE" in runbook_text
+    assert (
+        "both the onrender API URL and every configured custom API domain"
+        in runbook_text
+    )
+
+
+def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    ownership = runbook.split("## Render Environment Ownership", 1)[1].split(
+        "## Runtime Tuning Flags", 1
+    )[0]
+    ownership_text = " ".join(ownership.split())
+
+    assert "Both `argus-app` and `argus-api`" in ownership_text
+    assert "password-recovery redirects" in ownership_text
+    assert "approval signup links" in ownership_text
+    assert "`ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`" in ownership_text
 
 
 def test_execution_realism_contract_is_consistent_across_canon_and_release_docs() -> None:
