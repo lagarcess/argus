@@ -361,3 +361,42 @@ def test_transient_failure_reuses_amber_recovery_with_a_typed_replay(
     assert replay["type"] == "retest_run"
     assert replay["payload"] == _valid_envelope("retest-source-run")
     assert error_payload["retest_receipt"]["source_run_id"] == "retest-source-run"
+
+
+def test_admitted_user_turn_persists_the_receipt_for_reload(stored_run: Any) -> None:
+    from argus.api.chat.request_admission import prepare_chat_request_admission
+
+    payload = _retest_request(_valid_envelope("retest-source-run"))
+    turn = prepare_retest_turn(
+        payload=payload,
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        language="en",
+        today=_TODAY,
+    )
+    assert turn is not None
+    api_state.store.conversation_owners[_CONVERSATION_ID] = _USER_ID
+
+    admission = prepare_chat_request_admission(
+        payload=payload,
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        display_message=chat_display_message(payload, language="en"),
+        mention_provenance=[],
+        enabled=True,
+        language="en",
+        owner="message_only",
+        extra_user_metadata={"retest_receipt": dict(turn.receipt)},
+    )
+    request_message = admission.persist()
+
+    assert request_message is not None
+    assert request_message.content == "Retest with current data"
+    assert request_message.metadata["retest_receipt"]["strategy_family"] == (
+        "buy_and_hold"
+    )
+    assert request_message.metadata["chat_action"] == sanitized_retest_action(
+        "retest-source-run"
+    )

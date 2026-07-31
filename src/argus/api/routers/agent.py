@@ -408,7 +408,6 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
         language=language,
-        confirmation_id=api_state.store.new_id(),
     )
     request_admission = prepare_chat_request_admission(
         payload=payload,
