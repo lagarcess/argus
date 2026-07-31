@@ -80,6 +80,7 @@ describe("keyboard shortcuts overlay", () => {
     expect(sidebar).toContain("QuickJumpBadge");
     expect(profileMenu).toContain("useQuickJump");
     expect(profileMenu).toContain("QuickJumpBadge");
+    expect(profileMenu).toContain('presentation="shortcut_hint"');
     expect(existsSync(quickPeekPath)).toBe(true);
   });
 

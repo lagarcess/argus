@@ -477,7 +477,11 @@ export default function ProfileMenu({
   const quickJumpBadge = (id: string) => {
     const number = numberFor(id);
     return isQuickJumpActive && number !== null ? (
-      <QuickJumpBadge number={number} />
+      <QuickJumpBadge
+        number={number}
+        presentation="shortcut_hint"
+        usesCommandKey={usesCommandKey}
+      />
     ) : null;
   };
 

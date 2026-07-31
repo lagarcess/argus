@@ -1,8 +1,27 @@
+import { quickJumpHintDisplay } from "@/lib/keyboard-shortcuts";
+
 type QuickJumpBadgeProps = {
   number: number;
+  presentation?: "badge" | "shortcut_hint";
+  usesCommandKey?: boolean;
 };
 
-export function QuickJumpBadge({ number }: QuickJumpBadgeProps) {
+export function QuickJumpBadge({
+  number,
+  presentation = "badge",
+  usesCommandKey = false,
+}: QuickJumpBadgeProps) {
+  if (presentation === "shortcut_hint") {
+    return (
+      <span
+        aria-hidden="true"
+        className="font-mono text-[11px] font-medium tracking-tight text-black/30 dark:text-white/30"
+      >
+        {quickJumpHintDisplay(number, usesCommandKey)}
+      </span>
+    );
+  }
+
   return (
     <span
       aria-hidden="true"

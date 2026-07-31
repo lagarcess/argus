@@ -195,6 +195,13 @@ export function keyboardShortcutHintDisplay(
     .join("");
 }
 
+export function quickJumpHintDisplay(
+  number: number,
+  usesCommandKey: boolean,
+): string {
+  return usesCommandKey ? `⌘⌥${number}` : `Ctrl+Shift+${number}`;
+}
+
 export function isKeyboardShortcutHintModifierActive(
   event: KeyboardShortcutEvent,
   usesCommandKey: boolean,

@@ -7,6 +7,7 @@ const {
   keyboardShortcutHintDisplay,
   keyboardShortcutDisplay,
   matchesKeyboardShortcut,
+  quickJumpHintDisplay,
 } = keyboardShortcuts;
 const quickJumpIndexForEvent = (
   keyboardShortcuts as typeof keyboardShortcuts & {
@@ -98,6 +99,8 @@ describe("keyboard shortcut registry", () => {
     ]);
     expect(keyboardShortcutHintDisplay("new_chat", true)).toBe("⌘⇧.");
     expect(keyboardShortcutHintDisplay("omnisearch", false)).toBe("Ctrl+K");
+    expect(quickJumpHintDisplay(1, true)).toBe("⌘⌥1");
+    expect(quickJumpHintDisplay(9, false)).toBe("Ctrl+Shift+9");
   });
 
   test("reveals shortcut hints while the platform primary modifier is held", () => {
