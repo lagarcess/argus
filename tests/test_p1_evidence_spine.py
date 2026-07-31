@@ -265,8 +265,10 @@ def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> 
     item = search_results[0][1]
     assert item.type == "conversation"
     assert item.id == conversation.id
-    assert item.dossier.tested.run_count == 1
-    assert item.dossier.outcome is not None
+    assert item.total_runs == 1
+    assert item.decided_runs == 0
+    assert item.dossier is not None
+    assert item.dossier.run_id == run.id
 
 
 def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:

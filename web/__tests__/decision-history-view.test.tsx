@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   DecisionHistoryView,
   decisionHistoryKeyboardAction,
+  focusDecisionHistoryListbox,
 } from "../components/sidebar/command-palette/DecisionHistoryView";
 import type { RunDossier } from "../lib/run-dossier-contract";
 
@@ -133,7 +134,8 @@ describe("decision history view", () => {
     expect(refreshing).toContain("Loading decision history");
     expect(errored).toContain("Run newest");
     expect(errored).toContain("Could not load decision history");
-    expect(errored).toContain("Retry");
+    expect(errored).toContain("Try again");
+    expect(errored).not.toContain("Retry");
     expect(erroredHtml).not.toContain(">Load older<");
   });
 
@@ -164,7 +166,55 @@ describe("decision history view", () => {
     ).toEqual({ activeIndex: 1, selectedIndex: null, back: false, handled: false });
   });
 
-  test("requests listbox focus so ArrowDown then Enter selects the second run", () => {
+  test("focuses the listbox after the initial async history response", () => {
+    let focusCalls = 0;
+    let focusOptions: FocusOptions | undefined;
+    const listbox = {
+      focus(options?: FocusOptions) {
+        focusCalls += 1;
+        focusOptions = options;
+      },
+    };
+
+    expect(
+      focusDecisionHistoryListbox({
+        listbox,
+        status: "ready",
+        itemCount: 3,
+        hasFocused: false,
+      }),
+    ).toBe(true);
+    expect(focusCalls).toBe(1);
+    expect(focusOptions).toEqual({ preventScroll: true });
+
+    expect(
+      focusDecisionHistoryListbox({
+        listbox,
+        status: "loading",
+        itemCount: 3,
+        hasFocused: false,
+      }),
+    ).toBe(false);
+    expect(
+      focusDecisionHistoryListbox({
+        listbox,
+        status: "ready",
+        itemCount: 0,
+        hasFocused: false,
+      }),
+    ).toBe(false);
+    expect(
+      focusDecisionHistoryListbox({
+        listbox,
+        status: "ready",
+        itemCount: 3,
+        hasFocused: true,
+      }),
+    ).toBe(false);
+    expect(focusCalls).toBe(1);
+  });
+
+  test("renders the listbox keyboard target so ArrowDown then Enter selects the second run", () => {
     const html = renderToStaticMarkup(
       <DecisionHistoryView
         items={[newest, middle, oldest]}
@@ -188,7 +238,6 @@ describe("decision history view", () => {
     });
 
     expect(html).toContain('role="listbox"');
-    expect(html).toContain('autofocus=""');
     expect(selected.selectedIndex).toBe(1);
   });
 });

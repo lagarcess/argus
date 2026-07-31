@@ -46,6 +46,10 @@ const dossierCopy = {
     en: "Could not load decision history",
     es419: "No se pudo cargar el historial de decisiones",
   },
+  "command_palette.decision_history_retry": {
+    en: "Try again",
+    es419: "Intentar de nuevo",
+  },
   "command_palette.decision_history_loading": {
     en: "Loading decision history",
     es419: "Cargando el historial de decisiones",

@@ -1,5 +1,8 @@
 {
   "allowed_growth_lines": 75,
+  "allowed_growth_lines_by_file": {
+    "web/components/sidebar/ChatCommandPalette.tsx": 0
+  },
   "top_offender_count": 10,
   "scan_roots": ["src", "web"],
   "scan_extensions": [".py", ".ts", ".tsx"],

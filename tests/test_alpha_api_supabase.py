@@ -2632,9 +2632,11 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     assert item["dossier"]["decision"] == {
         "state": "promising",
         "note": "Worth revisiting.",
-        "run_label": None,
+        "run_label": "AAPL MSFT evidence run",
     }
     assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
+    assert item["total_runs"] == 1
+    assert item["decided_runs"] == 1
 
 
 def test_search_supabase_projects_localized_actions_without_generation(
@@ -2719,7 +2721,7 @@ def test_search_supabase_projects_localized_actions_without_generation(
 
     assert response.status_code == 200
     conversation = response.json()["items"][0]
-    run_fresh, decision = conversation["actions"]
+    run_fresh, decision = conversation["dossier"]["actions"]
     assert run_fresh["type"] == "run_fresh"
     assert run_fresh["source_run_id"] == "run-action-es"
     assert run_fresh["send_text"].startswith(
@@ -2770,12 +2772,10 @@ def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     assert response.status_code == 200
     item = response.json()["items"][0]
     assert item["type"] == "conversation"
-    assert item["dossier"]["decision"] == {
-        "state": "rejected",
-        "note": "Too volatile for me.",
-        "run_label": None,
-    }
-    assert item["dossier"]["outcome"] is None
+    assert item["dossier"] is None
+    assert item["total_runs"] == 0
+    assert item["decided_runs"] == 0
+    assert item["decision_states"] == ["rejected"]
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(

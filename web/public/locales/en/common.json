@@ -934,6 +934,7 @@
     "decision_history_loading": "Loading decision history",
     "decision_history_loading_older": "Loading older decisions",
     "decision_history_error": "Could not load decision history",
+    "decision_history_retry": "Try again",
     "no_decision_saved": "No decision saved",
     "add_decision_short": "Add decision",
     "change_decision_short": "Change decision",

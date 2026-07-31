@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -82,6 +83,35 @@ def test_modularity_budget_fails_only_past_allowed_growth(tmp_path: Path) -> Non
     assert budget.current_lines == 4
     assert budget.limit == 3
     assert budget.overage == 1
+
+
+def test_modularity_budget_applies_per_file_growth_overrides(tmp_path: Path) -> None:
+    default_file = tmp_path / "default.py"
+    strict_file = tmp_path / "strict.py"
+    default_file.write_text("line\n" * 2, encoding="utf-8")
+    strict_file.write_text("line\n" * 2, encoding="utf-8")
+    config = tmp_path / "budget.json"
+    config.write_text(
+        json.dumps(
+            {
+                "allowed_growth_lines": 2,
+                "allowed_growth_lines_by_file": {str(strict_file): 0},
+                "watched_files": {
+                    str(default_file): 1,
+                    str(strict_file): 1,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    budgets_by_name = {budget.path.name: budget for budget in collect_budgets(config)}
+
+    assert budgets_by_name["default.py"].allowed_growth_lines == 2
+    assert budgets_by_name["default.py"].overage == 0
+    assert budgets_by_name["strict.py"].allowed_growth_lines == 0
+    assert budgets_by_name["strict.py"].limit == 1
+    assert budgets_by_name["strict.py"].overage == 1
 
 
 def test_modularity_budget_resolves_repo_relative_paths_from_config_location(

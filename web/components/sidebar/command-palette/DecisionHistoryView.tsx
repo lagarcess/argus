@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { commandPaletteDecisionStateFallback } from "@/lib/command-palette-items";
@@ -31,6 +31,30 @@ export type DecisionHistoryKeyboardAction = {
   back: boolean;
   handled: boolean;
 };
+
+type DecisionHistoryFocusTarget = {
+  focus: (options?: FocusOptions) => void;
+};
+
+type DecisionHistoryFocusInput = {
+  listbox: DecisionHistoryFocusTarget | null;
+  status: RunDossierHistoryState["status"];
+  itemCount: number;
+  hasFocused: boolean;
+};
+
+export function focusDecisionHistoryListbox({
+  listbox,
+  status,
+  itemCount,
+  hasFocused,
+}: DecisionHistoryFocusInput): boolean {
+  if (listbox === null || status !== "ready" || itemCount === 0 || hasFocused) {
+    return false;
+  }
+  listbox.focus({ preventScroll: true });
+  return true;
+}
 
 export function decisionHistoryKeyboardAction({
   key,
@@ -105,12 +129,24 @@ export function DecisionHistoryView({
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const [activeIndex, setActiveIndex] = useState(0);
+  const listboxRef = useRef<HTMLDivElement>(null);
+  const hasFocusedListboxRef = useRef(false);
   const boundedActiveIndex =
     items.length > 0 ? Math.min(activeIndex, items.length - 1) : 0;
   const activeDescendant =
     items.length > 0
       ? `decision-history-run-${items[boundedActiveIndex].run_id}`
       : undefined;
+
+  useEffect(() => {
+    const focused = focusDecisionHistoryListbox({
+      listbox: listboxRef.current,
+      status,
+      itemCount: items.length,
+      hasFocused: hasFocusedListboxRef.current,
+    });
+    if (focused) hasFocusedListboxRef.current = true;
+  }, [items.length, status]);
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const action = decisionHistoryKeyboardAction({
@@ -161,6 +197,7 @@ export function DecisionHistoryView({
 
       {items.length > 0 ? (
         <div
+          ref={listboxRef}
           role="listbox"
           aria-label={t(
             "command_palette.decision_history",
@@ -168,7 +205,6 @@ export function DecisionHistoryView({
           )}
           aria-activedescendant={activeDescendant}
           tabIndex={0}
-          autoFocus
           onKeyDown={handleKeyDown}
           className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/10"
         >
@@ -271,7 +307,7 @@ export function DecisionHistoryView({
             onClick={() => void onRetry()}
             className="mt-2 min-h-11 rounded-full border border-[#d66d75]/25 px-4 text-[12px] font-medium text-[#ad4e56] dark:text-[#e58c93]"
           >
-            {t("common.retry", "Retry")}
+            {t("command_palette.decision_history_retry", "Try again")}
           </button>
         </div>
       ) : null}
