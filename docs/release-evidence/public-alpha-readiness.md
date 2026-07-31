@@ -64,14 +64,14 @@ The post-deploy control-plane and metrics readbacks are recorded below.
 
 ## Hosted exact-SHA release proof
 
-The final public-alpha candidate
-`c76d4d9251a09984971807a3d310685bc326043d` reached all three hosted surfaces:
+The final public-alpha runtime candidate
+`2330ec42d52d912b6cdb1be5e74aa343a5d5abe0` reached all three hosted surfaces:
 
 | Surface | Render identifier | Terminal evidence |
 | --- | --- | --- |
-| `argus-api` | `dep-d9mia55aeets73a31jgg` | `live`, exact commit, finished 2026-07-31 22:44:49 UTC |
-| `argus-app` | `dep-d9mia56417fc73bg1ju0` | `live`, exact commit, finished 2026-07-31 22:45:14 UTC |
-| `argus-backtests` Workflow | `wfv-d9mia5fqj5pc73d33320` | `ready`, version name `c76d4d9`, exact commit |
+| `argus-api` | `dep-d9miovnqj5pc73d3utrg` | `live`, exact commit, finished 2026-07-31 23:16:52 UTC |
+| `argus-app` | `dep-d9miovnavr4c73eg6agg` | `live`, exact commit, finished 2026-07-31 23:16:43 UTC |
+| `argus-backtests` Workflow | `wfv-d9miovjm8hqs73cebpeg` | `ready`, version name `2330ec4`, exact commit |
 
 Before deployment, the release-config audit found the live API missing the
 declared non-secret `ARGUS_APP_ORIGIN`. It was synced to
@@ -102,8 +102,8 @@ The service had no configured custom domains.
 
 While the public surface was closed, the paid app service reached
 `http://argus-ohr5:10000/health` through Render's private network. The
-post-deploy exact-SHA probe job `job-d9mib9942hec73dqtlhg` succeeded with log
-marker `private_health_exact_sha status=200`.
+final exact-SHA probe job `job-d9miqe3m8hqs73cee9h0` succeeded with log marker
+`private_health_final_sha status=200`.
 
 Maintenance was disabled only after the migration and hosted probes below.
 The control plane then read back `maintenanceMode.enabled=false`; public
