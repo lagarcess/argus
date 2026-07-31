@@ -25,15 +25,44 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
 6. Persists across devices and reloads — backend-owned, not local storage.
 7. RLS proof is a real contract gate: a user can read/write only their own
    `avatar_theme`, proven, not assumed.
+8. **Palette generation method (added after first attempt landed generic,
+   not SOTA):** flat, differently-saturated named colors read as a stock
+   default palette, not a designed system — the first attempt's swatches
+   didn't share a common DNA (compare how much more saturated the gold
+   swatch is than the slate one). Fix:
+   - Generate all themes from **one systematic formula** — same
+     saturation and lightness, only hue rotates at even intervals around
+     the wheel. Picking assorted named colors independently is exactly
+     what produced the generic result.
+   - Use a **subtle two-stop gradient within the same hue**, not a flat
+     single-color fill — a light tint blending toward the base tone, or
+     base toward a deeper shade. This is the standard current treatment
+     for this exact UI element (Linear, Vercel, Raycast-style monogram
+     badges) and is likely the single biggest lever from generic to
+     considered.
+   - Lean toward a **richer, slightly muted register** — deeper jewel
+     tones rather than bright, fully-saturated primary-adjacent colors,
+     which read as louder/candy-like and less sophisticated.
+   - Render and screenshot the new set before finalizing — this is a
+     visual quality bar, verify it visually, don't just describe it.
+9. **Scope boundary, unrelated to the palette:** this feature does not
+   touch the existing "App language" setting or relocate it from wherever
+   it currently lives. If it currently requires reaching it via a
+   different entry point (e.g. a top-left icon) than the new avatar
+   picker, that access path stays exactly as it was — do not consolidate
+   it into the new Profile surface as a side effect of adding the avatar
+   picker. If "App language" was already inside this same surface before
+   this lane touched anything, say so and this is moot; if it moved,
+   revert that specific change.
 
 ## Left to the agent's taste
 
-- The actual 6-8 theme choices, hues, gradients.
 - Exact contrast mechanism — floor requirement is the initial must read
   clearly against its background (basic WCAG contrast), not a prescribed
   formula.
-- Where the picker lives in the profile menu and its exact interaction
-  pattern.
+- Where the *avatar picker itself* lives in the profile menu and its
+  exact interaction pattern — this freedom does not extend to relocating
+  other, pre-existing settings (see decision 9).
 
 ## Stop and report if
 
