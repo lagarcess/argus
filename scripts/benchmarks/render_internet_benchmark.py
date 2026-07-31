@@ -1039,7 +1039,13 @@ def _timestamp_value(value: Any) -> float | None:
     try:
         return datetime.fromisoformat(normalized).timestamp()
     except ValueError:
-        return None
+        try:
+            return datetime.strptime(
+                normalized,
+                "%Y-%m-%dT%H:%M:%S.%f%z",
+            ).timestamp()
+        except ValueError:
+            return None
 
 
 def _rounded_timings(timings: dict[str, float]) -> dict[str, float]:

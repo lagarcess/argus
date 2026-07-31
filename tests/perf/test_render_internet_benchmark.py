@@ -284,3 +284,14 @@ def test_safe_job_summary_extracts_workflow_timestamps_and_durations() -> None:
         "result_readout_total": 900.679,
         "link_result": 80.789,
     }
+
+
+def test_timestamp_value_accepts_postgres_variable_fractional_precision() -> None:
+    module = _load_benchmark_module()
+
+    started = module._timestamp_value("2026-07-31T06:04:17.78465+00:00")
+    finished = module._timestamp_value("2026-07-31T06:04:18.78465+00:00")
+
+    assert started is not None
+    assert finished is not None
+    assert round((finished - started) * 1000.0, 3) == 1000.0

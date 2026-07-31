@@ -421,6 +421,17 @@ def test_duration_measurements_fail_closed(
         module._duration_ms(start, end)
 
 
+def test_duration_measurements_accept_postgres_variable_fractional_precision() -> None:
+    module = _load_module()
+
+    duration_ms = module._duration_ms(
+        "2026-07-31T06:04:17.78465+00:00",
+        "2026-07-31T06:04:18.78465+00:00",
+    )
+
+    assert duration_ms == 1000.0
+
+
 def test_partial_report_is_sanitized_and_cannot_validate_as_success(
     tmp_path: Path,
 ) -> None:

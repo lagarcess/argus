@@ -30,6 +30,7 @@ try:
         _run_action_headers,
         _stream_chat,
         _timed_json_request,
+        _timestamp_value,
         extract_confirmation_run_action,
         extract_run_reference,
         parse_sse_events,
@@ -41,6 +42,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
         _run_action_headers,
         _stream_chat,
         _timed_json_request,
+        _timestamp_value,
         extract_confirmation_run_action,
         extract_run_reference,
         parse_sse_events,
@@ -1120,12 +1122,7 @@ def _duration_ms(started_at: Any, finished_at: Any) -> float:
 
 
 def _timestamp(value: Any) -> float | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        return datetime.fromisoformat(value.strip().replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return None
+    return _timestamp_value(value)
 
 
 def _sha256_json(value: Mapping[str, Any]) -> str:
