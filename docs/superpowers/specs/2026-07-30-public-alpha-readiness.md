@@ -42,14 +42,32 @@ who walk through it.
    code change (threading account type into the LLM client's key selection)
    can't land in this window, ship a single capped production key as the
    interim floor and say so explicitly — never ship with no cap at all.
-   **Discovered key topology (2026-07-30):** the account's single active key
-   (`argus-dev-key`, uncapped) serves both the founder's local dev/live
-   evals and production. The cap goes on a NEW production-only key
-   (`argus-prod`, $10/week reset), swapped into Render's
-   `OPENROUTER_API_KEY` by the founder — never on the shared dev key, so
-   founder eval sessions can neither trip the production cap nor pollute
-   decision 6's zero-trip count, and the prod key's usage graph becomes the
-   first clean production-cost metric separated from dev burn.
+   **Key + env topology (locked 2026-07-30, keys already created):**
+   - `ARGUS_PROD_OPENROUTER_API_KEY` — new `argus-prod` key, $10/week
+     reset. All hosted non-guest traffic.
+   - `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` — new `argus-guest` key,
+     $5/week reset. Hosted guest traffic once the key-selection code lands.
+   - `OPENROUTER_API_KEY` — the original uncapped `argus-dev-key`, demoted
+     to dev/local-only. **NOT renamed** — every eval script and tool
+     expects the conventional name, and renaming invites the fake-failure
+     env drift this repo has been burned by before. Hosted runtime must
+     never read it.
+   - **No silent fallback, fail loud:** in hosted environments, a missing
+     `ARGUS_PROD_OPENROUTER_API_KEY` (or guest var, once guest routing
+     lands) is a boot failure — never a fallback to `OPENROUTER_API_KEY`.
+     A silent fallback would route production onto the uncapped dev key
+     and defeat the cap invisibly. Local dev keeps using
+     `OPENROUTER_API_KEY` exactly as today.
+   - **Deploy ordering:** the Render dashboard/CLI values for the new env
+     vars must exist BEFORE the deploy that reads them ships — a
+     `render.yaml` change referencing a `sync: false` var with no
+     dashboard value boots the API keyless. The founder has authorized
+     env-var changes via Render CLI, so the builder may set them, but the
+     ordering rule stands regardless of who does it.
+   Never cap the shared dev key: founder eval sessions must neither trip
+   the production cap nor pollute decision 6's zero-trip count, and the
+   prod key's usage graph is the first clean production-cost metric
+   separated from dev burn.
 4. **Registration stays allowlist-gated through this lane.** The signup form
    in `GuestConversionModal.tsx` already exists and already works end to end
    for allowlisted emails (`POST /auth/signup`, gated by
@@ -113,7 +131,12 @@ who walk through it.
 
 - `render.yaml` — `argus-api` plan/tier change once lean is verified; Render
   Workflow concurrency settings documented alongside the change that sets
-  them (not necessarily in this same file, but recorded somewhere durable).
+  them (not necessarily in this same file, but recorded somewhere durable);
+  the two new OpenRouter env vars added (`sync: false`), replacing hosted
+  use of `OPENROUTER_API_KEY` per decision 3's topology — dashboard values
+  set before the deploy that reads them.
+- `.env.example` — document the three-var OpenRouter scheme so a fresh
+  checkout knows `OPENROUTER_API_KEY` is dev-only.
 - Hosted Supabase Auth dashboard — explicitly confirm/set "Confirm email";
   configure Resend as the custom SMTP provider. Neither is a code change,
   both are real configuration that must be verified, not assumed from local
