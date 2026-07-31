@@ -7,13 +7,15 @@ const root = join(import.meta.dir, "..");
 describe("chat archive/delete lifecycle source contract", () => {
   test("chat switching routes cold misses through the bounded transcript cache", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
+    const loadConversationStart = chat.indexOf("const loadConversation = async (");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
 
     expect(loadConversationStart).toBeGreaterThan(-1);
     expect(chat).toContain("new TranscriptSessionCache<Message[]>()");
-    expect(loadConversation).toContain("navigateConversationTranscript(convId)");
+    expect(loadConversation).toContain(
+      "convId, undefined, { messageId, scrollToLatest }",
+    );
     expect(loadConversation).not.toContain('setStreamStatus(t("common.loading"))');
     expect(chat).toContain('phase === "loading"');
     expect(chat).toContain("setMessages([])");

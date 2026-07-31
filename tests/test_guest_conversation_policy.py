@@ -402,10 +402,10 @@ def test_guest_search_is_limited_to_current_workspace_artifacts(
 
     assert response.status_code == 200
     payload = response.json()
-    assert {(item["type"], item["id"]) for item in payload["items"]} == {
-        ("chat", CONVERSATION_ID),
-        ("backtest", "00000000-0000-0000-0000-000000000064"),
-    }
+    assert [(item["type"], item["id"]) for item in payload["items"]] == [
+        ("conversation", CONVERSATION_ID)
+    ]
+    assert payload["items"][0]["conversation_id"] == CONVERSATION_ID
     assert payload["ledger_groups"] == []
     gateway.search_rows.assert_called_once_with(
         user_id=USER_ID,

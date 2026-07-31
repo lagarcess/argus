@@ -43,7 +43,11 @@ from argus.domain.backtest_message_projection import (
     represented_backtest_job_request_ids,
 )
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import ConversationCursorError, MessageCursorError
+from argus.domain.supabase_gateway import (
+    ConversationCursorError,
+    MessageAnchorError,
+    MessageCursorError,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
@@ -66,10 +70,7 @@ def _public_message_projection(messages: list[Message]) -> list[Message]:
             update={"metadata": public_confirmation_projection(message.metadata)}
         )
         for message in messages
-        if not (
-            message.role == "user"
-            and is_legacy_onboarding_marker(message.content)
-        )
+        if not (message.role == "user" and is_legacy_onboarding_marker(message.content))
     ]
 
 
@@ -442,8 +443,17 @@ def list_messages(
     request: Request,
     limit: int = Query(50, ge=1, le=100),
     cursor: str | None = Query(None),
+    anchor_message_id: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedMessages:
+    if cursor is not None and anchor_message_id is not None:
+        raise problem(
+            request,
+            status_code=422,
+            code="invalid_message_anchor",
+            title="Invalid Message Anchor",
+            detail="A message anchor cannot be combined with a cursor.",
+        )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
@@ -491,14 +501,17 @@ def list_messages(
     transcript_represented_request_ids: set[str] = set()
     if api_state.supabase_gateway is not None:
         try:
-            items = api_state.supabase_gateway.list_messages(
-                user_id=user.id,
-                conversation_id=conversation_id,
-                limit=limit,
-                cursor_created_at=cursor_created_at,
-                cursor_id=cursor_id,
-                page=True,
-            )
+            message_page_options = {
+                "user_id": user.id,
+                "conversation_id": conversation_id,
+                "limit": limit,
+                "cursor_created_at": cursor_created_at,
+                "cursor_id": cursor_id,
+                "page": True,
+            }
+            if anchor_message_id is not None:
+                message_page_options["anchor_message_id"] = anchor_message_id
+            items = api_state.supabase_gateway.list_messages(**message_page_options)
             database_page = True
             database_page_ids = {message.id for message in items}
             if (
@@ -520,6 +533,14 @@ def list_messages(
                 items = [*items, *later_work]
         except MessageCursorError:
             raise invalid_cursor_problem(request) from None
+        except MessageAnchorError:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Message anchor not found.",
+            ) from None
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -568,6 +589,19 @@ def list_messages(
     if not database_page and cursor_created_at is not None and cursor_id is not None:
         cursor_key = (cursor_created_at, cursor_id)
         items = [item for item in items if (item.created_at, item.id) > cursor_key]
+    if not database_page and anchor_message_id is not None:
+        anchors = [item for item in items if item.id == anchor_message_id]
+        if len(anchors) != 1:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Message anchor not found.",
+            )
+        anchor = anchors[0]
+        anchor_key = (anchor.created_at, anchor.id)
+        items = [item for item in items if (item.created_at, item.id) >= anchor_key]
     page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]

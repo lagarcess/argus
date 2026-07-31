@@ -18,12 +18,12 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-29
+## Active Post-Promotion Pointer — 2026-07-31
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint contains PR
-#304 at `59a274c3`; new work must branch from the current remote
+#306 at `b71f1eaf`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -66,6 +66,14 @@ PR #304 then completed the bounded result-surface ownership arc: Quick take,
 Explain result, typed Try next rows, and recoverable failure now have distinct
 owners through live turns, durable jobs, reload, and both supported languages.
 Issue #249 is closed.
+PR #305 then completed issue #253's decision-first recall projection and panel
+as `88ab906d`. PR #306 completed the founder-locked Full Omnisearch outcome as
+`b71f1eaf`: one ranked row per conversation, bounded object-first transcript
+recall with jump-to-match, deterministic dossiers and asset rollups, exact
+decision filters and mutation refresh, and provider-free **Run it fresh**
+composition. The memory and Postgres paths preserve the integrated #232
+pagination and #252 conversation-switching contracts. Issue #253 is closed;
+there is no remaining Full Omnisearch implementation lane.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213

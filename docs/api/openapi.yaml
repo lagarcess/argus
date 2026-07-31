@@ -942,6 +942,13 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+      - name: anchor_message_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -1244,6 +1251,7 @@ paths:
         required: true
         schema:
           type: string
+          maxLength: 512
       - name: limit
         in: query
         required: false
@@ -1277,6 +1285,18 @@ paths:
         schema:
           type: boolean
           default: false
+      - name: conversation_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -1291,7 +1311,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+          description: Search temporarily unavailable because exact bounded recall could not
+            be completed, or authentication-session verification is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected server error occurred.
           content:
@@ -2589,7 +2614,14 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/SearchItem'
+            oneOf:
+            - $ref: '#/components/schemas/SearchItem'
+            - $ref: '#/components/schemas/SearchAssetRollup'
+            discriminator:
+              propertyName: type
+              mapping:
+                asset_rollup: '#/components/schemas/SearchAssetRollup'
+                conversation: '#/components/schemas/SearchItem'
           type: array
         next_cursor:
           anyOf:
@@ -2646,43 +2678,58 @@ components:
             - system
           - type: 'null'
       type: object
-    SearchItem:
+    SearchAssetDecisionCounts:
+      properties:
+        promising:
+          type: integer
+          minimum: 0.0
+        watching:
+          type: integer
+          minimum: 0.0
+        rejected:
+          type: integer
+          minimum: 0.0
+        revisit_later:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - promising
+      - watching
+      - rejected
+      - revisit_later
+    SearchAssetRollup:
       properties:
         type:
           type: string
-          enum:
-          - chat
-          - strategy
-          - collection
-          - run
-          - backtest
-          - evidence
-          - decision
-          - idea
-        id:
+          const: asset_rollup
+          default: asset_rollup
+        symbol:
           type: string
-        title:
-          type: string
-        matched_text:
-          type: string
-        updated_at:
+          maxLength: 24
+          minLength: 1
+        run_count:
+          type: integer
+          minimum: 1.0
+        decision_counts:
+          $ref: '#/components/schemas/SearchAssetDecisionCounts'
+        last_touched_at:
           type: string
           format: date-time
-        conversation_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-        lifecycle:
-          anyOf:
-          - type: string
-            enum:
-            - captured
-            - reviewed
-            - saved
-            - decided
-            - archived
-            - discarded
-          - type: 'null'
+      type: object
+      required:
+      - symbol
+      - run_count
+      - decision_counts
+      - last_touched_at
+    SearchDecisionAction:
+      properties:
+        type:
+          type: string
+          const: decision
+          default: decision
+        evidence_artifact_id:
+          type: string
         decision_state:
           anyOf:
           - type: string
@@ -2692,18 +2739,203 @@ components:
             - rejected
             - revisit_later
           - type: 'null'
-        preview:
+        note:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: string
+            maxLength: 2000
           - type: 'null'
+        run_label:
+          type: string
+          maxLength: 160
+      type: object
+      required:
+      - evidence_artifact_id
+      - run_label
+    SearchDossier:
+      properties:
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        tested:
+          $ref: '#/components/schemas/SearchDossierTested'
+        outcome:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierOutcome'
+          - type: 'null'
+        left_off:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierLeftOff'
+          - type: 'null'
+      type: object
+      required:
+      - tested
+    SearchDossierDecision:
+      properties:
+        state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+      type: object
+      required:
+      - state
+    SearchDossierLeftOff:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        nudge:
+          anyOf:
+          - type: string
+            enum:
+            - undecided
+            - suggestion_untaken
+            - stale_result
+          - type: 'null'
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchDossierMetric:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        value:
+          anyOf:
+          - type: string
+          - type: integer
+          - type: number
+      type: object
+      required:
+      - name
+      - value
+    SearchDossierOutcome:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        benchmark_symbol:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        quick_take:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        metrics:
+          items:
+            $ref: '#/components/schemas/SearchDossierMetric'
+          type: array
+          maxItems: 4
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchDossierTested:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        strategy_families:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        run_count:
+          type: integer
+          minimum: 0.0
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      type: object
+      required:
+      - run_count
+    SearchItem:
+      properties:
+        type:
+          type: string
+          const: conversation
+        id:
+          type: string
+        title:
+          type: string
+        archived:
+          type: boolean
+        matched_text:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        conversation_id:
+          type: string
+        match:
+          $ref: '#/components/schemas/SearchMatch'
+        dossier:
+          $ref: '#/components/schemas/SearchDossier'
+        actions:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchRunFreshAction'
+            - $ref: '#/components/schemas/SearchDecisionAction'
+            discriminator:
+              propertyName: type
+              mapping:
+                decision: '#/components/schemas/SearchDecisionAction'
+                run_fresh: '#/components/schemas/SearchRunFreshAction'
+          type: array
+          maxItems: 2
+        decision_states:
+          items:
+            type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          type: array
+          default: []
       type: object
       required:
       - type
       - id
       - title
+      - archived
       - matched_text
       - updated_at
+      - conversation_id
+      - match
+      - dossier
     SearchLedgerGroup:
       properties:
         decision_state:
@@ -2719,6 +2951,164 @@ components:
       required:
       - decision_state
       - count
+    SearchMatch:
+      properties:
+        layer:
+          type: string
+          enum:
+          - conversation
+          - message
+          - run
+          - idea
+          - evidence
+          - decision
+        fragment:
+          type: string
+          maxLength: 500
+        count:
+          type: integer
+          minimum: 1.0
+        message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - layer
+      - fragment
+      - count
+    SearchRunFreshAction:
+      properties:
+        type:
+          type: string
+          const: run_fresh
+          default: run_fresh
+        source_run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        canonical_setup:
+          $ref: '#/components/schemas/SearchRunFreshSetup'
+        send_text:
+          type: string
+          maxLength: 4000
+      type: object
+      required:
+      - source_run_id
+      - run_label
+      - canonical_setup
+      - send_text
+    SearchRunFreshDateRange:
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+      type: object
+      required:
+      - start
+      - end
+    SearchRunFreshSetup:
+      properties:
+        strategy_type:
+          type: string
+          enum:
+          - buy_and_hold
+          - dca_accumulation
+          - indicator_threshold
+          - signal_strategy
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+        timeframe:
+          type: string
+          maxLength: 24
+          minLength: 1
+        date_range:
+          $ref: '#/components/schemas/SearchRunFreshDateRange'
+        sizing_mode:
+          type: string
+          enum:
+          - capital_amount
+          - position_size
+        capital_amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        position_size:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+            enum:
+            - daily
+            - weekly
+            - biweekly
+            - monthly
+            - quarterly
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        starting_principal:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+        benchmark_symbol:
+          type: string
+          maxLength: 24
+          minLength: 1
+        entry_rule:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        exit_rule:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        rule_spec:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        parameters:
+          additionalProperties: true
+          type: object
+        execution_realism:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+      type: object
+      required:
+      - strategy_type
+      - symbols
+      - asset_class
+      - timeframe
+      - date_range
+      - sizing_mode
+      - benchmark_symbol
     SignupRequest:
       properties:
         email:

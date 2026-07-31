@@ -137,13 +137,26 @@ function classifyOrdinaryTransportAmbiguity(
 export async function loadAllConversationMessagePages(
   conversationId: string,
   loadPage: typeof getConversationMessages = getConversationMessages,
-  options: Readonly<{ signal?: AbortSignal }> = {},
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ): Promise<ApiMessage[]> {
   const items: ApiMessage[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
   while (true) {
-    const page = await loadPage(conversationId, 100, cursor, options);
+    const page = await loadPage(
+      conversationId,
+      100,
+      cursor,
+      cursor
+        ? { signal: options.signal }
+        : {
+            signal: options.signal,
+            anchorMessageId: options.anchorMessageId,
+          },
+    );
     items.push(...page.items);
     const nextCursor = page.next_cursor?.trim();
     if (!nextCursor) return items;

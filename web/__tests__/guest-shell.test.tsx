@@ -79,7 +79,8 @@ describe("guest shell contract", () => {
       "groundedDiscoveryAvailable={canUseGroundedDiscovery}",
     );
     expect(chat).toContain("canManageConversation={canManageConversation}");
-    expect(palette).toContain("if (isGuest) return;");
+    expect(palette).toContain("setLedgerGroups(isGuest ? []");
+    expect(palette).toContain("setLedgerGroups([]);");
     expect(palette).toContain("groundedDiscoveryAvailable");
     expect(palette).toContain('"command_palette.guest.discovery_unavailable"');
     expect(en.command_palette.guest.discovery_unavailable).toBe(

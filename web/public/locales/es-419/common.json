@@ -899,7 +899,20 @@
     "guest": {
       "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
     },
+    "asset_rollup": {
+      "heading": "Tu historial con este activo",
+      "runs_involving_one": "{{count}} ejecución que incluye {{symbol}}",
+      "runs_involving_other": "{{count}} ejecuciones que incluyen {{symbol}}",
+      "last_touched": "Última actividad: {{date}}"
+    },
     "no_results": "No se encontraron resultados",
+    "try_searching": "Prueba con un ticker, una frase o una nota que recuerdes.",
+    "keep_typing": "Sigue escribiendo",
+    "keep_typing_detail": "La búsqueda comienza cuando una palabra tiene al menos 3 caracteres.",
+    "read_error": "Argus no pudo cargar estos resultados.",
+    "retry_search": "Intentar la búsqueda de nuevo",
+    "load_more_error": "Argus no pudo cargar más resultados. Tus resultados actuales siguen disponibles.",
+    "retry_load_more": "Intentar cargar más",
     "no_conversations": "No hay conversaciones aún",
     "clear_search": "Borrar búsqueda",
     "rename_conversation": "Renombrar conversación",
@@ -909,6 +922,12 @@
     "preview_empty": "Abre la conversación fuente para ver más contexto.",
     "open_conversation": "Abrir conversación",
     "open_source_conversation": "Abrir conversación fuente",
+    "open_at_match": "Enter abre la coincidencia",
+    "open_at_left_off": "⌘/Ctrl+Enter abre donde lo dejaste",
+    "run_fresh": "Volver a probar · {{run}}",
+    "add_decision": "Agregar decisión · {{run}}",
+    "change_decision": "Cambiar decisión · {{run}}",
+    "save_decision": "Guardar decisión",
     "select_preview": "Selecciona un resultado para ver sus detalles.",
     "ledger": {
       "decision_filters": "Filtros de decisión",
@@ -932,6 +951,27 @@
       "total_return_pct": "Rendimiento total",
       "volatility_pct": "Volatilidad"
     },
+    "dossier_values": {
+      "decision_on": "{{state}} · en {{run}}",
+      "run_count_one": "{{count}} ejecución",
+      "run_count_other": "{{count}} ejecuciones",
+      "strategy_families": {
+        "buy_and_hold": "Comprar y mantener",
+        "buy_hold": "Comprar y mantener",
+        "buy_the_dip": "Comprar en caídas",
+        "dca": "Compras periódicas",
+        "dca_accumulation": "Compras periódicas",
+        "moving_average_crossover": "Cruce de medias móviles",
+        "rsi_mean_reversion": "Umbral RSI",
+        "unknown": "Estrategia"
+      },
+      "nudges": {
+        "stale_result": "El resultado podría necesitar actualización",
+        "suggestion_untaken": "Siguiente paso sugerido",
+        "undecided": "Sin decisión",
+        "unknown": "Siguiente paso guardado"
+      }
+    },
     "preview_fields": {
       "assets": "Activos",
       "assumptions": "Supuestos",
@@ -939,19 +979,25 @@
       "breakdown": "Desglose",
       "decision": "Decisión",
       "digest": "Resumen",
+      "left_off": "Dónde lo dejaste",
       "metrics": "Métricas",
+      "outcome": "Cómo salió",
       "preview": "Vista previa",
       "quick_take": "Lectura rápida",
       "note": "Tu nota",
+      "tested": "Lo que probaste",
       "what_happened": "Qué pasó"
     },
     "conversation_count_one": "{{count}} conversación",
     "conversation_count_other": "{{count}} conversaciones",
     "result_count_one": "{{count}} resultado",
     "result_count_other": "{{count}} resultados",
+    "match_count_one": "{{count}} coincidencia",
+    "match_count_other": "{{count}} coincidencias",
     "type": {
       "backtest": "Backtest",
       "chat": "Conversación",
+      "conversation": "Conversación",
       "collection": "Colección",
       "decision": "Decisión",
       "evidence": "Evidencia",

@@ -18,6 +18,7 @@ _MARKDOWN_HEADING_PREFIX_RE = re.compile(r"(?m)^\s{0,3}#{1,6}\s+")
 _MARKDOWN_BULLET_PREFIX_RE = re.compile(r"(?m)^\s*[-*]\s+")
 _MARKDOWN_EMPHASIS_RE = re.compile(r"[*`]+")
 _WHITESPACE_RE = re.compile(r"\s+")
+_MAX_DECISION_NOTE_LENGTH = 2000
 
 
 @dataclass(frozen=True)
@@ -163,10 +164,18 @@ def decision_recall_preview(
     state = _safe_text(decision_state)
     if state is not None:
         preview["decision_state"] = state
-    note_text = _safe_text(note)
+    note_text = _safe_verbatim_note(note)
     if note_text is not None:
         preview["note"] = note_text
     return preview
+
+
+def _safe_verbatim_note(value: object) -> str | None:
+    """Bound a decision note without flattening its user-authored newlines."""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned[:_MAX_DECISION_NOTE_LENGTH] or None
 
 
 def evidence_preview_from_payload(

@@ -2579,11 +2579,10 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["items"]) == 2
-    assert payload["next_cursor"] is not None
-    assert {item["type"] for item in payload["items"]}.issubset(
-        {"chat", "strategy", "collection", "run"}
-    )
+    assert [(item["type"], item["id"]) for item in payload["items"]] == [
+        ("conversation", "chat-1")
+    ]
+    assert payload["next_cursor"] is None
 
 
 def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
@@ -2634,6 +2633,58 @@ def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
         guest_scope=False,
         guest_conversation_id=None,
     )
+
+
+def test_search_supabase_pushes_visible_conversation_ids_to_bounded_reader(
+    mock_gateway,
+):
+    conversation_ids = [
+        "00000000-0000-0000-0000-000000000091",
+        "00000000-0000-0000-0000-000000000092",
+    ]
+    mock_gateway.search_rows.return_value = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts={
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "",
+            "limit": 2,
+            "conversation_id": conversation_ids,
+            "include_ledger_groups": "true",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="",
+        source_limit=2,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=True,
+        guest_scope=False,
+        guest_conversation_id=None,
+        conversation_ids=conversation_ids,
+    )
+    assert response.json()["next_cursor"] is None
 
 
 def test_search_reader_cursor_failure_maps_to_invalid_cursor_problem(
@@ -2765,39 +2816,116 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert {item["type"] for item in items} == {
-        "backtest",
-        "idea",
-        "evidence",
-        "decision",
+    assert len(items) == 1
+    item = items[0]
+    assert item["type"] == "conversation"
+    assert item["id"] == item["conversation_id"] == "conversation-1"
+    assert item["dossier"]["decision"] == {
+        "state": "promising",
+        "note": "Worth revisiting.",
+        "run_label": None,
     }
-    evidence = next(item for item in items if item["type"] == "evidence")
-    assert evidence["preview"] == {
-        "digest": "AAPL MSFT beat SPY in the test window.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
+    assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
+
+
+def test_search_supabase_projects_localized_actions_without_generation(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    from argus.agent_runtime import runtime as agent_runtime
+    from argus.domain import engine as domain_engine
+
+    def unexpected_external_call(*_: object, **__: object) -> None:
+        raise AssertionError("Search action projection must not call external systems")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", unexpected_external_call)
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", unexpected_external_call)
+    monkeypatch.setattr(agent_runtime, "run_agent_turn", unexpected_external_call)
+    spanish_user = _mock_profile(language="es-419")
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = spanish_user
+    mock_gateway.get_or_create_mock_user.return_value = spanish_user
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-action-es",
+                "title": "Dossier GLD",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "runs": [
+            {
+                "id": "run-action-es",
+                "conversation_id": "conversation-action-es",
+                "status": "completed",
+                "asset_class": "equity",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "timeframe": "1D",
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-12-31",
+                    "resolved_parameters": {
+                        "sizing_mode": "capital_amount",
+                        "capital_amount": 10_000,
+                    },
+                },
+                "conversation_result_card": {"title": "GLD anual"},
+                "created_at": now.isoformat(),
+            }
+        ],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "evidence-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "source_run_id": "run-action-es",
+                "title": "GLD anual",
+                "digest": "GLD frente a SPY.",
+                "payload": {},
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "evidence_artifact_id": "evidence-action-es",
+                "decision_state": "promising",
+                "note": "Revisar el próximo año.",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "messages": [],
     }
-    assert "context_packets" not in evidence["preview"]
-    assert not any(key.endswith("_id") for key in evidence["preview"])
-    idea = next(item for item in items if item["type"] == "idea")
-    assert idea["preview"]["digest"] == "Test AAPL and MSFT against SPY."
-    assert not any(key.endswith("_id") for key in idea["preview"])
-    decision = next(item for item in items if item["type"] == "decision")
-    assert decision["preview"]["decision_state"] == "promising"
-    assert not any(key.endswith("_id") for key in decision["preview"])
-    assert decision["matched_text"] == (
-        "Worth revisiting. · AAPL MSFT beat SPY in the test window."
+
+    response = client.get(
+        "/api/v1/search?q=GLD&limit=20",
+        headers={"Authorization": "Bearer test-token"},
     )
-    assert "promising" not in decision["matched_text"]
-    # Decision recall (issue #253): verbatim note, artifact-only digest, and
-    # the linked evidence facts projected from the hydrated payload.
-    assert decision["preview"]["note"] == "Worth revisiting."
-    assert decision["preview"]["digest"] == (
-        "AAPL MSFT beat SPY in the test window."
+
+    assert response.status_code == 200
+    conversation = response.json()["items"][0]
+    run_fresh, decision = conversation["actions"]
+    assert run_fresh["type"] == "run_fresh"
+    assert run_fresh["source_run_id"] == "run-action-es"
+    assert run_fresh["send_text"].startswith(
+        "Prueba nuevamente esta configuración compatible exacta"
     )
-    assert decision["preview"]["quick_take"] == "AAPL and MSFT beat SPY."
-    assert decision["preview"]["symbols"] == ["AAPL", "MSFT"]
-    assert decision["preview"]["benchmark_symbol"] == "SPY"
+    assert run_fresh["send_text"].endswith(
+        "Muestra la confirmación Lista para ejecutar; todavía no la ejecutes."
+    )
+    assert decision == {
+        "type": "decision",
+        "evidence_artifact_id": "evidence-action-es",
+        "decision_state": "promising",
+        "note": "Revisar el próximo año.",
+        "run_label": "GLD anual",
+    }
 
 
 def test_search_supabase_decision_without_payload_keeps_honest_fallback(
@@ -2831,17 +2959,14 @@ def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     )
 
     assert response.status_code == 200
-    decision = next(
-        item for item in response.json()["items"] if item["type"] == "decision"
-    )
-    preview = decision["preview"]
-    assert preview["note"] == "Too volatile for me."
-    assert preview["decision_state"] == "rejected"
-    assert preview["digest"] == "NVDA lost to SPY in the window."
-    # No payload means no invented facts: nothing beyond the stored truth.
-    assert "quick_take" not in preview
-    assert "metrics_summary" not in preview
-    assert "symbols" not in preview
+    item = response.json()["items"][0]
+    assert item["type"] == "conversation"
+    assert item["dossier"]["decision"] == {
+        "state": "rejected",
+        "note": "Too volatile for me.",
+        "run_label": None,
+    }
+    assert item["dossier"]["outcome"] is None
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(
@@ -2925,10 +3050,9 @@ def test_search_supabase_orders_p1_artifacts_before_source_conversation(
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    chat_index = ordered_types.index("chat")
-    for artifact_type in ("backtest", "evidence", "idea", "decision"):
-        assert ordered_types.index(artifact_type) < chat_index
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
@@ -2974,8 +3098,9 @@ def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts(
@@ -3023,8 +3148,9 @@ def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifact(
@@ -3073,8 +3199,9 @@ def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifac
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("strategy") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):

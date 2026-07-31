@@ -28,6 +28,10 @@ class MessageCursorError(ValueError):
     """Raised when a message cursor cannot be applied safely."""
 
 
+class MessageAnchorError(ValueError):
+    """Raised when an owned transcript anchor cannot be resolved exactly."""
+
+
 def _truthy_metadata_filter(field: str) -> str:
     return (
         f"and(metadata->>{field}.neq.,"
@@ -177,8 +181,13 @@ class SupabaseMessageReadMixin:
         limit: int | None,
         cursor_created_at: datetime | None = None,
         cursor_id: str | None = None,
+        anchor_message_id: str | None = None,
         page: bool = False,
     ) -> list[Message]:
+        if anchor_message_id is not None and (
+            cursor_created_at is not None or cursor_id is not None
+        ):
+            raise MessageCursorError("message anchor and cursor are mutually exclusive")
         if (cursor_created_at is None) != (cursor_id is None):
             raise MessageCursorError("invalid message cursor")
         if cursor_id is not None:
@@ -188,12 +197,35 @@ class SupabaseMessageReadMixin:
                 raise MessageCursorError("invalid message cursor") from None
             if normalized_cursor_id != cursor_id:
                 raise MessageCursorError("invalid message cursor")
+        if anchor_message_id is not None:
+            try:
+                normalized_anchor_id = str(UUID(anchor_message_id))
+            except (AttributeError, TypeError, ValueError):
+                raise MessageAnchorError("invalid message anchor") from None
+            if normalized_anchor_id != anchor_message_id:
+                raise MessageAnchorError("invalid message anchor")
+            anchor_rows = (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .eq("id", anchor_message_id)
+                .limit(2)
+                .execute()
+                .data
+                or []
+            )
+            if len(anchor_rows) != 1:
+                raise MessageAnchorError("message anchor is missing or ambiguous")
+            anchor = Message.model_validate(anchor_rows[0])
+            cursor_created_at = anchor.created_at
+            cursor_id = anchor.id
         if page and limit is None:
             raise ValueError("Message pages require a finite limit.")
         if not page and cursor_created_at is not None:
             raise ValueError("Message cursors are only valid for page reads.")
 
-        if page and self.keyset_reader is not None:
+        if page and self.keyset_reader is not None and anchor_message_id is None:
             assert limit is not None
             keyset_rows = self.keyset_reader.list_message_rows(
                 user_id=user_id,
@@ -218,9 +250,10 @@ class SupabaseMessageReadMixin:
                 )
                 if cursor_created_at is not None and cursor_id is not None:
                     timestamp = cursor_created_at.isoformat()
+                    id_operator = "gte" if anchor_message_id is not None else "gt"
                     query = query.or_(
                         f"created_at.gt.{timestamp},"
-                        f"and(created_at.eq.{timestamp},id.gt.{cursor_id})"
+                        f"and(created_at.eq.{timestamp},id.{id_operator}.{cursor_id})"
                     )
             ordered = query.order("created_at", desc=False).order("id", desc=False)
             rows_data: list[Any]
