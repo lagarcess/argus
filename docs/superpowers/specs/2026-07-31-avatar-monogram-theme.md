@@ -45,15 +45,15 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
      which read as louder/candy-like and less sophisticated.
    - Render and screenshot the new set before finalizing — this is a
      visual quality bar, verify it visually, don't just describe it.
-9. **Scope boundary, unrelated to the palette:** this feature does not
-   touch the existing "App language" setting or relocate it from wherever
-   it currently lives. If it currently requires reaching it via a
-   different entry point (e.g. a top-left icon) than the new avatar
-   picker, that access path stays exactly as it was — do not consolidate
-   it into the new Profile surface as a side effect of adding the avatar
-   picker. If "App language" was already inside this same surface before
-   this lane touched anything, say so and this is moot; if it moved,
-   revert that specific change.
+9. **Correction (superseded the original decision 9): not a relocation
+   issue.** "App language" already lived in this same Profile modal
+   before this lane touched anything — the founder's concern was that
+   inserting the new palette row above it pushed it further down the
+   layout, not that it moved to a different surface. No access-path
+   problem, just a layout-ordering question: once the palette itself
+   reads as intentional (per decision 8, not generic swatches), confirm
+   with the founder whether "App language" should stay above the palette
+   row or the current order is fine.
 
 ## Left to the agent's taste
 
