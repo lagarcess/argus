@@ -36,7 +36,18 @@ who walk through it.
    lane; the load test decides WHICH paid tier, not whether. Expect
    roughly $7/mo per service at the entry paid tier (verify current Render
    pricing at change time) plus usage-based Workflow compute; the PR
-   records the chosen tiers and the actual monthly number.
+   records the chosen tiers and the actual monthly number. **The same
+   forced-move logic applies to Supabase, discovered 2026-07-31 during
+   the 29-migration production repair:** the production project sits on
+   Supabase's free tier, which has zero backup/PITR capability
+   (`pitr_enabled=false`, no completed backups). A production database
+   with no restore point is the same category of gap as an API on a
+   spin-down tier — incompatible with real production readiness, not a
+   one-off cost tied to this single migration. Upgrade to Supabase Pro
+   (roughly $25/mo, verify current pricing at change time) and wait for a
+   completed managed backup before applying the migration batch, rather
+   than a manual encrypted dump — the dataset is small (174MB) so the
+   first backup cycle should complete quickly.
 2. **The load test runs on real infrastructure, not local/synthetic, before
    any tier decision.** Concurrency envelope, already scoped in the archived
    capacity doc: 1 job idle, 5 simultaneous globally, 2 queued same-user, 10
