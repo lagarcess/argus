@@ -180,15 +180,23 @@ who walk through it.
     against this spec's assumptions — proven via Management API against
     the confirmed production project ref (`lgdhvepyrzbnscqssgqq`, no
     preview branch exists for this lane), fixed as follows:**
-    - **Native anonymous sign-ins were disabled — turn ON.** Proven load-
-      bearing, not assumed: `POST /auth/guest`
-      (`src/argus/api/routers/auth.py:142`) calls
+    - **Native anonymous sign-ins were disabled — turned ON by the founder
+      directly (2026-07-31).** Proven load-bearing, not assumed:
+      `POST /auth/guest` (`src/argus/api/routers/auth.py:142`) calls
       `supabase_gateway.sign_in_anonymously()`, which calls Supabase's
       `auth.sign_in_anonymously()`
       (`src/argus/domain/supabase_guest_accounts.py:44`) — hosted guest
       bootstrap cannot function without this. This corrects and replaces
       any earlier assumption in this spec that guest mode's mechanism was
-      independent of Supabase's native anonymous auth.
+      independent of Supabase's native anonymous auth. **Follow-up check,
+      not a new blocker:** Supabase's own dashboard warns that anonymous
+      users are granted the `authenticated` role for RLS purposes, so any
+      Row-Level-Security policy scoped to `authenticated` now also covers
+      guest sessions. Guest mode is pre-existing shipped functionality,
+      so this was almost certainly already accounted for — but confirm
+      with a quick RLS policy pass (no policy grants a guest session
+      access to another user's data or anything admin-adjacent) rather
+      than assuming.
     - **Turnstile/CAPTCHA is enabled project-wide, and the existing
       signup/login flow was never wired to supply a token — this was a
       pre-existing gap, not something this lane broke.** Fix: reuse the
