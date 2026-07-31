@@ -256,7 +256,8 @@ Do not begin or continue public Guest exposure when any of these is true:
 
 - Turnstile server validation is absent or unproven.
 - An anonymous identity can be created without a valid challenge.
-- There is no hard provider spending limit.
+- The registered key is not capped at `$10/week`, or the Guest key is not
+  capped at `$5/week`, in the live OpenRouter dashboard.
 - Client-IP/origin behavior is unknown or trivially spoofable.
 - Guest limits can be bypassed within one authenticated UUID.
 - Replay creates duplicate settlement, provider access, jobs, Runs, or results.

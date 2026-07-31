@@ -252,6 +252,14 @@ def test_public_alpha_load_and_cost_evidence_is_durable() -> None:
     assert "$0.20/hour" in evidence
 
 
+def test_guest_launch_safety_records_live_hard_provider_caps() -> None:
+    safety = " ".join(_source("docs/GUEST_PUBLIC_LAUNCH_SAFETY.md").split())
+
+    assert "There is no hard provider spending limit." not in safety
+    assert "registered key is not capped at `$10/week`" in safety
+    assert "Guest key is not capped at `$5/week`" in safety
+
+
 def test_private_launch_runbook_assigns_app_origin_and_smtp_secret_correctly() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     ownership = runbook.split("## Render Environment Ownership", 1)[1].split(
