@@ -176,11 +176,11 @@ def test_waitlist_exposure_waits_for_paid_render_rollback_controls() -> None:
     api_service = blueprint.split("name: argus-api", 1)[1].split("\n  - type:", 1)[0]
     app_service = blueprint.split("name: argus-app", 1)[1]
 
-    assert "plan: starter" in api_service
+    assert "plan: standard" in api_service
     assert "plan: starter" in app_service
     assert (
-        "The checked-in Render Blueprint declares both `argus-api` and "
-        "`argus-app` as `plan: starter`." in evidence
+        "The checked-in Render Blueprint declares `argus-api` as `plan: standard` "
+        "and `argus-app` as `plan: starter`." in evidence
     )
     assert (
         "Do not apply "
@@ -245,9 +245,10 @@ def test_public_alpha_load_and_cost_evidence_is_durable() -> None:
     assert "1,466 seconds" in evidence
     assert "0.407222 hours" in evidence
     assert "$0.081444" in evidence
-    assert "Starter" in evidence
-    assert "$7/month per service" in evidence
-    assert "$14/month total" in evidence
+    assert "0.15 CPU" in evidence
+    assert "83.88%" in evidence
+    assert "$32/month fixed service floor" in evidence
+    assert "$25 API + $7 app" in evidence
     assert "Standard Workflow compute" in evidence
     assert "$0.20/hour" in evidence
 

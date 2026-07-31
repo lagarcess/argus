@@ -57,9 +57,10 @@ same 512-MiB RAM ceiling and leave only 82.51 MiB of measured peak headroom.
 Starter remains the proportional choice for `argus-app` because the paid-tier
 requirement there is no spin-down, and no load evidence supports buying four
 times the RAM. This would produce a $32/month fixed service floor ($25 API + $7
-app), plus metered Workflow compute and any overage. The founder has not yet
-selected or applied this tier split; both live services remain Free and no plan
-change is authorized until that selection is made.
+app), plus metered Workflow compute and any overage. The founder selected this
+tier split in Render on 2026-07-31. Render applies the instance-type changes on
+the next successful deploy, so the dashboard selection is not live-tier proof;
+control-plane readback after that deploy remains mandatory.
 
 ## Production migration lineage repair
 
@@ -115,11 +116,11 @@ API SHA predates the merged Omnisearch reader, so exact hosted recall behavior
 remains an exact-candidate deploy proof rather than migration-application
 proof.
 
-The checked-in Blueprint still declares both services as `plan: starter`; it
-predates the resource-headroom readback above and is not evidence of a selected
-or live instance type. Supabase stays on its free tier for this lane: there are
-no real users or customer data to protect yet, and the 2026-07-31 spec
-correction explicitly defers a Pro decision until that changes.
+The checked-in Blueprint declares `argus-api` as `plan: standard` and
+`argus-app` as `plan: starter`, matching the founder's selected tier split.
+Supabase stays on its free tier for this lane: there are no real users or
+customer data to protect yet, and the 2026-07-31 spec correction explicitly
+defers a Pro decision until that changes.
 
 ## Approval SMTP secret
 
@@ -137,10 +138,11 @@ requested-role migration, and exact Phase 2 deploy are complete.
 
 ## Waitlist paid-control precondition
 
-The checked-in Render Blueprint declares both `argus-api` and `argus-app` as
-`plan: starter`. A checked-in plan is not proof of the live instance type, and
-it is not yet safe by itself for the requested-role migration or waitlist
-exposure. Render documents that [maintenance mode is available only on paid web
+The checked-in Render Blueprint declares `argus-api` as `plan: standard` and
+`argus-app` as `plan: starter`. A checked-in plan or dashboard selection is not
+proof of the live instance type, and it is not yet safe by itself for the
+requested-role migration or waitlist exposure. Render documents that
+[maintenance mode is available only on paid web
 services](https://render.com/docs/maintenance-mode), [Free web services cannot
 receive private-network traffic](https://render.com/docs/private-network), and
 [Free web services do not support shell or SSH

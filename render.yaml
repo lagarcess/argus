@@ -6,7 +6,7 @@ services:
     branch: main
     rootDir: .
     region: virginia
-    plan: starter
+    plan: standard
     autoDeployTrigger: off
     buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
