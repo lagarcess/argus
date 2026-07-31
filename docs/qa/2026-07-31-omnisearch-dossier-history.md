@@ -93,6 +93,16 @@ Trace/network evidence:
 
 ## Verification
 
-Full repository verification is recorded in the pull request against the final
-candidate SHA. Disposable-Postgres-only tests remain explicitly skipped when
+The exact post-acceptance branch passed:
+
+- `poetry run pytest tests/ -q`: 3,242 passed, 209 skipped, 87% coverage;
+- hermetic agent-runtime and spine sweep: 1,439 passed;
+- OpenAPI compatibility and Alpha artifact checks: 34 passed;
+- `bun test`: 793 passed;
+- ESLint: zero errors and one pre-existing unused-import warning in
+  `ChatInterface.tsx`;
+- Next.js production build, Ruff, modularity budget, generated OpenAPI
+  comparison, environment topology, and diff hygiene: passed.
+
+Disposable-Postgres-only tests remain explicitly skipped when
 `ARGUS_DISPOSABLE_DATABASE_URL` is unavailable; no migration was added.
