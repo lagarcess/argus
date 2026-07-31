@@ -220,14 +220,13 @@ describe("retest failure recovery", () => {
         content: "Something went wrong. Your conversation is saved. Please try again.",
         created_at: "2026-07-31T00:00:01Z",
         metadata: {
+          // Server-side reconciliation retires the failure once the retry
+          // lands an authoritative artifact in the same segment.
+          agent_runtime_failure_superseded: true,
           recovery: { code: "runtime_failure", retryable: true },
-          retry_last_turn: {
-            request_message_id: "user-retest-1",
-            message: "Retest with current data",
-            action: PERSISTED_ACTION,
-          },
         },
       } as ApiMessage,
+      userActionMessage({ id: "user-retest-2" }),
       {
         id: "assistant-confirmation-1",
         conversation_id: "conversation-1",
@@ -250,6 +249,11 @@ describe("retest failure recovery", () => {
 
     const receipts = messages.filter((message) => message.retestReceipt);
     expect(receipts).toHaveLength(1);
+    expect(receipts[0].id).toBe("user-retest-2");
+    expect(messages.map((message) => message.id)).toEqual([
+      "user-retest-2",
+      "assistant-confirmation-1",
+    ]);
     expect(messages.at(-1)?.kind).toBe("strategy_confirmation");
   });
 });
