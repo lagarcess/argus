@@ -20,12 +20,20 @@ describe("keyboard shortcuts overlay", () => {
 
     const overlay = readFileSync(overlayPath, "utf-8");
     const chat = source("components/chat/ChatInterface.tsx");
+    const keyboardShortcutHook = source(
+      "components/keyboard/useChatKeyboardShortcuts.ts",
+    );
     const guestShellActions = source("components/guest/useGuestShellActions.ts");
     const menu = source("components/sidebar/ProfileMenu.tsx");
 
     expect(overlay).toContain("KEYBOARD_SHORTCUTS.filter");
     expect(overlay).toContain("max-h-[calc(100dvh-2rem)]");
-    expect(chat).toContain('matchesKeyboardShortcut("keyboard_shortcuts", event)');
+    expect(chat).toContain("useChatKeyboardShortcuts");
+    expect(keyboardShortcutHook).toContain(
+      'matchesKeyboardShortcut("keyboard_shortcuts", event)',
+    );
+    expect(keyboardShortcutHook).toContain("canOpenKeyboardShortcuts");
+    expect(keyboardShortcutHook).toContain("canManageFocusedConversation");
     expect(guestShellActions).toContain(
       'matchesKeyboardShortcut("omnisearch", event)',
     );
@@ -110,6 +118,9 @@ describe("keyboard shortcuts overlay", () => {
 
   test("routes every real action through the central registry", () => {
     const chat = source("components/chat/ChatInterface.tsx");
+    const keyboardShortcutHook = source(
+      "components/keyboard/useChatKeyboardShortcuts.ts",
+    );
 
     for (const id of [
       "new_chat",
@@ -120,9 +131,12 @@ describe("keyboard shortcuts overlay", () => {
       "open_settings",
       "toggle_pin_focused_chat",
     ]) {
-      expect(chat).toContain(`matchesKeyboardShortcut("${id}", event)`);
+      expect(keyboardShortcutHook).toContain(
+        `matchesKeyboardShortcut("${id}", event)`,
+      );
     }
-    expect(chat).toContain("setShowChatOptions(true);");
-    expect(chat).toContain("<RecentsQuickPeek");
+    expect(chat).toContain("useChatKeyboardShortcuts");
+    expect(keyboardShortcutHook).toContain("current.showChatOptions();");
+    expect(keyboardShortcutHook).toContain("setIsRecentsQuickPeekOpen(true);");
   });
 });

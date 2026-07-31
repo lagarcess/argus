@@ -12,9 +12,8 @@ import { ArrowDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
-import KeyboardShortcutsOverlay from "@/components/sidebar/KeyboardShortcutsOverlay";
-import RecentsQuickPeek from "@/components/sidebar/RecentsQuickPeek";
-import { nextSidebarRecentsState } from "@/lib/sidebar-shortcuts";
+import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
+import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
 import ChatSidebar, {
   type SidebarMode,
 } from "@/components/sidebar/ChatSidebar";
@@ -24,6 +23,7 @@ import StarterActions from "@/components/chat/StarterActions";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
+import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
@@ -56,7 +56,6 @@ import {
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
-import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
@@ -86,6 +85,12 @@ import {
   conversationLoadFailureMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
+import {
+  COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS,
+  historyItemBelongsToConversation,
+  isMissingConversationLoadError,
+  POST_TURN_TITLE_REFRESH_DELAYS_MS,
+} from "@/lib/chat-conversation-view-helpers";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
@@ -184,43 +189,8 @@ import {
 } from "./artifact-history";
 
 type View = "chat" | "strategies" | "settings";
-type SendOptions = {
-  renderUserMessage?: boolean;
-  replacementAssistantId?: string;
-  bypassGuestGate?: boolean;
-};
+type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
-const COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS = 150;
-const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
-
-function historyItemBelongsToConversation(
-  item: HistoryItem,
-  targetConversationId: string,
-) {
-  return (
-    item.id === targetConversationId ||
-    item.conversation_id === targetConversationId
-  );
-}
-
-function isMissingConversationLoadError(error: unknown) {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const status = "status" in error ? Number(error.status) : null;
-  const code =
-    "code" in error && typeof error.code === "string" ? error.code : null;
-  return status === 403 || status === 404 || code === "not_found";
-}
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
@@ -246,10 +216,6 @@ export default function ChatInterface() {
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const [isRecentsQuickPeekOpen, setIsRecentsQuickPeekOpen] =
-    useState(false);
-  const [settingsOpenRequest, setSettingsOpenRequest] = useState(0);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<
     string | null
@@ -897,34 +863,16 @@ export default function ChatInterface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateScrollPositionState = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const activeTranscriptId = readyTranscriptConversationIdRef.current;
-    const userId = account?.user.id;
-    if (
-      activeTranscriptId &&
-      userId &&
-      activeTranscriptId === activeConversationIdRef.current
-    ) {
-      transcriptSessionCache.rememberScroll({
-        userId,
-        conversationId: activeTranscriptId,
-        scrollTop: container.scrollTop,
-      });
-    }
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current = isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  }, [account?.user.id, transcriptSessionCache]);
-
-  const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
-    bottomRef.current?.scrollIntoView({ behavior });
-    shouldAutoScrollRef.current = true;
-    setShowJumpToLatest(false);
-  };
+  const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({
+    accountUserId: account?.user.id,
+    activeConversationIdRef,
+    readyTranscriptConversationIdRef,
+    bottomRef,
+    scrollContainerRef,
+    shouldAutoScrollRef,
+    transcriptSessionCache,
+    setShowJumpToLatest,
+  });
 
   useLayoutEffect(() => {
     const pendingAnchor = pendingMessageAnchorRef.current;
@@ -970,7 +918,7 @@ export default function ChatInterface() {
     } else {
       updateScrollPositionState();
     }
-  }, [messages.length, streamStatus, updateScrollPositionState]);
+  }, [messages.length, scrollToLatest, streamStatus, updateScrollPositionState]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
@@ -2055,11 +2003,11 @@ export default function ChatInterface() {
     placeholder: t("chat.new_chat", "New chat"),
   });
 
-  const handleStartHeaderRename = useCallback(() => {
+  const handleStartHeaderRename = () => {
     if (!conversationId) return;
     setHeaderRenameValue(renamePrefillTitle(activeTitleRecord));
     setIsRenamingHeaderChat(true);
-  }, [activeTitleRecord, conversationId]);
+  };
 
   const handleSaveHeaderRename = async () => {
     if (!conversationId || isSavingHeaderRename) return;
@@ -2082,7 +2030,7 @@ export default function ChatInterface() {
     }
   };
 
-  const handleToggleHeaderPin = useCallback(async () => {
+  const handleToggleHeaderPin = async () => {
     if (!conversationId || isPinningHeaderChat) return;
     setIsPinningHeaderChat(true);
     try {
@@ -2096,21 +2044,13 @@ export default function ChatInterface() {
     } finally {
       setIsPinningHeaderChat(false);
     }
-  }, [
-    activeHistoryChat,
-    closeChatOptions,
-    conversationId,
-    isPinningHeaderChat,
-    refreshHistory,
-    showToast,
-    t,
-  ]);
+  };
 
-  const handleRequestHeaderDelete = useCallback(() => {
+  const handleRequestHeaderDelete = () => {
     if (!conversationId) return;
     setPendingHeaderDeleteId(conversationId);
     closeChatOptions();
-  }, [closeChatOptions, conversationId]);
+  };
 
   const handleConfirmHeaderDelete = async () => {
     if (!pendingHeaderDeleteId || isDeletingHeaderChat) return;
@@ -2162,94 +2102,25 @@ export default function ChatInterface() {
     isHydratingConversation ||
     failedConversationId === conversationId;
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!matchesKeyboardShortcut("keyboard_shortcuts", event)) return;
-      event.preventDefault();
-      setKeyboardShortcutsOpen((open) => !open);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        keyboardShortcutsOpen ||
-        searchOverlayOpen ||
-        isRecentsQuickPeekOpen ||
-        pendingHeaderDeleteId ||
-        isEditableShortcutTarget(event.target)
-      ) {
-        return;
-      }
-
-      if (matchesKeyboardShortcut("new_chat", event)) {
-        event.preventDefault();
-        setIsRecentsQuickPeekOpen(false);
-        requestNewChat();
-        closeTransientSidebar();
-        return;
-      }
-      if (matchesKeyboardShortcut("open_recents", event)) {
-        event.preventDefault();
-        setIsRecentsExpanded(false);
-        setIsRecentsQuickPeekOpen(true);
-        return;
-      }
-      if (matchesKeyboardShortcut("expand_sidebar_recents", event)) {
-        event.preventDefault();
-        setIsRecentsQuickPeekOpen(false);
-        const nextState = nextSidebarRecentsState(
-          isSidebarOpen,
-          isRecentsExpanded,
-        );
-        setIsSidebarOpen(nextState.sidebarOpen);
-        setIsRecentsExpanded(nextState.recentsExpanded);
-        return;
-      }
-      if (matchesKeyboardShortcut("open_settings", event) && !isGuest) {
-        event.preventDefault();
-        setIsRecentsQuickPeekOpen(false);
-        setSettingsOpenRequest((request) => request + 1);
-        return;
-      }
-      if (!canManageConversation || !conversationId) return;
-
-      if (matchesKeyboardShortcut("delete_focused_chat", event)) {
-        event.preventDefault();
-        handleRequestHeaderDelete();
-        return;
-      }
-      if (matchesKeyboardShortcut("rename_focused_chat", event)) {
-        event.preventDefault();
-        setShowChatOptions(true);
-        handleStartHeaderRename();
-        return;
-      }
-      if (matchesKeyboardShortcut("toggle_pin_focused_chat", event)) {
-        event.preventDefault();
-        void handleToggleHeaderPin();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
+  const keyboardShortcuts = useChatKeyboardShortcuts({
+    isChatView: currentView === "chat",
     canManageConversation,
-    closeTransientSidebar,
     conversationId,
-    handleRequestHeaderDelete,
-    handleStartHeaderRename,
-    handleToggleHeaderPin,
     isGuest,
-    isRecentsExpanded,
-    isRecentsQuickPeekOpen,
-    isSidebarOpen,
-    keyboardShortcutsOpen,
-    pendingHeaderDeleteId,
-    requestNewChat,
     searchOverlayOpen,
-  ]);
+    deleteConfirmationOpen: Boolean(pendingHeaderDeleteId),
+    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen,
+    sidebarOpen: isSidebarOpen,
+    setSidebarOpen: setIsSidebarOpen,
+    recentsExpanded: isRecentsExpanded,
+    setRecentsExpanded: setIsRecentsExpanded,
+    requestNewChat,
+    closeTransientSidebar,
+    requestDelete: handleRequestHeaderDelete,
+    startRename: handleStartHeaderRename,
+    togglePin: handleToggleHeaderPin,
+    showChatOptions: () => setShowChatOptions(true),
+  });
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -2311,8 +2182,10 @@ export default function ChatInterface() {
           });
         }}
         onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
-        onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
-        settingsOpenRequest={settingsOpenRequest}
+        onOpenKeyboardShortcuts={() =>
+          keyboardShortcuts.setKeyboardShortcutsOpen(true)
+        }
+        settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={omnisearchEnabled}
@@ -2322,17 +2195,19 @@ export default function ChatInterface() {
         guestExpiresAt={account?.guest?.expires_at}
       />
 
-      {isRecentsQuickPeekOpen && (
-        <RecentsQuickPeek
-          historyItems={historyItems}
-          activeConversationId={conversationId}
-          onOpenItem={(item) => {
-            setIsRecentsQuickPeekOpen(false);
-            openHistoryItem(item);
-          }}
-          onClose={() => setIsRecentsQuickPeekOpen(false)}
-        />
-      )}
+      <KeyboardShortcutSurfaces
+        keyboardShortcutsOpen={keyboardShortcuts.keyboardShortcutsOpen}
+        onCloseKeyboardShortcuts={() =>
+          keyboardShortcuts.setKeyboardShortcutsOpen(false)
+        }
+        recentsQuickPeekOpen={keyboardShortcuts.isRecentsQuickPeekOpen}
+        historyItems={historyItems}
+        activeConversationId={conversationId}
+        onOpenHistoryItem={openHistoryItem}
+        onCloseRecentsQuickPeek={() =>
+          keyboardShortcuts.setIsRecentsQuickPeekOpen(false)
+        }
+      />
 
       {omnisearchEnabled &&
         (!isGuest || canUseOmnisearch) &&
@@ -2353,12 +2228,6 @@ export default function ChatInterface() {
             onConversationRemoved={handleConversationRemoved}
           />
         )}
-
-      {keyboardShortcutsOpen && (
-        <KeyboardShortcutsOverlay
-          onClose={() => setKeyboardShortcutsOpen(false)}
-        />
-      )}
 
       <ConfirmDialog
         isOpen={Boolean(pendingHeaderDeleteId)}

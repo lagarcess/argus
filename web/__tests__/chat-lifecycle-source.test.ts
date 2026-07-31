@@ -147,6 +147,10 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("a missing bootstrap conversation is pruned without removing an interactive failure", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
+      "utf-8",
+    );
     const navigationStart = chat.indexOf(
       "async function navigateConversationTranscript(",
     );
@@ -156,7 +160,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     const navigation = chat.slice(navigationStart, navigationEnd);
 
-    expect(chat).toContain("function isMissingConversationLoadError(error: unknown)");
+    expect(viewHelpers).toContain(
+      "function isMissingConversationLoadError(error: unknown)",
+    );
     expect(navigation).toContain("options.bootstrap &&");
     expect(navigation).toContain("isMissingConversationLoadError(state.error)");
     expect(navigation).toContain("setHistoryItems((current) =>");

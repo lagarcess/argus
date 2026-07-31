@@ -14,7 +14,7 @@ export type KeyboardShortcutGroup = "navigation" | "chat" | "quick_jump";
 
 export type KeyboardShortcutEvent = Pick<
   KeyboardEvent,
-  "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey"
+  "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "repeat" | "shiftKey"
 >;
 
 type KeyboardShortcutMatch =
@@ -142,6 +142,7 @@ export function matchesKeyboardShortcut(
   id: KeyboardShortcutId,
   event: KeyboardShortcutEvent,
 ): boolean {
+  if (event.repeat) return false;
   const shortcut = keyboardShortcut(id);
   if (shortcut.match === "quick_jump") return false;
 
@@ -224,6 +225,7 @@ export function quickJumpIndexForEvent(
   event: KeyboardShortcutEvent,
   usesCommandKey: boolean,
 ): number | null {
+  if (event.repeat) return null;
   const modifierMatches = usesCommandKey
     ? event.metaKey && event.altKey && !event.ctrlKey && !event.shiftKey
     : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;

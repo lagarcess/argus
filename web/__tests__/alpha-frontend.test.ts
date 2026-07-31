@@ -2120,15 +2120,19 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("function schedulePostTurnHistoryRefresh");
     expect(chat).toContain("listConversations");
     expect(chat).toContain("title_source");
     expect(chat).toContain("window.setTimeout");
-    expect(chat).toContain("1500");
-    expect(chat).toContain("5000");
-    expect(chat).toContain("9000");
-    expect(chat).toContain("13000");
+    expect(viewHelpers).toContain("1500");
+    expect(viewHelpers).toContain("5000");
+    expect(viewHelpers).toContain("9000");
+    expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
       "schedulePostTurnHistoryRefresh(targetConversationId);",
     );

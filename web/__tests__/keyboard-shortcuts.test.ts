@@ -221,4 +221,34 @@ describe("keyboard shortcut registry", () => {
       ),
     ).toBeNull();
   });
+
+  test("ignores auto-repeat for actions and quick-jump digits", () => {
+    expect(
+      matchesKeyboardShortcut("keyboard_shortcuts", {
+        key: "/",
+        code: "Slash",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        repeat: true,
+      }),
+    ).toBe(false);
+    expect(quickJumpIndexForEvent).toBeTypeOf("function");
+    if (!quickJumpIndexForEvent) return;
+    expect(
+      quickJumpIndexForEvent(
+        {
+          key: "1",
+          code: "Digit1",
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: true,
+          repeat: true,
+        },
+        true,
+      ),
+    ).toBeNull();
+  });
 });
