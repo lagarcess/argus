@@ -836,7 +836,11 @@ export default function ProfileMenu({
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
-            className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
+            className={`relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 transition-[opacity,transform,filter] duration-200 ease-out dark:border-white/10 dark:bg-[#1b1d20] ${
+              isAvatarPickerOpen
+                ? "scale-[0.98] opacity-45 blur-[1px]"
+                : ""
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="argus-profile-modal-title"
@@ -1093,14 +1097,14 @@ export default function ProfileMenu({
               </button>
             </div>
             <div
-              className="grid grid-cols-4 gap-3"
+              className="grid grid-cols-8 gap-3"
               role="radiogroup"
               aria-label={t(
                 "settings.profile.avatar_theme.label",
                 "Monogram color",
               )}
             >
-              {AVATAR_THEMES.map((theme) => {
+              {AVATAR_THEMES.map((theme, index) => {
                 const selected =
                   (profile?.avatar_theme ?? "ocean") === theme.token;
                 const themeLabel = t(
@@ -1117,7 +1121,9 @@ export default function ProfileMenu({
                     title={themeLabel}
                     disabled={isSavingAvatarTheme}
                     onClick={() => void handleAvatarThemeSelect(theme.token)}
-                    className={`flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 ${
+                    className={`col-span-2 flex h-11 w-11 justify-self-center items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 ${
+                      index === 4 ? "col-start-2" : ""
+                    } ${
                       selected
                         ? "ring-2 ring-black ring-offset-2 dark:ring-white dark:ring-offset-[#23262a]"
                         : ""

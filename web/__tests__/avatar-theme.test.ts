@@ -66,6 +66,9 @@ describe("avatar monogram themes", () => {
     expect(menu).toContain('document.addEventListener("keydown", handleKeyDown)');
     expect(menu).toContain("avatarTriggerRef.current?.focus()");
     expect(menu).toContain("h-11 w-11 items-center justify-center");
+    expect(menu).toContain("grid-cols-8 gap-3");
+    expect(menu).toContain('index === 4 ? "col-start-2" : ""');
+    expect(menu).toContain('"scale-[0.98] opacity-45 blur-[1px]"');
     expect(menu).not.toContain("<fieldset");
     expect(menu).toContain("bg-[#191c1f] text-white dark:bg-white/10");
     expect(menu).toContain("profile?.display_name?.trim() ||");
