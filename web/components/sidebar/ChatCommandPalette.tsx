@@ -111,6 +111,8 @@ type DateDisplayGroup = {
 
 const SEARCH_DEBOUNCE_MS = 200;
 const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
+export const commandPaletteDossierPanelClassName = (view: DossierPaneState["view"]) =>
+  `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:h-auto md:max-h-none md:w-[44%] md:overflow-visible md:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
 
 function isEditableKeyboardTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -1658,13 +1660,11 @@ export default function ChatCommandPalette({
           </div>
 
           {layoutMode === "expanded" && (
-            <div className="flex max-h-[42%] w-full shrink-0 flex-col overflow-y-auto bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:overflow-visible md:p-6">
+            <div className={commandPaletteDossierPanelClassName(dossierPaneState.view)}>
               {selectedPreview ? (
                 <div
                   className="flex h-full flex-col"
-                  data-dossier-pane={
-                    selectedPreview.dossier ? "true" : undefined
-                  }
+                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
                 >
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">

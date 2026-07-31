@@ -421,4 +421,31 @@ describe("command palette dossier integration", () => {
       source.indexOf("onOpenHistory="),
     );
   });
+
+  test("mobile history reserves a scrollable pane while keeping the conversation list", async () => {
+    const paletteModule = await import(
+      "../components/sidebar/ChatCommandPalette"
+    );
+    const panelClassName = Reflect.get(
+      paletteModule,
+      "commandPaletteDossierPanelClassName",
+    );
+
+    expect(typeof panelClassName).toBe("function");
+    if (typeof panelClassName !== "function") return;
+
+    const historyClasses = String(panelClassName("history")).split(/\s+/);
+    expect(historyClasses).toContain("h-[68%]");
+    expect(historyClasses).toContain("max-h-[68%]");
+    expect(historyClasses).toContain("overflow-hidden");
+    expect(historyClasses).toContain("md:h-auto");
+    expect(historyClasses).toContain("md:max-h-none");
+    expect(historyClasses).toContain("md:overflow-visible");
+    expect(historyClasses).not.toContain("max-h-[42%]");
+
+    const dossierClasses = String(panelClassName("dossier")).split(/\s+/);
+    expect(dossierClasses).toContain("max-h-[42%]");
+    expect(dossierClasses).toContain("overflow-y-auto");
+    expect(dossierClasses).not.toContain("h-[68%]");
+  });
 });
