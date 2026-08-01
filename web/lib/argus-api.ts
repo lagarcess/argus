@@ -37,6 +37,34 @@ export type BacktestJobStatus =
   | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
+export type ConversationOperationStatus =
+  | "idle"
+  | "queued"
+  | "running"
+  | "checking";
+export type ConversationOperationKind = "chat_turn" | "backtest_job" | null;
+export type ConversationOperation = {
+  status: ConversationOperationStatus;
+  kind?: ConversationOperationKind;
+  updated_at?: string | null;
+};
+export type ConversationAttentionStatus =
+  | "none"
+  | "new_activity"
+  | "manual_unread"
+  | "needs_input"
+  | "needs_attention";
+export type ConversationAttention = {
+  status: ConversationAttentionStatus;
+  cursor?: string | null;
+};
+export type ConversationActivity = {
+  operation: ConversationOperation;
+  attention: ConversationAttention;
+};
+export type ConversationActivityPatch =
+  | { action: "mark_unread" }
+  | { action: "mark_read"; through_attention_cursor?: string | null };
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -168,6 +196,7 @@ export type Conversation = {
   updated_at: string;
   last_message_preview?: string | null;
   language?: "en" | "es-419" | null;
+  activity?: ConversationActivity | null;
 };
 
 type AuthSessionPayload = {
@@ -234,11 +263,11 @@ export type Collection = {
   updated_at: string;
 };
 
-export type HistoryItem = {
+type HistoryItemBase = {
   type: HistoryItemType;
   id: string;
   title: string;
-  /** Chat items only; mirrors the conversation record. */
+  /** Present on chat items; retained as optional for existing history consumers. */
   title_source?: TitleSource | null;
   subtitle: string;
   pinned: boolean;
@@ -246,6 +275,18 @@ export type HistoryItem = {
   conversation_id?: string | null;
   expires_at?: string | null;
 };
+
+export type ChatHistoryItem = HistoryItemBase & {
+  type: "chat";
+  activity?: ConversationActivity | null;
+};
+
+export type NonChatHistoryItem = HistoryItemBase & {
+  type: Exclude<HistoryItemType, "chat">;
+  activity?: never;
+};
+
+export type HistoryItem = ChatHistoryItem | NonChatHistoryItem;
 
 export type ArtifactLifecycle =
   | "captured"
@@ -803,6 +844,22 @@ export async function patchConversation(
   );
 }
 
+export async function getConversationActivity(conversationId: string) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+  );
+}
+
+export async function patchConversationActivity(
+  conversationId: string,
+  patch: ConversationActivityPatch,
+) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+    { method: "PATCH", body: JSON.stringify(patch) },
+  );
+}
+
 export async function deleteConversation(conversationId: string) {
   return apiFetch<{ success: boolean }>(`/conversations/${conversationId}`, {
     method: "DELETE",
@@ -1010,16 +1067,22 @@ export async function getBacktestJob(jobId: string) {
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────
 
+export type ChatStreamOptions = Readonly<{
+  requestId?: string;
+  signal?: AbortSignal;
+}>;
+
 export async function streamChatMessage(
   conversationId: string,
   input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
   mentions: ChatMention[] = [],
+  options: ChatStreamOptions = {},
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? crypto.randomUUID();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1033,6 +1096,7 @@ export async function streamChatMessage(
 
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
+    signal: options.signal,
     headers: {
       "Content-Type": "application/json",
       "X-Request-Id": submittedRequestId,
