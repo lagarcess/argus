@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectOneCanonicalCard } from "./auth-card-assertions";
 
 const signupEmail = "confirmation-state@example.com";
 const password = "correct-horse-battery-staple";
@@ -62,6 +63,7 @@ test("sessionless signup focuses check-email state without navigating", async ({
   await expect(state).toBeVisible();
   await expect(state.getByRole("heading", { name: "Check your email" }))
     .toBeFocused();
+  await expectOneCanonicalCard(state.locator("xpath=.."));
   await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
 });
 

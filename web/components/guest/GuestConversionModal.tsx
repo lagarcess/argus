@@ -103,7 +103,7 @@ export default function GuestConversionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="guest-conversion-title"
-        className="relative w-full max-w-[440px] rounded-[28px] border border-black/10 bg-[#f9f9f9] p-6 shadow-2xl dark:border-white/10 dark:bg-[#1c1f24] sm:p-8"
+        className="relative w-full max-w-[440px] rounded-[20px] border border-black/10 bg-[#f9f9f9] p-6 dark:border-white/10 dark:bg-[#1c1f24] sm:p-8"
       >
         <button
           type="button"
@@ -119,6 +119,7 @@ export default function GuestConversionModal({
         {mode === "request" ? (
           <RequestAccess
             headingId="guest-conversion-title"
+            embedded
             onShowSignup={() => setMode("signup")}
             onShowLogin={() => setMode("login")}
           />
@@ -143,6 +144,7 @@ export default function GuestConversionModal({
             <AuthForm
               mode={mode}
               allowModeSwitch={publicAccountAccessEnabled}
+              embedded
               onModeChange={setMode}
               onSubmit={onAuthenticate}
             />

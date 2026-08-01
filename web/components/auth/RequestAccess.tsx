@@ -13,12 +13,14 @@ import { requestAccess } from "@/lib/guest-api";
 
 type RequestAccessProps = {
   headingId?: string;
+  embedded?: boolean;
   onShowSignup: () => void;
   onShowLogin: () => void;
 };
 
 export default function RequestAccess({
   headingId = "request-access-title",
+  embedded = false,
   onShowSignup,
   onShowLogin,
 }: RequestAccessProps) {
@@ -54,13 +56,15 @@ export default function RequestAccess({
   };
 
   return (
-    <div className="w-full">
+    <div
+      className={
+        embedded
+          ? "w-full"
+          : "w-full rounded-[20px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]"
+      }
+    >
       {isAccepted ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-[28px] border border-black/10 bg-black/[0.025] px-6 py-7 text-center dark:border-white/10 dark:bg-white/[0.04]"
-        >
+        <div role="status" aria-live="polite" className="text-center">
           <h2
             id={headingId}
             ref={acceptedHeadingRef}
