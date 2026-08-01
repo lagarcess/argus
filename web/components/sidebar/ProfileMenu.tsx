@@ -458,6 +458,41 @@ export default function ProfileMenu({
     [accountKind, isSavingAvatarTheme, profile, t],
   );
 
+  const handleAvatarThemeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+      if (isSavingAvatarTheme) return;
+
+      const lastIndex = AVATAR_THEMES.length - 1;
+      let nextIndex: number | null = null;
+
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+          break;
+        case "Home":
+          nextIndex = 0;
+          break;
+        case "End":
+          nextIndex = lastIndex;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      avatarThemeDrawerRef.current
+        ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+        [nextIndex]?.focus();
+      void handleAvatarThemeSelect(AVATAR_THEMES[nextIndex].token);
+    },
+    [handleAvatarThemeSelect, isSavingAvatarTheme],
+  );
+
   const handleOpenDeleteRequest = useCallback(() => {
     setDeleteRequestState("idle");
     setIsDeleteRequestOpen(true);
@@ -826,7 +861,7 @@ export default function ProfileMenu({
                       {profileInitial(profile)}
                     </span>
                     <span
-                      className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 scale-75 items-center justify-center rounded-full bg-white text-black opacity-0 ring-1 ring-black/10 transition duration-150 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
+                      className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
                       aria-hidden="true"
                     >
                       <Edit2 className="h-2.5 w-2.5" />
@@ -972,6 +1007,7 @@ export default function ProfileMenu({
                       <div
                         className="grid grid-cols-8 place-items-center gap-y-2 sm:grid-cols-7"
                         role="radiogroup"
+                        aria-busy={isSavingAvatarTheme || undefined}
                         aria-label={t(
                           "settings.profile.avatar_theme.label",
                           "Avatar color",
@@ -992,9 +1028,17 @@ export default function ProfileMenu({
                               aria-checked={selected}
                               aria-label={themeLabel}
                               title={themeLabel}
-                              disabled={isSavingAvatarTheme}
+                              aria-disabled={isSavingAvatarTheme || undefined}
                               onClick={() => void handleAvatarThemeSelect(theme.token)}
-                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 sm:col-span-1 ${
+                              onKeyDown={(event) =>
+                                handleAvatarThemeKeyDown(event, index)
+                              }
+                              tabIndex={selected ? 0 : -1}
+                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50 sm:col-span-1 ${
+                                isSavingAvatarTheme
+                                  ? "cursor-wait opacity-60"
+                                  : ""
+                              } ${
                                 index === 4 ? "col-start-2 sm:col-auto" : ""
                               }`}
                             >
