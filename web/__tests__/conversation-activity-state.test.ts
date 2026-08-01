@@ -6,7 +6,9 @@ import {
   createConversationActivityState,
   selectAggregateConversationActivityPresentation,
   selectConversationActivityPresentation,
+  selectConversationAttentionCursor,
   selectConversationAnnouncement,
+  selectConversationHasEffectiveUnread,
   selectConversationIsLocked,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
@@ -26,6 +28,77 @@ const activity = (
 });
 
 describe("conversation activity presentation", () => {
+  test("selects effective unread independently from working presentation", () => {
+    let state = createConversationActivityState();
+    const unreadStatuses = [
+      "new_activity",
+      "manual_unread",
+      "needs_input",
+      "needs_attention",
+    ] as const;
+
+    for (const attention of unreadStatuses) {
+      state = conversationActivityReducer(state, {
+        type: "server_projection_merged",
+        conversationId: attention,
+        activity: activity("running", attention, `cursor-${attention}`),
+        revision: 1,
+      });
+      expect(selectConversationActivityPresentation(state, attention)).toBe(
+        "working",
+      );
+      expect(selectConversationHasEffectiveUnread(state, attention)).toBe(true);
+      expect(selectConversationAttentionCursor(state, attention)).toBe(
+        `cursor-${attention}`,
+      );
+    }
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "read",
+      activity: activity("running", "none"),
+      revision: 1,
+    });
+    expect(selectConversationHasEffectiveUnread(state, "read")).toBe(false);
+    expect(selectConversationAttentionCursor(state, "read")).toBeNull();
+  });
+
+  test("applies only the current optimistic read intent to effective unread", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("running", "new_activity", "cursor-current"),
+      revision: 1,
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "read-1",
+      action: "mark_read",
+      revision: 2,
+      activeView: true,
+    });
+    expect(selectConversationHasEffectiveUnread(state, "conversation-a")).toBe(
+      false,
+    );
+    expect(selectConversationAttentionCursor(state, "conversation-a")).toBe(
+      "cursor-current",
+    );
+
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "unread-2",
+      action: "mark_unread",
+      revision: 3,
+      activeView: true,
+    });
+    expect(selectConversationHasEffectiveUnread(state, "conversation-a")).toBe(
+      true,
+    );
+  });
+
   test("uses the locked precedence for canonical and optimistic conflicts", () => {
     const attentionCases = [
       ["needs_attention", "needs_attention"],

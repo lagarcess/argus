@@ -21,7 +21,7 @@ import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import { executeChatTranscriptUpdateScroll, useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
-import { useConversationActivity } from "@/components/chat/useConversationActivity";
+import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
 import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
@@ -197,7 +197,6 @@ type View = "chat" | "strategies" | "settings";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
-
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -325,7 +324,10 @@ export default function ChatInterface() {
     accountScopeKey: account?.user.id ?? null,
     refreshHistory: refreshHistoryForActivity,
     invalidateInactiveTranscript: invalidateInactiveActivityTranscript,
-    onMutationNotice: () => undefined,
+    onMutationNotice: (notice) => {
+      const descriptor = conversationActivityMutationNoticeDescriptor(notice);
+      showToast(t(descriptor.key, descriptor.defaultValue), descriptor.variant);
+    },
     causalClock: activityCausalClock,
   });
   const [requestSessions] = useState(() =>
@@ -2124,6 +2126,7 @@ export default function ChatInterface() {
         onToggle={toggleSidebar}
         currentView={currentView}
         conversationId={conversationId}
+        conversationActivity={conversationActivity}
         isRecentsExpanded={isRecentsExpanded}
         onToggleRecents={() => setIsRecentsExpanded((expanded) => !expanded)}
         historyItems={historyItems}
@@ -2265,6 +2268,9 @@ export default function ChatInterface() {
                   isOpen={showChatOptions}
                   onToggleOpen={() => setShowChatOptions(!showChatOptions)}
                   onRequestClose={closeChatOptions}
+                  isUnread={conversationActivity.hasEffectiveUnread(conversationId)}
+                  isReadMutationPending={conversationActivity.hasEffectiveUnread(conversationId) ? conversationActivity.isMutationPending(conversationId, "mark_read") : conversationActivity.isMutationPending(conversationId, "mark_unread")}
+                  onToggleUnread={() => conversationActivity.hasEffectiveUnread(conversationId) ? void conversationActivity.markRead(conversationId, conversationActivity.selectAttentionCursor(conversationId)) : void conversationActivity.markUnread(conversationId)}
                   isRenaming={isRenamingHeaderChat}
                   renameValue={headerRenameValue}
                   onRenameValueChange={setHeaderRenameValue}

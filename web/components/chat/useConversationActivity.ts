@@ -21,7 +21,9 @@ import {
   createConversationActivityState,
   selectAggregateConversationActivityPresentation,
   selectConversationActivityPresentation,
+  selectConversationAttentionCursor,
   selectConversationAnnouncement,
+  selectConversationHasEffectiveUnread,
   selectConversationIsLocked,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
@@ -48,6 +50,41 @@ export type ConversationActivityMutationNotice = Readonly<{
   action: MutationAction;
   outcome: "success" | "error";
 }>;
+
+export type ConversationActivityMutationNoticeDescriptor = Readonly<{
+  key: string;
+  defaultValue: string;
+  variant: "neutral" | "error";
+}>;
+
+export const conversationActivityMutationNoticeDescriptor = (
+  notice: ConversationActivityMutationNotice,
+): ConversationActivityMutationNoticeDescriptor => {
+  if (notice.outcome === "error") {
+    return notice.action === "mark_read"
+      ? {
+          key: "chat.activity.mark_read_error",
+          defaultValue: "Couldn’t mark this conversation as read. Try again.",
+          variant: "error",
+        }
+      : {
+          key: "chat.activity.mark_unread_error",
+          defaultValue: "Couldn’t mark this conversation as unread. Try again.",
+          variant: "error",
+        };
+  }
+  return notice.action === "mark_read"
+    ? {
+        key: "chat.activity.mark_read_success",
+        defaultValue: "Marked as read.",
+        variant: "neutral",
+      }
+    : {
+        key: "chat.activity.mark_unread_success",
+        defaultValue: "Marked as unread.",
+        variant: "neutral",
+      };
+};
 
 export type ConversationActivityPatchTransport = (
   conversationId: string,
@@ -101,6 +138,12 @@ export type ConversationActivityRuntime = Readonly<{
   selectAggregatePresentation: (
     conversationIds?: readonly string[],
   ) => ConversationActivityPresentation;
+  hasEffectiveUnread: (
+    conversationId: string | null | undefined,
+  ) => boolean;
+  selectAttentionCursor: (
+    conversationId: string | null | undefined,
+  ) => string | null;
   isConversationLocked: (
     conversationId: string | null | undefined,
   ) => boolean;
@@ -314,6 +357,14 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       this.state,
       conversationIds ?? Array.from(this.loadedConversationIds),
     );
+
+  hasEffectiveUnread = (
+    conversationId: string | null | undefined,
+  ): boolean => selectConversationHasEffectiveUnread(this.state, conversationId);
+
+  selectAttentionCursor = (
+    conversationId: string | null | undefined,
+  ): string | null => selectConversationAttentionCursor(this.state, conversationId);
 
   isConversationLocked = (
     conversationId: string | null | undefined,
@@ -813,6 +864,8 @@ export function useConversationActivity(
     state,
     selectPresentation: runtime.selectPresentation,
     selectAggregatePresentation: runtime.selectAggregatePresentation,
+    hasEffectiveUnread: runtime.hasEffectiveUnread,
+    selectAttentionCursor: runtime.selectAttentionCursor,
     isConversationLocked: runtime.isConversationLocked,
     hasManualUnreadGuard: runtime.hasManualUnreadGuard,
     startRequest: runtime.startRequest,

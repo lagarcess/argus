@@ -477,11 +477,17 @@ describe("conversation activity mutations", () => {
     harness.runtime.start();
     await drainMicrotasks();
 
-    const mutation = harness.runtime.markRead("conversation-a", null);
+    const mutation = harness.runtime.markRead(
+      "conversation-a",
+      harness.runtime.selectAttentionCursor("conversation-a"),
+    );
     expect(patches).toEqual([
       {
         conversationId: "conversation-a",
-        patch: { action: "mark_read", through_attention_cursor: null },
+        patch: {
+          action: "mark_read",
+          through_attention_cursor: "cursor-visible",
+        },
       },
     ]);
     expect(harness.runtime.selectPresentation("conversation-a")).toBe("none");
@@ -525,6 +531,8 @@ describe("conversation activity mutations", () => {
     expect(harness.notices).toEqual([]);
 
     const currentFailure = harness.runtime.markUnread("conversation-a");
+    expect(harness.runtime.hasEffectiveUnread("conversation-a")).toBe(true);
+    expect(harness.runtime.hasManualUnreadGuard("conversation-a")).toBe(true);
     requests[1]!.reject(new Error("older read failed"));
     await staleFailure;
     expect(harness.runtime.selectPresentation("conversation-a")).toBe(
@@ -535,6 +543,8 @@ describe("conversation activity mutations", () => {
     requests[2]!.reject(new Error("current unread failed"));
     await currentFailure;
     expect(harness.runtime.selectPresentation("conversation-a")).toBe("none");
+    expect(harness.runtime.hasEffectiveUnread("conversation-a")).toBe(false);
+    expect(harness.runtime.hasManualUnreadGuard("conversation-a")).toBe(false);
     expect(harness.notices).toEqual([
       {
         conversationId: "conversation-a",
@@ -774,7 +784,7 @@ describe("conversation activity account and presentation ownership", () => {
     expect(harness.runtime.isRequestCurrent("conversation-a", "request-a")).toBe(true);
   });
 
-  test("exposes request, guard, aggregate, and announcement accessors", () => {
+  test("exposes request, unread, cursor, guard, aggregate, and announcement accessors", () => {
     const harness = runtimeHarness({
       historyItems: [
         chat("conversation-a", idleActivity("manual_unread", "cursor-a")),
@@ -785,6 +795,8 @@ describe("conversation activity account and presentation ownership", () => {
     harness.runtime.start();
 
     expect(harness.runtime.selectAggregatePresentation()).toBe("needs_input");
+    expect(harness.runtime.hasEffectiveUnread("conversation-a")).toBe(true);
+    expect(harness.runtime.selectAttentionCursor("conversation-a")).toBe("cursor-a");
     expect(harness.runtime.hasManualUnreadGuard("conversation-a")).toBe(true);
     harness.runtime.resetViewEpoch("conversation-a");
     expect(harness.runtime.hasManualUnreadGuard("conversation-a")).toBe(false);

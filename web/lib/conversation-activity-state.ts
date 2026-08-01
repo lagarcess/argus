@@ -194,6 +194,20 @@ const canonicalAttentionPresentation = (
   }
 };
 
+const currentMutationForRecord = (
+  record: ConversationActivityRecord,
+): ConversationActivityMutationRecord | null =>
+  record.mutation && record.serverRevision <= record.mutation.issuedRevision
+    ? record.mutation
+    : null;
+
+const canonicalAttentionIsUnread = (
+  activity: ConversationActivity | null,
+): boolean => {
+  const status: unknown = activity?.attention.status;
+  return status !== undefined && status !== null && status !== "none";
+};
+
 const presentationForRecord = (
   record: ConversationActivityRecord | undefined,
 ): ConversationActivityPresentation => {
@@ -205,10 +219,7 @@ const presentationForRecord = (
   }
 
   const canonical = canonicalAttentionPresentation(record.canonical);
-  const currentMutation =
-    record.mutation && record.serverRevision <= record.mutation.issuedRevision
-      ? record.mutation
-      : null;
+  const currentMutation = currentMutationForRecord(record);
   if (currentMutation?.action === "mark_read") {
     return "none";
   }
@@ -480,6 +491,27 @@ export const selectConversationActivityPresentation = (
   conversationId
     ? presentationForRecord(state.byConversationId[conversationId])
     : "none";
+
+export const selectConversationHasEffectiveUnread = (
+  state: ConversationActivityState,
+  conversationId: string | null | undefined,
+): boolean => {
+  if (!conversationId) return false;
+  const record = state.byConversationId[conversationId];
+  if (!record) return false;
+  const currentMutation = currentMutationForRecord(record);
+  if (currentMutation?.action === "mark_read") return false;
+  if (currentMutation?.action === "mark_unread") return true;
+  return canonicalAttentionIsUnread(record.canonical);
+};
+
+export const selectConversationAttentionCursor = (
+  state: ConversationActivityState,
+  conversationId: string | null | undefined,
+): string | null =>
+  conversationId
+    ? state.byConversationId[conversationId]?.canonical?.attention.cursor ?? null
+    : null;
 
 export const selectAggregateConversationActivityPresentation = (
   state: ConversationActivityState,
