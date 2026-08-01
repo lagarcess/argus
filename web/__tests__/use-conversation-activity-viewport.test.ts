@@ -417,7 +417,7 @@ describe("conversation activity viewport read proof", () => {
       'requestSessions.authorize(requestSession, "final")',
     );
     const visibleTerminalPromotion = chat.indexOf(
-      "promoteVisibleConversationActivityTerminal({",
+      "terminalReadiness.accept(",
       finalAuthorization,
     );
 
@@ -434,8 +434,12 @@ describe("conversation activity viewport read proof", () => {
     expect(chat.slice(finalAuthorization, visibleTerminalPromotion + 600)).toContain(
       "identityAuthorized",
     );
-    expect(chat.match(/stageCached\(targetConversationId\)/g)).toHaveLength(5);
-    expect(chat.match(/promoteVisibleConversationActivityTerminal\(\{/g)).toHaveLength(3);
+    expect(
+      chat.match(/beginConversationActivityTerminalReadiness\(/g),
+    ).toHaveLength(4);
+    expect(chat.match(/terminalReadiness\.accept\(/g)).toHaveLength(4);
+    expect(chat.match(/terminalReadiness\.finish\(/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(chat).toContain("promoteCanonicalConversationActivityTranscript({");
 
     const saveAction = chat.slice(
       chat.indexOf("const handleSaveStrategyAction"),
@@ -453,8 +457,9 @@ describe("conversation activity viewport read proof", () => {
     expect(saveAction).toContain("synchronizeConversationViewRefs(");
     expect(cancelAction).toContain("synchronizeConversationViewRefs(");
     for (const owner of [sendAction, saveAction, cancelAction]) {
-      expect(owner).toContain("stageCached(targetConversationId)");
-      expect(owner).toContain("promoteVisibleConversationActivityTerminal({");
+      expect(owner).toContain("beginConversationActivityTerminalReadiness(");
+      expect(owner).toContain("terminalReadiness.accept(");
+      expect(owner).toContain("terminalReadiness.finish(");
     }
   });
 

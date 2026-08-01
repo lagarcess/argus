@@ -451,4 +451,110 @@ describe("production chat request-session ownership", () => {
     expect(readyTranscriptConversationIdRef.current).toBeNull();
     expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
   });
+
+  test("settles each staged chat request through one visible artifact or canonical reconcile", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    for (const terminal of ["persisted_recovery", "response_only_save"] as const) {
+      const readiness = viewport.createConversationActivityTranscriptReadiness();
+      readiness.stageCanonical("conversation-a");
+      const reconciles: string[] = [];
+      const session = viewport.createConversationActivityTerminalReadinessSession({
+        getRequest: () => ({ conversationId: "conversation-a", kind: "chat_turn" }),
+        activeConversationIdRef: { current: "conversation-a" },
+        currentViewRef: { current: "chat" },
+        readyTranscriptConversationIdRef: { current: "conversation-a" },
+        transcriptReadiness: readiness,
+        reconcileCanonical: (conversationId) => reconciles.push(conversationId),
+      });
+
+      expect(session.stage()).toBe(true);
+      expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
+      expect(session.accept(
+        terminal === "persisted_recovery"
+          ? { message_id: "message-recovery", recovery: { code: "runtime_failure" } }
+          : { assistant_response: "Saved" },
+        true,
+      )).toBe(true);
+      expect(readiness.snapshot("conversation-a").canonicalReady).toBe(true);
+      expect(session.finish(true)).toBe(false);
+      expect(reconciles).toEqual([]);
+    }
+
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    readiness.stageCanonical("conversation-a");
+    const reconciles: string[] = [];
+    const session = viewport.createConversationActivityTerminalReadinessSession({
+      getRequest: () => ({ conversationId: "conversation-a", kind: "chat_turn" }),
+      activeConversationIdRef: { current: "conversation-a" },
+      currentViewRef: { current: "chat" },
+      readyTranscriptConversationIdRef: { current: "conversation-a" },
+      transcriptReadiness: readiness,
+      reconcileCanonical: (conversationId) => reconciles.push(conversationId),
+    });
+    expect(session.stage()).toBe(true);
+    expect(session.accept({}, true)).toBe(false);
+    expect(session.finish(true)).toBe(true);
+    expect(session.finish(true)).toBe(false);
+    expect(reconciles).toEqual(["conversation-a"]);
+  });
+
+  test("defers backtest readiness until the canonical job response is rendered", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    readiness.stageCanonical("conversation-a");
+    const readyRef = { current: "conversation-a" as string | null };
+    const reconciles: string[] = [];
+    const activeRef = { current: "conversation-a" as string | null };
+    const viewRef = { current: "chat" };
+    const session = viewport.createConversationActivityTerminalReadinessSession({
+      getRequest: () => ({ conversationId: "conversation-a", kind: "backtest_job" }),
+      activeConversationIdRef: activeRef,
+      currentViewRef: viewRef,
+      readyTranscriptConversationIdRef: readyRef,
+      transcriptReadiness: readiness,
+      reconcileCanonical: (conversationId) => reconciles.push(conversationId),
+    });
+
+    expect(session.stage()).toBe(true);
+    expect(session.accept({ backtest_job: {} as NonNullable<ChatFinalPayload["backtest_job"]> }, true)).toBe(false);
+    expect(session.finish(true)).toBe(false);
+    expect(reconciles).toEqual([]);
+    expect(viewport.promoteCanonicalConversationActivityTranscript({
+      conversationId: "conversation-a",
+      activeConversationIdRef: activeRef,
+      currentViewRef: viewRef,
+      readyTranscriptConversationIdRef: readyRef,
+      transcriptReadiness: readiness,
+    })).toBe(true);
+    expect(readiness.snapshot("conversation-a").canonicalReady).toBe(true);
+  });
+
+  test("inactive terminal settlement cannot overwrite the visible transcript owner", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    readiness.stageCanonical("conversation-b");
+    const readyRef = { current: "conversation-b" as string | null };
+    const reconciles: string[] = [];
+    const session = viewport.createConversationActivityTerminalReadinessSession({
+      getRequest: () => ({ conversationId: "conversation-a", kind: "chat_turn" }),
+      activeConversationIdRef: { current: "conversation-b" },
+      currentViewRef: { current: "chat" },
+      readyTranscriptConversationIdRef: readyRef,
+      transcriptReadiness: readiness,
+      reconcileCanonical: (conversationId) => reconciles.push(conversationId),
+    });
+
+    expect(session.stage()).toBe(false);
+    expect(session.accept({ assistant_response: "Late" }, true)).toBe(false);
+    expect(session.finish(true)).toBe(false);
+    expect(readyRef.current).toBe("conversation-b");
+    expect(readiness.snapshot("conversation-b").canonicalReady).toBe(true);
+    expect(reconciles).toEqual([]);
+  });
 });

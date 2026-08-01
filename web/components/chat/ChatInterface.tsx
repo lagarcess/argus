@@ -29,7 +29,7 @@ import { executeChatTranscriptUpdateScroll, useChatScrollControls } from "@/comp
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { useConversationActivity } from "@/components/chat/useConversationActivity";
-import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTranscriptReadiness, promoteVisibleConversationActivityTerminal, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
+import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import {
@@ -51,7 +51,7 @@ import {
   type ChatStreamEvent,
   type ChatActionRequest,
   type HistoryItem,
-  type BacktestRun,
+  type BacktestRun, type BacktestJobResponse,
   type SearchConversationItem,
 } from "@/lib/argus-api";
 import {
@@ -348,21 +348,12 @@ export default function ChatInterface() {
   );
   const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
   const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
-  const handleDurableJobCompletion = useCallback(
-    (targetConversationId: string) => {
-      invalidateTranscriptForMutation(
-        targetConversationId,
-        "durable_job_completion",
-      );
-    },
-    [invalidateTranscriptForMutation],
-  );
-  useBacktestJobPolling(
-    messages,
-    canApplyConversationOwnedUpdate,
-    setMessages,
-    handleDurableJobCompletion,
-  );
+  const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
+      const targetConversationId = response.job.conversation_id;
+      invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
+      promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+    }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
+  useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
 
   const retireActiveTranscriptPresentationForNavigation = useCallback(() => {
     setStreamStatus(null);
@@ -748,7 +739,7 @@ export default function ChatInterface() {
     });
     await handle.completion;
   }
-
+  function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -1149,8 +1140,8 @@ export default function ChatInterface() {
       requestKind,
     );
     if (!initialRequestSession) return false;
-    activityTranscriptReadiness.stageCached(targetConversationId);
     let requestSession: ChatRequestSession = initialRequestSession;
+    const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
         ? null
@@ -1250,6 +1241,7 @@ export default function ChatInterface() {
             ),
           ),
         );
+        if (!terminalReadiness.accept({ message_id: event.data.message_id, recovery: event.data.recovery ?? null, retry_last_turn: event.data.retry_last_turn ?? null }, true)) terminalReadiness.finish(true);
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
@@ -1440,7 +1432,7 @@ export default function ChatInterface() {
             return normalizeDurableRetryActionHistory(nextMessages);
           });
         }
-        promoteVisibleConversationActivityTerminal({ conversationId: requestSession.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: requestSession.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+        terminalReadiness.accept(event.data, identityAuthorized);
       }
       if (event.event === "title") {
         if (
@@ -1460,7 +1452,7 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         if (!requestSessions.authorize(requestSession, "done")) return;
-        finishRequestTransport(requestSession);
+        terminalReadiness.finish(true); finishRequestTransport(requestSession);
       }
     };
     const moveRequestToConversation = (nextConversationId: string) => {
@@ -1558,6 +1550,7 @@ export default function ChatInterface() {
             if (canApplyVisibleStreamUpdate()) {
               setMessages(view.messages);
             }
+            terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
           }
           return;
@@ -1599,6 +1592,7 @@ export default function ChatInterface() {
                 ),
               );
             }
+            terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
             return;
           }
@@ -1613,6 +1607,7 @@ export default function ChatInterface() {
                 ),
               );
             }
+            terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
             return;
           }
@@ -1656,6 +1651,7 @@ export default function ChatInterface() {
             ),
           );
         }
+        terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
       }
     })();
@@ -1697,7 +1693,7 @@ export default function ChatInterface() {
     };
     const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
-    activityTranscriptReadiness.stageCached(targetConversationId);
+    const terminalReadiness = beginConversationActivityTerminalReadiness(() => request);
 
     try {
       setMessages((prev) => markResultCardSaving(prev, runId, true));
@@ -1733,7 +1729,7 @@ export default function ChatInterface() {
             if (requestSessions.authorize(request, "save_cleanup")) {
               setMessages((prev) => markResultCardSaving(prev, runId, false));
             }
-            if (savedStrategyId) promoteVisibleConversationActivityTerminal({ conversationId: request.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: request.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+            terminalReadiness.accept(event.data, identityAuthorized);
           }
           if (event.event === "error") {
             if (!requestSessions.authorize(request, "error")) return;
@@ -1744,13 +1740,14 @@ export default function ChatInterface() {
               );
               setMessages((prev) => markResultCardSaving(prev, runId, false));
             }
-            finishRequestTransport(request);
+            terminalReadiness.finish(true); finishRequestTransport(request);
           }
           if (event.event === "done") {
             if (!requestSessions.authorize(request, "done")) return;
             if (requestSessions.authorize(request, "save_cleanup")) {
               setMessages((prev) => markResultCardSaving(prev, runId, false));
             }
+            terminalReadiness.finish(true);
             finishRequestTransport(request);
           }
         },
@@ -1770,6 +1767,7 @@ export default function ChatInterface() {
         showToast(message, "error");
         setMessages((prev) => markResultCardSaving(prev, runId, false));
       }
+      terminalReadiness.finish(true);
       finishRequestTransport(request);
     }
   };
@@ -1830,7 +1828,7 @@ export default function ChatInterface() {
     };
     const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
-    activityTranscriptReadiness.stageCached(targetConversationId);
+    const terminalReadiness = beginConversationActivityTerminalReadiness(() => request);
 
     setStreamStatus(null);
     try {
@@ -1852,7 +1850,7 @@ export default function ChatInterface() {
                 [effect],
               ),
             );
-            promoteVisibleConversationActivityTerminal({ conversationId: request.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: request.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+            terminalReadiness.accept(event.data, identityAuthorized);
           }
           if (event.event === "error") {
             if (!requestSessions.authorize(request, "error")) return;
@@ -1862,10 +1860,12 @@ export default function ChatInterface() {
                 "error",
               );
             }
+            terminalReadiness.finish(true);
             finishRequestTransport(request);
           }
           if (event.event === "done") {
             if (!requestSessions.authorize(request, "done")) return;
+            terminalReadiness.finish(true);
             finishRequestTransport(request);
           }
         },
@@ -1882,6 +1882,7 @@ export default function ChatInterface() {
           ? err.message
           : t("chat.error_generic");
       if (requestSessions.canWriteVisible(request)) showToast(message, "error");
+      terminalReadiness.finish(true);
       finishRequestTransport(request);
     }
   };

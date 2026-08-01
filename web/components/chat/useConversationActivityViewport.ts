@@ -155,6 +155,89 @@ export const promoteVisibleConversationActivityTerminal = (options: Readonly<{
   return true;
 };
 
+type ConversationActivityTerminalRequest = Readonly<{
+  conversationId: string;
+  kind: "chat_turn" | "backtest_job";
+}>;
+
+type ConversationActivityTerminalReadinessSessionOptions = Readonly<{
+  getRequest: () => ConversationActivityTerminalRequest;
+  activeConversationIdRef: { current: string | null };
+  currentViewRef: { current: string };
+  readyTranscriptConversationIdRef: { current: string | null };
+  transcriptReadiness: ConversationActivityTranscriptReadiness;
+  reconcileCanonical: (conversationId: string) => void;
+}>;
+
+export type ConversationActivityTerminalReadinessSession = Readonly<{
+  stage: () => boolean;
+  accept: (payload: ChatFinalPayload, identityAuthorized: boolean) => boolean;
+  finish: (identityAuthorized: boolean) => boolean;
+}>;
+
+export const promoteCanonicalConversationActivityTranscript = (options: Readonly<{
+  conversationId: string;
+  activeConversationIdRef: { current: string | null };
+  currentViewRef: { current: string };
+  readyTranscriptConversationIdRef: { current: string | null };
+  transcriptReadiness: ConversationActivityTranscriptReadiness;
+}>): boolean => {
+  if (
+    options.currentViewRef.current !== "chat" ||
+    options.activeConversationIdRef.current !== options.conversationId
+  ) return false;
+  options.transcriptReadiness.stageCanonical(options.conversationId);
+  options.readyTranscriptConversationIdRef.current = options.conversationId;
+  return true;
+};
+
+export const createConversationActivityTerminalReadinessSession = (
+  options: ConversationActivityTerminalReadinessSessionOptions,
+): ConversationActivityTerminalReadinessSession => {
+  let settled = false;
+  const visibleRequest = (): ConversationActivityTerminalRequest | null => {
+    const request = options.getRequest();
+    return options.currentViewRef.current === "chat" &&
+      options.activeConversationIdRef.current === request.conversationId
+      ? request
+      : null;
+  };
+  return {
+    stage: () => {
+      const request = visibleRequest();
+      if (!request) return false;
+      options.transcriptReadiness.stageCached(request.conversationId);
+      return true;
+    },
+    accept: (payload, identityAuthorized) => {
+      if (settled || !identityAuthorized) return false;
+      const request = visibleRequest();
+      if (!request) return false;
+      const promoted = promoteVisibleConversationActivityTerminal({
+        conversationId: request.conversationId,
+        identityAuthorized,
+        finalPayload: payload,
+        requestKind: request.kind,
+        activeConversationIdRef: options.activeConversationIdRef,
+        currentViewRef: options.currentViewRef,
+        readyTranscriptConversationIdRef:
+          options.readyTranscriptConversationIdRef,
+        transcriptReadiness: options.transcriptReadiness,
+      });
+      if (promoted) settled = true;
+      return promoted;
+    },
+    finish: (identityAuthorized) => {
+      if (settled || !identityAuthorized) return false;
+      const request = visibleRequest();
+      if (!request || request.kind === "backtest_job") return false;
+      settled = true;
+      options.reconcileCanonical(request.conversationId);
+      return true;
+    },
+  };
+};
+
 const createBrowserEffectsAdapter =
   (): ConversationActivityViewportEffectsAdapter => ({
     observeLatestActivity: ({ root, sentinel, onIntersectionChange }) => {

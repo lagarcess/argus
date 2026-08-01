@@ -191,7 +191,7 @@ export function useBacktestJobPolling(
   messages: Message[],
   ownsConversation: (conversationId?: string | null) => boolean,
   setMessages: Dispatch<SetStateAction<Message[]>>,
-  onDurableCompletion?: (conversationId: string) => void,
+  onDurableCompletion?: (response: BacktestJobResponse) => void,
 ): void {
   const pendingBacktestJobKey = useMemo(
     () => pendingBacktestJobIds(messages).join("|"),
@@ -225,7 +225,7 @@ export function useBacktestJobPolling(
           response.job.status === "running" ||
           (response.job.status === "succeeded" && !response.run);
         if (!shouldContinue) {
-          onDurableCompletion?.(response.job.conversation_id);
+          onDurableCompletion?.(response);
         }
         if (shouldContinue && attempt < 45) {
           timers.push(
