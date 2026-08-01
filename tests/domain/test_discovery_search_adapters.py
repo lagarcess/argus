@@ -237,3 +237,31 @@ class TestProviderSelection:
         with pytest.raises(SearchUnavailableError) as excinfo:
             search_provider_for_config(provider_id="mystery_engine")
         assert excinfo.value.reason == "not_configured"
+
+    def test_hosted_openrouter_search_uses_scoped_traffic_key(
+        self,
+        monkeypatch,
+    ) -> None:
+        from argus.domain.discovery_search import openrouter_web_search
+        from argus.llm.openrouter_key_policy import openrouter_traffic_class
+
+        seen: dict[str, object] = {}
+
+        def fake_post_json(**kwargs):
+            seen.update(kwargs)
+            return {"choices": [{"message": {"annotations": []}}]}
+
+        monkeypatch.setattr(openrouter_web_search, "post_json", fake_post_json)
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "")
+        monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+        monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+        monkeypatch.setenv("ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL", "m/x")
+
+        with openrouter_traffic_class("guest"):
+            provider = search_provider_for_config(
+                provider_id="openrouter_web_search"
+            )
+            provider.search("q", max_results=1, timeout_seconds=1.0)
+
+        assert seen["headers"] == {"Authorization": "Bearer guest-key"}

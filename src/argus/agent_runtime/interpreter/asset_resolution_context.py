@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Callable
 
 from loguru import logger
@@ -13,6 +12,7 @@ from argus.llm.openrouter import (
     OpenRouterTask,
     openrouter_structured_model_candidates,
 )
+from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
 _INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
 
@@ -141,7 +141,7 @@ def _provider_asset_context_preflight_enabled(
 ) -> bool:
     if not preferred_model:
         return False
-    if not (os.getenv("OPENROUTER_API_KEY") or "").strip():
+    if not resolve_openrouter_api_key():
         return False
     return getattr(invoke_schema, "__module__", "") == "argus.llm.openrouter"
 

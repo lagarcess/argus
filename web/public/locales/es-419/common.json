@@ -241,8 +241,8 @@
       "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
     },
     "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
-    "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
-    "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
+    "error_offline": "Argus no puede conectarse con su servicio en este momento. Revisa tu conexión e inténtalo de nuevo en un momento.",
+    "error_load": "No se pudo abrir esta conversación. Inténtalo de nuevo.",
     "opening_conversation": "Abriendo la conversación…",
     "error_open_conversation": "No se pudo abrir esta conversación.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
@@ -1107,6 +1107,20 @@
     }
   },
   "auth": {
+    "access_request": {
+      "title": "Solicita acceso a Argus",
+      "description": "Argus está en alfa pública. Comparte tu correo para solicitar acceso. Si se aprueba, te enviaremos un correo cuando puedas crear una cuenta.",
+      "email_label": "Correo electrónico",
+      "submit": "Solicitar acceso",
+      "submitting": "Solicitando acceso...",
+      "accepted_title": "Solicitud recibida",
+      "accepted_description": "Gracias. Recibimos tu solicitud. Si se aprueba el acceso, te enviaremos por correo el siguiente paso.",
+      "approved_prompt": "¿Ya recibiste aprobación?",
+      "approved_action": "Regístrate",
+      "existing_prompt": "¿Ya tienes una cuenta?",
+      "existing_action": "Inicia sesión",
+      "error": "No pudimos enviar tu solicitud. Inténtalo de nuevo."
+    },
     "login": {
       "brand": "argus",
       "subtitle": "Inicia sesion para continuar",
@@ -1124,7 +1138,9 @@
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
       "new_account": "¿Nuevo en Argus?",
-      "password_requirement": "Mínimo 8 caracteres."
+      "password_requirement": "Mínimo 8 caracteres.",
+      "confirmation_title": "Revisa tu correo",
+      "confirmation_description": "Usa el enlace de confirmación que enviamos para terminar de crear tu cuenta. Luego vuelve aquí para iniciar sesión."
     },
     "legal": {
       "continuing_prefix": "Al continuar, aceptas nuestros"
@@ -1163,7 +1179,8 @@
       "cleanup_warning": "Las sesiones fueron revocadas, pero este navegador no pudo confirmar la limpieza de cookies. Aún necesitas iniciar sesión de nuevo."
     },
     "errors": {
-      "generic": "Algo salio mal. Intentalo de nuevo."
+      "generic": "Algo salio mal. Intentalo de nuevo.",
+      "captcha_unavailable": "No pudimos completar la verificación de seguridad. Inténtalo de nuevo."
     }
   },
   "account_security": {

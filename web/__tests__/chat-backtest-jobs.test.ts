@@ -191,9 +191,11 @@ describe("chat backtest jobs", () => {
 
   for (const terminal of [
     {
+      // The job card owns the red failure signal; the settled confirmation
+      // reads quietly (failure-class inventory item 8).
       status: "failed" as const,
-      expectedStatus: "could_not_run",
-      expectedLabel: "Could not run",
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
     },
     {
       status: "canceled" as const,
@@ -949,8 +951,8 @@ describe("chat backtest jobs", () => {
       },
     );
 
-    expect(settledConfirmation.confirmation?.statusLabel).toBe("Could not run");
-    expect(settledConfirmation.confirmation?.status).toBe("could_not_run");
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(settledConfirmation.confirmation?.status).toBe("not_completed");
     expect(failedJob.kind).toBe("backtest_job");
     expect(failedJob.backtestJob?.status).toBe("failed");
   });

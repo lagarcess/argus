@@ -5,6 +5,8 @@ export type DiscoveryPanelDisplay = {
   bodyKey: string;
   bodyValues?: { query: string };
   busy: boolean;
+  /** True only for the lookup-failed state so error never renders as empty. */
+  failed?: boolean;
   headerFallback: string;
   headerKey: string;
   showBody: boolean;
@@ -42,6 +44,7 @@ export function discoveryPanelDisplay({
       bodyKey: "chat.discovery.unavailable",
       bodyValues,
       busy: false,
+      failed: true,
       headerFallback: "Discovery is taking longer than expected",
       headerKey: "chat.discovery.unavailable_title",
       showBody: itemCount === 0,

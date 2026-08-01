@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
-import { ArrowUp, AtSign } from "lucide-react";
+import { ArrowUp, AtSign, MessageSquareWarning } from "lucide-react";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
 import {
@@ -475,7 +476,17 @@ export default function ChatInput({
           aria-busy={discoveryPanel.busy}
           className="absolute bottom-full left-0 z-30 mb-2 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1f2227]"
         >
-          <div className="border-b border-black/5 px-4 py-2 text-[12px] font-medium text-black/45 dark:border-white/5 dark:text-white/45">
+          <div
+            role={discoveryPanel.failed ? "alert" : undefined}
+            className={`flex items-center gap-1.5 border-b border-black/5 px-4 py-2 text-[12px] font-medium dark:border-white/5 ${
+              discoveryPanel.failed
+                ? inlineFailureTextClass
+                : "text-black/45 dark:text-white/45"
+            }`}
+          >
+            {discoveryPanel.failed ? (
+              <MessageSquareWarning className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : null}
             {t(discoveryPanel.headerKey, discoveryPanel.headerFallback)}
           </div>
           {discoverySections.length > 0 ? (

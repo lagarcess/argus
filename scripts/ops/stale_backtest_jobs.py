@@ -26,6 +26,7 @@ def _copy_first_env(target: str, candidates: Sequence[str]) -> None:
 
 
 def _prepare_supabase_env() -> None:
+    _copy_first_env("DATABASE_URL", ("ARGUS_WORKFLOW_DATABASE_URL",))
     _copy_first_env(
         "SUPABASE_URL",
         (

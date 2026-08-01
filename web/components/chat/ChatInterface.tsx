@@ -23,6 +23,7 @@ import StarterActions from "@/components/chat/StarterActions";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
+import { useChatToast } from "@/components/chat/useChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
@@ -91,6 +92,7 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
+  offlineFallbackMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import {
@@ -260,7 +262,7 @@ export default function ChatInterface() {
   // browser cannot send starter prompts in the wrong language.
   const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
@@ -344,13 +346,6 @@ export default function ChatInterface() {
     setMessages,
     handleDurableJobCompletion,
   );
-
-  // ── Toast helper ───────────────────────────────────────────────────────────
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }, []);
 
   const clearConversationAttention = useCallback(
     (nextConversationId?: string | null) => {
@@ -810,14 +805,7 @@ export default function ChatInterface() {
         if (cancelled) return;
         setIsBootstrappingProfile(false);
         if (profileUnreachable) {
-          setMessages([
-            {
-              id: "offline",
-              role: "ai",
-              kind: "text",
-              content: t("chat.error_offline"),
-            },
-          ]);
+          setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
           return;
         }
         const activeRoute = readActiveConversationRouteState();
@@ -845,14 +833,7 @@ export default function ChatInterface() {
       } catch {
         if (cancelled) return;
         setIsBootstrappingProfile(false);
-        setMessages([
-          {
-            id: "offline",
-            role: "ai",
-            kind: "text",
-            content: t("chat.error_offline"),
-          },
-        ]);
+        setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
         setIsHydratingConversation(false);
       }
     })();
@@ -990,13 +971,14 @@ export default function ChatInterface() {
       }),
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
     onAdoptConversation: adoptGuestConversation,
-    onGateError: () => showToast(t("chat.error_generic")),
+    onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
         t(
           "guest.new_conversation.error",
           "The temporary chat was left unchanged.",
         ),
+        "error",
       ),
     omnisearchShortcutEnabled: omnisearchEnabled,
   });
@@ -1097,7 +1079,7 @@ export default function ChatInterface() {
         void refreshHistory();
       } catch (err) {
         console.error("Failed to start conversation before sending:", err);
-        showToast(t("chat.error_generic"));
+        showToast(t("chat.error_generic"), "error");
         return false;
       }
     }
@@ -1112,7 +1094,7 @@ export default function ChatInterface() {
         void refreshHistory();
       } catch (err) {
         console.error("Failed to start conversation before sending:", err);
-        showToast(t("chat.error_generic"));
+        showToast(t("chat.error_generic"), "error");
         return false;
       }
     }
@@ -1233,6 +1215,11 @@ export default function ChatInterface() {
           Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
+        // Same gate the `final` frame applies: a retryable failure wears the
+        // failure treatment no matter which frame delivered it.
+        const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
+          errorPayload.recovery,
+        );
         const durableRetry = durableRetryLastTurnFromStreamError(errorPayload);
         const durableRetryAction = durableRetry?.action ?? null;
         const metadataRetryAction = durableRetryAction
@@ -1270,6 +1257,7 @@ export default function ChatInterface() {
                           t("chat.error_backtest"),
                         ),
                         recoveryDisplay: errorRecoveryDisplay,
+                        assistantRecoveryCode: errorAssistantRecoveryCode,
                         actions:
                           visibleRetryAction && !durableRetryAction
                             ? [visibleRetryAction]
@@ -1765,6 +1753,7 @@ export default function ChatInterface() {
           if (event.event === "error") {
             showToast(
               chatStreamErrorText(event.data.detail, t("chat.error_generic")),
+              "error",
             );
             markConversationAttentionIfOutOfFocus(targetConversationId);
           }
@@ -1780,7 +1769,7 @@ export default function ChatInterface() {
         err instanceof ChatStreamError && err.message
           ? err.message
           : t("chat.error_generic");
-      showToast(message);
+      showToast(message, "error");
       markConversationAttentionIfOutOfFocus(targetConversationId);
     } finally {
       setMessages((prev) => markResultCardSaving(prev, runId, false));
@@ -1796,6 +1785,7 @@ export default function ChatInterface() {
             "settings.logout_error",
             "We couldn’t sign out this browser. Try again.",
           ),
+          "error",
         );
         return;
       }
@@ -1810,6 +1800,7 @@ export default function ChatInterface() {
           "settings.logout_error",
           "We couldn’t sign out this browser. Try again.",
         ),
+        "error",
       );
     }
   };
@@ -1856,6 +1847,7 @@ export default function ChatInterface() {
           if (event.event === "error") {
             showToast(
               chatStreamErrorText(event.data.detail, t("chat.error_generic")),
+              "error",
             );
             markConversationAttentionIfOutOfFocus(targetConversationId);
           }
@@ -1871,7 +1863,7 @@ export default function ChatInterface() {
         err instanceof ChatStreamError && err.message
           ? err.message
           : t("chat.error_generic");
-      showToast(message);
+      showToast(message, "error");
       markConversationAttentionIfOutOfFocus(targetConversationId);
     } finally {
       setIsStreamingResponse(false);
@@ -2003,7 +1995,7 @@ export default function ChatInterface() {
       showToast(t("common.save"));
       closeChatOptions();
     } catch {
-      showToast(t("chat.rename_failed"));
+      showToast(t("chat.rename_failed"), "error");
     } finally {
       setIsSavingHeaderRename(false);
     }
@@ -2019,7 +2011,7 @@ export default function ChatInterface() {
       refreshHistory();
       closeChatOptions();
     } catch {
-      showToast(t("common.error_occurred"));
+      showToast(t("common.error_occurred"), "error");
     } finally {
       setIsPinningHeaderChat(false);
     }
@@ -2039,7 +2031,7 @@ export default function ChatInterface() {
       showToast(t("common.delete"));
       handleConversationRemoved(pendingHeaderDeleteId);
     } catch {
-      showToast(t("common.error_occurred"));
+      showToast(t("common.error_occurred"), "error");
     } finally {
       setIsDeletingHeaderChat(false);
       setPendingHeaderDeleteId(null);
@@ -2566,7 +2558,7 @@ export default function ChatInterface() {
           />
         )}
 
-        <ChatToast message={toast} />
+        <ChatToast message={toast?.message ?? null} variant={toast?.variant} />
       </section>
 
       {/* ── Feedback Dialog ── */}

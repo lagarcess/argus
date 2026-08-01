@@ -278,6 +278,7 @@ class SupabaseGateway(
         self,
         email: str,
         password: str,
+        captcha_token: str,
         display_name: str | None = None,
         username: str | None = None,
         language: Language = "en",
@@ -293,7 +294,8 @@ class SupabaseGateway(
                             "display_name": display_name,
                             "username": username,
                             "language": language,
-                        }
+                        },
+                        "captcha_token": captcha_token,
                     },
                 }
             )
@@ -314,17 +316,69 @@ class SupabaseGateway(
         row = _row_one(rows)
         if not row or row.get("disabled_at") is not None:
             return None
-        role = str(row.get("role") or "user").strip().lower()
-        return role if role in {"admin", "developer", "user"} else "user"
+        role = str(row.get("role") or "").strip().lower()
+        return role if role in {"admin", "developer", "user"} else None
 
     def private_alpha_email_allowed(self, email: str) -> bool:
         return self.private_alpha_role_for_email(email) is not None
 
-    def login(self, email: str, password: str) -> dict[str, Any]:
+    def request_private_alpha_access(
+        self,
+        *,
+        email: str,
+        language: Language,
+    ) -> None:
+        self.client.table("private_alpha_allowlist").upsert(
+            {
+                "email": _normalize_email(email),
+                "role": "requested",
+                "language": language,
+            },
+            on_conflict="email",
+            ignore_duplicates=True,
+        ).execute()
+
+    def get_requested_private_alpha_access(self, email: str) -> dict[str, Any] | None:
+        rows = (
+            self.client.table("private_alpha_allowlist")
+            .select("email,role,language,disabled_at")
+            .eq("email", _normalize_email(email))
+            .eq("role", "requested")
+            .is_("disabled_at", "null")
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        if row is None or row.get("language") not in {"en", "es-419"}:
+            return None
+        return row
+
+    def approve_requested_private_alpha_access(self, *, email: str) -> bool:
+        updated = (
+            self.client.table("private_alpha_allowlist")
+            .update({"role": "user", "updated_at": _now_iso()})
+            .eq("email", _normalize_email(email))
+            .eq("role", "requested")
+            .is_("disabled_at", "null")
+            .execute()
+        )
+        row = _row_one(updated)
+        return bool(row and row.get("role") == "user")
+
+    def login(
+        self,
+        email: str,
+        password: str,
+        captcha_token: str,
+    ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
             response = auth_client.auth.sign_in_with_password(
-                {"email": email, "password": password}
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"captcha_token": captcha_token},
+                }
             )
             if not response.session:
                 raise RuntimeError("Login failed: No session returned.")

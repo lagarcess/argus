@@ -15,6 +15,7 @@
         "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS": "15",
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_MOCK_AUTH": "false",
+        "ARGUS_APP_ORIGIN": "https://argus-app-suz5.onrender.com",
         "ARGUS_STRATEGIES_ENABLED": "false",
         "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "true",
         "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
@@ -44,13 +45,15 @@
       "required_present": [
         "ARGUS_CORS_ALLOW_ORIGINS",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
         "DATABASE_URL",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "SUPABASE_JWT_SECRET",
         "RENDER_API_KEY",
-        "OPENROUTER_API_KEY",
+        "ARGUS_PROD_OPENROUTER_API_KEY",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY"
       ],
@@ -71,13 +74,15 @@
       "required_present": [
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-        "NEXT_PUBLIC_ARGUS_API_URL"
+        "NEXT_PUBLIC_ARGUS_API_URL",
+        "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY"
       ],
       "optional": ["NEXT_PUBLIC_POSTHOG_KEY"]
     },
     "workflow": {
       "name": "argus-backtests",
       "env": {
+        "APP_ENV": "production",
         "ARGUS_RENDER_WORKFLOW_PROOF_TASK": "argus-backtests/workflow_proof",
         "ARGUS_WORKFLOW_PROOF_PLAN": "starter",
         "POETRY_VERSION": "2.1.3",
@@ -99,7 +104,8 @@
         "ARGUS_WORKFLOW_DATABASE_URL",
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY",
-        "OPENROUTER_API_KEY"
+        "ARGUS_PROD_OPENROUTER_API_KEY",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY"
       ],
       "optional": [
         "ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT",

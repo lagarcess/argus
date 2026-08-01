@@ -1,12 +1,15 @@
 import { describe, test } from "bun:test";
 import i18next from "i18next";
 import { doesNotMatch, equal, match } from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement, type ComponentProps, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 
 import ForgotPasswordPage from "../app/auth/forgot-password/page";
 import AuthForm from "../components/auth/AuthForm";
+import RequestAccess from "../components/auth/RequestAccess";
 import ExpiredGuestSession from "../components/guest/ExpiredGuestSession";
 import GuestConversionModal from "../components/guest/GuestConversionModal";
 import en from "../public/locales/en/common.json";
@@ -35,6 +38,14 @@ function authForm(embedded: boolean): ReactElement {
   return createElement(AuthForm, props);
 }
 
+function requestAccess(embedded: boolean): ReactElement {
+  return createElement(RequestAccess, {
+    embedded,
+    onShowSignup: () => undefined,
+    onShowLogin: () => undefined,
+  });
+}
+
 function occurrences(value: string, fragment: string): number {
   return value.split(fragment).length - 1;
 }
@@ -43,8 +54,17 @@ describe("auth card consistency", () => {
   test("standalone auth owns one canonical card while embedded auth adds none", async () => {
     const standalone = await renderLocalized(authForm(false));
     const embedded = await renderLocalized(authForm(true));
-    const canonicalCard =
-      "rounded-[20px] border border-black/10 bg-white p-7";
+    const canonicalCard = "rounded-[20px] border border-black/10 bg-white p-7";
+
+    equal(occurrences(standalone, canonicalCard), 1);
+    doesNotMatch(standalone, /shadow/);
+    equal(occurrences(embedded, canonicalCard), 0);
+  });
+
+  test("standalone request access owns one canonical card while embedded access adds none", async () => {
+    const standalone = await renderLocalized(requestAccess(false));
+    const embedded = await renderLocalized(requestAccess(true));
+    const canonicalCard = "rounded-[20px] border border-black/10 bg-white p-7";
 
     equal(occurrences(standalone, canonicalCard), 1);
     doesNotMatch(standalone, /shadow/);
@@ -65,7 +85,7 @@ describe("auth card consistency", () => {
   });
 
   test("guest conversion uses one 20px zero-shadow card", async () => {
-    const html = await renderLocalized(
+    const authHtml = await renderLocalized(
       createElement(GuestConversionModal, {
         isOpen: true,
         reason: "new_conversation",
@@ -75,11 +95,39 @@ describe("auth card consistency", () => {
         onAuthenticate: async () => undefined,
       }),
     );
+    const requestHtml = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "new_conversation",
+        initialMode: "login",
+        publicAccountAccessEnabled: false,
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
 
-    equal(occurrences(html, "border border-black/10"), 1);
-    match(html, /rounded-\[20px\]/);
-    doesNotMatch(html, /rounded-\[28px\]/);
-    doesNotMatch(html, /shadow/);
+    for (const html of [authHtml, requestHtml]) {
+      equal(occurrences(html, "border border-black/10"), 1);
+      match(html, /rounded-\[20px\]/);
+      doesNotMatch(html, /rounded-\[28px\]/);
+      doesNotMatch(html, /shadow/);
+    }
+  });
+
+  test("confirmation states keep the outer card and the canonical blocking error token", () => {
+    const authSource = readFileSync(
+      join(import.meta.dir, "../components/auth/AuthForm.tsx"),
+      "utf8",
+    );
+    const requestSource = readFileSync(
+      join(import.meta.dir, "../components/auth/RequestAccess.tsx"),
+      "utf8",
+    );
+
+    match(authSource, /needsEmailConfirmation \? \(/);
+    match(authSource, /className=\{blockingErrorBannerClass\}/);
+    doesNotMatch(authSource, /rounded-\[28px\]|shadow-/);
+    doesNotMatch(requestSource, /rounded-\[28px\]|shadow-/);
   });
 
   test("forgot password uses the canonical 20px card radius", async () => {

@@ -6,7 +6,7 @@ services:
     branch: main
     rootDir: .
     region: virginia
-    plan: free
+    plan: standard
     autoDeployTrigger: off
     buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
@@ -33,6 +33,8 @@ services:
       - key: ARGUS_MOCK_AUTH
         value: "false"
       - key: ARGUS_CORS_ALLOW_ORIGINS
+        value: https://argus-app-suz5.onrender.com
+      - key: ARGUS_APP_ORIGIN
         value: https://argus-app-suz5.onrender.com
       - key: ARGUS_STRATEGIES_ENABLED
         value: "false"
@@ -66,6 +68,8 @@ services:
         value: "25"
       - key: ARGUS_OPS_TOKEN
         sync: false
+      - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
@@ -78,7 +82,9 @@ services:
         sync: false
       - key: RENDER_API_KEY
         sync: false
-      - key: OPENROUTER_API_KEY
+      - key: ARGUS_PROD_OPENROUTER_API_KEY
+        sync: false
+      - key: ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY
         sync: false
       - key: ARGUS_UTILITY_MODEL
         value: google/gemini-2.5-flash-lite
@@ -112,7 +118,7 @@ services:
     branch: main
     rootDir: web
     region: virginia
-    plan: free
+    plan: starter
     autoDeployTrigger: off
     buildCommand: npm install -g bun && bun install --frozen-lockfile && bun run build
     startCommand: bun run start -- -p $PORT
@@ -133,6 +139,8 @@ services:
         value: "true"
       - key: NEXT_PUBLIC_ARGUS_API_URL
         value: https://argus-ohr5.onrender.com/api/v1
+      - key: NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY
+        sync: false
       - key: NEXT_PUBLIC_STRATEGIES_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_COLLECTIONS_ENABLED

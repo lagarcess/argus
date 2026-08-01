@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 type CommandPaletteLoadMoreControlProps = {
   failed: boolean;
@@ -21,7 +22,7 @@ export default function CommandPaletteLoadMoreControl({
     <div className="mx-2 flex flex-col gap-2">
       {failed && (
         <p
-          className="text-[12px] leading-relaxed text-[#b25e65] dark:text-[#e58b92]"
+          className={`text-[12px] leading-relaxed ${inlineFailureTextClass}`}
           role="alert"
         >
           {t(

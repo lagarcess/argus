@@ -1,11 +1,26 @@
 import {
   apiFetch,
   persistBrowserSession,
+  unauthenticatedApiFetch,
+  type ApiLanguage,
   type AuthResponsePayload,
   type Conversation,
 } from "@/lib/argus-api";
 import { getSupabaseClient } from "@/lib/supabase-client";
 import type { GuestPendingActionSummary } from "@/lib/guest-conversion";
+
+export async function requestAccess(payload: {
+  email: string;
+  language: ApiLanguage;
+}): Promise<{ accepted: true }> {
+  return unauthenticatedApiFetch<{ accepted: true }>(
+    "/auth/access-requests",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
 
 export async function createGuestHandoff(payload: {
   destination_email: string;

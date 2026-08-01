@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.naming import suggest_entity_name
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
@@ -19,6 +20,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.store import utcnow
+from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
 router = APIRouter(prefix="/api/v1", tags=["strategies"])
 
@@ -51,11 +53,15 @@ def create_strategy(
 
     strategy_name = payload.name
     if not strategy_name:
-        suggested = suggest_entity_name(
-            entity_type="strategy",
-            context=f"Template: {payload.template}\nSymbols: {', '.join(payload.symbols)}",
-            language=user.language,
-        )
+        with openrouter_traffic_class(account_context(request).kind):
+            suggested = suggest_entity_name(
+                entity_type="strategy",
+                context=(
+                    f"Template: {payload.template}\n"
+                    f"Symbols: {', '.join(payload.symbols)}"
+                ),
+                language=user.language,
+            )
         strategy_name = suggested or f"{', '.join(payload.symbols)} idea"
 
     if api_state.supabase_gateway is not None:

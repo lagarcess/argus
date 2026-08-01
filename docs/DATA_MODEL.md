@@ -256,17 +256,24 @@ and login; it should not be exposed as a frontend product surface.
 ### Fields
 - `email`: `text` (Primary Key, lowercased)
 - `role`: `text` (Default: `user`)
+- `language`: `text` (Default: `en`)
 - `disabled_at`: `timestamptz` (Nullable)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
 ### Enums
-- **role**: `admin`, `developer`, `user`
+- **role**: `admin`, `developer`, `user`, `requested`
+- **language**: `en`, `es-419`
 
 ### Notes
-- Rows are managed directly in Supabase during private alpha. No invite
-  dashboard, waitlist, referral system, or public invite-code flow is part of
-  this pass.
+- The public access-request endpoint may insert a missing `requested` row. It
+  never updates an existing requested, approved, privileged, or disabled row.
+- `requested` and unknown roles never grant permanent account access.
+- The ops approval action loads an active requested row and stored language,
+  sends the localized approval email first, and only then compare-and-sets
+  `requested` to `user` while `disabled_at` remains null.
+- There is no invite dashboard, referral system, public invite-code flow,
+  pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
 - If an email is missing or `disabled_at` is set, `/auth/signup` and
@@ -1256,7 +1263,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
-- Backend service-role access checks the table before auth signup/login.
+- All privileges remain revoked from `public`, `anon`, and `authenticated`;
+  no client policy permits direct requested-row access.
+- Backend service-role access owns request capture, approval transition, and
+  access checks before auth signup/login.
 
 ---
 

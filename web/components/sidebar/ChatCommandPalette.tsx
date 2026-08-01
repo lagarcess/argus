@@ -15,11 +15,13 @@ import {
   Loader2,
   Maximize2,
   MessageSquare,
+  MessageSquareWarning,
   Minimize2,
   Search,
   Trash2,
   X,
 } from "lucide-react";
+import { panelFailureIconClass } from "@/lib/failure-treatment";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
@@ -1271,6 +1273,10 @@ export default function ChatCommandPalette({
                 className="flex flex-col items-center justify-center px-6 py-20 text-center"
                 role="alert"
               >
+                <MessageSquareWarning
+                  className={`mb-3 ${panelFailureIconClass}`}
+                  aria-hidden="true"
+                />
                 <p className="text-[14px] text-black/50 dark:text-white/50">
                   {t(
                     "command_palette.read_error",

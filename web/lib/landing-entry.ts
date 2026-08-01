@@ -1,4 +1,4 @@
-export type LandingAuthMode = "intro" | "signup" | "login";
+export type LandingAuthMode = "intro" | "request" | "signup" | "login";
 
 export type LandingEntrySurface = "loading" | "guest" | "auth";
 

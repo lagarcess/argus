@@ -8,6 +8,7 @@ import AuthForm, {
 import { linkGuestIdentity } from "@/lib/guest-api";
 import { loginWithEmail } from "@/lib/argus-api";
 import { retryGuestSession } from "@/lib/guest-session";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 type ExpiredGuestSessionProps = {
   publicAccountAccessEnabled: boolean;
@@ -124,7 +125,7 @@ export default function ExpiredGuestSession({
         )}
 
         {restartError && (
-          <p className="mt-4 text-center text-sm text-red-600 dark:text-red-300" role="alert">
+          <p className={`mt-4 text-center text-sm ${inlineFailureTextClass}`} role="alert">
             {restartError}
           </p>
         )}

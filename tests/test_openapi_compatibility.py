@@ -97,11 +97,12 @@ def test_prefix_appears_exactly_once_per_public_operation(
     assert checked.get("servers") in (None, [])
 
 
-def test_exclusions_are_exactly_the_three_named_operations(checked: dict) -> None:
+def test_exclusions_are_exactly_the_named_operations(checked: dict) -> None:
     assert openapi_compat.EXCLUDED_OPERATIONS == frozenset(
         {
             ("get", "/health"),
             ("get", "/internal/readiness"),
+            ("post", "/internal/access-requests/approve"),
             ("post", "/api/v1/dev/reset"),
         }
     )
@@ -110,6 +111,36 @@ def test_exclusions_are_exactly_the_three_named_operations(checked: dict) -> Non
             method,
             path,
         )
+
+
+def test_access_request_is_public_but_approval_is_exactly_excluded(
+    generated: dict,
+    checked: dict,
+) -> None:
+    assert "post" in generated["paths"]["/api/v1/auth/access-requests"]
+    assert "post" in checked["paths"]["/api/v1/auth/access-requests"]
+    assert "post" in generated["paths"]["/internal/access-requests/approve"]
+    assert checked.get("paths", {}).get("/internal/access-requests/approve") is None
+
+
+def test_access_request_contract_requires_acceptance_and_documents_failures(
+    generated: dict,
+    checked: dict,
+) -> None:
+    for document in (generated, checked):
+        schema = document["components"]["schemas"]["AccessRequestAccepted"]
+        assert schema["required"] == ["accepted"]
+        assert "default" not in schema["properties"]["accepted"]
+
+        responses = document["paths"]["/api/v1/auth/access-requests"]["post"][
+            "responses"
+        ]
+        assert set(responses) == {"202", "403", "422", "429", "503"}
+        for status_code in ("403", "429", "503"):
+            assert (
+                responses[status_code]["content"]["application/json"]["schema"]["$ref"]
+                == "#/components/schemas/Error"
+            )
 
 
 def test_unapproved_exclusion_of_a_public_route_fails_as_missing(
