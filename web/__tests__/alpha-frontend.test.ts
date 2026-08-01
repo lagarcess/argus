@@ -344,9 +344,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain(
       "appendOrReplacePendingAssistantMessage(baseMessages",
     );
-    expect(chat).toContain(
-      "replacementAssistantId: failedAssistantId ?? undefined",
-    );
+    expect(chat).toContain("failedAssistantId");
+    expect(chat).toContain("renderUserMessage: false");
+    expect(chat).toContain("replacementAssistantId: failedAssistantId");
+    expect(chat).toContain("requestMessageId");
+    expect(chat).toContain("renderUserMessage: true");
     expect(chat).toContain(
       "const persistedErrorMessageId = event.data.message_id?.trim()",
     );
@@ -1039,11 +1041,17 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const scrollControls = readFileSync(
+      join(root, "components/chat/useChatScrollControls.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
     expect(chat).toContain('aria-label="Jump to latest"');
-    expect(chat).toContain("distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX");
+    expect(scrollControls).toContain(
+      "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
+    );
     expect(chat).toContain("scrollToLatest");
     expect(chat).toContain("shouldAutoScrollRef.current");
   });
@@ -1330,6 +1338,13 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/command-palette-items.ts"),
       "utf-8",
     );
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(palette).toContain("includeLedgerGroups: true");
@@ -1352,10 +1367,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(adapter).toContain('activation: "open_conversation"');
     expect(adapter).toContain("export function commandPaletteStatusLabelKey");
     expect(adapter).toContain("export function commandPaletteStatusFallback");
-    expect(adapter).toContain("export function commandPalettePreviewFields");
-    expect(palette).toContain("const selectedPreviewFields = useMemo");
-    expect(palette).toContain("selectedPreviewFields.map");
-    expect(palette).toContain("t(field.labelKey, field.labelFallback)");
+    expect(adapter).not.toContain("commandPalettePreviewFields");
+    expect(palette).toContain("<RunDossierView");
+    expect(dossier).toContain("formatRunDossierSetup");
+    expect(dossier).toContain("formatRunDossierMetrics");
     expect(palette).toContain("const activateItem = useCallback");
     expect(palette).not.toContain('item.activation === "select_preview"');
     expect(palette).toContain("onMouseEnter={() => setPreviewItem(item)}");
@@ -1401,12 +1416,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain(
       'searchParams.append("anchor_message_id", options.anchorMessageId)',
     );
+    const turnAnchor = readFileSync(
+      join(root, "components/chat/useTranscriptTurnAnchor.ts"),
+      "utf-8",
+    );
     expect(chat).toContain(
       "loadAllConversationMessagePages(\n          targetConversationId,",
     );
     expect(chat).toContain("data-message-id={msg.id}");
-    expect(chat).toContain('element.scrollIntoView({ block: "center" })');
-    expect(chat).toContain("element.focus({ preventScroll: true })");
+    expect(chat).toContain("useTranscriptTurnAnchor({");
+    expect(turnAnchor).toContain('element.scrollIntoView({ block: "center" })');
+    expect(turnAnchor).toContain("element.focus({ preventScroll: true })");
     expect(palette).toContain(
       "commandPaletteOpenMessageId(item, openAtLeftOff)",
     );
@@ -1453,6 +1473,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("decisionChipClassName");
     expect(card).toContain("border-[#5ba897]/18 bg-transparent");
     expect(card).toContain("selectedDecisionState === state");
+    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(card).toContain("nextDecisionNoteValue(");
+    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
   });
 
   test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {
@@ -1465,7 +1488,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const contract = readFileSync(
-      join(root, "lib/search-contract.ts"),
+      join(root, "lib/run-dossier-contract.ts"),
       "utf-8",
     );
 
@@ -1492,16 +1515,20 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
-    const runFreshButton = palette.slice(
-      palette.indexOf("{selectedRunFreshAction &&"),
-      palette.indexOf("{selectedDecisionAction &&"),
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
     );
 
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
-    expect(runFreshButton).toContain("disabled={turnInFlight}");
-    expect(runFreshButton).toContain("disabled:cursor-not-allowed");
-    expect(runFreshButton).toContain("disabled:opacity-50");
+    expect(palette).toContain("runFreshDisabled={turnInFlight}");
+    expect(dossier).toContain("disabled={runFreshDisabled}");
+    expect(dossier).toContain("disabled:cursor-not-allowed");
+    expect(dossier).toContain("disabled:opacity-50");
   });
 
   test("omnisearch preserves the active turn when its conversation is selected", () => {
@@ -1860,6 +1887,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
+    const dossierIntegration = readFileSync(
+      join(root, "lib/command-palette-dossier-integration.ts"),
+      "utf-8",
+    );
     const initialHistoryFetch = palette.slice(
       palette.indexOf("const requestId = ++historyRequestIdRef.current"),
       palette.indexOf("const clearSearchAndLedger"),
@@ -1949,14 +1980,19 @@ describe("Argus Alpha frontend contract", () => {
       refreshCanonicalSearch.indexOf("++searchRequestIdRef.current"),
     );
     expect(saveDecision.indexOf("await createEvidenceDecision")).toBeLessThan(
-      saveDecision.indexOf("setDecisionDraft(null)"),
+      saveDecision.indexOf("onMutated?.()"),
     );
-    expect(saveDecision.indexOf("setDecisionDraft(null)")).toBeLessThan(
-      saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+    expect(saveDecision.indexOf("onMutated?.()")).toBeLessThan(
+      saveDecision.indexOf("refreshCanonicalSearch:"),
     );
+    expect(saveDecision).toContain("refreshLoadedHistory:");
+    expect(dossierIntegration).toMatch(
+      /Promise\.all\(\[\s*refreshCanonicalSearch\(\),\s*refreshLoadedHistory\(\),\s*\]\)/,
+    );
+    expect(saveDecision).not.toContain("setDecisionDraft");
     expect(
       saveDecision.slice(
-        saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+        saveDecision.indexOf("refreshCanonicalSearch:"),
       ),
     ).not.toContain("setDecisionSaveFailed(true)");
     expect(refreshCanonicalSearch).toContain(': currentQuery');
@@ -2120,15 +2156,19 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("function schedulePostTurnHistoryRefresh");
     expect(chat).toContain("listConversations");
     expect(chat).toContain("title_source");
     expect(chat).toContain("window.setTimeout");
-    expect(chat).toContain("1500");
-    expect(chat).toContain("5000");
-    expect(chat).toContain("9000");
-    expect(chat).toContain("13000");
+    expect(viewHelpers).toContain("1500");
+    expect(viewHelpers).toContain("5000");
+    expect(viewHelpers).toContain("9000");
+    expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
       "schedulePostTurnHistoryRefresh(targetConversationId);",
     );

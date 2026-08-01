@@ -970,6 +970,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/run-dossiers:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRunDossiers'
+        '400':
+          description: The pagination cursor is invalid or stale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/discovery/assets:
     get:
       tags:
@@ -2124,7 +2182,7 @@ components:
         note:
           anyOf:
           - type: string
-            maxLength: 2000
+            maxLength: 500
           - type: 'null'
       type: object
       required:
@@ -2474,6 +2532,59 @@ components:
       - reason
       - conversation_id
       - action_id
+    GuestUser:
+      properties:
+        id:
+          type: string
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          default: dark
+        is_admin:
+          type: boolean
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+      description: Guest-safe profile projection without registered-only preferences.
     HistoryItem:
       additionalProperties: true
       type: object
@@ -2610,6 +2721,27 @@ components:
       type: object
       required:
       - items
+    PaginatedRunDossiers:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RunDossier'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - items
+      - total_runs
+      - decided_runs
     PaginatedSearch:
       properties:
         items:
@@ -2676,6 +2808,91 @@ components:
             - dark
             - light
             - system
+          - type: 'null'
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
+      type: object
+    RunDossier:
+      properties:
+        run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        result_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        tested:
+          $ref: '#/components/schemas/RunDossierTested'
+        outcome:
+          $ref: '#/components/schemas/SearchDossierOutcome'
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        actions:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchRunFreshAction'
+            - $ref: '#/components/schemas/SearchDecisionAction'
+            discriminator:
+              propertyName: type
+              mapping:
+                decision: '#/components/schemas/SearchDecisionAction'
+                run_fresh: '#/components/schemas/SearchRunFreshAction'
+          type: array
+          maxItems: 2
+      type: object
+      required:
+      - run_id
+      - run_label
+      - completed_at
+      - tested
+      - outcome
+    RunDossierTested:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        strategy_family:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
           - type: 'null'
       type: object
     SearchAssetDecisionCounts:
@@ -2751,25 +2968,6 @@ components:
       required:
       - evidence_artifact_id
       - run_label
-    SearchDossier:
-      properties:
-        decision:
-          anyOf:
-          - $ref: '#/components/schemas/SearchDossierDecision'
-          - type: 'null'
-        tested:
-          $ref: '#/components/schemas/SearchDossierTested'
-        outcome:
-          anyOf:
-          - $ref: '#/components/schemas/SearchDossierOutcome'
-          - type: 'null'
-        left_off:
-          anyOf:
-          - $ref: '#/components/schemas/SearchDossierLeftOff'
-          - type: 'null'
-      type: object
-      required:
-      - tested
     SearchDossierDecision:
       properties:
         state:
@@ -2792,26 +2990,6 @@ components:
       type: object
       required:
       - state
-    SearchDossierLeftOff:
-      properties:
-        run_label:
-          type: string
-          maxLength: 160
-        completed_at:
-          type: string
-          format: date-time
-        nudge:
-          anyOf:
-          - type: string
-            enum:
-            - undecided
-            - suggestion_untaken
-            - stale_result
-          - type: 'null'
-      type: object
-      required:
-      - run_label
-      - completed_at
     SearchDossierMetric:
       properties:
         name:
@@ -2853,34 +3031,6 @@ components:
       required:
       - run_label
       - completed_at
-    SearchDossierTested:
-      properties:
-        symbols:
-          items:
-            type: string
-          type: array
-          maxItems: 5
-        strategy_families:
-          items:
-            type: string
-          type: array
-          maxItems: 5
-        run_count:
-          type: integer
-          minimum: 0.0
-        start_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-        end_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-      type: object
-      required:
-      - run_count
     SearchItem:
       properties:
         type:
@@ -2902,19 +3052,15 @@ components:
         match:
           $ref: '#/components/schemas/SearchMatch'
         dossier:
-          $ref: '#/components/schemas/SearchDossier'
-        actions:
-          items:
-            oneOf:
-            - $ref: '#/components/schemas/SearchRunFreshAction'
-            - $ref: '#/components/schemas/SearchDecisionAction'
-            discriminator:
-              propertyName: type
-              mapping:
-                decision: '#/components/schemas/SearchDecisionAction'
-                run_fresh: '#/components/schemas/SearchRunFreshAction'
-          type: array
-          maxItems: 2
+          anyOf:
+          - $ref: '#/components/schemas/RunDossier'
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
         decision_states:
           items:
             type: string
@@ -2936,6 +3082,8 @@ components:
       - conversation_id
       - match
       - dossier
+      - total_runs
+      - decided_runs
     SearchLedgerGroup:
       properties:
         decision_state:
@@ -3407,6 +3555,17 @@ components:
           - light
           - system
           default: dark
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
         is_admin:
           type: boolean
           default: false
@@ -3427,7 +3586,9 @@ components:
     UserResponse:
       properties:
         user:
-          $ref: '#/components/schemas/User'
+          anyOf:
+          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/GuestUser'
         account_kind:
           type: string
           enum:

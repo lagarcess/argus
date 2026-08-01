@@ -72,6 +72,21 @@ def test_search_declares_bounded_visible_conversation_recall(
     }
 
 
+def test_decision_note_write_schema_caps_new_notes_without_narrowing_reads(
+    generated: dict,
+) -> None:
+    schemas = generated["components"]["schemas"]
+    create_note = schemas["DecisionNoteCreate"]["properties"]["note"]["anyOf"][0]
+    dossier_note = schemas["SearchDossierDecision"]["properties"]["note"][
+        "anyOf"
+    ][0]
+    action_note = schemas["SearchDecisionAction"]["properties"]["note"]["anyOf"][0]
+
+    assert create_note["maxLength"] == 500
+    assert dossier_note["maxLength"] == 2000
+    assert action_note["maxLength"] == 2000
+
+
 def test_prefix_appears_exactly_once_per_public_operation(
     generated: dict, checked: dict
 ) -> None:
@@ -297,6 +312,33 @@ def test_chat_stream_declares_the_approved_request_boundary_failures(
         assert responses[status]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/Error"
         }
+
+
+def test_openapi_contract_exposes_lazy_run_dossier_history(
+    generated: dict,
+) -> None:
+    operation = generated["paths"][
+        "/api/v1/conversations/{conversation_id}/run-dossiers"
+    ]["get"]
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/PaginatedRunDossiers"
+    }
+    for status in ("400", "404"):
+        assert operation["responses"][status]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/Error"}
+    parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+    assert parameters["limit"]["schema"]["default"] == 20
+    assert parameters["limit"]["schema"]["maximum"] == 100
+    search_item = generated["components"]["schemas"]["SearchItem"]
+    assert search_item["properties"]["dossier"]["anyOf"] == [
+        {"$ref": "#/components/schemas/RunDossier"},
+        {"type": "null"},
+    ]
+    assert {"dossier", "total_runs", "decided_runs"}.issubset(
+        search_item["required"]
+    )
+    assert "actions" not in search_item["properties"]
 
 
 def test_regeneration_script_matches_checked_artifact() -> None:

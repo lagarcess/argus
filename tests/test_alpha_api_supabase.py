@@ -934,6 +934,91 @@ def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
     mock_gateway.update_user.assert_called_once()
 
 
+def test_patch_me_persists_a_curated_avatar_theme(mock_gateway):
+    before = _mock_profile()
+    mock_gateway.get_user.return_value = before
+
+    def _updated_user(_user_id: str, payload: dict) -> User:
+        return User.model_validate(payload)
+
+    mock_gateway.update_user.side_effect = _updated_user
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "plum"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["avatar_theme"] == "plum"
+    assert mock_gateway.update_user.call_args.args[1]["avatar_theme"] == "plum"
+
+
+def test_patch_me_rejects_an_unknown_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "arbitrary-hex"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_me_rejects_a_null_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": None},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
+    now = utcnow()
+    registered = UserResponse(
+        user=_mock_profile(),
+        account_kind="registered",
+        guest=None,
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=True,
+            can_manage_conversation=True,
+            can_save_decision=True,
+            can_manage_account=True,
+            can_use_omnisearch=True,
+            can_search_current_workspace=False,
+            can_use_grounded_discovery=True,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+    guest = UserResponse(
+        user=_mock_profile(),
+        account_kind="guest",
+        guest=GuestAccountSummary(
+            expires_at=now + timedelta(days=7),
+            conversation_limit=1,
+            message_limit=10,
+            simulation_limit=1,
+            feedback_limit=5,
+        ),
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=False,
+            can_manage_conversation=False,
+            can_save_decision=False,
+            can_manage_account=False,
+            can_use_omnisearch=False,
+            can_search_current_workspace=True,
+            can_use_grounded_discovery=False,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+
+    assert registered.model_dump(mode="json")["user"]["avatar_theme"] == "ocean"
+    assert "avatar_theme" not in guest.model_dump(mode="json")["user"]
+
+
 def test_feedback_accepts_account_deletion_request_and_enriches_context(mock_gateway):
     response = client.post(
         "/api/v1/feedback",
@@ -2823,9 +2908,11 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     assert item["dossier"]["decision"] == {
         "state": "promising",
         "note": "Worth revisiting.",
-        "run_label": None,
+        "run_label": "AAPL MSFT evidence run",
     }
     assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
+    assert item["total_runs"] == 1
+    assert item["decided_runs"] == 1
 
 
 def test_search_supabase_projects_localized_actions_without_generation(
@@ -2910,7 +2997,7 @@ def test_search_supabase_projects_localized_actions_without_generation(
 
     assert response.status_code == 200
     conversation = response.json()["items"][0]
-    run_fresh, decision = conversation["actions"]
+    run_fresh, decision = conversation["dossier"]["actions"]
     assert run_fresh["type"] == "run_fresh"
     assert run_fresh["source_run_id"] == "run-action-es"
     assert run_fresh["send_text"].startswith(
@@ -2961,12 +3048,10 @@ def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     assert response.status_code == 200
     item = response.json()["items"][0]
     assert item["type"] == "conversation"
-    assert item["dossier"]["decision"] == {
-        "state": "rejected",
-        "note": "Too volatile for me.",
-        "run_label": None,
-    }
-    assert item["dossier"]["outcome"] is None
+    assert item["dossier"] is None
+    assert item["total_runs"] == 0
+    assert item["decided_runs"] == 0
+    assert item["decision_states"] == ["rejected"]
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(

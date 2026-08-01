@@ -12,6 +12,7 @@ import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
+import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
@@ -40,7 +41,7 @@ type ChatMessageProps = {
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
-  onDecisionSaved?: () => void;
+  onDecisionSaved?: (decisionState: DecisionState) => void;
   onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;

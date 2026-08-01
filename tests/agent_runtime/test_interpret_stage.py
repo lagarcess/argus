@@ -3317,8 +3317,8 @@ def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest result" in answer_lower
-    assert "could not safely answer that follow-up" in answer_lower
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
     assert result.decision.artifact_target == "latest_result"
@@ -3384,7 +3384,8 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert not answer.startswith("**")
     # Issue #249: failure prose never wears result chrome.
     assert "response_intent" not in result.patch
-    assert "could not safely answer that follow-up" in answer_lower
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert result.patch["recovery"] == {
         "code": "latest_result_followup_unavailable",
         "retryable": True,
@@ -3519,8 +3520,8 @@ def test_unanchored_clarification_after_result_uses_followup_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest result" in answer_lower
-    assert "could not safely answer that follow-up" in answer_lower
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert "one more detail" not in answer
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.requires_clarification is False
@@ -3597,7 +3598,7 @@ def test_result_followup_timeout_uses_localized_recovery(
     assert not answer.startswith("**")
     # Issue #249: failure prose never wears result chrome.
     assert "response_intent" not in result.patch
-    assert "could not safely answer that follow-up" in answer
+    assert answer == "I couldn’t answer that follow-up. Your result is still here."
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"
     assert receipts[-1].failure_mode == "result_followup_timeout"

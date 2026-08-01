@@ -101,6 +101,48 @@ expensive to unwind. Pure visual taste (the palette itself) is left open.
   exact interaction pattern — this freedom does not extend to relocating
   other, pre-existing settings (see decision 9).
 
+## Addendum — approved visual pivot (2026-07-31)
+
+This addendum is the source of truth where it conflicts with decision 9 or
+the earlier exploratory directions.
+
+11. **The picker is an inline drawer in the existing Profile modal, not a
+    centered submodal.** Clicking the avatar directly reveals and dismisses
+    it in place. The resting Profile modal remains light: avatar, name,
+    handle, email, and App language keep their established positions; it
+    gains no persistent color row or new settings destination.
+12. **The drawer has one deliberate seam, not competing dividers.** Its
+    header uses the Profile row convention (label on the left, quiet action
+    on the right): `Avatar color`, one horizontal hairline that indicates the
+    expanded region, and `Hide` with an upward chevron. Clicking the avatar,
+    the header, or Escape collapses the drawer and returns focus to the avatar
+    trigger. The avatar's pencil is the visible edit affordance; no native
+    hover tooltip is needed.
+13. **Picker geometry is intentionally quieter and contained.** Each option
+    retains a 44px interactive target, while the painted monogram is 36px.
+    The selected-state ring stays inside that target rather than growing past
+    it. The neutral original Argus monogram remains the deterministic default
+    and has a subtle picker edge so it reads on both appearances.
+14. **The visual distinction remains deliberate.** Picker swatches can be
+    clear and comparable because they are active-selection UI. Persistent
+    badges remain the restrained ambient treatment required by decision 10.
+
+### Explicitly not built because of the founder steer and pivot
+
+- **No centered avatar submodal.** It was superseded after visual inspection
+  in favor of the inline drawer.
+- **No separate Settings destination.** The avatar is changed where it is
+  seen, without moving or pushing down App language.
+- **No profile-picture mode.** There is no image upload, cropper, Storage
+  bucket, image CDN, public image URL, or fallback image behavior. A real
+  picture-avatar surface remains a separate future lane, not a disguised
+  extension of this one.
+- **No arbitrary color picker or free-form palette.** The durable enum and
+  the avatar-specific gradient system remain the bounded choice set.
+- **No guest control, initials rewrite, or new durable profile surface beyond
+  `avatar_theme`.** The display-name → username → email initial derivation,
+  registered-only boundary, API contract, and RLS proof remain intact.
+
 ## Stop and report if
 
 - Passing contrast requires per-theme custom logic beyond a simple

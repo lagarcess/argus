@@ -602,7 +602,7 @@ def test_visible_id_recall_is_one_owner_scoped_hydration(
     assert pool.tracker == {"query_count": 1, "row_counts": [1]}
 
 
-def test_search_projects_and_clears_the_untaken_suggestion_nudge(
+def test_search_projects_the_latest_run_result_message_anchor(
     search_identities,
 ) -> None:
     owner_id = search_identities["owner"]
@@ -631,15 +631,27 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
             conversation_id=conversation_id,
             source_run_id=run_id,
         )
-        _insert_message(
+        result_message_id = _insert_message(
             cursor,
             user_id=owner_id,
             conversation_id=conversation_id,
             timestamp=now + timedelta(minutes=2),
             role="assistant",
-            content="Here are supported next experiments.",
+            content="GLD result.",
             metadata={
                 "result_run_id": str(run_id),
+                "result_card": {"title": "GLD result"},
+            },
+        )
+        _insert_message(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now + timedelta(minutes=3),
+            role="assistant",
+            content="Here are supported next experiments.",
+            metadata={
+                "latest_run_id": str(run_id),
                 "next_experiments": {
                     "version": "argus_next_experiments/v1",
                     "rows": [
@@ -659,15 +671,15 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
         source_limit=4,
     )
     [(_, offered_item)] = _ranked(offered.rows, "GLD")
-    assert offered_item.dossier.left_off is not None
-    assert offered_item.dossier.left_off.nudge == "suggestion_untaken"
+    assert offered_item.dossier is not None
+    assert offered_item.dossier.result_message_id == str(result_message_id)
 
     with _connect() as connection, connection.cursor() as cursor:
         _insert_message(
             cursor,
             user_id=owner_id,
             conversation_id=conversation_id,
-            timestamp=now + timedelta(minutes=3),
+            timestamp=now + timedelta(minutes=4),
             role="user",
             content="I will take a different path.",
         )
@@ -678,8 +690,8 @@ def test_search_projects_and_clears_the_untaken_suggestion_nudge(
         source_limit=4,
     )
     [(_, followed_up_item)] = _ranked(followed_up.rows, "GLD")
-    assert followed_up_item.dossier.left_off is not None
-    assert followed_up_item.dossier.left_off.nudge is None
+    assert followed_up_item.dossier is not None
+    assert followed_up_item.dossier.result_message_id == str(result_message_id)
 
 
 def test_search_centers_fragment_on_late_user_message_match(
@@ -950,6 +962,114 @@ def test_conversation_cursor_pages_after_evidence_winner_without_gaps(
 
     assert len(seen) == len(set(seen))
     assert set(seen) == inserted
+
+
+def test_exact_two_character_symbol_pages_filter_and_ledger_are_owner_scoped(
+    search_identities,
+) -> None:
+    owner_id = search_identities["owner"]
+    other_id = search_identities["other"]
+    now = datetime(2026, 7, 27, 17, tzinfo=timezone.utc)
+    expected_counts: dict[str, int] = {}
+    promising_conversation_id: str | None = None
+    with _connect() as connection, connection.cursor() as cursor:
+        for offset, decision_state in enumerate(("promising", "rejected")):
+            conversation_id = _insert_conversation(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=offset),
+                title=f"BA owner research {offset}",
+            )
+            run_count = 2 if offset == 0 else 1
+            expected_counts[str(conversation_id)] = run_count
+            if decision_state == "promising":
+                promising_conversation_id = str(conversation_id)
+            newest_run_id = None
+            for run_offset in range(run_count):
+                newest_run_id = _insert_run(
+                    cursor,
+                    user_id=owner_id,
+                    timestamp=(
+                        now
+                        - timedelta(minutes=offset)
+                        - timedelta(seconds=run_offset)
+                    ),
+                    title=f"BA owner result {offset}-{run_offset}",
+                    conversation_id=conversation_id,
+                    symbols=["BA"],
+                )
+            _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(minutes=offset),
+                title=f"BA owner idea {offset}",
+                summary=f"BA owner summary {offset}",
+                conversation_id=conversation_id,
+                decision_state=decision_state,
+                source_run_id=newest_run_id,
+            )
+
+        foreign_conversation = _insert_conversation(
+            cursor,
+            user_id=other_id,
+            timestamp=now + timedelta(hours=1),
+            title="BA foreign research",
+        )
+        _insert_run(
+            cursor,
+            user_id=other_id,
+            timestamp=now + timedelta(hours=1),
+            title="BA foreign result",
+            conversation_id=foreign_conversation,
+            symbols=["BA"],
+        )
+
+    reader, _ = _reader()
+    first_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="ba",
+        source_limit=2,
+        include_ledger_groups=True,
+    )
+    first_page = _ranked(first_result.rows, "ba")[:1]
+    assert len(first_page) == 1
+    assert first_result.asset_rollup is not None
+    assert first_result.asset_rollup.run_count == 3
+    assert first_result.ledger_counts == {
+        "promising": 1,
+        "watching": 0,
+        "rejected": 1,
+        "revisit_later": 0,
+    }
+
+    second_result = reader.search_rows(
+        user_id=str(owner_id),
+        query="ba",
+        source_limit=2,
+        cursor_updated_at=first_page[0][1].updated_at,
+        cursor_id=first_page[0][1].id,
+    )
+    second_page = _ranked(second_result.rows, "ba")[:1]
+    pages = [*first_page, *second_page]
+    assert {item.id for _, item in pages} == set(expected_counts)
+    assert {
+        item.id: item.match.count
+        for _, item in pages
+    } == expected_counts
+    assert str(foreign_conversation) not in {item.id for _, item in pages}
+
+    promising = _ranked(
+        reader.search_rows(
+            user_id=str(owner_id),
+            query="ba",
+            source_limit=3,
+            decision_state="promising",
+        ).rows,
+        "ba",
+    )
+    assert len(promising) == 1
+    assert promising_conversation_id is not None
+    assert promising[0][1].id == promising_conversation_id
 
 
 def test_conversation_cursor_reaches_message_after_source_candidate_cap(
@@ -1424,29 +1544,36 @@ def test_full_lineage_aggregates_survive_more_than_five_children(
         )
         run_ids: list[UUID] = []
         for offset in range(7):
-            run_ids.append(
-                _insert_run(
-                    cursor,
-                    user_id=owner_id,
-                    timestamp=now - timedelta(days=7 - offset),
-                    title=f"Run {offset}",
-                    conversation_id=conversation_id,
-                    symbols=[f"S{offset}", "AAPL"],
-                    start_date=f"20{19 + offset}-01-01",
-                    end_date=f"20{19 + offset}-12-31",
-                )
+            run_id = _insert_run(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(days=7 - offset),
+                title=f"Run {offset}",
+                conversation_id=conversation_id,
+                symbols=[f"S{offset}", "AAPL"],
+                start_date=f"20{19 + offset}-01-01",
+                end_date=f"20{19 + offset}-12-31",
             )
-        _insert_idea_spine(
-            cursor,
-            user_id=owner_id,
-            timestamp=now + timedelta(minutes=1),
-            title="Judged oldest run",
-            summary="Anchor decision",
-            decision_note="Anchor decision",
-            conversation_id=conversation_id,
-            source_run_id=run_ids[0],
-            decision_state="watching",
-        )
+            run_ids.append(run_id)
+            spine = _insert_idea_spine(
+                cursor,
+                user_id=owner_id,
+                timestamp=now - timedelta(days=7 - offset)
+                + timedelta(minutes=1),
+                title=f"Run {offset} evidence",
+                summary=(
+                    "Anchor decision" if offset == 0 else f"Run {offset} evidence"
+                ),
+                decision_note=f"Decision {offset}",
+                conversation_id=conversation_id,
+                source_run_id=run_id,
+                decision_state="watching",
+            )
+            if offset >= 5:
+                cursor.execute(
+                    "delete from public.decision_notes where id = %s",
+                    (spine["decision"],),
+                )
 
     reader, _ = _reader()
     result = reader.search_rows(
@@ -1456,13 +1583,14 @@ def test_full_lineage_aggregates_survive_more_than_five_children(
     )
     item = _ranked(result.rows, "anchor")[0][1]
 
-    assert item.dossier.tested.run_count == 7
-    assert str(item.dossier.tested.start_date) == "2019-01-01"
+    assert item.total_runs == 7
+    assert item.decided_runs == 5
+    assert item.dossier is not None
+    assert item.dossier.run_id == str(run_ids[6])
+    assert str(item.dossier.tested.start_date) == "2025-01-01"
     assert str(item.dossier.tested.end_date) == "2025-12-31"
     assert item.decision_states == ("watching",)
-    assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Run 0"
-    assert item.dossier.outcome is not None
+    assert item.dossier.decision is None
     assert item.dossier.outcome.run_label == "Run 6"
 
 

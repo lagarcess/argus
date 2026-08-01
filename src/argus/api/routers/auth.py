@@ -41,6 +41,7 @@ from argus.api.schemas import (
     LoginRequest,
     SignupRequest,
     User,
+    guest_safe_user,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
@@ -138,9 +139,21 @@ def _enforce_guest_attempt_limit(request: Request) -> None:
     )
 
 
+def _auth_user_payload(user: User, *, account_kind: str) -> dict[str, object]:
+    response_user = guest_safe_user(user) if account_kind == "guest" else user
+    return response_user.model_dump(mode="json")
+
+
 @router.get("/auth/session")
-def auth_session(user: User = Depends(current_user)) -> dict[str, object]:  # noqa: B008
-    return {"authenticated": True, "user": user.model_dump(mode="json")}
+def auth_session(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> dict[str, object]:
+    context = account_context(request)
+    return {
+        "authenticated": True,
+        "user": _auth_user_payload(user, account_kind=context.kind),
+    }
 
 
 @router.post("/auth/guest")
@@ -193,7 +206,7 @@ def guest_bootstrap(
                     "reused": True,
                     "renewed_after_expiry": False,
                     "public_account_access_enabled": public_account_access_enabled(),
-                    "user": existing.model_dump(mode="json"),
+                    "user": _auth_user_payload(existing, account_kind=context.kind),
                     "account_kind": "guest",
                 }
             )

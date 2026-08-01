@@ -40,6 +40,10 @@ from argus.domain.postgres_keyset_reader import (
     ConversationKeysetCursorError,
     PostgresKeysetReader,
 )
+from argus.domain.postgres_run_dossier_reader import (
+    PostgresRunDossierReader,
+    RunDossierSourcePage,
+)
 from argus.domain.postgres_search_reader import (
     PostgresSearchReader,
     SearchReadResult,
@@ -128,6 +132,7 @@ class SupabaseGateway(
     history_reader: PostgresHistoryReader | None = None
     search_reader: PostgresSearchReader | None = None
     keyset_reader: PostgresKeysetReader | None = None
+    run_dossier_reader: PostgresRunDossierReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -157,6 +162,7 @@ class SupabaseGateway(
             history_reader=history_reader,
             keyset_reader=PostgresKeysetReader(history_reader.pool),
             search_reader=PostgresSearchReader(history_reader.pool),
+            run_dossier_reader=PostgresRunDossierReader(history_reader.pool),
         )
 
     def new_id(self) -> str:
@@ -1614,6 +1620,27 @@ class SupabaseGateway(
             kwargs["conversation_ids"] = conversation_ids
         return self.search_reader.search_rows(
             **kwargs,
+        )
+
+    def list_run_dossier_source_rows(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int,
+        cursor_completed_at: datetime | None,
+        cursor_run_id: str | None,
+    ) -> RunDossierSourcePage:
+        if self.run_dossier_reader is None:
+            raise RuntimeError(
+                "Persistent run dossier history requires its Postgres reader."
+            )
+        return self.run_dossier_reader.list_source_rows(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            limit=limit,
+            cursor_completed_at=cursor_completed_at,
+            cursor_run_id=cursor_run_id,
         )
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:

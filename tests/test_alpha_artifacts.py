@@ -345,10 +345,21 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
             "Server-authoritative permission to expose ordinary account creation."
         ),
     }
-    assert user_response["properties"]["user"] == {"$ref": "#/components/schemas/User"}
+    assert user_response["properties"]["user"] == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/User"},
+            {"$ref": "#/components/schemas/GuestUser"},
+        ]
+    }
     assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {
         "anyOf": [{"type": "string"}, {"type": "null"}]
     }
+    assert "avatar_theme" in openapi["components"]["schemas"]["User"][
+        "properties"
+    ]
+    assert "avatar_theme" not in openapi["components"]["schemas"]["GuestUser"][
+        "properties"
+    ]
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:

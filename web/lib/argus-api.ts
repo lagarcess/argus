@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
+import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -13,6 +14,7 @@ import {
 } from "./language-features";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
@@ -253,11 +255,7 @@ export type ArtifactLifecycle =
   | "archived"
   | "discarded";
 
-export type DecisionState =
-  | "watching"
-  | "promising"
-  | "rejected"
-  | "revisit_later";
+export type DecisionState = RunDossierDecisionState;
 
 export type EvidenceArtifact = {
   id: string;
@@ -286,7 +284,7 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchConversationItem = SearchConversationContract<DecisionState>;
+export type SearchConversationItem = SearchConversationContract;
 
 export type SearchAssetRollupItem = {
   type: "asset_rollup";
@@ -636,6 +634,7 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  avatar_theme?: AvatarTheme;
 };
 
 export async function getMe() {

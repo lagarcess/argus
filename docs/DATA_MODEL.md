@@ -129,6 +129,8 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
+- `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
+  `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
 - `is_admin`: `boolean` (Default: `false`)
 - `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
   to the historical shape below)
@@ -779,6 +781,25 @@ Constraints:
   user-owned evidence artifact.
 - Duplicate POST/retry semantics update the existing decision row and return the
   canonical current decision.
+- The public decision write contract accepts at most 500 note characters. The
+  durable column remains nullable `text` so previously accepted longer notes
+  stay readable; no migration or destructive truncation is introduced.
+
+### Run dossier read projection
+
+Run dossier history is not a table or durable summary. The
+`GET /api/v1/conversations/{conversation_id}/run-dossiers` endpoint projects
+existing owner-scoped records in this order:
+
+`Conversation -> completed BacktestRun -> EvidenceArtifact -> current
+DecisionNote (optional) -> assistant result message anchor (optional)`.
+
+Only completed evidence-backed runs are eligible. Ordering and pagination use
+the run's effective completion activity, `coalesce(updated_at, created_at)`,
+then run id, newest first. `total_runs` and `decided_runs` are scalar
+server-owned counts over the complete eligible set; clients never accumulate
+them from pages. This projection creates no record, migration, revision log,
+embedding, or generated recap.
 
 Durable decision capture:
 - The API uses the service-role-only `upsert_current_decision_note` RPC so the
@@ -1235,6 +1256,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   authorization.
 - Expired guest identities cannot read or write product rows.
 - Another guest and a permanent user see zero guest workspace rows.
+- `profiles.avatar_theme` is a registered-account preference. The database
+  default keeps every row valid, but restrictive profile RLS policies use the
+  trusted `is_anonymous` JWT claim so a guest cannot read or write it through
+  the client role. The API omits the field from guest responses.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.

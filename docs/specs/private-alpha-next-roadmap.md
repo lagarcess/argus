@@ -22,8 +22,8 @@ that Argus remembers, compares, and stays honest about staleness.
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current integrated product checkpoint contains PR
-#306 at `b71f1eaf`; new work must branch from the current remote
+`main` at `217ead12`. The current integrated product checkpoint runs through PR
+#317 at `2ff6f3c6`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -74,6 +74,17 @@ decision filters and mutation refresh, and provider-free **Run it fresh**
 composition. The memory and Postgres paths preserve the integrated #232
 pagination and #252 conversation-switching contracts. Issue #253 is closed;
 there is no remaining Full Omnisearch implementation lane.
+PR #316 then completed issue #309's run-anchored Omnisearch dossier history as
+`9aa209d4`: users can inspect bounded prior finalized runs and their effective
+decisions without leaving Omnisearch. PR #318 corrected accepted-turn failure
+ownership and reload-stable Retry presentation as `f6d0981e`; the follow-up
+test-isolation checkpoint is `1ed8d4f0`, and issue #313 is closed. PR #315 added
+the conversation activity rail as `6e20328c`, and PR #317 added the centralized
+keyboard overlay and quick-navigation system as `2ff6f3c6` while preserving
+Cmd/Ctrl+K Omnisearch and the existing F2 rename binding. Issue #310 and Draft
+PR #311 are now unblocked by #309's landing, but must reconcile onto the current
+integration head and finish their intentionally deferred schema, palette,
+contract, and exact-head acceptance work before merge review.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213

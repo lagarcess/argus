@@ -12,15 +12,19 @@ import { ArrowDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
+import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
+import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
 import ChatSidebar, {
   type SidebarMode,
 } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
+import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
@@ -54,6 +58,11 @@ import {
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
+  useTranscriptTurnAnchor,
+  type PendingMessageAnchor,
+  type PendingScrollRestore,
+} from "@/components/chat/useTranscriptTurnAnchor";
+import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
@@ -67,6 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
+import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
   clearActiveConversationPointer,
   isCurrentAnchoredConversationRequest,
@@ -82,6 +92,12 @@ import {
   conversationLoadFailureMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
+import {
+  COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS,
+  historyItemBelongsToConversation,
+  isMissingConversationLoadError,
+  POST_TURN_TITLE_REFRESH_DELAYS_MS,
+} from "@/lib/chat-conversation-view-helpers";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
@@ -180,35 +196,8 @@ import {
 } from "./artifact-history";
 
 type View = "chat" | "strategies" | "settings";
-type SendOptions = {
-  renderUserMessage?: boolean;
-  replacementAssistantId?: string;
-  bypassGuestGate?: boolean;
-};
+type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
-const COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS = 150;
-const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
-
-function historyItemBelongsToConversation(
-  item: HistoryItem,
-  targetConversationId: string,
-) {
-  return (
-    item.id === targetConversationId ||
-    item.conversation_id === targetConversationId
-  );
-}
-
-function isMissingConversationLoadError(error: unknown) {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const status = "status" in error ? Number(error.status) : null;
-  const code =
-    "code" in error && typeof error.code === "string" ? error.code : null;
-  return status === 403 || status === 404 || code === "not_found";
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
@@ -299,14 +288,8 @@ export default function ChatInterface() {
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
   const authenticatedUserIdRef = useRef<string | null>(null);
   const readyTranscriptConversationIdRef = useRef<string | null>(null);
-  const pendingScrollRestoreRef = useRef<{
-    conversationId: string;
-    scrollTop: number | null;
-  } | null>(null);
-  const pendingMessageAnchorRef = useRef<{
-    conversationId: string;
-    messageId: string;
-  } | null>(null);
+  const pendingScrollRestoreRef = useRef<PendingScrollRestore>(null);
+  const pendingMessageAnchorRef = useRef<PendingMessageAnchor>(null);
   const messageElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -703,16 +686,15 @@ export default function ChatInterface() {
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
-        if (!snapshot.some((message) => message.id === requestedMessageId)) {
-          throw new Error("Transcript anchor was not returned.");
-        }
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
         readyTranscriptConversationIdRef.current = targetConversationId;
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
-          messageId: requestedMessageId,
+          messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
         setMessages(snapshot);
@@ -881,72 +863,29 @@ export default function ChatInterface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateScrollPositionState = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const activeTranscriptId = readyTranscriptConversationIdRef.current;
-    const userId = account?.user.id;
-    if (
-      activeTranscriptId &&
-      userId &&
-      activeTranscriptId === activeConversationIdRef.current
-    ) {
-      transcriptSessionCache.rememberScroll({
-        userId,
-        conversationId: activeTranscriptId,
-        scrollTop: container.scrollTop,
-      });
-    }
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current = isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  }, [account?.user.id, transcriptSessionCache]);
+  const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({
+    accountUserId: account?.user.id,
+    activeConversationIdRef,
+    readyTranscriptConversationIdRef,
+    bottomRef,
+    scrollContainerRef,
+    shouldAutoScrollRef,
+    transcriptSessionCache,
+    setShowJumpToLatest,
+  });
 
-  const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
-    bottomRef.current?.scrollIntoView({ behavior });
-    shouldAutoScrollRef.current = true;
-    setShowJumpToLatest(false);
-  };
-
-  useLayoutEffect(() => {
-    const pendingAnchor = pendingMessageAnchorRef.current;
-    if (
-      pendingAnchor &&
-      pendingAnchor.conversationId === conversationId &&
-      pendingAnchor.conversationId === activeConversationIdRef.current
-    ) {
-      const element = messageElementRefs.current.get(pendingAnchor.messageId);
-      if (element) {
-        element.scrollIntoView({ block: "center" });
-        element.focus({ preventScroll: true });
-        pendingMessageAnchorRef.current = null;
-        pendingScrollRestoreRef.current = null;
-        shouldAutoScrollRef.current = false;
-        setShowJumpToLatest(true);
-        return;
-      }
-    }
-    const pending = pendingScrollRestoreRef.current;
-    const container = scrollContainerRef.current;
-    if (
-      !pending ||
-      !container ||
-      pending.conversationId !== conversationId ||
-      pending.conversationId !== activeConversationIdRef.current
-    ) {
-      return;
-    }
-    container.scrollTop = pending.scrollTop ?? container.scrollHeight;
-    pendingScrollRestoreRef.current = null;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current =
-      pending.scrollTop === null ? true : isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  }, [conversationId, messages]);
+  const { anchorToTurn } = useTranscriptTurnAnchor({
+    conversationId,
+    messages,
+    jumpToLatestThresholdPx: JUMP_TO_LATEST_THRESHOLD_PX,
+    activeConversationIdRef,
+    pendingMessageAnchorRef,
+    pendingScrollRestoreRef,
+    messageElementRefs,
+    scrollContainerRef,
+    shouldAutoScrollRef,
+    setShowJumpToLatest,
+  });
 
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
@@ -954,7 +893,7 @@ export default function ChatInterface() {
     } else {
       updateScrollPositionState();
     }
-  }, [messages.length, streamStatus, updateScrollPositionState]);
+  }, [messages.length, scrollToLatest, streamStatus, updateScrollPositionState]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
@@ -1967,12 +1906,14 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          requestMessageId
-            ? { renderUserMessage: true }
-            : {
+          failedAssistantId
+            ? {
                 renderUserMessage: false,
-                replacementAssistantId: failedAssistantId ?? undefined,
-              },
+                replacementAssistantId: failedAssistantId,
+              }
+            : requestMessageId
+              ? { renderUserMessage: true }
+              : { renderUserMessage: false },
         );
       }
       return;
@@ -2138,6 +2079,26 @@ export default function ChatInterface() {
     isHydratingConversation ||
     failedConversationId === conversationId;
 
+  const keyboardShortcuts = useChatKeyboardShortcuts({
+    isChatView: currentView === "chat",
+    canManageConversation,
+    conversationId,
+    isGuest,
+    searchOverlayOpen,
+    deleteConfirmationOpen: Boolean(pendingHeaderDeleteId),
+    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen,
+    sidebarOpen: isSidebarOpen,
+    setSidebarOpen: setIsSidebarOpen,
+    recentsExpanded: isRecentsExpanded,
+    setRecentsExpanded: setIsRecentsExpanded,
+    requestNewChat,
+    closeTransientSidebar,
+    requestDelete: handleRequestHeaderDelete,
+    startRename: handleStartHeaderRename,
+    togglePin: handleToggleHeaderPin,
+    showChatOptions: () => setShowChatOptions(true),
+  });
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isBootstrappingProfile) {
@@ -2198,6 +2159,10 @@ export default function ChatInterface() {
           });
         }}
         onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
+        onOpenKeyboardShortcuts={() =>
+          keyboardShortcuts.setKeyboardShortcutsOpen(true)
+        }
+        settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={omnisearchEnabled}
@@ -2205,6 +2170,20 @@ export default function ChatInterface() {
         showProfileMenu={!isGuest}
         isGuest={isGuest}
         guestExpiresAt={account?.guest?.expires_at}
+      />
+
+      <KeyboardShortcutSurfaces
+        keyboardShortcutsOpen={keyboardShortcuts.keyboardShortcutsOpen}
+        onCloseKeyboardShortcuts={() =>
+          keyboardShortcuts.setKeyboardShortcutsOpen(false)
+        }
+        recentsQuickPeekOpen={keyboardShortcuts.isRecentsQuickPeekOpen}
+        historyItems={historyItems}
+        activeConversationId={conversationId}
+        onOpenHistoryItem={openHistoryItem}
+        onCloseRecentsQuickPeek={() =>
+          keyboardShortcuts.setIsRecentsQuickPeekOpen(false)
+        }
       />
 
       {omnisearchEnabled &&
@@ -2484,7 +2463,16 @@ export default function ChatInterface() {
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
                             onDecisionUnavailable={requestGuestDecision}
-                            onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
+                            onDecisionSaved={(decisionState) => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.result
+                                    ? { ...m, result: { ...m.result, decisionState } }
+                                    : m,
+                                ),
+                              );
+                              if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
+                            }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
                             resumeDecisionArtifactId={
                               msg.id === resumeDecisionMessageId
@@ -2506,6 +2494,11 @@ export default function ChatInterface() {
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
+
+                <ConversationActivityRail
+                  messages={messages}
+                  onSelectTick={anchorToTurn}
+                />
 
                 {/* Input fade + bar */}
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />

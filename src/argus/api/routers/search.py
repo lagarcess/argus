@@ -29,6 +29,7 @@ from argus.domain.postgres_search_reader import (
     SearchReadResult,
 )
 from argus.domain.search_text import (
+    normalize_search_symbol,
     search_has_indexable_token,
     search_query_is_indexable,
 )
@@ -135,7 +136,10 @@ def search(
         )
 
     text_search_enabled = not query or search_has_indexable_token(query)
-    if cursor and not text_search_enabled:
+    conversation_search_enabled = (
+        text_search_enabled or normalize_search_symbol(query) is not None
+    )
+    if cursor and not conversation_search_enabled:
         raise invalid_cursor_problem(request)
 
     scored_items: list[tuple[int, SearchItem]] = []
@@ -193,7 +197,7 @@ def search(
                     else limit + 1
                 ),
                 allow_decision_action=context.capabilities.can_save_decision,
-                include_conversation_rows=text_search_enabled,
+                include_conversation_rows=conversation_search_enabled,
                 cursor_updated_at=cursor_dt,
                 cursor_id=cursor_id,
                 decision_state=decision_state,

@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from argus.api import memory_search_candidates
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
@@ -23,6 +24,7 @@ from argus.api.schemas import (
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 def _stream_events(stream: str) -> list[dict[str, Any]]:
@@ -1779,6 +1781,254 @@ def test_search_memory_mode_symbol_only_query_returns_only_asset_rollup() -> Non
     assert rejected.json()["code"] == "validation_error"
 
 
+def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation_ids: list[str] = []
+    expected_match_counts: dict[str, int] = {}
+    for index in range(2):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Aircraft research {index}"},
+        ).json()["conversation"]
+        conversation_ids.append(conversation["id"])
+        run_count = 3 if index == 0 else 1
+        expected_match_counts[conversation["id"]] = run_count
+        for run_index in range(run_count):
+            run = BacktestRun(
+                id=(
+                    "asset-rollup-two-character-symbol-"
+                    f"{index}-{run_index}"
+                ),
+                conversation_id=conversation["id"],
+                strategy_id=None,
+                status="completed",
+                asset_class="equity",
+                symbols=["BA"],
+                allocation_method="equal_weight",
+                benchmark_symbol="SPY",
+                metrics={},
+                config_snapshot={"template": "buy_and_hold"},
+                conversation_result_card={
+                    "title": f"BA result {index}-{run_index}"
+                },
+                created_at=(
+                    now
+                    - timedelta(minutes=index)
+                    - timedelta(seconds=run_index)
+                ),
+            )
+            api_state.store.backtest_runs[run.id] = run
+            api_state.store.backtest_run_owners[run.id] = user_id
+
+    distractor = client.post(
+        "/api/v1/conversations",
+        json={"title": "Balanced allocation without Boeing"},
+    ).json()["conversation"]
+
+    first_page = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
+
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert first_payload["items"][0] == {
+        "type": "asset_rollup",
+        "symbol": "BA",
+        "run_count": 4,
+        "decision_counts": {
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+        "last_touched_at": now.isoformat().replace("+00:00", "Z"),
+    }
+    first_conversations = [
+        item
+        for item in first_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(first_conversations) == 1
+    assert first_conversations[0]["match"]["layer"] == "run"
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        "/api/v1/search",
+        params={
+            "q": "ba",
+            "limit": 1,
+            "cursor": first_payload["next_cursor"],
+        },
+    )
+
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    second_conversations = [
+        item
+        for item in second_payload["items"]
+        if item["type"] == "conversation"
+    ]
+    assert len(second_conversations) == 1
+    assert {
+        item["conversation_id"]
+        for item in first_conversations + second_conversations
+    } == set(conversation_ids)
+    assert distractor["id"] not in {
+        item["conversation_id"]
+        for item in first_conversations + second_conversations
+    }
+    assert {
+        item["title"] for item in first_conversations + second_conversations
+    } == {"Aircraft research 0", "Aircraft research 1"}
+    assert {
+        item["conversation_id"]: item["match"]["count"]
+        for item in first_conversations + second_conversations
+    } == expected_match_counts
+    assert second_payload["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    ("promoted_title", "pinned"),
+    (("BA", False), ("Pinned aircraft thesis", True)),
+)
+def test_two_character_symbol_search_preserves_rank_tiers_beyond_window(
+    promoted_title: str,
+    pinned: bool,
+) -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+
+    promoted = client.post(
+        "/api/v1/conversations",
+        json={"title": promoted_title},
+    ).json()["conversation"]
+    if pinned:
+        promoted = client.patch(
+            f"/api/v1/conversations/{promoted['id']}",
+            json={"pinned": True},
+        ).json()["conversation"]
+    promoted_run = BacktestRun(
+        id=f"promoted-ba-run-{pinned}",
+        conversation_id=promoted["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["BA"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "buy_and_hold"},
+        conversation_result_card={"title": "Promoted BA result"},
+        created_at=now - timedelta(days=1),
+    )
+    api_state.store.backtest_runs[promoted_run.id] = promoted_run
+    api_state.store.backtest_run_owners[promoted_run.id] = user_id
+
+    for index in range(25):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Recent aircraft research {index}"},
+        ).json()["conversation"]
+        run = BacktestRun(
+            id=f"recent-ba-run-{pinned}-{index}",
+            conversation_id=conversation["id"],
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["BA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"Recent BA result {index}"},
+            created_at=now + timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    conversations = [
+        item for item in response.json()["items"] if item["type"] == "conversation"
+    ]
+    assert len(conversations) == 1
+    assert conversations[0]["conversation_id"] == promoted["id"]
+
+
+def test_two_character_symbol_search_bounds_run_detail_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+
+    for index in range(60):
+        conversation = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Aircraft scale research {index}"},
+        ).json()["conversation"]
+        run = BacktestRun(
+            id=f"bounded-ba-run-{index}",
+            conversation_id=conversation["id"],
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["BA"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={"title": f"Bounded BA result {index}"},
+            created_at=now + timedelta(minutes=index),
+        )
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+
+    original = memory_search_candidates._symbol_query_match
+    detail_calls = 0
+
+    def counted_symbol_query_match(*args: object, **kwargs: object):
+        nonlocal detail_calls
+        detail_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        memory_search_candidates,
+        "_symbol_query_match",
+        counted_symbol_query_match,
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "ba", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    assert detail_calls <= 20
+    assert response.json()["next_cursor"] is not None
+
+    detail_calls = 0
+    cursor_response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "ba",
+            "limit": 1,
+            "cursor": response.json()["next_cursor"],
+        },
+    )
+
+    assert cursor_response.status_code == 200
+    assert detail_calls <= 40
+
+
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     # Memory mode shares the Supabase matcher semantics: a multi-word query
     # matches when every token appears, not only as one contiguous substring.
@@ -1794,7 +2044,7 @@ def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
     assert {item["type"] for item in items} == {"conversation"}
 
 
-@pytest.mark.parametrize("query", ["a", "GL", "__"])
+@pytest.mark.parametrize("query", ["a", "GL D", "__"])
 def test_search_memory_mode_defers_queries_without_an_indexable_token(
     query: str,
 ) -> None:
@@ -2681,10 +2931,9 @@ def test_search_id_scoped_recall_hydrates_visible_history_outside_ranked_page() 
     assert items_by_id[target_id]["archived"] is False
     assert items_by_id[archived_id]["archived"] is True
     assert items_by_id[target_id]["title"] == "Visible active conversation"
-    assert items_by_id[target_id]["dossier"]["decision"] is None
-    assert items_by_id[target_id]["dossier"]["tested"]["run_count"] == 0
-    assert items_by_id[target_id]["dossier"]["outcome"] is None
-    assert items_by_id[target_id]["dossier"]["left_off"] is None
+    assert items_by_id[target_id]["dossier"] is None
+    assert items_by_id[target_id]["total_runs"] == 0
+    assert items_by_id[target_id]["decided_runs"] == 0
     assert payload["next_cursor"] is None
     assert len(payload["ledger_groups"]) == 4
 
@@ -2845,6 +3094,27 @@ def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
     assert "decision_state" in str(body["context"]["errors"])
 
 
+def test_decision_note_write_limit_is_500_and_legacy_reads_remain_compatible() -> None:
+    from argus.api.schemas import DecisionNoteCreate, SearchDossierDecision
+
+    accepted = DecisionNoteCreate(decision_state="watching", note="x" * 500)
+    assert accepted.note == "x" * 500
+
+    with pytest.raises(ValidationError):
+        DecisionNoteCreate(decision_state="watching", note="x" * 501)
+
+    legacy = SearchDossierDecision(state="watching", note="x" * 2000)
+    assert legacy.note == "x" * 2000
+
+    client = _client()
+    rejected = client.post(
+        "/api/v1/evidence-artifacts/artifact-1/decision",
+        json={"decision_state": "watching", "note": "x" * 501},
+    )
+    assert rejected.status_code == 422
+    assert "note" in str(rejected.json()["context"]["errors"])
+
+
 def test_search_projects_one_typed_conversation_dossier() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
@@ -2880,22 +3150,103 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
     assert "preview" not in item
 
     dossier = item["dossier"]
-    assert list(dossier) == ["decision", "tested", "outcome", "left_off"]
+    assert list(dossier) == [
+        "run_id",
+        "run_label",
+        "completed_at",
+        "result_message_id",
+        "tested",
+        "outcome",
+        "decision",
+        "actions",
+    ]
+    assert dossier["run_id"]
+    assert dossier["result_message_id"]
     assert dossier["decision"] == {
         "state": "watching",
         "note": "Track it.\nReview risk before the next run.",
-        "run_label": None,
+        "run_label": dossier["run_label"],
     }
     assert dossier["tested"]["symbols"] == ["TSLA"]
-    assert dossier["tested"]["strategy_families"] == ["rsi_mean_reversion"]
-    assert dossier["tested"]["run_count"] == 1
+    assert dossier["tested"]["strategy_family"] == "rsi_mean_reversion"
     assert dossier["outcome"]["run_label"]
     assert dossier["outcome"]["benchmark_symbol"] == "SPY"
     assert dossier["outcome"]["quick_take"] == "I tested that idea with TSLA."
     assert dossier["outcome"]["metrics"] == [{"name": "total_return_pct", "value": 12.5}]
-    assert dossier["left_off"]["run_label"] == dossier["outcome"]["run_label"]
-    assert dossier["left_off"]["completed_at"]
-    assert dossier["left_off"]["nudge"] is None
+    assert item["total_runs"] == 1
+    assert item["decided_runs"] == 1
+    assert "actions" not in item
+
+    history = client.get(
+        f"/api/v1/conversations/{conversation['id']}/run-dossiers?limit=20"
+    )
+    assert history.status_code == 200
+    assert history.json() == {
+        "items": [dossier],
+        "next_cursor": None,
+        "total_runs": 1,
+        "decided_runs": 1,
+    }
+
+
+def test_run_dossier_history_uses_non_leaking_ownership_and_cursor_errors() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="owned-dossier-history",
+        title="Owned history",
+        updated_at=now,
+    )
+    _store_search_conversation(
+        user_id="other-owner",
+        conversation_id="foreign-dossier-history",
+        title="Foreign history",
+        updated_at=now,
+    )
+    _store_search_conversation(
+        user_id=user_id,
+        conversation_id="deleted-dossier-history",
+        title="Deleted history",
+        updated_at=now,
+        deleted_at=now,
+    )
+
+    owned = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers"
+    )
+    malformed = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers",
+        params={"cursor": "not-a-cursor"},
+    )
+    over_bound = client.get(
+        "/api/v1/conversations/owned-dossier-history/run-dossiers",
+        params={"limit": 101},
+    )
+    hidden = [
+        client.get(f"/api/v1/conversations/{conversation_id}/run-dossiers")
+        for conversation_id in (
+            "missing-dossier-history",
+            "foreign-dossier-history",
+            "deleted-dossier-history",
+        )
+    ]
+
+    assert owned.status_code == 200
+    assert owned.json() == {
+        "items": [],
+        "next_cursor": None,
+        "total_runs": 0,
+        "decided_runs": 0,
+    }
+    assert malformed.status_code == 400
+    assert malformed.json()["detail"] == "Invalid cursor."
+    assert over_bound.status_code == 422
+    assert [response.status_code for response in hidden] == [404, 404, 404]
+    assert {response.json()["detail"] for response in hidden} == {
+        "Conversation not found."
+    }
 
 
 def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> None:
@@ -2984,7 +3335,7 @@ def test_search_dossier_accepts_postgres_trimmed_fractional_activity() -> None:
     )
 
 
-def test_search_dossier_marks_a_decided_old_result_stale() -> None:
+def test_search_dossier_keeps_an_old_decided_result_on_one_run() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
     now = utcnow()
@@ -3031,12 +3382,15 @@ def test_search_dossier_marks_a_decided_old_result_stale() -> None:
     )
 
     assert projected is not None
-    left_off = projected[1].dossier.left_off
-    assert left_off is not None
-    assert left_off.nudge == "stale_result"
+    dossier = projected[1].dossier
+    assert dossier is not None
+    assert dossier.run_id == run_id
+    assert dossier.completed_at == completed_at
+    assert dossier.decision is not None
+    assert dossier.decision.state == "watching"
 
 
-def test_search_dossier_marks_only_a_definitely_untaken_suggestion() -> None:
+def test_search_dossier_result_anchor_does_not_depend_on_later_user_copy() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
     now = utcnow()
@@ -3119,14 +3473,14 @@ def test_search_dossier_marks_only_a_definitely_untaken_suggestion() -> None:
     )
 
     assert offered is not None
-    assert offered[1].dossier.left_off is not None
-    assert offered[1].dossier.left_off.nudge == "suggestion_untaken"
+    assert offered[1].dossier is not None
+    assert offered[1].dossier.result_message_id == assistant_offer["id"]
     assert followed_up is not None
-    assert followed_up[1].dossier.left_off is not None
-    assert followed_up[1].dossier.left_off.nudge is None
+    assert followed_up[1].dossier is not None
+    assert followed_up[1].dossier.result_message_id == assistant_offer["id"]
 
 
-def test_search_decision_names_judged_run_when_latest_run_is_different() -> None:
+def test_search_default_dossier_does_not_mix_an_older_run_decision() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
     first_response = client.post(
@@ -3158,10 +3512,13 @@ def test_search_decision_names_judged_run_when_latest_run_is_different() -> None
     response = client.get("/api/v1/search?q=anchor&limit=20")
 
     assert response.status_code == 200
-    dossier = response.json()["items"][0]["dossier"]
-    assert dossier["decision"]["run_label"] == first["conversation_result_card"]["title"]
-    assert dossier["outcome"]["run_label"] == second["conversation_result_card"]["title"]
-    assert dossier["left_off"]["nudge"] == "undecided"
+    item = response.json()["items"][0]
+    dossier = item["dossier"]
+    assert dossier["run_id"] == second["id"]
+    assert dossier["run_label"] == second["conversation_result_card"]["title"]
+    assert dossier["decision"] is None
+    assert item["total_runs"] == 2
+    assert item["decided_runs"] == 1
 
 
 def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
@@ -3260,7 +3617,7 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
     conversation = next(
         item for item in response.json()["items"] if item["type"] == "conversation"
     )
-    run_fresh, change_decision = conversation["actions"]
+    run_fresh, change_decision = conversation["dossier"]["actions"]
     expected_end = date.today()
     expected_start = expected_end - timedelta(days=365)
     assert run_fresh == {
@@ -3378,12 +3735,12 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
 
     assert projected is not None
     _, item = projected
-    assert [action.type for action in item.actions] == ["run_fresh"]
-    assert item.actions[0].source_run_id == "latest-run"
-    assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Older AAPL run"
-    assert item.dossier.left_off is not None
-    assert item.dossier.left_off.nudge == "undecided"
+    assert item.dossier is not None
+    assert [action.type for action in item.dossier.actions] == ["run_fresh"]
+    assert item.dossier.actions[0].source_run_id == "latest-run"
+    assert item.dossier.decision is None
+    assert item.total_runs == 2
+    assert item.decided_runs == 1
 
 
 def _chat_persisted_run_fresh_fixture(
@@ -3423,15 +3780,31 @@ def _chat_persisted_run_fresh_fixture(
         },
         runs=[run.model_dump(mode="python")],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "action-fixture-evidence",
+                "source_conversation_id": run.conversation_id,
+                "source_run_id": run.id,
+                "title": "Action fixture evidence",
+                "digest": "Action fixture result.",
+                "payload": {},
+                "created_at": run.created_at,
+                "updated_at": run.created_at,
+            }
+        ],
         decisions=[],
         query="",
         language=language,
     )
     assert projected is not None
     _, item = projected
+    assert item.dossier is not None
     action = next(
-        (candidate for candidate in item.actions if candidate.type == "run_fresh"),
+        (
+            candidate
+            for candidate in item.dossier.actions
+            if candidate.type == "run_fresh"
+        ),
         None,
     )
     assert action is not None
@@ -3680,13 +4053,27 @@ def test_search_run_fresh_omits_unfaithful_dca_snapshot(
         },
         runs=[run],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "incomplete-dca-evidence",
+                "source_conversation_id": run["conversation_id"],
+                "source_run_id": run["id"],
+                "title": "Incomplete DCA",
+                "digest": "Incomplete DCA result.",
+                "payload": {},
+                "created_at": run["created_at"],
+                "updated_at": run["created_at"],
+            }
+        ],
         decisions=[],
         query="",
     )
     assert projected is not None
     _, item = projected
-    assert all(candidate.type != "run_fresh" for candidate in item.actions)
+    assert item.dossier is not None
+    assert all(
+        candidate.type != "run_fresh" for candidate in item.dossier.actions
+    )
 
 
 def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> None:
@@ -3742,7 +4129,18 @@ def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> Non
             }
         ],
         ideas=[],
-        evidence=[],
+        evidence=[
+            {
+                "id": "oversized-run-fresh-evidence",
+                "source_conversation_id": "oversized-run-fresh-conversation",
+                "source_run_id": "oversized-run-fresh-run",
+                "title": "Large signal result",
+                "digest": "Large signal result.",
+                "payload": {},
+                "created_at": now,
+                "updated_at": now,
+            }
+        ],
         decisions=[],
         query="",
     )
@@ -3750,8 +4148,11 @@ def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> Non
     assert projected is not None
     _, item = projected
     assert item.title == "Large signal strategy"
+    assert item.dossier is not None
     assert item.dossier.tested is not None
-    assert all(candidate.type != "run_fresh" for candidate in item.actions)
+    assert all(
+        candidate.type != "run_fresh" for candidate in item.dossier.actions
+    )
 
 
 def test_invalid_cursor_returns_problem_details() -> None:
