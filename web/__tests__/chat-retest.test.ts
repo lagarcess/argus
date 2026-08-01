@@ -291,11 +291,15 @@ describe("retest failure recovery", () => {
       } as ApiMessage,
     ]);
 
+    // One receipt survives the replay. Since #318 the transcript keeps the
+    // original user row and aliases the replay id, so Omnisearch can still
+    // focus the projected row.
     const receipts = messages.filter((message) => message.retestReceipt);
     expect(receipts).toHaveLength(1);
-    expect(receipts[0].id).toBe("user-retest-2");
+    expect(receipts[0].id).toBe("user-retest-1");
+    expect(receipts[0].transcriptAnchorIds).toContain("user-retest-2");
     expect(messages.map((message) => message.id)).toEqual([
-      "user-retest-2",
+      "user-retest-1",
       "assistant-confirmation-1",
     ]);
     expect(messages.at(-1)?.kind).toBe("strategy_confirmation");
