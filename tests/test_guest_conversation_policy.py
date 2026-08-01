@@ -49,6 +49,20 @@ def _conversation() -> Conversation:
     )
 
 
+def _configure_activity_projection(gateway: MagicMock) -> None:
+    gateway.reconcile_conversation_activity_turns.return_value = []
+    gateway.read_conversation_activity_batch.side_effect = (
+        lambda *, user_id, conversation_ids: [
+            {
+                "conversation_id": conversation_id,
+                "sources": [],
+                "read_state": None,
+            }
+            for conversation_id in conversation_ids
+        ]
+    )
+
+
 def test_guest_create_conversation_reuses_the_single_bound_conversation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -78,6 +92,7 @@ def test_guest_create_conversation_reuses_the_single_bound_conversation(
     gateway.get_active_guest_workspace.return_value = workspace
     gateway.get_conversation.return_value = conversation
     gateway.conversation_has_user_message.return_value = False
+    _configure_activity_projection(gateway)
 
     with (
         patch.object(api_state, "supabase_gateway", gateway),
@@ -231,6 +246,7 @@ def test_guest_start_over_replaces_the_bound_conversation_in_place(
     }
     gateway.get_or_create_profile_for_auth_user.return_value = profile
     gateway.replace_guest_conversation.return_value = replacement
+    _configure_activity_projection(gateway)
 
     with (
         patch.object(api_state, "supabase_gateway", gateway),
@@ -282,6 +298,7 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
     gateway.get_or_create_profile_for_auth_user.return_value = profile
     gateway.get_active_guest_workspace.return_value = workspace
     gateway.get_conversation.return_value = conversation
+    _configure_activity_projection(gateway)
 
     with (
         patch.object(api_state, "supabase_gateway", gateway),
@@ -306,6 +323,14 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
                 "created_at": conversation.updated_at.isoformat().replace("+00:00", "Z"),
                 "conversation_id": CONVERSATION_ID,
                 "expires_at": workspace.expires_at.isoformat().replace("+00:00", "Z"),
+                "activity": {
+                    "operation": {
+                        "status": "idle",
+                        "kind": None,
+                        "updated_at": None,
+                    },
+                    "attention": {"status": "none", "cursor": None},
+                },
             }
         ],
         "next_cursor": None,

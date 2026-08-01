@@ -12,6 +12,7 @@ from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
 )
+from argus.api.conversation_activity import conversation_activity_service
 from argus.api.dependencies import (
     current_user,
     dev_memory_fallback_enabled,
@@ -54,6 +55,20 @@ from argus.domain.supabase_gateway import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+
+
+def _with_activity(
+    conversation: Conversation,
+    *,
+    user_id: str,
+    reconcile: bool = False,
+) -> Conversation:
+    activity = conversation_activity_service.project(
+        user_id=user_id,
+        conversation_ids=[conversation.id],
+        reconcile=reconcile,
+    )[conversation.id]
+    return conversation.model_copy(update={"activity": activity})
 
 
 def _memory_conversation_owned_by(
@@ -152,7 +167,9 @@ def create_conversation(
                         )
                     )
                     if not has_user_message:
-                        return ConversationResponse(conversation=existing)
+                        return ConversationResponse(
+                            conversation=_with_activity(existing, user_id=user.id)
+                        )
                     require_account_capability(
                         request,
                         "can_create_additional_conversation",
@@ -189,7 +206,9 @@ def create_conversation(
             language=language,
             user_id=user.id,
         )
-    return ConversationResponse(conversation=conversation)
+    return ConversationResponse(
+        conversation=_with_activity(conversation, user_id=user.id)
+    )
 
 
 @router.post(
@@ -225,7 +244,9 @@ def replace_guest_conversation(
             title="Could Not Start Over",
             detail="The temporary conversation was left unchanged.",
         ) from exc
-    return ConversationResponse(conversation=conversation)
+    return ConversationResponse(
+        conversation=_with_activity(conversation, user_id=user.id)
+    )
 
 
 @router.get("/conversations", response_model=PaginatedConversations)
@@ -297,6 +318,15 @@ def list_conversations(
     page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
+    activities = conversation_activity_service.project(
+        user_id=user.id,
+        conversation_ids=[item.id for item in page_items],
+        reconcile=True,
+    )
+    page_items = [
+        item.model_copy(update={"activity": activities[item.id]})
+        for item in page_items
+    ]
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
@@ -394,7 +424,9 @@ def patch_conversation(
         data["updated_at"] = utcnow()
         updated = Conversation.model_validate(data)
         api_state.store.conversations[conversation_id] = updated
-    return ConversationResponse(conversation=updated)
+    return ConversationResponse(
+        conversation=_with_activity(updated, user_id=user.id)
+    )
 
 
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)

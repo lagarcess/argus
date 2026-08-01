@@ -474,7 +474,48 @@ remain immutable; message reads project the current lifecycle row into
   recovery, and typed `retry_last_turn` metadata without changing the immutable
   message row. The frontend places the presentation-only recovery row directly
   after that user message; the API does not create or persist an assistant
-  message for this projection.
+message for this projection.
+
+---
+
+## 8.2 conversation_read_states
+
+Stores one durable read boundary and optional manual-unread flag for an owned
+conversation. It is not an event log and does not duplicate lifecycle, job,
+message, or result content.
+
+### Fields
+
+- `user_id`: `uuid` (Part of the primary key; references `profiles.id` with
+  update/delete cascade)
+- `conversation_id`: `uuid` (Part of the primary key)
+- `read_through_occurred_at`: `timestamptz` (Nullable)
+- `read_through_source_kind`: `text` (`chat_turn` or `backtest_job`, nullable)
+- `read_through_source_id`: `uuid` (Nullable)
+- `manual_unread_at`: `timestamptz` (Nullable and independent of read-through)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+The three read-through fields are either all null or all non-null. Boundaries
+compare as `(occurred_at, source_kind_rank, source_id)`, with `chat_turn = 1`
+and `backtest_job = 2`, and advance monotonically. The primary key is
+`(user_id, conversation_id)`. A composite foreign key to
+`conversations(id, user_id)` uses `ON UPDATE CASCADE` and `ON DELETE CASCADE`,
+so guest claim transfers the state and conversation cleanup removes it in the
+same transaction.
+
+Authenticated owners may select their row through RLS but cannot insert,
+update, or delete it directly. Server-only RPCs own mutation, lock the
+conversation/read/source rows, and revalidate terminal eligibility before
+advancing a cursor. Read RPCs accept at most 100 owned conversation ids and the
+activity reconciler settles at most 20 stale turns across that batch using the
+existing lifecycle evidence predicate.
+
+The migration baseline is idempotent and keyset-batched at 500 conversations.
+It marks only the newest eligible terminal boundary at or before the captured
+migration-start cutoff as read. Activity completing after that cutoff remains
+unread. The baseline and later activity reads do not update conversation,
+message, job, Run, artifact, or sort timestamps.
 
 ---
 
@@ -1209,9 +1250,16 @@ Recents is a mixed-type feed displaying activity across the platform.
   "title": "Tesla dip thread",
   "subtitle": "Last message or metric preview",
   "pinned": false,
-  "created_at": "timestamp"
+  "created_at": "timestamp",
+  "activity": {
+    "operation": {"status": "idle", "kind": null, "updated_at": null},
+    "attention": {"status": "none", "cursor": null}
+  }
 }
 ```
+
+`activity` is projected on `chat` rows only and omitted from all other History
+types. It is not stored on the conversation and does not affect History order.
 ---
 
 # 18. Search Model
@@ -1244,9 +1292,15 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   role may insert, update, delete, or execute its server transition function;
   the server-side persistence boundary owns every write.
 
+### Conversation read state
+- `conversation_read_states` grants authenticated owners `SELECT` only.
+  `PUBLIC`, `anon`, and `authenticated` cannot write or execute its mutation,
+  read-source, reconciliation, or baseline functions; service-role persistence
+  owns those operations.
+
 ### Tables Requiring RLS
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
-  `chat_turn_lifecycles`, `strategies`, `collections`,
+  `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
   `usage_counters`, `guest_workspaces`.
 
@@ -1279,11 +1333,19 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **messages**: `(conversation_id, created_at DESC)`
 - **chat_turn_lifecycles**: `(conversation_id, status, updated_at)`,
   `(user_id, status, updated_at)`, unique `(assistant_message_id)` where not null
+- **chat_turn_lifecycles activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, turn_id DESC)` for active
+  rows and `(user_id, conversation_id, status, terminal_at DESC, turn_id DESC)`
+  for terminal rows
 - **strategies**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
 - **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
+- **backtest_jobs activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, id DESC)` for active or
+  checking rows and `(user_id, conversation_id, status, finished_at DESC, id DESC)`
+  for terminal rows
 - **backtest_jobs unique/idempotency**:
   `UNIQUE(user_id, operation_scope, idempotency_key)`
 - **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`

@@ -50,6 +50,9 @@ from argus.domain.postgres_search_reader import (
 )
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.supabase_conversation_activity import (
+    SupabaseConversationActivityMixin,
+)
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
@@ -123,6 +126,7 @@ def _supabase_client_options() -> ClientOptions:
 class SupabaseGateway(
     GuestAccountPersistenceMixin,
     ChatTurnLifecycleGatewayMixin,
+    SupabaseConversationActivityMixin,
     SupabaseMessageReadMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
@@ -180,6 +184,7 @@ class SupabaseGateway(
         for table in (
             "feedback",
             "usage_counters",
+            "conversation_read_states",
             "chat_turn_lifecycles",
             "collection_strategies",
             "decision_notes",

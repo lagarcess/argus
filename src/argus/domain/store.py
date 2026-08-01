@@ -108,6 +108,14 @@ class AlphaStore:
         repr=False,
         compare=False,
     )
+    conversation_read_states: dict[tuple[str, str], dict[str, Any]] = field(
+        default_factory=dict
+    )
+    conversation_read_state_lock: Any = field(
+        default_factory=RLock,
+        repr=False,
+        compare=False,
+    )
     ideas: dict[str, Idea] = field(default_factory=dict)
     idea_owners: dict[str, str] = field(default_factory=dict)
     idea_versions: dict[str, IdeaVersion] = field(default_factory=dict)
@@ -173,6 +181,7 @@ class AlphaStore:
         self.backtest_run_owners.clear()
         self.backtest_finalizations.clear()
         self.chat_turn_lifecycles.clear()
+        self.conversation_read_states.clear()
         self.ideas.clear()
         self.idea_owners.clear()
         self.idea_versions.clear()

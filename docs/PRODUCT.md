@@ -218,6 +218,12 @@ Purpose:
 - reinforce continuity
 - help users return repeatedly
 
+Recents distinguishes work in progress from attention. A task may be working
+without being unread; terminal activity becomes unseen only beyond the user's
+durable read boundary. Registered users may also deliberately mark a task
+unread as a reminder. These states come from backend lifecycle and read truth,
+never message wording, client timers, or changes to recency ordering.
+
 Private-alpha launch keeps the visible product surface to Chat, Recents/history,
 completed result cards, and minimal account/settings/feedback. Dedicated
 Strategies and Collections surfaces are not visible under private-alpha defaults.

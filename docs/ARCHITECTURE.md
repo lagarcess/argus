@@ -523,6 +523,22 @@ read semantics live in `docs/API_CONTRACT.md` under
 `contract-chat-turn-lifecycle`; the current-state persistence shape lives in
 `docs/DATA_MODEL.md` section 8.1.
 
+### Conversation Activity and Read Projection
+
+The API combines `chat_turn_lifecycles`, conversation-scoped `backtest_jobs`,
+fully finalized Run/evidence truth, and `conversation_read_states` into one
+activity projection. Operation state and attention state are independent: a
+task can be working while an older completion is still unseen. The frontend
+renders this typed projection; it does not scan prose or infer completion from
+transport events.
+
+Conversation and History pages project activity only after pagination, in one
+owner-scoped batch of at most 100 task ids. Reads may reconcile at most 20 stale
+turns using the existing lifecycle evidence predicate, but never advance read
+state. Mark-read mutations lock and revalidate the referenced terminal source
+before advancing the monotonic boundary. Activity reads and mutations do not
+change `conversations.updated_at`, previews, ordering, or list cursors.
+
 ### Conversation Artifact Continuity
 
 Conversation text is input, not state truth. Once a confirmation card, result

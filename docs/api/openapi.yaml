@@ -917,6 +917,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/activity:
+    get:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/ConversationActivityMarkUnread'
+              - $ref: '#/components/schemas/ConversationActivityMarkRead'
+              discriminator:
+                propertyName: action
+                mapping:
+                  mark_unread: '#/components/schemas/ConversationActivityMarkUnread'
+                  mark_read: '#/components/schemas/ConversationActivityMarkRead'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '403':
+          description: A guest cannot manually mark a task unread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The supplied terminal source is no longer eligible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages:
     get:
       tags:
@@ -2084,12 +2182,66 @@ components:
             - en
             - es-419
           - type: 'null'
+        activity:
+          anyOf:
+          - $ref: '#/components/schemas/ConversationActivity'
+          - type: 'null'
       type: object
       required:
       - id
       - title
       - created_at
       - updated_at
+    ConversationActivity:
+      properties:
+        operation:
+          $ref: '#/components/schemas/ConversationOperation'
+        attention:
+          $ref: '#/components/schemas/ConversationAttention'
+      type: object
+      required:
+      - operation
+      - attention
+    ConversationActivityMarkRead:
+      properties:
+        action:
+          type: string
+          const: mark_read
+        through_attention_cursor:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationActivityMarkUnread:
+      properties:
+        action:
+          type: string
+          const: mark_unread
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationAttention:
+      properties:
+        status:
+          type: string
+          enum:
+          - none
+          - new_activity
+          - manual_unread
+          - needs_input
+          - needs_attention
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - status
     ConversationCreate:
       properties:
         title:
@@ -2104,6 +2256,30 @@ components:
             - es-419
           - type: 'null'
       type: object
+    ConversationOperation:
+      properties:
+        status:
+          type: string
+          enum:
+          - idle
+          - queued
+          - running
+          - checking
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - chat_turn
+            - backtest_job
+          - type: 'null'
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - status
     ConversationPatch:
       properties:
         title:
@@ -2587,8 +2763,54 @@ components:
       - updated_at
       description: Guest-safe profile projection without registered-only preferences.
     HistoryItem:
-      additionalProperties: true
+      $ref: '#/components/schemas/HistoryItemWire'
+    HistoryItemWire:
+      properties:
+        type:
+          type: string
+          enum:
+          - chat
+          - strategy
+          - collection
+          - run
+        id:
+          type: string
+        title:
+          type: string
+        title_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+        subtitle:
+          type: string
+        pinned:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        activity:
+          $ref: '#/components/schemas/ConversationActivity'
       type: object
+      required:
+      - type
+      - id
+      - title
+      - subtitle
+      - pinned
+      - created_at
+      - conversation_id
+      - expires_at
     LoginRequest:
       properties:
         email:
