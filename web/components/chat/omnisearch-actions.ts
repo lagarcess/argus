@@ -16,7 +16,6 @@ type OmnisearchActionDeps = {
 };
 
 export type OmnisearchActions = {
-  runFresh: (conversationId: string, sendText: string) => Promise<void>;
   retest: (conversationId: string, sourceRunId: string) => Promise<void>;
 };
 
@@ -40,10 +39,6 @@ export function omnisearchActionHandlers(
   };
 
   return {
-    runFresh: (conversationId, sendText) =>
-      submitToSourceConversation(conversationId, (deps) => {
-        void deps.send(sendText);
-      }),
     retest: (conversationId, sourceRunId) =>
       submitToSourceConversation(conversationId, (deps) => {
         const action = retestActionOption(sourceRunId);

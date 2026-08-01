@@ -2721,15 +2721,16 @@ def test_search_supabase_projects_localized_actions_without_generation(
 
     assert response.status_code == 200
     conversation = response.json()["items"][0]
-    run_fresh, decision = conversation["dossier"]["actions"]
-    assert run_fresh["type"] == "run_fresh"
-    assert run_fresh["source_run_id"] == "run-action-es"
-    assert run_fresh["send_text"].startswith(
-        "Prueba nuevamente esta configuración compatible exacta"
-    )
-    assert run_fresh["send_text"].endswith(
-        "Muestra la confirmación Lista para ejecutar; todavía no la ejecutes."
-    )
+    retest, decision = conversation["dossier"]["actions"]
+    # Localization no longer rides a generated prompt: the action is identity
+    # and policy only, and the confirmation card carries the localized copy.
+    assert retest == {
+        "type": "retest_run",
+        "source_run_id": "run-action-es",
+        "run_label": retest["run_label"],
+        "window_policy": "same_duration_ending_today",
+        "contract_version": "argus_retest_run/v1",
+    }
     assert decision == {
         "type": "decision",
         "evidence_artifact_id": "evidence-action-es",

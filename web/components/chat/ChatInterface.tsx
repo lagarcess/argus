@@ -2197,7 +2197,7 @@ export default function ChatInterface() {
               setSearchOverlayOpen(false);
               void loadConversation(convId, messageId, openAtLeftOff);
             }}
-            onRunFresh={omnisearch.runFresh}
+            onRetest={omnisearch.retest}
             turnInFlight={turnInFlight}
             activeConversationId={conversationId}
             isGuest={isGuest}

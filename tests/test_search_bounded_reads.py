@@ -1048,7 +1048,7 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     assert item.dossier.decision.run_label == "Latest run"
     assert item.dossier.outcome.run_label == "Latest run"
     assert [action.type for action in item.dossier.actions] == [
-        "run_fresh",
+        "retest_run",
         "decision",
     ]
     decision_action = item.dossier.actions[1]

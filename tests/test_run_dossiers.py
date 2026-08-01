@@ -115,8 +115,14 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
     assert dossier.decision is not None
     assert dossier.decision.note == "Keep this line.\n  Preserve this indentation."
     assert len(dossier.outcome.metrics) == 4
-    assert dossier.actions[0].type == "run_fresh"
+    assert dossier.actions[0].type == "retest_run"
     assert dossier.actions[0].source_run_id == dossier.run_id
+    # The typed envelope carries identity and policy only; the executable
+    # setup is reloaded server-side from the owner-scoped source run.
+    assert dossier.actions[0].window_policy == "same_duration_ending_today"
+    assert dossier.actions[0].contract_version == "argus_retest_run/v1"
+    assert not hasattr(dossier.actions[0], "canonical_setup")
+    assert not hasattr(dossier.actions[0], "send_text")
     assert dossier.actions[1].type == "decision"
     assert dossier.actions[1].evidence_artifact_id == artifact["id"]
 
@@ -487,7 +493,7 @@ def test_guest_history_is_limited_to_the_active_workspace(
         user=user,
     )
     assert page.total_runs == 1
-    assert [action.type for action in page.items[0].actions] == ["run_fresh"]
+    assert [action.type for action in page.items[0].actions] == ["retest_run"]
 
     with pytest.raises(HTTPException) as hidden:
         list_run_dossiers(

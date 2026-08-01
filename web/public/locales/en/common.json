@@ -946,11 +946,9 @@
     "empty": "No recent chats yet."
   },
   "command_palette": {
-    "close": "Close search",
-    "search_placeholder": "Search Argus...",
-    "guest": {
-      "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
-    },
+    "add_decision": "Add decision · {{run}}",
+    "add_decision_short": "Add decision",
+    "archive_conversation": "Archive conversation",
     "asset_rollup": {
       "heading": "Your Argus history",
       "scope_registered": "Across your conversations",
@@ -959,74 +957,25 @@
       "runs_involving_other": "{{count}} runs involving {{symbol}}",
       "last_touched": "Last touched {{date}}"
     },
-    "no_results": "No results found",
-    "try_searching": "Try a ticker, phrase, or note you remember.",
-    "keep_typing": "Keep typing",
-    "keep_typing_detail": "Search starts with a 2-character ticker or a 3-character word.",
-    "read_error": "Argus couldn’t load these results.",
-    "retry_search": "Try searching again",
-    "load_more_error": "Argus couldn’t load more results. Your current results are still available.",
-    "retry_load_more": "Try loading more",
-    "no_conversations": "No conversations yet",
-    "clear_search": "Clear search",
-    "rename_conversation": "Rename conversation",
-    "archive_conversation": "Archive conversation",
-    "delete_conversation": "Delete conversation",
-    "preview": "Preview",
-    "preview_empty": "Open the source conversation to view more context.",
-    "open_conversation": "Open conversation",
-    "open_source_conversation": "Open source conversation",
-    "open_at_match": "Enter opens the match",
-    "open_at_left_off": "⌘/Ctrl+Enter opens where you left off",
-    "retest_current_data": "Retest with current data",
-    "run_fresh": "Run it fresh · {{run}}",
-    "add_decision": "Add decision · {{run}}",
-    "change_decision": "Change decision · {{run}}",
-    "save_decision": "Save decision",
     "back_to_latest_run": "Back to latest run",
     "back_to_run_details": "Back to run details",
+    "change_decision": "Change decision · {{run}}",
+    "change_decision_short": "Edit",
+    "clear_search": "Clear search",
+    "close": "Close search",
+    "conversation_count_one": "{{count}} conversation",
+    "conversation_count_other": "{{count}} conversations",
     "decision_history": "Decision history",
     "decision_history_count": "{{decided}} of {{total}} decided",
+    "decision_history_error": "Could not load decision history",
     "decision_history_loading": "Loading decision history",
     "decision_history_loading_older": "Loading older decisions",
-    "decision_history_error": "Could not load decision history",
     "decision_history_retry": "Try again",
-    "no_decision_saved": "No decision saved",
-    "add_decision_short": "Add decision",
-    "change_decision_short": "Edit",
-    "decision_note_label": "Decision note: ",
-    "decision_note_editor_label": "Decision note",
     "decision_note_count": "{{count}} / {{max}}",
-    "show_full_note": "Show full note",
-    "show_less_note": "Show less",
+    "decision_note_editor_label": "Decision note",
+    "decision_note_label": "Decision note: ",
     "decision_saved": "Saved",
-    "run_fresh_short": "Retest setup",
-    "run_fresh_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
-    "open_in_conversation": "Open in conversation",
-    "load_older": "Load older",
-    "select_preview": "Select a result to preview its details.",
-    "ledger": {
-      "decision_filters": "Decision filters",
-      "no_saved_ideas": "No saved ideas in this state"
-    },
-    "status": {
-      "archived": "Archived",
-      "captured": "Captured",
-      "decided": "Decided",
-      "decision": "Decision",
-      "discarded": "Discarded",
-      "reviewed": "Reviewed",
-      "saved": "Saved"
-    },
-    "metric_labels": {
-      "benchmark_return_pct": "Benchmark return",
-      "delta_vs_benchmark_pct": "Against benchmark",
-      "excess_return_pct": "Against benchmark",
-      "max_drawdown_pct": "Worst drop",
-      "sharpe_ratio": "Sharpe",
-      "total_return_pct": "Total return",
-      "volatility_pct": "Volatility"
-    },
+    "delete_conversation": "Delete conversation",
     "dossier_values": {
       "decision_on": "{{state}} · on {{run}}",
       "run_count_one": "{{count}} run",
@@ -1057,6 +1006,39 @@
         "unknown": "Next step saved"
       }
     },
+    "guest": {
+      "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
+    },
+    "keep_typing": "Keep typing",
+    "keep_typing_detail": "Search starts with a 2-character ticker or a 3-character word.",
+    "ledger": {
+      "decision_filters": "Decision filters",
+      "no_saved_ideas": "No saved ideas in this state"
+    },
+    "load_more_error": "Argus couldn’t load more results. Your current results are still available.",
+    "load_older": "Load older",
+    "match_count_one": "{{count}} match",
+    "match_count_other": "{{count}} matches",
+    "metric_labels": {
+      "benchmark_return_pct": "Benchmark return",
+      "delta_vs_benchmark_pct": "Against benchmark",
+      "excess_return_pct": "Against benchmark",
+      "max_drawdown_pct": "Worst drop",
+      "sharpe_ratio": "Sharpe",
+      "total_return_pct": "Total return",
+      "volatility_pct": "Volatility"
+    },
+    "no_conversations": "No conversations yet",
+    "no_decision_saved": "No decision saved",
+    "no_results": "No results found",
+    "no_source_conversation": "No source conversation",
+    "open_at_left_off": "⌘/Ctrl+Enter opens where you left off",
+    "open_at_match": "Enter opens the match",
+    "open_conversation": "Open conversation",
+    "open_in_conversation": "Open in conversation",
+    "open_source_conversation": "Open source conversation",
+    "preview": "Preview",
+    "preview_empty": "Open the source conversation to view more context.",
     "preview_fields": {
       "assets": "Assets",
       "assumptions": "Assumptions",
@@ -1073,12 +1055,29 @@
       "tested": "What you tested",
       "what_happened": "What happened"
     },
-    "conversation_count_one": "{{count}} conversation",
-    "conversation_count_other": "{{count}} conversations",
+    "read_error": "Argus couldn’t load these results.",
+    "rename_conversation": "Rename conversation",
     "result_count_one": "{{count}} result",
     "result_count_other": "{{count}} results",
-    "match_count_one": "{{count}} match",
-    "match_count_other": "{{count}} matches",
+    "retest_current_data": "Retest with current data",
+    "retest_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "retry_load_more": "Try loading more",
+    "retry_search": "Try searching again",
+    "save_decision": "Save decision",
+    "search_placeholder": "Search Argus...",
+    "select_preview": "Select a result to preview its details.",
+    "show_full_note": "Show full note",
+    "show_less_note": "Show less",
+    "status": {
+      "archived": "Archived",
+      "captured": "Captured",
+      "decided": "Decided",
+      "decision": "Decision",
+      "discarded": "Discarded",
+      "reviewed": "Reviewed",
+      "saved": "Saved"
+    },
+    "try_searching": "Try a ticker, phrase, or note you remember.",
     "type": {
       "backtest": "Backtest",
       "chat": "Conversation",
@@ -1089,8 +1088,7 @@
       "idea": "Idea",
       "run": "Run",
       "strategy": "Strategy"
-    },
-    "no_source_conversation": "No source conversation"
+    }
   },
   "auth": {
     "login": {
