@@ -2,21 +2,21 @@
 
 import { Bitcoin, LineChart, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
-import { normalizeEnabledLanguage } from "@/lib/language-features";
+
+export type StarterSelectionMetadata = {
+  strategy_category: "buy_and_hold" | "dca_accumulation";
+};
 
 type StarterActionsProps = {
-  onSelect: (value: string) => void;
+  onSelect: (value: string, metadata: StarterSelectionMetadata) => void;
   disabled?: boolean;
-  guestAnalyticsEnabled?: boolean;
 };
 
 export default function StarterActions({
   onSelect,
   disabled = false,
-  guestAnalyticsEnabled = false,
 }: StarterActionsProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const actions = [
     {
       key: "tsla",
@@ -60,18 +60,7 @@ export default function StarterActions({
           key={key}
           type="button"
           disabled={disabled}
-          onClick={() => {
-            if (guestAnalyticsEnabled) {
-              captureGuestFunnelEvent({
-                event: "starter_action_selected",
-                language: normalizeEnabledLanguage(i18n.resolvedLanguage),
-                surface: "starter_actions",
-                strategy_category,
-                terminal_outcome: "selected",
-              });
-            }
-            onSelect(value);
-          }}
+          onClick={() => onSelect(value, { strategy_category })}
           className="flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
         >
           <Icon className="h-4 w-4 text-black/60 dark:text-white/60" />

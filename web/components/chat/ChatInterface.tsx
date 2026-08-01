@@ -10,7 +10,7 @@ import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardS
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import StarterActions from "@/components/chat/StarterActions";
+import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
@@ -18,7 +18,11 @@ import { ConversationActivityJumpButton } from "@/components/chat/ConversationAc
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import { useChatToast } from "@/components/chat/useChatToast";
-import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
+import EmptyChatSurface from "@/components/chat/EmptyChatSurface";
+import {
+  useInitialChatSession,
+  type ProfileState,
+} from "@/components/chat/useInitialChatSession";
 import { executeChatTranscriptUpdateScroll, useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
@@ -26,6 +30,7 @@ import { conversationActivityMutationNoticeDescriptor, useConversationActivity }
 import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
+import ExpiredGuestSession from "@/components/guest/ExpiredGuestSession";
 import {
   useGuestExperience,
   useGuestSendBridge,
@@ -48,11 +53,7 @@ import {
   type BacktestRun, type BacktestJobResponse,
   type SearchConversationItem,
 } from "@/lib/argus-api";
-import {
-  chatExploratorySuggestionsEnabled,
-  omnisearchEnabled,
-  strategiesEnabled,
-} from "@/lib/private-alpha-flags";
+import { omnisearchEnabled, strategiesEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -86,7 +87,6 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
-  offlineFallbackMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import {
@@ -196,6 +196,29 @@ import {
 
 type View = "chat" | "strategies" | "settings";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
+type SendSelection =
+  | ChatMention[]
+  | ChatActionOption
+  | StarterSelectionMetadata;
+type GuestPendingSubmission = {
+  text: string;
+  mentionsOrAction?: SendSelection;
+  actionArg?: ChatActionOption;
+  options?: SendOptions;
+};
+
+function isStarterSelectionMetadata(
+  selection: SendSelection | undefined,
+): selection is StarterSelectionMetadata {
+  return (
+    !Array.isArray(selection) &&
+    typeof selection === "object" &&
+    selection !== null &&
+    "strategy_category" in selection &&
+    !("type" in selection)
+  );
+}
+
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ChatInterface() {
@@ -204,13 +227,18 @@ export default function ChatInterface() {
   const [account, setAccount] = useState<Awaited<
     ReturnType<typeof getMe>
   > | null>(null);
+  const [profileState, setProfileState] = useState<ProfileState>("probing");
+  const [expiredPublicAccountAccessEnabled, setExpiredPublicAccountAccessEnabled] =
+    useState(false);
   const refreshAccount = useCallback(async () => {
     const nextAccount = await getMe();
+    if (nextAccount === null) return null;
     setAccount(nextAccount);
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
     if (resolvedLanguage && resolvedLanguage !== i18n.language) {
       await i18n.changeLanguage(resolvedLanguage);
     }
+    setProfileState("established");
     return nextAccount;
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -248,13 +276,14 @@ export default function ChatInterface() {
     guestExpiresAt: account?.guest?.expires_at,
     activityCausalClock,
   });
+  const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
+  const [guestSubmissionError, setGuestSubmissionError] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
-  const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast, showToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
@@ -275,6 +304,8 @@ export default function ChatInterface() {
   const activeConversationIdRef = useRef<string | null>(null);
   const hasAcceptedUserInputRef = useRef(false);
   const guestSendRef = useRef<GuestResumeSend | null>(null);
+  const sendAdmissionInFlightRef = useRef(false);
+  const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [transcriptSessionCache] = useState(
     () => new TranscriptSessionCache<Message[]>(),
@@ -738,68 +769,16 @@ export default function ChatInterface() {
   function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
-        let profileUnreachable = false;
-        try {
-          meResponse = await getMe();
-          if (!cancelled) setAccount(meResponse);
-        } catch (error) {
-          const status =
-            typeof error === "object" && error !== null && "status" in error
-              ? (error as { status?: number }).status
-              : undefined;
-          profileUnreachable = status !== 401 && status !== 403;
-        }
-        const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
-        if (resolvedLanguage && resolvedLanguage !== i18n.language) {
-          await i18n.changeLanguage(resolvedLanguage);
-        }
-        if (cancelled) return;
-        setIsBootstrappingProfile(false);
-        if (profileUnreachable) {
-          setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
-          return;
-        }
-        const activeRoute = readActiveConversationRouteState();
-        let activeConversationId = activeRoute.conversationId;
-        if (!activeConversationId && meResponse?.account_kind === "guest") {
-          const { items } = await listConversations({ limit: 2 });
-          if (cancelled || hasAcceptedUserInputRef.current) return;
-          activeConversationId = items[0]?.id ?? null;
-        }
-        if (activeConversationId) {
-          const userId = meResponse?.user.id;
-          if (!userId) {
-            resetToEmptyChatSurface();
-            return;
-          }
-          await navigateConversationTranscript(activeConversationId, userId, {
-            bootstrap: true,
-            messageId: activeRoute.messageId ?? undefined,
-          });
-          return;
-        }
-
-        if (cancelled || hasAcceptedUserInputRef.current) return;
-        resetToEmptyChatSurface();
-      } catch {
-        if (cancelled) return;
-        setIsBootstrappingProfile(false);
-        setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
-        setIsHydratingConversation(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      transcriptSessionCache.cancelActiveNavigation();
-    };
-    // Bootstraps the active conversation once; re-running on i18n updates would create noisy chat reloads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useInitialChatSession({
+    hasAcceptedUserInputRef,
+    setAccount,
+    setProfileState,
+    setMessages,
+    setIsHydratingConversation,
+    resetToEmptyChatSurface,
+    navigateConversationTranscript,
+    cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
+  });
 
   const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({
     accountUserId: account?.user.id,
@@ -917,8 +896,10 @@ export default function ChatInterface() {
     },
   });
 
+  const guestBootstrapRequired = profileState === "bootstrap_required";
   const guestExperience = useGuestExperience({
     account,
+    guestBootstrapRequired,
     conversationId,
     messages,
     sendRef: guestSendRef,
@@ -933,7 +914,15 @@ export default function ChatInterface() {
         context: { surface: "guest_header", conversation_id: conversationId },
       }),
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
+    onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
+      guestSubmissionRetryRef.current = null;
+      setGuestSubmissionError(false);
+      setExpiredPublicAccountAccessEnabled(publicAccountAccessEnabled);
+      setProfileState("expired");
+    },
+    onGuestBootstrapError: () => setGuestSubmissionError(true),
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -951,6 +940,7 @@ export default function ChatInterface() {
     canSaveDecision,
     canUseOmnisearch,
     canUseGroundedDiscovery,
+    canSubmitFeedback,
     requestGuestDecision,
     requestGuestFeedback,
     requestGuestSearchUpgrade,
@@ -997,20 +987,51 @@ export default function ChatInterface() {
 
   const handleSend = async (
     text: string,
-    mentionsOrAction?: ChatMention[] | ChatActionOption,
+    mentionsOrAction?: SendSelection,
     actionArg?: ChatActionOption,
     options?: SendOptions,
   ) => {
     const trimmed = text.trim();
+    let guestSubmissionHandedToStream = false;
     if (!trimmed) return false;
-    if (isStreamingResponse) return false;
+    if (sendAdmissionInFlightRef.current || isStreamingResponse) {
+      return false;
+    }
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
-    const action = Array.isArray(mentionsOrAction)
+    const starterSelection = isStarterSelectionMetadata(mentionsOrAction)
+      ? mentionsOrAction
+      : undefined;
+    const action: ChatActionOption | undefined = Array.isArray(mentionsOrAction)
       ? actionArg
-      : mentionsOrAction;
+      : starterSelection
+        ? undefined
+        : (mentionsOrAction as ChatActionOption | undefined);
+    const isDeferredGuestSubmission =
+      guestBootstrapRequired && !options?.bypassGuestGate;
+
+    sendAdmissionInFlightRef.current = true;
+    if (isDeferredGuestSubmission) {
+      guestSubmissionRetryRef.current = {
+        text,
+        mentionsOrAction,
+        actionArg,
+        options,
+      };
+      setGuestSubmissionError(false);
+      setGuestSubmissionPending(true);
+      setStreamStatus(t("guest.entry.sending", "Sending..."));
+    }
+
+    try {
     if (
       !options?.bypassGuestGate &&
-      !(await guestExperience.admitSend({ text: trimmed, mentions, action }))
+      !(await guestExperience.admitSend({
+        text: trimmed,
+        mentions,
+        action,
+        starterSelection,
+        language: i18n.resolvedLanguage ?? i18n.language,
+      }))
     ) {
       return false;
     }
@@ -1124,7 +1145,7 @@ export default function ChatInterface() {
         renderUserMessage,
       });
     });
-    setStreamStatus(null);
+    if (!isDeferredGuestSubmission) setStreamStatus(null);
 
     const streamInput: string | ChatActionRequest = action?.type
       ? chatActionRequestFromAction(action)
@@ -1136,6 +1157,7 @@ export default function ChatInterface() {
       requestKind,
     );
     if (!initialRequestSession) return false;
+    guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
     const ordinaryTransportMessageIds =
@@ -1147,6 +1169,9 @@ export default function ChatInterface() {
 
     const canApplyVisibleStreamUpdate = () =>
       requestSessions.canWriteVisible(requestSession);
+    const clearNeutralGuestSubmission = () => {
+      if (isDeferredGuestSubmission) setGuestSubmissionPending(false);
+    };
     const handleStreamEvent = (event: ChatStreamEvent) => {
       if (event.event === "stage_start") {
         if (!requestSessions.authorize(requestSession, "stage")) return;
@@ -1155,6 +1180,7 @@ export default function ChatInterface() {
           requestSession.identity.requestId,
           "running",
         );
+        clearNeutralGuestSubmission();
         if (!canApplyVisibleStreamUpdate()) return;
         const stageKey = `chat.status.${event.data.stage}`;
         const detail = event.data.detail;
@@ -1176,6 +1202,7 @@ export default function ChatInterface() {
       }
       if (event.event === "error") {
         if (!requestSessions.authorize(requestSession, "error")) return;
+        clearNeutralGuestSubmission();
         throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
         if (!canApplyVisibleStreamUpdate()) {
           finishRequestTransport(requestSession);
@@ -1243,6 +1270,7 @@ export default function ChatInterface() {
       if (event.event === "final") {
         const identityAuthorized = requestSessions.authorize(requestSession, "final");
         if (!identityAuthorized) return;
+        clearNeutralGuestSubmission();
         setStreamStatus(null);
         const finalPayload = event.data as typeof event.data &
           Record<string, unknown>;
@@ -1448,6 +1476,7 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         if (!requestSessions.authorize(requestSession, "done")) return;
+        clearNeutralGuestSubmission();
         terminalReadiness.finish(true); finishRequestTransport(requestSession);
       }
     };
@@ -1488,6 +1517,7 @@ export default function ChatInterface() {
       );
     };
 
+    guestSubmissionHandedToStream = true;
     void (async () => {
       try {
         await streamToConversation(targetConversationId);
@@ -1514,6 +1544,7 @@ export default function ChatInterface() {
             err = retryErr;
           }
         }
+        clearNeutralGuestSubmission();
         const isOrdinaryTransportAmbiguity =
           action?.type !== "run_backtest" &&
           (!(err instanceof ChatStreamError) || err.status === 0);
@@ -1652,6 +1683,24 @@ export default function ChatInterface() {
       }
     })();
     return true;
+    } finally {
+      sendAdmissionInFlightRef.current = false;
+      if (isDeferredGuestSubmission && !guestSubmissionHandedToStream) {
+        setGuestSubmissionPending(false);
+        setStreamStatus(null);
+      }
+    }
+  };
+
+  const retryGuestSubmission = () => {
+    const pending = guestSubmissionRetryRef.current;
+    if (!pending) return;
+    void handleSend(
+      pending.text,
+      pending.mentionsOrAction,
+      pending.actionArg,
+      pending.options,
+    );
   };
 
   useGuestSendBridge(guestSendRef, handleSend);
@@ -2054,7 +2103,10 @@ export default function ChatInterface() {
   // disables itself while a turn runs; persistent discovery rows have to obey
   // the same lock or they become a way to spam turns around it.
   const turnInFlight =
-    Boolean(visibleStreamStatus) || isStreamingResponse || isHydratingConversation;
+    Boolean(visibleStreamStatus) ||
+    isStreamingResponse ||
+    isHydratingConversation ||
+    guestSubmissionPending;
   // Next-move rows render under their owning message instead of a floating
   // strip above the composer, but they keep every gate the strip applied:
   // nothing offers a next move mid-turn, or while an active card already owns
@@ -2069,8 +2121,6 @@ export default function ChatInterface() {
   const showStreamStatus = Boolean(
     visibleStreamStatus && latestAssistantContent.length === 0,
   );
-  const showExploratorySuggestions =
-    chatExploratorySuggestionsEnabled && showSuggestions;
   const showConversationDisclaimer = shouldShowConversationDisclaimer(
     messages,
     isStreamingResponse,
@@ -2083,6 +2133,7 @@ export default function ChatInterface() {
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
+    guestSubmissionPending ||
     failedConversationId === conversationId;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
@@ -2107,11 +2158,23 @@ export default function ChatInterface() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (isBootstrappingProfile) {
+  if (profileState === "probing" || profileState === "unavailable") {
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div
+          aria-label={t("guest.entry.loading", "Opening Argus")}
+          className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          role="status"
+        />
       </div>
+    );
+  }
+
+  if (profileState === "expired") {
+    return (
+      <ExpiredGuestSession
+        publicAccountAccessEnabled={expiredPublicAccountAccessEnabled}
+      />
     );
   }
 
@@ -2175,10 +2238,12 @@ export default function ChatInterface() {
         settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
-        omnisearchEnabled={omnisearchEnabled}
+        omnisearchEnabled={
+          omnisearchEnabled && (!isGuest || canUseOmnisearch)
+        }
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
-        isGuest={isGuest}
+        isGuest={guestExperience.isEstablishedGuest}
         guestExpiresAt={account?.guest?.expires_at}
       />
 
@@ -2258,6 +2323,7 @@ export default function ChatInterface() {
               {currentView === "chat" && isGuest ? (
                 <GuestHeader
                   expiresAt={account?.guest?.expires_at ?? null}
+                  feedbackEnabled={canSubmitFeedback}
                   onFeedback={requestGuestFeedback}
                   onSignIn={requestGuestSignIn}
                 />
@@ -2301,96 +2367,20 @@ export default function ChatInterface() {
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
             <ConversationActivityAnnouncement activity={conversationActivity} conversationId={conversationId} title={activeTitleRecord ? headerConversationTitle : null} enabled={!isHydratingConversation} />
             {showEmptyChatSurface ? (
-              <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-                <EmptyChatHeading isGuest={isGuest} />
-
-                <div className="w-full max-w-2xl">
-                  <ChatInput
-                    key="new-conversation"
-                    onSend={handleSend}
-                    disabled={isStreamingResponse || isHydratingConversation}
-                    placeholder={chatInputPlaceholder}
-                    onToast={showToast}
-                  />
-                  <ChatLegalNotice
-                    expiresAt={account?.guest?.expires_at}
-                    isGuest={isGuest}
-                    variant="before_message"
-                  />
-                </div>
-
-                <StarterActions
-                  disabled={isStreamingResponse || isHydratingConversation}
-                  guestAnalyticsEnabled={guestExperience.isGuest}
-                  onSelect={handleSend}
-                />
-
-                {chatExploratorySuggestionsEnabled && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => setShowSuggestions(!showSuggestions)}
-                      className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
-                    >
-                      {showSuggestions
-                        ? t("chat.hide_suggestions")
-                        : t("chat.show_suggestions")}
-                    </button>
-                  </div>
-                )}
-
-                {showExploratorySuggestions && (
-                  <div className="mt-8 flex flex-col items-center gap-4 text-center">
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q1",
-                            "What if I bought Apple after big drops?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q1",
-                        "What if I bought Apple after big drops?",
-                      )}
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q2",
-                            "What if I bought Bitcoin when it starts rising?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q2",
-                        "What if I bought Bitcoin when it starts rising?",
-                      )}
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q3",
-                            "What if I bought Tesla every month?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q3",
-                        "What if I bought Tesla every month?",
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <EmptyChatSurface
+                isGuest={isGuest}
+                expiresAt={account?.guest?.expires_at}
+                guestSubmissionPending={guestSubmissionPending}
+                guestSubmissionError={guestSubmissionError}
+                isStreamingResponse={isStreamingResponse}
+                isHydratingConversation={isHydratingConversation}
+                showSuggestions={showSuggestions}
+                placeholder={chatInputPlaceholder}
+                onSend={handleSend}
+                onRetryGuestSubmission={retryGuestSubmission}
+                onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
+                onToast={showToast}
+              />
             ) : (
               <>
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
@@ -2407,7 +2397,7 @@ export default function ChatInterface() {
                   onScroll={updateScrollPositionState}
                   role="region"
                   aria-label={t("common.conversation", "Conversation")}
-                  aria-busy={isHydratingConversation}
+                  aria-busy={isHydratingConversation || guestSubmissionPending}
                   className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
                 >
                   <div className="space-y-8">

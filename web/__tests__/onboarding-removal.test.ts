@@ -82,9 +82,9 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
   });
 
   test("generic localized starter prompts remain on the empty chat surface", () => {
-    const chat = read("components/chat/ChatInterface.tsx");
+    const emptyChat = read("components/chat/EmptyChatSurface.tsx");
     const starters = read("components/chat/StarterActions.tsx");
-    expect(chat).toContain("<StarterActions");
+    expect(emptyChat).toContain("<StarterActions");
     expect(starters).toContain("chat.starter_actions.tsla.value");
     expect(starters).toContain("chat.starter_actions.btc.value");
     expect(starters).toContain("chat.starter_actions.dca.value");
@@ -96,22 +96,56 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
 
   test("chat first paint waits for the authenticated profile language", () => {
     const chat = read("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("isBootstrappingProfile");
-    const bootstrapFlip = chat.indexOf("setIsBootstrappingProfile(false)");
-    const languageApply = chat.indexOf("await i18n.changeLanguage(resolvedLanguage)");
+    const init = read("components/chat/useInitialChatSession.ts");
+    const refreshStart = chat.indexOf("const refreshAccount = useCallback");
+    const refreshEnd = chat.indexOf("const [messages, setMessages]", refreshStart);
+    const refresh = chat.slice(refreshStart, refreshEnd);
+    const languageApply = init.indexOf(
+      "await i18n.changeLanguage(resolvedLanguage)",
+    );
+    const establishedFlip = init.indexOf('setProfileState("established")');
+    const refreshLanguageApply = refresh.indexOf(
+      "await i18n.changeLanguage(resolvedLanguage)",
+    );
+    const refreshEstablishedFlip = refresh.indexOf(
+      'setProfileState("established")',
+    );
+    expect(refreshStart).toBeGreaterThan(-1);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+    expect(refreshLanguageApply).toBeGreaterThan(-1);
+    expect(refreshEstablishedFlip).toBeGreaterThan(refreshLanguageApply);
     expect(languageApply).toBeGreaterThan(-1);
-    expect(bootstrapFlip).toBeGreaterThan(languageApply);
-    expect(chat).toContain("if (isBootstrappingProfile) {");
+    expect(establishedFlip).toBeGreaterThan(languageApply);
+    expect(chat).toContain(
+      'if (profileState === "probing" || profileState === "unavailable") {',
+    );
   });
 
-  test("an unreachable backend surfaces the offline message, not a healthy chat", () => {
+  test("a successful null profile probe never enters authenticated chat", () => {
+    const landing = read("app/page.tsx");
+    const init = read("components/chat/useInitialChatSession.ts");
+
+    expect(landing).toContain("const meResponse = await getMe()");
+    expect(landing).toContain("if (meResponse === null)");
+    expect(init).toContain("if (meResponse === null)");
+    expect(init.indexOf("if (meResponse === null)")).toBeLessThan(
+      init.indexOf('setProfileState("established")'),
+    );
+  });
+
+  test("an unreachable backend fails closed to the auth-first surface", () => {
     const chat = read("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("profileUnreachable = status !== 401 && status !== 403");
-    const unreachableBranch = chat.indexOf("if (profileUnreachable) {");
-    expect(unreachableBranch).toBeGreaterThan(-1);
-    expect(
-      chat.slice(unreachableBranch, unreachableBranch + 400),
-    ).toContain("chat.error_offline");
+    const init = read("components/chat/useInitialChatSession.ts");
+    const failClosedBranch = init.indexOf(
+      'else if (probeOutcome === "fail_closed") {',
+    );
+    expect(failClosedBranch).toBeGreaterThan(-1);
+    const failClosed = init.slice(failClosedBranch, failClosedBranch + 220);
+    expect(failClosed).toContain('setProfileState("unavailable")');
+    expect(failClosed).toContain('router.replace("/?auth=login")');
+    expect(chat).toContain(
+      'if (profileState === "probing" || profileState === "unavailable") {',
+    );
   });
 
   test("legacy persisted marker content still cannot become a retry action", () => {

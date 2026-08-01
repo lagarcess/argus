@@ -18,6 +18,8 @@
     "unpin": "Unpin",
     "loading": "Loading...",
     "retry": "Retry",
+    "try_again": "Try again",
+    "back": "Back",
     "error_occurred": "An error occurred",
     "save": "Save",
     "confirm": "Confirm",
@@ -1277,6 +1279,7 @@
   "guest": {
     "entry": {
       "loading": "Opening Argus",
+      "sending": "Sending...",
       "error": "Argus couldn't open a temporary chat. Try again."
     },
     "expired": {

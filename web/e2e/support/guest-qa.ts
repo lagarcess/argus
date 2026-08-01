@@ -660,8 +660,11 @@ export function assertExactLocalCandidate(
   }).trim();
   if (root !== REPOSITORY_ROOT) throw new Error("Wrong guest QA worktree");
   if (head !== candidate) throw new Error("Candidate SHA does not match HEAD");
-  if (branch !== "codex/guest-experience") {
-    throw new Error("Guest QA must run from codex/guest-experience");
+  if (
+    branch !== "codex/guest-experience" &&
+    branch !== "codex/guest-bootstrap-deferred-conversion"
+  ) {
+    throw new Error("Guest QA must run from an approved guest candidate branch");
   }
   if (status && process.env.ARGUS_GUEST_QA_ALLOW_TEST_DIFF !== "true") {
     throw new Error("Guest QA worktree must be clean");
@@ -2505,52 +2508,45 @@ export async function freshGuest(
   } = {},
 ): Promise<GuestMe> {
   const timeoutMs = options.timeoutMs ?? 60_000;
-  const bootstrapOwnerPromise = page
-    .waitForResponse(
-      (candidate) =>
-        candidate.request().method() === "POST" &&
-        new URL(candidate.url()).pathname.endsWith("/api/v1/auth/guest") &&
-        candidate.status() === 200,
-      { timeout: timeoutMs },
-    )
-    .then(async (response) => {
-      const payload = (await response.json()) as {
-        user?: { id?: unknown } | null;
-      };
-      const owner = requireUuid(
-        typeof payload.user?.id === "string" ? payload.user.id : "",
-        "guest bootstrap owner",
-      );
-      options.onBootstrapOwner?.(owner);
-      return owner;
-    });
-  const mePromise = Promise.all([
-    waitForMe(page, timeoutMs),
-    bootstrapOwnerPromise,
-  ]).then(([me, bootstrapOwner]) => {
+  const captchaToken =
+    process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN?.trim() ?? "";
+  try {
+    if (!captchaToken) {
+      throw new Error("Local guest QA CAPTCHA token is missing");
+    }
+    const bootstrapResponse = await page.context().request.post(
+      `${LOCAL_API_BASE}/auth/guest`,
+      {
+        data: { captcha_token: captchaToken, language: "en" },
+        headers: { origin: LOCAL_APP_ORIGIN },
+        timeout: timeoutMs,
+      },
+    );
+    if (bootstrapResponse.status() !== 200) {
+      throw new Error("Local guest QA bootstrap was rejected");
+    }
+    const payload = (await bootstrapResponse.json()) as {
+      user?: { id?: unknown } | null;
+    };
+    const bootstrapOwner = requireUuid(
+      typeof payload.user?.id === "string" ? payload.user.id : "",
+      "guest bootstrap owner",
+    );
+    options.onBootstrapOwner?.(bootstrapOwner);
+
+    const mePromise = waitForMe(page, timeoutMs);
+    await page.goto("/chat", { waitUntil: "domcontentloaded" });
+    const me = await mePromise;
     if (me.user.id !== bootstrapOwner) {
       throw new Error("Guest bootstrap and verified profile owners differ");
     }
-    return { kind: "authenticated" as const, me };
-  });
-  const entryErrorPromise = page
-    .getByRole("button", { name: /Try again|Intentar de nuevo/i })
-    .waitFor({ state: "visible", timeout: timeoutMs })
-    .then(() => ({ kind: "entry_error" as const }));
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  let outcome: Awaited<typeof mePromise> | Awaited<typeof entryErrorPromise>;
-  try {
-    outcome = await Promise.race([mePromise, entryErrorPromise]);
+    expect(new URL(page.url()).pathname).toBe("/chat");
+    return me;
   } catch (error) {
     throw new Error("Guest public entry failed before authentication", {
       cause: error,
     });
   }
-  if (outcome.kind === "entry_error") {
-    throw new Error("Guest public entry failed before authentication");
-  }
-  expect(new URL(page.url()).pathname).toBe("/chat");
-  return outcome.me;
 }
 
 export function evidenceLabel(namespace: string, value: string): string {

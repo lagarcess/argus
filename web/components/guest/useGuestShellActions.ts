@@ -7,6 +7,7 @@ import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 
 type GuestShellActionsInput = {
   account: UserResponse | null;
+  guestBootstrapRequired: boolean;
   hasAcceptedContent: boolean;
   closeTransientSidebar: () => void;
   onOpenFeedback: () => void;
@@ -20,6 +21,7 @@ type GuestShellActionsInput = {
 
 export function useGuestShellActions({
   account,
+  guestBootstrapRequired,
   hasAcceptedContent,
   closeTransientSidebar,
   onOpenFeedback,
@@ -31,18 +33,23 @@ export function useGuestShellActions({
   omnisearchShortcutEnabled,
 }: GuestShellActionsInput) {
   const isGuest = account?.account_kind === "guest";
+  const isGuestPresentation = isGuest || guestBootstrapRequired;
   const capabilities = account?.capabilities;
+  const registeredCapabilityFallback = account?.account_kind === "registered";
   const canManageConversation =
-    capabilities?.can_manage_conversation ?? true;
-  const canSaveDecision = capabilities?.can_save_decision ?? true;
-  const canUseOmnisearch = capabilities?.can_use_omnisearch ?? true;
+    capabilities?.can_manage_conversation ?? registeredCapabilityFallback;
+  const canSaveDecision =
+    capabilities?.can_save_decision ?? registeredCapabilityFallback;
+  const canUseOmnisearch =
+    capabilities?.can_use_omnisearch ?? registeredCapabilityFallback;
   const canUseGroundedDiscovery =
-    capabilities?.can_use_grounded_discovery ?? true;
+    capabilities?.can_use_grounded_discovery ?? registeredCapabilityFallback;
+  const canSubmitFeedback = capabilities?.can_submit_feedback ?? false;
 
   const requestOmnisearch = useCallback(() => {
-    if (isGuest && !canUseOmnisearch) return;
+    if (isGuestPresentation && !canUseOmnisearch) return;
     onOpenOmnisearch();
-  }, [canUseOmnisearch, isGuest, onOpenOmnisearch]);
+  }, [canUseOmnisearch, isGuestPresentation, onOpenOmnisearch]);
 
   const requestGuestSignIn = useCallback(() => {
     onRequestSignIn();
@@ -54,12 +61,13 @@ export function useGuestShellActions({
   );
 
   const requestGuestFeedback = useCallback(() => {
+    if (!canSubmitFeedback) return;
     onOpenFeedback();
-  }, [onOpenFeedback]);
+  }, [canSubmitFeedback, onOpenFeedback]);
 
   const requestNewChat = useCallback(() => {
     const decision = decideGuestNewConversationGate({
-      accountKind: isGuest ? "guest" : "registered",
+      accountKind: isGuestPresentation ? "guest" : "registered",
       hasAcceptedContent,
     });
     if (decision.kind === "choose_non_empty") {
@@ -71,7 +79,7 @@ export function useGuestShellActions({
   }, [
     closeTransientSidebar,
     hasAcceptedContent,
-    isGuest,
+    isGuestPresentation,
     onNewChat,
     onRequestNonEmptyGuestChoice,
   ]);
@@ -90,11 +98,13 @@ export function useGuestShellActions({
   }, [omnisearchShortcutEnabled, requestOmnisearch]);
 
   return {
-    isGuest,
+    isGuest: isGuestPresentation,
+    isEstablishedGuest: isGuest,
     canManageConversation,
     canSaveDecision,
     canUseOmnisearch,
     canUseGroundedDiscovery,
+    canSubmitFeedback,
     requestGuestDecision,
     requestGuestFeedback,
     requestGuestSignIn,

@@ -18,6 +18,8 @@
     "unpin": "Desanclar",
     "loading": "Cargando...",
     "retry": "Reintentar",
+    "try_again": "Intentar de nuevo",
+    "back": "Volver",
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
     "confirm": "Confirmar",
@@ -1277,6 +1279,7 @@
   "guest": {
     "entry": {
       "loading": "Abriendo Argus",
+      "sending": "Enviando...",
       "error": "Argus no pudo abrir un chat temporal. Inténtalo de nuevo."
     },
     "expired": {

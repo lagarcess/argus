@@ -21,6 +21,7 @@ import {
   resolveLandingEntrySurface,
 } from "@/lib/landing-entry";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
+import { guestProfileProbeOutcome } from "@/lib/guest-account";
 
 type AuthMode = "intro" | "request" | "signup" | "login";
 
@@ -50,6 +51,8 @@ export default function LandingPage() {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const [authMode, setAuthMode] = useState<AuthMode>("intro");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [profileProbeFailedClosed, setProfileProbeFailedClosed] =
+    useState(false);
 
   useEffect(() => {
     const nextAuthMode = authModeFromLocation();
@@ -61,11 +64,19 @@ export default function LandingPage() {
     let cancelled = false;
     (async () => {
       try {
-        await getMe();
+        const meResponse = await getMe();
         if (cancelled) return;
+        if (meResponse === null) {
+          setProfileProbeFailedClosed(true);
+          setIsCheckingSession(false);
+          return;
+        }
         router.replace("/chat");
-      } catch {
+      } catch (error) {
         if (cancelled) return;
+        setProfileProbeFailedClosed(
+          guestProfileProbeOutcome(error) === "fail_closed",
+        );
         setIsCheckingSession(false);
       }
     })();
@@ -124,7 +135,8 @@ export default function LandingPage() {
   const isSignup = authMode === "signup";
   const entrySurface = resolveLandingEntrySurface({
     authMode,
-    guestEntryAvailable: guestAccessEnabled && guestCaptchaConfigured,
+    guestEntryAvailable:
+      !profileProbeFailedClosed && guestAccessEnabled && guestCaptchaConfigured,
     isCheckingSession,
   });
 
