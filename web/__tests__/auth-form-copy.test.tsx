@@ -34,6 +34,19 @@ async function renderAuthForm(mode: AuthFormMode, language: "en" | "es-419") {
 }
 
 describe("auth form copy", () => {
+  test("signup associates the password requirement with the password input", async () => {
+    const signup = await renderAuthForm("signup", "en");
+    const login = await renderAuthForm("login", "en");
+
+    expect(signup).toContain(
+      'aria-describedby="auth-signup-password-requirement"',
+    );
+    expect(signup).toContain(
+      '<p id="auth-signup-password-requirement"',
+    );
+    expect(login).not.toContain("auth-signup-password-requirement");
+  });
+
   test("English signup explains the password rule and auth actions use sentence case", async () => {
     const signup = await renderAuthForm("signup", "en");
     const login = await renderAuthForm("login", "en");

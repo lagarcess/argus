@@ -91,6 +91,9 @@ export default function AuthForm({
             autoComplete={isSignup ? "new-password" : "current-password"}
             required
             minLength={isSignup ? 8 : undefined}
+            aria-describedby={
+              isSignup ? "auth-signup-password-requirement" : undefined
+            }
             className="w-full rounded-[20px] border border-black/15 bg-transparent px-5 py-[14px] pr-14 text-[16px] tracking-[0.16px] text-black transition-colors placeholder:text-black/40 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:border-white/20 dark:text-white dark:placeholder:text-white/40 dark:focus-visible:ring-white"
           />
           <button
@@ -112,7 +115,10 @@ export default function AuthForm({
         </div>
 
         {isSignup && (
-          <p className="-mt-1 px-1 text-[12px] tracking-[0.16px] text-black/55 dark:text-white/55">
+          <p
+            id="auth-signup-password-requirement"
+            className="-mt-1 px-1 text-[12px] tracking-[0.16px] text-black/55 dark:text-white/55"
+          >
             {t(
               "auth.signup.password_requirement",
               "At least 8 characters.",
