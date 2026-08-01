@@ -1041,11 +1041,17 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const scrollControls = readFileSync(
+      join(root, "components/chat/useChatScrollControls.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
     expect(chat).toContain('aria-label="Jump to latest"');
-    expect(chat).toContain("distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX");
+    expect(scrollControls).toContain(
+      "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
+    );
     expect(chat).toContain("scrollToLatest");
     expect(chat).toContain("shouldAutoScrollRef.current");
   });
