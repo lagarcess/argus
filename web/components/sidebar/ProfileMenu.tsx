@@ -6,6 +6,7 @@ import {
   Activity,
   Archive,
   ChevronRight,
+  ChevronUp,
   Database,
   HelpCircle,
   Keyboard,
@@ -28,6 +29,12 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  AVATAR_THEMES,
+  avatarThemeClassName,
+  avatarThemeStyle,
+  type AvatarTheme,
+} from "@/lib/avatar-theme";
 import {
   ENABLED_LANGUAGES,
   languageDisplayAbbreviation,
@@ -115,9 +122,14 @@ export default function ProfileMenu({
   const { t, i18n } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
+  const avatarTriggerRef = useRef<HTMLButtonElement>(null);
+  const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
+  const [accountKind, setAccountKind] = useState<"guest" | "registered" | null>(
+    null,
+  );
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -125,11 +137,47 @@ export default function ProfileMenu({
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isSavingAvatarTheme, setIsSavingAvatarTheme] = useState(false);
+  const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeAvatarPicker = useCallback(() => {
+    if (!isAvatarPickerOpen) return;
+
+    setIsAvatarPickerOpen(false);
+    avatarTriggerRef.current?.focus();
+  }, [isAvatarPickerOpen]);
+
+  const toggleAvatarPicker = useCallback(() => {
+    if (accountKind !== "registered") return;
+
+    if (isAvatarPickerOpen) {
+      closeAvatarPicker();
+      return;
+    }
+
+    setAvatarThemeError(null);
+    setIsAvatarPickerOpen(true);
+  }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
+
+  const closeProfileModal = useCallback(() => {
+    setIsAvatarPickerOpen(false);
+    setActiveModal(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isAvatarPickerOpen) return;
+
+    const selectedTheme = avatarThemeDrawerRef.current?.querySelector<HTMLButtonElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    selectedTheme?.focus();
+  }, [isAvatarPickerOpen]);
 
   // Fetch profile on open
   useEffect(() => {
@@ -137,7 +185,10 @@ export default function ProfileMenu({
       setNameError(null);
       setLanguageError(null);
       getMe()
-        .then(({ user }) => setProfile(user))
+        .then(({ user, account_kind }) => {
+          setProfile(user);
+          setAccountKind(account_kind);
+        })
         .catch(() => null);
     }
   }, [isOpen]);
@@ -190,17 +241,24 @@ export default function ProfileMenu({
         setIsLanguagePickerOpen(false);
         return;
       }
+      if (isAvatarPickerOpen) {
+        closeAvatarPicker();
+        return;
+      }
       if (isDeleteRequestOpen) {
         if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
         return;
       }
-      setActiveModal(null);
+      closeProfileModal();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [
     activeModal,
+    closeAvatarPicker,
+    closeProfileModal,
     deleteRequestState,
+    isAvatarPickerOpen,
     isDeleteRequestOpen,
     isLanguagePickerOpen,
   ]);
@@ -307,6 +365,14 @@ export default function ProfileMenu({
   );
   const currentLanguageAbbreviation =
     languageDisplayAbbreviation(currentLanguage);
+  const avatarClassName =
+    accountKind === "registered"
+      ? avatarThemeClassName(profile?.avatar_theme)
+      : "bg-[#191c1f] text-white dark:bg-white/10";
+  const avatarStyle =
+    accountKind === "registered"
+      ? avatarThemeStyle(profile?.avatar_theme, "ambient")
+      : undefined;
   const handleLanguageSelect = useCallback(
     async (code: string) => {
       const nextLanguage = normalizeEnabledLanguage(code);
@@ -358,6 +424,73 @@ export default function ProfileMenu({
       }
     },
     [i18n, isSavingLanguage, profile, t],
+  );
+
+  const handleAvatarThemeSelect = useCallback(
+    async (avatarTheme: AvatarTheme) => {
+      if (!profile || accountKind !== "registered" || isSavingAvatarTheme) return;
+
+      const previousTheme = profile.avatar_theme;
+      setAvatarThemeError(null);
+      setIsSavingAvatarTheme(true);
+      setProfile((current) =>
+        current ? { ...current, avatar_theme: avatarTheme } : current,
+      );
+
+      try {
+        const { user } = await patchMe({ avatar_theme: avatarTheme });
+        setProfile(user);
+      } catch (err) {
+        console.error("Failed to update avatar theme", err);
+        setProfile((current) =>
+          current ? { ...current, avatar_theme: previousTheme } : current,
+        );
+        setAvatarThemeError(
+          t(
+            "settings.profile.avatar_theme.save_error",
+            "Could not update your avatar color yet.",
+          ),
+        );
+      } finally {
+        setIsSavingAvatarTheme(false);
+      }
+    },
+    [accountKind, isSavingAvatarTheme, profile, t],
+  );
+
+  const handleAvatarThemeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+      if (isSavingAvatarTheme) return;
+
+      const lastIndex = AVATAR_THEMES.length - 1;
+      let nextIndex: number | null = null;
+
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+          break;
+        case "Home":
+          nextIndex = 0;
+          break;
+        case "End":
+          nextIndex = lastIndex;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      avatarThemeDrawerRef.current
+        ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+        [nextIndex]?.focus();
+      void handleAvatarThemeSelect(AVATAR_THEMES[nextIndex].token);
+    },
+    [handleAvatarThemeSelect, isSavingAvatarTheme],
   );
 
   const handleOpenDeleteRequest = useCallback(() => {
@@ -678,7 +811,7 @@ export default function ProfileMenu({
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
           <button
             className="absolute inset-0"
-            onClick={() => setActiveModal(null)}
+            onClick={closeProfileModal}
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
@@ -696,7 +829,7 @@ export default function ProfileMenu({
                 {t("settings.profile.title", "Profile")}
               </h2>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeProfileModal}
                 className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
                 aria-label={t("settings.profile.close", "Close profile")}
               >
@@ -707,9 +840,41 @@ export default function ProfileMenu({
             <div className="flex flex-col gap-3">
               {/* Avatar + Name */}
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#191c1f] text-[16px] font-bold text-white dark:bg-white/10">
-                  {profileInitial(profile)}
-                </div>
+                {accountKind === "registered" ? (
+                  <button
+                    ref={avatarTriggerRef}
+                    type="button"
+                    onClick={toggleAvatarPicker}
+                    className="group relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50"
+                    aria-label={t(
+                      "settings.profile.avatar_theme.change",
+                      "Edit avatar",
+                    )}
+                    aria-expanded={isAvatarPickerOpen}
+                    aria-controls="argus-avatar-theme-drawer"
+                    data-avatar-theme-trigger
+                  >
+                    <span
+                      className={`flex h-full w-full items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                      style={avatarStyle}
+                    >
+                      {profileInitial(profile)}
+                    </span>
+                    <span
+                      className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
+                      aria-hidden="true"
+                    >
+                      <Edit2 className="h-2.5 w-2.5" />
+                    </span>
+                  </button>
+                ) : (
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                    style={avatarStyle}
+                  >
+                    {profileInitial(profile)}
+                  </div>
+                )}
                 <div className="flex min-w-0 flex-1 flex-col">
                   {/* Display Name - editable */}
                   {editingName ? (
@@ -794,6 +959,117 @@ export default function ProfileMenu({
                   </span>
                 </div>
               </div>
+
+              {accountKind === "registered" && (
+                <div
+                  id="argus-avatar-theme-drawer"
+                  ref={avatarThemeDrawerRef}
+                  className={`grid transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
+                    isAvatarPickerOpen
+                      ? "mt-0 grid-rows-[1fr] opacity-100"
+                      : "mt-0 grid-rows-[0fr] opacity-0"
+                  }`}
+                  aria-hidden={!isAvatarPickerOpen}
+                  inert={!isAvatarPickerOpen}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={closeAvatarPicker}
+                        className="flex h-11 w-full items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30"
+                        aria-label={t(
+                          "settings.profile.avatar_theme.close",
+                          "Hide avatar colors",
+                        )}
+                      >
+                        <span className="whitespace-nowrap text-[13px] text-black/50 dark:text-white/50">
+                          {t(
+                            "settings.profile.avatar_theme.label",
+                            "Avatar color",
+                          )}
+                        </span>
+                        <span
+                          className="h-px flex-1 bg-black/10 dark:bg-white/10"
+                          aria-hidden="true"
+                        />
+                        <span className="text-[11px] text-black/35 dark:text-white/35">
+                          {t(
+                            "settings.profile.avatar_theme.hide",
+                            "Hide",
+                          )}
+                        </span>
+                        <ChevronUp
+                          className="h-3.5 w-3.5 text-black/35 dark:text-white/35"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div
+                        className="grid grid-cols-8 place-items-center gap-y-2 sm:grid-cols-7"
+                        role="radiogroup"
+                        aria-busy={isSavingAvatarTheme || undefined}
+                        aria-label={t(
+                          "settings.profile.avatar_theme.label",
+                          "Avatar color",
+                        )}
+                      >
+                        {AVATAR_THEMES.map((theme, index) => {
+                          const selected =
+                            (profile?.avatar_theme ?? "ocean") === theme.token;
+                          const themeLabel = t(
+                            `settings.profile.avatar_theme.themes.${theme.token}`,
+                            theme.token,
+                          );
+                          return (
+                            <button
+                              key={theme.token}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              aria-label={themeLabel}
+                              title={themeLabel}
+                              aria-disabled={isSavingAvatarTheme || undefined}
+                              onClick={() => void handleAvatarThemeSelect(theme.token)}
+                              onKeyDown={(event) =>
+                                handleAvatarThemeKeyDown(event, index)
+                              }
+                              tabIndex={selected ? 0 : -1}
+                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50 sm:col-span-1 ${
+                                isSavingAvatarTheme
+                                  ? "cursor-wait opacity-60"
+                                  : ""
+                              } ${
+                                index === 4 ? "col-start-2 sm:col-auto" : ""
+                              }`}
+                            >
+                              <span
+                                className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold ${theme.className} ${
+                                  theme.token === "ocean"
+                                    ? "border-black/20 dark:border-white/20"
+                                    : "border-transparent"
+                                } ${
+                                  selected
+                                    ? "ring-2 ring-black/70 dark:ring-white/80"
+                                    : ""
+                                }`}
+                                style={avatarThemeStyle(theme.token, "picker")}
+                                aria-hidden="true"
+                              >
+                                {profileInitial(profile)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {avatarThemeError && (
+                        <span className="mt-3 block text-[12px] text-[#d66d75]">
+                          {avatarThemeError}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">

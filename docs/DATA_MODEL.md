@@ -129,6 +129,8 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
+- `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
+  `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
 - `is_admin`: `boolean` (Default: `false`)
 - `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
   to the historical shape below)
@@ -1247,6 +1249,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   authorization.
 - Expired guest identities cannot read or write product rows.
 - Another guest and a permanent user see zero guest workspace rows.
+- `profiles.avatar_theme` is a registered-account preference. The database
+  default keeps every row valid, but restrictive profile RLS policies use the
+  trusted `is_anonymous` JWT claim so a guest cannot read or write it through
+  the client role. The API omits the field from guest responses.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
