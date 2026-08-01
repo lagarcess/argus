@@ -1115,7 +1115,7 @@ describe("chat backtest jobs", () => {
       "const confirmationId = ambiguousRunConfirmationId",
     );
     const ambiguityEnd = chat.indexOf(
-      "const canApplyOwnedUpdate",
+      "const canApplyVisibleUpdate",
       ambiguityStart,
     );
     const ambiguity = chat.slice(ambiguityStart, ambiguityEnd);
@@ -1123,22 +1123,22 @@ describe("chat backtest jobs", () => {
       'reconciliation.kind === "recoverable"',
     );
     const recovery = ambiguity.slice(recoveryStart);
-    const clearStart = chat.indexOf("function clearActiveStreamState()");
-    const clearEnd = chat.indexOf("const loadMoreHistory", clearStart);
-    const clearState = chat.slice(clearStart, clearEnd);
-
     expect(ambiguityStart).toBeGreaterThan(-1);
     expect(ambiguity).toContain("applyRecoverableRunReconciliation");
     expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
-    expect(ambiguity).toContain("clearActiveStreamState()");
+    expect(ambiguity).toContain("finishRequestTransport(requestSession)");
     expect(ambiguity).toContain(
-      "streamToConversation(activeStreamTargetConversationId)",
+      "streamToConversation(requestSession.identity.conversationId)",
     );
     expect(chat).toContain(
       'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
     );
-    expect(clearState).toContain("setStreamStatus(null)");
-    expect(clearState).toContain("setIsStreamingResponse(false)");
+    expect(chat).not.toContain("conversationActivity.settleRequest");
+    expect(ambiguity).toContain(
+      'requestSessions.authorize(requestSession, "run_replay")',
+    );
+    expect(ambiguity).toContain("canApplyVisibleStreamUpdate()");
+    expect(chat).not.toContain("setIsStreamingResponse(false)");
     expect(ambiguity).toContain("durableStateUnknown: true");
     expect(recovery).not.toContain(
       "settleConfirmationAfterActionTransportError(",

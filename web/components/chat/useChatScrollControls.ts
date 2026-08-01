@@ -4,6 +4,23 @@ import { useCallback } from "react";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 
+export const chatScrollPositionState = (distanceFromBottom: number) => ({
+  shouldAutoScroll: distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX,
+  showJumpToLatest: distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX,
+});
+
+export const executeChatTranscriptUpdateScroll = (options: Readonly<{
+  shouldAutoScrollRef: { current: boolean };
+  scrollToLatest: (behavior?: ScrollBehavior) => void;
+  updateScrollPositionState: () => void;
+}>): void => {
+  if (options.shouldAutoScrollRef.current) {
+    options.scrollToLatest("smooth");
+    return;
+  }
+  options.updateScrollPositionState();
+};
+
 type UseChatScrollControlsOptions = {
   accountUserId: string | undefined;
   activeConversationIdRef: { current: string | null };
@@ -48,9 +65,9 @@ export function useChatScrollControls({
     }
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current = isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
+    const nextState = chatScrollPositionState(distanceFromBottom);
+    shouldAutoScrollRef.current = nextState.shouldAutoScroll;
+    setShowJumpToLatest(nextState.showJumpToLatest);
   }, [
     accountUserId,
     activeConversationIdRef,

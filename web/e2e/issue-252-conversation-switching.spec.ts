@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import type {
+  ConversationActivity,
+  ConversationActivityPatch,
+} from "../lib/argus-api";
 
 const CREATED_AT = "2026-07-28T12:00:00Z";
 const USER_ID = "issue-252-user";
@@ -32,6 +36,7 @@ function transcript(conversationId: ConversationId, index = 0) {
 }
 
 type FixtureOptions = {
+  activities?: Partial<Record<ConversationId, ConversationActivity>>;
   delaysMs?: Partial<Record<ConversationId, number | number[]>>;
   decisionResultConversation?: ConversationId;
   failingAttempts?: Partial<Record<ConversationId, number[]>>;
@@ -43,6 +48,10 @@ type FixtureOptions = {
 };
 
 type FixtureState = {
+  activityMutations: Array<{
+    conversationId: ConversationId;
+    body: ConversationActivityPatch;
+  }>;
   decisionRequestCount: number;
   decisionState: "watching" | null;
   messageRequestCounts: Record<ConversationId, number>;
@@ -50,6 +59,21 @@ type FixtureState = {
   unexpectedRequests: string[];
   userId: string;
 };
+
+function activity(
+  operation: ConversationActivity["operation"]["status"] = "idle",
+  attention: ConversationActivity["attention"]["status"] = "none",
+  cursor: string | null = null,
+): ConversationActivity {
+  return {
+    operation: {
+      status: operation,
+      kind: operation === "idle" ? null : "chat_turn",
+      updated_at: operation === "idle" ? null : CREATED_AT,
+    },
+    attention: { status: attention, cursor },
+  };
+}
 
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
@@ -59,7 +83,10 @@ function json(route: Route, body: unknown, status = 200) {
   });
 }
 
-function conversation(conversationId: ConversationId) {
+function conversation(
+  conversationId: ConversationId,
+  conversationActivity: ConversationActivity = activity(),
+) {
   return {
     id: conversationId,
     title: title(conversationId),
@@ -71,6 +98,7 @@ function conversation(conversationId: ConversationId) {
     updated_at: CREATED_AT,
     last_message_preview: `History summary ${suffix(conversationId)}`,
     language: "en",
+    activity: conversationActivity,
   };
 }
 
@@ -154,6 +182,7 @@ async function installConversationFixture(
 ): Promise<FixtureState> {
   const language = options.language ?? "en";
   const state: FixtureState = {
+    activityMutations: [],
     decisionRequestCount: 0,
     decisionState: null,
     messageRequestCounts: Object.fromEntries(
@@ -257,9 +286,36 @@ async function installConversationFixture(
     }
     if (url.pathname.endsWith("/api/v1/conversations")) {
       return json(route, {
-        items: CONVERSATION_IDS.map(conversation),
+        items: CONVERSATION_IDS.map((conversationId) =>
+          conversation(
+            conversationId,
+            options.activities?.[conversationId] ?? activity(),
+          ),
+        ),
         next_cursor: null,
       });
+    }
+    const activityMatch = url.pathname.match(
+      /\/api\/v1\/conversations\/(conversation-[a-j])\/activity$/,
+    );
+    if (activityMatch) {
+      const conversationId = activityMatch[1] as ConversationId;
+      const current = options.activities?.[conversationId] ?? activity();
+      if (request.method() === "GET") return json(route, current);
+      if (request.method() === "PATCH") {
+        const body = request.postDataJSON() as ConversationActivityPatch;
+        state.activityMutations.push({ conversationId, body });
+        const next =
+          body.action === "mark_unread"
+            ? activity(
+                current.operation.status,
+                "manual_unread",
+                current.attention.cursor ?? null,
+              )
+            : activity();
+        if (options.activities) options.activities[conversationId] = next;
+        return json(route, next);
+      }
     }
     const messageMatch = url.pathname.match(
       /\/api\/v1\/conversations\/(conversation-[a-j])\/messages$/,

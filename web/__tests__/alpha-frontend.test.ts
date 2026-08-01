@@ -650,7 +650,7 @@ describe("Argus Alpha frontend contract", () => {
       chat.indexOf("const turnInFlight ="),
       chat.indexOf("const nextMovesEnabled ="),
     );
-    expect(inFlight).toContain("streamStatus");
+    expect(inFlight).toContain("visibleStreamStatus");
     expect(inFlight).toContain("isStreamingResponse");
     expect(inFlight).toContain("isHydratingConversation");
     const gate = chat.slice(
@@ -1002,7 +1002,7 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("latestAssistantContent");
     expect(chat).toMatch(
-      /const showStreamStatus = Boolean\s*\(\s*streamStatus && latestAssistantContent\.length === 0,?\s*\)/,
+      /const showStreamStatus = Boolean\s*\(\s*visibleStreamStatus && latestAssistantContent\.length === 0,?\s*\)/,
     );
     expect(chat).toContain("{showStreamStatus && (");
   });
@@ -1017,7 +1017,12 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("if (isStreamingResponse) return false;");
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(targetConversationId)",
+    );
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(conversationId)",
+    );
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
     expect(chat).toContain(
@@ -1026,7 +1031,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
-    expect(chat).toContain("setIsStreamingResponse(false);");
+    expect(chat).toContain(
+      "createChatRequestSessionController",
+    );
+    expect(chat).toContain(
+      'requestSessions.authorize(requestSession, "final")',
+    );
+    expect(chat).toContain(
+      'requestSessions.authorize(\n            requestSession,\n            "title",',
+    );
+    expect(chat).toContain("finishRequestTransport(requestSession)");
+    expect(chat).not.toContain("conversationActivity.settleRequest");
+    expect(chat).not.toContain("setIsStreamingResponse(false);");
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
     expect(input).toContain("contentEditable={!disabled}");
@@ -1048,7 +1064,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
-    expect(chat).toContain('aria-label="Jump to latest"');
+    expect(chat.match(/<ConversationActivityJumpButton/g)).toHaveLength(1);
+    expect(chat).not.toContain('aria-label="Jump to latest"');
     expect(scrollControls).toContain(
       "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
     );
@@ -2187,8 +2204,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(viewHelpers).toContain("9000");
     expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
-      "schedulePostTurnHistoryRefresh(targetConversationId);",
+      "session.identity.conversationId,",
     );
+    const finishTransportStart = chat.indexOf("function finishRequestTransport");
+    const finishTransportEnd = chat.indexOf("useEffect(", finishTransportStart);
+    const finishTransport = chat.slice(finishTransportStart, finishTransportEnd);
+    expect(finishTransport).toContain(
+      "requestSessions.finishTransport(session)",
+    );
+    expect(finishTransport).toContain("requestSessions.isAccountCurrent(session)");
+    expect(finishTransport).not.toContain("request_settled");
     expect(chat).toContain("Title/sidebar refresh is fail-open");
     expect(chat).toContain(
       "void refreshAndCheckTitle().catch(() => undefined);",

@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import {
+  ConversationActivityIndicator,
+  conversationActivityLabelDescriptor,
+  useConversationActivityPresentation,
+} from "@/components/chat/ConversationActivityIndicator";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -48,7 +53,17 @@ import { inlineFailureTextClass } from "@/lib/failure-treatment";
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
 type View = "chat" | "strategies" | "settings";
-const EMPTY_ATTENTION_IDS = new Set<string>();
+
+type ConversationActivityReadOwner = Readonly<{
+  hasEffectiveUnread: (conversationId: string) => boolean;
+  selectAttentionCursor: (conversationId: string) => string | null;
+  markRead: (conversationId: string, cursor: string | null) => Promise<void>;
+  markUnread: (conversationId: string) => Promise<void>;
+  isMutationPending: (
+    conversationId: string,
+    action: "mark_read" | "mark_unread",
+  ) => boolean;
+}>;
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
@@ -63,6 +78,7 @@ export type ChatSidebarProps = {
 
   /** Currently active conversation id (used for highlighting) */
   conversationId: string | null;
+  conversationActivity: ConversationActivityReadOwner;
 
   // ── Recents ──────────────────────────────────────────────────────────────
   /** Whether the Recents accordion is expanded */
@@ -70,8 +86,6 @@ export type ChatSidebarProps = {
   onToggleRecents: () => void;
   /** History items for the Recents list */
   historyItems: HistoryItem[];
-  /** Session-local conversations with completed Argus turns the user has not opened yet */
-  attentionConversationIds?: ReadonlySet<string>;
   /** Whether more history pages are available */
   historyNextCursor: string | null;
   /** Whether a history page load is in progress */
@@ -123,10 +137,10 @@ export default function ChatSidebar({
   mode = "expanded",
   currentView,
   conversationId,
+  conversationActivity,
   isRecentsExpanded,
   onToggleRecents,
   historyItems,
-  attentionConversationIds = EMPTY_ATTENTION_IDS,
   historyNextCursor,
   isLoadingMoreHistory,
   hasRequestedOlderHistory,
@@ -153,6 +167,8 @@ export default function ChatSidebar({
   guestExpiresAt = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
+  const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
+    useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -260,6 +276,11 @@ export default function ChatSidebar({
     () => historyItems.filter((item) => item.type === "chat"),
     [historyItems],
   );
+  const loadedConversationIds = useMemo(
+    () => chatItems.map(historyConversationId),
+    [chatItems],
+  );
+  const aggregateActivityPresentation = selectAggregatePresentation(loadedConversationIds);
 
   // ── Date-grouped history ────────────────────────────────────────────────
   const groupedHistory = useMemo(
@@ -515,6 +536,7 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
+            activityPresentation={aggregateActivityPresentation}
             shortcutHint={keyboardShortcutHintDisplay(
               "expand_sidebar_recents",
               usesCommandKey,
@@ -583,15 +605,22 @@ export default function ChatSidebar({
                         {visibleItems.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
-                        const hasConversationAttention =
-                          !isActiveConversation && attentionConversationIds.has(itemConversationId);
-                        const attentionLabel = t("chat.history.new_activity", "New activity");
+                        const isUnread = conversationActivity.hasEffectiveUnread(itemConversationId);
+                        const isReadMutationPending = isUnread
+                          ? conversationActivity.isMutationPending(itemConversationId, "mark_read")
+                          : conversationActivity.isMutationPending(itemConversationId, "mark_unread");
+                        const itemActivityPresentation = selectPresentation(itemConversationId);
+                        const itemOperationLabel = selectOperationLabel(itemConversationId);
                         const displayTitle = conversationDisplayTitle(
                           item,
                           t("chat.new_chat", "New chat"),
                         );
-                        const rowAriaLabel = hasConversationAttention
-                          ? `${displayTitle}. ${attentionLabel}.`
+                        const activityLabel = conversationActivityLabelDescriptor(
+                          itemActivityPresentation,
+                          itemOperationLabel,
+                        );
+                        const rowAriaLabel = activityLabel
+                          ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
                           : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
@@ -619,7 +648,6 @@ export default function ChatSidebar({
                             aria-label={rowAriaLabel}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
-                            data-has-attention={hasConversationAttention ? "true" : undefined}
                             data-conversation-id={itemConversationId}
                             onClick={(e) => {
                               // Only navigate if click was on this element or its text children,
@@ -633,6 +661,7 @@ export default function ChatSidebar({
                             onKeyDown={(e) => {
                               if (
                                 (e.key === "Enter" || e.key === " ") &&
+                                e.target === e.currentTarget &&
                                 renamingId !== item.id
                               ) {
                                 e.preventDefault();
@@ -643,16 +672,11 @@ export default function ChatSidebar({
                               isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
-                          {hasConversationAttention && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute left-4 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[#f4f4f4] bg-[#70a38d] dark:border-[#191c1f] dark:bg-[#9bc6b4]"
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                            <ConversationActivityIndicator
+                              presentation={itemActivityPresentation}
                             />
-                          )}
-                          {hasConversationAttention && (
-                            <span className="sr-only">{attentionLabel}</span>
-                          )}
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center"></div>
+                          </div>
                           <div
                             className={`min-w-0 flex-1 pl-3 ${
                               quickJumpHint ? "pr-[104px]" : "pr-10"
@@ -693,11 +717,7 @@ export default function ChatSidebar({
                                 >
                                   {displayTitle}
                                 </span>
-                                <span className={`mt-0.5 block truncate text-[12px] ${
-                                  hasConversationAttention
-                                    ? "text-black/60 dark:text-white/60"
-                                    : "text-black/40 dark:text-white/40"
-                                }`}>
+                                <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
                                   {item.subtitle}
                                 </span>
                                 {isGuest && expiresAt ? (
@@ -723,7 +743,7 @@ export default function ChatSidebar({
                           </div>
                           {renamingId !== item.id &&
                             (canManageConversation || quickJumpHint) && (
-                              <div className="absolute right-2 top-1/2 flex h-7 w-[88px] -translate-y-1/2 items-center justify-end">
+                              <div className="absolute right-2 top-1/2 flex h-11 w-[88px] -translate-y-1/2 items-center justify-end">
                                 {canManageConversation ? (
                                   <RecentChatActions
                                     item={conversationActionItem}
@@ -731,6 +751,13 @@ export default function ChatSidebar({
                                     onRename={handleStartRename}
                                     onArchive={handleArchive}
                                     onDelete={handleRequestDelete}
+                                    isUnread={isUnread}
+                                    isReadMutationPending={isReadMutationPending}
+                                    onToggleUnread={() =>
+                                      isUnread
+                                        ? conversationActivity.markRead(itemConversationId, conversationActivity.selectAttentionCursor(itemConversationId))
+                                        : conversationActivity.markUnread(itemConversationId)
+                                    }
                                     quickJumpHint={quickJumpHint}
                                   />
                                 ) : (

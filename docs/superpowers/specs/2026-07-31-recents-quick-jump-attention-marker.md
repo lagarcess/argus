@@ -10,6 +10,13 @@ Founder-locked 2026-07-31, after visual review of merged PR #317 exposed a
 presentation gap between Recents and Settings and a same-gutter collision with
 the existing Recents attention marker.
 
+> **Historical follow-up (2026-08-01):** The accepted lane and geometry in this
+> document remain historical product evidence. The later
+> [conversation activity, attention, and unread lifecycle](./2026-08-01-conversation-activity-attention-unread-lifecycle.md)
+> replaces session-local attention ownership with the durable typed activity
+> projection while preserving this document's fixed left marker lane, right
+> quick-jump slot, row geometry, ordering, and shortcut behavior.
+
 ## 1. Why
 
 `docs/PRODUCT.md` defines Recents as a continuity surface whose purpose is to
