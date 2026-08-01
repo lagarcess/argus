@@ -25,7 +25,7 @@ function failedMessage(id = "failed-message"): Message {
 }
 
 describe("chat retry action history", () => {
-  test("keeps durable retry adjacent to its latest owning user message", () => {
+  test("keeps an abandoned input-side retry on its owning user message", () => {
     const owner: Message = {
       id: "request-message-1",
       role: "user",

@@ -67,6 +67,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
+import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
   clearActiveConversationPointer,
   isCurrentAnchoredConversationRequest,
@@ -703,16 +704,15 @@ export default function ChatInterface() {
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
-        if (!snapshot.some((message) => message.id === requestedMessageId)) {
-          throw new Error("Transcript anchor was not returned.");
-        }
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
         readyTranscriptConversationIdRef.current = targetConversationId;
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
-          messageId: requestedMessageId,
+          messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
         setMessages(snapshot);
@@ -1967,12 +1967,14 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          requestMessageId
-            ? { renderUserMessage: true }
-            : {
+          failedAssistantId
+            ? {
                 renderUserMessage: false,
-                replacementAssistantId: failedAssistantId ?? undefined,
-              },
+                replacementAssistantId: failedAssistantId,
+              }
+            : requestMessageId
+              ? { renderUserMessage: true }
+              : { renderUserMessage: false },
         );
       }
       return;

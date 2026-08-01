@@ -268,17 +268,6 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sidebar).not.toContain("temporaryExpiresAt");
   });
 
-  test("durable retry renders beside its owning row and creates a visible new attempt", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
-
-    expect(chat).toContain("normalizeDurableRetryActionHistory");
-    expect(chat).toContain("retryLastTurnRequestMessageIdFromAction");
-    expect(chat).toContain("renderUserMessage: true");
-    expect(message).toContain("data-testid=\"user-turn-recovery\"");
-    expect(message).toContain("data-testid=\"user-turn-retry\"");
-  });
-
   test("the adjacent user-turn Retry control keeps a 44px minimum tap target", () => {
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const retryStart = message.indexOf('data-testid="user-turn-retry"');

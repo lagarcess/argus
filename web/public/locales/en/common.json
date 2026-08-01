@@ -252,7 +252,7 @@
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
-      "latest_result_followup_unavailable": "I still have the latest result in this chat, but I could not safely answer that follow-up. Please retry in a moment.",
+      "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
       "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
