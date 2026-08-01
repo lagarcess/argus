@@ -45,6 +45,8 @@ DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 
+DECISION_NOTE_WRITE_MAX_LENGTH = 500
+
 CHAT_STREAM_MAX_BODY_BYTES = 65_536
 CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
 CHAT_STREAM_MAX_MESSAGE_LENGTH = 16_000
@@ -463,7 +465,10 @@ class DecisionNote(BaseModel):
 
 class DecisionNoteCreate(BaseModel):
     decision_state: DecisionState
-    note: str | None = Field(default=None, max_length=2000)
+    note: str | None = Field(
+        default=None,
+        max_length=DECISION_NOTE_WRITE_MAX_LENGTH,
+    )
 
     @field_validator("note")
     @classmethod
@@ -513,14 +518,6 @@ class SearchDossierDecision(BaseModel):
     run_label: str | None = Field(default=None, max_length=160)
 
 
-class SearchDossierTested(BaseModel):
-    symbols: list[str] = Field(default_factory=list, max_length=5)
-    strategy_families: list[str] = Field(default_factory=list, max_length=5)
-    run_count: int = Field(ge=0)
-    start_date: date | None = None
-    end_date: date | None = None
-
-
 class SearchDossierMetric(BaseModel):
     name: str = Field(max_length=80)
     value: str | int | float
@@ -532,26 +529,6 @@ class SearchDossierOutcome(BaseModel):
     benchmark_symbol: str | None = Field(default=None, max_length=24)
     quick_take: str | None = Field(default=None, max_length=500)
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
-
-
-SearchDossierNudge = Literal[
-    "undecided",
-    "suggestion_untaken",
-    "stale_result",
-]
-
-
-class SearchDossierLeftOff(BaseModel):
-    run_label: str = Field(max_length=160)
-    completed_at: datetime
-    nudge: SearchDossierNudge | None = None
-
-
-class SearchDossier(BaseModel):
-    decision: SearchDossierDecision | None = None
-    tested: SearchDossierTested
-    outcome: SearchDossierOutcome | None = None
-    left_off: SearchDossierLeftOff | None = None
 
 
 SearchRunFreshStrategyType = Literal[
@@ -647,6 +624,33 @@ SearchDossierAction = Annotated[
 ]
 
 
+class RunDossierTested(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+    strategy_family: str | None = Field(default=None, max_length=80)
+    cadence: str | None = Field(default=None, max_length=24)
+    timeframe: str | None = Field(default=None, max_length=24)
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class RunDossier(BaseModel):
+    run_id: str
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    result_message_id: str | None = None
+    tested: RunDossierTested
+    outcome: SearchDossierOutcome
+    decision: SearchDossierDecision | None = None
+    actions: list[SearchDossierAction] = Field(default_factory=list, max_length=2)
+
+
+class PaginatedRunDossiers(BaseModel):
+    items: list[RunDossier]
+    next_cursor: str | None = None
+    total_runs: int = Field(ge=0)
+    decided_runs: int = Field(ge=0)
+
+
 SearchMatchLayer = Literal[
     "conversation",
     "message",
@@ -686,8 +690,9 @@ class SearchItem(BaseModel):
     updated_at: datetime
     conversation_id: str
     match: SearchMatch
-    dossier: SearchDossier
-    actions: list[SearchDossierAction] = Field(default_factory=list, max_length=2)
+    dossier: RunDossier | None
+    total_runs: int = Field(ge=0)
+    decided_runs: int = Field(ge=0)
     # Bounded conversation aggregate used for decision filters and counts.
     # The dossier separately carries the latest decision.
     decision_states: tuple[DecisionState, ...] = ()

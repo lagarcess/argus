@@ -6,7 +6,7 @@ Last reconciled: 2026-07-31
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #306 at `b71f1eaf`. Later commits may reconcile
+Latest product checkpoint: PR #317 at `2ff6f3c6`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -45,6 +45,17 @@ provider-free **Run it fresh** composition. The accepted implementation keeps
 the #232 pagination/cursor boundary and #252 navigation-race guarantees, adds
 no RAG/embeddings or durable recall model, and closes the Omnisearch product
 lane without claiming deployment or tester exposure.
+PR #316 subsequently completed issue #309's bounded run-dossier history and
+effective-decision browser as `9aa209d4`. PR #318 made accepted-turn downstream
+failures remain assistant-owned across reload and Retry as `f6d0981e`, followed
+by the test-isolation checkpoint `1ed8d4f0`; issue #313 is closed. PR #315 added
+the current-conversation activity rail as `6e20328c`. PR #317 then added one
+central keyboard-shortcut registry, localized help overlay, and shared Recents
+and Settings quick-jump behavior as `2ff6f3c6`, without changing Cmd/Ctrl+K
+Omnisearch or the existing F2 rename binding. The typed-retest Draft PR #311 is
+now unblocked by #309/#316 but remains a worker candidate until it reconciles
+the new dossier, palette, schema, activity-rail, and keyboard surfaces and
+passes its final exact-head gates.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

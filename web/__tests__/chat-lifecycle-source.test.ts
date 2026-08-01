@@ -147,6 +147,10 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("a missing bootstrap conversation is pruned without removing an interactive failure", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
+      "utf-8",
+    );
     const navigationStart = chat.indexOf(
       "async function navigateConversationTranscript(",
     );
@@ -156,7 +160,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     const navigation = chat.slice(navigationStart, navigationEnd);
 
-    expect(chat).toContain("function isMissingConversationLoadError(error: unknown)");
+    expect(viewHelpers).toContain(
+      "function isMissingConversationLoadError(error: unknown)",
+    );
     expect(navigation).toContain("options.bootstrap &&");
     expect(navigation).toContain("isMissingConversationLoadError(state.error)");
     expect(navigation).toContain("setHistoryItems((current) =>");
@@ -266,17 +272,6 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(footer.match(/data-testid="guest-temporary-notice"/g)?.length).toBe(1);
     expect(sidebar).not.toContain("guest-sidebar-expiry");
     expect(sidebar).not.toContain("temporaryExpiresAt");
-  });
-
-  test("durable retry renders beside its owning row and creates a visible new attempt", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
-
-    expect(chat).toContain("normalizeDurableRetryActionHistory");
-    expect(chat).toContain("retryLastTurnRequestMessageIdFromAction");
-    expect(chat).toContain("renderUserMessage: true");
-    expect(message).toContain("data-testid=\"user-turn-recovery\"");
-    expect(message).toContain("data-testid=\"user-turn-retry\"");
   });
 
   test("the adjacent user-turn Retry control keeps a 44px minimum tap target", () => {
@@ -414,13 +409,17 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(decisionSuccess).toContain(
       "setSavedDecisionState(response.decision.decision_state)",
     );
-    expect(decisionSuccess).toContain("onDecisionSaved?.()");
-    expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
-      decisionSuccess.indexOf("onDecisionSaved?.()"),
+    expect(decisionSuccess).toContain(
+      "onDecisionSaved?.(response.decision.decision_state)",
     );
-    expect(message).toContain("onDecisionSaved?: () => void");
+    expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
+      decisionSuccess.indexOf("onDecisionSaved?.("),
+    );
+    expect(message).toContain(
+      "onDecisionSaved?: (decisionState: DecisionState) => void",
+    );
     expect(message).toContain("onDecisionSaved={onDecisionSaved}");
-    expect(chat).toContain("onDecisionSaved={() =>");
+    expect(chat).toContain("onDecisionSaved={(decisionState) =>");
     expect(savedStrategySuccess).toContain("invalidateTranscriptForMutation(");
     expect(savedStrategySuccess).toContain("targetConversationId");
     expect(savedStrategySuccess).toContain('"durable_result_action"');

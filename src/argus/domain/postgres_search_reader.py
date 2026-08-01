@@ -44,7 +44,7 @@ _CONVERSATION_ROW_GROUPS = tuple(
         for source, group in _ROW_GROUP_BY_SOURCE.items()
         if source != "asset_rollup"
     )
-)
+) + ("messages",)
 
 
 class SearchCursorError(ValueError):
@@ -1201,6 +1201,7 @@ _CONVERSATION_LEDGER_INPUT_CTE = sql.SQL(
         select
             %(user_id)s::uuid as user_id,
             %(normalized_query)s::text as normalized_query,
+            %(symbol_query)s::text as symbol_query,
             %(text_search_enabled)s::boolean as text_search_enabled
     )
     """
@@ -1223,6 +1224,33 @@ _CONVERSATION_DECISION_FILTER = sql.SQL(
 )
 
 
+def _run_symbol_slot(run_alias: sql.Composable, slot: int) -> sql.Composed:
+    return sql.SQL("btrim({})").format(
+        symbol_index_expression(
+            sql.SQL("{}.symbols[{}]").format(run_alias, sql.Literal(slot))
+        )
+    )
+
+
+def _exact_run_symbol_predicate(run_alias: sql.Composable) -> sql.Composed:
+    return sql.SQL("\n or \n").join(
+        sql.SQL(
+            """
+            (
+                {run_alias}.symbols[{slot}] is not null
+                and input.symbol_query collate "C"
+                    = {normalized_symbol} collate "C"
+            )
+            """
+        ).format(
+            run_alias=run_alias,
+            slot=sql.Literal(slot),
+            normalized_symbol=_run_symbol_slot(run_alias, slot),
+        )
+        for slot in range(1, 6)
+    )
+
+
 def _conversation_match_ctes(
     *,
     has_anchor: bool,
@@ -1241,6 +1269,7 @@ def _conversation_match_ctes(
         "|| coalesce(run.config_snapshot->>'template', '') || ' ' "
         "|| coalesce(run.conversation_result_card->>'strategy_label', '')"
     )
+    run_symbol_predicate = _exact_run_symbol_predicate(sql.SQL("run"))
     idea_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
@@ -1265,15 +1294,14 @@ def _conversation_match_ctes(
         exists (
             select 1
             from public.backtest_runs as symbol_run
-            cross join unnest(symbol_run.symbols) as symbol
             where symbol_run.user_id = input.user_id
               and symbol_run.conversation_id = conversation.id
               and symbol_run.status = 'completed'
-              and input.symbol_query = btrim({normalized_symbol})
+              and ({symbol_predicate})
         )::integer
         """
     ).format(
-        normalized_symbol=symbol_index_expression(sql.SQL("symbol")),
+        symbol_predicate=_exact_run_symbol_predicate(sql.SQL("symbol_run")),
     )
     conversation_activity_query = sql.SQL(
         """
@@ -1614,13 +1642,20 @@ def _conversation_match_ctes(
              or conversation.id = input.guest_conversation_id
          )
          {decision_filter}
-        where input.text_search_enabled
-          and input.normalized_query <> ''
-          and ({run_predicate})
+        where input.normalized_query <> ''
+          and (
+              (input.text_search_enabled and ({run_predicate}))
+              or (
+                  not input.text_search_enabled
+                  and input.symbol_query is not null
+                  and ({run_symbol_predicate})
+              )
+          )
         """
     ).format(
         matched_text_sql=run_matched_text,
         run_predicate=run_predicate,
+        run_symbol_predicate=run_symbol_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
     idea_source = sql.SQL(
@@ -1929,11 +1964,7 @@ def _conversation_match_ctes(
 
 
 def _asset_symbol_slot(slot: int) -> sql.Composed:
-    return sql.SQL("btrim({})").format(
-        symbol_index_expression(
-            sql.SQL("run.symbols[{}]").format(sql.Literal(slot))
-        )
-    )
+    return _run_symbol_slot(sql.SQL("run"), slot)
 
 
 def _asset_symbol_candidate_branch(slot: int) -> sql.Composed:
@@ -2332,6 +2363,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
         "|| coalesce(run.config_snapshot->>'template', '') || ' ' "
         "|| coalesce(run.conversation_result_card->>'strategy_label', '')"
     )
+    run_symbol_predicate = _exact_run_symbol_predicate(sql.SQL("run"))
     idea_haystack = _normalized("idea.title || ' ' || coalesce(idea.summary, '')")
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
@@ -2479,9 +2511,15 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
               on conversation.id = run.conversation_id
              and conversation.user_id = input.user_id
              and conversation.deleted_at is null
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({run_predicate})
+            where input.normalized_query <> ''
+              and (
+                  (input.text_search_enabled and ({run_predicate}))
+                  or (
+                      not input.text_search_enabled
+                      and input.symbol_query is not null
+                      and ({run_symbol_predicate})
+                  )
+              )
 
             union
 
@@ -2548,6 +2586,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             run_haystack,
             _normalized(_RUN_INDEX_HAYSTACK),
         ),
+        run_symbol_predicate=run_symbol_predicate,
         idea_predicate=token_predicate(idea_haystack, idea_haystack),
         evidence_predicate=token_predicate(
             evidence_haystack,
@@ -2569,6 +2608,8 @@ select
         'deleted_at', conversation.deleted_at,
         '_recall_summary', jsonb_build_object(
             'run_count', coalesce(run_summary.run_count, 0),
+            'total_runs', coalesce(run_summary.run_count, 0),
+            'decided_runs', coalesce(run_summary.decided_runs, 0),
             'symbols', coalesce(run_summary.symbols, array[]::text[]),
             'strategy_families',
                 coalesce(run_summary.strategy_families, array[]::text[]),
@@ -2584,14 +2625,27 @@ select
         )
     ) as conversation_payload,
     latest_run.payload as latest_run_payload,
-    judged_run.payload as judged_run_payload,
     latest_evidence.payload as latest_evidence_payload,
     latest_run_decision.payload as latest_run_decision_payload,
-    latest_decision.payload as latest_decision_payload
+    latest_recall_decision.payload as latest_recall_decision_payload,
+    latest_result_message.payload as latest_result_message_payload
 from public.conversations as conversation
 left join lateral (
     select
         count(*)::integer as run_count,
+        count(*) filter (
+            where exists (
+                select 1
+                from public.evidence_artifacts as decided_evidence
+                join public.decision_notes as decided
+                  on decided.evidence_artifact_id = decided_evidence.id
+                 and decided.user_id = %(user_id)s
+                where decided_evidence.user_id = %(user_id)s
+                  and decided_evidence.source_conversation_id = conversation.id
+                  and decided_evidence.source_run_id = run.id
+                  and decided.source_conversation_id = conversation.id
+            )
+        )::integer as decided_runs,
         (
             select (array_agg(symbol order by last_used desc, symbol))[1:5]
             from (
@@ -2652,6 +2706,13 @@ left join lateral (
     where run.user_id = %(user_id)s
       and run.conversation_id = conversation.id
       and run.status = 'completed'
+      and exists (
+          select 1
+          from public.evidence_artifacts as eligible_evidence
+          where eligible_evidence.user_id = %(user_id)s
+            and eligible_evidence.source_conversation_id = conversation.id
+            and eligible_evidence.source_run_id = run.id
+      )
 ) as run_summary on true
 left join lateral (
     select array_agg(
@@ -2683,7 +2744,8 @@ left join lateral (
             'config_snapshot', run.config_snapshot,
             'conversation_result_card', run.conversation_result_card,
             'created_at', run.created_at,
-            'updated_at', run.updated_at
+            'updated_at', run.updated_at,
+            'completed_at', coalesce(run.updated_at, run.created_at)
         ) as payload,
         run.id,
         exists (
@@ -2700,6 +2762,13 @@ left join lateral (
     where run.user_id = %(user_id)s
       and run.conversation_id = conversation.id
       and run.status = 'completed'
+      and exists (
+          select 1
+          from public.evidence_artifacts as eligible_evidence
+          where eligible_evidence.user_id = %(user_id)s
+            and eligible_evidence.source_conversation_id = conversation.id
+            and eligible_evidence.source_run_id = run.id
+      )
     order by coalesce(run.updated_at, run.created_at) desc, run.id desc
     limit 1
 ) as latest_run on true
@@ -2732,23 +2801,21 @@ left join lateral (
     limit 1
 ) as latest_suggestion on true
 left join lateral (
-    select
-        jsonb_build_object(
-            'id', decision.id,
-            'idea_id', decision.idea_id,
-            'idea_version_id', decision.idea_version_id,
-            'evidence_artifact_id', decision.evidence_artifact_id,
-            'source_conversation_id', decision.source_conversation_id,
-            'decision_state', decision.decision_state,
-            'note', decision.note,
-            'created_at', decision.created_at,
-            'updated_at', decision.updated_at,
-            'source_run_id', evidence.source_run_id,
-            'artifact_title', evidence.title,
-            'artifact_digest', evidence.digest,
-            'artifact_payload', evidence.payload
-        ) as payload,
-        evidence.source_run_id
+    select jsonb_build_object(
+        'id', decision.id,
+        'idea_id', decision.idea_id,
+        'idea_version_id', decision.idea_version_id,
+        'evidence_artifact_id', decision.evidence_artifact_id,
+        'source_conversation_id', decision.source_conversation_id,
+        'decision_state', decision.decision_state,
+        'note', decision.note,
+        'created_at', decision.created_at,
+        'updated_at', decision.updated_at,
+        'source_run_id', evidence.source_run_id,
+        'artifact_title', evidence.title,
+        'artifact_digest', evidence.digest,
+        'artifact_payload', evidence.payload
+    ) as payload
     from public.decision_notes as decision
     left join public.evidence_artifacts as evidence
       on evidence.id = decision.evidence_artifact_id
@@ -2757,26 +2824,7 @@ left join lateral (
       and decision.source_conversation_id = conversation.id
     order by decision.updated_at desc, decision.id desc
     limit 1
-) as latest_decision on true
-left join lateral (
-    select jsonb_build_object(
-        'id', run.id,
-        'conversation_id', run.conversation_id,
-        'status', run.status,
-        'asset_class', run.asset_class,
-        'symbols', run.symbols,
-        'benchmark_symbol', run.benchmark_symbol,
-        'config_snapshot', run.config_snapshot,
-        'conversation_result_card', run.conversation_result_card,
-        'created_at', run.created_at,
-        'updated_at', run.updated_at
-    ) as payload
-    from public.backtest_runs as run
-    where run.user_id = %(user_id)s
-      and run.conversation_id = conversation.id
-      and run.id = latest_decision.source_run_id
-    limit 1
-) as judged_run on true
+) as latest_recall_decision on true
 left join lateral (
     select jsonb_build_object(
         'id', evidence.id,
@@ -2820,6 +2868,34 @@ left join lateral (
     order by decision.updated_at desc, decision.id desc
     limit 1
 ) as latest_run_decision on true
+left join lateral (
+    select jsonb_build_object(
+        'id', message.id,
+        'conversation_id', message.conversation_id,
+        'role', message.role,
+        'content', message.content,
+        'metadata', message.metadata,
+        'created_at', message.created_at
+    ) as payload
+    from public.messages as message
+    where message.user_id = %(user_id)s
+      and message.conversation_id = conversation.id
+      and message.role = 'assistant'
+      and (
+          message.metadata->>'result_run_id' = latest_run.id::text
+          or message.metadata->>'latest_run_id' = latest_run.id::text
+      )
+    order by
+        case
+            when jsonb_typeof(message.metadata->'result_card') = 'object'
+             and message.metadata->'result_card' <> '{}'::jsonb
+                then 0
+            else 1
+        end,
+        message.created_at desc,
+        message.id desc
+    limit 1
+) as latest_result_message on true
 cross join lateral (
     select max(source_activity.activity_at) as activity_at
     from (
@@ -2977,6 +3053,9 @@ class PostgresSearchReader:
         text_search_enabled = (
             not normalized_query or search_has_indexable_token(query)
         )
+        conversation_search_enabled = (
+            text_search_enabled or symbol_query is not None
+        )
         anchor_token = max(
             (token for token in normalized_tokens if len(token) >= 3),
             key=len,
@@ -2995,9 +3074,9 @@ class PostgresSearchReader:
                     else None
                 ),
             )
-        if has_cursor and not text_search_enabled:
+        if has_cursor and not conversation_search_enabled:
             raise SearchCursorError(
-                "A symbol-only search cannot continue from a conversation cursor."
+                "Deferred search cannot continue from a conversation cursor."
             )
         legacy_skip_message, legacy_goal_pattern = legacy_onboarding_sql_filters()
         params: dict[str, Any] = {
@@ -3081,7 +3160,7 @@ class PostgresSearchReader:
                             has_anchor=anchor_token is not None,
                             has_cursor=has_cursor,
                         )
-                        if text_search_enabled
+                        if conversation_search_enabled
                         else _asset_rollup_search_sql()
                     )
                     cursor.execute(search_sql, params)
@@ -3107,7 +3186,7 @@ class PostgresSearchReader:
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
                     ledger_counts = {state: 0 for state in _DECISION_STATES}
-                    if text_search_enabled:
+                    if conversation_search_enabled:
                         ledger_params = {
                             **params,
                             "decision_state": None,
@@ -3170,21 +3249,17 @@ def _hydrate_conversation_recall(
             conversation_payload["_recall_match"] = recall_match
         hydrated["conversations"].append(conversation_payload)
 
-        seen_run_ids: set[str] = set()
-        for key in ("latest_run_payload", "judged_run_payload"):
-            payload = row.get(key)
-            if not isinstance(payload, dict):
-                continue
-            run_id = str(payload.get("id") or "")
-            if not run_id or run_id in seen_run_ids:
-                continue
-            seen_run_ids.add(run_id)
-            hydrated["runs"].append(payload)
+        latest_run = row.get("latest_run_payload")
+        if isinstance(latest_run, dict):
+            hydrated["runs"].append(latest_run)
         latest_evidence = row.get("latest_evidence_payload")
         if isinstance(latest_evidence, dict):
             hydrated["evidence"].append(latest_evidence)
         seen_decision_ids: set[str] = set()
-        for key in ("latest_decision_payload", "latest_run_decision_payload"):
+        for key in (
+            "latest_recall_decision_payload",
+            "latest_run_decision_payload",
+        ):
             latest_decision = row.get(key)
             if not isinstance(latest_decision, dict):
                 continue
@@ -3193,6 +3268,9 @@ def _hydrate_conversation_recall(
                 continue
             seen_decision_ids.add(decision_id)
             hydrated["decisions"].append(latest_decision)
+        latest_result_message = row.get("latest_result_message_payload")
+        if isinstance(latest_result_message, dict):
+            hydrated["messages"].append(latest_result_message)
     return hydrated
 
 

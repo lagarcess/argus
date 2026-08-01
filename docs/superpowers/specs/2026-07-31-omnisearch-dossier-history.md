@@ -1,6 +1,8 @@
 # Omnisearch run dossiers — browse prior evidence and effective decisions without opening chat
 
-Status: **PROPOSED — awaiting founder lock**
+Status: **DELIVERED** by PR #316, merged into `codex/private-alpha-next` as
+`9aa209d4`; issue #309 is closed. This file is retained as implementation and
+acceptance evidence, not as an active worker instruction.
 
 Depends on the delivered Full Omnisearch contract in
 `docs/superpowers/specs/2026-07-29-omnisearch-memory-recall.md` and PR #306
@@ -186,6 +188,79 @@ Guest access stays current-workspace and owner-scoped. Missing, deleted, or
 unauthorized conversations return the existing conversation ownership/not-found
 contract without leaking existence.
 
+### 2.6 Founder-approved dossier refinement
+
+The founder approved the following post-implementation refinement on July 31,
+2026. These decisions amend the illustrated hierarchy in section 2.1 without
+changing its one-run ownership rule:
+
+- New and edited decision notes accept at most 500 characters in both the chat
+  result-card editor and the Omnisearch editor. The API request schema is the
+  canonical write gate. Existing longer notes remain readable verbatim so the
+  refinement does not corrupt or hide previously accepted durable records.
+- A long note in the selected dossier initially shows a bounded five-line
+  preview with accessible `Show full note` / `Show less` controls. Expanding it
+  uses the dossier's existing scroll flow; the note never becomes a nested
+  scroll region.
+- The selected decision state and its compact `Edit` action share one row. The
+  visible edit control may be smaller than 44 pixels only when its effective
+  pointer target remains at least 44 pixels.
+- The existing provider-free `run_fresh` action moves into the selected
+  backtest card's top-right action slot and is labeled `Retest setup`. Its
+  tooltip explains that Argus reuses the setup with the latest available data
+  and shows confirmation before anything runs. This is presentation-only: the
+  action keeps the existing deterministic chat-send transport and does not
+  adopt sibling `retest_run` behavior.
+- Asset-rollup copy states that the registered-user aggregate spans Argus
+  conversations; guest copy states that it covers only the temporary
+  conversation. The response shape and aggregation rules remain unchanged.
+- Search retains the three-character text-index threshold, while a single
+  canonical symbol-shaped query becomes eligible at two characters. This
+  enables symbols such as `BA` without permitting broad two-character text
+  search or adding a provider lookup. When the query exactly matches a stored
+  canonical symbol, Search returns both the asset rollup and the bounded,
+  cursor-safe conversation rows whose completed runs contain that symbol.
+- Every canonical strategy family rendered in the dossier has natural EN and
+  es-419 copy. An unknown future family falls back to a readable code label;
+  the setup line must never render an empty segment or doubled separator.
+- The provider-free visual-QA gallery does not append `Run <number>` to card
+  titles. Production continues to render the canonical result-card title
+  verbatim; the fixture must not imply that sequence numbers are product copy.
+- Historical-view Back controls use an accessible arrow-only treatment.
+
+The chat result card continues to expose decision capture only when its result
+has no current decision. Existing decisions are not editable there because the
+card does not hydrate the canonical note. Omnisearch remains the current-decision
+edit surface; adding a second chat edit workflow requires a separate explicit
+product decision and contract.
+
+### 2.7 Founder-approved final browser-QA addendum
+
+The founder approved the final desktop and mobile browser treatment on July 31,
+2026. These decisions supersede any earlier illustrative spacing or locale
+implications while preserving the behavior and ownership rules above:
+
+- Bounded outcome metrics render as one compact two-column definition table
+  with separator lines. They do not return to individually filled statistic
+  tiles; the table keeps the four canonical metrics readable without consuming
+  unnecessary vertical space.
+- The dossier body remains vertically scrollable so every selected-run fact,
+  decision control, transcript action, and history disclosure stays reachable
+  on desktop and mobile. The long-note disclosure continues to use that parent
+  scroll flow rather than introducing a nested note scrollbar.
+- Every supported cadence (`daily`, `weekly`, `biweekly`, `monthly`, and
+  `quarterly`) has natural EN and es-419 display copy. Unknown future cadence
+  codes retain the same readable fallback rule as unknown strategy families;
+  missing optional facts never render a `<missing>` placeholder or empty
+  separator segment.
+- Dossier numbers use the selected product locale directly. In particular,
+  `es-419` must be passed to `Intl.NumberFormat` without coercion to `es-ES`, so
+  the approved Latin American Spanish display uses values such as `6.7%` and
+  remains consistent with the chat result surface.
+
+This addendum records the approved shipped presentation. It adds no new API,
+runtime, durable model, provider call, or sibling typed-retest behavior.
+
 ## 3. Architecture and ownership
 
 ### 3.1 Canonical truth
@@ -270,6 +345,18 @@ hydration, or retry semantics.
 - Search/Recents behavior, left-row match highlighting, decision filters,
   asset rollups, conversation isolation, and jump-to-match from PR #306 do not
   regress.
+- A two-character exact symbol such as `BA` returns its asset rollup and its
+  matching conversation row, while two-character ordinary text remains
+  deferred.
+- Saving a new note long enough to exceed the five-line preview immediately
+  returns to the collapsed dossier with functional `Show full note` / `Show
+  less` controls after canonical refresh.
+- Dossier setup lines never contain an empty strategy slot in EN or es-419.
+- The four bounded metrics use the compact separator-based table and remain
+  reachable through the dossier's parent scroll flow at desktop and mobile
+  sizes.
+- Supported cadence labels are natural in EN and es-419, and es-419 dossier
+  numbers use the approved Latin American format (`6.7%`, not `6,7 %`).
 - Memory and Supabase/Postgres modes return equivalent typed results.
 - EN and es-419 behave equivalently on desktop and mobile.
 - Hover, focus, disclosure, history loading, decision save, and navigation make

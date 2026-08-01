@@ -2004,6 +2004,88 @@ Soft delete conversation.
 }
 ```
 
+## `GET /api/v1/conversations/{conversation_id}/run-dossiers`
+
+Returns a lazy, newest-first page of finalized evidence-backed runs for one
+owned conversation.
+
+**Query Params:**
+
+- `limit`: optional, defaults to `20`, minimum `1`, maximum `100`.
+- `cursor`: optional opaque keyset cursor over the previous page's final
+  `(completed_at, run_id)` row.
+
+A row is eligible only when its BacktestRun is completed and has an owned
+EvidenceArtifact in the same conversation. Failed, incomplete, or
+evidence-less runs do not appear and do not contribute to `total_runs` or
+`decided_runs`. `decided_runs` counts eligible runs whose selected evidence
+artifact has a current DecisionNote.
+
+The owner must match the conversation and every projected child record. A guest
+may read only its active guest workspace conversation. Missing, deleted,
+foreign, and out-of-workspace conversations all return the existing
+non-leaking `404 Conversation not found` response. Malformed, stale, foreign,
+or no-longer-eligible cursor pivots return `400 validation_error` with
+`Invalid cursor.`
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "run_id": "uuid",
+      "run_label": "Weekly GLD pullback",
+      "completed_at": "timestamp",
+      "result_message_id": "uuid-or-null",
+      "tested": {
+        "symbols": ["GLD"],
+        "strategy_family": "indicator_threshold",
+        "cadence": null,
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31"
+      },
+      "outcome": {
+        "run_label": "Weekly GLD pullback",
+        "completed_at": "timestamp",
+        "benchmark_symbol": "SPY",
+        "quick_take": "GLD held up better than SPY.",
+        "metrics": [
+          { "name": "total_return_pct", "value": 8.4 }
+        ]
+      },
+      "decision": {
+        "state": "watching",
+        "note": "Hold through earnings.\nReview risk first.",
+        "run_label": "Weekly GLD pullback"
+      },
+      "actions": [
+        {
+          "type": "decision",
+          "evidence_artifact_id": "uuid",
+          "decision_state": "watching",
+          "note": "Hold through earnings.\nReview risk first.",
+          "run_label": "Weekly GLD pullback"
+        }
+      ]
+    }
+  ],
+  "next_cursor": null,
+  "total_runs": 1,
+  "decided_runs": 1
+}
+```
+
+`result_message_id` prefers the latest owned assistant message whose metadata
+contains a non-empty `result_card` and points to that exact run through
+`result_run_id` or `latest_run_id`. When no such result-card message exists, it
+falls back to the latest owned assistant pointer for legacy history; it is
+`null` when neither exists. Notes preserve internal whitespace and newlines
+within the existing 2,000-character bound. Actions are deterministic, bounded
+to two, and always target the same run/evidence pair as their row. The endpoint
+stores nothing and makes no LLM, provider, or market-data call.
+
 ## `GET /conversations/{id}/messages`
 
 **Query Params:**
@@ -2997,6 +3079,11 @@ Server behavior:
 }
 ```
 
+`note` is optional and accepts at most 500 characters on every new or repeated
+write. Read projections continue to return previously accepted notes up to the
+existing 2,000-character transport bound so tightening authoring does not hide
+or corrupt legacy user text.
+
 `decision_state` enum:
 - `watching`
 - `promising`
@@ -3159,16 +3246,18 @@ the `/search` contract.
         "message_id": "uuid"
       },
       "decision_states": ["watching"],
+      "total_runs": 2,
+      "decided_runs": 1,
       "dossier": {
-        "decision": {
-          "state": "watching",
-          "note": "Hold through earnings.\nReview risk first.",
-          "run_label": "Monthly GLD buys"
-        },
+        "run_id": "uuid",
+        "run_label": "Weekly GLD pullback",
+        "completed_at": "timestamp",
+        "result_message_id": "uuid",
         "tested": {
           "symbols": ["GLD"],
-          "strategy_families": ["dca", "rsi_mean_reversion"],
-          "run_count": 2,
+          "strategy_family": "indicator_threshold",
+          "cadence": null,
+          "timeframe": "1D",
           "start_date": "2025-01-01",
           "end_date": "2026-07-29"
         },
@@ -3181,53 +3270,53 @@ the `/search` contract.
             { "name": "total_return_pct", "value": 8.4 }
           ]
         },
-        "left_off": {
-          "run_label": "Weekly GLD pullback",
-          "completed_at": "timestamp",
-          "nudge": "undecided"
-        }
-      },
-      "actions": [
-        {
-          "type": "run_fresh",
-          "source_run_id": "uuid",
-          "run_label": "Weekly GLD pullback",
-          "canonical_setup": {
-            "strategy_type": "indicator_threshold",
-            "symbols": ["GLD"],
-            "asset_class": "equity",
-            "timeframe": "1D",
-            "date_range": {
-              "start": "2025-07-29",
-              "end": "2026-07-29"
-            },
-            "sizing_mode": "capital_amount",
-            "capital_amount": 10000.0,
-            "position_size": null,
-            "cadence": null,
-            "recurring_contribution": null,
-            "starting_principal": null,
-            "benchmark_symbol": "SPY",
-            "entry_rule": null,
-            "exit_rule": null,
-            "rule_spec": {
-              "indicator": "rsi",
-              "operator": "below",
-              "threshold": 30
-            },
-            "parameters": {},
-            "execution_realism": null
-          },
-          "send_text": "Test this exact supported setup again ... Show the Ready-to-run confirmation; do not run it yet."
-        },
-        {
-          "type": "decision",
-          "evidence_artifact_id": "uuid",
-          "decision_state": "watching",
+        "decision": {
+          "state": "watching",
           "note": "Hold through earnings.\nReview risk first.",
           "run_label": "Weekly GLD pullback"
-        }
-      ]
+        },
+        "actions": [
+          {
+            "type": "run_fresh",
+            "source_run_id": "uuid",
+            "run_label": "Weekly GLD pullback",
+            "canonical_setup": {
+              "strategy_type": "indicator_threshold",
+              "symbols": ["GLD"],
+              "asset_class": "equity",
+              "timeframe": "1D",
+              "date_range": {
+                "start": "2025-07-29",
+                "end": "2026-07-29"
+              },
+              "sizing_mode": "capital_amount",
+              "capital_amount": 10000.0,
+              "position_size": null,
+              "cadence": null,
+              "recurring_contribution": null,
+              "starting_principal": null,
+              "benchmark_symbol": "SPY",
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": {
+                "indicator": "rsi",
+                "operator": "below",
+                "threshold": 30
+              },
+              "parameters": {},
+              "execution_realism": null
+            },
+            "send_text": "Test this exact supported setup again ... Show the Ready-to-run confirmation; do not run it yet."
+          },
+          {
+            "type": "decision",
+            "evidence_artifact_id": "uuid",
+            "decision_state": "watching",
+            "note": "Hold through earnings.\nReview risk first.",
+            "run_label": "Weekly GLD pullback"
+          }
+        ]
+      }
     }
   ],
   "next_cursor": null,
@@ -3249,6 +3338,15 @@ owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
 run contributes to at most one decision state. `last_touched_at` is the latest
 activity on those runs or their evidence/decision lineage.
 
+Text recall requires at least one normalized token with three characters. A
+single symbol-shaped query is separately eligible at two characters so stored
+symbols such as `BA` can resolve through the bounded symbol index without
+opening broad two-character text search. An exact stored-symbol query returns
+the rollup plus the normal bounded, cursor-safe conversation rows whose
+completed runs contain that symbol. A merely unambiguous symbol prefix may
+still return only the rollup. One-character, whitespace-containing, and
+non-alphanumeric symbol queries remain deferred.
+
 The asset rollup is an additive presentation row. It is outside the
 conversation `limit`, ranking, decision filter, ledger grouping, and cursor
 sequence; it has no conversation id or management actions and cannot become a
@@ -3261,19 +3359,22 @@ one of `conversation`, `message`, `run`, `idea`, `evidence`, or `decision`;
 that winning layer. `message_id` is present only when `layer = message`. It is
 an owner-scoped jump anchor for the normal conversation message read above.
 
-`dossier` always has the fixed reading order `decision`, `tested`, `outcome`,
-`left_off`. Optional sections are `null` when stored truth is absent. Lists are
-bounded to five symbols, five strategy families, and four typed metrics. A
-decision note is the user's exact bounded note with internal newlines
-preserved. `run_label` is present on the decision when multiple runs make its
-target otherwise ambiguous. `left_off.nudge` is null or one of `undecided`,
-`suggestion_untaken`, `stale_result`; the backend never invents a nudge.
+`dossier` is either `null` or one completed evidence-backed run. It is `null`
+only for ordinary conversation/message/idea recall that has no finalized
+evidence-backed run; in that case `total_runs = 0` and `decided_runs = 0`.
+Every present dossier anchors its run identity, tested setup, outcome, current
+decision, result-message anchor, and actions to the same run/evidence pair.
+Lists are bounded to five symbols and four typed metrics. A decision note is
+the user's exact bounded note with internal newlines preserved. New writes are
+bounded to 500 characters, while read projections retain the existing 2,000-
+character compatibility bound for legacy notes. `total_runs`
+and `decided_runs` are backend-owned full-lineage counts, not page totals.
 
-`actions` is a bounded, backend-owned list attached only to conversation rows.
-It contains at most one `run_fresh` action followed by at most one `decision`
-action:
+`dossier.actions` is a bounded, backend-owned list. It contains at most one
+`run_fresh` action followed by at most one `decision` action:
 
-- `run_fresh` is projected only from the latest supported completed run. Its
+- `run_fresh` is projected only from the default dossier's selected supported
+  completed evidence-backed run. Its
   `canonical_setup` contains the public, executable strategy shape rather than
   raw provider or engine configuration. The backend preserves the original
   inclusive window length and shifts that window to end on the current date.
@@ -3367,10 +3468,11 @@ conversation dossiers and `next_cursor = null`. Missing, foreign, or deleted
 ids are omitted without revealing ownership. This is one bounded read for the
 at-most-50 chats already visible in History; clients must not replace it with
 one request per row or an automatic walk through unrelated ranked pages.
-For a non-empty query, recall begins only when at least one normalized token has
-three characters. One- and two-character partial input returns no search rows
-and does not read transcript or artifact haystacks; the palette asks the user to
-keep typing. This protects the bounded per-keystroke read contract.
+For a non-empty query, text recall begins only when at least one normalized
+token has three characters. One- and two-character ordinary or partial text
+does not read transcript or artifact haystacks; the palette asks the user to
+keep typing. The exact stored-symbol exception above reads only completed-run
+symbol lineage. This protects the bounded per-keystroke read contract.
 
 *Future semantic retrieval may extend this endpoint.*
 

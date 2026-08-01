@@ -341,7 +341,7 @@ export function hydrateMessagesFromApi(
     });
 
   // Retirement runs before the durable normalize: it needs to see the
-  // superseded failure to pop the retry's duplicate request bubble.
+  // superseded failure to hide the retry's duplicate request bubble.
   const normalized = normalizeDurableRetryActionHistory(
     retireSupersededFailures(
       applyConsumedResultActions(

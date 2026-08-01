@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import type { UserResponse } from "@/lib/guest-account";
 import { decideGuestNewConversationGate } from "@/lib/guest-capability-gates";
+import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 
 type GuestShellActionsInput = {
   account: UserResponse | null;
@@ -78,10 +79,7 @@ export function useGuestShellActions({
   useEffect(() => {
     if (!omnisearchShortcutEnabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        !(event.metaKey || event.ctrlKey) ||
-        event.key.toLowerCase() !== "k"
-      ) {
+      if (!matchesKeyboardShortcut("omnisearch", event)) {
         return;
       }
       event.preventDefault();
