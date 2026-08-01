@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -44,6 +45,7 @@ export type ConversationActivityMutationNotice = Readonly<{
 export type ConversationActivityPatchTransport = (
   conversationId: string,
   patch: ConversationActivityPatch,
+  options: Readonly<{ signal: AbortSignal }>,
 ) => Promise<ConversationActivity>;
 
 export type ConversationActivityEffectsAdapter = Readonly<{
@@ -60,7 +62,10 @@ type ConversationActivityInputs = Readonly<{
 }>;
 
 type ConversationActivityCallbacks = Readonly<{
-  refreshHistory: () => void;
+  refreshHistory: () =>
+    | readonly HistoryItem[]
+    | void
+    | Promise<readonly HistoryItem[] | void>;
   invalidateInactiveTranscript: (conversationId: string) => void;
   onMutationNotice: (notice: ConversationActivityMutationNotice) => void;
 }>;
@@ -92,6 +97,7 @@ export type ConversationActivityRuntime = Readonly<{
   hasManualUnreadGuard: (
     conversationId: string | null | undefined,
   ) => boolean;
+  updateActiveConversationId: (conversationId: string | null) => void;
   startRequest: (
     conversationId: string,
     requestId: string,
@@ -142,14 +148,24 @@ const isUnresolvedOperation = (
   return status != null && status !== "idle";
 };
 
+const activitiesAreEqual = (
+  left: ConversationActivity | null,
+  right: ConversationActivity,
+): boolean =>
+  left?.operation.status === right.operation.status &&
+  left.operation.kind === right.operation.kind &&
+  left.operation.updated_at === right.operation.updated_at &&
+  left.attention.status === right.attention.status &&
+  left.attention.cursor === right.attention.cursor;
+
 const transportKey = (conversationId: string, requestId: string): string =>
   JSON.stringify([conversationId, requestId]);
 
 const createBrowserEffectsAdapter = (): ConversationActivityEffectsAdapter => ({
   schedulePoll: (callback, delayMs) => {
     if (typeof window === "undefined") return () => undefined;
-    const intervalId = window.setInterval(callback, delayMs);
-    return () => window.clearInterval(intervalId);
+    const timeoutId = window.setTimeout(callback, delayMs);
+    return () => window.clearTimeout(timeoutId);
   },
   subscribeWindowFocus: (callback) => {
     if (typeof window === "undefined") return () => undefined;
@@ -170,19 +186,29 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   private readonly listeners = new Set<StateListener>();
   private readonly mutationSequences = new Map<string, number>();
   private readonly transports = new Map<string, AbortController>();
+  private readonly mutationTransports = new Map<
+    string,
+    Readonly<{ mutationId: string; controller: AbortController }>
+  >();
   private readonly loadedConversationIds = new Set<string>();
   private activeConversationId: string | null;
+  private lastInputActiveConversationId: string | null;
   private accountScopeKey: string | null;
   private responseRevision = 0;
   private accountEpoch = 0;
   private started = false;
   private cancelPoll: (() => void) | null = null;
+  private refreshInFlight: Readonly<{
+    epoch: number;
+    promise: Promise<void>;
+  }> | null = null;
   private unsubscribeFocus: (() => void) | null = null;
   private unsubscribeVisibility: (() => void) | null = null;
   private callbacks: ConversationActivityCallbacks;
 
   constructor(private readonly options: CreateConversationActivityRuntimeOptions) {
     this.activeConversationId = options.activeConversationId;
+    this.lastInputActiveConversationId = options.activeConversationId;
     this.accountScopeKey = options.accountScopeKey;
     this.callbacks = {
       refreshHistory: options.refreshHistory,
@@ -198,16 +224,15 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     if (this.started) return;
     this.started = true;
     this.unsubscribeFocus = this.options.effects.subscribeWindowFocus(() => {
-      this.refreshCanonicalHistory();
+      void this.refreshCanonicalHistory();
     });
     this.unsubscribeVisibility =
       this.options.effects.subscribeVisibilityChange(() => {
         if (this.options.effects.isDocumentVisible()) {
-          this.refreshCanonicalHistory();
+          void this.refreshCanonicalHistory();
         }
       });
-    this.refreshCanonicalHistory();
-    this.reconcilePolling();
+    void this.refreshCanonicalHistory();
   };
 
   dispose = (): void => {
@@ -236,11 +261,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   updateInputs = (inputs: ConversationActivityInputs): void => {
     const accountChanged = inputs.accountScopeKey !== this.accountScopeKey;
     const navigationChanged =
-      inputs.activeConversationId !== this.activeConversationId;
+      inputs.activeConversationId !== this.lastInputActiveConversationId;
     if (accountChanged) {
       this.resetAccount(inputs.accountScopeKey);
     }
     this.activeConversationId = inputs.activeConversationId;
+    this.lastInputActiveConversationId = inputs.activeConversationId;
     if (inputs.accountScopeKey) {
       this.mergeHistory(inputs.historyItems);
     } else {
@@ -252,7 +278,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       inputs.accountScopeKey &&
       (accountChanged || navigationChanged)
     ) {
-      this.refreshCanonicalHistory();
+      void this.refreshCanonicalHistory();
     }
   };
 
@@ -277,6 +303,10 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     conversationId: string | null | undefined,
   ): boolean => selectManualUnreadGuard(this.state, conversationId);
 
+  updateActiveConversationId = (conversationId: string | null): void => {
+    this.activeConversationId = conversationId;
+  };
+
   startRequest = (
     conversationId: string,
     requestId: string,
@@ -290,7 +320,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       status,
       kind,
     });
-    this.refreshCanonicalHistory();
+    void this.refreshCanonicalHistory();
   };
 
   progressRequest = (
@@ -315,11 +345,11 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.dispatch({ type: "request_settled", conversationId, requestId });
     if (
       options.invalidateInactiveTranscript === true &&
-      conversationId !== this.activeConversationId
+      conversationId !== this.currentActiveConversationId()
     ) {
       this.callbacks.invalidateInactiveTranscript(conversationId);
     }
-    this.refreshCanonicalHistory();
+    void this.refreshCanonicalHistory();
   };
 
   isRequestCurrent = (conversationId: string, requestId: string): boolean =>
@@ -391,8 +421,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     for (const listener of this.listeners) listener();
   }
 
-  private mergeHistory(historyItems: readonly HistoryItem[]): void {
-    this.loadedConversationIds.clear();
+  private mergeHistory(
+    historyItems: readonly HistoryItem[],
+    responseRevision?: number,
+    replaceLoadedConversationIds = true,
+  ): void {
+    if (replaceLoadedConversationIds) this.loadedConversationIds.clear();
     for (const item of historyItems) {
       if (item.type !== "chat") continue;
       const conversationId = item.conversation_id ?? item.id;
@@ -401,6 +435,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
 
       const priorActivity =
         this.state.byConversationId[conversationId]?.canonical ?? null;
+      if (activitiesAreEqual(priorActivity, item.activity)) continue;
       const settled =
         isUnresolvedOperation(priorActivity) &&
         !isUnresolvedOperation(item.activity);
@@ -408,10 +443,14 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
         type: "server_projection_merged",
         conversationId,
         activity: item.activity,
-        revision: this.nextResponseRevision(),
-        activeView: conversationId === this.activeConversationId,
+        revision: responseRevision ?? this.nextResponseRevision(),
+        activeView:
+          conversationId === this.currentActiveConversationId(),
       });
-      if (settled && conversationId !== this.activeConversationId) {
+      if (
+        settled &&
+        conversationId !== this.currentActiveConversationId()
+      ) {
         this.callbacks.invalidateInactiveTranscript(conversationId);
       }
     }
@@ -427,18 +466,23 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.mutationSequences.set(sequenceKey, sequence);
     const mutationId = `${this.accountEpoch}:${sequenceKey}:${sequence}`;
     const epoch = this.accountEpoch;
+    this.abortMutationTransport(conversationId);
+    const controller = new AbortController();
+    this.mutationTransports.set(conversationId, { mutationId, controller });
     this.dispatch({
       type: "mutation_started",
       conversationId,
       mutationId,
       action,
       revision: this.nextResponseRevision(),
-      activeView: conversationId === this.activeConversationId,
+      activeView: conversationId === this.currentActiveConversationId(),
     });
 
     let request: Promise<ConversationActivity>;
     try {
-      request = this.options.patchActivity(conversationId, patch);
+      request = this.options.patchActivity(conversationId, patch, {
+        signal: controller.signal,
+      });
     } catch (error) {
       request = Promise.reject(error);
     }
@@ -446,18 +490,29 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     return request.then(
       (activity) => {
         if (!this.mutationIsCurrent(conversationId, mutationId, epoch)) return;
+        const priorActivity =
+          this.state.byConversationId[conversationId]?.canonical ?? null;
         this.dispatch({
           type: "mutation_succeeded",
           conversationId,
           mutationId,
           activity,
         });
+        const nextActivity =
+          this.state.byConversationId[conversationId]?.canonical ?? null;
+        if (
+          isUnresolvedOperation(priorActivity) &&
+          !isUnresolvedOperation(nextActivity) &&
+          conversationId !== this.currentActiveConversationId()
+        ) {
+          this.callbacks.invalidateInactiveTranscript(conversationId);
+        }
         this.callbacks.onMutationNotice({
           conversationId,
           action,
           outcome: "success",
         });
-        this.refreshCanonicalHistory();
+        void this.refreshCanonicalHistory();
       },
       () => {
         if (!this.mutationIsCurrent(conversationId, mutationId, epoch)) return;
@@ -468,7 +523,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
           outcome: "error",
         });
       },
-    );
+    ).finally(() => {
+      const registered = this.mutationTransports.get(conversationId);
+      if (registered?.mutationId === mutationId) {
+        this.mutationTransports.delete(conversationId);
+      }
+    });
   }
 
   private mutationIsCurrent(
@@ -511,14 +571,20 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
 
   private reconcilePolling(): void {
     const shouldPoll =
-      this.started && Boolean(this.accountScopeKey) && this.hasUnresolvedWork();
+      this.started &&
+      Boolean(this.accountScopeKey) &&
+      this.hasUnresolvedWork() &&
+      this.refreshInFlight?.epoch !== this.accountEpoch;
     if (!shouldPoll) {
       this.cancelPolling();
       return;
     }
     if (this.cancelPoll) return;
     this.cancelPoll = this.options.effects.schedulePoll(
-      () => this.refreshCanonicalHistory(),
+      () => {
+        this.cancelPoll = null;
+        void this.refreshCanonicalHistory();
+      },
       ACTIVITY_POLL_CADENCE_MS,
     );
   }
@@ -528,14 +594,43 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.cancelPoll = null;
   }
 
-  private refreshCanonicalHistory(): void {
-    if (!this.accountScopeKey) return;
-    try {
-      this.callbacks.refreshHistory();
-    } catch {
-      // A cold refresh failure carries no activity truth. The existing surface
-      // remains neutral until a canonical projection arrives.
+  private refreshCanonicalHistory(): Promise<void> {
+    if (!this.accountScopeKey) return Promise.resolve();
+    if (this.refreshInFlight?.epoch === this.accountEpoch) {
+      return this.refreshInFlight.promise;
     }
+    this.cancelPolling();
+    const epoch = this.accountEpoch;
+    const responseRevision = this.nextResponseRevision();
+    let refreshResult:
+      | readonly HistoryItem[]
+      | void
+      | Promise<readonly HistoryItem[] | void>;
+    try {
+      refreshResult = this.callbacks.refreshHistory();
+    } catch {
+      refreshResult = Promise.reject(new Error("Activity refresh failed"));
+    }
+    const promise = Promise.resolve(refreshResult)
+      .then((historyItems) => {
+        if (
+          epoch === this.accountEpoch &&
+          historyItems !== undefined
+        ) {
+          this.mergeHistory(historyItems, responseRevision, false);
+        }
+      })
+      .catch(() => {
+        // A failed refresh carries no activity truth. Keep the current surface.
+      })
+      .finally(() => {
+        if (this.refreshInFlight?.promise === promise) {
+          this.refreshInFlight = null;
+          this.reconcilePolling();
+        }
+      });
+    this.refreshInFlight = { epoch, promise };
+    return promise;
   }
 
   private resetAccount(nextAccountScopeKey: string | null): void {
@@ -551,6 +646,19 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   private abortRegisteredTransports(): void {
     for (const controller of this.transports.values()) controller.abort();
     this.transports.clear();
+    for (const { controller } of this.mutationTransports.values()) {
+      controller.abort();
+    }
+    this.mutationTransports.clear();
+  }
+
+  private abortMutationTransport(conversationId: string): void {
+    this.mutationTransports.get(conversationId)?.controller.abort();
+    this.mutationTransports.delete(conversationId);
+  }
+
+  private currentActiveConversationId(): string | null {
+    return this.activeConversationId;
   }
 }
 
@@ -578,6 +686,7 @@ export type UseConversationActivityResult = Readonly<{
     | "getState"
     | "updateCallbacks"
     | "updateInputs"
+    | "updateActiveConversationId"
   >;
 
 export function useConversationActivity(
@@ -602,6 +711,10 @@ export function useConversationActivity(
     runtime.getState,
     runtime.getState,
   );
+
+  useLayoutEffect(() => {
+    runtime.updateActiveConversationId(options.activeConversationId);
+  }, [runtime, options.activeConversationId]);
 
   useEffect(() => {
     runtime.updateCallbacks({

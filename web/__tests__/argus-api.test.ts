@@ -119,7 +119,12 @@ describe("conversation activity API contract", () => {
     }) as typeof fetch;
 
     await getConversationActivity("conversation-1");
-    await patchConversationActivity("conversation-1", { action: "mark_unread" });
+    const controller = new AbortController();
+    await patchConversationActivity(
+      "conversation-1",
+      { action: "mark_unread" },
+      { signal: controller.signal },
+    );
     await patchConversationActivity("conversation-1", {
       action: "mark_read",
       through_attention_cursor: "attention:chat_turn:1",
@@ -135,6 +140,7 @@ describe("conversation activity API contract", () => {
       method: "PATCH",
       body: JSON.stringify({ action: "mark_unread" }),
     });
+    expect(requests[1]?.init?.signal).toBe(controller.signal);
     expect(requests[2]?.init).toMatchObject({
       method: "PATCH",
       body: JSON.stringify({

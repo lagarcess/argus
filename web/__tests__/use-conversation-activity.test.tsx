@@ -99,7 +99,9 @@ class ControlledEffects implements ConversationActivityEffectsAdapter {
   }
 
   firePoll(): void {
-    this.poll?.();
+    const callback = this.poll;
+    this.poll = null;
+    callback?.();
   }
 
   fireFocus(): void {
@@ -123,7 +125,12 @@ function runtimeHarness(options: Readonly<{
   patchActivity?: (
     conversationId: string,
     patch: ConversationActivityPatch,
+    options: Readonly<{ signal: AbortSignal }>,
   ) => Promise<ConversationActivity>;
+  refreshHistory?: () =>
+    | readonly HistoryItem[]
+    | void
+    | Promise<readonly HistoryItem[] | void>;
 }> = {}) {
   const effects = new ControlledEffects();
   const refreshes: string[] = [];
@@ -133,9 +140,9 @@ function runtimeHarness(options: Readonly<{
     historyItems: options.historyItems ?? [],
     activeConversationId: options.activeConversationId ?? null,
     accountScopeKey: options.accountScopeKey ?? "account-a",
-    refreshHistory: () => {
+    refreshHistory: options.refreshHistory ?? (() => {
       refreshes.push("refresh");
-    },
+    }),
     invalidateInactiveTranscript: (conversationId) => {
       invalidations.push(conversationId);
     },
@@ -150,18 +157,25 @@ function runtimeHarness(options: Readonly<{
   return { runtime, effects, refreshes, invalidations, notices };
 }
 
+const drainMicrotasks = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 describe("conversation activity refresh ownership", () => {
-  test("bootstraps and polls only while loaded canonical or local work is unresolved", () => {
+  test("bootstraps and polls only while loaded canonical or local work is unresolved", async () => {
     const harness = runtimeHarness({
       historyItems: [chat("conversation-a", workingActivity("queued"))],
       activeConversationId: "conversation-b",
     });
 
     harness.runtime.start();
+    await drainMicrotasks();
     expect(harness.refreshes).toHaveLength(1);
     expect(harness.effects.hasPoll()).toBe(true);
 
     harness.effects.firePoll();
+    await drainMicrotasks();
     expect(harness.refreshes).toHaveLength(2);
 
     harness.runtime.updateInputs({
@@ -180,10 +194,12 @@ describe("conversation activity refresh ownership", () => {
       "queued",
       "chat_turn",
     );
+    await drainMicrotasks();
     expect(harness.refreshes).toHaveLength(3);
     expect(harness.effects.hasPoll()).toBe(true);
 
     harness.runtime.settleRequest("conversation-local", "request-local");
+    await drainMicrotasks();
     expect(harness.refreshes).toHaveLength(4);
     expect(harness.effects.hasPoll()).toBe(false);
   });
@@ -209,34 +225,40 @@ describe("conversation activity refresh ownership", () => {
     expect(effects.hasPoll()).toBe(false);
   });
 
-  test("refreshes on focus and only on a visible-document resume", () => {
+  test("refreshes on focus and only on a visible-document resume", async () => {
     const harness = runtimeHarness();
     harness.runtime.start();
+    await drainMicrotasks();
 
     harness.effects.fireFocus();
+    await drainMicrotasks();
     harness.effects.setVisible(false);
     expect(harness.refreshes).toHaveLength(2);
 
     harness.effects.setVisible(true);
+    await drainMicrotasks();
     expect(harness.refreshes).toHaveLength(3);
   });
 
-  test("refreshes bounded history when navigation changes the active conversation", () => {
+  test("refreshes bounded history when navigation changes the active conversation", async () => {
     const harness = runtimeHarness({ activeConversationId: "conversation-a" });
     harness.runtime.start();
+    await drainMicrotasks();
 
     harness.runtime.updateInputs({
       historyItems: [],
       activeConversationId: "conversation-b",
       accountScopeKey: "account-a",
     });
+    await drainMicrotasks();
 
     expect(harness.refreshes).toHaveLength(2);
   });
 
-  test("keeps inactive settlement independent and transport release non-terminal", () => {
+  test("keeps inactive settlement independent and transport release non-terminal", async () => {
     const harness = runtimeHarness({ activeConversationId: "conversation-b" });
     harness.runtime.start();
+    await drainMicrotasks();
     harness.runtime.startRequest(
       "conversation-a",
       "request-current",
@@ -271,6 +293,50 @@ describe("conversation activity refresh ownership", () => {
     });
     expect(harness.invalidations).toEqual(["conversation-a"]);
   });
+
+  test("coalesces polling, focus, and visibility into one refresh with no idle tail", async () => {
+    const firstRefresh = deferred<readonly HistoryItem[] | void>();
+    const secondRefresh = deferred<readonly HistoryItem[] | void>();
+    const refreshes = [firstRefresh, secondRefresh];
+    let refreshIndex = 0;
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-a", workingActivity("running"))],
+      activeConversationId: "conversation-b",
+      refreshHistory: () => refreshes[refreshIndex++]!.promise,
+    });
+
+    harness.runtime.start();
+    harness.effects.fireFocus();
+    harness.effects.setVisible(true);
+    expect(refreshIndex).toBe(1);
+
+    firstRefresh.resolve([
+      chat("conversation-a", workingActivity("running")),
+    ]);
+    await drainMicrotasks();
+    expect(harness.effects.hasPoll()).toBe(true);
+
+    harness.effects.firePoll();
+    harness.effects.fireFocus();
+    harness.effects.setVisible(true);
+    expect(refreshIndex).toBe(2);
+
+    harness.runtime.updateInputs({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-done")),
+      ],
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
+    });
+    secondRefresh.resolve([
+      chat("conversation-a", idleActivity("new_activity", "cursor-done")),
+    ]);
+    await drainMicrotasks();
+
+    expect(harness.effects.hasPoll()).toBe(false);
+    harness.effects.firePoll();
+    expect(refreshIndex).toBe(2);
+  });
 });
 
 describe("conversation activity mutations", () => {
@@ -291,6 +357,7 @@ describe("conversation activity mutations", () => {
       },
     });
     harness.runtime.start();
+    await drainMicrotasks();
 
     const mutation = harness.runtime.markRead("conversation-a", null);
     expect(patches).toEqual([
@@ -306,6 +373,7 @@ describe("conversation activity mutations", () => {
 
     request.resolve(idleActivity());
     await mutation;
+    await drainMicrotasks();
 
     expect(harness.runtime.isMutationPending("conversation-a")).toBe(false);
     expect(harness.notices).toEqual([
@@ -379,14 +447,103 @@ describe("conversation activity mutations", () => {
     expect(after).toBeGreaterThan(before ?? 0);
     expect(harness.runtime.selectPresentation("conversation-a")).toBe("needs_input");
   });
+
+  test("keeps an optimistic mutation current across identical navigation replays", async () => {
+    const request = deferred<ConversationActivity>();
+    const activity = idleActivity("new_activity", "cursor-stable");
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-a", activity)],
+      activeConversationId: "conversation-a",
+      patchActivity: () => request.promise,
+    });
+    harness.runtime.start();
+    await drainMicrotasks();
+
+    const mutation = harness.runtime.markRead("conversation-a", "cursor-stable");
+    harness.runtime.updateInputs({
+      historyItems: [chat("conversation-a", { ...activity })],
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
+    });
+
+    expect(harness.runtime.selectPresentation("conversation-a")).toBe("none");
+    request.resolve(idleActivity());
+    await mutation;
+    expect(
+      harness.runtime.getState().byConversationId["conversation-a"]?.canonical,
+    ).toEqual(idleActivity());
+  });
+
+  test("does not let an older in-flight history response supersede a newer mutation", async () => {
+    const refresh = deferred<readonly HistoryItem[] | void>();
+    const mutationResponse = deferred<ConversationActivity>();
+    let refreshCount = 0;
+    const harness = runtimeHarness({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-old")),
+      ],
+      activeConversationId: "conversation-a",
+      refreshHistory: () =>
+        refreshCount++ === 0
+          ? refresh.promise
+          : [chat("conversation-a", idleActivity())],
+      patchActivity: () => mutationResponse.promise,
+    });
+    harness.runtime.start();
+
+    const mutation = harness.runtime.markRead("conversation-a", "cursor-old");
+    refresh.resolve([
+      chat("conversation-a", idleActivity("needs_input", "cursor-before-read")),
+    ]);
+    await drainMicrotasks();
+    expect(harness.runtime.selectPresentation("conversation-a")).toBe("none");
+
+    mutationResponse.resolve(idleActivity());
+    await mutation;
+    expect(harness.runtime.selectPresentation("conversation-a")).toBe("none");
+    expect(
+      harness.runtime.getState().byConversationId["conversation-a"]?.canonical,
+    ).toEqual(idleActivity());
+  });
+
+  test("invalidates one inactive transcript when a mutation response settles canonical work", async () => {
+    const request = deferred<ConversationActivity>();
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-a", workingActivity("checking"))],
+      activeConversationId: "conversation-b",
+      patchActivity: () => request.promise,
+    });
+    harness.runtime.start();
+    await drainMicrotasks();
+
+    const mutation = harness.runtime.markUnread("conversation-a");
+    request.resolve(idleActivity("manual_unread", "cursor-terminal"));
+    await mutation;
+    harness.runtime.updateInputs({
+      historyItems: [
+        chat(
+          "conversation-a",
+          idleActivity("manual_unread", "cursor-terminal"),
+        ),
+      ],
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
+    });
+
+    expect(harness.invalidations).toEqual(["conversation-a"]);
+  });
 });
 
 describe("conversation activity account and presentation ownership", () => {
   test("aborts registered transports and ignores late mutation settlement on logout", async () => {
     const request = deferred<ConversationActivity>();
+    let mutationSignal: AbortSignal | null = null;
     const harness = runtimeHarness({
       historyItems: [chat("conversation-a", workingActivity("running"))],
-      patchActivity: () => request.promise,
+      patchActivity: (_conversationId, _patch, options) => {
+        mutationSignal = options.signal;
+        return request.promise;
+      },
     });
     harness.runtime.start();
     const controllerA = new AbortController();
@@ -403,12 +560,33 @@ describe("conversation activity account and presentation ownership", () => {
 
     expect(controllerA.signal.aborted).toBe(true);
     expect(controllerB.signal.aborted).toBe(true);
+    expect(mutationSignal?.aborted).toBe(true);
     expect(harness.runtime.getState().byConversationId).toEqual({});
     expect(harness.effects.hasPoll()).toBe(false);
 
     request.resolve(idleActivity("manual_unread"));
     await mutation;
     expect(harness.notices).toEqual([]);
+  });
+
+  test("uses layout-synchronous active identity before passive inputs settle", async () => {
+    const harness = runtimeHarness({
+      activeConversationId: "conversation-a",
+    });
+    harness.runtime.startRequest(
+      "conversation-a",
+      "request-a",
+      "running",
+      "chat_turn",
+    );
+    await drainMicrotasks();
+
+    harness.runtime.updateActiveConversationId("conversation-b");
+    harness.runtime.settleRequest("conversation-a", "request-a", {
+      invalidateInactiveTranscript: true,
+    });
+
+    expect(harness.invalidations).toEqual(["conversation-a"]);
   });
 
   test("exposes request, guard, aggregate, and announcement accessors", () => {

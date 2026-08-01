@@ -853,10 +853,15 @@ export async function getConversationActivity(conversationId: string) {
 export async function patchConversationActivity(
   conversationId: string,
   patch: ConversationActivityPatch,
+  options: Readonly<{ signal?: AbortSignal }> = {},
 ) {
   return apiFetch<ConversationActivity>(
     `/conversations/${conversationId}/activity`,
-    { method: "PATCH", body: JSON.stringify(patch) },
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      signal: options.signal,
+    },
   );
 }
 

@@ -32,10 +32,10 @@ type RecentConversationsState = {
   loadHistoryPage: (
     nextCursor?: string | null,
     append?: boolean,
-  ) => Promise<void>;
+  ) => Promise<readonly HistoryItem[]>;
   clearHistory: () => void;
   loadMoreHistory: () => void;
-  refreshHistory: () => void;
+  refreshHistory: () => Promise<readonly HistoryItem[]>;
 };
 
 export function useRecentConversations({
@@ -50,7 +50,9 @@ export function useRecentConversations({
     useState(false);
   const [historyLoadMoreError, setHistoryLoadMoreError] = useState(false);
   const paginationInFlightRef = useRef(false);
-  const pageRequestsRef = useRef(new Map<string, Promise<void>>());
+  const pageRequestsRef = useRef(
+    new Map<string, Promise<readonly HistoryItem[]>>(),
+  );
   const firstPageConversationIdsRef = useRef<Set<string>>(new Set());
   const guestExpiresAtRef = useRef(guestExpiresAt);
 
@@ -91,6 +93,7 @@ export function useRecentConversations({
             firstPageConversationIdsRef.current = refresh.nextFirstPageConversationIds;
           }
           setHistoryNextCursor(next_cursor);
+          return projected;
         })
         .finally(() => {
           pageRequestsRef.current.delete(requestKey);
@@ -108,7 +111,7 @@ export function useRecentConversations({
     const refreshRequest = inFlightFirstPage
       ? inFlightFirstPage.then(runRefresh, runRefresh)
       : runRefresh();
-    void refreshRequest.catch(() => undefined);
+    return refreshRequest;
   }, [loadHistoryPage]);
 
   const clearHistory = useCallback(() => {
