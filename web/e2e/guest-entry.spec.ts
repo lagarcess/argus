@@ -430,7 +430,7 @@ for (const entryCase of [
   });
 }
 
-test("@guest-shell private-alpha denial fails closed without guest bootstrap", async ({
+test("@guest-shell private-alpha denial preserves the auth-first request-access fallback", async ({
   page,
 }) => {
   const evidence = await mockGuestJourney(page, {
@@ -449,7 +449,7 @@ test("@guest-shell private-alpha denial fails closed without guest bootstrap", a
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(
-    page.getByRole("button", { name: "Sign up with email" }),
+    page.getByRole("button", { name: "Request access" }),
   ).toBeVisible();
   await expect(page.getByTestId("chat-input")).toHaveCount(0);
   expect(evidence.unauthenticatedProfileProbeCalls).toBeGreaterThanOrEqual(1);
@@ -623,7 +623,7 @@ test("@guest-shell root re-entry restores the one server-owned guest conversatio
   expect(evidence.profilePatches).toEqual([]);
 });
 
-test("@registered-hydration an accepted local turn wins a delayed reload without wedging the composer", async ({
+test("@registered-hydration keeps the composer locked until a delayed reload settles", async ({
   page,
 }) => {
   let releaseHydration!: () => void;
@@ -732,17 +732,17 @@ test("@registered-hydration an accepted local turn wins a delayed reload without
     await messageLoadPending;
     const input = page.getByTestId("chat-input");
     await expect(input).toBeVisible();
+    await expect(input).toBeDisabled();
+    expect(streamPostCount).toBe(0);
+
+    releaseHydration();
+
     await expect(input).toBeEnabled();
     await input.fill("Accepted while reload is pending");
     await input.press("Enter");
     await expect(page.getByText("Local accepted response")).toBeVisible();
     expect(messageLoadCount).toBe(2);
     expect(streamPostCount).toBe(1);
-
-    releaseHydration();
-
-    await expect(page.getByText("Persisted stale turn")).toHaveCount(0);
-    await expect(page.getByText("Persisted stale response")).toHaveCount(0);
     await expect(input).toBeEnabled();
   } finally {
     releaseHydration();
@@ -953,13 +953,15 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
   );
 
   await page.getByRole("button", { name: "Sign in" }).click();
-  const signInDialog = page.getByRole("dialog", { name: "Sign in" });
-  await expect(signInDialog).toBeVisible();
-  await expect(signInDialog).toContainText(
-    "Sign in to keep this conversation and start another.",
+  const requestAccessDialog = page.getByRole("dialog", {
+    name: "Request access to Argus",
+  });
+  await expect(requestAccessDialog).toBeVisible();
+  await expect(requestAccessDialog).toContainText(
+    "Share your email to request access.",
   );
-  await signInDialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(signInDialog).toHaveCount(0);
+  await requestAccessDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(requestAccessDialog).toHaveCount(0);
   await expect(page.getByTestId("guest-temporary-notice")).toHaveCount(1);
   await expect(page).toHaveURL(/\/chat$/);
 
@@ -1012,7 +1014,7 @@ test("@guest-shell capability chrome stays visible and opens typed conversion", 
       "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible.",
     ),
   ).toBeVisible();
-  expect(searchCalls).toBe(0);
+  expect(searchCalls).toBe(1);
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Cerrar búsqueda" }),
@@ -1239,8 +1241,12 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
     "Change the chart range",
   );
   await page.getByRole("button", { name: "Add decision" }).click();
-  const decisionDialog = page.getByRole("dialog", { name: "Sign in" });
-  await expect(decisionDialog).toContainText("Sign in to save this decision.");
+  const decisionDialog = page.getByRole("dialog", {
+    name: "Request access to Argus",
+  });
+  await expect(decisionDialog).toContainText(
+    "Share your email to request access.",
+  );
   await decisionDialog.getByRole("button", { name: "Cancel" }).click();
   await expect(decisionDialog).toHaveCount(0);
   expect(durableHintWrites).toBe(0);
