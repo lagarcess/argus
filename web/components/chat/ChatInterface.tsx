@@ -19,7 +19,9 @@ import ChatSidebar, {
 } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import StarterActions from "@/components/chat/StarterActions";
+import StarterActions, {
+  type StarterSelectionMetadata,
+} from "@/components/chat/StarterActions";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
@@ -30,6 +32,7 @@ import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecyc
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
+import ExpiredGuestSession from "@/components/guest/ExpiredGuestSession";
 import {
   useGuestExperience,
   useGuestSendBridge,
@@ -202,6 +205,29 @@ type View = "chat" | "strategies" | "settings";
 type ProfileState =
   "probing" | "established" | "bootstrap_required" | "expired" | "unavailable";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
+type SendSelection =
+  | ChatMention[]
+  | ChatActionOption
+  | StarterSelectionMetadata;
+type GuestPendingSubmission = {
+  text: string;
+  mentionsOrAction?: SendSelection;
+  actionArg?: ChatActionOption;
+  options?: SendOptions;
+};
+
+function isStarterSelectionMetadata(
+  selection: SendSelection | undefined,
+): selection is StarterSelectionMetadata {
+  return (
+    !Array.isArray(selection) &&
+    typeof selection === "object" &&
+    selection !== null &&
+    "strategy_category" in selection &&
+    !("type" in selection)
+  );
+}
+
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -212,6 +238,8 @@ export default function ChatInterface() {
     ReturnType<typeof getMe>
   > | null>(null);
   const [profileState, setProfileState] = useState<ProfileState>("probing");
+  const [expiredPublicAccountAccessEnabled, setExpiredPublicAccountAccessEnabled] =
+    useState(false);
   const refreshAccount = useCallback(async () => {
     const nextAccount = await getMe();
     setAccount(nextAccount);
@@ -256,6 +284,8 @@ export default function ChatInterface() {
     guestExpiresAt: account?.guest?.expires_at,
   });
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
+  const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
+  const [guestSubmissionError, setGuestSubmissionError] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
@@ -284,6 +314,8 @@ export default function ChatInterface() {
   const activeStreamConversationIdRef = useRef<string | null>(null);
   const hasAcceptedUserInputRef = useRef(false);
   const guestSendRef = useRef<GuestResumeSend | null>(null);
+  const sendAdmissionInFlightRef = useRef(false);
+  const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
   const ordinaryTransportReconciliationAbortRef =
     useRef<AbortController | null>(null);
   const currentViewRef = useRef<View>("chat");
@@ -988,6 +1020,13 @@ export default function ChatInterface() {
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
     onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
+    onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
+      guestSubmissionRetryRef.current = null;
+      setGuestSubmissionError(false);
+      setExpiredPublicAccountAccessEnabled(publicAccountAccessEnabled);
+      setProfileState("expired");
+    },
+    onGuestBootstrapError: () => setGuestSubmissionError(true),
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -1001,7 +1040,6 @@ export default function ChatInterface() {
   });
   const {
     isGuest,
-    isEstablishedGuest,
     canManageConversation,
     canSaveDecision,
     canUseOmnisearch,
@@ -1053,20 +1091,53 @@ export default function ChatInterface() {
 
   const handleSend = async (
     text: string,
-    mentionsOrAction?: ChatMention[] | ChatActionOption,
+    mentionsOrAction?: SendSelection,
     actionArg?: ChatActionOption,
     options?: SendOptions,
   ) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
-    if (isStreamingResponse) return false;
+    if (
+      sendAdmissionInFlightRef.current ||
+      activeStreamConversationIdRef.current ||
+      isStreamingResponse
+    ) {
+      return false;
+    }
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
-    const action = Array.isArray(mentionsOrAction)
+    const starterSelection = isStarterSelectionMetadata(mentionsOrAction)
+      ? mentionsOrAction
+      : undefined;
+    const action: ChatActionOption | undefined = Array.isArray(mentionsOrAction)
       ? actionArg
-      : mentionsOrAction;
+      : starterSelection
+        ? undefined
+        : (mentionsOrAction as ChatActionOption | undefined);
+    const isDeferredGuestSubmission =
+      guestBootstrapRequired && !options?.bypassGuestGate;
+
+    sendAdmissionInFlightRef.current = true;
+    if (isDeferredGuestSubmission) {
+      guestSubmissionRetryRef.current = {
+        text,
+        mentionsOrAction,
+        actionArg,
+        options,
+      };
+      setGuestSubmissionError(false);
+      setGuestSubmissionPending(true);
+    }
+
+    try {
     if (
       !options?.bypassGuestGate &&
-      !(await guestExperience.admitSend({ text: trimmed, mentions, action }))
+      !(await guestExperience.admitSend({
+        text: trimmed,
+        mentions,
+        action,
+        starterSelection,
+        language: i18n.resolvedLanguage ?? i18n.language,
+      }))
     ) {
       return false;
     }
@@ -1181,6 +1252,7 @@ export default function ChatInterface() {
     setStreamStatus(null);
     activeStreamConversationIdRef.current = targetConversationId;
     setIsStreamingResponse(true);
+    guestSubmissionRetryRef.current = null;
 
     const streamInput: string | ChatActionRequest = action?.type
       ? chatActionRequestFromAction(action)
@@ -1708,6 +1780,23 @@ export default function ChatInterface() {
       }
     })();
     return true;
+    } finally {
+      sendAdmissionInFlightRef.current = false;
+      if (isDeferredGuestSubmission) {
+        setGuestSubmissionPending(false);
+      }
+    }
+  };
+
+  const retryGuestSubmission = () => {
+    const pending = guestSubmissionRetryRef.current;
+    if (!pending) return;
+    void handleSend(
+      pending.text,
+      pending.mentionsOrAction,
+      pending.actionArg,
+      pending.options,
+    );
   };
 
   useGuestSendBridge(guestSendRef, handleSend);
@@ -2061,7 +2150,10 @@ export default function ChatInterface() {
   // disables itself while a turn runs; persistent discovery rows have to obey
   // the same lock or they become a way to spam turns around it.
   const turnInFlight =
-    Boolean(streamStatus) || isStreamingResponse || isHydratingConversation;
+    Boolean(streamStatus) ||
+    isStreamingResponse ||
+    isHydratingConversation ||
+    guestSubmissionPending;
   // Next-move rows render under their owning message instead of a floating
   // strip above the composer, but they keep every gate the strip applied:
   // nothing offers a next move mid-turn, or while an active card already owns
@@ -2090,6 +2182,7 @@ export default function ChatInterface() {
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
+    guestSubmissionPending ||
     failedConversationId === conversationId;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
@@ -2123,6 +2216,14 @@ export default function ChatInterface() {
           role="status"
         />
       </div>
+    );
+  }
+
+  if (profileState === "expired") {
+    return (
+      <ExpiredGuestSession
+        publicAccountAccessEnabled={expiredPublicAccountAccessEnabled}
+      />
     );
   }
 
@@ -2312,14 +2413,51 @@ export default function ChatInterface() {
               <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
                 <EmptyChatHeading isGuest={isGuest} />
 
-                <div className="w-full max-w-2xl">
+                <div
+                  aria-busy={guestSubmissionPending}
+                  className="w-full max-w-2xl"
+                >
                   <ChatInput
                     key="new-conversation"
                     onSend={handleSend}
-                    disabled={isStreamingResponse || isHydratingConversation}
+                    disabled={
+                      isStreamingResponse ||
+                      isHydratingConversation ||
+                      guestSubmissionPending
+                    }
                     placeholder={chatInputPlaceholder}
                     onToast={showToast}
                   />
+                  {guestSubmissionPending && (
+                    <div
+                      aria-label={t("guest.entry.sending", "Sending...")}
+                      className="mt-3 flex justify-center"
+                      role="status"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-black/25 border-t-black/70 dark:border-white/25 dark:border-t-white/70"
+                      />
+                      <span className="sr-only">
+                        {t("guest.entry.sending", "Sending...")}
+                      </span>
+                    </div>
+                  )}
+                  {guestSubmissionError && !guestSubmissionPending && (
+                    <div
+                      className="mt-3 flex flex-wrap items-center justify-center gap-2 text-center text-sm text-red-600 dark:text-red-300"
+                      role="alert"
+                    >
+                      <span>{t("guest.entry.error")}</span>
+                      <button
+                        type="button"
+                        className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
+                        onClick={retryGuestSubmission}
+                      >
+                        {t("common.try_again", "Try again")}
+                      </button>
+                    </div>
+                  )}
                   <ChatLegalNotice
                     expiresAt={account?.guest?.expires_at}
                     isGuest={isGuest}
@@ -2328,8 +2466,11 @@ export default function ChatInterface() {
                 </div>
 
                 <StarterActions
-                  disabled={isStreamingResponse || isHydratingConversation}
-                  guestAnalyticsEnabled={isEstablishedGuest}
+                  disabled={
+                    isStreamingResponse ||
+                    isHydratingConversation ||
+                    guestSubmissionPending
+                  }
                   onSelect={handleSend}
                 />
 

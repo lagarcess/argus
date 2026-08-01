@@ -39,9 +39,7 @@ describe("shared starter actions", () => {
     expect(chat).toContain("<StarterActions");
     expect(chat).toContain("onSelect={handleSend}");
     expect(chat).toContain('profileState === "probing"');
-    expect(chat).toContain(
-      "disabled={isStreamingResponse || isHydratingConversation}",
-    );
+    expect(chat).toContain("guestSubmissionPending");
     expect(chat).toContain("hasAcceptedUserInputRef.current = true");
     expect(chat).toContain("cancelled || hasAcceptedUserInputRef.current");
     expect(chat.match(/<StarterActions/g)?.length).toBe(1);
@@ -52,8 +50,11 @@ describe("shared starter actions", () => {
     expect(starter).not.toContain("captureGuestFunnelEvent");
     expect(guestExperience).toContain("startGuestSession");
     expect(`${chat}\n${guestExperience}`).toContain("captureGuestFunnelEvent");
-    expect(guestExperience.indexOf("startGuestSession")).toBeLessThan(
-      guestExperience.indexOf("getUsageAllowances"),
+    const admissionOwner = guestExperience.slice(
+      guestExperience.indexOf("const admitSend"),
+    );
+    expect(admissionOwner.indexOf("startGuestSession")).toBeLessThan(
+      admissionOwner.indexOf("getUsageAllowances"),
     );
   });
 });

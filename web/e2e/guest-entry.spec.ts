@@ -881,7 +881,7 @@ for (const failureCase of [
       await expect(
         page.getByRole("button", { name: localizedCase.retry }),
       ).toBeVisible();
-      await expect(composer).toHaveValue(localizedCase.text);
+      await expect(composer).toHaveText(localizedCase.text);
       expect(evidence.requestOrder).toEqual(failureCase.expectedOrder);
       expect({
         usage: evidence.usageCalls,
@@ -896,7 +896,9 @@ for (const failureCase of [
 test("@guest-shell capability chrome stays visible and opens typed conversion", async ({
   page,
 }) => {
-  const evidence = await mockGuestJourney(page);
+  const evidence = await mockGuestJourney(page, {
+    initiallyAuthenticated: true,
+  });
   let searchCalls = 0;
   page.on("request", (request) => {
     if (new URL(request.url()).pathname.endsWith("/api/v1/search")) {
@@ -1055,7 +1057,7 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await mockGuestJourney(page);
+  await mockGuestJourney(page, { initiallyAuthenticated: true });
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const composer = page.getByTestId("chat-input");
@@ -1144,7 +1146,9 @@ test("@guest-shell mobile keeps composer, legal copy, and 44px controls reachabl
 test("@guest-shell hints require typed artifacts and dismiss locally without writes", async ({
   page,
 }) => {
-  const evidence = await mockGuestJourney(page);
+  const evidence = await mockGuestJourney(page, {
+    initiallyAuthenticated: true,
+  });
   let durableHintWrites = 0;
   page.on("request", (request) => {
     const url = new URL(request.url());

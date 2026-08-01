@@ -11,6 +11,7 @@ import type {
   ChatMention,
   Message,
 } from "@/components/chat/types";
+import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import { useGuestConversion } from "@/components/guest/useGuestConversion";
 import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
 import { getUsageAllowances } from "@/lib/argus-api";
@@ -20,7 +21,10 @@ import {
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
+import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
+import { startGuestSession } from "@/lib/guest-session";
+import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
   newConversationConversionMode,
@@ -60,6 +64,8 @@ type UseGuestExperienceInput = {
   onOpenOmnisearch: () => void;
   onRequestPendingGuestSignIn: () => void;
   onAdoptConversation: (conversationId: string) => void;
+  onGuestBootstrapExpired: (publicAccountAccessEnabled: boolean) => void;
+  onGuestBootstrapError: () => void;
   onGateError: () => void;
   onStartOverError: () => void;
   omnisearchShortcutEnabled: boolean;
@@ -69,6 +75,8 @@ type GuestSendAdmissionInput = {
   text: string;
   mentions: ChatMention[];
   action?: ChatActionOption;
+  starterSelection?: StarterSelectionMetadata;
+  language?: string | null;
 };
 
 export function useGuestExperience({
@@ -85,6 +93,8 @@ export function useGuestExperience({
   onOpenOmnisearch,
   onRequestPendingGuestSignIn,
   onAdoptConversation,
+  onGuestBootstrapExpired,
+  onGuestBootstrapError,
   onGateError,
   onStartOverError,
   omnisearchShortcutEnabled,
@@ -168,9 +178,41 @@ export function useGuestExperience({
   });
 
   const admitSend = useCallback(
-    async ({ text, mentions, action }: GuestSendAdmissionInput) => {
-      if (guestBootstrapRequired) return true;
-      if (!shell.isGuest) return true;
+    async ({
+      text,
+      mentions,
+      action,
+      starterSelection,
+      language,
+    }: GuestSendAdmissionInput) => {
+      let effectiveAccount = account;
+      if (guestBootstrapRequired) {
+        try {
+          const bootstrap = await startGuestSession(language);
+          if (bootstrap.renewed_after_expiry) {
+            onGuestBootstrapExpired(
+              bootstrap.public_account_access_enabled ?? false,
+            );
+            return false;
+          }
+          effectiveAccount = await refreshAccount();
+        } catch {
+          onGuestBootstrapError();
+          return false;
+        }
+      }
+      if (effectiveAccount?.account_kind !== "guest") return true;
+
+      if (starterSelection) {
+        captureGuestFunnelEvent({
+          event: "starter_action_selected",
+          language: normalizeEnabledLanguage(language),
+          surface: "starter_actions",
+          strategy_category: starterSelection.strategy_category,
+          terminal_outcome: "selected",
+        });
+      }
+
       try {
         const usage = await getUsageAllowances();
         if (action?.type === "run_backtest") {
@@ -215,10 +257,13 @@ export function useGuestExperience({
     [
       conversationId,
       conversion,
+      account,
       guestBootstrapRequired,
       messages,
+      onGuestBootstrapError,
+      onGuestBootstrapExpired,
       onGateError,
-      shell.isGuest,
+      refreshAccount,
     ],
   );
 
