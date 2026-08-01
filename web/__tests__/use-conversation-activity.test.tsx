@@ -857,6 +857,7 @@ describe("conversation activity account and presentation ownership", () => {
     harness.runtime.start();
 
     expect(harness.runtime.selectAggregatePresentation()).toBe("needs_input");
+    expect(harness.runtime.selectOperationLabel("conversation-a")).toBeNull();
     expect(harness.runtime.hasEffectiveUnread("conversation-a")).toBe(true);
     expect(harness.runtime.selectAttentionCursor("conversation-a")).toBe("cursor-a");
     expect(harness.runtime.hasManualUnreadGuard("conversation-a")).toBe(true);
@@ -873,6 +874,9 @@ describe("conversation activity account and presentation ownership", () => {
       true,
     );
     expect(harness.runtime.selectAggregatePresentation()).toBe("working");
+    expect(harness.runtime.selectOperationLabel("conversation-a")).toBe(
+      "working",
+    );
 
     const announcement = harness.runtime.getAnnouncement("conversation-a");
     expect(announcement?.presentation).toBe("working");

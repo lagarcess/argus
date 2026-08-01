@@ -10,6 +10,7 @@ import {
   selectConversationAnnouncement,
   selectConversationHasEffectiveUnread,
   selectConversationIsLocked,
+  selectConversationOperationLabel,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
 } from "../lib/conversation-activity-state";
@@ -28,6 +29,34 @@ const activity = (
 });
 
 describe("conversation activity presentation", () => {
+  test("selects the local operation label before canonical queued running or checking truth", () => {
+    let state = createConversationActivityState();
+    for (const [status, expected] of [
+      ["queued", "queued"],
+      ["running", "working"],
+      ["checking", "checking"],
+    ] as const) {
+      state = conversationActivityReducer(state, {
+        type: "server_projection_merged",
+        conversationId: status,
+        activity: activity(status),
+        revision: 1,
+      });
+      expect(selectConversationOperationLabel(state, status)).toBe(expected);
+    }
+
+    state = conversationActivityReducer(state, {
+      type: "request_started",
+      conversationId: "running",
+      requestId: "local-queued",
+      status: "queued",
+      kind: "chat_turn",
+      revision: 2,
+    });
+    expect(selectConversationOperationLabel(state, "running")).toBe("queued");
+    expect(selectConversationOperationLabel(state, "missing")).toBeNull();
+  });
+
   test("selects effective unread independently from working presentation", () => {
     let state = createConversationActivityState();
     const unreadStatuses = [

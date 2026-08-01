@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { createConversationActivityRuntime } from "../components/chat/useConversationActivity";
@@ -16,6 +18,11 @@ import {
   consumeConversationActivityAnnouncement,
   conversationActivityAnnouncementDescriptor,
 } from "../components/chat/ConversationActivityAnnouncement";
+
+const chatInterfaceSource = readFileSync(
+  join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+  "utf-8",
+);
 
 const idleActivity = (): ConversationActivity => ({
   operation: { status: "idle", kind: null, updated_at: null },
@@ -566,6 +573,15 @@ describe("production chat request-session ownership", () => {
 });
 
 describe("active conversation activity announcements", () => {
+  test("wires only the active owned title and typed operation label selector", () => {
+    expect(chatInterfaceSource).toContain(
+      "title={activeTitleRecord ? headerConversationTitle : null}",
+    );
+    expect(chatInterfaceSource).toContain(
+      "selectOperationLabel={conversationActivity.selectOperationLabel}",
+    );
+  });
+
   test("renders one atomic sr-only polite status region", () => {
     const html = renderToStaticMarkup(
       <ConversationActivityLiveRegion
@@ -582,32 +598,86 @@ describe("active conversation activity announcements", () => {
     expect(html).toContain("New activity is ready in Tesla dip idea.");
   });
 
-  test("consumes one localized message per reducer transition key", () => {
+  test("waits for an unloaded conversation title before one correct-title consumption", () => {
     const harness = requestHarness();
     const request = harness.controller.begin("conversation-a", "chat_turn");
     expect(request).not.toBeNull();
+    const transition = harness.runtime.getAnnouncement("conversation-a");
+    expect(transition).not.toBeNull();
 
-    const first = consumeConversationActivityAnnouncement({
+    const beforeTitle = consumeConversationActivityAnnouncement({
       activity: harness.runtime,
       conversationId: "conversation-a",
+      transition: transition!,
+      title: null,
+      translate: (_key, options) => options.defaultValue.replace(
+        "{{title}}",
+        String(options.title),
+      ),
+    });
+    expect(beforeTitle).toBeNull();
+    expect(harness.runtime.getAnnouncement("conversation-a")?.key).toBe(
+      transition?.key,
+    );
+
+    const resolved = consumeConversationActivityAnnouncement({
+      activity: harness.runtime,
+      conversationId: "conversation-a",
+      transition: transition!,
       title: "Tesla dip idea",
       translate: (_key, options) => options.defaultValue.replace(
         "{{title}}",
         String(options.title),
       ),
     });
-    const unchangedPoll = consumeConversationActivityAnnouncement({
-      activity: harness.runtime,
-      conversationId: "conversation-a",
-      title: "Tesla dip idea",
-      translate: (_key, options) => options.defaultValue,
-    });
 
-    expect(first).toMatchObject({
+    expect(resolved).toMatchObject({
       conversationId: "conversation-a",
-      message: "Argus is working in Tesla dip idea.",
+      message: "Argus is working on Tesla dip idea.",
     });
-    expect(unchangedPoll).toBeNull();
+    expect(harness.runtime.getAnnouncement("conversation-a")).toBeNull();
+  });
+
+  test("retains the captured message through a Strict Effects setup cleanup setup replay", () => {
+    const harness = requestHarness();
+    harness.controller.begin("conversation-a", "chat_turn");
+    const captured = harness.runtime.getAnnouncement("conversation-a");
+    expect(captured).not.toBeNull();
+    let logicalAcknowledgments = 0;
+    const unsubscribe = harness.runtime.subscribe(() => {
+      if (harness.runtime.getAnnouncement("conversation-a") === null) {
+        logicalAcknowledgments += 1;
+      }
+    });
+    let mountedMessage: ReturnType<
+      typeof consumeConversationActivityAnnouncement
+    > = null;
+    const strictEffectSetup = () => {
+      mountedMessage = consumeConversationActivityAnnouncement({
+        activity: harness.runtime,
+        conversationId: "conversation-a",
+        transition: captured!,
+        title: "Tesla dip idea",
+        translate: (_key, options) => options.defaultValue.replace(
+          "{{title}}",
+          String(options.title),
+        ),
+      });
+      return () => undefined;
+    };
+
+    strictEffectSetup()();
+    strictEffectSetup();
+    unsubscribe();
+    const html = renderToStaticMarkup(
+      <ConversationActivityLiveRegion
+        announcementKey={mountedMessage?.key ?? "none"}
+        message={mountedMessage?.message ?? ""}
+      />,
+    );
+
+    expect(logicalAcknowledgments).toBe(1);
+    expect(html).toContain("Argus is working on Tesla dip idea.");
   });
 
   test("uses transition-specific copy and leaves optimistic manual unread to its toast", () => {
@@ -615,7 +685,7 @@ describe("active conversation activity announcements", () => {
       conversationActivityAnnouncementDescriptor("new_activity", "Tesla dip idea"),
     ).toEqual({
       key: "chat.activity.announce_new_activity",
-      defaultValue: "New activity is ready in {{title}}.",
+      defaultValue: "{{title}} is ready.",
       title: "Tesla dip idea",
     });
     expect(

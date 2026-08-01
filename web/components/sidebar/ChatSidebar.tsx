@@ -167,7 +167,7 @@ export default function ChatSidebar({
   guestExpiresAt = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
-  const { selectPresentation, selectAggregatePresentation } =
+  const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
     useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -610,12 +610,14 @@ export default function ChatSidebar({
                           ? conversationActivity.isMutationPending(itemConversationId, "mark_read")
                           : conversationActivity.isMutationPending(itemConversationId, "mark_unread");
                         const itemActivityPresentation = selectPresentation(itemConversationId);
+                        const itemOperationLabel = selectOperationLabel(itemConversationId);
                         const displayTitle = conversationDisplayTitle(
                           item,
                           t("chat.new_chat", "New chat"),
                         );
                         const activityLabel = conversationActivityLabelDescriptor(
                           itemActivityPresentation,
+                          itemOperationLabel,
                         );
                         const rowAriaLabel = activityLabel
                           ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`

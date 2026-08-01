@@ -2118,7 +2118,7 @@ export default function ChatInterface() {
   return (
     <ConversationActivityPresentationProvider
       selectPresentation={conversationActivity.selectPresentation}
-      selectAggregatePresentation={conversationActivity.selectAggregatePresentation}
+      selectAggregatePresentation={conversationActivity.selectAggregatePresentation} selectOperationLabel={conversationActivity.selectOperationLabel}
     >
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
       {/* ── Desktop sidebar ── */}
@@ -2299,7 +2299,7 @@ export default function ChatInterface() {
         )}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
-            <ConversationActivityAnnouncement activity={conversationActivity} conversationId={conversationId} title={headerConversationTitle} enabled={!isHydratingConversation} />
+            <ConversationActivityAnnouncement activity={conversationActivity} conversationId={conversationId} title={activeTitleRecord ? headerConversationTitle : null} enabled={!isHydratingConversation} />
             {showEmptyChatSurface ? (
               <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
                 <EmptyChatHeading isGuest={isGuest} />

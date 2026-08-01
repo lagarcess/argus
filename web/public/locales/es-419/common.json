@@ -222,6 +222,8 @@
     "jump_to_latest": "Ir a lo más reciente",
     "activity": {
       "working": "En curso",
+      "queued": "En espera",
+      "checking": "Consultando el estado",
       "needs_attention": "Necesita atención",
       "needs_input": "Necesita tu respuesta",
       "new_activity": "Actividad nueva",
@@ -239,7 +241,7 @@
       "announce_working": "Argus está trabajando en {{title}}.",
       "announce_needs_attention": "{{title}} necesita atención.",
       "announce_needs_input": "{{title}} necesita tu respuesta.",
-      "announce_new_activity": "Hay actividad nueva lista en {{title}}."
+      "announce_new_activity": "{{title}} ya está lista."
     },
     "show_suggestions": "Mostrar sugerencias",
     "hide_suggestions": "Ocultar sugerencias",

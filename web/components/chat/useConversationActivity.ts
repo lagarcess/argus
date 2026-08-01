@@ -26,12 +26,14 @@ import {
   selectConversationHasEffectiveUnread,
   selectConversationIsLocked,
   selectConversationMutationIsPending,
+  selectConversationOperationLabel,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
   type ConversationActivityCausalClock,
   type ConversationActivityHistorySnapshot,
   type ConversationActivityAnnouncement,
   type ConversationActivityPresentation,
+  type ConversationActivityOperationLabel,
   type ConversationActivityState,
 } from "@/lib/conversation-activity-state";
 
@@ -139,6 +141,9 @@ export type ConversationActivityRuntime = Readonly<{
   selectAggregatePresentation: (
     conversationIds?: readonly string[],
   ) => ConversationActivityPresentation;
+  selectOperationLabel: (
+    conversationId: string | null | undefined,
+  ) => ConversationActivityOperationLabel | null;
   hasEffectiveUnread: (
     conversationId: string | null | undefined,
   ) => boolean;
@@ -358,6 +363,11 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       this.state,
       conversationIds ?? Array.from(this.loadedConversationIds),
     );
+
+  selectOperationLabel = (
+    conversationId: string | null | undefined,
+  ): ConversationActivityOperationLabel | null =>
+    selectConversationOperationLabel(this.state, conversationId);
 
   hasEffectiveUnread = (
     conversationId: string | null | undefined,
@@ -863,6 +873,7 @@ export function useConversationActivity(
     state,
     selectPresentation: runtime.selectPresentation,
     selectAggregatePresentation: runtime.selectAggregatePresentation,
+    selectOperationLabel: runtime.selectOperationLabel,
     hasEffectiveUnread: runtime.hasEffectiveUnread,
     selectAttentionCursor: runtime.selectAttentionCursor,
     isConversationLocked: runtime.isConversationLocked,

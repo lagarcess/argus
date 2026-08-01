@@ -48,6 +48,10 @@ describe("chat sidebar activity ownership", () => {
 
     expect(sidebar).toContain("useConversationActivityPresentation");
     expect(sidebar).toContain("selectPresentation(itemConversationId)");
+    expect(sidebar).toContain("selectOperationLabel(itemConversationId)");
+    expect(sidebar).toContain(
+      "conversationActivityLabelDescriptor(\n                          itemActivityPresentation,\n                          itemOperationLabel,",
+    );
     expect(sidebar).toContain("selectAggregatePresentation(loadedConversationIds)");
     expect(sidebar).toContain(
       "activityPresentation={aggregateActivityPresentation}",

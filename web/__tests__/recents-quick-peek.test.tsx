@@ -9,11 +9,18 @@ import {
 import RecentsQuickPeek from "../components/sidebar/RecentsQuickPeek";
 import type { HistoryItem } from "../lib/argus-api";
 import type { ConversationActivityPresentation } from "../lib/conversation-activity-state";
+import type { ConversationActivityOperationLabel } from "../lib/conversation-activity-state";
 
 const presentations: Record<string, ConversationActivityPresentation> = {
-  working: "working",
+  queued: "working",
+  checking: "working",
   unread: "new_activity",
   attention: "needs_attention",
+};
+
+const operationLabels: Record<string, ConversationActivityOperationLabel> = {
+  queued: "queued",
+  checking: "checking",
 };
 
 const items: HistoryItem[] = Object.keys(presentations).map((id) => ({
@@ -41,6 +48,8 @@ describe("RecentsQuickPeek conversation activity", () => {
               new_chat: "Nuevo chat",
               activity: {
                 working: "Trabajando",
+                queued: "En espera",
+                checking: "Consultando el estado",
                 new_activity: "Actividad nueva",
                 needs_attention: "Necesita atención",
               },
@@ -62,10 +71,13 @@ describe("RecentsQuickPeek conversation activity", () => {
             conversationId ? presentations[conversationId] ?? "none" : "none"
           }
           selectAggregatePresentation={() => "working"}
+          selectOperationLabel={(conversationId) =>
+            conversationId ? operationLabels[conversationId] ?? null : null
+          }
         >
           <RecentsQuickPeek
             historyItems={items}
-            activeConversationId="working"
+            activeConversationId="queued"
             onOpenItem={() => undefined}
             onClose={() => undefined}
           />
@@ -74,7 +86,10 @@ describe("RecentsQuickPeek conversation activity", () => {
     );
 
     expect(html).toContain('aria-current="page"');
-    expect(html).toContain('aria-label="working chat. Trabajando."');
+    expect(html).toContain('aria-label="queued chat. En espera."');
+    expect(html).toContain(
+      'aria-label="checking chat. Consultando el estado."',
+    );
     expect(html).toContain('aria-label="unread chat. Actividad nueva."');
     expect(html).toContain('aria-label="attention chat. Necesita atención."');
     expect(html).toContain('data-conversation-activity="working"');

@@ -9,7 +9,10 @@ import {
 import { CircleAlert, CircleHelp, LoaderCircle } from "lucide-react";
 
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
-import type { ConversationActivityPresentation } from "@/lib/conversation-activity-state";
+import type {
+  ConversationActivityOperationLabel,
+  ConversationActivityPresentation,
+} from "@/lib/conversation-activity-state";
 
 type ConversationActivityPresentationContextValue = Readonly<{
   selectPresentation: (
@@ -18,22 +21,27 @@ type ConversationActivityPresentationContextValue = Readonly<{
   selectAggregatePresentation: (
     conversationIds?: readonly string[],
   ) => ConversationActivityPresentation;
+  selectOperationLabel: (
+    conversationId: string | null | undefined,
+  ) => ConversationActivityOperationLabel | null;
 }>;
 
 const ConversationActivityPresentationContext =
   createContext<ConversationActivityPresentationContextValue>({
     selectPresentation: () => "none",
     selectAggregatePresentation: () => "none",
+    selectOperationLabel: () => null,
   });
 
 export function ConversationActivityPresentationProvider({
   children,
   selectPresentation,
   selectAggregatePresentation,
+  selectOperationLabel,
 }: ConversationActivityPresentationContextValue & Readonly<{ children: ReactNode }>) {
   const value = useMemo(
-    () => ({ selectPresentation, selectAggregatePresentation }),
-    [selectAggregatePresentation, selectPresentation],
+    () => ({ selectPresentation, selectAggregatePresentation, selectOperationLabel }),
+    [selectAggregatePresentation, selectOperationLabel, selectPresentation],
   );
 
   return (
@@ -75,10 +83,27 @@ const ACTIVITY_LABELS: Record<
   },
 };
 
+const OPERATION_LABELS: Record<
+  ConversationActivityOperationLabel,
+  ActivityLabelDescriptor
+> = {
+  queued: { key: "chat.activity.queued", defaultValue: "Queued" },
+  working: ACTIVITY_LABELS.working,
+  checking: {
+    key: "chat.activity.checking",
+    defaultValue: "Checking status",
+  },
+};
+
 export const conversationActivityLabelDescriptor = (
   presentation: ConversationActivityPresentation,
+  operationLabel: ConversationActivityOperationLabel | null = null,
 ): ActivityLabelDescriptor | null =>
-  presentation === "none" ? null : ACTIVITY_LABELS[presentation];
+  presentation === "none"
+    ? null
+    : presentation === "working" && operationLabel
+      ? OPERATION_LABELS[operationLabel]
+      : ACTIVITY_LABELS[presentation];
 
 type ConversationActivityIndicatorProps = Readonly<{
   presentation: ConversationActivityPresentation;

@@ -22,9 +22,7 @@ type ActivityTranslation = (
 
 type ActivityAnnouncementOwner = Pick<
   UseConversationActivityResult,
-  | "acknowledgeAnnouncement"
-  | "getAnnouncement"
-  | "selectPresentation"
+  "acknowledgeAnnouncement" | "getAnnouncement" | "selectPresentation"
 >;
 
 type ConsumedActivityAnnouncement = Readonly<{
@@ -39,7 +37,7 @@ const ANNOUNCEMENT_COPY: Record<
 > = {
   working: {
     key: "chat.activity.announce_working",
-    defaultValue: "Argus is working in {{title}}.",
+    defaultValue: "Argus is working on {{title}}.",
   },
   needs_attention: {
     key: "chat.activity.announce_needs_attention",
@@ -51,7 +49,7 @@ const ANNOUNCEMENT_COPY: Record<
   },
   new_activity: {
     key: "chat.activity.announce_new_activity",
-    defaultValue: "New activity is ready in {{title}}.",
+    defaultValue: "{{title}} is ready.",
   },
 };
 
@@ -66,19 +64,20 @@ export const conversationActivityAnnouncementDescriptor = (
 export const consumeConversationActivityAnnouncement = ({
   activity,
   conversationId,
+  transition,
   title,
   translate,
 }: Readonly<{
   activity: Pick<
     ActivityAnnouncementOwner,
-    "acknowledgeAnnouncement" | "getAnnouncement"
+    "acknowledgeAnnouncement"
   >;
   conversationId: string;
-  title: string;
+  transition: ActivityTransition;
+  title: string | null;
   translate: ActivityTranslation;
 }>): ConsumedActivityAnnouncement | null => {
-  const transition = activity.getAnnouncement(conversationId);
-  if (!transition) return null;
+  if (!title) return null;
   const descriptor = conversationActivityAnnouncementDescriptor(
     transition.presentation,
     title,
@@ -117,13 +116,13 @@ export default function ConversationActivityAnnouncement({
 }: Readonly<{
   activity: ActivityAnnouncementOwner;
   conversationId: string | null;
-  title: string;
+  title: string | null;
   enabled?: boolean;
 }>) {
   const { t } = useTranslation();
   const [consumed, setConsumed] =
     useState<ConsumedActivityAnnouncement | null>(null);
-  const transition = enabled
+  const transition = enabled && title
     ? activity.getAnnouncement(conversationId)
     : null;
   const presentation = enabled
@@ -140,6 +139,7 @@ export default function ConversationActivityAnnouncement({
         consumeConversationActivityAnnouncement({
           activity,
           conversationId,
+          transition,
           title,
           translate: t,
         }),

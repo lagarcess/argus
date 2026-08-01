@@ -33,6 +33,11 @@ export type ConversationActivityPresentation =
   | "manual_unread"
   | "none";
 
+export type ConversationActivityOperationLabel =
+  | "queued"
+  | "working"
+  | "checking";
+
 type ActiveOperationStatus = Exclude<ConversationOperationStatus, "idle">;
 
 export type ConversationActivityRequestRecord = {
@@ -161,6 +166,16 @@ const isKnownActiveStatus = (value: unknown): value is ActiveOperationStatus =>
   value === "queued" || value === "running" || value === "checking";
 
 const isKnownIdleStatus = (value: unknown): value is "idle" => value === "idle";
+
+const operationLabelForStatus = (
+  status: unknown,
+): ConversationActivityOperationLabel | null => {
+  if (status === "queued") return "queued";
+  if (status === "running") return "working";
+  if (status === "checking") return "checking";
+  if (status == null || status === "idle") return null;
+  return "checking";
+};
 
 const canonicalOperationIsWorking = (
   activity: ConversationActivity | null,
@@ -491,6 +506,17 @@ export const selectConversationActivityPresentation = (
   conversationId
     ? presentationForRecord(state.byConversationId[conversationId])
     : "none";
+
+export const selectConversationOperationLabel = (
+  state: ConversationActivityState,
+  conversationId: string | null | undefined,
+): ConversationActivityOperationLabel | null => {
+  if (!conversationId) return null;
+  const record = state.byConversationId[conversationId];
+  return operationLabelForStatus(
+    record?.request?.status ?? record?.canonical?.operation.status,
+  );
+};
 
 export const selectConversationHasEffectiveUnread = (
   state: ConversationActivityState,

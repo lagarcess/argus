@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ConversationActivityIndicator } from "../components/chat/ConversationActivityIndicator";
+import {
+  ConversationActivityIndicator,
+  conversationActivityLabelDescriptor,
+} from "../components/chat/ConversationActivityIndicator";
 import type { ConversationActivity } from "../lib/argus-api";
 import {
   conversationActivityReducer,
@@ -40,6 +43,21 @@ const contrastRatio = (foreground: string, background: string): number => {
 };
 
 describe("ConversationActivityIndicator", () => {
+  test("uses typed queued and checking labels while running stays working", () => {
+    expect(conversationActivityLabelDescriptor("working", "queued")).toEqual({
+      key: "chat.activity.queued",
+      defaultValue: "Queued",
+    });
+    expect(conversationActivityLabelDescriptor("working", "checking")).toEqual({
+      key: "chat.activity.checking",
+      defaultValue: "Checking status",
+    });
+    expect(conversationActivityLabelDescriptor("working", "working")).toEqual({
+      key: "chat.activity.working",
+      defaultValue: "Working",
+    });
+  });
+
   test("renders the existing selector's winning state when work covers unread attention", () => {
     const canonical: ConversationActivity = {
       operation: { status: "idle", kind: null, updated_at: null },

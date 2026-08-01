@@ -222,6 +222,8 @@
     "jump_to_latest": "Jump to latest",
     "activity": {
       "working": "Working",
+      "queued": "Queued",
+      "checking": "Checking status",
       "needs_attention": "Needs attention",
       "needs_input": "Needs your input",
       "new_activity": "New activity",
@@ -236,10 +238,10 @@
       "mark_unread_error": "Couldn’t mark this conversation as unread. Try again.",
       "mark_read_success": "Marked as read.",
       "mark_unread_success": "Marked as unread.",
-      "announce_working": "Argus is working in {{title}}.",
+      "announce_working": "Argus is working on {{title}}.",
       "announce_needs_attention": "{{title}} needs attention.",
       "announce_needs_input": "{{title}} needs your input.",
-      "announce_new_activity": "New activity is ready in {{title}}."
+      "announce_new_activity": "{{title}} is ready."
     },
     "show_suggestions": "Show suggestions",
     "hide_suggestions": "Hide suggestions",

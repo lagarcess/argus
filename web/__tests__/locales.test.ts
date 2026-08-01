@@ -145,6 +145,14 @@ const conversationActivityCopy = {
     en: "Working",
     es419: "En curso",
   },
+  "chat.activity.queued": {
+    en: "Queued",
+    es419: "En espera",
+  },
+  "chat.activity.checking": {
+    en: "Checking status",
+    es419: "Consultando el estado",
+  },
   "chat.activity.needs_attention": {
     en: "Needs attention",
     es419: "Necesita atención",
@@ -203,7 +211,7 @@ const conversationActivityCopy = {
     es419: "Marcada como no leída.",
   },
   "chat.activity.announce_working": {
-    en: "Argus is working in {{title}}.",
+    en: "Argus is working on {{title}}.",
     es419: "Argus está trabajando en {{title}}.",
   },
   "chat.activity.announce_needs_attention": {
@@ -215,8 +223,8 @@ const conversationActivityCopy = {
     es419: "{{title}} necesita tu respuesta.",
   },
   "chat.activity.announce_new_activity": {
-    en: "New activity is ready in {{title}}.",
-    es419: "Hay actividad nueva lista en {{title}}.",
+    en: "{{title}} is ready.",
+    es419: "{{title}} ya está lista.",
   },
 } as const;
 

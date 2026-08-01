@@ -31,7 +31,8 @@ export default function RecentsQuickPeek({
   onClose,
 }: RecentsQuickPeekProps) {
   const { t } = useTranslation();
-  const { selectPresentation } = useConversationActivityPresentation();
+  const { selectOperationLabel, selectPresentation } =
+    useConversationActivityPresentation();
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const visibleItems = useMemo(
     () => historyItems.filter((item) => item.type === "chat").slice(0, 9),
@@ -128,8 +129,10 @@ export default function RecentsQuickPeek({
               );
               const itemActivityPresentation =
                 selectPresentation(conversationId);
+              const itemOperationLabel = selectOperationLabel(conversationId);
               const activityLabel = conversationActivityLabelDescriptor(
                 itemActivityPresentation,
+                itemOperationLabel,
               );
               const rowAriaLabel = activityLabel
                 ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
