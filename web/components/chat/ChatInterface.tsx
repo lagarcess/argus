@@ -1149,6 +1149,7 @@ export default function ChatInterface() {
       requestKind,
     );
     if (!initialRequestSession) return false;
+    activityTranscriptReadiness.stageCached(targetConversationId);
     let requestSession: ChatRequestSession = initialRequestSession;
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
@@ -1439,13 +1440,7 @@ export default function ChatInterface() {
             return normalizeDurableRetryActionHistory(nextMessages);
           });
         }
-        promoteVisibleConversationActivityTerminal({
-          conversationId: requestSession.identity.conversationId,
-          identityAuthorized,
-          acceptedTypedFinalArtifact: Boolean(event.data.confirmation || event.data.run || finalBacktestJob || finalText),
-          requestKind: requestSession.kind, activeConversationIdRef, currentViewRef,
-          readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness,
-        });
+        promoteVisibleConversationActivityTerminal({ conversationId: requestSession.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: requestSession.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
       }
       if (event.event === "title") {
         if (
@@ -1702,6 +1697,7 @@ export default function ChatInterface() {
     };
     const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
+    activityTranscriptReadiness.stageCached(targetConversationId);
 
     try {
       setMessages((prev) => markResultCardSaving(prev, runId, true));
@@ -1715,7 +1711,8 @@ export default function ChatInterface() {
             conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
           }
           if (event.event === "final") {
-            if (!requestSessions.authorize(request, "final")) return;
+            const identityAuthorized = requestSessions.authorize(request, "final");
+            if (!identityAuthorized) return;
             const finalPayload = event.data as typeof event.data &
               Record<string, unknown>;
             const savedStrategyId =
@@ -1736,6 +1733,7 @@ export default function ChatInterface() {
             if (requestSessions.authorize(request, "save_cleanup")) {
               setMessages((prev) => markResultCardSaving(prev, runId, false));
             }
+            if (savedStrategyId) promoteVisibleConversationActivityTerminal({ conversationId: request.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: request.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
           }
           if (event.event === "error") {
             if (!requestSessions.authorize(request, "error")) return;
@@ -1832,6 +1830,7 @@ export default function ChatInterface() {
     };
     const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
+    activityTranscriptReadiness.stageCached(targetConversationId);
 
     setStreamStatus(null);
     try {
@@ -1845,13 +1844,15 @@ export default function ChatInterface() {
             conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
           }
           if (event.event === "final") {
-            if (!requestSessions.authorize(request, "cancel")) return;
+            const identityAuthorized = requestSessions.authorize(request, "cancel");
+            if (!identityAuthorized) return;
             setMessages((prev) =>
               applyConfirmationActionEffects(
                 markComposerActionsInactive(prev),
                 [effect],
               ),
             );
+            promoteVisibleConversationActivityTerminal({ conversationId: request.identity.conversationId, identityAuthorized, finalPayload: event.data, requestKind: request.kind, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
           }
           if (event.event === "error") {
             if (!requestSessions.authorize(request, "error")) return;

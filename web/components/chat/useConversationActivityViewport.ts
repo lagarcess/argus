@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
+import type { ChatFinalPayload } from "@/lib/argus-api";
 import type { TranscriptMutation } from "@/lib/chat-transcript-session-cache";
 import type { UseConversationActivityResult } from "./useConversationActivity";
 
@@ -110,10 +111,32 @@ export const conversationActivityMutationRequiresCanonicalHydration = (
   mutation !== "message_send" && mutation !== "retry" &&
   mutation !== "recovery" && mutation !== "conversation_rename";
 
+const hasNonEmptyFinalValue = (value: unknown): boolean =>
+  typeof value === "string" && value.trim().length > 0;
+
+export const chatFinalPayloadOwnsVisibleTerminalArtifact = (
+  payload: ChatFinalPayload,
+): boolean => {
+  const savedStrategyId = (payload as ChatFinalPayload & {
+    saved_strategy_id?: unknown;
+  }).saved_strategy_id;
+  const persistedMessage = hasNonEmptyFinalValue(payload.message_id);
+  return (
+    hasNonEmptyFinalValue(payload.assistant_response) ||
+    hasNonEmptyFinalValue(payload.assistant_prompt) ||
+    payload.confirmation != null ||
+    payload.confirmation_cancelled != null ||
+    payload.run != null ||
+    (persistedMessage && hasNonEmptyFinalValue(payload.stage_outcome)) ||
+    (persistedMessage && payload.recovery != null) ||
+    hasNonEmptyFinalValue(savedStrategyId)
+  );
+};
+
 export const promoteVisibleConversationActivityTerminal = (options: Readonly<{
   conversationId: string;
   identityAuthorized: boolean;
-  acceptedTypedFinalArtifact: boolean;
+  finalPayload: ChatFinalPayload;
   requestKind: "chat_turn" | "backtest_job";
   activeConversationIdRef: { current: string | null };
   currentViewRef: { current: string };
@@ -122,7 +145,7 @@ export const promoteVisibleConversationActivityTerminal = (options: Readonly<{
 }>): boolean => {
   if (
     !options.identityAuthorized ||
-    !options.acceptedTypedFinalArtifact ||
+    !chatFinalPayloadOwnsVisibleTerminalArtifact(options.finalPayload) ||
     options.requestKind !== "chat_turn" ||
     options.currentViewRef.current !== "chat" ||
     options.activeConversationIdRef.current !== options.conversationId

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { createConversationActivityRuntime } from "../components/chat/useConversationActivity";
 import type { ConversationActivity, HistoryItem } from "../lib/argus-api";
+import type { ChatFinalPayload } from "../lib/argus-api";
 import type { ConversationActivityHistorySnapshot } from "../lib/conversation-activity-state";
 import {
   createChatRequestSessionController,
@@ -358,7 +359,7 @@ describe("production chat request-session ownership", () => {
       const promoted = viewport.promoteVisibleConversationActivityTerminal({
         conversationId: request!.identity.conversationId,
         identityAuthorized: harness.controller.authorize(request!, "final"),
-        acceptedTypedFinalArtifact: true,
+        finalPayload: { assistant_response: "Done" },
         requestKind: request!.kind,
         activeConversationIdRef,
         currentViewRef,
@@ -390,7 +391,7 @@ describe("production chat request-session ownership", () => {
     const promoted = viewport.promoteVisibleConversationActivityTerminal({
       conversationId: requestA!.identity.conversationId,
       identityAuthorized: harness.controller.authorize(requestA!, "final"),
-      acceptedTypedFinalArtifact: true,
+      finalPayload: { assistant_response: "Done" },
       requestKind: requestA!.kind,
       activeConversationIdRef: { current: "conversation-b" },
       currentViewRef: { current: "chat" },
@@ -402,5 +403,52 @@ describe("production chat request-session ownership", () => {
     expect(readyTranscriptConversationIdRef.current).toBe("conversation-b");
     expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
     expect(readiness.snapshot("conversation-b").canonicalReady).toBe(true);
+  });
+
+  test("recognizes typed visible final artifacts without accepting whitespace", async () => {
+    const { chatFinalPayloadOwnsVisibleTerminalArtifact } = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    const accepted: ChatFinalPayload[] = [
+      { assistant_response: "Answer" },
+      { assistant_response: "", stage_outcome: "completed", message_id: "message-1" },
+      { confirmation: {} as NonNullable<ChatFinalPayload["confirmation"]> },
+      { confirmation_cancelled: { confirmation_id: "confirmation-1" } },
+      { recovery: { code: "retryable" }, message_id: "message-2" },
+      { saved_strategy_id: "strategy-1" } as ChatFinalPayload,
+    ];
+    for (const payload of accepted) {
+      expect(chatFinalPayloadOwnsVisibleTerminalArtifact(payload)).toBe(true);
+    }
+    for (const payload of [
+      {},
+      { assistant_response: "   " },
+      { stage_outcome: "completed", message_id: "   " },
+      { stage_outcome: "   ", message_id: "message-3" },
+      { backtest_job: {} as NonNullable<ChatFinalPayload["backtest_job"]> },
+    ] satisfies ChatFinalPayload[]) {
+      expect(chatFinalPayloadOwnsVisibleTerminalArtifact(payload)).toBe(false);
+    }
+  });
+
+  test("never promotes a backtest request final before canonical transcript hydration", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    const readyTranscriptConversationIdRef = { current: null as string | null };
+
+    expect(viewport.promoteVisibleConversationActivityTerminal({
+      conversationId: "conversation-a",
+      identityAuthorized: true,
+      finalPayload: { backtest_job: {} as NonNullable<ChatFinalPayload["backtest_job"]> },
+      requestKind: "backtest_job",
+      activeConversationIdRef: { current: "conversation-a" },
+      currentViewRef: { current: "chat" },
+      readyTranscriptConversationIdRef,
+      transcriptReadiness: readiness,
+    })).toBe(false);
+    expect(readyTranscriptConversationIdRef.current).toBeNull();
+    expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
   });
 });
