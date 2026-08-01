@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Eye, EyeClosed } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { blockingErrorBannerClass } from "@/lib/failure-treatment";
 
 export type AuthFormMode = "login" | "signup";
 
@@ -191,10 +192,7 @@ export default function AuthForm({
         )}
 
         {authError && (
-          <p
-            role="alert"
-            className="rounded-[20px] border border-red-500/20 bg-red-500/[0.04] px-5 py-3 text-center text-sm font-medium text-red-600 dark:text-red-300"
-          >
+          <p role="alert" className={blockingErrorBannerClass}>
             {authError}
           </p>
         )}

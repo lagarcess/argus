@@ -14,6 +14,7 @@ import type {
   DecisionState,
   SearchDecisionAction,
 } from "@/lib/run-dossier-contract";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 const DECISION_STATES: readonly DecisionState[] = [
   "watching",
@@ -169,7 +170,7 @@ export function DecisionEditor({
         </p>
       ) : null}
       {error && (
-        <p className="mt-2 text-[12px] text-[#d66d75]" role="alert">
+        <p className={`mt-2 text-[12px] ${inlineFailureTextClass}`} role="alert">
           {t(
             "chat.error_generic",
             "Something went wrong. Please try again.",

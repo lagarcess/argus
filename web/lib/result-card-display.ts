@@ -248,6 +248,7 @@ type EvidenceTone = "positive" | "negative" | "neutral";
 type EvidenceMetric = {
   label: string;
   value: string;
+  unavailable?: boolean;
 };
 
 type HeroEvidence = {
@@ -255,6 +256,7 @@ type HeroEvidence = {
   label: string;
   detail: string;
   tone: EvidenceTone;
+  unavailable?: boolean;
 };
 
 type HeroDeltaEvidenceView = {
@@ -303,14 +305,18 @@ export function heroDeltaEvidenceView(
       label: copy.endingValueLabel,
       detail: heroDetail(parsedEndingValue?.change, totalReturnValue, copy, options?.locale),
       tone,
+      // Unavailable values must read as absent, never as a healthy metric.
+      unavailable: !(parsedEndingValue?.endingDisplay ?? endingValue?.value),
     },
     benchmark: {
       label: benchmarkLabel(benchmarkSymbol, copy),
       value: benchmarkDisplayValue(benchmark, copy),
+      unavailable: !benchmark?.value.trim(),
     },
     worstDrop: {
       label: copy.worstDropLabel,
       value: worstDrop?.value ?? copy.unavailable,
+      unavailable: !worstDrop?.value,
     },
     timeframeDisplay: facts.timeframeDisplay,
     trustGroups: compactTrustGroups(

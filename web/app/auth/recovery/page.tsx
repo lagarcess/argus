@@ -8,6 +8,7 @@ import {
   getAuthSecurityActions,
   type SessionActionResult,
 } from "@/lib/auth-security";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 type RecoveryState = "checking" | "ready" | "invalid" | "saving" | "done";
 
@@ -99,7 +100,7 @@ export default function RecoveryPage() {
 
         {state === "invalid" && (
           <div className="mt-5 space-y-4">
-            <p role="alert" className="text-sm leading-relaxed text-red-600 dark:text-red-300">
+            <p role="alert" className={`text-sm leading-relaxed ${inlineFailureTextClass}`}>
               {error ??
                 t(
                   "auth.recovery.invalid_link",
@@ -141,7 +142,7 @@ export default function RecoveryPage() {
                 className="mt-2 w-full rounded-[18px] border border-black/15 bg-transparent px-4 py-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-black dark:border-white/20 dark:focus-visible:ring-white"
               />
             </label>
-            {error && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{error}</p>}
+            {error && <p role="alert" className={`text-sm ${inlineFailureTextClass}`}>{error}</p>}
             <button
               type="submit"
               disabled={state === "saving"}
@@ -183,7 +184,7 @@ export default function RecoveryPage() {
                 )}
               </p>
             )}
-            {error && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{error}</p>}
+            {error && <p role="alert" className={`text-sm ${inlineFailureTextClass}`}>{error}</p>}
             {result.revocation === "failed" ? (
               <button
                 type="button"

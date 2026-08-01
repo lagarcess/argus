@@ -1213,10 +1213,13 @@ describe("Argus Alpha frontend contract", () => {
       'import { writeClipboardText } from "@/lib/clipboard";',
     );
     expect(message).toContain("await writeClipboardText(text)");
-    expect(message).toContain("onToast?: (message: string) => void");
     expect(message).toContain(
-      'onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"))',
+      'onToast?: (message: string, variant?: "neutral" | "error") => void',
     );
+    expect(message).toContain(
+      't(copied ? "chat.copy_success" : "chat.copy_failed")',
+    );
+    expect(message).toContain('copied ? "neutral" : "error"');
     expect(message).not.toContain("absolute -left-12");
     expect(message).toContain("chat.copy_success");
     expect(message).toContain("chat.copy_failed");
@@ -1226,7 +1229,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain('className="h-28"');
     expect(toast).toContain("absolute inset-x-0 bottom-24");
     expect(toast).toContain("flex justify-center");
-    expect(toast).toContain('role="status"');
+    // Success stays a polite status pill; failures escalate to an alert.
+    expect(toast).toContain('role={isError ? "alert" : "status"}');
+    expect(toast).toContain('aria-live={isError ? "assertive" : "polite"}');
     expect(toast).toContain("dark:bg-[#1f2225]");
     expect(chat).not.toContain("rounded-full bg-black dark:bg-white");
     expect(en).toContain('"copy_success": "Copied"');

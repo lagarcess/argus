@@ -1,7 +1,9 @@
 "use client";
 
+import { MessageSquareWarning } from "lucide-react";
 import { ArgusLogo } from "@/components/ArgusLogo";
 import { useTranslation } from "react-i18next";
+import { panelFailureIconClass } from "@/lib/failure-treatment";
 
 type ConversationRetrievalStateProps =
   | Readonly<{
@@ -40,6 +42,7 @@ export default function ConversationRetrievalState(
         role="alert"
         className="flex min-h-[45vh] flex-col items-center justify-center gap-4 px-6 text-center"
       >
+        <MessageSquareWarning className={panelFailureIconClass} aria-hidden="true" />
         <p className="text-[14px] text-black/55 dark:text-white/55">
           {t(
             "chat.error_open_conversation",

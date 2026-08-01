@@ -41,6 +41,7 @@ import {
 } from "@/lib/chat-recents";
 
 import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -679,7 +680,7 @@ export default function ChatSidebar({
                                   maxLength={80}
                                 />
                                 {renameError && (
-                                  <p className="mt-1 text-[11px] font-medium text-[#d66d75]" role="alert">
+                                  <p className={`mt-1 text-[11px] font-medium ${inlineFailureTextClass}`} role="alert">
                                     {renameError}
                                   </p>
                                 )}
@@ -800,7 +801,7 @@ export default function ChatSidebar({
                   {historyLoadMoreError && (
                     <p
                       role="alert"
-                      className="px-11 text-[12px] leading-relaxed text-[#b84e58] dark:text-[#e38d95]"
+                      className={`px-11 text-[12px] leading-relaxed ${inlineFailureTextClass}`}
                     >
                       {t("chat.history.load_older_error")}
                     </p>

@@ -23,6 +23,13 @@ import {
 } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
+import FailureNotice from "./FailureNotice";
+import {
+  retryableNoticeBodyClass,
+  retryableNoticeContainerClass,
+  retryableNoticeIconClass,
+  retryableNoticeRetryPillClass,
+} from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
@@ -33,7 +40,7 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
-  onToast?: (message: string) => void;
+  onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
@@ -195,7 +202,10 @@ export default function ChatMessage({
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
-    onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"));
+    onToast?.(
+      t(copied ? "chat.copy_success" : "chat.copy_failed"),
+      copied ? "neutral" : "error",
+    );
   };
 
   const getDisplayContent = () => {
@@ -374,13 +384,13 @@ export default function ChatMessage({
             // no normal-answer bubble (issue #249).
             <div
               role="status"
-              className="flex w-full max-w-[min(100%,660px)] items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]"
+              className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
             >
               <MessageSquareWarning
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
+                className={retryableNoticeIconClass}
                 aria-hidden="true"
               />
-              <div className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+              <div className={retryableNoticeBodyClass}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {displayContent}
                 </ReactMarkdown>
@@ -389,12 +399,24 @@ export default function ChatMessage({
                 <button
                   type="button"
                   onClick={() => onAction?.(retryAction)}
-                  className="shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10"
+                  className={retryableNoticeRetryPillClass}
                 >
                   {actionLabel(retryAction)}
                 </button>
               ) : null}
             </div>
+          ) : !isUser &&
+            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
+            // A rejected/inactive action is still a failure statement; it
+            // must not read as an ordinary answer, only quieter than amber.
+            <FailureNotice
+              className="max-w-[min(100%,660px)]"
+              testId="artifact-action-failure-notice"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {displayContent}
+              </ReactMarkdown>
+            </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               {factHeadingLabel && (

@@ -85,6 +85,8 @@ describe("chat discovery panel display", () => {
         bodyKey,
         bodyValues: query ? { query } : undefined,
         busy,
+        // Only the lookup-failed state marks itself, so error ≠ empty.
+        ...(status === "error" ? { failed: true } : {}),
         headerFallback,
         headerKey,
         showBody: itemCount === 0,

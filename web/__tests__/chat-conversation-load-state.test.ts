@@ -18,6 +18,7 @@ describe("chat conversation load state", () => {
       kind: "text",
       contentPresentation: "conversation_load_failure",
       content: "Could not load that conversation. Try again.",
+      assistantRecoveryCode: "conversation_load_failure",
       actions: [
         {
           id: "retry-load-conversation",
