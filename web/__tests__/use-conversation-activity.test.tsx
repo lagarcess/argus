@@ -209,10 +209,26 @@ describe("conversation activity refresh ownership", () => {
     expect(harness.refreshes).toHaveLength(3);
     expect(harness.effects.hasPoll()).toBe(true);
 
-    harness.runtime.settleRequest("conversation-local", "request-local");
+    const controller = new AbortController();
+    harness.runtime.registerTransport(
+      "conversation-local",
+      "request-local",
+      controller,
+    );
+    expect(
+      harness.runtime.finishTransport(
+        "conversation-local",
+        "request-local",
+        controller,
+      ),
+    ).toBe(true);
     await drainMicrotasks();
-    expect(harness.refreshes).toHaveLength(4);
-    expect(harness.effects.hasPoll()).toBe(false);
+    expect(harness.runtime.isRequestCurrent("conversation-local", "request-local")).toBe(
+      true,
+    );
+    expect(harness.runtime.getState().byConversationId["conversation-local"]?.request?.status)
+      .toBe("checking");
+    expect(harness.effects.hasPoll()).toBe(true);
   });
 
   test("does not invent working state or idle polling when cold activity refresh fails", () => {
@@ -288,7 +304,7 @@ describe("conversation activity refresh ownership", () => {
     expect(harness.refreshes).toHaveLength(2);
   });
 
-  test("keeps inactive settlement independent and transport release non-terminal", async () => {
+  test("keeps transport completion checking until strictly newer canonical idle", async () => {
     const harness = runtimeHarness({ activeConversationId: "conversation-b" });
     harness.runtime.start();
     await drainMicrotasks();
@@ -305,26 +321,80 @@ describe("conversation activity refresh ownership", () => {
       "request-current",
       controller,
     );
-    harness.runtime.releaseTransport(
+    expect(harness.runtime.finishTransport(
       "conversation-a",
       "request-current",
       controller,
-    );
+    )).toBe(true);
     expect(controller.signal.aborted).toBe(false);
     expect(harness.invalidations).toEqual([]);
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-current")).toBe(
+      true,
+    );
+    expect(harness.runtime.getState().byConversationId["conversation-a"]?.request?.status)
+      .toBe("checking");
 
-    harness.runtime.settleRequest("conversation-a", "request-stale", {
-      invalidateInactiveTranscript: true,
+    const issuedRevision = harness.runtime.getState()
+      .byConversationId["conversation-a"]?.request?.issuedRevision ?? 0;
+    harness.runtime.updateInputs({
+      historyItems: [chat("conversation-a", idleActivity())],
+      historyActivityRevision: issuedRevision,
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
     });
     expect(harness.runtime.isRequestCurrent("conversation-a", "request-current")).toBe(
       true,
     );
     expect(harness.invalidations).toEqual([]);
 
-    harness.runtime.settleRequest("conversation-a", "request-current", {
-      invalidateInactiveTranscript: true,
+    harness.runtime.updateInputs({
+      historyItems: [chat("conversation-a", workingActivity("running"))],
+      historyActivityRevision: issuedRevision + 1,
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
     });
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-current")).toBe(
+      true,
+    );
+
+    harness.runtime.updateInputs({
+      historyItems: [chat("conversation-a", idleActivity("new_activity", "cursor-done"))],
+      historyActivityRevision: issuedRevision + 2,
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
+    });
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-current")).toBe(
+      false,
+    );
     expect(harness.invalidations).toEqual(["conversation-a"]);
+  });
+
+  test("keeps an inactive Run locked through failed refresh after transport done", async () => {
+    const harness = runtimeHarness({
+      activeConversationId: "conversation-b",
+      refreshHistory: () => Promise.reject(new Error("history delayed")),
+    });
+    harness.runtime.start();
+    harness.runtime.startRequest(
+      "conversation-a",
+      "request-run",
+      "running",
+      "backtest_job",
+    );
+    const controller = new AbortController();
+    harness.runtime.registerTransport("conversation-a", "request-run", controller);
+
+    expect(
+      harness.runtime.finishTransport("conversation-a", "request-run", controller),
+    ).toBe(true);
+    await drainMicrotasks();
+
+    expect(harness.runtime.selectPresentation("conversation-a")).toBe("working");
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-run")).toBe(
+      true,
+    );
+    expect(harness.effects.hasPoll()).toBe(true);
+    expect(harness.invalidations).toEqual([]);
   });
 
   test("coalesces polling, focus, and visibility into one refresh with no idle tail", async () => {
@@ -638,11 +708,7 @@ describe("conversation activity account and presentation ownership", () => {
     harness.runtime.registerTransport("conversation-b", "request-b", controllerB);
     const mutation = harness.runtime.markUnread("conversation-a");
 
-    harness.runtime.updateInputs({
-      historyItems: [],
-      activeConversationId: null,
-      accountScopeKey: null,
-    });
+    expect(harness.runtime.synchronizeAccountScope(null)).toBe(true);
 
     expect(controllerA.signal.aborted).toBe(true);
     expect(controllerB.signal.aborted).toBe(true);
@@ -653,6 +719,23 @@ describe("conversation activity account and presentation ownership", () => {
     request.resolve(idleActivity("manual_unread"));
     await mutation;
     expect(harness.notices).toEqual([]);
+  });
+
+  test("preserves the passive navigation refresh after a layout-synchronous account reset", async () => {
+    const harness = runtimeHarness({ activeConversationId: "conversation-a" });
+    harness.runtime.start();
+    await drainMicrotasks();
+
+    expect(harness.runtime.synchronizeAccountScope("account-b")).toBe(true);
+    harness.runtime.updateActiveConversationId("conversation-b");
+    harness.runtime.updateInputs({
+      historyItems: [],
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-b",
+    });
+    await drainMicrotasks();
+
+    expect(harness.refreshes).toHaveLength(2);
   });
 
   test("uses layout-synchronous active identity before passive inputs settle", async () => {
@@ -668,11 +751,12 @@ describe("conversation activity account and presentation ownership", () => {
     await drainMicrotasks();
 
     harness.runtime.updateActiveConversationId("conversation-b");
-    harness.runtime.settleRequest("conversation-a", "request-a", {
-      invalidateInactiveTranscript: true,
-    });
+    const controller = new AbortController();
+    harness.runtime.registerTransport("conversation-a", "request-a", controller);
+    harness.runtime.finishTransport("conversation-a", "request-a", controller);
 
-    expect(harness.invalidations).toEqual(["conversation-a"]);
+    expect(harness.invalidations).toEqual([]);
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-a")).toBe(true);
   });
 
   test("exposes request, guard, aggregate, and announcement accessors", () => {

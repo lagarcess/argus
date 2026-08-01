@@ -48,7 +48,6 @@ import { inlineFailureTextClass } from "@/lib/failure-treatment";
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
 type View = "chat" | "strategies" | "settings";
-const EMPTY_ATTENTION_IDS = new Set<string>();
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
@@ -70,8 +69,6 @@ export type ChatSidebarProps = {
   onToggleRecents: () => void;
   /** History items for the Recents list */
   historyItems: HistoryItem[];
-  /** Session-local conversations with completed Argus turns the user has not opened yet */
-  attentionConversationIds?: ReadonlySet<string>;
   /** Whether more history pages are available */
   historyNextCursor: string | null;
   /** Whether a history page load is in progress */
@@ -126,7 +123,6 @@ export default function ChatSidebar({
   isRecentsExpanded,
   onToggleRecents,
   historyItems,
-  attentionConversationIds = EMPTY_ATTENTION_IDS,
   historyNextCursor,
   isLoadingMoreHistory,
   hasRequestedOlderHistory,
@@ -583,16 +579,10 @@ export default function ChatSidebar({
                         {visibleItems.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
-                        const hasConversationAttention =
-                          !isActiveConversation && attentionConversationIds.has(itemConversationId);
-                        const attentionLabel = t("chat.history.new_activity", "New activity");
                         const displayTitle = conversationDisplayTitle(
                           item,
                           t("chat.new_chat", "New chat"),
                         );
-                        const rowAriaLabel = hasConversationAttention
-                          ? `${displayTitle}. ${attentionLabel}.`
-                          : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
                         const expiresAt = item.expires_at ?? guestExpiresAt;
@@ -616,10 +606,9 @@ export default function ChatSidebar({
                             key={`chat:${item.id}`}
                             role="button"
                             tabIndex={0}
-                            aria-label={rowAriaLabel}
+                            aria-label={displayTitle}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
-                            data-has-attention={hasConversationAttention ? "true" : undefined}
                             data-conversation-id={itemConversationId}
                             onClick={(e) => {
                               // Only navigate if click was on this element or its text children,
@@ -643,15 +632,6 @@ export default function ChatSidebar({
                               isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
-                          {hasConversationAttention && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute left-4 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[#f4f4f4] bg-[#70a38d] dark:border-[#191c1f] dark:bg-[#9bc6b4]"
-                            />
-                          )}
-                          {hasConversationAttention && (
-                            <span className="sr-only">{attentionLabel}</span>
-                          )}
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center"></div>
                           <div
                             className={`min-w-0 flex-1 pl-3 ${
@@ -693,11 +673,7 @@ export default function ChatSidebar({
                                 >
                                   {displayTitle}
                                 </span>
-                                <span className={`mt-0.5 block truncate text-[12px] ${
-                                  hasConversationAttention
-                                    ? "text-black/60 dark:text-white/60"
-                                    : "text-black/40 dark:text-white/40"
-                                }`}>
+                                <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
                                   {item.subtitle}
                                 </span>
                                 {isGuest && expiresAt ? (

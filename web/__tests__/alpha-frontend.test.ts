@@ -650,7 +650,7 @@ describe("Argus Alpha frontend contract", () => {
       chat.indexOf("const turnInFlight ="),
       chat.indexOf("const nextMovesEnabled ="),
     );
-    expect(inFlight).toContain("streamStatus");
+    expect(inFlight).toContain("visibleStreamStatus");
     expect(inFlight).toContain("isStreamingResponse");
     expect(inFlight).toContain("isHydratingConversation");
     const gate = chat.slice(
@@ -1002,7 +1002,7 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("latestAssistantContent");
     expect(chat).toMatch(
-      /const showStreamStatus = Boolean\s*\(\s*streamStatus && latestAssistantContent\.length === 0,?\s*\)/,
+      /const showStreamStatus = Boolean\s*\(\s*visibleStreamStatus && latestAssistantContent\.length === 0,?\s*\)/,
     );
     expect(chat).toContain("{showStreamStatus && (");
   });
@@ -1032,14 +1032,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
     expect(chat).toContain(
-      'canApplyConversationRequestUpdate(identity, "request")',
+      "createChatRequestSessionController",
     );
     expect(chat).toContain(
-      "conversationActivity.settleRequest(identity.conversationId, identity.requestId)",
+      'requestSessions.authorize(requestSession, "final")',
     );
     expect(chat).toContain(
-      "if (event.data.conversation_id !== requestIdentity.conversationId) return;",
+      'requestSessions.authorize(\n            requestSession,\n            "title",',
     );
+    expect(chat).toContain("finishRequestTransport(requestSession)");
+    expect(chat).not.toContain("conversationActivity.settleRequest");
     expect(chat).not.toContain("setIsStreamingResponse(false);");
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
@@ -2201,15 +2203,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(viewHelpers).toContain("9000");
     expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
-      "schedulePostTurnHistoryRefresh(identity.conversationId);",
+      "session.identity.conversationId,",
     );
-    const settleRequestStart = chat.indexOf("function settleConversationRequest");
-    const settleRequestEnd = chat.indexOf("useEffect(", settleRequestStart);
-    const settleRequest = chat.slice(settleRequestStart, settleRequestEnd);
-    expect(settleRequest).toContain(
-      "conversationActivity.releaseTransport(identity.conversationId, identity.requestId, controller)",
+    const finishTransportStart = chat.indexOf("function finishRequestTransport");
+    const finishTransportEnd = chat.indexOf("useEffect(", finishTransportStart);
+    const finishTransport = chat.slice(finishTransportStart, finishTransportEnd);
+    expect(finishTransport).toContain(
+      "requestSessions.finishTransport(session)",
     );
-    expect(settleRequest).not.toContain("window.clearTimeout");
+    expect(finishTransport).toContain("requestSessions.isAccountCurrent(session)");
+    expect(finishTransport).not.toContain("request_settled");
     expect(chat).toContain("Title/sidebar refresh is fail-open");
     expect(chat).toContain(
       "void refreshAndCheckTitle().catch(() => undefined);",

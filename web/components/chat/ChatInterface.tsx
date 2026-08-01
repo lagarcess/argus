@@ -85,9 +85,7 @@ import {
   isCurrentAnchoredConversationRequest,
   readActiveConversationRouteState,
   rememberActiveConversationId,
-  shouldApplyConversationRequestUpdate,
   shouldApplyConversationOwnedUpdate,
-  shouldApplyConversationScopedUpdate,
   shouldStartConversationForVisibleEmptyChat,
   targetConversationIdForSend,
 } from "@/lib/chat-conversation-routing";
@@ -144,6 +142,11 @@ import {
 } from "@/lib/chat-run-reconciliation";
 import { isConfirmationAction } from "@/lib/chat-action-ownership";
 import { createConversationActivityCausalClock } from "@/lib/conversation-activity-state";
+import {
+  createChatRequestSessionController,
+  type ChatRequestSession,
+  visibleRequestStatus,
+} from "@/lib/chat-request-session";
 import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
 import {
   TranscriptSessionCache,
@@ -198,7 +201,6 @@ import {
 
 type View = "chat" | "strategies" | "settings";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
-type ConversationRequestIdentity = Readonly<{ conversationId: string; requestId: string }>;
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -332,8 +334,23 @@ export default function ChatInterface() {
     onMutationNotice: () => undefined,
     causalClock: activityCausalClock,
   });
+  const [requestSessions] = useState(() =>
+    createChatRequestSessionController({
+      activity: conversationActivity,
+      accountScopeKey: account?.user.id ?? null,
+      routeContext: {
+        activeConversationId: conversationId,
+        currentView,
+        routeState: readActiveConversationRouteState(),
+      },
+    }),
+  );
   const isStreamingResponse =
     conversationActivity.isConversationLocked(conversationId);
+  const visibleStreamStatus = visibleRequestStatus(
+    streamStatus,
+    isStreamingResponse,
+  );
   const handleDurableJobCompletion = useCallback(
     (targetConversationId: string) => {
       invalidateTranscriptForMutation(
@@ -371,6 +388,15 @@ export default function ChatInterface() {
     setFailedConversationId(null);
     setIsHydratingConversation(false);
   }, [clearColdTranscriptRetrieval, transcriptSessionCache]);
+
+  useLayoutEffect(() => {
+    requestSessions.synchronizeAccountScope(account?.user.id ?? null);
+    requestSessions.updateRouteContext({
+      activeConversationId: conversationId,
+      currentView,
+      routeState: readActiveConversationRouteState(),
+    });
+  }, [account?.user.id, conversationId, currentView, requestSessions]);
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
@@ -424,11 +450,12 @@ export default function ChatInterface() {
 
   function schedulePostTurnHistoryRefresh(
     targetConversationId?: string | null,
+    isAccountCurrent: () => boolean = () => true,
   ) {
     let settled = false;
 
     const refreshAndCheckTitle = async () => {
-      if (settled) return;
+      if (settled || !isAccountCurrent()) return;
       try {
         await loadHistoryPage(null, false);
         if (!targetConversationId) return;
@@ -456,38 +483,12 @@ export default function ChatInterface() {
     }
   }
 
-  function canApplyConversationRequestUpdate(
-    identity: ConversationRequestIdentity,
-    scope: "request" | "visible",
-  ) {
-    return shouldApplyConversationRequestUpdate({
-      targetConversationId: identity.conversationId,
-      requestId: identity.requestId,
-      currentRequestId: conversationActivity.isRequestCurrent(
-        identity.conversationId,
-        identity.requestId,
-      ) ? identity.requestId : null,
-      scope,
-      activeConversationId: activeConversationIdRef.current,
-      currentView: currentViewRef.current,
-      routeState: readActiveConversationRouteState(),
-    });
-  }
-
-  function settleConversationRequest(
-    identity: ConversationRequestIdentity,
-    controller: AbortController,
-  ) {
-    if (!canApplyConversationRequestUpdate(identity, "request")) return false;
-    if (canApplyConversationRequestUpdate(identity, "visible")) {
-      setStreamStatus(null);
-    }
-    conversationActivity.releaseTransport(identity.conversationId, identity.requestId, controller);
-    conversationActivity.settleRequest(identity.conversationId, identity.requestId);
-    if (currentViewRef.current !== "chat" || identity.conversationId !== activeConversationIdRef.current) {
-      invalidateInactiveActivityTranscript(identity.conversationId);
-    }
-    schedulePostTurnHistoryRefresh(identity.conversationId);
+  function finishRequestTransport(session: ChatRequestSession) {
+    if (!requestSessions.finishTransport(session)) return false;
+    schedulePostTurnHistoryRefresh(
+      session.identity.conversationId,
+      () => requestSessions.isAccountCurrent(session),
+    );
     return true;
   }
   useEffect(
@@ -1136,19 +1137,14 @@ export default function ChatInterface() {
     const streamInput: string | ChatActionRequest = action?.type
       ? chatActionRequestFromAction(action)
       : trimmed;
-    let activeStreamTargetConversationId = targetConversationId;
-    let requestIdentity: ConversationRequestIdentity = {
-      conversationId: targetConversationId, requestId: crypto.randomUUID(),
-    };
-    const requestController = new AbortController();
     const requestKind =
       action?.type === "run_backtest" ? "backtest_job" : "chat_turn";
-    conversationActivity.startRequest(
-      requestIdentity.conversationId, requestIdentity.requestId, "queued", requestKind,
+    const initialRequestSession = requestSessions.begin(
+      targetConversationId,
+      requestKind,
     );
-    conversationActivity.registerTransport(
-      requestIdentity.conversationId, requestIdentity.requestId, requestController,
-    );
+    if (!initialRequestSession) return false;
+    let requestSession: ChatRequestSession = initialRequestSession;
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
         ? null
@@ -1157,18 +1153,16 @@ export default function ChatInterface() {
           );
 
     const canApplyVisibleStreamUpdate = () =>
-      canApplyConversationRequestUpdate(requestIdentity, "visible");
-    const canApplyOwnedStreamUpdate = () =>
-      canApplyConversationRequestUpdate(requestIdentity, "request");
-    const clearActiveStreamState = () =>
-      settleConversationRequest(requestIdentity, requestController);
+      requestSessions.canWriteVisible(requestSession);
     const handleStreamEvent = (event: ChatStreamEvent) => {
-      if (!canApplyOwnedStreamUpdate()) return;
-      throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
-      const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
       if (event.event === "stage_start") {
-        conversationActivity.progressRequest(requestIdentity.conversationId, requestIdentity.requestId, "running");
-        if (!canApplyVisibleUpdate) return;
+        if (!requestSessions.authorize(requestSession, "stage")) return;
+        conversationActivity.progressRequest(
+          requestSession.identity.conversationId,
+          requestSession.identity.requestId,
+          "running",
+        );
+        if (!canApplyVisibleStreamUpdate()) return;
         const stageKey = `chat.status.${event.data.stage}`;
         const detail = event.data.detail;
         setStreamStatus(
@@ -1177,7 +1171,7 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "token") {
-        if (!canApplyVisibleUpdate) return;
+        if (!requestSessions.authorize(requestSession, "token")) return;
         setStreamStatus(null);
         setMessages((prev) =>
           prev.map((m) =>
@@ -1188,8 +1182,10 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
-        if (!canApplyVisibleUpdate) {
-          clearActiveStreamState();
+        if (!requestSessions.authorize(requestSession, "error")) return;
+        throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
+        if (!canApplyVisibleStreamUpdate()) {
+          finishRequestTransport(requestSession);
           return;
         }
         const errorPayload = event.data as typeof event.data &
@@ -1248,10 +1244,10 @@ export default function ChatInterface() {
             ),
           ),
         );
-        clearActiveStreamState();
+        finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
-        if (!canApplyVisibleUpdate) return;
+        if (!requestSessions.authorize(requestSession, "final")) return;
         setStreamStatus(null);
         const finalPayload = event.data as typeof event.data &
           Record<string, unknown>;
@@ -1439,38 +1435,33 @@ export default function ChatInterface() {
         }
       }
       if (event.event === "title") {
-        if (event.data.conversation_id !== requestIdentity.conversationId) return;
+        if (
+          !requestSessions.authorize(
+            requestSession,
+            "title",
+            event.data.conversation_id,
+          )
+        ) return;
         setHistoryItems((prev) =>
           prev.map((item) =>
-            item.id === requestIdentity.conversationId
+            item.id === requestSession.identity.conversationId
               ? { ...item, title: event.data.title }
               : item,
           ),
         );
       }
       if (event.event === "done") {
-        clearActiveStreamState();
+        if (!requestSessions.authorize(requestSession, "done")) return;
+        finishRequestTransport(requestSession);
       }
     };
     const moveRequestToConversation = (nextConversationId: string) => {
-      if (!canApplyOwnedStreamUpdate()) return false;
-      const previousIdentity = requestIdentity;
-      conversationActivity.releaseTransport(
-        previousIdentity.conversationId, previousIdentity.requestId, requestController,
+      const transferred = requestSessions.transfer(
+        requestSession,
+        nextConversationId,
       );
-      conversationActivity.settleRequest(
-        previousIdentity.conversationId, previousIdentity.requestId,
-      );
-      requestIdentity = {
-        conversationId: nextConversationId, requestId: previousIdentity.requestId,
-      };
-      activeStreamTargetConversationId = nextConversationId;
-      conversationActivity.startRequest(
-        requestIdentity.conversationId, requestIdentity.requestId, "queued", requestKind,
-      );
-      conversationActivity.registerTransport(
-        requestIdentity.conversationId, requestIdentity.requestId, requestController,
-      );
+      if (!transferred) return false;
+      requestSession = transferred;
       return true;
     };
     const streamToConversation = async (nextTargetConversationId: string) => {
@@ -1491,8 +1482,8 @@ export default function ChatInterface() {
           ? []
           : mentions,
         {
-          requestId: requestIdentity.requestId,
-          signal: requestController.signal,
+          requestId: requestSession.identity.requestId,
+          signal: requestSession.controller.signal,
         },
       );
       throwIfAmbiguousRunStreamTermination(
@@ -1505,7 +1496,7 @@ export default function ChatInterface() {
       try {
         await streamToConversation(targetConversationId);
       } catch (err: unknown) {
-        if (!canApplyOwnedStreamUpdate()) return;
+        if (!requestSessions.authorize(requestSession, "catch")) return;
         if (
           err instanceof ChatStreamError &&
           err.status === 404 &&
@@ -1531,38 +1522,46 @@ export default function ChatInterface() {
           action?.type !== "run_backtest" &&
           (!(err instanceof ChatStreamError) || err.status === 0);
         if (isOrdinaryTransportAmbiguity) {
-          conversationActivity.progressRequest(requestIdentity.conversationId, requestIdentity.requestId, "checking");
+          if (!requestSessions.authorize(requestSession, "ambiguity")) return;
+          conversationActivity.progressRequest(
+            requestSession.identity.conversationId,
+            requestSession.identity.requestId,
+            "checking",
+          );
           if (canApplyVisibleStreamUpdate()) {
             setStreamStatus(t("chat.status.checking"));
           }
           const view = await resolveOrdinaryTransportAmbiguityView(
             async () =>
-              loadAllConversationMessagePages(requestIdentity.conversationId),
+              loadAllConversationMessagePages(requestSession.identity.conversationId),
             hydrateMessagesFromApi,
             {
               assistantId,
               message: conversationLoadFailureMessage(
-                requestIdentity.conversationId,
+                requestSession.identity.conversationId,
                 t("chat.error_load"),
               ),
             },
             ordinaryTransportMessageIds,
             err instanceof ChatStreamError ? err.requestId : null,
-            { signal: requestController.signal },
+            { signal: requestSession.controller.signal },
           );
-          if (canApplyOwnedStreamUpdate()) {
+          if (requestSessions.authorize(requestSession, "ambiguity")) {
             if (canApplyVisibleStreamUpdate()) {
               setMessages(view.messages);
             }
-            if (!view.showChecking) {
-              clearActiveStreamState();
-            }
+            finishRequestTransport(requestSession);
           }
           return;
         }
         const confirmationId = ambiguousRunConfirmationId(action, err);
         if (confirmationId) {
-          conversationActivity.progressRequest(requestIdentity.conversationId, requestIdentity.requestId, "checking");
+          if (!requestSessions.authorize(requestSession, "run_replay")) return;
+          conversationActivity.progressRequest(
+            requestSession.identity.conversationId,
+            requestSession.identity.requestId,
+            "checking",
+          );
           if (canApplyVisibleStreamUpdate()) {
             setStreamStatus(t("chat.status.checking"));
             setMessages((prev) =>
@@ -1574,9 +1573,9 @@ export default function ChatInterface() {
           const reconciliation = await reconcileAmbiguousRunResponse({
             lookup: () => getBacktestJobByAction(confirmationId),
             replay: () =>
-              streamToConversation(activeStreamTargetConversationId),
+              streamToConversation(requestSession.identity.conversationId),
           });
-          if (!canApplyOwnedStreamUpdate()) return;
+          if (!requestSessions.authorize(requestSession, "run_replay")) return;
           if (reconciliation.kind === "replayed") return;
           if (reconciliation.kind === "durable") {
             if (canApplyVisibleStreamUpdate()) {
@@ -1592,7 +1591,7 @@ export default function ChatInterface() {
                 ),
               );
             }
-            clearActiveStreamState();
+            finishRequestTransport(requestSession);
             return;
           }
           if (reconciliation.kind === "recoverable") {
@@ -1601,12 +1600,12 @@ export default function ChatInterface() {
                 applyRecoverableRunReconciliation(
                   prev,
                   assistantId,
-                  requestIdentity.conversationId,
+                  requestSession.identity.conversationId,
                   reconciliation.error,
                 ),
               );
             }
-            clearActiveStreamState();
+            finishRequestTransport(requestSession);
             return;
           }
         }
@@ -1649,7 +1648,7 @@ export default function ChatInterface() {
             ),
           );
         }
-        clearActiveStreamState();
+        finishRequestTransport(requestSession);
       }
     })();
     return true;
@@ -1657,24 +1656,6 @@ export default function ChatInterface() {
 
   useGuestSendBridge(guestSendRef, handleSend);
   // ── Action routing ─────────────────────────────────────────────────────────
-
-  function beginConversationRequest(
-    targetConversationId: string,
-    kind: "chat_turn" | "backtest_job" = "chat_turn",
-  ): Readonly<{ identity: ConversationRequestIdentity; controller: AbortController }> | null {
-    if (conversationActivity.isConversationLocked(targetConversationId)) {
-      return null;
-    }
-    const identity = { conversationId: targetConversationId, requestId: crypto.randomUUID() };
-    const controller = new AbortController();
-    conversationActivity.startRequest(
-      identity.conversationId, identity.requestId, "queued", kind,
-    );
-    conversationActivity.registerTransport(
-      identity.conversationId, identity.requestId, controller,
-    );
-    return { identity, controller };
-  }
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
     const routeState = readActiveConversationRouteState();
@@ -1705,10 +1686,8 @@ export default function ChatInterface() {
       payload: action.payload,
       presentation: action.presentation,
     };
-    const request = beginConversationRequest(targetConversationId);
+    const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
-    const canApplyRequest = (scope: "request" | "visible") =>
-      canApplyConversationRequestUpdate(request.identity, scope);
 
     try {
       setMessages((prev) => markResultCardSaving(prev, runId, true));
@@ -1717,12 +1696,12 @@ export default function ChatInterface() {
         streamInput,
         i18n.language,
         (event) => {
-          if (!canApplyRequest("request")) return;
           if (event.event === "stage_start") {
+            if (!requestSessions.authorize(request, "stage")) return;
             conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
           }
           if (event.event === "final") {
-            if (!canApplyRequest("visible")) return;
+            if (!requestSessions.authorize(request, "final")) return;
             const finalPayload = event.data as typeof event.data &
               Record<string, unknown>;
             const savedStrategyId =
@@ -1740,18 +1719,27 @@ export default function ChatInterface() {
             } else if (event.data.assistant_response) {
               showToast(event.data.assistant_response);
             }
+            if (requestSessions.authorize(request, "save_cleanup")) {
+              setMessages((prev) => markResultCardSaving(prev, runId, false));
+            }
           }
           if (event.event === "error") {
-            if (canApplyRequest("visible")) {
+            if (!requestSessions.authorize(request, "error")) return;
+            if (requestSessions.canWriteVisible(request)) {
               showToast(
                 chatStreamErrorText(event.data.detail, t("chat.error_generic")),
                 "error",
               );
+              setMessages((prev) => markResultCardSaving(prev, runId, false));
             }
-            settleConversationRequest(request.identity, request.controller);
+            finishRequestTransport(request);
           }
           if (event.event === "done") {
-            settleConversationRequest(request.identity, request.controller);
+            if (!requestSessions.authorize(request, "done")) return;
+            if (requestSessions.authorize(request, "save_cleanup")) {
+              setMessages((prev) => markResultCardSaving(prev, runId, false));
+            }
+            finishRequestTransport(request);
           }
         },
         [],
@@ -1761,24 +1749,16 @@ export default function ChatInterface() {
         },
       );
     } catch (err: unknown) {
-      if (!canApplyRequest("request")) return;
+      if (!requestSessions.authorize(request, "catch")) return;
       const message =
         err instanceof ChatStreamError && err.message
           ? err.message
           : t("chat.error_generic");
-      if (canApplyRequest("visible")) showToast(message, "error");
-      settleConversationRequest(request.identity, request.controller);
-    } finally {
-      if (
-        shouldApplyConversationScopedUpdate({
-          targetConversationId,
-          activeConversationId: activeConversationIdRef.current,
-          currentView: currentViewRef.current,
-          routeState: readActiveConversationRouteState(),
-        })
-      ) {
+      if (requestSessions.authorize(request, "save_cleanup")) {
+        showToast(message, "error");
         setMessages((prev) => markResultCardSaving(prev, runId, false));
       }
+      finishRequestTransport(request);
     }
   };
 
@@ -1795,6 +1775,8 @@ export default function ChatInterface() {
         );
         return;
       }
+      requestSessions.synchronizeAccountScope(null);
+      setAccount(null);
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
       clearHistory();
@@ -1833,10 +1815,8 @@ export default function ChatInterface() {
       payload: action.payload,
       presentation: action.presentation,
     };
-    const request = beginConversationRequest(targetConversationId);
+    const request = requestSessions.begin(targetConversationId, "chat_turn");
     if (!request) return;
-    const canApplyRequest = (scope: "request" | "visible") =>
-      canApplyConversationRequestUpdate(request.identity, scope);
 
     setStreamStatus(null);
     try {
@@ -1845,12 +1825,12 @@ export default function ChatInterface() {
         streamInput,
         i18n.language,
         (event) => {
-          if (!canApplyRequest("request")) return;
           if (event.event === "stage_start") {
+            if (!requestSessions.authorize(request, "stage")) return;
             conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
           }
           if (event.event === "final") {
-            if (!canApplyRequest("visible")) return;
+            if (!requestSessions.authorize(request, "cancel")) return;
             setMessages((prev) =>
               applyConfirmationActionEffects(
                 markComposerActionsInactive(prev),
@@ -1859,16 +1839,18 @@ export default function ChatInterface() {
             );
           }
           if (event.event === "error") {
-            if (canApplyRequest("visible")) {
+            if (!requestSessions.authorize(request, "error")) return;
+            if (requestSessions.canWriteVisible(request)) {
               showToast(
                 chatStreamErrorText(event.data.detail, t("chat.error_generic")),
                 "error",
               );
             }
-            settleConversationRequest(request.identity, request.controller);
+            finishRequestTransport(request);
           }
           if (event.event === "done") {
-            settleConversationRequest(request.identity, request.controller);
+            if (!requestSessions.authorize(request, "done")) return;
+            finishRequestTransport(request);
           }
         },
         [],
@@ -1878,13 +1860,13 @@ export default function ChatInterface() {
         },
       );
     } catch (err: unknown) {
-      if (!canApplyRequest("request")) return;
+      if (!requestSessions.authorize(request, "catch")) return;
       const message =
         err instanceof ChatStreamError && err.message
           ? err.message
           : t("chat.error_generic");
-      if (canApplyRequest("visible")) showToast(message, "error");
-      settleConversationRequest(request.identity, request.controller);
+      if (requestSessions.canWriteVisible(request)) showToast(message, "error");
+      finishRequestTransport(request);
     }
   };
 
@@ -2059,7 +2041,7 @@ export default function ChatInterface() {
   // disables itself while a turn runs; persistent discovery rows have to obey
   // the same lock or they become a way to spam turns around it.
   const turnInFlight =
-    Boolean(streamStatus) || isStreamingResponse || isHydratingConversation;
+    Boolean(visibleStreamStatus) || isStreamingResponse || isHydratingConversation;
   // Next-move rows render under their owning message instead of a floating
   // strip above the composer, but they keep every gate the strip applied:
   // nothing offers a next move mid-turn, or while an active card already owns
@@ -2072,7 +2054,7 @@ export default function ChatInterface() {
       .find((message) => message.role === "ai")
       ?.content?.trim() ?? "";
   const showStreamStatus = Boolean(
-    streamStatus && latestAssistantContent.length === 0,
+    visibleStreamStatus && latestAssistantContent.length === 0,
   );
   const showExploratorySuggestions =
     chatExploratorySuggestionsEnabled && showSuggestions;
@@ -2433,7 +2415,7 @@ export default function ChatInterface() {
                         isLatestAi &&
                         msg.kind === "text" &&
                         (isStreamingResponse ||
-                          !!streamStatus ||
+                          !!visibleStreamStatus ||
                           (msg.content ?? "") === "");
                       return (
                         <div
@@ -2497,7 +2479,7 @@ export default function ChatInterface() {
                     {showStreamStatus && (
                       <div className="ml-12">
                         <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">
-                          {streamStatus}
+                          {visibleStreamStatus}
                         </span>
                       </div>
                     )}

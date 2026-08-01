@@ -39,6 +39,10 @@ type ActiveOperationKind = Exclude<ConversationOperationKind, null>;
 type MutationAction = ConversationActivityPatch["action"];
 type StateListener = () => void;
 
+const isConversationActivityHistorySnapshot = (
+  value: ConversationActivityHistorySnapshot | readonly HistoryItem[],
+): value is ConversationActivityHistorySnapshot => !Array.isArray(value);
+
 export type ConversationActivityMutationNotice = Readonly<{
   conversationId: string;
   action: MutationAction;
@@ -109,18 +113,20 @@ export type ConversationActivityRuntime = Readonly<{
     requestId: string,
     status: ActiveOperationStatus,
     kind: ActiveOperationKind,
-  ) => void;
+  ) => number;
   progressRequest: (
     conversationId: string,
     requestId: string,
     status: ActiveOperationStatus,
   ) => void;
-  settleRequest: (
+  finishTransport: (
     conversationId: string,
     requestId: string,
-    options?: Readonly<{ invalidateInactiveTranscript?: boolean }>,
-  ) => void;
+    controller?: AbortController,
+  ) => boolean;
+  retireRequest: (conversationId: string, requestId: string) => boolean;
   isRequestCurrent: (conversationId: string, requestId: string) => boolean;
+  synchronizeAccountScope: (accountScopeKey: string | null) => boolean;
   markRead: (
     conversationId: string,
     throughCursor: string | null,
@@ -202,6 +208,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   private accountScopeKey: string | null;
   private responseRevision = 0;
   private accountEpoch = 0;
+  private accountRefreshPending = false;
   private started = false;
   private cancelPoll: (() => void) | null = null;
   private refreshInFlight: Readonly<{
@@ -248,7 +255,6 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   };
 
   dispose = (): void => {
-    if (!this.started) return;
     this.started = false;
     this.cancelPolling();
     this.unsubscribeFocus?.();
@@ -277,6 +283,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     if (accountChanged) {
       this.resetAccount(inputs.accountScopeKey);
     }
+    const accountRefreshPending = this.accountRefreshPending;
     this.activeConversationId = inputs.activeConversationId;
     this.lastInputActiveConversationId = inputs.activeConversationId;
     if (inputs.accountScopeKey) {
@@ -284,11 +291,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     } else {
       this.loadedConversationIds.clear();
     }
+    this.accountRefreshPending = false;
     this.reconcilePolling();
     if (
       this.started &&
       inputs.accountScopeKey &&
-      (accountChanged || navigationChanged)
+      (accountChanged || accountRefreshPending || navigationChanged)
     ) {
       void this.refreshCanonicalHistory();
     }
@@ -324,15 +332,18 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     requestId: string,
     status: ActiveOperationStatus,
     kind: ActiveOperationKind,
-  ): void => {
+  ): number => {
+    const revision = this.nextResponseRevision();
     this.dispatch({
       type: "request_started",
       conversationId,
       requestId,
       status,
       kind,
+      revision,
     });
     void this.refreshCanonicalHistory();
+    return revision;
   };
 
   progressRequest = (
@@ -348,24 +359,37 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     });
   };
 
-  settleRequest = (
+  finishTransport = (
     conversationId: string,
     requestId: string,
-    options: Readonly<{ invalidateInactiveTranscript?: boolean }> = {},
-  ): void => {
-    if (!this.isRequestCurrent(conversationId, requestId)) return;
-    this.dispatch({ type: "request_settled", conversationId, requestId });
-    if (
-      options.invalidateInactiveTranscript === true &&
-      conversationId !== this.currentActiveConversationId()
-    ) {
-      this.callbacks.invalidateInactiveTranscript(conversationId);
-    }
+    controller?: AbortController,
+  ): boolean => {
+    this.releaseTransport(conversationId, requestId, controller);
+    if (!this.isRequestCurrent(conversationId, requestId)) return false;
+    this.dispatch({
+      type: "request_progressed",
+      conversationId,
+      requestId,
+      status: "checking",
+    });
     void this.refreshCanonicalHistory();
+    return true;
+  };
+
+  retireRequest = (conversationId: string, requestId: string): boolean => {
+    if (!this.isRequestCurrent(conversationId, requestId)) return false;
+    this.dispatch({ type: "request_retired", conversationId, requestId });
+    return true;
   };
 
   isRequestCurrent = (conversationId: string, requestId: string): boolean =>
     selectConversationRequestIsCurrent(this.state, conversationId, requestId);
+
+  synchronizeAccountScope = (accountScopeKey: string | null): boolean => {
+    if (accountScopeKey === this.accountScopeKey) return false;
+    this.resetAccount(accountScopeKey);
+    return true;
+  };
 
   markRead = (
     conversationId: string,
@@ -445,9 +469,15 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       this.loadedConversationIds.add(conversationId);
       if (!item.activity) continue;
 
-      const priorActivity =
-        this.state.byConversationId[conversationId]?.canonical ?? null;
-      if (activitiesAreEqual(priorActivity, item.activity)) continue;
+      const priorRecord = this.state.byConversationId[conversationId];
+      const priorActivity = priorRecord?.canonical ?? null;
+      const revision = responseRevision ?? this.nextResponseRevision();
+      const canSettleRequest = Boolean(
+        priorRecord?.request &&
+        revision > priorRecord.request.issuedRevision &&
+        item.activity.operation.status === "idle",
+      );
+      if (activitiesAreEqual(priorActivity, item.activity) && !canSettleRequest) continue;
       const settled =
         isUnresolvedOperation(priorActivity) &&
         !isUnresolvedOperation(item.activity);
@@ -455,14 +485,15 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
         type: "server_projection_merged",
         conversationId,
         activity: item.activity,
-        revision: responseRevision ?? this.nextResponseRevision(),
+        revision,
         activeView:
           conversationId === this.currentActiveConversationId(),
       });
-      if (
-        settled &&
-        conversationId !== this.currentActiveConversationId()
-      ) {
+      const requestSettled = Boolean(
+        priorRecord?.request &&
+        !this.state.byConversationId[conversationId]?.request,
+      );
+      if ((settled || requestSettled) && conversationId !== this.currentActiveConversationId()) {
         this.callbacks.invalidateInactiveTranscript(conversationId);
       }
     }
@@ -632,14 +663,14 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     const promise = Promise.resolve(refreshResult)
       .then((historyItems) => {
         if (epoch !== this.accountEpoch || historyItems === undefined) return;
-        if (Array.isArray(historyItems)) {
-          this.mergeHistory(historyItems, responseRevision, false);
-        } else {
+        if (isConversationActivityHistorySnapshot(historyItems)) {
           this.mergeHistory(
             historyItems.items,
             historyItems.revision,
             false,
           );
+        } else {
+          this.mergeHistory(historyItems, responseRevision, false);
         }
       })
       .catch(() => {
@@ -659,6 +690,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.abortRegisteredTransports();
     this.accountEpoch += 1;
     this.accountScopeKey = nextAccountScopeKey;
+    this.accountRefreshPending = Boolean(nextAccountScopeKey);
     this.responseRevision = 0;
     this.mutationSequences.clear();
     this.loadedConversationIds.clear();
@@ -737,8 +769,9 @@ export function useConversationActivity(
   );
 
   useLayoutEffect(() => {
+    runtime.synchronizeAccountScope(options.accountScopeKey);
     runtime.updateActiveConversationId(options.activeConversationId);
-  }, [runtime, options.activeConversationId]);
+  }, [runtime, options.accountScopeKey, options.activeConversationId]);
 
   useEffect(() => {
     runtime.updateCallbacks({
@@ -781,8 +814,10 @@ export function useConversationActivity(
     hasManualUnreadGuard: runtime.hasManualUnreadGuard,
     startRequest: runtime.startRequest,
     progressRequest: runtime.progressRequest,
-    settleRequest: runtime.settleRequest,
+    finishTransport: runtime.finishTransport,
+    retireRequest: runtime.retireRequest,
     isRequestCurrent: runtime.isRequestCurrent,
+    synchronizeAccountScope: runtime.synchronizeAccountScope,
     markRead: runtime.markRead,
     markUnread: runtime.markUnread,
     isMutationPending: runtime.isMutationPending,

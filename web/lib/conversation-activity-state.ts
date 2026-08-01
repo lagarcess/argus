@@ -39,6 +39,7 @@ export type ConversationActivityRequestRecord = {
   requestId: string;
   status: ActiveOperationStatus;
   kind: Exclude<ConversationOperationKind, null>;
+  issuedRevision: number;
 };
 
 export type ConversationActivityMutationRecord = {
@@ -84,6 +85,7 @@ export type ConversationActivityAction =
       requestId: string;
       status: ActiveOperationStatus;
       kind: Exclude<ConversationOperationKind, null>;
+      revision: number;
     }
   | {
       type: "request_progressed";
@@ -92,7 +94,7 @@ export type ConversationActivityAction =
       status: ActiveOperationStatus;
     }
   | {
-      type: "request_settled";
+      type: "request_retired";
       conversationId: string;
       requestId: string;
     }
@@ -326,6 +328,12 @@ export function conversationActivityReducer(
         ...current,
         canonical: action.activity,
         serverRevision: action.revision,
+        request:
+          current.request &&
+          action.revision > current.request.issuedRevision &&
+          isKnownIdleStatus(action.activity.operation.status)
+            ? null
+            : current.request,
         manualUnreadGuardSource: guardSource,
         manualUnreadGuardGeneration: guardGeneration,
       });
@@ -337,6 +345,7 @@ export function conversationActivityReducer(
           requestId: action.requestId,
           status: action.status,
           kind: action.kind,
+          issuedRevision: action.revision,
         },
       });
     case "request_progressed":
@@ -347,7 +356,7 @@ export function conversationActivityReducer(
         ...current,
         request: { ...current.request, status: action.status },
       });
-    case "request_settled":
+    case "request_retired":
       if (current.request?.requestId !== action.requestId) {
         return state;
       }

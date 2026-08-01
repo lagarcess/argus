@@ -1126,17 +1126,17 @@ describe("chat backtest jobs", () => {
     expect(ambiguityStart).toBeGreaterThan(-1);
     expect(ambiguity).toContain("applyRecoverableRunReconciliation");
     expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
-    expect(ambiguity).toContain("clearActiveStreamState()");
+    expect(ambiguity).toContain("finishRequestTransport(requestSession)");
     expect(ambiguity).toContain(
-      "streamToConversation(activeStreamTargetConversationId)",
+      "streamToConversation(requestSession.identity.conversationId)",
     );
     expect(chat).toContain(
       'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
     );
-    expect(chat).toContain(
-      "settleConversationRequest(requestIdentity, requestController)",
+    expect(chat).not.toContain("conversationActivity.settleRequest");
+    expect(ambiguity).toContain(
+      'requestSessions.authorize(requestSession, "run_replay")',
     );
-    expect(ambiguity).toContain("canApplyOwnedStreamUpdate()");
     expect(ambiguity).toContain("canApplyVisibleStreamUpdate()");
     expect(chat).not.toContain("setIsStreamingResponse(false)");
     expect(ambiguity).toContain("durableStateUnknown: true");

@@ -51,6 +51,7 @@ describe("conversation activity presentation", () => {
         requestId: "request-1",
         status: "queued",
         kind: "chat_turn",
+        revision: 2,
       });
       expect(selectConversationActivityPresentation(state, attention)).toBe("working");
     }
@@ -103,6 +104,7 @@ describe("conversation activity presentation", () => {
       requestId: "request-working",
       status: "running",
       kind: "chat_turn",
+      revision: 2,
     });
     expect(
       selectAggregateConversationActivityPresentation(state, [
@@ -137,6 +139,7 @@ describe("conversation activity presentation", () => {
           requestId: "request-working",
           status: "running",
           kind: "chat_turn",
+          revision: 1,
         });
       } else {
         state = conversationActivityReducer(state, {
@@ -197,6 +200,7 @@ describe("conversation-scoped request ownership", () => {
       requestId: "request-a1",
       status: "queued",
       kind: "chat_turn",
+      revision: 1,
     });
     state = conversationActivityReducer(state, {
       type: "request_started",
@@ -204,6 +208,7 @@ describe("conversation-scoped request ownership", () => {
       requestId: "request-b1",
       status: "running",
       kind: "backtest_job",
+      revision: 2,
     });
     state = conversationActivityReducer(state, {
       type: "request_started",
@@ -211,6 +216,7 @@ describe("conversation-scoped request ownership", () => {
       requestId: "request-a2",
       status: "running",
       kind: "chat_turn",
+      revision: 3,
     });
 
     expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
@@ -229,22 +235,64 @@ describe("conversation-scoped request ownership", () => {
       requestId: "request-a1",
       status: "checking",
     });
-    const afterLateSettle = conversationActivityReducer(afterLateProgress, {
-      type: "request_settled",
+    const afterLateRetirement = conversationActivityReducer(afterLateProgress, {
+      type: "request_retired",
       conversationId: "conversation-a",
       requestId: "request-a1",
     });
-    expect(afterLateSettle).toBe(state);
-    expect(selectConversationIsLocked(afterLateSettle, "conversation-a")).toBe(true);
-    expect(selectConversationIsLocked(afterLateSettle, "conversation-b")).toBe(true);
+    expect(afterLateRetirement).toBe(state);
+    expect(selectConversationIsLocked(afterLateRetirement, "conversation-a")).toBe(true);
+    expect(selectConversationIsLocked(afterLateRetirement, "conversation-b")).toBe(true);
 
-    const afterCurrentSettle = conversationActivityReducer(afterLateSettle, {
-      type: "request_settled",
+    const afterCurrentRetirement = conversationActivityReducer(afterLateRetirement, {
+      type: "request_retired",
       conversationId: "conversation-a",
       requestId: "request-a2",
     });
-    expect(selectConversationIsLocked(afterCurrentSettle, "conversation-a")).toBe(false);
-    expect(selectConversationIsLocked(afterCurrentSettle, "conversation-b")).toBe(true);
+    expect(selectConversationIsLocked(afterCurrentRetirement, "conversation-a")).toBe(false);
+    expect(selectConversationIsLocked(afterCurrentRetirement, "conversation-b")).toBe(true);
+  });
+
+  test("settles only from a strictly newer canonical idle projection", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity(),
+      revision: 2,
+    });
+    state = conversationActivityReducer(state, {
+      type: "request_started",
+      conversationId: "conversation-a",
+      requestId: "request-a",
+      status: "queued",
+      kind: "chat_turn",
+      revision: 5,
+    });
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity(),
+      revision: 4,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("running"),
+      revision: 6,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity(),
+      revision: 7,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(false);
   });
 });
 
