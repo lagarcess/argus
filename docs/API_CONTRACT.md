@@ -1700,6 +1700,8 @@ csrf_origin_rejected` problem response and does not clear cookies.
 }
 ```
 
+Guest sessions omit registered-account preferences, including `avatar_theme`.
+
 ---
 
 # 8. User / Preferences
@@ -1719,6 +1721,7 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
+    "avatar_theme": "ocean",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -1838,7 +1841,8 @@ Update profile preferences. Partial update semantics are supported.
   "display_name": "Lucas",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark"
+  "theme": "dark",
+  "avatar_theme": "plum"
 }
 ```
 
@@ -1853,6 +1857,11 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
+  `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
+- Avatar themes are registered-account preferences. Guests cannot update a
+  profile, and guest-facing `/me` and `/auth/session` responses omit
+  `avatar_theme`.
 - A legacy `onboarding` object from an old client is ignored; the API cannot
   write onboarding state.
 

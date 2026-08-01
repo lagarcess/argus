@@ -2459,6 +2459,59 @@ components:
       - reason
       - conversation_id
       - action_id
+    GuestUser:
+      properties:
+        id:
+          type: string
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          default: dark
+        is_admin:
+          type: boolean
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+      description: Guest-safe profile projection without registered-only preferences.
     HistoryItem:
       additionalProperties: true
       type: object
@@ -2678,6 +2731,17 @@ components:
             - light
             - system
           - type: 'null'
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
       type: object
     RunDossier:
       properties:
@@ -3307,6 +3371,17 @@ components:
           - light
           - system
           default: dark
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
         is_admin:
           type: boolean
           default: false
@@ -3327,7 +3402,9 @@ components:
     UserResponse:
       properties:
         user:
-          $ref: '#/components/schemas/User'
+          anyOf:
+          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/GuestUser'
         account_kind:
           type: string
           enum:
