@@ -1,33 +1,25 @@
 from __future__ import annotations
 
-import json
 import re
 from collections import deque
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 from argus.api.schemas import (
     DecisionState,
     SearchAssetDecisionCounts,
     SearchAssetRollup,
-    SearchDecisionAction,
-    SearchDossier,
-    SearchDossierDecision,
-    SearchDossierLeftOff,
-    SearchDossierMetric,
-    SearchDossierOutcome,
-    SearchDossierTested,
     SearchItem,
     SearchMatch,
     SearchMatchLayer,
-    SearchRunFreshAction,
-    SearchRunFreshSetup,
 )
 from argus.api.search_utils import score_search_item
-from argus.domain.evidence import (
-    decision_recall_preview,
-    evidence_preview_from_payload,
+from argus.domain.run_dossiers import (
+    current_decision_for,
+    newest_evidence_backed_completed_runs,
+    project_run_dossier,
+    result_message_id_for,
 )
 from argus.domain.search_text import (
     normalize_search_symbol,
@@ -36,8 +28,6 @@ from argus.domain.search_text import (
 )
 
 _MAX_SYMBOLS = 5
-_MAX_FAMILIES = 5
-_MAX_METRICS = 4
 _MAX_LABEL_LENGTH = 160
 _MAX_MATCH_LENGTH = 500
 _DECISION_STATES: tuple[DecisionState, ...] = (
@@ -55,28 +45,6 @@ _LAYER_BY_RANK: dict[int, SearchMatchLayer] = {
     6: "decision",
 }
 _NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
-_RUN_FRESH_STRATEGIES = {
-    "buy_and_hold",
-    "dca_accumulation",
-    "indicator_threshold",
-    "signal_strategy",
-}
-_RUN_FRESH_CADENCES = {
-    "daily",
-    "weekly",
-    "biweekly",
-    "monthly",
-    "quarterly",
-}
-_RUN_FRESH_PARAMETER_KEYS = (
-    "indicator",
-    "indicator_period",
-    "entry_threshold",
-    "exit_threshold",
-    "fast_period",
-    "slow_period",
-    "moving_average_type",
-)
 _ISO_FRACTION_RE = re.compile(
     r"^(?P<prefix>.*\d{2}:\d{2}:\d{2}\.)"
     r"(?P<fraction>\d{1,6})"
@@ -248,6 +216,10 @@ def project_conversation_recall(
     completed_runs = [
         row for row in relevant_runs if row.get("status", "completed") == "completed"
     ]
+    eligible = newest_evidence_backed_completed_runs(
+        runs=relevant_runs,
+        evidence=relevant_evidence,
+    )
 
     candidates = _match_candidates(
         conversation=conversation,
@@ -329,78 +301,27 @@ def project_conversation_recall(
     if match_count == 0:
         match_count = sum(candidate.layer == winning_match.layer for candidate in matches)
 
-    sorted_runs = sorted(
-        completed_runs,
-        key=_row_activity,
-        reverse=True,
-    )
-    sorted_decisions = sorted(
-        relevant_decisions,
-        key=_row_activity,
-        reverse=True,
-    )
-    artifacts_by_id = {
-        _text(row.get("id")): row
-        for row in relevant_evidence
-        if _text(row.get("id")) is not None
-    }
-    runs_by_id = {
-        _text(row.get("id")): row
-        for row in relevant_runs
-        if _text(row.get("id")) is not None
-    }
-
     recall_summary = conversation.get("_recall_summary")
     summary = recall_summary if isinstance(recall_summary, Mapping) else {}
-    decision = _decision_projection(
-        decisions=sorted_decisions,
-        artifacts_by_id=artifacts_by_id,
-        runs_by_id=runs_by_id,
-        include_run_label=int(summary.get("run_count") or len(sorted_runs)) > 1,
-    )
-    latest_run = sorted_runs[0] if sorted_runs else None
-    outcome = _outcome_projection(
-        run=latest_run,
-        evidence=relevant_evidence,
-    )
-    decided_run_ids = {
-        _text(
-            artifacts_by_id.get(_text(row.get("evidence_artifact_id")), {}).get(
-                "source_run_id"
-            )
+    dossier = None
+    if eligible:
+        latest_run, latest_artifact = eligible[0]
+        latest_decision = current_decision_for(latest_artifact, relevant_decisions)
+        dossier = project_run_dossier(
+            run=latest_run,
+            artifact=latest_artifact,
+            decision=latest_decision,
+            result_message_id=result_message_id_for(latest_run, conversation_messages),
+            allow_decision_action=allow_decision_action,
+            language=language,
         )
-        for row in relevant_decisions
-    }
-    latest_run_decided = summary.get("latest_run_decided")
-    latest_suggestion_untaken = summary.get("latest_suggestion_untaken")
-    left_off = _left_off_projection(
-        run=latest_run,
-        is_decided=(
-            bool(latest_run_decided)
-            if latest_run_decided is not None
-            else bool(latest_run and _text(latest_run.get("id")) in decided_run_ids)
-        ),
-        suggestion_untaken=(
-            bool(latest_suggestion_untaken)
-            if latest_suggestion_untaken is not None
-            else conversation_has_untaken_suggestion(
-                run=latest_run,
-                messages=conversation_messages,
-            )
-        ),
-    )
-    actions = []
-    run_fresh_action = _run_fresh_action(run=latest_run, language=language)
-    if run_fresh_action is not None:
-        actions.append(run_fresh_action)
-    decision_action = _decision_action(
-        run=latest_run,
-        evidence=relevant_evidence,
-        decisions=relevant_decisions,
-        allow=allow_decision_action,
-    )
-    if decision_action is not None:
-        actions.append(decision_action)
+    eligible_decisions = [
+        current
+        for _, artifact in eligible
+        if (current := current_decision_for(artifact, relevant_decisions)) is not None
+    ]
+    total_runs = int(summary.get("total_runs") or len(eligible))
+    decided_runs = int(summary.get("decided_runs") or len(eligible_decisions))
     summary_states = _text_list(summary.get("decision_states"))
     decision_states = tuple(
         state
@@ -408,7 +329,10 @@ def project_conversation_recall(
         if state in summary_states
         or (
             not summary_states
-            and any(row.get("decision_state") == state for row in relevant_decisions)
+            and any(
+                row.get("decision_state") == state
+                for row in (eligible_decisions or relevant_decisions)
+            )
         )
     )
     summary_activity = _datetime(summary.get("latest_activity"))
@@ -449,13 +373,9 @@ def project_conversation_recall(
                 count=match_count,
                 message_id=winning_match.message_id,
             ),
-            dossier=SearchDossier(
-                decision=decision,
-                tested=_tested_projection(sorted_runs, summary=summary),
-                outcome=outcome,
-                left_off=left_off,
-            ),
-            actions=actions,
+            dossier=dossier,
+            total_runs=total_runs,
+            decided_runs=decided_runs,
             decision_states=decision_states,
         ),
     )
@@ -568,478 +488,6 @@ def _match_candidates(
     return candidates
 
 
-def _decision_projection(
-    *,
-    decisions: Sequence[Mapping[str, Any]],
-    artifacts_by_id: Mapping[str | None, Mapping[str, Any]],
-    runs_by_id: Mapping[str | None, Mapping[str, Any]],
-    include_run_label: bool,
-) -> SearchDossierDecision | None:
-    if not decisions:
-        return None
-    latest = decisions[0]
-    artifact = artifacts_by_id.get(_text(latest.get("evidence_artifact_id")), {})
-    payload = artifact.get("payload")
-    preview = decision_recall_preview(
-        decision_state=latest.get("decision_state"),
-        note=latest.get("note"),
-        artifact_title=artifact.get("title") or latest.get("artifact_title"),
-        artifact_digest=artifact.get("digest") or latest.get("artifact_digest"),
-        artifact_payload=(
-            payload
-            if isinstance(payload, dict)
-            else cast(dict[str, Any] | None, latest.get("artifact_payload"))
-        ),
-    )
-    state = preview.get("decision_state")
-    if state not in _DECISION_STATES:
-        return None
-    source_run_id = _text(artifact.get("source_run_id") or latest.get("source_run_id"))
-    judged_run = runs_by_id.get(source_run_id)
-    return SearchDossierDecision(
-        state=cast(DecisionState, state),
-        note=cast(str | None, preview.get("note")),
-        run_label=_run_label(judged_run) if include_run_label and judged_run else None,
-    )
-
-
-def _tested_projection(
-    runs: Sequence[Mapping[str, Any]],
-    *,
-    summary: Mapping[str, Any] | None = None,
-) -> SearchDossierTested:
-    summary = summary or {}
-    start_dates: list[date] = []
-    end_dates: list[date] = []
-    for run in runs:
-        start, end = _run_date_span(run)
-        if start is not None:
-            start_dates.append(start)
-        if end is not None:
-            end_dates.append(end)
-    run_counts = [
-        int(run.get("conversation_run_count") or 0)
-        for run in runs
-        if run.get("conversation_run_count")
-    ]
-    return SearchDossierTested(
-        symbols=(_text_list(summary.get("symbols")) or _symbols_from_runs(runs))[
-            :_MAX_SYMBOLS
-        ],
-        strategy_families=(
-            _text_list(summary.get("strategy_families")) or _strategy_families(runs)
-        )[:_MAX_FAMILIES],
-        run_count=int(summary.get("run_count") or max(run_counts, default=len(runs))),
-        start_date=_date(summary.get("start_date"))
-        or (min(start_dates) if start_dates else None),
-        end_date=_date(summary.get("end_date"))
-        or (max(end_dates) if end_dates else None),
-    )
-
-
-def _outcome_projection(
-    *,
-    run: Mapping[str, Any] | None,
-    evidence: Sequence[Mapping[str, Any]],
-) -> SearchDossierOutcome | None:
-    if run is None:
-        return None
-    run_id = _text(run.get("id"))
-    artifact = max(
-        (row for row in evidence if _text(row.get("source_run_id")) == run_id),
-        key=_row_activity,
-        default={},
-    )
-    payload = artifact.get("payload")
-    preview = evidence_preview_from_payload(
-        digest=artifact.get("digest"),
-        title=artifact.get("title"),
-        payload=payload if isinstance(payload, dict) else None,
-    )
-    metrics = preview.get("metrics_summary")
-    metric_rows: list[SearchDossierMetric] = []
-    if isinstance(metrics, dict):
-        for name, value in metrics.items():
-            if len(metric_rows) >= _MAX_METRICS:
-                break
-            if isinstance(value, (str, int, float)) and not isinstance(value, bool):
-                metric_rows.append(SearchDossierMetric(name=name, value=value))
-    return SearchDossierOutcome(
-        run_label=_run_label(run),
-        completed_at=_row_activity(run),
-        benchmark_symbol=_text(
-            preview.get("benchmark_symbol") or run.get("benchmark_symbol")
-        ),
-        quick_take=_bounded_text(preview.get("quick_take"), 500),
-        metrics=metric_rows,
-    )
-
-
-def _left_off_projection(
-    *,
-    run: Mapping[str, Any] | None,
-    is_decided: bool,
-    suggestion_untaken: bool,
-) -> SearchDossierLeftOff | None:
-    if run is None:
-        return None
-    completed_at = _row_activity(run)
-    nudge = "undecided" if not is_decided else None
-    if nudge is None and suggestion_untaken:
-        nudge = "suggestion_untaken"
-    if nudge is None and _is_stale_result(completed_at):
-        nudge = "stale_result"
-    return SearchDossierLeftOff(
-        run_label=_run_label(run),
-        completed_at=completed_at,
-        nudge=nudge,
-    )
-
-
-def _run_fresh_action(
-    *,
-    run: Mapping[str, Any] | None,
-    language: str,
-) -> SearchRunFreshAction | None:
-    if run is None:
-        return None
-    run_id = _text(run.get("id"))
-    config = _config(run)
-    resolved_strategy = _mapping(config.get("resolved_strategy"))
-    resolved_parameters = _mapping(config.get("resolved_parameters"))
-    resolved_engine_config = _mapping(resolved_parameters.get("engine_config"))
-    snapshot_engine_config = _mapping(config.get("engine_config"))
-    strategy_type = _text(
-        resolved_strategy.get("strategy_type") or config.get("template")
-    )
-    if strategy_type not in _RUN_FRESH_STRATEGIES or run_id is None:
-        return None
-
-    symbols = _run_symbols(run)
-    asset_class = _text(
-        resolved_strategy.get("asset_class") or run.get("asset_class")
-    )
-    timeframe = _text(resolved_parameters.get("timeframe") or config.get("timeframe"))
-    benchmark_symbol = _text(
-        resolved_parameters.get("benchmark_symbol")
-        or config.get("benchmark_symbol")
-        or run.get("benchmark_symbol")
-    )
-    original_start, original_end = _run_date_span(run)
-    if (
-        not symbols
-        or asset_class not in {"equity", "crypto", "currency_pair"}
-        or timeframe is None
-        or benchmark_symbol is None
-        or original_start is None
-        or original_end is None
-        or original_end < original_start
-    ):
-        return None
-
-    sizing_mode = _text(resolved_parameters.get("sizing_mode"))
-    capital_amount = _number(
-        resolved_parameters.get("capital_amount")
-        or config.get("starting_capital")
-        or config.get("capital_amount")
-    )
-    position_size = _number(resolved_parameters.get("position_size"))
-    if sizing_mode is None:
-        sizing_mode = "position_size" if position_size is not None else "capital_amount"
-    if sizing_mode == "capital_amount":
-        position_size = None
-    elif sizing_mode == "position_size":
-        capital_amount = None
-    else:
-        return None
-    cadence = _text(resolved_parameters.get("cadence") or config.get("cadence"))
-    if strategy_type == "dca_accumulation":
-        if cadence not in _RUN_FRESH_CADENCES:
-            return None
-        recurring_contribution = _consistent_number(
-            resolved_parameters.get("recurring_contribution"),
-            resolved_engine_config.get("recurring_contribution"),
-            snapshot_engine_config.get("recurring_contribution"),
-        )
-        starting_principal = _consistent_number(
-            resolved_parameters.get("starting_principal"),
-            resolved_engine_config.get("starting_principal"),
-            snapshot_engine_config.get("starting_principal"),
-            allow_zero=True,
-        )
-        if (
-            recurring_contribution is None
-            or starting_principal != 0
-            or capital_amount != recurring_contribution
-        ):
-            return None
-    else:
-        cadence = None
-        recurring_contribution = None
-        starting_principal = None
-
-    today = date.today()
-    current_start = today - timedelta(days=(original_end - original_start).days)
-    parameters = {
-        key: resolved_parameters[key]
-        for key in _RUN_FRESH_PARAMETER_KEYS
-        if key in resolved_parameters
-        and isinstance(resolved_parameters[key], (str, int, float, bool))
-    }
-    execution_realism_valid, execution_realism = _consistent_mapping(
-        resolved_engine_config.get("_execution_realism"),
-        snapshot_engine_config.get("_execution_realism"),
-        resolved_parameters.get("_execution_realism"),
-        resolved_parameters.get("execution_realism"),
-        config.get("_execution_realism"),
-    )
-    if not execution_realism_valid:
-        return None
-    try:
-        setup = SearchRunFreshSetup(
-            strategy_type=strategy_type,
-            symbols=symbols,
-            asset_class=asset_class,
-            timeframe=timeframe,
-            date_range={"start": current_start, "end": today},
-            sizing_mode=sizing_mode,
-            capital_amount=capital_amount,
-            position_size=position_size,
-            cadence=cadence,
-            recurring_contribution=recurring_contribution,
-            starting_principal=starting_principal,
-            benchmark_symbol=benchmark_symbol,
-            entry_rule=_mapping_or_none(resolved_strategy.get("entry_rule")),
-            exit_rule=_mapping_or_none(resolved_strategy.get("exit_rule")),
-            rule_spec=_mapping_or_none(
-                resolved_strategy.get("rule_spec")
-                or resolved_parameters.get("rule_spec")
-                or config.get("rule_spec")
-            ),
-            parameters=parameters,
-            execution_realism=execution_realism,
-        )
-        return SearchRunFreshAction(
-            source_run_id=run_id,
-            run_label=_run_label(run),
-            canonical_setup=setup,
-            send_text=_run_fresh_send_text(setup=setup, language=language),
-        )
-    except ValueError:
-        return None
-
-
-def _decision_action(
-    *,
-    run: Mapping[str, Any] | None,
-    evidence: Sequence[Mapping[str, Any]],
-    decisions: Sequence[Mapping[str, Any]],
-    allow: bool,
-) -> SearchDecisionAction | None:
-    if not allow or run is None:
-        return None
-    run_id = _text(run.get("id"))
-    artifact = max(
-        (row for row in evidence if _text(row.get("source_run_id")) == run_id),
-        key=_row_activity,
-        default=None,
-    )
-    if artifact is None or (artifact_id := _text(artifact.get("id"))) is None:
-        return None
-    latest_decision = max(
-        (
-            row
-            for row in decisions
-            if _text(row.get("evidence_artifact_id")) == artifact_id
-        ),
-        key=_row_activity,
-        default=None,
-    )
-    state = latest_decision.get("decision_state") if latest_decision else None
-    return SearchDecisionAction(
-        evidence_artifact_id=artifact_id,
-        decision_state=cast(DecisionState | None, state)
-        if state in _DECISION_STATES
-        else None,
-        note=_bounded_text(latest_decision.get("note"), 2000)
-        if latest_decision
-        else None,
-        run_label=_run_label(run),
-    )
-
-
-def _run_fresh_send_text(*, setup: SearchRunFreshSetup, language: str) -> str:
-    symbols = ", ".join(setup.symbols)
-    amount = (
-        _format_number(setup.capital_amount)
-        if setup.sizing_mode == "capital_amount"
-        else _format_number(setup.position_size)
-    )
-    if language == "es-419":
-        cadence = {
-            "daily": "diaria",
-            "weekly": "semanal",
-            "biweekly": "quincenal",
-            "monthly": "mensual",
-            "quarterly": "trimestral",
-        }.get(setup.cadence or "", setup.cadence or "")
-        strategy = {
-            "buy_and_hold": "comprar y mantener",
-            "dca_accumulation": f"acumulación DCA {cadence}",
-            "indicator_threshold": "estrategia de umbral de indicador",
-            "signal_strategy": "estrategia de señales",
-        }[setup.strategy_type]
-        if setup.strategy_type == "dca_accumulation":
-            sizing = (
-                f"un aporte recurrente de "
-                f"${_format_number(setup.recurring_contribution)} {cadence} y "
-                f"capital inicial de ${_format_number(setup.starting_principal)}"
-            )
-        else:
-            sizing = (
-                f"${amount} de capital inicial"
-                if setup.sizing_mode == "capital_amount"
-                else f"{amount} por posición"
-            )
-        prefix = (
-            "Prueba nuevamente esta configuración compatible exacta del "
-            f"{setup.date_range.start.isoformat()} al "
-            f"{setup.date_range.end.isoformat()}: {strategy} {symbols} en "
-            f"{setup.timeframe} con {sizing}, referencia "
-            f"{setup.benchmark_symbol}, solo posiciones largas y pesos iguales"
-        )
-        suffix = (
-            ". Muestra la confirmación Lista para ejecutar; todavía no la ejecutes."
-        )
-        detail_labels = {
-            "entry_rule": "regla de entrada",
-            "exit_rule": "regla de salida",
-            "rule_spec": "especificación de reglas",
-            "parameters": "parámetros",
-            "execution_realism": "costos modelados",
-        }
-    else:
-        cadence = setup.cadence or ""
-        strategy = {
-            "buy_and_hold": "buy and hold",
-            "dca_accumulation": f"{cadence} DCA accumulation",
-            "indicator_threshold": "indicator threshold strategy",
-            "signal_strategy": "signal strategy",
-        }[setup.strategy_type]
-        if setup.strategy_type == "dca_accumulation":
-            sizing = (
-                f"a ${_format_number(setup.recurring_contribution)} {cadence} "
-                "recurring contribution and "
-                f"${_format_number(setup.starting_principal)} starting principal"
-            )
-        else:
-            sizing = (
-                f"${amount} starting capital"
-                if setup.sizing_mode == "capital_amount"
-                else f"{amount} per position"
-            )
-        prefix = (
-            "Test this exact supported setup again from "
-            f"{setup.date_range.start.isoformat()} to "
-            f"{setup.date_range.end.isoformat()}: {strategy} {symbols} on "
-            f"{setup.timeframe} with {sizing}, benchmark "
-            f"{setup.benchmark_symbol}, long only and equal weight"
-        )
-        suffix = (
-            ". Show the Ready-to-run confirmation; do not run it yet."
-        )
-        detail_labels = {
-            "entry_rule": "entry rule",
-            "exit_rule": "exit rule",
-            "rule_spec": "rule spec",
-            "parameters": "parameters",
-            "execution_realism": "execution realism",
-        }
-    details = [
-        (detail_id, value)
-        for detail_id, value in (
-            ("entry_rule", setup.entry_rule),
-            ("exit_rule", setup.exit_rule),
-            ("rule_spec", setup.rule_spec),
-            ("parameters", setup.parameters or None),
-            ("execution_realism", setup.execution_realism),
-        )
-        if value is not None
-    ]
-    if setup.strategy_type == "buy_and_hold":
-        details = [
-            pair
-            for pair in details
-            if pair[0] not in {"entry_rule", "exit_rule"}
-        ]
-    detail_text = "".join(
-        f"; {detail_labels[detail_id]} {_stable_json(value)}"
-        for detail_id, value in details
-    )
-    return f"{prefix}{detail_text}{suffix}"
-
-
-def _format_number(value: float | None) -> str:
-    if value is None:
-        return "0"
-    return f"{value:g}"
-
-
-def _stable_json(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-
-
-def _mapping(value: object) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
-
-
-def _mapping_or_none(value: object) -> dict[str, Any] | None:
-    return dict(value) if isinstance(value, Mapping) else None
-
-
-def _consistent_mapping(*values: object) -> tuple[bool, dict[str, Any] | None]:
-    present = [value for value in values if value is not None]
-    if not present:
-        return True, None
-    if any(not isinstance(value, Mapping) for value in present):
-        return False, None
-    mappings = [dict(cast(Mapping[str, Any], value)) for value in present]
-    if any(value != mappings[0] for value in mappings[1:]):
-        return False, None
-    return True, mappings[0]
-
-
-def _consistent_number(
-    *values: object,
-    allow_zero: bool = False,
-) -> float | None:
-    present = [value for value in values if value is not None]
-    if not present:
-        return None
-    parsed = [
-        _nonnegative_number(value) if allow_zero else _number(value)
-        for value in present
-    ]
-    if any(value is None for value in parsed):
-        return None
-    numbers = cast(list[float], parsed)
-    if any(value != numbers[0] for value in numbers[1:]):
-        return None
-    return numbers[0]
-
-
-def _number(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value) if value > 0 else None
-
-
-def _nonnegative_number(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value) if value >= 0 else None
-
-
 def _run_search_text(run: Mapping[str, Any]) -> str:
     return " ".join(
         part
@@ -1091,6 +539,10 @@ def _run_symbols(run: Mapping[str, Any]) -> list[str]:
 def _config(run: Mapping[str, Any]) -> Mapping[str, Any]:
     value = run.get("config_snapshot")
     return value if isinstance(value, dict) else {}
+
+
+def _mapping(value: object) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _run_date_span(run: Mapping[str, Any]) -> tuple[date | None, date | None]:

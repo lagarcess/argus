@@ -1330,6 +1330,13 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/command-palette-items.ts"),
       "utf-8",
     );
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(palette).toContain("includeLedgerGroups: true");
@@ -1352,10 +1359,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(adapter).toContain('activation: "open_conversation"');
     expect(adapter).toContain("export function commandPaletteStatusLabelKey");
     expect(adapter).toContain("export function commandPaletteStatusFallback");
-    expect(adapter).toContain("export function commandPalettePreviewFields");
-    expect(palette).toContain("const selectedPreviewFields = useMemo");
-    expect(palette).toContain("selectedPreviewFields.map");
-    expect(palette).toContain("t(field.labelKey, field.labelFallback)");
+    expect(adapter).not.toContain("commandPalettePreviewFields");
+    expect(palette).toContain("<RunDossierView");
+    expect(dossier).toContain("formatRunDossierSetup");
+    expect(dossier).toContain("formatRunDossierMetrics");
     expect(palette).toContain("const activateItem = useCallback");
     expect(palette).not.toContain('item.activation === "select_preview"');
     expect(palette).toContain("onMouseEnter={() => setPreviewItem(item)}");
@@ -1453,6 +1460,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("decisionChipClassName");
     expect(card).toContain("border-[#5ba897]/18 bg-transparent");
     expect(card).toContain("selectedDecisionState === state");
+    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(card).toContain("nextDecisionNoteValue(");
+    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
   });
 
   test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {
@@ -1465,7 +1475,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const contract = readFileSync(
-      join(root, "lib/search-contract.ts"),
+      join(root, "lib/run-dossier-contract.ts"),
       "utf-8",
     );
 
@@ -1492,16 +1502,20 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
-    const runFreshButton = palette.slice(
-      palette.indexOf("{selectedRunFreshAction &&"),
-      palette.indexOf("{selectedDecisionAction &&"),
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
     );
 
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
-    expect(runFreshButton).toContain("disabled={turnInFlight}");
-    expect(runFreshButton).toContain("disabled:cursor-not-allowed");
-    expect(runFreshButton).toContain("disabled:opacity-50");
+    expect(palette).toContain("runFreshDisabled={turnInFlight}");
+    expect(dossier).toContain("disabled={runFreshDisabled}");
+    expect(dossier).toContain("disabled:cursor-not-allowed");
+    expect(dossier).toContain("disabled:opacity-50");
   });
 
   test("omnisearch preserves the active turn when its conversation is selected", () => {
@@ -1860,6 +1874,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
+    const dossierIntegration = readFileSync(
+      join(root, "lib/command-palette-dossier-integration.ts"),
+      "utf-8",
+    );
     const initialHistoryFetch = palette.slice(
       palette.indexOf("const requestId = ++historyRequestIdRef.current"),
       palette.indexOf("const clearSearchAndLedger"),
@@ -1949,14 +1967,19 @@ describe("Argus Alpha frontend contract", () => {
       refreshCanonicalSearch.indexOf("++searchRequestIdRef.current"),
     );
     expect(saveDecision.indexOf("await createEvidenceDecision")).toBeLessThan(
-      saveDecision.indexOf("setDecisionDraft(null)"),
+      saveDecision.indexOf("onMutated?.()"),
     );
-    expect(saveDecision.indexOf("setDecisionDraft(null)")).toBeLessThan(
-      saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+    expect(saveDecision.indexOf("onMutated?.()")).toBeLessThan(
+      saveDecision.indexOf("refreshCanonicalSearch:"),
     );
+    expect(saveDecision).toContain("refreshLoadedHistory:");
+    expect(dossierIntegration).toMatch(
+      /Promise\.all\(\[\s*refreshCanonicalSearch\(\),\s*refreshLoadedHistory\(\),\s*\]\)/,
+    );
+    expect(saveDecision).not.toContain("setDecisionDraft");
     expect(
       saveDecision.slice(
-        saveDecision.indexOf("await refreshAfterCanonicalMutation"),
+        saveDecision.indexOf("refreshCanonicalSearch:"),
       ),
     ).not.toContain("setDecisionSaveFailed(true)");
     expect(refreshCanonicalSearch).toContain(': currentQuery');

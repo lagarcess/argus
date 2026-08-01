@@ -4,6 +4,7 @@ import re
 
 _SEARCH_SEPARATOR_RE = re.compile(r"[\W_]+", re.UNICODE)
 SEARCH_INDEXABLE_TOKEN_MIN_LENGTH = 3
+SEARCH_SYMBOL_QUERY_MIN_LENGTH = 2
 
 
 def normalize_search_text(value: object) -> str:
@@ -32,7 +33,7 @@ def search_query_is_indexable(value: object) -> bool:
     return (
         symbol is not None
         and "\x00" not in symbol
-        and len(symbol) >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH
+        and len(symbol) >= SEARCH_SYMBOL_QUERY_MIN_LENGTH
         and any(character.isalnum() for character in symbol)
     )
 

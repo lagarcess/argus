@@ -60,11 +60,13 @@ describe("frontend search normalization", () => {
     expect(searchHasIndexableToken("ßß")).toBeTrue();
   });
 
-  test("allows one punctuated canonical symbol through the search gate", () => {
+  test("allows two-character canonical symbols without broad short text", () => {
     expect(searchQueryIsIndexable("BF.B")).toBeTrue();
     expect(searchQueryIsIndexable("ss/e")).toBeTrue();
-    expect(searchQueryIsIndexable("GL")).toBeFalse();
+    expect(searchQueryIsIndexable("GL")).toBeTrue();
+    expect(searchQueryIsIndexable("G")).toBeFalse();
     expect(searchQueryIsIndexable("BF B")).toBeFalse();
+    expect(searchQueryIsIndexable("GL D")).toBeFalse();
     expect(searchQueryIsIndexable("B\u0085F")).toBeFalse();
     expect(searchQueryIsIndexable("B\u001cF")).toBeFalse();
     expect(searchQueryIsIndexable("\0BF.B")).toBeFalse();
