@@ -7,6 +7,8 @@ type FakeTurnstileMode = "visible" | "stuck";
 
 declare global {
   interface Window {
+    completeCaptchaForTest?: () => void;
+    escapeReachedBackground?: number;
     rejectCaptchaForTest?: () => void;
   }
 }
@@ -20,6 +22,13 @@ async function prepareCaptcha(
     ({ language: selectedLanguage, mode: selectedMode }) => {
       window.localStorage.setItem("i18nextLng", selectedLanguage);
       window.localStorage.setItem("argus-theme", "dark");
+      window.escapeReachedBackground = 0;
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          window.escapeReachedBackground =
+            (window.escapeReachedBackground ?? 0) + 1;
+        }
+      });
       Object.defineProperty(window, "turnstile", {
         configurable: true,
         value: {
@@ -28,11 +37,15 @@ async function prepareCaptcha(
             options: {
               theme?: "auto" | "light" | "dark";
               "before-interactive-callback"?: () => void;
+              callback?: (token: string) => void;
               "error-callback"?: () => boolean;
             },
           ) {
             document.documentElement.dataset.renderedTurnstileTheme =
               options.theme;
+            window.completeCaptchaForTest = () => {
+              options.callback?.("test-captcha-token");
+            };
             window.rejectCaptchaForTest = () => {
               options["error-callback"]?.();
             };
@@ -82,6 +95,16 @@ for (const fixture of [
     page,
   }) => {
     await prepareCaptcha(page, fixture.language, "visible");
+    if (fixture.language === "en") {
+      await page.route("**/api/v1/auth/login", async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 5_500));
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "internal_error" }),
+        });
+      });
+    }
     await submitLogin(page);
 
     const shell = page.getByTestId("turnstile-challenge-shell");
@@ -100,17 +123,26 @@ for (const fixture of [
     });
     await expect(shell).toBeFocused();
 
+    await page.keyboard.press("Escape");
+    await expect(shell).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.escapeReachedBackground ?? -1))
+      .toBe(0);
+
     await page.waitForTimeout(250);
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/${fixture.screenshot}`,
       fullPage: true,
     });
 
-    await page.evaluate(() => window.rejectCaptchaForTest?.());
+    await page.evaluate((complete) => {
+      if (complete) window.completeCaptchaForTest?.();
+      else window.rejectCaptchaForTest?.();
+    }, fixture.language === "en");
     await expect(shell).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Sign in|Iniciar sesión/ }),
-    ).toBeFocused();
+    ).toBeFocused({ timeout: 8_000 });
   });
 }
 

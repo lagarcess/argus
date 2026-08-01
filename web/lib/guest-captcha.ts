@@ -225,6 +225,12 @@ async function createTurnstileShell(
     }
     root.focus({ preventScroll: true });
   };
+  const containEscape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  root.addEventListener("keydown", containEscape);
 
   return {
     container,
@@ -253,26 +259,24 @@ async function createTurnstileShell(
       root.remove();
       if (focusBeforeChallenge?.isConnected) {
         const restoreFocus = () => {
-          if (
-            !focusBeforeChallenge.isConnected ||
-            focusBeforeChallenge.matches(":disabled")
-          ) {
-            return false;
+          if (!focusBeforeChallenge.isConnected) {
+            restoreObserver.disconnect();
+            return;
           }
+          if (focusBeforeChallenge.matches(":disabled")) return;
           focusBeforeChallenge.focus({ preventScroll: true });
-          return true;
+          restoreObserver.disconnect();
         };
-        const restoreObserver = new MutationObserver(() => {
-          if (restoreFocus()) restoreObserver.disconnect();
-        });
+        const restoreObserver = new MutationObserver(restoreFocus);
         restoreObserver.observe(focusBeforeChallenge, {
           attributes: true,
           attributeFilter: ["disabled"],
         });
-        window.requestAnimationFrame(() => {
-          if (restoreFocus()) restoreObserver.disconnect();
+        restoreObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
         });
-        window.setTimeout(() => restoreObserver.disconnect(), 5_000);
+        window.requestAnimationFrame(restoreFocus);
       }
     },
   };
