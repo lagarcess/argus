@@ -53,6 +53,7 @@ type MockGuestJourneyOptions = {
     body: unknown;
   };
   profileRefreshNull?: boolean;
+  initialProfileNull?: boolean;
   initialProfileFailure?: {
     status: number;
     body: unknown;
@@ -182,6 +183,10 @@ async function mockGuestJourney(
     evidence.profileProbeCalls += 1;
     if (!authenticated) {
       evidence.unauthenticatedProfileProbeCalls += 1;
+      if (options.initialProfileNull) {
+        await fulfillJson(route, null);
+        return;
+      }
       if (options.initialProfileFailure) {
         await fulfillJson(
           route,
@@ -405,6 +410,90 @@ test("@guest-shell null profile refresh blocks admission before guest work", asy
     stream: evidence.streamCalls,
   }).toEqual({ usage: 0, conversation: 0, stream: 0 });
 });
+
+test("@guest-shell a null landing profile stays auth-first without guest work", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, { initialProfileNull: true });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "argus" })).toBeVisible();
+  await expect(page.getByTestId("chat-input")).toHaveCount(0);
+  expect({
+    bootstrap: evidence.bootstrapCalls,
+    usage: evidence.usageCalls,
+    conversation: evidence.conversationCreateCalls,
+    stream: evidence.streamCalls,
+  }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+});
+
+test("@guest-shell a null chat profile fails closed before admission", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, { initialProfileNull: true });
+  await page.goto("/chat", { waitUntil: "domcontentloaded" });
+
+  await expect(page).toHaveURL(/\/?auth=login$/);
+  await expect(page.getByTestId("chat-input")).toHaveCount(0);
+  expect({
+    bootstrap: evidence.bootstrapCalls,
+    usage: evidence.usageCalls,
+    conversation: evidence.conversationCreateCalls,
+    stream: evidence.streamCalls,
+  }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+});
+
+for (const preBootstrapSidebarCase of [
+  {
+    language: "en",
+    retentionCopy: "Sign in to keep your history",
+    expiryCopy: /Available until/,
+    noRecentCopy: "No recent chats yet.",
+    recentsLabel: "Recents",
+  },
+  {
+    language: "es-419",
+    retentionCopy: "Inicia sesión para conservar tu historial",
+    expiryCopy: /Disponible hasta/,
+    noRecentCopy: "Aún no hay chats recientes.",
+    recentsLabel: "Recientes",
+  },
+] as const) {
+  test(`@guest-shell ${preBootstrapSidebarCase.language} pre-bootstrap sidebar makes no retention promise`, async ({
+    page,
+  }) => {
+    await page.addInitScript((language) => {
+      window.localStorage.setItem("i18nextLng", language);
+    }, preBootstrapSidebarCase.language);
+    const evidence = await mockGuestJourney(page);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByTestId("chat-input")).toBeVisible();
+    await page.getByRole("button", { name: "Expand sidebar" }).click();
+    const sidebar = page.locator("aside");
+    await expect
+      .poll(async () => (await sidebar.boundingBox())?.width ?? 0)
+      .toBeGreaterThanOrEqual(280);
+    await sidebar
+      .getByRole("button", { name: preBootstrapSidebarCase.recentsLabel })
+      .click();
+    await expect(
+      sidebar.getByText(preBootstrapSidebarCase.noRecentCopy, { exact: true }),
+    ).toBeVisible();
+    await expect(sidebar.getByText(preBootstrapSidebarCase.retentionCopy, {
+      exact: true,
+    })).toHaveCount(0);
+    await expect(sidebar.getByText(preBootstrapSidebarCase.expiryCopy)).toHaveCount(
+      0,
+    );
+    expect({
+      bootstrap: evidence.bootstrapCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+    }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+  });
+}
 
 for (const entryCase of [
   {

@@ -823,11 +823,10 @@ export default function ChatInterface() {
     (async () => {
       try {
         let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
-        let probeOutcome: ReturnType<
-          typeof guestProfileProbeOutcome
-        > | null = null;
+        let probeOutcome: ReturnType<typeof guestProfileProbeOutcome> | null = null;
         try {
           meResponse = await getMe();
+          if (meResponse === null) probeOutcome = "fail_closed";
           if (!cancelled) {
             setAccount(meResponse);
           }
@@ -2302,7 +2301,7 @@ export default function ChatInterface() {
         }
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
-        isGuest={isGuest}
+        isGuest={guestExperience.isEstablishedGuest}
         guestExpiresAt={account?.guest?.expires_at}
       />
 

@@ -64,8 +64,13 @@ export default function LandingPage() {
     let cancelled = false;
     (async () => {
       try {
-        await getMe();
+        const meResponse = await getMe();
         if (cancelled) return;
+        if (meResponse === null) {
+          setProfileProbeFailedClosed(true);
+          setIsCheckingSession(false);
+          return;
+        }
         router.replace("/chat");
       } catch (error) {
         if (cancelled) return;

@@ -128,6 +128,24 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
     );
   });
 
+  test("a successful null profile probe never enters authenticated chat", () => {
+    const landing = read("app/page.tsx");
+    const chat = read("components/chat/ChatInterface.tsx");
+    const initStart = chat.indexOf("// ── Init conversation");
+    const initEnd = chat.indexOf(
+      "const { scrollToLatest, updateScrollPositionState }",
+      initStart,
+    );
+    const init = chat.slice(initStart, initEnd);
+
+    expect(landing).toContain("const meResponse = await getMe()");
+    expect(landing).toContain("if (meResponse === null)");
+    expect(init).toContain("if (meResponse === null)");
+    expect(init.indexOf("if (meResponse === null)")).toBeLessThan(
+      init.indexOf('setProfileState("established")'),
+    );
+  });
+
   test("an unreachable backend fails closed to the auth-first surface", () => {
     const chat = read("components/chat/ChatInterface.tsx");
     const failClosedBranch = chat.indexOf(
