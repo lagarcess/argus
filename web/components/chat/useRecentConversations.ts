@@ -15,6 +15,7 @@ import {
 import {
   mergeRecentChats,
   projectConversationToRecentChat,
+  refreshFirstPageRecentChats,
 } from "@/lib/chat-recents";
 
 type UseRecentConversationsOptions = Readonly<{
@@ -50,6 +51,7 @@ export function useRecentConversations({
   const [historyLoadMoreError, setHistoryLoadMoreError] = useState(false);
   const paginationInFlightRef = useRef(false);
   const pageRequestsRef = useRef(new Map<string, Promise<void>>());
+  const firstPageConversationIdsRef = useRef<Set<string>>(new Set());
   const guestExpiresAtRef = useRef(guestExpiresAt);
 
   useEffect(() => {
@@ -78,9 +80,20 @@ export function useRecentConversations({
                 guestExpiresAt: guestExpiresAtRef.current,
               }),
             );
-          setHistoryItems((current) =>
-            append ? mergeRecentChats(current, projected) : projected,
-          );
+          if (append) {
+            setHistoryItems((current) => mergeRecentChats(current, projected));
+          } else {
+            setHistoryItems((current) =>
+              refreshFirstPageRecentChats(
+                current,
+                firstPageConversationIdsRef.current,
+                projected,
+              ),
+            );
+            firstPageConversationIdsRef.current = new Set(
+              projected.map((item) => item.conversation_id ?? item.id),
+            );
+          }
           setHistoryNextCursor(next_cursor);
         })
         .finally(() => {
@@ -108,6 +121,7 @@ export function useRecentConversations({
     setHasRequestedOlderHistory(false);
     setHistoryLoadMoreError(false);
     pageRequestsRef.current.clear();
+    firstPageConversationIdsRef.current.clear();
     paginationInFlightRef.current = false;
   }, []);
 

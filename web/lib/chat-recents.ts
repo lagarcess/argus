@@ -34,24 +34,52 @@ export function projectConversationToRecentChat(
     created_at: conversation.updated_at,
     conversation_id: conversation.id,
     expires_at: options.guestExpiresAt ?? null,
+    ...(conversation.activity === undefined
+      ? {}
+      : { activity: conversation.activity }),
   };
 }
+
+const conversationIdentity = (item: HistoryItem): string =>
+  item.conversation_id ?? item.id;
 
 export function mergeRecentChats(
   existing: HistoryItem[],
   incoming: HistoryItem[],
 ): HistoryItem[] {
-  const seen = new Set(
-    existing.map((item) => item.conversation_id ?? item.id),
+  const incomingByConversationId = new Map(
+    incoming.map((item) => [conversationIdentity(item), item]),
   );
-  const merged = [...existing];
-  for (const item of incoming) {
-    const conversationId = item.conversation_id ?? item.id;
-    if (seen.has(conversationId)) continue;
-    seen.add(conversationId);
-    merged.push(item);
-  }
-  return merged;
+  const existingConversationIds = new Set(
+    existing.map(conversationIdentity),
+  );
+  const appendedConversationIds = new Set(existingConversationIds);
+  const appended = incoming.flatMap((item) => {
+    const conversationId = conversationIdentity(item);
+    if (appendedConversationIds.has(conversationId)) return [];
+    appendedConversationIds.add(conversationId);
+    return [incomingByConversationId.get(conversationId) ?? item];
+  });
+
+  return [
+    ...existing.map(
+      (item) => incomingByConversationId.get(conversationIdentity(item)) ?? item,
+    ),
+    ...appended,
+  ];
+}
+
+export function refreshFirstPageRecentChats(
+  existing: HistoryItem[],
+  previousFirstPageConversationIds: Iterable<string>,
+  incomingFirstPage: HistoryItem[],
+): HistoryItem[] {
+  const previousFirstPageIds = new Set(previousFirstPageConversationIds);
+  const retainedOlderChats = existing.filter(
+    (item) => !previousFirstPageIds.has(conversationIdentity(item)),
+  );
+
+  return mergeRecentChats(incomingFirstPage, retainedOlderChats);
 }
 
 export function groupRecentChats(
