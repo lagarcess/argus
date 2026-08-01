@@ -252,7 +252,7 @@
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
-      "latest_result_followup_unavailable": "I still have the latest result in this chat, but I could not safely answer that follow-up. Please retry in a moment.",
+      "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
       "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
@@ -467,6 +467,13 @@
     "saved": "Saved",
     "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "activity_rail": {
+      "aria_label": "Conversation activity",
+      "backtest_completed": "Backtest finished",
+      "needs_attention": "Needed attention",
+      "needs_attention_body": "This turn hit an issue and offered a way forward.",
+      "jump_hint": "Click to jump to this turn"
+    },
     "backtest_job": {
       "queued_title": "Backtest queued",
       "queued_status": "Queued",
@@ -909,6 +916,35 @@
       "confirm": "Delete conversation"
     }
   },
+  "keyboard_shortcuts": {
+    "title": "Keyboard shortcuts",
+    "description": "Quick ways to move through Argus.",
+    "close": "Close keyboard shortcuts",
+    "menu_item": "Keyboard shortcuts",
+    "groups": {
+      "navigation": "Navigation",
+      "chat": "Chat",
+      "quick_jump": "Quick jump"
+    },
+    "quick_jump_description": "Hold the modifier keys to reveal numbers on visible items.",
+    "shortcuts": {
+      "omnisearch": "Open search",
+      "keyboard_shortcuts": "Show keyboard shortcuts",
+      "new_chat": "New chat",
+      "open_recents": "Open Recents",
+      "delete_focused_chat": "Delete current chat",
+      "rename_focused_chat": "Rename current chat",
+      "expand_sidebar_recents": "Toggle sidebar and Recents",
+      "open_settings": "Open Settings",
+      "toggle_pin_focused_chat": "Pin or unpin current chat",
+      "quick_jump": "Quick-jump visible items"
+    }
+  },
+  "recents_quick_peek": {
+    "title": "Recents",
+    "close": "Close Recents",
+    "empty": "No recent chats yet."
+  },
   "command_palette": {
     "close": "Close search",
     "search_placeholder": "Search Argus...",
@@ -916,7 +952,9 @@
       "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
     },
     "asset_rollup": {
-      "heading": "Your history with this asset",
+      "heading": "Your Argus history",
+      "scope_registered": "Across your conversations",
+      "scope_guest": "In this temporary conversation",
       "runs_involving_one": "{{count}} run involving {{symbol}}",
       "runs_involving_other": "{{count}} runs involving {{symbol}}",
       "last_touched": "Last touched {{date}}"
@@ -924,7 +962,7 @@
     "no_results": "No results found",
     "try_searching": "Try a ticker, phrase, or note you remember.",
     "keep_typing": "Keep typing",
-    "keep_typing_detail": "Search starts when one word has at least 3 characters.",
+    "keep_typing_detail": "Search starts with a 2-character ticker or a 3-character word.",
     "read_error": "Argus couldn’t load these results.",
     "retry_search": "Try searching again",
     "load_more_error": "Argus couldn’t load more results. Your current results are still available.",
@@ -945,6 +983,27 @@
     "add_decision": "Add decision · {{run}}",
     "change_decision": "Change decision · {{run}}",
     "save_decision": "Save decision",
+    "back_to_latest_run": "Back to latest run",
+    "back_to_run_details": "Back to run details",
+    "decision_history": "Decision history",
+    "decision_history_count": "{{decided}} of {{total}} decided",
+    "decision_history_loading": "Loading decision history",
+    "decision_history_loading_older": "Loading older decisions",
+    "decision_history_error": "Could not load decision history",
+    "decision_history_retry": "Try again",
+    "no_decision_saved": "No decision saved",
+    "add_decision_short": "Add decision",
+    "change_decision_short": "Edit",
+    "decision_note_label": "Decision note: ",
+    "decision_note_editor_label": "Decision note",
+    "decision_note_count": "{{count}} / {{max}}",
+    "show_full_note": "Show full note",
+    "show_less_note": "Show less",
+    "decision_saved": "Saved",
+    "run_fresh_short": "Retest setup",
+    "run_fresh_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "open_in_conversation": "Open in conversation",
+    "load_older": "Load older",
     "select_preview": "Select a result to preview its details.",
     "ledger": {
       "decision_filters": "Decision filters",
@@ -972,14 +1031,23 @@
       "decision_on": "{{state}} · on {{run}}",
       "run_count_one": "{{count}} run",
       "run_count_other": "{{count}} runs",
+      "cadences": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "biweekly": "Biweekly",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly"
+      },
       "strategy_families": {
         "buy_and_hold": "Buy and hold",
         "buy_hold": "Buy and hold",
         "buy_the_dip": "Buy the dip",
         "dca": "Recurring buys",
         "dca_accumulation": "Recurring buys",
+        "indicator_threshold": "RSI threshold",
         "moving_average_crossover": "Moving-average crossover",
         "rsi_mean_reversion": "RSI threshold",
+        "signal_strategy": "Moving-average crossover",
         "unknown": "Strategy"
       },
       "nudges": {

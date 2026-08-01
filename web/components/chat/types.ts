@@ -232,6 +232,8 @@ export type StrategyConfirmationCapabilities = {
 
 export type Message = {
   id: string;
+  /** Hidden durable message ids that should focus this projected transcript row. */
+  transcriptAnchorIds?: string[];
   role: "user" | "ai";
   kind?:
     | "text"

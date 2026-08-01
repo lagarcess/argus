@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
+import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -252,11 +253,7 @@ export type ArtifactLifecycle =
   | "archived"
   | "discarded";
 
-export type DecisionState =
-  | "watching"
-  | "promising"
-  | "rejected"
-  | "revisit_later";
+export type DecisionState = RunDossierDecisionState;
 
 export type EvidenceArtifact = {
   id: string;
@@ -285,7 +282,7 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchConversationItem = SearchConversationContract<DecisionState>;
+export type SearchConversationItem = SearchConversationContract;
 
 export type SearchAssetRollupItem = {
   type: "asset_rollup";

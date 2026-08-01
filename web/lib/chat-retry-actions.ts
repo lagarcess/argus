@@ -340,70 +340,9 @@ export function isRetryAction(action: ChatActionOption | null | undefined): bool
 export function normalizeDurableRetryActionHistory(
   messages: Message[],
 ): Message[] {
-  const coalesced = messages.map((message) => ({ ...message }));
-  const omittedMessageIndexes = new Set<number>();
-  for (const [index, message] of coalesced.entries()) {
-    if (
-      message.role !== "ai" ||
-      message.kind !== "text" ||
-      !message.recoveryDisplay
-    ) {
-      continue;
-    }
-    const retryActions = (message.actions ?? []).filter(
-      (action) => action.type === "retry_last_turn",
-    );
-    const nonRetryActions = (message.actions ?? []).filter(
-      (action) => action.type !== "retry_last_turn",
-    );
-    const linkedRequestMessageId =
-      retryActions
-        .map(retryLastTurnRequestMessageIdFromAction)
-        .find((requestMessageId) => requestMessageId !== null) ?? null;
-    let ownerIndex = linkedRequestMessageId
-      ? coalesced.findIndex(
-          (candidate, candidateIndex) =>
-            candidateIndex < index &&
-            candidate.role === "user" &&
-            candidate.id === linkedRequestMessageId,
-        )
-      : -1;
-    if (
-      ownerIndex < 0 &&
-      index > 0 &&
-      coalesced[index - 1].role === "user" &&
-      coalesced[index - 1].actions?.some(
-        (action) =>
-          retryLastTurnRequestMessageIdFromAction(action) ===
-          coalesced[index - 1].id,
-      )
-    ) {
-      ownerIndex = index - 1;
-    }
-    if (ownerIndex < 0 || nonRetryActions.length > 0) {
-      continue;
-    }
-    const owner = coalesced[ownerIndex];
-    const ownerActions = owner.actions ?? [];
-    const transferredActions = retryActions.filter(
-      (retryAction) =>
-        !ownerActions.some((ownerAction) => ownerAction.id === retryAction.id),
-    );
-    coalesced[ownerIndex] = {
-      ...owner,
-      recoveryDisplay: message.recoveryDisplay,
-      actions:
-        ownerActions.length > 0 || transferredActions.length > 0
-          ? [...ownerActions, ...transferredActions]
-          : undefined,
-    };
-    omittedMessageIndexes.add(index);
-  }
-
-  const visibleMessages = coalesced.filter(
-    (_message, index) => !omittedMessageIndexes.has(index),
-  );
-  return visibleMessages.flatMap((message, index) => {
+  // Accepted user input and an Argus-side failure are separate transcript
+  // events. The retry payload links them without moving presentation ownership.
+  return messages.flatMap((message, index) => {
     if (
       message.role === "ai" &&
       message.kind === "text" &&
@@ -414,7 +353,7 @@ export function normalizeDurableRetryActionHistory(
     if (!message.actions?.some(isRetryAction)) {
       return [message];
     }
-    const laterWork = visibleMessages.slice(index + 1).some((later) => {
+    const laterWork = messages.slice(index + 1).some((later) => {
       if (later.role === "user") {
         return true;
       }

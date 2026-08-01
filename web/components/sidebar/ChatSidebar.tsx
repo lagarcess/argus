@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
+import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
@@ -27,6 +29,10 @@ import {
   conversationDisplayTitle,
   renamePrefillTitle,
 } from "@/lib/chat-title-display";
+import {
+  isKeyboardShortcutHintModifierActive,
+  keyboardShortcutHintDisplay,
+} from "@/lib/keyboard-shortcuts";
 import {
   RECENTS_INITIAL_GROUP_LIMIT,
   getVisibleRecentChats,
@@ -94,6 +100,8 @@ export type ChatSidebarProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   /** Sidebar preference handler */
   onOpenSidebarPreference?: () => void;
+  onOpenKeyboardShortcuts?: () => void;
+  settingsOpenRequest?: number;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
   canManageConversation?: boolean;
@@ -134,6 +142,8 @@ export default function ChatSidebar({
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
+  onOpenKeyboardShortcuts,
+  settingsOpenRequest = 0,
   strategiesEnabled = false,
   omnisearchEnabled = false,
   canManageConversation = true,
@@ -153,7 +163,10 @@ export default function ChatSidebar({
   const [expandedRecentGroups, setExpandedRecentGroups] = useState<
     Set<RecentChatGroupKey>
   >(() => new Set());
+  const [usesCommandKey, setUsesCommandKey] = useState(false);
+  const [showShortcutHints, setShowShortcutHints] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
+  const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPointerInsideSidebarRef = useRef(false);
 
@@ -206,6 +219,41 @@ export default function ChatSidebar({
     };
   }, [isProfileMenuOpen, isOpen, mode, onToggle]);
 
+  useEffect(() => {
+    setUsesCommandKey(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowShortcutHints(false);
+      return;
+    }
+
+    const updateShortcutHints = (event: KeyboardEvent) => {
+      setShowShortcutHints(
+        isKeyboardShortcutHintModifierActive(event, usesCommandKey),
+      );
+    };
+    const hideShortcutHints = () => setShowShortcutHints(false);
+
+    document.addEventListener("keydown", updateShortcutHints);
+    document.addEventListener("keyup", updateShortcutHints);
+    window.addEventListener("blur", hideShortcutHints);
+    return () => {
+      document.removeEventListener("keydown", updateShortcutHints);
+      document.removeEventListener("keyup", updateShortcutHints);
+      window.removeEventListener("blur", hideShortcutHints);
+    };
+  }, [isOpen, usesCommandKey]);
+
+  useEffect(() => {
+    if (settingsOpenRequest === previousSettingsOpenRequestRef.current) return;
+    previousSettingsOpenRequestRef.current = settingsOpenRequest;
+    setIsProfileMenuOpen(true);
+  }, [settingsOpenRequest]);
+
   // ── Filter to chats only ────────────────────────────────────────────────
   const chatItems = useMemo(
     () => historyItems.filter((item) => item.type === "chat"),
@@ -229,6 +277,44 @@ export default function ChatSidebar({
       return next;
     });
   }, []);
+
+  const visibleRecentItems = useMemo(
+    () =>
+      groupedHistory.flatMap((group) =>
+        getVisibleRecentChats(group, {
+          expanded: expandedRecentGroups.has(group.key),
+          selectedConversationId: conversationId,
+        }),
+      ),
+    [conversationId, expandedRecentGroups, groupedHistory],
+  );
+  const quickJumpRecentItems = useMemo(
+    () =>
+      visibleRecentItems.map((item) => ({
+        id: historyConversationId(item),
+        pinned: item.pinned,
+      })),
+    [visibleRecentItems],
+  );
+  const handleQuickJumpRecent = useCallback(
+    (id: string) => {
+      const item = visibleRecentItems.find(
+        (candidate) => historyConversationId(candidate) === id,
+      );
+      if (item) onOpenItem(item);
+    },
+    [onOpenItem, visibleRecentItems],
+  );
+  const { isQuickJumpActive, numberFor } = useQuickJump({
+    enabled:
+      isOpen &&
+      isRecentsExpanded &&
+      renamingId === null &&
+      !isProfileMenuOpen,
+    items: quickJumpRecentItems,
+    onSelect: handleQuickJumpRecent,
+    usesCommandKey,
+  });
 
   // ── Chat actions ────────────────────────────────────────────────────────
   const handlePin = useCallback(async (id: string, pinned: boolean) => {
@@ -392,6 +478,8 @@ export default function ChatSidebar({
           icon={MessageCirclePlus}
           label={t("chat.new_chat")}
           collapsed={!isOpen}
+          shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
+          showShortcutHint={showShortcutHints}
           onClick={() => {
             onNewChat();
           }}
@@ -403,6 +491,8 @@ export default function ChatSidebar({
             icon={Search}
             label={t("common.search", "Search")}
             collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay("omnisearch", usesCommandKey)}
+            showShortcutHint={showShortcutHints}
             onClick={onOpenSearch}
             iconSize={20}
           />
@@ -424,6 +514,11 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay(
+              "expand_sidebar_recents",
+              usesCommandKey,
+            )}
+            showShortcutHint={showShortcutHints}
             onClick={() => {
               if (!isOpen) {
                 // When collapsed: expand sidebar + open recents
@@ -542,7 +637,14 @@ export default function ChatSidebar({
                           {hasConversationAttention && (
                             <span className="sr-only">{attentionLabel}</span>
                           )}
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                            {isQuickJumpActive &&
+                            numberFor(itemConversationId) !== null ? (
+                              <QuickJumpBadge
+                                number={numberFor(itemConversationId)!}
+                              />
+                            ) : null}
+                          </div>
                           <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (
                               <>
@@ -759,6 +861,7 @@ export default function ChatSidebar({
             onDeleteAllConversations={handleRequestDeleteAllConversations}
             onHistoryMutated={onHistoryMutated}
             onOpenSidebarPreference={onOpenSidebarPreference}
+            onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
             anchorRef={profileButtonRef}
             sidebarCollapsed={!isOpen}
           />
@@ -767,6 +870,11 @@ export default function ChatSidebar({
               icon={User}
               label={t("common.settings")}
               collapsed={!isOpen}
+              shortcutHint={keyboardShortcutHintDisplay(
+                "open_settings",
+                usesCommandKey,
+              )}
+              showShortcutHint={showShortcutHints}
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               iconSize={20}
             />

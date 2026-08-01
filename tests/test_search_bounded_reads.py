@@ -99,6 +99,8 @@ def _hydration_row() -> dict[str, Any]:
             "deleted_at": None,
             "_recall_summary": {
                 "run_count": 7,
+                "total_runs": 7,
+                "decided_runs": 5,
                 "symbols": ["AAPL", "MSFT"],
                 "strategy_families": ["buy_and_hold"],
                 "start_date": "2019-01-01",
@@ -170,6 +172,16 @@ def _hydration_row() -> dict[str, Any]:
             "note": "Latest-run decision.",
             "updated_at": "2026-07-26T13:00:00+00:00",
         },
+        "latest_result_message_payload": {
+            "id": "00000000-0000-0000-0000-000000000201",
+            "conversation_id": CONVERSATION_ID,
+            "role": "assistant",
+            "content": "Latest run result",
+            "metadata": {
+                "result_run_id": "00000000-0000-0000-0000-000000000401"
+            },
+            "created_at": ACTIVITY_AT,
+        },
     }
 
 
@@ -197,10 +209,11 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "conversations": 1,
         "strategies": 0,
         "collections": 0,
-        "runs": 2,
+        "runs": 1,
         "ideas": 0,
         "evidence": 1,
-        "decisions": 2,
+        "decisions": 1,
+        "messages": 1,
     }
     assert result.rows["conversations"][0]["_recall_match"] == {
         "matched_text": "Search decision evidence",
@@ -211,16 +224,59 @@ def test_search_first_page_is_one_candidate_one_hydration_and_one_ledger_read() 
         "symbol_exact_match": False,
         "activity_at": ACTIVITY_AT,
     }
-    assert result.rows["conversations"][0]["_recall_summary"]["run_count"] == 7
+    assert result.rows["conversations"][0]["_recall_summary"]["total_runs"] == 7
     assert result.ledger_counts == {
         "promising": 1,
         "watching": 1,
         "rejected": 0,
         "revisit_later": 0,
     }
+    hydration_sql = str(pool.cursor.executions[1][0])
+    assert "message.metadata->'result_card'" in hydration_sql
+    assert hydration_sql.index("message.metadata->'result_card'") < hydration_sql.index(
+        "message.created_at desc"
+    )
     assert len(pool.cursor.executions) == 3
     assert pool.cursor.executions[0][1]["source_limit"] == 4
     assert pool.acquisition_timeouts == [2.0]
+
+
+def test_search_hydrates_latest_recall_decision_without_a_run_dossier() -> None:
+    reader_type, _ = _reader_types()
+    hydration = _hydration_row()
+    hydration["latest_run_payload"] = None
+    hydration["latest_evidence_payload"] = None
+    hydration["latest_run_decision_payload"] = None
+    hydration["latest_result_message_payload"] = None
+    hydration["latest_recall_decision_payload"] = {
+        "id": "00000000-0000-0000-0000-000000000501",
+        "source_conversation_id": CONVERSATION_ID,
+        "evidence_artifact_id": "00000000-0000-0000-0000-000000000302",
+        "decision_state": "promising",
+        "note": "Search decision.",
+        "artifact_digest": "Search decision evidence",
+        "updated_at": ACTIVITY_AT,
+    }
+    pool = _RecordingPool(
+        [
+            [_conversation_candidate()],
+            [hydration],
+        ]
+    )
+
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="search",
+        source_limit=4,
+    )
+
+    assert result.rows["runs"] == []
+    assert result.rows["evidence"] == []
+    assert result.rows["decisions"] == [
+        hydration["latest_recall_decision_payload"]
+    ]
+    hydration_sql = pool.cursor.executions[1][0]
+    assert "latest_recall_decision_payload" in str(hydration_sql)
 
 
 def test_search_visible_id_recall_is_one_bounded_hydration_and_one_ledger_read() -> None:
@@ -294,7 +350,7 @@ def test_search_rejects_nonpositive_bound_before_database_read() -> None:
     assert pool.cursor.executions == []
 
 
-@pytest.mark.parametrize("query", ["a", "GL", "__"])
+@pytest.mark.parametrize("query", ["a", "GL D", "__"])
 def test_search_defers_nonempty_queries_without_an_indexable_token(
     query: str,
 ) -> None:
@@ -320,13 +376,14 @@ def test_search_defers_nonempty_queries_without_an_indexable_token(
     assert pool.acquisition_timeouts == []
 
 
-def test_search_allows_long_punctuated_symbol_without_text_scans() -> None:
+@pytest.mark.parametrize("symbol", ["GL", "ss/e"])
+def test_search_allows_symbol_only_queries_without_text_scans(symbol: str) -> None:
     reader_type, _ = _reader_types()
-    pool = _RecordingPool([[]])
+    pool = _RecordingPool([[], []])
 
     result = reader_type(pool).search_rows(
         user_id=OWNER_ID,
-        query="ss/e",
+        query=symbol,
         source_limit=4,
         include_ledger_groups=True,
     )
@@ -338,16 +395,21 @@ def test_search_allows_long_punctuated_symbol_without_text_scans() -> None:
         "rejected": 0,
         "revisit_later": 0,
     }
-    assert len(pool.cursor.executions) == 1
+    assert len(pool.cursor.executions) == 2
     rendered, params = pool.cursor.executions[0]
     sql_text = rendered.as_string()
-    assert params["symbol_query"] == "ss/e"
+    assert params["symbol_query"] == symbol.casefold()
     assert params["text_search_enabled"] is False
     assert "%(text_search_enabled)s::boolean as text_search_enabled" in sql_text
-    assert "conversation_page" not in sql_text
-    assert "decision_candidates" not in sql_text
-    assert "public.messages" not in sql_text
-    assert "public.ideas" not in sql_text
+    assert "not input.text_search_enabled" in sql_text
+    assert (
+        "btrim(public.argus_search_symbol_casefold("
+        'run.symbols[1])) collate "C"'
+    ) in sql_text
+    assert all(
+        execution_params["text_search_enabled"] is False
+        for _, execution_params in pool.cursor.executions
+    )
 
 
 def test_empty_search_keeps_recents_and_ledger_reads_enabled() -> None:
@@ -376,33 +438,77 @@ def test_conversation_search_sql_guards_all_text_match_sources() -> None:
 
     rendered = _conversation_search_sql(has_anchor=False).as_string()
 
-    assert rendered.count("input.text_search_enabled") == 6
+    assert rendered.count("input.text_search_enabled") == 7
+    assert "not input.text_search_enabled" in rendered
 
 
-def test_search_indexability_includes_long_punctuated_symbols() -> None:
+def test_search_indexability_separates_two_character_symbols_from_text() -> None:
     from argus.domain.search_text import search_query_is_indexable
 
+    assert search_query_is_indexable("GL") is True
     assert search_query_is_indexable("ss/e") is True
     assert search_query_is_indexable("J\u030c/USD") is True
-    for deferred in ("GL", "__", "___", "\x00__", "/-.", "a"):
+    for deferred in ("G", "GL D", "__", "___", "\x00__", "/-."):
         assert search_query_is_indexable(deferred) is False
 
 
-def test_symbol_only_search_rejects_cursor_before_database_read() -> None:
-    reader_type, cursor_error = _reader_types()
-    pool = _RecordingPool([])
+def test_symbol_only_search_accepts_a_conversation_cursor() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[_conversation_candidate()], []])
 
-    with pytest.raises(cursor_error, match="symbol-only"):
-        reader_type(pool).search_rows(
-            user_id=OWNER_ID,
-            query="ss/e",
-            source_limit=4,
-            cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
-            cursor_id=CONVERSATION_ID,
-        )
+    result = reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ba",
+        source_limit=4,
+        cursor_updated_at=datetime(2026, 7, 27, 12, tzinfo=timezone.utc),
+        cursor_id=CONVERSATION_ID,
+    )
 
-    assert pool.cursor.executions == []
-    assert pool.acquisition_timeouts == []
+    assert result.rows["conversations"] == []
+    assert len(pool.cursor.executions) == 2
+    assert pool.cursor.executions[0][1]["text_search_enabled"] is False
+    assert "public.backtest_runs" in pool.cursor.executions[0][0].as_string()
+
+
+def test_symbol_only_search_uses_exact_run_symbols_without_broad_text() -> None:
+    reader_type, _ = _reader_types()
+    pool = _RecordingPool([[]])
+
+    reader_type(pool).search_rows(
+        user_id=OWNER_ID,
+        query="ba",
+        source_limit=4,
+    )
+
+    rendered, params = pool.cursor.executions[0]
+    sql_text = rendered.as_string()
+    assert params["text_search_enabled"] is False
+    assert "conversation_page" in sql_text
+    assert "unnest(run.symbols)" not in sql_text
+    assert "unnest(symbol_run.symbols)" not in sql_text
+    for slot in range(1, 6):
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'run.symbols[{slot}])) collate "C"'
+        ) in sql_text
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'symbol_run.symbols[{slot}])) collate "C"'
+        ) in sql_text
+    assert "where input.text_search_enabled" in sql_text
+
+
+def test_symbol_only_ledger_uses_indexed_run_symbol_slots() -> None:
+    from argus.domain.postgres_search_reader import _conversation_ledger_sql
+
+    rendered = _conversation_ledger_sql(has_anchor=False).as_string()
+
+    assert "unnest(run.symbols)" not in rendered
+    for slot in range(1, 6):
+        assert (
+            "btrim(public.argus_search_symbol_casefold("
+            f'run.symbols[{slot}])) collate "C"'
+        ) in rendered
 
 
 @pytest.mark.parametrize("pivot_rows", [[], [_conversation_candidate()] * 2])
@@ -600,8 +706,8 @@ def test_conversation_symbol_rank_uses_canonical_expanding_casefold() -> None:
 
     rendered = pool.cursor.executions[0][0].as_string()
     assert (
-        "input.symbol_query = "
-        "btrim(public.argus_search_symbol_casefold(symbol))"
+        "btrim(public.argus_search_symbol_casefold("
+        'symbol_run.symbols[1])) collate "C"'
     ) in rendered
     assert "input.symbol_query = lower(symbol)" not in rendered
 
@@ -837,6 +943,8 @@ def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap()
 
     assert result.rows["conversations"][0]["_recall_summary"] == {
         "run_count": 7,
+        "total_runs": 7,
+        "decided_runs": 5,
         "symbols": ["AAPL", "MSFT"],
         "strategy_families": ["buy_and_hold"],
         "start_date": "2019-01-01",
@@ -847,8 +955,7 @@ def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap()
         "latest_activity": ACTIVITY_AT,
     }
     assert [row["conversation_id"] for row in result.rows["runs"]] == [
-        CONVERSATION_ID,
-        CONVERSATION_ID,
+        CONVERSATION_ID
     ]
     assert len(pool.cursor.executions) == 2
     hydration_sql, params = pool.cursor.executions[1]
@@ -930,15 +1037,21 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     assert item.matched_text == "Search decision evidence"
     assert item.updated_at.isoformat() == ACTIVITY_AT
     assert item.decision_states == ("promising", "watching")
-    assert item.dossier.tested.run_count == 7
-    assert item.dossier.tested.symbols == ["AAPL", "MSFT"]
-    assert item.dossier.tested.start_date.isoformat() == "2019-01-01"
+    assert item.total_runs == 7
+    assert item.decided_runs == 5
+    assert item.dossier is not None
+    assert item.dossier.run_id == "00000000-0000-0000-0000-000000000401"
+    assert item.dossier.result_message_id == "00000000-0000-0000-0000-000000000201"
+    assert item.dossier.tested.symbols == ["AAPL"]
+    assert item.dossier.tested.start_date.isoformat() == "2025-01-01"
     assert item.dossier.decision is not None
-    assert item.dossier.decision.run_label == "Judged older run"
-    assert item.dossier.outcome is not None
+    assert item.dossier.decision.run_label == "Latest run"
     assert item.dossier.outcome.run_label == "Latest run"
-    assert [action.type for action in item.actions] == ["run_fresh", "decision"]
-    decision_action = item.actions[1]
+    assert [action.type for action in item.dossier.actions] == [
+        "run_fresh",
+        "decision",
+    ]
+    decision_action = item.dossier.actions[1]
     assert decision_action.type == "decision"
     assert decision_action.evidence_artifact_id == (
         "00000000-0000-0000-0000-000000000301"

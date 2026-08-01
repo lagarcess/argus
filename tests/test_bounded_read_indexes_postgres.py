@@ -533,3 +533,24 @@ def test_current_read_predicates_select_each_forward_index(
                     f"idx_backtest_runs_owner_symbol_{slot}_prefix"
                     in _plan_index_names(plan)
                 )
+
+                cursor.execute(
+                    f"""
+                    explain (format json)
+                    select id
+                    from public.backtest_runs
+                    where user_id = %s
+                      and status = 'completed'
+                      and symbols[{slot}] is not null
+                      and btrim(
+                          public.argus_search_symbol_casefold(symbols[{slot}])
+                      ) collate "C" = %s collate "C"
+                    limit 2
+                    """,  # noqa: S608
+                    (owner_id, "aapl"),
+                )
+                exact_plan = cursor.fetchone()[0][0]["Plan"]
+                assert (
+                    f"idx_backtest_runs_owner_symbol_{slot}_prefix"
+                    in _plan_index_names(exact_plan)
+                )

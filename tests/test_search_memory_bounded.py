@@ -1239,8 +1239,9 @@ def test_memory_search_preserves_the_latest_untaken_assistant_offer() -> None:
 
     assert len(read.scored_items) == 1
     _, item = read.scored_items[0]
-    assert item.dossier.left_off is not None
-    assert item.dossier.left_off.nudge == "suggestion_untaken"
+    assert item.dossier is not None
+    assert item.dossier.result_message_id == offer.id
+    assert "left_off" not in item.dossier.model_dump()
 
     assistant_text_search = search_assembly.memory_search_read(
         user=user,
@@ -1265,5 +1266,7 @@ def test_memory_search_preserves_the_latest_untaken_assistant_offer() -> None:
         query="",
         source_limit=1,
     )
-    assert followed_up.scored_items[0][1].dossier.left_off is not None
-    assert followed_up.scored_items[0][1].dossier.left_off.nudge is None
+    followed_up_dossier = followed_up.scored_items[0][1].dossier
+    assert followed_up_dossier is not None
+    assert followed_up_dossier.result_message_id == offer.id
+    assert "left_off" not in followed_up_dossier.model_dump()
