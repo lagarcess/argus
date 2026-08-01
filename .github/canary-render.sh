@@ -16,6 +16,7 @@ APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"
 API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"
 EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
+SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"
@@ -39,7 +40,11 @@ if [ -z "$CANDIDATE_SHA" ]; then
 fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
-COOKIE_JAR="$(mktemp)"
+BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
+SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
+SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
+SIGNUP_AUTH_USER_IDS="$(mktemp)"
+SIGNUP_ALLOWLIST_RESPONSE="$(mktemp)"
 API_JOB_RESPONSE="$(mktemp)"
 API_MESSAGES_RESPONSE="$(mktemp)"
 API_SEARCH_RESPONSE="$(mktemp)"
@@ -52,11 +57,30 @@ IDEA_ROWS="$(mktemp)"
 IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF"
+chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
+chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
+chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
+printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
+  > "$SERVICE_ROLE_CURL_CONFIG"
+printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
+  >> "$SERVICE_ROLE_CURL_CONFIG"
+
+SIGNUP_IDENTITY_SETUP_ATTEMPTED="false"
 
 cleanup() {
+  local exit_status=$?
+  local signup_cleanup_failed=0
+  trap - EXIT
+  if [ "${SIGNUP_IDENTITY_SETUP_ATTEMPTED:-false}" = "true" ]; then
+    cleanup_signup_identity || signup_cleanup_failed=1
+  fi
   rm -f "$BROWSER_IDENTITY_HANDOFF"
+  rm -f "$BROWSER_AUTH_CURL_CONFIG"
   rm -f \
-    "$COOKIE_JAR" \
+    "$SERVICE_ROLE_CURL_CONFIG" \
+    "$SIGNUP_AUTH_USERS_RESPONSE" \
+    "$SIGNUP_AUTH_USER_IDS" \
+    "$SIGNUP_ALLOWLIST_RESPONSE" \
     "$API_JOB_RESPONSE" \
     "$API_MESSAGES_RESPONSE" \
     "$API_SEARCH_RESPONSE" \
@@ -68,6 +92,13 @@ cleanup() {
     "$IDEA_ROWS" \
     "$IDEA_VERSION_ROWS" \
     "$RECEIPT_ROWS"
+  if [ "$signup_cleanup_failed" -ne 0 ]; then
+    echo "ERROR: dedicated signup identity cleanup failed." >&2
+    if [ "$exit_status" -eq 0 ]; then
+      exit_status=1
+    fi
+  fi
+  exit "$exit_status"
 }
 trap cleanup EXIT
 
@@ -92,6 +123,7 @@ WORKFLOW_VERSION_ID=""
 WORKFLOW_VERSION_STATUS=""
 WORKFLOW_EXPECTED_VERSION_ID=""
 USER_ID=""
+BROWSER_ACCESS_TOKEN=""
 CONVERSATION_ID=""
 BACKTEST_JOB_ID=""
 BACKTEST_RUN_ID=""
@@ -658,9 +690,24 @@ validate_release_evidence_contract() {
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
 }
 
-run_browser_canary() {
-  if ! ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
+run_browser_canary_phase() {
+  local phase="$1"
+  if ! env -u SUPABASE_SERVICE_ROLE_KEY \
+    -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
+    ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+    ARGUS_CANARY_BROWSER_PHASE="$phase" \
+    ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh"; then
+    return 1
+  fi
+}
+
+run_requested_signup_denial_canary() {
+  run_browser_canary_phase "access-denial"
+}
+
+run_browser_canary() {
+  if ! run_browser_canary_phase "full"; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
@@ -689,6 +736,7 @@ if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
 
 keys = (
     "user_id",
+    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -735,6 +783,7 @@ PY
 
   IFS=$'\t' read -r \
     USER_ID \
+    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
@@ -780,11 +829,12 @@ except json.JSONDecodeError as exc:
     raise SystemExit(1) from exc
 if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
     raise SystemExit(1)
-required = ("user_id", "conversation_id")
+required = ("user_id", "access_token", "conversation_id")
 if any(not isinstance(payload.get(key), str) or not payload[key].strip() for key in required):
     raise SystemExit(1)
 keys = (
     "user_id",
+    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -800,6 +850,7 @@ PY
 
   IFS='|' read -r \
     USER_ID \
+    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
@@ -823,10 +874,10 @@ PY
     "${SUPABASE_URL}/rest/v1/route_receipts?select=task,outcome,failure_mode&conversation_id=eq.${CONVERSATION_ID}&user_id=eq.${USER_ID}&order=created_at.desc&limit=20" \
     "$RECEIPT_ROWS" || true
 
-  if ! login_for_read_only_api_postconditions; then
+  if ! require_browser_session_for_read_only_api_postconditions; then
     return 0
   fi
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS --config "$BROWSER_AUTH_CURL_CONFIG" \
     "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" \
     > "$API_MESSAGES_RESPONSE" || true
   if [ -z "$BACKTEST_JOB_ID" ]; then
@@ -864,7 +915,7 @@ PY
     done
   fi
   if [ -n "$BACKTEST_JOB_ID" ]; then
-    curl -fsS -b "$COOKIE_JAR" \
+    curl -fsS --config "$BROWSER_AUTH_CURL_CONFIG" \
       "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" \
       > "$API_JOB_RESPONSE" || true
     if [ -z "$BACKTEST_RUN_ID" ] && [ -s "$API_JOB_RESPONSE" ]; then
@@ -889,19 +940,14 @@ PY
   echo "canary_failed_browser_capture_inputs=collected"
 }
 
-login_for_read_only_api_postconditions() {
-  local login_body
-  login_body="$(CANARY_EMAIL="$EMAIL" CANARY_PASSWORD="$PASSWORD" python3 - <<'PY'
-import json
-import os
-print(json.dumps({"email": os.environ["CANARY_EMAIL"], "password": os.environ["CANARY_PASSWORD"]}))
-PY
-  )"
-  curl -fsS \
-    -c "$COOKIE_JAR" \
-    -H "Content-Type: application/json" \
-    -d "$login_body" \
-    "${API_URL}/api/v1/auth/login" >/dev/null
+require_browser_session_for_read_only_api_postconditions() {
+  if [ -z "$BROWSER_ACCESS_TOKEN" ]; then
+    return 1
+  fi
+  : > "$BROWSER_AUTH_CURL_CONFIG"
+  printf 'header = "Authorization: Bearer %s"\n' "$BROWSER_ACCESS_TOKEN" \
+    > "$BROWSER_AUTH_CURL_CONFIG"
+  chmod 600 "$BROWSER_AUTH_CURL_CONFIG"
 }
 
 verify_api_postconditions() {
@@ -912,11 +958,11 @@ import urllib.parse
 print(urllib.parse.quote(os.environ["CANARY_SEARCH_QUERY"], safe=""))
 PY
   )"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS --config "$BROWSER_AUTH_CURL_CONFIG" \
     "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" > "$API_JOB_RESPONSE"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS --config "$BROWSER_AUTH_CURL_CONFIG" \
     "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" > "$API_MESSAGES_RESPONSE"
-  curl -fsS -b "$COOKIE_JAR" \
+  curl -fsS --config "$BROWSER_AUTH_CURL_CONFIG" \
     "${API_URL}/api/v1/search?q=${encoded_search_query}&include_ledger_groups=true" > "$API_SEARCH_RESPONSE"
 
   CANARY_JOB_FILE="$API_JOB_RESPONSE" \
@@ -1021,13 +1067,226 @@ if not isinstance(ledger_groups, list) or not any(
 PY
 }
 
+service_role_curl() {
+  curl -fsS --config "$SERVICE_ROLE_CURL_CONFIG" "$@"
+}
+
+signup_identity_is_safe() {
+  CANARY_LOGIN_EMAIL="$EMAIL" CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
+import os
+
+login_email = os.environ["CANARY_LOGIN_EMAIL"].strip().casefold()
+signup_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+pinned_signup_email = "delivered@resend.dev"
+raise SystemExit(
+    0
+    if login_email
+    and signup_email == pinned_signup_email
+    and login_email != signup_email
+    else 1
+)
+PY
+}
+
+collect_signup_auth_user_ids() {
+  local page=1
+  local page_count
+  : > "$SIGNUP_AUTH_USER_IDS"
+  while [ "$page" -le 1000 ]; do
+    if ! service_role_curl \
+      "${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=1000" \
+      > "$SIGNUP_AUTH_USERS_RESPONSE"; then
+      return 1
+    fi
+    if ! CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_AUTH_USERS_RESPONSE" \
+      >> "$SIGNUP_AUTH_USER_IDS" <<'PY'; then
+import json
+import os
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+users = payload.get("users") if isinstance(payload, dict) else payload
+if not isinstance(users, list):
+    raise SystemExit(1)
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+for user in users:
+    if not isinstance(user, dict):
+        continue
+    if str(user.get("email") or "").strip().casefold() != target:
+        continue
+    user_id = str(user.get("id") or "").strip()
+    if not user_id:
+        raise SystemExit(1)
+    print(user_id)
+PY
+      return 1
+    fi
+    if ! page_count="$(python3 - "$SIGNUP_AUTH_USERS_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+users = payload.get("users") if isinstance(payload, dict) else payload
+if not isinstance(users, list):
+    raise SystemExit(1)
+print(len(users))
+PY
+    )"; then
+      return 1
+    fi
+    if [ "$page_count" -lt 1000 ]; then
+      return 0
+    fi
+    page=$((page + 1))
+  done
+  return 1
+}
+
+delete_signup_auth_identity() {
+  local user_id
+  local delete_failed=0
+  if ! collect_signup_auth_user_ids; then
+    return 1
+  fi
+  while IFS= read -r user_id; do
+    if [ -z "$user_id" ]; then
+      continue
+    fi
+    if ! service_role_curl -X DELETE \
+      "${SUPABASE_URL}/auth/v1/admin/users/${user_id}" >/dev/null; then
+      delete_failed=1
+    fi
+  done < "$SIGNUP_AUTH_USER_IDS"
+  if [ "$delete_failed" -ne 0 ]; then
+    return 1
+  fi
+  if ! collect_signup_auth_user_ids; then
+    return 1
+  fi
+  [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
+}
+
+encoded_signup_email() {
+  CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
+import os
+import urllib.parse
+
+print(urllib.parse.quote(os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold(), safe=""))
+PY
+}
+
+delete_signup_allowlist() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    -X DELETE \
+    -H "Prefer: return=minimal" \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}" \
+    >/dev/null
+}
+
+insert_requested_signup_allowlist() {
+  local signup_body
+  if ! signup_body="$(CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
+import json
+import os
+
+print(
+    json.dumps(
+        {
+            "email": os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold(),
+            "role": "requested",
+            "language": os.environ["CANARY_LANGUAGE"],
+        }
+    )
+)
+PY
+  )"; then
+    return 1
+  fi
+  service_role_curl \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -H "Prefer: resolution=ignore-duplicates,return=representation" \
+    -d "$signup_body" \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?on_conflict=email" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "requested"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("requested signup identity was not created exactly once")
+PY
+}
+
+verify_no_signup_auth_identity() {
+  collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
+}
+
+promote_requested_signup_allowlist() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=representation" \
+    -d '{"role":"user"}' \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.requested&disabled_at=is.null" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "user"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("requested signup identity promotion did not affect exactly one row")
+PY
+}
+
+prepare_signup_identity() {
+  SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
+  delete_signup_auth_identity &&
+    delete_signup_allowlist &&
+    insert_requested_signup_allowlist
+}
+
+cleanup_signup_identity() {
+  local cleanup_failed=0
+  delete_signup_auth_identity || cleanup_failed=1
+  delete_signup_allowlist || cleanup_failed=1
+  return "$cleanup_failed"
+}
+
 supabase_get() {
   local url="$1"
   local output_path="$2"
-  curl -fsS \
-    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-    "$url" > "$output_path"
+  service_role_curl "$url" > "$output_path"
 }
 
 verify_canonical_postconditions() {
@@ -1210,12 +1469,30 @@ fi
 if [ -z "$PASSWORD" ]; then
   fail_canary "auth" "missing_canary_password"
 fi
+if [ -z "$SIGNUP_EMAIL" ]; then
+  fail_canary "auth" "missing_canary_signup_email"
+fi
+if ! signup_identity_is_safe; then
+  fail_canary "auth" "canary_signup_identity_not_safe"
+fi
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
 fi
 
 prepare_capture_destination
 validate_release_evidence_contract
+if ! prepare_signup_identity; then
+  fail_canary "auth" "canary_signup_identity_setup_failed"
+fi
+if ! run_requested_signup_denial_canary; then
+  fail_canary "auth" "requested_signup_was_not_denied"
+fi
+if ! verify_no_signup_auth_identity; then
+  fail_canary "auth" "requested_signup_created_auth_identity"
+fi
+if ! promote_requested_signup_allowlist; then
+  fail_canary "auth" "requested_signup_promotion_failed"
+fi
 
 if ! run_browser_canary; then
   recover_browser_failure_capture_inputs || true
@@ -1224,8 +1501,8 @@ fi
 if ! verify_browser_identity_handoff; then
   fail_canary "browser_identity" "private_identity_handoff_failed"
 fi
-if ! login_for_read_only_api_postconditions; then
-  fail_canary "api_postconditions" "read_only_login_failed"
+if ! require_browser_session_for_read_only_api_postconditions; then
+  fail_canary "api_postconditions" "browser_session_missing"
 fi
 if ! verify_api_postconditions; then
   fail_canary "api_postconditions" "canonical_api_postconditions_failed"

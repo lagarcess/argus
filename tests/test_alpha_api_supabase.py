@@ -25,6 +25,7 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
+from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.postgres_history_reader import (
     HistoryCursorError,
@@ -211,15 +212,42 @@ def test_gateway_auth_flows_use_separate_auth_client():
 
     gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
 
-    assert gateway.signup(email="alpha@example.com", password="password") == {
+    assert gateway.signup(
+        email="alpha@example.com",
+        password="password",
+        captcha_token="captcha-proof",
+    ) == {
         "user": {"id": "auth-user"}
     }
-    assert gateway.login(email="alpha@example.com", password="password") == {
+    assert gateway.login(
+        email="alpha@example.com",
+        password="password",
+        captcha_token="captcha-proof",
+    ) == {
         "session": {"access_token": "token"}
     }
 
-    auth_client.auth.sign_up.assert_called_once()
-    auth_client.auth.sign_in_with_password.assert_called_once()
+    auth_client.auth.sign_up.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {
+                "data": {
+                    "display_name": None,
+                    "username": None,
+                    "language": "en",
+                },
+                "captcha_token": "captcha-proof",
+            },
+        }
+    )
+    auth_client.auth.sign_in_with_password.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {"captcha_token": "captcha-proof"},
+        }
+    )
     service_client.auth.sign_up.assert_not_called()
     service_client.auth.sign_in_with_password.assert_not_called()
 
@@ -236,6 +264,7 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
     gateway.signup(
         email="alpha@example.com",
         password="password",
+        captcha_token="captcha-proof",
         language="es-419",
     )
 
@@ -248,7 +277,8 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
                     "display_name": None,
                     "username": None,
                     "language": "es-419",
-                }
+                },
+                "captcha_token": "captcha-proof",
             },
         }
     )
@@ -1116,6 +1146,75 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
         "fee_bps": 0.0,
         "slippage_bps": 0.0,
     }
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "registered",
+    }
+
+
+def test_guest_run_backtest_supabase_persists_guest_traffic_class(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api.routers import backtest as backtest_router
+
+    profile = _mock_profile().model_copy(
+        update={
+            "email": None,
+            "username": None,
+            "display_name": None,
+            "is_admin": False,
+        }
+    )
+    workspace = GuestWorkspace(
+        user_id=profile.id,
+        conversation_id=None,
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": profile.id,
+        "email": None,
+        "is_anonymous": True,
+    }
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = profile
+    mock_gateway.get_active_guest_workspace.return_value = workspace
+    mock_gateway.client = object()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(
+        backtest_router,
+        "visitor_within_limits",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        backtest_router,
+        "settle_visitor_usage",
+        lambda *_args, **_kwargs: None,
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer guest-token",
+            "Idempotency-Key": "guest-supabase-traffic-class",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "guest",
+    }
 
 
 def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
@@ -1779,7 +1878,11 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json={
+            "email": email,
+            "password": password,
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
@@ -1805,7 +1908,11 @@ def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeyp
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "beta@example.com", "password": "password123"},
+        json={
+            "email": "beta@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
@@ -2005,7 +2112,11 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "beta@example.com", "password": "password123"},
+        json={
+            "email": "beta@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
@@ -2028,6 +2139,7 @@ def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
         json={
             "email": "alpha@example.com",
             "password": "password123",
+            "captcha_token": "captcha-proof",
             "language": "es-419",
         },
     )
@@ -2039,6 +2151,7 @@ def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
         display_name=None,
         username=None,
         language="es-419",
+        captcha_token="captcha-proof",
     )
 
 
@@ -2054,12 +2167,57 @@ def test_signup_rejects_unsupported_language_before_provider_signup(
         json={
             "email": "alpha@example.com",
             "password": "password123",
+            "captcha_token": "captcha-proof",
             "language": "fr-CA",
         },
     )
 
     assert response.status_code == 422
     mock_gateway.signup.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/signup", "/api/v1/auth/login"])
+def test_password_auth_requires_captcha_before_provider_call(
+    path,
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    response = client.post(
+        path,
+        json={"email": "alpha@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.login.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/signup", "/api/v1/auth/login"])
+def test_password_auth_bounds_captcha_before_provider_call(
+    path,
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    response = client.post(
+        path,
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "captcha_token": "x" * 4097,
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.login.assert_not_called()
 
 
 def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
@@ -2072,7 +2230,11 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "stranger@example.com", "password": "password123"},
+        json={
+            "email": "stranger@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 400
@@ -2098,7 +2260,11 @@ def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "alpha@example.com", "password": "password123"},
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 400
@@ -2117,7 +2283,11 @@ def test_login_normalizes_private_alpha_access_failures(
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "disabled@example.com", "password": "password123"},
+        json={
+            "email": "disabled@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 401
@@ -2140,7 +2310,11 @@ def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "alpha@example.com", "password": "wrong-password"},
+        json={
+            "email": "alpha@example.com",
+            "password": "wrong-password",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 401
@@ -2149,6 +2323,7 @@ def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
     mock_gateway.login.assert_called_once_with(
         email="alpha@example.com",
         password="wrong-password",
+        captcha_token="captcha-proof",
     )
 
 
@@ -2168,14 +2343,22 @@ def test_login_rate_limit_blocks_extra_attempt_before_provider(
     for _ in range(auth_router.AUTH_LOGIN_ATTEMPT_LIMIT):
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "alpha@example.com", "password": "wrong-password"},
+            json={
+                "email": "alpha@example.com",
+                "password": "wrong-password",
+                "captcha_token": "captcha-proof",
+            },
             headers=headers,
         )
         assert response.status_code == 401
 
     blocked = client.post(
         "/api/v1/auth/login",
-        json={"email": "alpha@example.com", "password": "wrong-password"},
+        json={
+            "email": "alpha@example.com",
+            "password": "wrong-password",
+            "captcha_token": "captcha-proof",
+        },
         headers=headers,
     )
 
@@ -2200,7 +2383,11 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
     for _ in range(auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT):
         response = client.post(
             "/api/v1/auth/signup",
-            json={"email": "stranger@example.com", "password": "password123"},
+            json={
+                "email": "stranger@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+            },
             headers=headers,
         )
         assert response.status_code == 400
@@ -2208,7 +2395,11 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
 
     blocked = client.post(
         "/api/v1/auth/signup",
-        json={"email": "stranger@example.com", "password": "password123"},
+        json={
+            "email": "stranger@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
         headers=headers,
     )
 

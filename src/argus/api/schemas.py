@@ -858,6 +858,7 @@ def _context_depth(value: Any) -> int:
 class SignupRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
     language: Language = "en"
     display_name: str | None = None
     username: str | None = None
@@ -866,6 +867,58 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
+
+
+class AccessRequestCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+    language: Language
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+
+class AccessRequestAccepted(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    accepted: Literal[True]
+
+
+class AccessApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+
+class AccessApprovalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    approved: Literal[True] = True
 
 
 class GuestBootstrapRequest(BaseModel):

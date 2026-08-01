@@ -249,9 +249,10 @@ dispatch/execution and removes the Render API key from `argus-api`.
 public service URLs, public Supabase URL/anon key values, feature flags, paper
 trading mode, CORS origins, and model routing IDs.
 
-The `argus-app` service must also set the server-only `ARGUS_APP_ORIGIN` to the
-exact HTTPS app origin. It builds password-recovery redirects and must never use
-a `NEXT_PUBLIC_` name. Local development may use the documented localhost
+Both `argus-app` and `argus-api` must set the server-only `ARGUS_APP_ORIGIN` to
+the exact HTTPS app origin. The web service uses it for password-recovery
+redirects; the API uses it for approval signup links. It must never use a
+`NEXT_PUBLIC_` name. Local development may use the documented localhost
 origins; production must not use HTTP.
 
 Keep true secrets manual in Render:
@@ -263,6 +264,7 @@ Keep true secrets manual in Render:
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_OPS_TOKEN`
+- `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`
 - `POSTHOG_PROJECT_TOKEN`
 
 Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
@@ -388,6 +390,47 @@ Do not roll back by reversing migrations or deleting anonymous users in bulk.
 Authentication continues to land both guest and registered identities directly
 in ordinary chat. Guest behavior differs through verified identity,
 persistence, allowances, and conversion policy, not through onboarding.
+
+### Paid waitlist rollback controls
+
+The live `argus-api` plan is `standard`. The live `argus-app` plan is
+`starter`. The requested-role migration and access-request exposure are
+complete after the paid-plan readback and maintenance/private-health probes in
+`docs/release-evidence/public-alpha-readiness.md`. Public account creation is
+still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+The evidence records the paid API instance type plus the maintenance and
+private/SSH/local verification controls.
+
+The paid controls must remain available for rollback. If any control becomes
+unavailable, rollback below `061ba50e` remains forbidden until the maintenance,
+quiescence, and private route-absence proof can be completed.
+
+### Waitlist rollback floor
+
+The durable waitlist rollback procedure is
+`docs/release-evidence/public-alpha-readiness.md`. Commit `061ba50e` is the
+fail-closed floor while the schema can contain active `requested` rows. Prefer
+a forward fix. Before any authorized rollback below that commit:
+
+1. read back `serviceDetails.maintenanceMode.enabled=true` out of band and
+   require the exact maintenance status and page fingerprint on the onrender
+   URL and every configured custom domain;
+2. complete a same-SHA restart and prove Render's old-instance shutdown/drain
+   finished with no pre-maintenance worker left;
+3. only then take the `ACCESS EXCLUSIVE` lock, disable active requested rows,
+   read back and assert zero, then commit;
+4. deploy under maintenance and verify the exact rollback SHA from Render
+   metadata;
+5. require a private invalid-body route-absence probe to return HTTP `404`;
+6. re-verify the maintenance configuration and response signature;
+7. disable maintenance last, then require the public invalid-body readback to
+   return HTTP `404` on every public API surface.
+
+Generic error statuses are not maintenance proof. If control-plane state,
+response fingerprint, restart drain, exact SHA, or a private verification
+surface cannot be verified, rollback below the floor is forbidden; stop and
+forward-fix. Never execute the production cleanup SQL during local repository
+verification.
 
 ## Smoke Test
 

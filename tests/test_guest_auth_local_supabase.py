@@ -1005,7 +1005,11 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
 
             signed_in = client.post(
                 "/api/v1/auth/login",
-                json={"email": email, "password": password},
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                },
             )
             assert signed_in.status_code == 200
             claimed = signed_in.json()["guest_claim"]
@@ -1015,7 +1019,11 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             client.cookies.set("argus-guest-handoff", handoff_secret)
             reconciled = client.post(
                 "/api/v1/auth/login",
-                json={"email": email, "password": password},
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                },
             )
             assert reconciled.status_code == 200
             assert reconciled.json()["guest_claim"] == claimed

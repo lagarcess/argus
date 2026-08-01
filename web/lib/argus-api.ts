@@ -22,6 +22,7 @@ import {
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
+import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -667,26 +668,28 @@ export async function signupWithEmail(payload: {
   display_name?: string | null;
   username?: string | null;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/signup",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
-  return response;
+  return { response, needsEmailConfirmation: !response.session };
 }
 
 export async function loginWithEmail(payload: {
   email: string;
   password: string;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/login",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);

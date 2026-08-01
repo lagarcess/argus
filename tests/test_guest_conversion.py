@@ -224,7 +224,11 @@ def test_login_reconciles_cookie_bound_handoff_before_returning_session() -> Non
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 200
@@ -276,7 +280,11 @@ def test_login_handoff_reconciliation_does_not_duplicate_completion_events() -> 
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 200
@@ -320,7 +328,11 @@ def test_terminal_login_handoff_failure_keeps_login_and_clears_stale_cookies(
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == expected_status
@@ -366,7 +378,11 @@ def test_retryable_login_handoff_failure_keeps_login_and_handoff_cookie() -> Non
         client.cookies.set("argus-guest-handoff", "opaque-cookie-secret")
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "member@example.com", "password": "strong-password"},
+            json={
+                "email": "member@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
         )
 
     assert response.status_code == 503
@@ -467,12 +483,28 @@ def test_terminal_direct_handoff_claim_clears_stale_cookies() -> None:
     )
 
 
-def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_mutating(
+def test_allowlisted_guest_can_link_while_public_registration_is_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
     gateway = MagicMock(spec=SupabaseGateway)
-    gateway.private_alpha_email_disabled.return_value = False
-    gateway.link_anonymous_identity.side_effect = RuntimeError("provider rejected")
+    gateway.private_alpha_email_allowed.return_value = True
+    gateway.link_anonymous_identity.return_value = {
+        "user": {
+            "id": GUEST_ID,
+            "email": "approved@example.com",
+            "is_anonymous": False,
+        },
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+            "expires_in": 3600,
+        },
+    }
+    gateway.get_or_create_profile_for_auth_user.return_value = _profile(
+        user_id=GUEST_ID,
+        email="approved@example.com",
+    )
     app.dependency_overrides.clear()
     from argus.api.dependencies import current_user
 
@@ -483,19 +515,10 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
             TestClient(app) as client,
         ):
             client.cookies.set("sb-refresh-token", "guest-refresh-token")
-            disabled = client.post(
+            response = client.post(
                 "/api/v1/auth/guest/link",
                 json={
-                    "email": "new-member@example.com",
-                    "password": "strong-password",
-                },
-                headers={"Authorization": "Bearer guest-token"},
-            )
-            monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
-            failed = client.post(
-                "/api/v1/auth/guest/link",
-                json={
-                    "email": "new-member@example.com",
+                    "email": "approved@example.com",
                     "password": "strong-password",
                 },
                 headers={"Authorization": "Bearer guest-token"},
@@ -503,11 +526,62 @@ def test_public_account_flag_owns_in_place_link_and_provider_failure_is_non_muta
     finally:
         app.dependency_overrides.clear()
 
-    assert disabled.status_code == 403
-    assert disabled.json()["code"] == "public_account_access_unavailable"
-    assert failed.status_code == 400
-    assert failed.json()["code"] == "guest_identity_link_failed"
-    gateway.link_anonymous_identity.assert_called_once()
+    assert response.status_code == 200
+    assert response.json()["account_kind"] == "registered"
+    assert response.json()["user"]["id"] == GUEST_ID
+    gateway.private_alpha_email_allowed.assert_called_once_with(
+        "approved@example.com"
+    )
+    gateway.private_alpha_email_disabled.assert_not_called()
+    gateway.link_anonymous_identity.assert_called_once_with(
+        access_token="guest-token",
+        refresh_token="guest-refresh-token",
+        email="approved@example.com",
+        password="strong-password",
+    )
+    gateway.mark_guest_identity_linked.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "requested@example.com",
+        "unknown@example.com",
+        "disabled@example.com",
+    ],
+)
+def test_unapproved_guest_link_fails_closed_without_provider_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    email: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_allowed.return_value = False
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _guest_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app) as client,
+        ):
+            client.cookies.set("sb-refresh-token", "guest-refresh-token")
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={
+                    "email": email,
+                    "password": "strong-password",
+                },
+                headers={"Authorization": "Bearer guest-token"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "guest_identity_link_failed"
+    gateway.private_alpha_email_allowed.assert_called_once_with(email)
+    gateway.link_anonymous_identity.assert_not_called()
     gateway.mark_guest_identity_linked.assert_not_called()
 
 

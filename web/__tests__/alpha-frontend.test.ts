@@ -2649,7 +2649,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(authForm).toContain("auth.password.hide");
     expect(page).toContain("signupWithEmail");
     expect(page).toContain("loginWithEmail");
-    expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');
+    expect(page).toContain(
+      'type AuthMode = "intro" | "request" | "signup" | "login"',
+    );
+    expect(page).toContain('updateAuthMode("request")');
     expect(page).toContain('updateAuthMode("signup")');
     expect(page).toContain('const showLogin = () => updateAuthMode("login")');
     expect(page).toContain('href="/terms"');

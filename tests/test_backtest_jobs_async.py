@@ -547,9 +547,10 @@ def _coverage_payload(
 
 
 def _context() -> BacktestJobShadowContext:
-    return BacktestJobShadowContext(
+    context = BacktestJobShadowContext(
         user_id="user-1",
         conversation_id="conversation-1",
+        account_kind="registered",
         request_message_id="message-1",
         confirmation_message_id="confirmation-message-1",
         idempotency_key="idem-1",
@@ -559,6 +560,7 @@ def _context() -> BacktestJobShadowContext:
             "payload": {"confirmation_id": "confirmation-1"},
         },
     )
+    return context
 
 
 def test_chat_job_identity_excludes_reason_while_execution_retains_it(
@@ -672,6 +674,10 @@ def test_real_workflow_mode_returns_async_job_without_delegate(
     assert events == ["job", "dispatch", "metadata"]
     assert delegate.calls == []
     assert gateway.jobs[0]["launch_payload"]["kind"] == "run_backtest_job"
+    assert (
+        gateway.jobs[0]["execution_metadata"]["openrouter_traffic_class"]
+        == "registered"
+    )
     assert (
         gateway.metadata_updates[0]["execution_metadata"]["workflow_dispatch"]["task"]
         == "argus-backtests/run_backtest_job"

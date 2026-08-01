@@ -12,8 +12,8 @@ describe("landing entry routing", () => {
     ).toBe("loading");
   });
 
-  test("keeps explicit login and signup requests on the auth surface", () => {
-    for (const authMode of ["login", "signup"] as const) {
+  test("keeps explicit request, login, and signup states on the auth surface", () => {
+    for (const authMode of ["request", "login", "signup"] as const) {
       expect(
         resolveLandingEntrySurface({
           authMode,

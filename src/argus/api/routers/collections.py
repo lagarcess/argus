@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.naming import suggest_entity_name
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
@@ -20,6 +21,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.store import utcnow
+from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
 router = APIRouter(prefix="/api/v1", tags=["collections"])
 
@@ -27,15 +29,17 @@ router = APIRouter(prefix="/api/v1", tags=["collections"])
 @router.post("/collections", response_model=CollectionResponse)
 def create_collection(
     payload: CollectionCreate,
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> CollectionResponse:
     collection_name = payload.name
     if not collection_name:
-        suggested = suggest_entity_name(
-            entity_type="collection",
-            context="User asked to create a new strategy collection.",
-            language=user.language,
-        )
+        with openrouter_traffic_class(account_context(request).kind):
+            suggested = suggest_entity_name(
+                entity_type="collection",
+                context="User asked to create a new strategy collection.",
+                language=user.language,
+            )
         collection_name = suggested or "New collection"
 
     if api_state.supabase_gateway is not None:
