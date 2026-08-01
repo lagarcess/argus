@@ -138,17 +138,24 @@ describe("guest session entry contract", () => {
   test("uses the existing server guest endpoint and persists the provider session", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const session = readFileSync(join(root, "lib/guest-session.ts"), "utf-8");
-    const entry = readFileSync(
-      join(root, "components/guest/GuestEntry.tsx"),
-      "utf-8",
-    );
 
     expect(session).toContain("export async function bootstrapGuest");
     expect(session).toContain('"/auth/guest"');
     expect(session).toContain("persistBrowserSession(response)");
     expect(api).toContain("if (error)");
+  });
+
+  test("routes guest presentation to chat without owning session bootstrap", () => {
+    const entry = readFileSync(
+      join(root, "components/guest/GuestEntry.tsx"),
+      "utf-8",
+    );
+
     expect(entry).toContain('router.replace("/chat")');
     expect(entry).not.toContain("router.refresh()");
+    expect(entry).not.toContain("@/lib/guest-session");
+    expect(entry).not.toContain("startGuestSession");
+    expect(entry).not.toContain("retryGuestSession");
   });
 
   test("links with the current browser refresh token instead of the bootstrap cookie", () => {
@@ -159,5 +166,4 @@ describe("guest session entry contract", () => {
     expect(guestApi).toContain("refresh_token:");
     expect(guestApi).toContain("Authorization");
   });
-
 });

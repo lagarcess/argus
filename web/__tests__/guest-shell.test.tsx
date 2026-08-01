@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { guestProfileProbeOutcome } from "../lib/guest-account";
 
 const root = join(import.meta.dir, "..");
 
@@ -9,6 +10,24 @@ function source(relativePath: string) {
 }
 
 describe("guest shell contract", () => {
+  test("only a missing or expired guest profile enters deferred bootstrap", () => {
+    expect(
+      guestProfileProbeOutcome({ status: 401, code: "not_authenticated" }),
+    ).toBe("bootstrap_required");
+    expect(
+      guestProfileProbeOutcome({ status: 403, code: "guest_session_expired" }),
+    ).toBe("bootstrap_required");
+    expect(
+      guestProfileProbeOutcome({
+        status: 403,
+        code: "private_alpha_access_required",
+      }),
+    ).toBe("fail_closed");
+    expect(
+      guestProfileProbeOutcome({ status: 500, code: "internal_error" }),
+    ).toBe("fail_closed");
+  });
+
   test("renders guest chrome from verified account capabilities", () => {
     const chat = source("components/chat/ChatInterface.tsx");
     const policy = source("components/guest/useGuestShellActions.ts");
@@ -17,7 +36,9 @@ describe("guest shell contract", () => {
 
     expect(existsSync(headerPath)).toBe(true);
     expect(existsSync(settingsPath)).toBe(true);
-    expect(policy).toContain('const isGuest = account?.account_kind === "guest"');
+    expect(policy).toContain(
+      'const isGuest = account?.account_kind === "guest"',
+    );
     expect(policy).toContain("capabilities?.can_manage_conversation");
     expect(policy).toContain("capabilities?.can_use_omnisearch");
     expect(policy).toContain("capabilities?.can_save_decision");
@@ -35,7 +56,9 @@ describe("guest shell contract", () => {
     expect(chat).toContain("requestGuestDecision");
     expect(chat).toContain("canManageConversation={canManageConversation}");
     expect(chat).toContain("showProfileMenu={!isGuest}");
-    expect(chat).not.toContain("temporaryExpiresAt={account?.guest?.expires_at");
+    expect(chat).not.toContain(
+      "temporaryExpiresAt={account?.guest?.expires_at",
+    );
     expect(result).toContain("canSaveDecision");
     expect(result).toContain("onDecisionUnavailable");
   });
@@ -99,7 +122,9 @@ describe("guest shell contract", () => {
 
     expect(sidebar).not.toContain("temporaryExpiresAt");
     expect(sidebar).not.toContain("guest-sidebar-expiry");
-    expect(chat).not.toContain("temporaryExpiresAt={account?.guest?.expires_at");
+    expect(chat).not.toContain(
+      "temporaryExpiresAt={account?.guest?.expires_at",
+    );
     expect(header).not.toContain("temporary_until");
     expect(intro).not.toContain("value_body");
     expect(chat).toContain('"guest.shell.input_placeholder"');
@@ -167,8 +192,14 @@ describe("guest shell contract", () => {
       }, value);
 
     for (const key of requiredKeys) {
-      expect(valueAt(en.guest?.shell, key), `missing en guest.shell.${key}`).toBeString();
-      expect(valueAt(es.guest?.shell, key), `missing es guest.shell.${key}`).toBeString();
+      expect(
+        valueAt(en.guest?.shell, key),
+        `missing en guest.shell.${key}`,
+      ).toBeString();
+      expect(
+        valueAt(es.guest?.shell, key),
+        `missing es guest.shell.${key}`,
+      ).toBeString();
     }
 
     expect(en.guest.shell.input_placeholder).toBe("What do you want to test?");

@@ -14,8 +14,16 @@ const ES_EXPIRY_DATE = new Intl.DateTimeFormat("es-419", {
 
 type GuestBootEvidence = {
   bootstrapCalls: number;
+  usageCalls: number;
+  conversationCreateCalls: number;
+  streamCalls: number;
+  starterEventCalls: number;
+  requestOrder: string[];
+  analyticsEvents: unknown[];
   profilePatches: unknown[];
   sentMessages: string[];
+  bootstrapRequested: Promise<void>;
+  releaseBootstrap: () => void;
   persistedMessages: Array<{
     id: string;
     conversation_id: string;
@@ -26,15 +34,30 @@ type GuestBootEvidence = {
   }>;
 };
 
-function guestMe() {
+type MockGuestJourneyOptions = {
+  initiallyAuthenticated?: boolean;
+  holdBootstrap?: boolean;
+  renewedAfterExpiry?: boolean;
+  publicAccountAccessEnabled?: boolean;
+  bootstrapFailure?: {
+    status: number;
+    body: unknown;
+  };
+  profileRefreshFailure?: {
+    status: number;
+    body: unknown;
+  };
+};
+
+function guestMe(language: "en" | "es-419" = "en") {
   return {
     user: {
       id: GUEST_ID,
       email: null,
       username: null,
       display_name: null,
-      language: "en",
-      locale: "en-US",
+      language,
+      locale: language === "es-419" ? "es-419" : "en-US",
       onboarding: {
         completed: false,
         stage: "language_selection",
@@ -71,31 +94,100 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
-async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
+async function mockGuestJourney(
+  page: Page,
+  options: MockGuestJourneyOptions = {},
+): Promise<GuestBootEvidence> {
+  let resolveBootstrapRequested!: () => void;
+  const bootstrapRequested = new Promise<void>((resolve) => {
+    resolveBootstrapRequested = resolve;
+  });
+  let releaseBootstrap!: () => void;
+  const bootstrapRelease = new Promise<void>((resolve) => {
+    releaseBootstrap = resolve;
+  });
+  let authenticated = options.initiallyAuthenticated ?? false;
+  let authenticatedByBootstrap = false;
+  let language: "en" | "es-419" = "en";
   const evidence: GuestBootEvidence = {
     bootstrapCalls: 0,
+    usageCalls: 0,
+    conversationCreateCalls: 0,
+    streamCalls: 0,
+    starterEventCalls: 0,
+    requestOrder: [],
+    analyticsEvents: [],
     profilePatches: [],
     sentMessages: [],
+    bootstrapRequested,
+    releaseBootstrap,
     persistedMessages: [],
   };
   await page.route("**/api/v1/auth/guest", async (route) => {
     evidence.bootstrapCalls += 1;
+    evidence.requestOrder.push("/auth/guest");
+    resolveBootstrapRequested();
+    if (options.holdBootstrap) await bootstrapRelease;
+    if (options.bootstrapFailure) {
+      await fulfillJson(
+        route,
+        options.bootstrapFailure.body,
+        options.bootstrapFailure.status,
+      );
+      return;
+    }
+    const payload = route.request().postDataJSON() as { language?: unknown };
+    language = payload.language === "es-419" ? "es-419" : "en";
     await fulfillJson(route, {
       authenticated: true,
       reused: evidence.bootstrapCalls > 1,
+      renewed_after_expiry: options.renewedAfterExpiry ?? false,
+      public_account_access_enabled:
+        options.publicAccountAccessEnabled ?? false,
       account_kind: "guest",
-      user: guestMe().user,
+      user: guestMe(language).user,
     });
+    authenticated = true;
+    authenticatedByBootstrap = true;
   });
 
   await page.route("**/api/v1/me", async (route) => {
     if (route.request().method() === "PATCH") {
       evidence.profilePatches.push(route.request().postDataJSON());
+      await fulfillJson(route, guestMe(language));
+      return;
     }
-    await fulfillJson(route, guestMe());
+    if (!authenticated) {
+      await fulfillJson(
+        route,
+        {
+          type: "about:blank",
+          title: "Not authenticated",
+          status: 401,
+          code: "not_authenticated",
+          detail: "No authenticated session is available.",
+        },
+        401,
+      );
+      return;
+    }
+    if (authenticatedByBootstrap) {
+      evidence.requestOrder.push("/me");
+      if (options.profileRefreshFailure) {
+        await fulfillJson(
+          route,
+          options.profileRefreshFailure.body,
+          options.profileRefreshFailure.status,
+        );
+        return;
+      }
+    }
+    await fulfillJson(route, guestMe(language));
   });
 
   await page.route("**/api/v1/me/usage", async (route) => {
+    evidence.usageCalls += 1;
+    evidence.requestOrder.push("/me/usage");
     await fulfillJson(route, {
       allowances: {
         messages: {
@@ -137,6 +229,8 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
       return;
     }
     if (route.request().method() === "POST") {
+      evidence.conversationCreateCalls += 1;
+      evidence.requestOrder.push("/conversations");
       await fulfillJson(route, {
         conversation: {
           id: CONVERSATION_ID,
@@ -175,7 +269,16 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
     await fulfillJson(route, { items: [], next_cursor: null });
   });
 
+  await page.route("**/api/v1/analytics/guest-events", async (route) => {
+    evidence.starterEventCalls += 1;
+    evidence.requestOrder.push("/analytics/guest-events");
+    evidence.analyticsEvents.push(route.request().postDataJSON());
+    await fulfillJson(route, { success: true });
+  });
+
   await page.route("**/api/v1/chat/stream", async (route) => {
+    evidence.streamCalls += 1;
+    evidence.requestOrder.push("/chat/stream");
     const body = route.request().postDataJSON() as { message?: string };
     evidence.sentMessages.push(body.message ?? "");
     evidence.persistedMessages = [
@@ -215,27 +318,213 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
   return evidence;
 }
 
-test("@guest-shell guest entry bootstraps once into ordinary chat without profile mutation", async ({
+for (const entryCase of [
+  {
+    language: "en",
+    text: "Compare Apple with SPY",
+    earlyStage: "Understanding your idea...",
+  },
+  {
+    language: "es-419",
+    text: "Compara Apple con SPY",
+    earlyStage: "Entendiendo tu idea...",
+  },
+] as const) {
+  test(`@guest-shell ${entryCase.language} first typed send defers bootstrap and preserves request ordering`, async ({
+    page,
+  }) => {
+    await page.addInitScript((language) => {
+      window.localStorage.setItem("i18nextLng", language);
+    }, entryCase.language);
+    const evidence = await mockGuestJourney(page, { holdBootstrap: true });
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    const composer = page.getByTestId("chat-input");
+    await expect(composer).toBeVisible({ timeout: 30_000 });
+    expect({
+      bootstrap: evidence.bootstrapCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+    }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+    expect(evidence.profilePatches).toEqual([]);
+
+    await composer.fill(entryCase.text);
+    expect({
+      bootstrap: evidence.bootstrapCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+    }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+
+    await composer.press("Enter");
+    await evidence.bootstrapRequested;
+    try {
+      await expect(composer).toHaveAttribute("aria-disabled", "true");
+      await expect(page.getByTestId("chat-send")).toBeDisabled();
+      await expect(
+        page.locator('[data-testid="chat-input"][aria-disabled="true"]'),
+      ).toHaveCount(1);
+      await expect(
+        page.getByText(entryCase.earlyStage, { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(
+          /CAPTCHA|bot check|verifying you|checking your session/i,
+        ),
+      ).toHaveCount(0);
+      expect({
+        usage: evidence.usageCalls,
+        conversation: evidence.conversationCreateCalls,
+        stream: evidence.streamCalls,
+      }).toEqual({ usage: 0, conversation: 0, stream: 0 });
+      expect(evidence.requestOrder).toEqual(["/auth/guest"]);
+    } finally {
+      evidence.releaseBootstrap();
+    }
+
+    await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+    expect(evidence.requestOrder).toEqual([
+      "/auth/guest",
+      "/me",
+      "/me/usage",
+      "/conversations",
+      "/chat/stream",
+    ]);
+    expect({
+      bootstrap: evidence.bootstrapCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+      starterEvent: evidence.starterEventCalls,
+    }).toEqual({
+      bootstrap: 1,
+      usage: 1,
+      conversation: 1,
+      stream: 1,
+      starterEvent: 0,
+    });
+    expect(evidence.sentMessages).toEqual([entryCase.text]);
+  });
+}
+
+for (const starterEntryCase of [
+  {
+    language: "en",
+    label: "Test Apple vs SPY",
+    value: "Compare Apple with SPY over the last 12 months.",
+  },
+  {
+    language: "es-419",
+    label: "Prueba Apple vs SPY",
+    value: "Compara Apple con SPY durante los últimos 12 meses.",
+  },
+] as const) {
+  test(`@guest-shell ${starterEntryCase.language} first starter action coalesces admission and analytics`, async ({
+    page,
+  }) => {
+    await page.addInitScript((language) => {
+      window.localStorage.setItem("i18nextLng", language);
+    }, starterEntryCase.language);
+    const evidence = await mockGuestJourney(page);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    await page
+      .getByRole("button", { name: starterEntryCase.label })
+      .evaluate((button: HTMLButtonElement) => {
+        button.click();
+        button.click();
+      });
+    await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+
+    expect(evidence.requestOrder).toEqual([
+      "/auth/guest",
+      "/me",
+      "/analytics/guest-events",
+      "/me/usage",
+      "/conversations",
+      "/chat/stream",
+    ]);
+    expect({
+      bootstrap: evidence.bootstrapCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+      starterEvent: evidence.starterEventCalls,
+    }).toEqual({
+      bootstrap: 1,
+      usage: 1,
+      conversation: 1,
+      stream: 1,
+      starterEvent: 1,
+    });
+    expect(evidence.sentMessages).toEqual([starterEntryCase.value]);
+    expect(evidence.analyticsEvents).toEqual([
+      {
+        event: "starter_action_selected",
+        language: starterEntryCase.language,
+        surface: "starter_actions",
+        strategy_category: "buy_and_hold",
+        terminal_outcome: "selected",
+      },
+    ]);
+  });
+}
+
+for (const failureCase of [
+  {
+    name: "bootstrap failure",
+    options: {
+      bootstrapFailure: {
+        status: 503,
+        body: {
+          code: "guest_bootstrap_failed",
+          detail: "Guest bootstrap failed.",
+        },
+      },
+    },
+    expectedOrder: ["/auth/guest"],
+  },
+  {
+    name: "profile refresh failure",
+    options: {
+      profileRefreshFailure: {
+        status: 503,
+        body: {
+          code: "profile_unavailable",
+          detail: "Profile unavailable.",
+        },
+      },
+    },
+    expectedOrder: ["/auth/guest", "/me"],
+  },
+] as const) {
+  test(`@guest-shell ${failureCase.name} preserves the starter draft and emits no funnel event`, async ({
+    page,
+  }) => {
+    const evidence = await mockGuestJourney(page, failureCase.options);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    await page.getByRole("button", { name: "Test Apple vs SPY" }).click();
+
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(evidence.requestOrder).toEqual(failureCase.expectedOrder);
+    expect({
+      starterEvent: evidence.starterEventCalls,
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+    }).toEqual({ starterEvent: 0, usage: 0, conversation: 0, stream: 0 });
+  });
+}
+
+test("@guest-shell verified starter actions keep their ordinary localized payloads", async ({
   page,
 }) => {
-  const evidence = await mockGuestJourney(page);
-
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-
-  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  expect(evidence.bootstrapCalls).toBe(1);
-  expect(evidence.profilePatches).toEqual([]);
-
-  await page.getByTestId("chat-input").fill("Compare Apple with SPY");
-  await page.getByTestId("chat-input").press("Enter");
-  await expect(page.getByText("Let’s test that idea.")).toBeVisible();
-  expect(evidence.sentMessages).toEqual(["Compare Apple with SPY"]);
-});
-
-test("@guest-shell verified starter actions use the same ordinary localized send payloads", async ({
-  page,
-}) => {
-  const evidence = await mockGuestJourney(page);
+  const evidence = await mockGuestJourney(page, {
+    initiallyAuthenticated: true,
+  });
   const starterCases = [
     {
       label: "Test Apple vs SPY",
@@ -278,7 +567,7 @@ test("@guest-shell root re-entry restores the one server-owned guest conversatio
   await expect(page.getByText("Compare Apple with SPY")).toBeVisible();
   await expect(page.getByText("Let’s test that idea.")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`conversation=${CONVERSATION_ID}`));
-  expect(evidence.bootstrapCalls).toBe(2);
+  expect(evidence.bootstrapCalls).toBe(1);
   expect(evidence.profilePatches).toEqual([]);
 });
 
@@ -430,17 +719,23 @@ for (const expiredCase of [
     await page.addInitScript((language) => {
       window.localStorage.setItem("i18nextLng", language);
     }, expiredCase.language);
-    await page.route("**/api/v1/auth/guest", async (route) => {
-      await fulfillJson(route, {
-        authenticated: true,
-        reused: false,
-        renewed_after_expiry: true,
-        account_kind: "guest",
-        user: guestMe().user,
-      });
+    const evidence = await mockGuestJourney(page, {
+      renewedAfterExpiry: true,
     });
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    const composer = page.getByTestId("chat-input");
+    await expect(composer).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: expiredCase.title }),
+    ).toHaveCount(0);
+    await composer.fill(
+      expiredCase.language === "es-419"
+        ? "Compara Apple con SPY"
+        : "Compare Apple with SPY",
+    );
+    await composer.press("Enter");
 
     await expect(
       page.getByRole("heading", { name: expiredCase.title }),
@@ -453,25 +748,27 @@ for (const expiredCase of [
       page.getByRole("button", { name: expiredCase.signIn }),
     ).toBeVisible();
     await expect(page.getByTestId("chat-input")).toHaveCount(0);
+    expect(evidence.requestOrder).toEqual(["/auth/guest"]);
+    expect({
+      usage: evidence.usageCalls,
+      conversation: evidence.conversationCreateCalls,
+      stream: evidence.streamCalls,
+    }).toEqual({ usage: 0, conversation: 0, stream: 0 });
   });
 }
 
 test("@guest-expiry public account capability offers in-place account creation", async ({
   page,
 }) => {
-  await page.route("**/api/v1/auth/guest", async (route) => {
-    await fulfillJson(route, {
-      authenticated: true,
-      reused: false,
-      renewed_after_expiry: true,
-      public_account_access_enabled: true,
-      account_kind: "guest",
-      user: guestMe().user,
-    });
+  await mockGuestJourney(page, {
+    renewedAfterExpiry: true,
+    publicAccountAccessEnabled: true,
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("chat-input").fill("Compare Apple with SPY");
+  await page.getByTestId("chat-input").press("Enter");
   await expect(
     page.getByRole("button", { name: "Create account" }),
   ).toBeVisible();
@@ -485,24 +782,26 @@ test("@guest-expiry public account capability offers in-place account creation",
 test("@guest-shell frontend-on server-off mismatch stays on a retry surface", async ({
   page,
 }) => {
-  await page.route("**/api/v1/auth/guest", async (route) => {
-    await fulfillJson(
-      route,
-      {
+  await mockGuestJourney(page, {
+    bootstrapFailure: {
+      status: 403,
+      body: {
         detail: {
           title: "Guest Access Unavailable",
           detail: "Guest access is not available.",
           code: "guest_access_unavailable",
         },
       },
-      403,
-    );
+    },
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
+  const composer = page.getByTestId("chat-input");
+  await composer.fill("Compare Apple with SPY");
+  await composer.press("Enter");
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
-  await expect(page.getByTestId("chat-input")).toHaveCount(0);
+  await expect(composer).toHaveValue("Compare Apple with SPY");
   await expect(page.getByRole("button", { name: "Sign up" })).toHaveCount(0);
 });
 

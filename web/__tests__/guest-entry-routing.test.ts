@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { resolveLandingEntrySurface } from "../lib/landing-entry";
+
+const root = join(import.meta.dir, "..");
 
 describe("landing entry routing", () => {
   test("resolves the existing session before default-on guest entry", () => {
@@ -39,5 +43,21 @@ describe("landing entry routing", () => {
         isCheckingSession: false,
       }),
     ).toBe("auth");
+  });
+
+  test("lets a configured guest render chat while preserving auth-first rollback", () => {
+    const chatPage = readFileSync(join(root, "app/chat/page.tsx"), "utf-8");
+    const guardStart = chatPage.indexOf("if (error || !data.user) {");
+    const guardEnd = chatPage.indexOf("\n  }\n\n  return", guardStart);
+    const unauthenticatedGuard = chatPage.slice(guardStart, guardEnd);
+
+    expect(guardStart).toBeGreaterThan(-1);
+    expect(guardEnd).toBeGreaterThan(guardStart);
+    expect(chatPage).toContain("guestCaptchaConfigured");
+    expect(unauthenticatedGuard).toContain("guestAccessEnabled");
+    expect(unauthenticatedGuard).toContain("guestCaptchaConfigured");
+    expect(unauthenticatedGuard).not.toContain('redirect("/")');
+    expect(unauthenticatedGuard).toContain('redirect("/?auth=login")');
+    expect(chatPage).toContain("<ChatInterface />");
   });
 });
