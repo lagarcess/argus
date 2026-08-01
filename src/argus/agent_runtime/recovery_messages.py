@@ -59,8 +59,7 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "safely apply that change. {action_guidance}"
     ),
     "latest_result_followup_unavailable": (
-        "I still have the latest result in this chat, but I could not safely answer "
-        "that follow-up. Please retry in a moment."
+        "I couldn’t answer that follow-up. Your result is still here."
     ),
     "private_alpha_save_unavailable": (
         "I cannot move this into Strategies while that surface is off for private "

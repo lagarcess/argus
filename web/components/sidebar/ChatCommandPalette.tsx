@@ -10,10 +10,8 @@ import {
 } from "react";
 import {
   Archive,
-  Check,
   ChevronRight,
   Edit2,
-  FileText,
   Loader2,
   Maximize2,
   MessageSquare,
@@ -24,9 +22,23 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
+import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
+import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
+import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
+import {
+  commitDossierDecision,
+  DEFAULT_DOSSIER_PANE_STATE,
+  dossierCountsForHistory,
+  dossierPaneKeyboardAction,
+  dossierPaneTransition,
+  openSelectedDossierConversation,
+  selectedDossierForPane,
+  type DossierPaneState,
+} from "@/lib/command-palette-dossier-integration";
 import {
   deleteConversation as apiDeleteConversation,
   createEvidenceDecision,
@@ -44,7 +56,6 @@ import {
   commandPaletteAssetRollupFromSearch,
   commandPaletteCanonicalRecallLimit,
   commandPaletteConversationNavigationDisabled,
-  commandPaletteDecisionVerb,
   commandPaletteDecisionStateFallback,
   commandPaletteGroupsByLedgerState,
   commandPaletteItemFromSearch,
@@ -54,7 +65,6 @@ import {
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
   commandPaletteOpenMessageId,
-  commandPalettePreviewFields,
   commandPaletteRequestIsCurrent,
   commandPaletteSelectedRenderedPreview,
   commandPaletteStatusFallback,
@@ -63,16 +73,17 @@ import {
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
+import type {
+  DecisionState as RunDossierDecisionState,
+  SearchDecisionAction,
+} from "@/lib/run-dossier-contract";
 import {
   isRecentRecallResponse,
   loadCommandPaletteRecentRecall,
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
+import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
-
-type DossierAction = SearchConversationItem["actions"][number];
-type RunFreshAction = Extract<DossierAction, { type: "run_fresh" }>;
-type DecisionAction = Extract<DossierAction, { type: "decision" }>;
 
 type ChatCommandPaletteProps = {
   onClose: () => void;
@@ -93,11 +104,6 @@ type ChatCommandPaletteProps = {
 
 type LayoutMode = "expanded" | "collapsed";
 type SearchReadError = "history" | "search" | "ledger" | null;
-type DecisionDraft = {
-  artifactId: string;
-  state: DecisionState;
-  note: string;
-};
 type DateDisplayGroup = {
   id: string;
   label: string;
@@ -106,12 +112,8 @@ type DateDisplayGroup = {
 
 const SEARCH_DEBOUNCE_MS = 200;
 const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
-const DECISION_STATES: readonly DecisionState[] = [
-  "watching",
-  "promising",
-  "rejected",
-  "revisit_later",
-];
+export const commandPaletteDossierPanelClassName = (view: DossierPaneState["view"]) =>
+  `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:h-auto md:max-h-none md:w-[44%] md:overflow-visible md:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
 
 function isEditableKeyboardTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -272,64 +274,23 @@ export default function ChatCommandPalette({
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<CommandPaletteDisplayItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [decisionDraft, setDecisionDraft] = useState<DecisionDraft | null>(
-    null,
-  );
   const [isSavingDecision, setIsSavingDecision] = useState(false);
-  const [decisionSaveFailed, setDecisionSaveFailed] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
+  const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
+    DEFAULT_DOSSIER_PANE_STATE,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyRequestIdRef = useRef(0);
   const ledgerBrowseRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
   const canonicalMutationIdRef = useRef(0);
+  const decisionMutationInFlightRef = useRef(false);
   const searchSignatureRef = useRef(RECENTS_SEARCH_SIGNATURE);
   const isRecentsMode =
     query.trim() === "" &&
     !isLedgerMode &&
     decisionStateFilter === null;
-  const dossierCopy = useMemo(
-    () => ({
-      decisionStateLabel: (state: string) =>
-        t(
-          `chat.result_card.decision_states.${state}`,
-          commandPaletteDecisionStateFallback(state),
-        ),
-      decisionAttribution: (state: string, run: string) =>
-        t("command_palette.dossier_values.decision_on", {
-          state,
-          run,
-          defaultValue: `${state} · on ${run}`,
-        }),
-      runCountLabel: (count: number) =>
-        t("command_palette.dossier_values.run_count", {
-          count,
-          defaultValue: `${count} ${count === 1 ? "run" : "runs"}`,
-        }),
-      strategyFamilyLabel: (family: string) =>
-        t(
-          `command_palette.dossier_values.strategy_families.${family}`,
-          t(
-            "command_palette.dossier_values.strategy_families.unknown",
-            "Strategy",
-          ),
-        ),
-      dateLabel: (value: string) =>
-        formatDossierDate(
-          value,
-          i18n.resolvedLanguage ?? i18n.language ?? "en",
-        ),
-      nudgeLabel: (nudge: string) =>
-        t(
-          `command_palette.dossier_values.nudges.${nudge}`,
-          t("command_palette.dossier_values.nudges.unknown", "Next step saved"),
-        ),
-      metricLabel: (id: string, fallback: string) =>
-        t(`command_palette.metric_labels.${id}`, fallback),
-    }),
-    [i18n.language, i18n.resolvedLanguage, t],
-  );
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -553,8 +514,17 @@ export default function ChatCommandPalette({
         ? commandPaletteAssetRollupFromSearch(assetRollup, {
             heading: t(
               "command_palette.asset_rollup.heading",
-              "Your history with this asset",
+              "Your Argus history",
             ),
+            scope: isGuest
+              ? t(
+                  "command_palette.asset_rollup.scope_guest",
+                  "In this temporary conversation",
+                )
+              : t(
+                  "command_palette.asset_rollup.scope_registered",
+                  "Across your conversations",
+                ),
             runsInvolving: (count, symbol) =>
               t("command_palette.asset_rollup.runs_involving", {
                 count,
@@ -580,13 +550,13 @@ export default function ChatCommandPalette({
               }),
           })
         : null,
-    [assetRollup, i18n.language, i18n.resolvedLanguage, t],
+    [assetRollup, i18n.language, i18n.resolvedLanguage, isGuest, t],
   );
   const displayItems = useMemo(() => {
     const items = isResultMode
       ? searchResults
           .filter(isSearchConversationItem)
-          .map((item) => commandPaletteItemFromSearch(item, dossierCopy))
+          .map((item) => commandPaletteItemFromSearch(item))
       : commandPaletteItemsFromHistory(
           recentItems,
           searchResults.filter(isSearchConversationItem),
@@ -598,13 +568,7 @@ export default function ChatCommandPalette({
           ? item
           : { ...item, canManageConversation: false },
       );
-  }, [
-    canManageConversation,
-    isResultMode,
-    recentItems,
-    searchResults,
-    dossierCopy,
-  ]);
+  }, [canManageConversation, isResultMode, recentItems, searchResults]);
   const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
     [displayItems, t],
@@ -631,38 +595,64 @@ export default function ChatCommandPalette({
     previewItem,
     groupedItems,
   );
-  const selectedPreviewFields = useMemo(
-    () =>
-      selectedPreview
-        ? commandPalettePreviewFields(selectedPreview, dossierCopy)
-        : [],
-    [dossierCopy, selectedPreview],
-  );
-  const selectedPreviewStatusLabelKey = selectedPreview
-    ? commandPaletteStatusLabelKey(selectedPreview)
-    : null;
-  const selectedPreviewStatusFallback = selectedPreview
-    ? commandPaletteStatusFallback(selectedPreview)
-    : null;
-  const selectedRunFreshAction = selectedPreview?.actions.find(
-    (action): action is RunFreshAction => action.type === "run_fresh",
-  );
-  const selectedDecisionAction = selectedPreview?.actions.find(
-    (action): action is DecisionAction => action.type === "decision",
-  );
   const selectedNavigationDisabled =
     commandPaletteConversationNavigationDisabled({
       turnInFlight,
       activeConversationId,
       targetConversationId: selectedPreview?.conversationId ?? null,
     });
+  const dossierContextKey = JSON.stringify([
+    query.trim(),
+    isLedgerMode,
+    decisionStateFilter,
+    selectedPreview?.source ?? null,
+    selectedPreview?.type ?? null,
+    selectedPreview?.id ?? null,
+    selectedPreview?.conversationId ?? null,
+  ]);
+  const history = useRunDossierHistory(
+    selectedPreview?.conversationId ?? "",
+    dossierContextKey,
+  );
+  const selectedDossier = selectedPreview?.dossier
+    ? selectedDossierForPane({
+        latestDossier: selectedPreview.dossier,
+        historyItems: history.items,
+        state: dossierPaneState,
+      })
+    : null;
+  const dossierCounts = dossierCountsForHistory({
+    history,
+    fallbackTotalRuns: selectedPreview?.totalRuns ?? 0,
+    fallbackDecidedRuns: selectedPreview?.decidedRuns ?? 0,
+  });
 
   useEffect(() => {
-    setDecisionDraft(null);
-    setDecisionSaveFailed(false);
+    setDossierPaneState((current) =>
+      dossierPaneTransition(current, {
+        type: "reset",
+        reason: "selection",
+      }),
+    );
+  }, [dossierContextKey]);
+
+  useEffect(() => {
+    if (
+      history.status !== "ready" ||
+      !dossierPaneState.historicalRunId ||
+      history.items.some(
+        (item) => item.run_id === dossierPaneState.historicalRunId,
+      )
+    ) {
+      return;
+    }
+    setDossierPaneState((current) =>
+      dossierPaneTransition(current, { type: "restore_latest" }),
+    );
   }, [
-    selectedPreview?.conversationId,
-    selectedDecisionAction?.evidence_artifact_id,
+    dossierPaneState.historicalRunId,
+    history.items,
+    history.status,
   ]);
 
   const refreshCanonicalSearch = useCallback(
@@ -730,61 +720,71 @@ export default function ChatCommandPalette({
         boolean,
         DecisionState | null,
       ];
-      try {
-        await refreshCanonicalSearch(currentSignature, mutationId);
-      } catch {
-        if (
-          mutationId === canonicalMutationIdRef.current &&
-          currentSignature === searchSignatureRef.current
-        ) {
-          setReadError(
-            currentLedgerMode
-              ? "ledger"
-              : currentQuery
-                ? "search"
-                : "history",
-          );
-        }
-      }
+      await refreshCanonicalMutation({
+        refresh: async () => {
+          await refreshCanonicalSearch(currentSignature, mutationId);
+        },
+        onFailure: () => {
+          if (
+            mutationId === canonicalMutationIdRef.current &&
+            currentSignature === searchSignatureRef.current
+          ) {
+            setReadError(
+              currentLedgerMode
+                ? "ledger"
+                : currentQuery
+                  ? "search"
+                  : "history",
+            );
+          }
+        },
+      });
     },
     [refreshCanonicalSearch],
   );
 
   const saveDecision = useCallback(
-    async (action: DecisionAction) => {
-      if (!decisionDraft || isSavingDecision) return;
-      if (decisionDraft.artifactId !== action.evidence_artifact_id) return;
+    async (
+      selectedRunId: string,
+      action: SearchDecisionAction,
+      draft: { decision_state: RunDossierDecisionState; note: string },
+    ) => {
+      if (decisionMutationInFlightRef.current) {
+        throw new Error("A decision mutation is already in progress.");
+      }
+      decisionMutationInFlightRef.current = true;
       const mutationId = ++canonicalMutationIdRef.current;
       setIsSavingDecision(true);
-      setDecisionSaveFailed(false);
       try {
-        try {
-          await createEvidenceDecision(action.evidence_artifact_id, {
-            decision_state: decisionDraft.state,
-            note: decisionDraft.note,
-          });
-        } catch {
-          if (mutationId === canonicalMutationIdRef.current) {
-            setDecisionSaveFailed(true);
-          }
-          return;
-        }
+        const reboundDossier = await commitDossierDecision({
+          selectedRunId,
+          mutate: async () => {
+            await createEvidenceDecision(action.evidence_artifact_id, draft);
+            if (mutationId !== canonicalMutationIdRef.current) {
+              throw new Error("Decision mutation context changed.");
+            }
+            onMutated?.();
+          },
+          refreshCanonicalSearch: () =>
+            refreshAfterCanonicalMutation(mutationId),
+          refreshLoadedHistory: async () => {
+            await history.refresh();
+            return history.getCurrentState();
+          },
+        });
         if (mutationId !== canonicalMutationIdRef.current) return;
-        setDecisionDraft(null);
-        onMutated?.();
-        await refreshAfterCanonicalMutation(mutationId);
+        setDossierPaneState((current) => {
+          if (current.historicalRunId !== selectedRunId) return current;
+          return reboundDossier
+            ? current
+            : dossierPaneTransition(current, { type: "restore_latest" });
+        });
       } finally {
-        if (mutationId === canonicalMutationIdRef.current) {
-          setIsSavingDecision(false);
-        }
+        decisionMutationInFlightRef.current = false;
+        setIsSavingDecision(false);
       }
     },
-    [
-      decisionDraft,
-      isSavingDecision,
-      onMutated,
-      refreshAfterCanonicalMutation,
-    ],
+    [history, onMutated, refreshAfterCanonicalMutation],
   );
 
   const updateLocalTitle = useCallback(
@@ -1021,7 +1021,11 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
-      await refreshAfterCanonicalMutation(mutationId);
+      try {
+        await refreshAfterCanonicalMutation(mutationId);
+      } catch {
+        // The canonical refresh already published the scoped read error.
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -1037,6 +1041,37 @@ export default function ChatCommandPalette({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const eventTarget =
+        event.target instanceof HTMLElement ? event.target : null;
+      const targetIsEditableDossierControl = Boolean(
+        eventTarget?.closest("[data-dossier-pane]") &&
+          isEditableKeyboardTarget(eventTarget),
+      );
+      const targetIsDossierControl = Boolean(
+        eventTarget?.closest("[data-dossier-pane]") &&
+          (isEditableKeyboardTarget(eventTarget) ||
+            eventTarget.closest("button")),
+      );
+      const dossierKeyboardAction = dossierPaneKeyboardAction({
+        key: event.key,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        targetIsDossierControl,
+        targetIsEditable: targetIsEditableDossierControl,
+        state: dossierPaneState,
+      });
+      if (dossierKeyboardAction === "restore_latest") {
+        event.preventDefault();
+        setDossierPaneState((current) =>
+          dossierPaneTransition(current, { type: "restore_latest" }),
+        );
+        return;
+      }
+      if (dossierKeyboardAction === "suppress_navigation") {
+        event.preventDefault();
+        return;
+      }
+      if (dossierKeyboardAction === "allow_control") return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (editingId) {
@@ -1077,6 +1112,7 @@ export default function ChatCommandPalette({
   }, [
     activateItem,
     cancelRename,
+    dossierPaneState,
     editingId,
     keyboardItems,
     onClose,
@@ -1282,7 +1318,7 @@ export default function ChatCommandPalette({
                         ? "command_palette.keep_typing_detail"
                         : "command_palette.try_searching",
                       isWaitingForIndexableQuery
-                        ? "Search starts when one word has at least 3 characters."
+                        ? "Search starts with a 2-character ticker or a 3-character word."
                         : "Try a ticker, phrase, or note you remember.",
                     )}
                   </p>
@@ -1291,37 +1327,7 @@ export default function ChatCommandPalette({
             ) : (
               <div className="flex flex-col gap-3 p-3">
                 {assetRollupDisplay && (
-                  <section
-                    className="rounded-[14px] border border-[#5ba897]/20 bg-[#5ba897]/[0.06] px-4 py-3 dark:border-[#7bc1ad]/20 dark:bg-[#7bc1ad]/[0.06]"
-                    aria-label={assetRollupDisplay.heading}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                          {assetRollupDisplay.heading}
-                        </p>
-                        <p className="mt-1 font-display text-[18px] font-semibold text-black dark:text-white">
-                          {assetRollupDisplay.symbol}
-                        </p>
-                      </div>
-                      <p className="text-right text-[11px] text-black/35 dark:text-white/35">
-                        {assetRollupDisplay.lastTouched}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-[13px] text-black/60 dark:text-white/60">
-                      {assetRollupDisplay.runs}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {assetRollupDisplay.decisions.map((decision) => (
-                        <span
-                          key={decision.state}
-                          className="rounded-full border border-black/8 bg-white/55 px-2 py-1 text-[10px] font-semibold text-black/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
-                        >
-                          {decision.label}
-                        </span>
-                      ))}
-                    </div>
-                  </section>
+                  <AssetHistoryRollup rollup={assetRollupDisplay} />
                 )}
                 {groupedItems.map((group, groupIndex) => {
                   const groupRowStart = groupedItems
@@ -1634,9 +1640,12 @@ export default function ChatCommandPalette({
           </div>
 
           {layoutMode === "expanded" && (
-            <div className="flex max-h-[42%] w-full shrink-0 flex-col overflow-y-auto bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:overflow-visible md:p-6">
+            <div className={commandPaletteDossierPanelClassName(dossierPaneState.view)}>
               {selectedPreview ? (
-                <div className="flex h-full flex-col">
+                <div
+                  className="flex h-full flex-col"
+                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
+                >
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
                       {(selectedPreview.type === "chat" ||
@@ -1653,15 +1662,6 @@ export default function ChatCommandPalette({
                           commandPaletteTypeFallback(selectedPreview.type),
                         )}
                       </span>
-                      {selectedPreviewStatusLabelKey &&
-                        selectedPreviewStatusFallback && (
-                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-                            {t(
-                              selectedPreviewStatusLabelKey,
-                              selectedPreviewStatusFallback,
-                            )}
-                          </span>
-                        )}
                     </div>
                     <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
                       {selectedPreview.title}
@@ -1674,230 +1674,143 @@ export default function ChatCommandPalette({
                       )}
                     </p>
                   </div>
-                  <div
-                    className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
-                    tabIndex={0}
-                    role="region"
-                    aria-label={t("command_palette.preview", "Preview")}
-                  >
-                    <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
-                      {t("command_palette.preview", "Preview")}
-                    </p>
-                    {selectedPreviewFields.length > 0 ? (
-                      <div className="mt-3 space-y-3">
-                        {selectedPreviewFields.map((field) => (
-                          <div key={field.id}>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-black/30 dark:text-white/30">
-                              {t(field.labelKey, field.labelFallback)}
-                            </p>
-                            {field.id === "note" ? (
-                              // The user's exact words, kept verbatim and
-                              // visually theirs.
-                              <p className="mt-1 whitespace-pre-line border-l-2 border-black/15 pl-3 text-[13px] italic leading-relaxed text-black/70 dark:border-white/20 dark:text-white/70">
-                                {field.value}
-                              </p>
-                            ) : (
-                              <p className="mt-1 text-[13px] leading-relaxed text-black/60 dark:text-white/60">
-                                {field.value}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                  {selectedPreview.dossier && selectedDossier ? (
+                    dossierPaneState.view === "history" ? (
+                      <DecisionHistoryView
+                        items={history.items}
+                        nextCursor={history.nextCursor}
+                        status={history.status}
+                        onBack={() =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "restore_latest",
+                            }),
+                          )
+                        }
+                        onLoadOlder={history.loadOlder}
+                        onRetry={history.retry}
+                        onSelectRun={(dossier) =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "select_run",
+                              runId: dossier.run_id,
+                            }),
+                          )
+                        }
+                      />
                     ) : (
-                      <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-                        {selectedPreview.snippet ||
-                          t(
-                            "command_palette.preview_empty",
-                            "Select a result to preview its details.",
-                          )}
-                      </p>
-                    )}
-                  </div>
-                  {(selectedRunFreshAction || selectedDecisionAction) && (
-                    <div className="mt-4 shrink-0 border-t border-black/5 pt-4 dark:border-white/5">
-                      <div className="flex flex-wrap gap-2">
-                        {selectedRunFreshAction &&
-                          selectedPreview.conversationId && (
-                            <button
-                              type="button"
-                              disabled={turnInFlight}
-                              onClick={() =>
-                                void onRunFresh(
-                                  selectedPreview.conversationId!,
-                                  selectedRunFreshAction.send_text,
+                      <RunDossierView
+                        key={selectedDossier.run_id}
+                        dossier={selectedDossier}
+                        totalRuns={dossierCounts.totalRuns}
+                        decidedRuns={dossierCounts.decidedRuns}
+                        onBackToLatest={
+                          dossierPaneState.historicalRunId
+                            ? () =>
+                                setDossierPaneState((current) =>
+                                  dossierPaneTransition(current, {
+                                    type: "restore_latest",
+                                  }),
                                 )
-                              }
-                              className="inline-flex min-h-11 items-center rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
-                            >
-                              {t(
-                                "command_palette.run_fresh",
-                                "Run it fresh · {{run}}",
-                                { run: selectedRunFreshAction.run_label },
-                              )}
-                            </button>
-                          )}
-                        {selectedDecisionAction && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDecisionSaveFailed(false);
-                              setDecisionDraft({
-                                artifactId:
-                                  selectedDecisionAction.evidence_artifact_id,
-                                state:
-                                  selectedDecisionAction.decision_state ??
-                                  "watching",
-                                note: selectedDecisionAction.note ?? "",
-                              });
-                            }}
-                            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 px-4 text-[13px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/65 dark:hover:bg-white/[0.05]"
-                          >
-                            <FileText className="h-4 w-4" />
-                            {commandPaletteDecisionVerb(
-                              selectedDecisionAction,
-                            ) === "add"
-                              ? t(
-                                  "command_palette.add_decision",
-                                  "Add decision · {{run}}",
-                                  { run: selectedDecisionAction.run_label },
-                                )
-                              : t(
-                                  "command_palette.change_decision",
-                                  "Change decision · {{run}}",
-                                  { run: selectedDecisionAction.run_label },
-                                )}
-                          </button>
-                        )}
-                      </div>
-                      {selectedDecisionAction &&
-                        decisionDraft?.artifactId ===
-                          selectedDecisionAction.evidence_artifact_id && (
-                          <div className="mt-3 rounded-[14px] border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.025]">
-                            <div className="flex flex-wrap gap-2">
-                              {DECISION_STATES.map((state) => (
-                                <button
-                                  key={state}
-                                  type="button"
-                                  onClick={() => {
-                                    setDecisionSaveFailed(false);
-                                    setDecisionDraft((current) =>
-                                      current ? { ...current, state } : current,
-                                    );
-                                  }}
-                                  className={ledgerDecisionChipClassName(
-                                    state,
-                                    decisionDraft.state === state,
-                                  )}
-                                >
-                                  {t(
-                                    `chat.result_card.decision_states.${state}`,
-                                    commandPaletteDecisionStateFallback(state),
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                            <textarea
-                              value={decisionDraft.note}
-                              maxLength={2000}
-                              onChange={(event) => {
-                                setDecisionSaveFailed(false);
-                                setDecisionDraft((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        note: event.target.value,
-                                      }
-                                    : current,
-                                );
-                              }}
-                              placeholder={t(
-                                "chat.result_card.decision_note_placeholder",
-                                "Optional note for future you",
-                              )}
-                              className="mt-3 min-h-24 w-full resize-y rounded-[12px] border border-black/10 bg-white px-3 py-2 text-[16px] leading-relaxed text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/25"
-                            />
-                            {decisionSaveFailed && (
-                              <p className="mt-2 text-[12px] text-[#d66d75]">
-                                {t(
-                                  "chat.error_generic",
-                                  "Something went wrong. Please try again.",
-                                )}
-                              </p>
+                            : undefined
+                        }
+                        onOpenHistory={() => {
+                          void history.open();
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "open_history",
+                            }),
+                          );
+                        }}
+                        openConversationDisabled={
+                          !selectedPreview.conversationId ||
+                          selectedNavigationDisabled
+                        }
+                        runFreshDisabled={turnInFlight}
+                        onOpenConversation={() => {
+                          openSelectedDossierConversation({
+                            conversationId: selectedPreview.conversationId,
+                            dossier: selectedDossier,
+                            navigationDisabled: selectedNavigationDisabled,
+                            onOpenConversation: (conversationId, messageId) =>
+                              onOpenConversation(conversationId, messageId),
+                            onClose,
+                          });
+                        }}
+                        onRunFresh={(action) => {
+                          if (!selectedPreview.conversationId) return;
+                          return onRunFresh(
+                            selectedPreview.conversationId,
+                            action.send_text,
+                          );
+                        }}
+                        onSaveDecision={(action, draft) =>
+                          saveDecision(selectedDossier.run_id, action, draft)
+                        }
+                      />
+                    )
+                  ) : (
+                    <>
+                      <div
+                        className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
+                        tabIndex={0}
+                        role="region"
+                        aria-label={t("command_palette.preview", "Preview")}
+                      >
+                        <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
+                          {t("command_palette.preview", "Preview")}
+                        </p>
+                        <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
+                          {selectedPreview.snippet ||
+                            t(
+                              "command_palette.preview_empty",
+                              "Select a result to preview its details.",
                             )}
-                            <div className="mt-3 flex justify-end gap-2">
-                              <button
-                                type="button"
-                                disabled={isSavingDecision}
-                                onClick={() => setDecisionDraft(null)}
-                                className="min-h-11 rounded-full border border-black/10 px-4 text-[13px] font-medium text-black/55 dark:border-white/10 dark:text-white/55"
-                              >
-                                {t("common.cancel", "Cancel")}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isSavingDecision}
-                                onClick={() =>
-                                  void saveDecision(selectedDecisionAction)
-                                }
-                                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white disabled:opacity-55 dark:bg-white dark:text-[#191c1f]"
-                              >
-                                {isSavingDecision ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4" />
-                                )}
-                                {t(
-                                  "command_palette.save_decision",
-                                  "Save decision",
-                                )}
-                              </button>
-                            </div>
-                          </div>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openSourceConversation(selectedPreview)}
+                        disabled={
+                          !selectedPreview.conversationId ||
+                          selectedNavigationDisabled
+                        }
+                        title={
+                          selectedPreview.conversationId
+                            ? undefined
+                            : t(
+                                "command_palette.no_source_conversation",
+                                "No source conversation",
+                              )
+                        }
+                        className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                      >
+                        <span>
+                          {selectedPreview.conversationId
+                            ? t(
+                                commandPaletteOpenLabelKey(selectedPreview),
+                                commandPaletteOpenFallback(selectedPreview),
+                              )
+                            : t(
+                                "command_palette.no_source_conversation",
+                                "No source conversation",
+                              )}
+                        </span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <p className="mt-1 text-[10px] text-black/25 dark:text-white/25">
+                        {t(
+                          "command_palette.open_at_match",
+                          "Enter opens the match",
+                        )}{" "}
+                        ·{" "}
+                        {t(
+                          "command_palette.open_at_left_off",
+                          "⌘/Ctrl+Enter opens where you left off",
                         )}
-                    </div>
+                      </p>
+                    </>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => openSourceConversation(selectedPreview)}
-                    disabled={
-                      !selectedPreview.conversationId ||
-                      selectedNavigationDisabled
-                    }
-                    title={
-                      selectedPreview.conversationId
-                        ? undefined
-                        : t(
-                            "command_palette.no_source_conversation",
-                            "No source conversation",
-                          )
-                    }
-                    className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
-                  >
-                    <span>
-                      {selectedPreview.conversationId
-                        ? t(
-                            commandPaletteOpenLabelKey(selectedPreview),
-                            commandPaletteOpenFallback(selectedPreview),
-                          )
-                        : t(
-                            "command_palette.no_source_conversation",
-                            "No source conversation",
-                          )}
-                    </span>
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                  <p className="mt-1 text-[10px] text-black/25 dark:text-white/25">
-                    {t(
-                      "command_palette.open_at_match",
-                      "Enter opens the match",
-                    )}{" "}
-                    ·{" "}
-                    {t(
-                      "command_palette.open_at_left_off",
-                      "⌘/Ctrl+Enter opens where you left off",
-                    )}
-                  </p>
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center">

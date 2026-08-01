@@ -20,6 +20,7 @@ import ChatSidebar, {
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
@@ -57,6 +58,11 @@ import {
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
+  useTranscriptTurnAnchor,
+  type PendingMessageAnchor,
+  type PendingScrollRestore,
+} from "@/components/chat/useTranscriptTurnAnchor";
+import {
   durableRetryLastTurnFromStreamError,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
@@ -70,6 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
+import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
   clearActiveConversationPointer,
   isCurrentAnchoredConversationRequest,
@@ -281,14 +288,8 @@ export default function ChatInterface() {
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
   const authenticatedUserIdRef = useRef<string | null>(null);
   const readyTranscriptConversationIdRef = useRef<string | null>(null);
-  const pendingScrollRestoreRef = useRef<{
-    conversationId: string;
-    scrollTop: number | null;
-  } | null>(null);
-  const pendingMessageAnchorRef = useRef<{
-    conversationId: string;
-    messageId: string;
-  } | null>(null);
+  const pendingScrollRestoreRef = useRef<PendingScrollRestore>(null);
+  const pendingMessageAnchorRef = useRef<PendingMessageAnchor>(null);
   const messageElementRefs = useRef(new Map<string, HTMLDivElement>());
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -685,16 +686,15 @@ export default function ChatInterface() {
         );
         if (!isCurrentRequest()) return;
         const snapshot = hydrateMessagesFromApi(items).messages;
-        if (!snapshot.some((message) => message.id === requestedMessageId)) {
-          throw new Error("Transcript anchor was not returned.");
-        }
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
         readyTranscriptConversationIdRef.current = targetConversationId;
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
-          messageId: requestedMessageId,
+          messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
         setMessages(snapshot);
@@ -874,43 +874,18 @@ export default function ChatInterface() {
     setShowJumpToLatest,
   });
 
-  useLayoutEffect(() => {
-    const pendingAnchor = pendingMessageAnchorRef.current;
-    if (
-      pendingAnchor &&
-      pendingAnchor.conversationId === conversationId &&
-      pendingAnchor.conversationId === activeConversationIdRef.current
-    ) {
-      const element = messageElementRefs.current.get(pendingAnchor.messageId);
-      if (element) {
-        element.scrollIntoView({ block: "center" });
-        element.focus({ preventScroll: true });
-        pendingMessageAnchorRef.current = null;
-        pendingScrollRestoreRef.current = null;
-        shouldAutoScrollRef.current = false;
-        setShowJumpToLatest(true);
-        return;
-      }
-    }
-    const pending = pendingScrollRestoreRef.current;
-    const container = scrollContainerRef.current;
-    if (
-      !pending ||
-      !container ||
-      pending.conversationId !== conversationId ||
-      pending.conversationId !== activeConversationIdRef.current
-    ) {
-      return;
-    }
-    container.scrollTop = pending.scrollTop ?? container.scrollHeight;
-    pendingScrollRestoreRef.current = null;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
-    shouldAutoScrollRef.current =
-      pending.scrollTop === null ? true : isNearBottom;
-    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
-  }, [conversationId, messages]);
+  const { anchorToTurn } = useTranscriptTurnAnchor({
+    conversationId,
+    messages,
+    jumpToLatestThresholdPx: JUMP_TO_LATEST_THRESHOLD_PX,
+    activeConversationIdRef,
+    pendingMessageAnchorRef,
+    pendingScrollRestoreRef,
+    messageElementRefs,
+    scrollContainerRef,
+    shouldAutoScrollRef,
+    setShowJumpToLatest,
+  });
 
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
@@ -1931,12 +1906,14 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          requestMessageId
-            ? { renderUserMessage: true }
-            : {
+          failedAssistantId
+            ? {
                 renderUserMessage: false,
-                replacementAssistantId: failedAssistantId ?? undefined,
-              },
+                replacementAssistantId: failedAssistantId,
+              }
+            : requestMessageId
+              ? { renderUserMessage: true }
+              : { renderUserMessage: false },
         );
       }
       return;
@@ -2486,7 +2463,16 @@ export default function ChatInterface() {
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
                             onDecisionUnavailable={requestGuestDecision}
-                            onDecisionSaved={() => { if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action"); }}
+                            onDecisionSaved={(decisionState) => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.result
+                                    ? { ...m, result: { ...m.result, decisionState } }
+                                    : m,
+                                ),
+                              );
+                              if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
+                            }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
                             resumeDecisionArtifactId={
                               msg.id === resumeDecisionMessageId
@@ -2508,6 +2494,11 @@ export default function ChatInterface() {
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
+
+                <ConversationActivityRail
+                  messages={messages}
+                  onSelectTick={anchorToTurn}
+                />
 
                 {/* Input fade + bar */}
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />

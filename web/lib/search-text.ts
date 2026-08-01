@@ -98,6 +98,7 @@ export function normalizedSearchTokens(value: string): string[] {
 }
 
 export const SEARCH_INDEXABLE_TOKEN_MIN_LENGTH = 3;
+export const SEARCH_SYMBOL_QUERY_MIN_LENGTH = 2;
 
 function isPythonWhitespace(character: string): boolean {
   const codepoint = character.codePointAt(0);
@@ -145,7 +146,7 @@ export function searchQueryIsIndexable(value: string): boolean {
   }
   const foldedSymbol = pythonCasefold(symbol);
   return (
-    Array.from(foldedSymbol).length >= SEARCH_INDEXABLE_TOKEN_MIN_LENGTH &&
+    Array.from(foldedSymbol).length >= SEARCH_SYMBOL_QUERY_MIN_LENGTH &&
     Array.from(foldedSymbol).some(isPythonAlphanumeric)
   );
 }

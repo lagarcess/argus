@@ -39,7 +39,8 @@ transcript to that turn.
 3. Hover-preview must not fire on incidental contact — this is the exact
    bug Codex's own users are hitting (instant-fire on first touch, sitting
    in the normal path between two frequently-used regions). Two founder-
-   directed mitigations, both required, not alternatives:
+   directed mitigations, both required, not alternatives (the shipped
+   behavior refines the letter of this decision — see addendum §2):
    - **Proximity/dwell gating, not instant hover-fire.** The rail "wakes
      up" as the cursor nears (a magnetic-reveal ramp, roughly a half-inch
      threshold) rather than triggering the instant it's touched. Exact
@@ -112,3 +113,61 @@ transcript to that turn.
 One PR against `codex/private-alpha-next`. EN/es-419, hermetic frontend
 suite, zero-provider-call proof, screenshot evidence given this is a new
 visible UI surface.
+
+## Implementation addendum (PR #315, 2026-07-31)
+
+Shipped from `codex/conversation-activity-rail`, founder-reviewed live.
+Where the build deviates from this note as originally written, and why
+each final call was made:
+
+1. **Geometry pivot: stacked queue, not a proportional minimap.** The
+   "fixed-width rail vs. proportional minimap" choice was left to the
+   agent, and the first build chose proportional — ticks placed by
+   transcript position. Founder review against the actual Codex behavior
+   rejected that: the ticks are teleport buttons, so they should cost
+   nothing to reach, and spacing that encodes transcript distance just
+   spreads the targets apart. Final: a fixed-pitch (12px) queue centered
+   on the rail, with per-tick dock/piano magnetization following the
+   pointer. Orientation concerns are covered by kind color-coding and the
+   existing jump-to-latest affordance; order still carries sequence and
+   the preview carries identity.
+
+2. **Dwell guards only the first opening, not browsing.** Decision 3's
+   letter ("proximity/dwell gating, not instant hover-fire") is shipped
+   as: cold entry onto the rail requires the ~180ms dwell before any
+   preview opens, but once a preview is open, gliding to a neighboring
+   tick switches it instantly. The bug being mitigated is the *first
+   unintended* opening on incidental contact; gliding after a deliberate
+   dwell is browsing, and per-tick dwell there would only make the piano
+   feel laggy. Both founder-directed mitigations (dwell + right-edge
+   placement, confirmed free of the palette's modal-only right pane)
+   remain in force.
+
+3. **Tick taxonomy resolved per updated decision 2**: three kinds, each
+   mapping onto an existing typed outcome — result turn (the Quick-take-
+   bearing `strategy_result`), decision saved (`decisionState` on the
+   evidence artifact, superseding the result tick for that turn), and
+   needed attention (typed recovery display / retryable failure code /
+   failed–canceled–expired job). Try next (chrome attached to a result
+   turn) and Explain result (a second mark on an already-marked run) were
+   proposed for exclusion and confirmed out. A later expansion
+   (breakdowns, discovery results, fact answers) was offered and
+   declined — the three kinds ship as-is. General educational turns have
+   no typed marker today; ticking them would require a small backend
+   marker slice first (never render-time classification).
+
+4. **Previews carry run symbols** (not in the original note): all tickers
+   listed, no "+N" overflow — the 5-symbol product cap means the full
+   list always fits — plus the lead ticker in each tick's aria-label, so
+   same-template runs stay distinguishable mid-glide.
+
+5. **Naming**: the note suggested renaming away from Codex's "activity
+   rail" term; internal identifiers kept `conversation activity rail`
+   (`chat.activity_rail.*`) since no user-visible string ever says it —
+   users see "Conversation activity" / "Actividad de la conversación".
+
+6. **Threshold and parked ideas**: rail renders at ≥12 transcript
+   messages with ≥2 ticks; hidden below `md`. A "you are here" emphasis
+   (highlighting the last landmark above the viewport) was discussed and
+   parked — with artifact-only ticks most reading positions sit between
+   landmarks, so it only earns its place if tick density ever grows.

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
+import {
+  projectedTranscriptAnchorId,
+  retireSupersededFailures,
+} from "@/lib/chat-retry-action-history";
 import {
   hydrateTextMessageFromApi,
   precedingUserMessageForRetryableRecovery,
@@ -16,7 +19,7 @@ const failureMetadata = {
 };
 
 describe("composition-failure retry contract (issue #249)", () => {
-  test("a superseded failure and its duplicate retry bubble stop rendering", () => {
+  test("a completed retry keeps the original user turn and hides its durable duplicate", () => {
     const messages = [
       { id: "u1", role: "user", kind: "text", content: "What was the worst drop?" },
       {
@@ -32,7 +35,11 @@ describe("composition-failure retry contract (issue #249)", () => {
 
     const retired = retireSupersededFailures(messages);
 
-    expect(retired.map((message) => message.id)).toEqual(["u2", "a2"]);
+    expect(retired.map((message) => message.id)).toEqual(["u1", "a2"]);
+    expect(retired.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(retired[0].transcriptAnchorIds).toEqual(["u2"]);
+    expect(projectedTranscriptAnchorId(retired, "u1")).toBe("u1");
+    expect(projectedTranscriptAnchorId(retired, "u2")).toBe("u1");
   });
 
   test("an unsuperseded failure keeps rendering", () => {

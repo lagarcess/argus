@@ -35,6 +35,7 @@ from argus.domain.conversation_recall import (
 from argus.domain.search_text import (
     normalize_search_symbol,
     normalize_search_text,
+    search_has_indexable_token,
     search_text_matches_query,
 )
 from argus.domain.store import AlphaStore
@@ -101,6 +102,10 @@ class _MemorySearchIndex:
     all_conversation_ids: RankedGroups
     conversation_ids_by_title: dict[str, RankedGroups]
     conversation_ids_by_symbol: dict[str, RankedGroups]
+    conversation_ids_by_symbol_tier: dict[
+        str,
+        dict[tuple[bool, bool], RankedGroups],
+    ]
     conversation_ids_by_decision_state: dict[str, RankedGroups]
     asset_symbols: tuple[str, ...]
     asset_rollups_by_symbol: dict[str, SearchAssetRollup]
@@ -193,6 +198,14 @@ def _bounded_memory_search_snapshot_for_index(
             else ()
         )
     eligible_conversation_ids = eligible_groups.members
+    symbol_query = normalize_search_symbol(query)
+    resolved_symbol = _resolve_asset_symbol(index, query=query)
+    exact_symbol = (
+        symbol_query
+        if symbol_query is not None
+        and symbol_query in index.conversation_ids_by_symbol
+        else None
+    )
 
     selected_conversation_ids: set[str] = set()
     selected_message_ids: set[str] = set()
@@ -205,15 +218,26 @@ def _bounded_memory_search_snapshot_for_index(
         )
     elif include_conversation_rows:
         if query:
-            selected_query_matches = _query_conversation_window(
-                index,
-                query=query,
-                candidate_limit=candidate_limit,
-                eligible_groups=eligible_groups,
-                eligible_conversation_ids=eligible_conversation_ids,
-                cursor_updated_at=cursor_updated_at,
-                cursor_id=cursor_id,
-            )
+            if search_has_indexable_token(query):
+                selected_query_matches = _query_conversation_window(
+                    index,
+                    query=query,
+                    candidate_limit=candidate_limit,
+                    eligible_groups=eligible_groups,
+                    eligible_conversation_ids=eligible_conversation_ids,
+                    cursor_updated_at=cursor_updated_at,
+                    cursor_id=cursor_id,
+                )
+            elif exact_symbol is not None:
+                selected_query_matches = _symbol_query_window(
+                    index,
+                    query=query,
+                    symbol=exact_symbol,
+                    candidate_limit=candidate_limit,
+                    eligible_conversation_ids=eligible_conversation_ids,
+                    cursor_updated_at=cursor_updated_at,
+                    cursor_id=cursor_id,
+                )
             selected_conversation_ids.update(selected_query_matches)
             selected_message_ids.update(
                 match.candidate.source_id
@@ -231,12 +255,21 @@ def _bounded_memory_search_snapshot_for_index(
                 )
             )
 
-    resolved_symbol = _resolve_asset_symbol(index, query=query)
     ledger_counts = (
-        _ledger_counts(
-            index,
-            query=query,
-            eligible_conversation_id=guest_conversation_id,
+        (
+            _symbol_ledger_counts(
+                index,
+                symbol=exact_symbol,
+                eligible_conversation_id=guest_conversation_id,
+            )
+            if exact_symbol is not None
+            and query
+            and not search_has_indexable_token(query)
+            else _ledger_counts(
+                index,
+                query=query,
+                eligible_conversation_id=guest_conversation_id,
+            )
         )
         if include_ledger_groups
         else None
@@ -272,9 +305,18 @@ def _bounded_memory_search_snapshot_for_index(
             for row in index.decisions_by_conversation.get(conversation_id, [])
         ],
         messages=[
-            index.messages_by_id[message_id]
-            for message_id in selected_message_ids
-            if message_id in index.messages_by_id
+            message
+            for message_id, message in index.messages_by_id.items()
+            if message_id in selected_message_ids
+            or (
+                str(message.get("conversation_id") or "")
+                in selected_conversation_ids
+                and message.get("role") == "assistant"
+                and (
+                    str((message.get("metadata") or {}).get("result_run_id") or "")
+                    or str((message.get("metadata") or {}).get("latest_run_id") or "")
+                )
+            )
         ],
         asset_rollup=(
             index.asset_rollups_by_symbol.get(resolved_symbol)
@@ -353,8 +395,20 @@ def _build_memory_search_index(
                 message.role == "user"
                 or (
                     message.role == "assistant"
-                    and valid_next_experiments_metadata(
-                        getattr(message, "metadata", None)
+                    and (
+                        valid_next_experiments_metadata(
+                            getattr(message, "metadata", None)
+                        )
+                        or bool(
+                            (
+                                getattr(message, "metadata", None) or {}
+                            ).get("result_run_id")
+                        )
+                        or bool(
+                            (
+                                getattr(message, "metadata", None) or {}
+                            ).get("latest_run_id")
+                        )
                     )
                 )
             )
@@ -638,6 +692,10 @@ def _build_memory_search_index(
     )
     conversation_ids_by_title: defaultdict[str, list[str]] = defaultdict(list)
     conversation_ids_by_symbol: defaultdict[str, list[str]] = defaultdict(list)
+    conversation_ids_by_symbol_tier: defaultdict[
+        str,
+        defaultdict[tuple[bool, bool], list[str]],
+    ] = defaultdict(lambda: defaultdict(list))
     conversation_ids_by_decision_state: defaultdict[str, list[str]] = (
         defaultdict(list)
     )
@@ -649,6 +707,12 @@ def _build_memory_search_index(
             conversation_ids_by_title[normalized_title].append(conversation_id)
         for symbol in conversation_symbols_by_id[conversation_id]:
             conversation_ids_by_symbol[symbol].append(conversation_id)
+            conversation_ids_by_symbol_tier[symbol][
+                (
+                    bool(conversations_by_id[conversation_id].get("pinned")),
+                    normalized_title == normalize_search_text(symbol),
+                )
+            ].append(conversation_id)
         for state in decision_states_by_conversation.get(conversation_id, set()):
             conversation_ids_by_decision_state[state].append(conversation_id)
 
@@ -674,6 +738,13 @@ def _build_memory_search_index(
         conversation_ids_by_symbol={
             symbol: ranked_groups(conversation_ids)
             for symbol, conversation_ids in conversation_ids_by_symbol.items()
+        },
+        conversation_ids_by_symbol_tier={
+            symbol: {
+                tier: ranked_groups(conversation_ids)
+                for tier, conversation_ids in tier_groups.items()
+            }
+            for symbol, tier_groups in conversation_ids_by_symbol_tier.items()
         },
         conversation_ids_by_decision_state={
             state: ranked_groups(conversation_ids)
@@ -1127,6 +1198,181 @@ def _recent_conversation_window(
     return list(dict.fromkeys((*eligible[:candidate_limit], *cursor_window)))
 
 
+def _symbol_query_window(
+    index: _MemorySearchIndex,
+    *,
+    query: str,
+    symbol: str,
+    candidate_limit: int,
+    eligible_conversation_ids: frozenset[str],
+    cursor_updated_at: datetime | None,
+    cursor_id: str | None,
+) -> dict[str, _ConversationQueryMatch]:
+    symbol_groups = index.conversation_ids_by_symbol.get(
+        symbol,
+        ranked_groups(()),
+    )
+    eligible_symbol_ids = symbol_groups.members & eligible_conversation_ids
+    tier_groups = index.conversation_ids_by_symbol_tier.get(symbol, {})
+    tiers = ((True, True), (True, False), (False, True), (False, False))
+
+    def rank_key(
+        conversation_id: str,
+    ) -> tuple[int, int, int, int, datetime, int, int, str]:
+        conversation = index.conversations[conversation_id]
+        layer_rank = _SOURCE_LAYERS.index("run") + 1
+        return search_rank_key(
+            score=score_search_item(
+                query=query,
+                title=str(
+                    conversation.get("title") or "Untitled conversation"
+                ),
+                # Every id in this symbol index has a completed run containing
+                # the exact symbol, so the matched-text contribution is fixed.
+                matched_text=symbol,
+                pinned=bool(conversation.get("pinned")),
+                symbol_exact_match=True,
+                match_layer_rank=layer_rank,
+            ),
+            kind="conversation",
+            updated_at=index.conversation_activity_by_id[conversation_id],
+            item_id=conversation_id,
+        )
+
+    def collect_ids(
+        *,
+        maximum_key: tuple[int, int, int, int, datetime, int, int, str]
+        | None = None,
+        cursor_tier: tuple[bool, bool] | None = None,
+    ) -> list[str]:
+        selected: list[str] = []
+        cursor_tier_index = (
+            tiers.index(cursor_tier) if cursor_tier is not None else 0
+        )
+        for tier_index, tier in enumerate(tiers):
+            if tier_index < cursor_tier_index:
+                continue
+            remaining = candidate_limit - len(selected)
+            if remaining <= 0:
+                break
+            groups = tier_groups.get(tier, ranked_groups(()))
+            start = 0
+            if cursor_tier == tier and cursor_id is not None:
+                start = groups.positions.get(cursor_id, 0)
+                while (
+                    start > 0
+                    and index.conversation_activity_by_id[groups.ordered[start - 1]]
+                    == cursor_updated_at
+                ):
+                    start -= 1
+
+            tier_ids: list[str] = []
+            cutoff_activity: datetime | None = None
+            for conversation_id in groups.ordered[start:]:
+                if conversation_id not in eligible_symbol_ids:
+                    continue
+                activity = index.conversation_activity_by_id[conversation_id]
+                if cutoff_activity is not None and activity < cutoff_activity:
+                    break
+                if (
+                    maximum_key is not None
+                    and rank_key(conversation_id) > maximum_key
+                ):
+                    continue
+                tier_ids.append(conversation_id)
+                if len(tier_ids) >= remaining:
+                    cutoff_activity = activity
+            tier_ids.sort(key=rank_key, reverse=True)
+            selected.extend(tier_ids[:remaining])
+        return selected
+
+    selected_ids = collect_ids()
+    if (
+        cursor_updated_at is not None
+        and cursor_id is not None
+        and cursor_id in eligible_symbol_ids
+        and index.conversation_activity_by_id.get(cursor_id) == cursor_updated_at
+    ):
+        conversation = index.conversations[cursor_id]
+        cursor_tier = (
+            bool(conversation.get("pinned")),
+            normalize_search_text(
+                conversation.get("title") or "Untitled conversation"
+            )
+            == normalize_search_text(query),
+        )
+        selected_ids.extend(
+            collect_ids(
+                maximum_key=rank_key(cursor_id),
+                cursor_tier=cursor_tier,
+            )
+        )
+
+    selected: dict[str, _ConversationQueryMatch] = {}
+    for conversation_id in dict.fromkeys(selected_ids):
+        match = _symbol_query_match(
+            index,
+            query=query,
+            symbol=symbol,
+            conversation_id=conversation_id,
+        )
+        if match is not None:
+            selected[conversation_id] = match
+    return selected
+
+
+def _symbol_query_match(
+    index: _MemorySearchIndex,
+    *,
+    query: str,
+    symbol: str,
+    conversation_id: str,
+) -> _ConversationQueryMatch | None:
+    matching_runs = [
+        row
+        for row in index.runs_by_conversation.get(conversation_id, ())
+        if row.get("status", "completed") == "completed"
+        and any(
+            normalize_search_symbol(value) == symbol
+            for value in _run_symbols(row)
+        )
+    ]
+    run = max(
+        matching_runs,
+        key=lambda row: (
+            _mapping_activity(row),
+            str(row.get("id") or ""),
+        ),
+        default=None,
+    )
+    if run is None:
+        return None
+    candidate = _candidate(
+        conversation_id=conversation_id,
+        source_id=str(run.get("id") or conversation_id),
+        row=run,
+        text=_run_search_text(run),
+    )
+    layer_rank = _SOURCE_LAYERS.index("run") + 1
+    conversation = index.conversations[conversation_id]
+    return _ConversationQueryMatch(
+        conversation_id=conversation_id,
+        candidate=candidate,
+        layer="run",
+        layer_rank=layer_rank,
+        score=score_search_item(
+            query=query,
+            title=str(conversation.get("title") or "Untitled conversation"),
+            matched_text=candidate.text,
+            pinned=bool(conversation.get("pinned")),
+            symbol_exact_match=True,
+            match_layer_rank=layer_rank,
+        ),
+        symbol_exact_match=True,
+        match_count=len(matching_runs),
+    )
+
+
 def _recent_conversation_seek_key(
     *,
     conversation_id: str,
@@ -1150,6 +1396,30 @@ def _ledger_counts(
         query=query,
         eligible_conversation_id=eligible_conversation_id,
     )
+
+
+def _symbol_ledger_counts(
+    index: _MemorySearchIndex,
+    *,
+    symbol: str,
+    eligible_conversation_id: str | None,
+) -> dict[str, int]:
+    symbol_conversations = index.conversation_ids_by_symbol.get(
+        symbol,
+        ranked_groups(()),
+    ).members
+    if eligible_conversation_id is not None:
+        symbol_conversations &= frozenset((eligible_conversation_id,))
+    return {
+        state: len(
+            symbol_conversations
+            & index.conversation_ids_by_decision_state.get(
+                state,
+                ranked_groups(()),
+            ).members
+        )
+        for state in ("promising", "watching", "rejected", "revisit_later")
+    }
 
 
 def _resolve_asset_symbol(
