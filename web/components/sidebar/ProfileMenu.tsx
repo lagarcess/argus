@@ -19,7 +19,6 @@ import {
   Trash2,
   User,
   FileText,
-  BookOpen,
   Bug,
   Lightbulb,
   MessageCircle,
@@ -1391,12 +1390,6 @@ export default function ProfileMenu({
               </span>
               <span className="ml-auto flex shrink-0">{quickJumpBadge("privacy")}</span>
             </a>
-            <button disabled className="flex min-h-[38px] w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
-              <BookOpen className="h-3.5 w-3.5" />
-              <span className="whitespace-nowrap">
-                {t("settings.help.release_notes", "Release Notes")}
-              </span>
-            </button>
           </div>
         )}
       </div>
