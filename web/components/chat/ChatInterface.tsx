@@ -2182,7 +2182,9 @@ export default function ChatInterface() {
         settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
         strategiesEnabled={strategiesEnabled}
-        omnisearchEnabled={omnisearchEnabled}
+        omnisearchEnabled={
+          omnisearchEnabled && (!isGuest || canUseOmnisearch)
+        }
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
         isGuest={isGuest}
