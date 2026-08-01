@@ -1985,7 +1985,18 @@ What remains is inert compatibility state only:
     {
       "id": "uuid",
       "title": "...",
-      "updated_at": "timestamp"
+      "updated_at": "timestamp",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
     }
   ],
   "next_cursor": null
@@ -2045,6 +2056,73 @@ Rename, pin, archive, or restore a soft-deleted conversation.
 ```
 *Note: User-provided title changes set `title_source = user_renamed`.*
 *Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
+
+Every emitted `Conversation` includes the additive `activity` projection,
+including create, guest replacement, patch, and paginated list responses. The
+schema field remains optional for wire compatibility, but this API version does
+not omit it from emitted conversation records.
+
+## Conversation activity
+
+`GET /api/v1/conversations/{id}/activity` returns the current projection.
+`PATCH /api/v1/conversations/{id}/activity` accepts exactly one of:
+
+```json
+{ "action": "mark_unread" }
+```
+
+```json
+{
+  "action": "mark_read",
+  "through_attention_cursor": "opaque-cursor-or-null"
+}
+```
+
+Both endpoints return:
+
+```json
+{
+  "operation": {
+    "status": "idle | queued | running | checking",
+    "kind": "chat_turn | backtest_job | null",
+    "updated_at": "timestamp-or-null"
+  },
+  "attention": {
+    "status": "none | new_activity | manual_unread | needs_input | needs_attention",
+    "cursor": "opaque-cursor-or-null"
+  }
+}
+```
+
+Operation precedence is `running > queued > checking > idle`; equal states use
+the newest source timestamp, then prefer a backtest job. Accepted turns and
+queued jobs are `queued`; running turns/jobs are `running`. A succeeded job is
+`checking` until its completed Run and evidence identity can be hydrated.
+
+Completed turns and hydrateable succeeded jobs produce `new_activity` beyond
+the read boundary. Existing typed `await_user_reply`, `needs_clarification`,
+and `await_approval` outcomes produce `needs_input`. Existing terminal
+lifecycle/job failures produce `needs_attention`; this contract adds no failure
+taxonomy or recovery behavior. Classification never matches message prose.
+
+`mark_unread` preserves the read-through boundary and is idempotent while the
+manual flag is already set. It requires a registered account. `mark_read(null)`
+clears only that manual flag. `mark_read(cursor)` also advances monotonically
+through the server-verified terminal boundary; a newer completion therefore
+remains unseen.
+
+Attention cursors are versioned and opaque and encode only source kind and
+UUID. The server reloads the timestamp and revalidates owner, conversation, and
+terminal eligibility under lock. Missing, deleted, foreign, or guest-out-of-
+workspace conversations return `404 not_found`; guest `mark_unread` returns
+`403 account_conversion_required`; a well-shaped but invalid/stale source
+returns `409 attention_cursor_conflict`; malformed actions or cursor shapes
+return `422`. All errors use the standard RFC 9457 Problem Details envelope.
+
+Activity reads may perform the existing evidence-based stale-turn
+reconciliation, bounded to 20 rows across at most 100 supplied task ids. They
+never mutate read state. Conversation ordering, pagination cursors, previews,
+and `conversations.updated_at` are unchanged.
 
 ## `DELETE /conversations/{id}`
 
@@ -3233,7 +3311,18 @@ Mixed recent activity feed.
       "pinned": false,
       "created_at": "timestamp",
       "conversation_id": "uuid",
-      "expires_at": "timestamp or null"
+      "expires_at": "timestamp or null",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
     }
   ],
   "next_cursor": null
@@ -3244,6 +3333,11 @@ Mixed recent activity feed.
 | user_renamed`, mirroring the conversation record). While it is
 `system_default`, clients should render a localized "New chat" placeholder
 instead of the stored default title.
+
+`activity` is present on every `chat` item, including the guest workspace row,
+and omitted from `run`, `strategy`, and `collection` items. It is projected in
+one bounded owner-scoped batch after the History page is selected, so it cannot
+change mixed-feed ordering or cursors.
 
 A verified guest receives at most its one workspace-bound conversation.
 `expires_at` is the exact fixed workspace expiry. Clients may localize its

@@ -341,6 +341,83 @@ def test_openapi_contract_exposes_lazy_run_dossier_history(
     assert "actions" not in search_item["properties"]
 
 
+def test_openapi_exposes_conversation_activity_and_read_contract(
+    generated: dict,
+    checked: dict,
+) -> None:
+    path = "/api/v1/conversations/{conversation_id}/activity"
+    for document in (generated, checked):
+        schemas = document["components"]["schemas"]
+        conversation = schemas["Conversation"]
+        assert conversation["properties"]["activity"]["anyOf"] == [
+            {"$ref": "#/components/schemas/ConversationActivity"},
+            {"type": "null"},
+        ]
+        assert "activity" not in conversation["required"]
+
+        operation = schemas["ConversationOperation"]
+        assert operation["properties"]["status"]["enum"] == [
+            "idle",
+            "queued",
+            "running",
+            "checking",
+        ]
+        assert operation["properties"]["kind"]["anyOf"][0]["enum"] == [
+            "chat_turn",
+            "backtest_job",
+        ]
+        attention = schemas["ConversationAttention"]
+        assert attention["properties"]["status"]["enum"] == [
+            "none",
+            "new_activity",
+            "manual_unread",
+            "needs_input",
+            "needs_attention",
+        ]
+
+        history_item = schemas["HistoryItemWire"]
+        assert history_item["properties"]["activity"] == {
+            "$ref": "#/components/schemas/ConversationActivity"
+        }
+        assert "activity" not in history_item["required"]
+
+        activity_path = document["paths"][path]
+        assert activity_path["get"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"] == {"$ref": "#/components/schemas/ConversationActivity"}
+        assert set(activity_path["get"]["responses"]) == {
+            "200",
+            "404",
+            "422",
+            "500",
+            "503",
+        }
+        patch = activity_path["patch"]
+        request = patch["requestBody"]["content"]["application/json"]["schema"]
+        assert request["oneOf"] == [
+            {"$ref": "#/components/schemas/ConversationActivityMarkUnread"},
+            {"$ref": "#/components/schemas/ConversationActivityMarkRead"},
+        ]
+        assert request["discriminator"]["propertyName"] == "action"
+        assert schemas["ConversationActivityMarkRead"]["properties"][
+            "through_attention_cursor"
+        ]["anyOf"][0]["maxLength"] == 256
+        assert set(patch["responses"]) == {
+            "200",
+            "403",
+            "404",
+            "409",
+            "422",
+            "500",
+            "503",
+        }
+        for method, statuses in (("get", ("404",)), ("patch", ("403", "404", "409", "422"))):
+            for status in statuses:
+                assert activity_path[method]["responses"][status]["content"][
+                    "application/json"
+                ]["schema"] == {"$ref": "#/components/schemas/Error"}
+
+
 def test_regeneration_script_matches_checked_artifact() -> None:
     from scripts.generate_openapi_artifact import build_artifact_document
 
