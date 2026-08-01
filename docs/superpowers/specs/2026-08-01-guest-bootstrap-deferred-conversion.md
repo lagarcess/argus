@@ -1,0 +1,113 @@
+# Guest bootstrap deferred to conversion, not page load — scope note
+
+Companion to
+[2026-07-31-guest-auth-captcha-ux.md](2026-07-31-guest-auth-captcha-ux.md)
+(#321). That note fixes the CAPTCHA widget's behavior wherever it fires.
+This note changes *when* it fires. Land #321 first, or at least don't
+diverge from its `guest-captcha.ts` changes — this lane reuses that
+acquisition function unchanged.
+
+## Why
+
+Founder concern: neither ChatGPT nor Grok verify anything before a visitor
+can type. Argus's current design establishes a real identity (Supabase
+anonymous auth via `sign_in_anonymously`) — and therefore a CAPTCHA check —
+before the user has expressed any intent at all. That's a brand-perception
+problem on top of the UX problem #321 already covers: the very first thing
+a new guest can encounter is a bot check, not the product.
+
+The natural fix is to defer guest bootstrap to the first action that
+actually needs a persisted workspace — most likely the first message send
+— rather than firing it on page mount.
+
+## Phase 1 — Audit (required before any implementation)
+
+There is a known, unexplained discrepancy that must be resolved first, not
+guessed past. Source in this repo (`web/components/guest/GuestEntry.tsx`,
+`web/lib/landing-entry.ts`) shows guest bootstrap firing eagerly in a
+`useEffect` on mount whenever `entrySurface === "guest"`. But a live
+reproduction against the hosted alpha
+(`argus-app-suz5.onrender.com`, running `claude/public-alpha-readiness`)
+showed the opposite: the guest could type and send a first message with no
+visible auth step, before any guest identity appeared to be established.
+These don't agree, and the gap must be understood before changing anything.
+
+Audit questions, answered with evidence (code reading + live reproduction),
+not assumption:
+
+1. Does `codex/private-alpha-next` (this integration branch) actually
+   exhibit the eager on-mount bootstrap today? Reproduce it directly,
+   don't just read the source.
+2. Why did the hosted `claude/public-alpha-readiness` deployment behave
+   differently? Branch drift, a flag difference, a newer routing change
+   upstream of what's in this branch, or something else? Trace it to a
+   real cause.
+3. What is the earliest point today at which a guest's conversation row
+   actually gets created in Supabase — is it tied to the auth bootstrap
+   itself, or to the first message send, or something else? This decides
+   whether "defer to first send" is even mechanically sound or whether
+   something else already depends on the workspace existing earlier.
+4. Does `ExpiredGuestSession.tsx`'s restart flow, or any other flow, assume
+   a guest session already exists at page load in a way that deferral
+   would break?
+
+Report findings before writing any implementation code. If the audit shows
+the two branches already agree and my read of `GuestEntry.tsx` was simply
+wrong about what's deployed, say so plainly — that changes this note's
+premise and the founder should hear that before Phase 2 proceeds.
+
+## Phase 1 gate — hard stop
+
+Do not start Phase 2 until the audit findings are reported and confirmed.
+This is the same discipline used elsewhere in this codebase for
+inventory-before-build passes — the point is to fix the right thing, once,
+not to guess and rework.
+
+## Phase 2 — Locked decisions (once the audit confirms the premise)
+
+1. **Guest bootstrap — and therefore CAPTCHA acquisition — must not fire
+   before the user's first action that actually needs a persisted
+   workspace.** Landing on the page, reading the copy, and typing must
+   never trigger any auth or CAPTCHA network activity by themselves.
+2. **The landing/chat composer must accept typed input from a guest with
+   no identity established yet.** Typing is free. Only submitting costs
+   anything.
+3. **When the user does submit, bootstrap + CAPTCHA happen inside that
+   submission's own existing loading state** (e.g. whatever shows
+   "Understanding your idea..." today) — not as a separate, earlier
+   interruption, and not as a second distinct "verifying you" step
+   stacked in front of the one the user already expects.
+4. **No new onboarding step is introduced.** This must not create
+   something PRODUCT.md's "no separate onboarding flow" principle would
+   flag — the guest experience should read as one continuous action, not
+   landing-then-a-check-then-typing.
+5. **Reuses #321's fixed CAPTCHA acquisition unchanged** (timeout, visual
+   shell, spinner) — this lane is purely about sequencing, not about
+   touching that mechanism again.
+6. Workspace/allowance semantics must not change: the seven-day workspace
+   window and the per-visitor daily allowance (PRODUCT.md, "Guest Entry")
+   stay exactly as they are today — this is a timing change, not a policy
+   change.
+
+## Stop and report if
+
+- The audit finds the guest conversation/workspace must exist before the
+  composer can meaningfully render, for some reason deeper than "that's
+  how it's built today" — report before assuming full deferral is
+  mechanically possible.
+- Deferring bootstrap breaks `ExpiredGuestSession.tsx`'s restart flow or
+  any other flow that currently assumes an existing guest session at page
+  load.
+- The audit contradicts this note's premise entirely (see Phase 1) — stop
+  there rather than implementing Phase 2 against a premise that turned out
+  to be wrong.
+
+## Where it stops
+
+Phase 1: a short written report, no code changes, reviewed before
+proceeding. Phase 2: one PR (or a small stack, if the audit reveals the
+change needs splitting) against `codex/private-alpha-next`, sequenced
+after or rebased onto #321's PR. Gates: EN/es-419, hermetic frontend
+suite, and recorded evidence (screenshots or a short capture) of a guest
+typing and sending a first message with zero visible auth step, followed
+by a correctly-established guest session.
