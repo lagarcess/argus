@@ -1097,7 +1097,7 @@
       "subtitle": "Sign in to continue",
       "email_placeholder": "Email address",
       "password_placeholder": "Password",
-      "submit": "Sign In",
+      "submit": "Sign in",
       "loading": "Signing in...",
       "errors": {
         "supabase_not_configured": "Supabase auth is not configured."
@@ -1108,7 +1108,8 @@
       "name_placeholder": "Name",
       "submit": "Sign up",
       "loading": "Creating account...",
-      "new_account": "new to argus?"
+      "new_account": "New to Argus?",
+      "password_requirement": "At least 8 characters."
     },
     "legal": {
       "continuing_prefix": "By continuing, you agree to our"
@@ -1187,9 +1188,9 @@
     }
   },
   "landing": {
-    "sign_up_email": "Sign up with Email",
-    "already_account": "already have an account?",
-    "sign_in": "sign in",
+    "sign_up_email": "Sign up with email",
+    "already_account": "Already have an account?",
+    "sign_in": "Sign in",
     "legal_prefix": "By signing up, you agree to our",
     "terms": "Terms",
     "privacy": "Privacy Policy"
