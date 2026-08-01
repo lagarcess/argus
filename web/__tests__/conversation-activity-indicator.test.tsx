@@ -18,6 +18,27 @@ const renderIndicator = (
     <ConversationActivityIndicator presentation={presentation} />,
   );
 
+const relativeLuminance = (hex: string): number => {
+  const [red, green, blue] = hex
+    .match(/.{2}/g)!
+    .map((channel) => Number.parseInt(channel, 16) / 255)
+    .map((channel) =>
+      channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4,
+    );
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+};
+
+const contrastRatio = (foreground: string, background: string): number => {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (
+    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+  );
+};
+
 describe("ConversationActivityIndicator", () => {
   test("renders the existing selector's winning state when work covers unread attention", () => {
     const canonical: ConversationActivity = {
@@ -68,9 +89,13 @@ describe("ConversationActivityIndicator", () => {
 
   test("keeps needs input static and visually distinct from failure", () => {
     const html = renderIndicator("needs_input");
+    const lightToken = html.match(/text-\[#([\da-f]{6})\]/i)?.[1];
 
     expect(html).toContain("lucide-circle-help");
-    expect(html).toContain("text-[#7da0ca]");
+    expect(lightToken).toBeDefined();
+    expect(contrastRatio(lightToken!, "ffffff")).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(lightToken!, "f2f2f2")).toBeGreaterThanOrEqual(3);
+    expect(html).toContain("dark:text-[#9ab9dc]");
     expect(html).not.toContain("lucide-circle-alert");
     expect(html).not.toContain("animate-");
   });

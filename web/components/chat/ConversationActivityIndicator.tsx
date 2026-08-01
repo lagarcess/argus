@@ -108,7 +108,7 @@ export function ConversationActivityIndicator({
       ) : presentation === "needs_attention" ? (
         <CircleAlert className={`${iconSize} ${inlineFailureTextClass}`} />
       ) : presentation === "needs_input" ? (
-        <CircleHelp className={`${iconSize} text-[#7da0ca] dark:text-[#9ab9dc]`} />
+        <CircleHelp className={`${iconSize} text-[#6f8eb4] dark:text-[#9ab9dc]`} />
       ) : (
         <span
           data-activity-dot="true"
