@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveLandingEntrySurface } from "../lib/landing-entry";
+import * as landingEntry from "../lib/landing-entry";
 
 const root = join(import.meta.dir, "..");
+const { resolveLandingEntrySurface } = landingEntry;
+
+type ResolveChatEntrySurface = (input: {
+  hasEstablishedUser: boolean;
+  guestAccessEnabled: boolean;
+  guestCaptchaConfigured: boolean;
+}) => "chat" | "auth";
 
 describe("landing entry routing", () => {
   test("resolves the existing session before default-on guest entry", () => {
@@ -45,19 +52,50 @@ describe("landing entry routing", () => {
     ).toBe("auth");
   });
 
-  test("lets a configured guest render chat while preserving auth-first rollback", () => {
-    const chatPage = readFileSync(join(root, "app/chat/page.tsx"), "utf-8");
-    const guardStart = chatPage.indexOf("if (error || !data.user) {");
-    const guardEnd = chatPage.indexOf("\n  }\n\n  return", guardStart);
-    const unauthenticatedGuard = chatPage.slice(guardStart, guardEnd);
+  test("requires both guest gates to render unauthenticated chat", () => {
+    const resolveChatEntrySurface = (
+      landingEntry as typeof landingEntry & {
+        resolveChatEntrySurface?: ResolveChatEntrySurface;
+      }
+    ).resolveChatEntrySurface;
 
-    expect(guardStart).toBeGreaterThan(-1);
-    expect(guardEnd).toBeGreaterThan(guardStart);
-    expect(chatPage).toContain("guestCaptchaConfigured");
-    expect(unauthenticatedGuard).toContain("guestAccessEnabled");
-    expect(unauthenticatedGuard).toContain("guestCaptchaConfigured");
-    expect(unauthenticatedGuard).not.toContain('redirect("/")');
-    expect(unauthenticatedGuard).toContain('redirect("/?auth=login")');
+    expect(resolveChatEntrySurface).toBeFunction();
+    if (!resolveChatEntrySurface) return;
+
+    expect(
+      resolveChatEntrySurface({
+        hasEstablishedUser: false,
+        guestAccessEnabled: true,
+        guestCaptchaConfigured: true,
+      }),
+    ).toBe("chat");
+    for (const rollback of [
+      { guestAccessEnabled: false, guestCaptchaConfigured: true },
+      { guestAccessEnabled: true, guestCaptchaConfigured: false },
+      { guestAccessEnabled: false, guestCaptchaConfigured: false },
+    ]) {
+      expect(
+        resolveChatEntrySurface({
+          hasEstablishedUser: false,
+          ...rollback,
+        }),
+      ).toBe("auth");
+    }
+    expect(
+      resolveChatEntrySurface({
+        hasEstablishedUser: true,
+        guestAccessEnabled: false,
+        guestCaptchaConfigured: false,
+      }),
+    ).toBe("chat");
+  });
+
+  test("uses the shared chat-entry decision without bouncing guests to root", () => {
+    const chatPage = readFileSync(join(root, "app/chat/page.tsx"), "utf-8");
+
+    expect(chatPage).toContain("resolveChatEntrySurface");
+    expect(chatPage).not.toContain('redirect("/")');
+    expect(chatPage).toContain('redirect("/?auth=login")');
     expect(chatPage).toContain("<ChatInterface />");
   });
 });

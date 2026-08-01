@@ -14,6 +14,8 @@ const ES_EXPIRY_DATE = new Intl.DateTimeFormat("es-419", {
 
 type GuestBootEvidence = {
   bootstrapCalls: number;
+  profileProbeCalls: number;
+  unauthenticatedProfileProbeCalls: number;
   usageCalls: number;
   conversationCreateCalls: number;
   streamCalls: number;
@@ -44,6 +46,10 @@ type MockGuestJourneyOptions = {
     body: unknown;
   };
   profileRefreshFailure?: {
+    status: number;
+    body: unknown;
+  };
+  initialProfileFailure?: {
     status: number;
     body: unknown;
   };
@@ -111,6 +117,8 @@ async function mockGuestJourney(
   let language: "en" | "es-419" = "en";
   const evidence: GuestBootEvidence = {
     bootstrapCalls: 0,
+    profileProbeCalls: 0,
+    unauthenticatedProfileProbeCalls: 0,
     usageCalls: 0,
     conversationCreateCalls: 0,
     streamCalls: 0,
@@ -157,7 +165,17 @@ async function mockGuestJourney(
       await fulfillJson(route, guestMe(language));
       return;
     }
+    evidence.profileProbeCalls += 1;
     if (!authenticated) {
+      evidence.unauthenticatedProfileProbeCalls += 1;
+      if (options.initialProfileFailure) {
+        await fulfillJson(
+          route,
+          options.initialProfileFailure.body,
+          options.initialProfileFailure.status,
+        );
+        return;
+      }
       await fulfillJson(
         route,
         {
@@ -342,6 +360,8 @@ for (const entryCase of [
 
     const composer = page.getByTestId("chat-input");
     await expect(composer).toBeVisible({ timeout: 30_000 });
+    expect(evidence.unauthenticatedProfileProbeCalls).toBeGreaterThanOrEqual(1);
+    const idleProfileProbeCalls = evidence.profileProbeCalls;
     expect({
       bootstrap: evidence.bootstrapCalls,
       usage: evidence.usageCalls,
@@ -351,6 +371,7 @@ for (const entryCase of [
     expect(evidence.profilePatches).toEqual([]);
 
     await composer.fill(entryCase.text);
+    expect(evidence.profileProbeCalls).toBe(idleProfileProbeCalls);
     expect({
       bootstrap: evidence.bootstrapCalls,
       usage: evidence.usageCalls,
@@ -408,6 +429,37 @@ for (const entryCase of [
     expect(evidence.sentMessages).toEqual([entryCase.text]);
   });
 }
+
+test("@guest-shell private-alpha denial fails closed without guest bootstrap", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, {
+    initialProfileFailure: {
+      status: 403,
+      body: {
+        type: "about:blank",
+        title: "Private alpha access required",
+        status: 403,
+        code: "private_alpha_access_required",
+        detail: "This account does not have private alpha access.",
+      },
+    },
+  });
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(
+    page.getByRole("button", { name: "Sign up with email" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("chat-input")).toHaveCount(0);
+  expect(evidence.unauthenticatedProfileProbeCalls).toBeGreaterThanOrEqual(1);
+  expect({
+    bootstrap: evidence.bootstrapCalls,
+    usage: evidence.usageCalls,
+    conversation: evidence.conversationCreateCalls,
+    stream: evidence.streamCalls,
+  }).toEqual({ bootstrap: 0, usage: 0, conversation: 0, stream: 0 });
+});
 
 for (const starterEntryCase of [
   {
@@ -500,7 +552,7 @@ for (const failureCase of [
     expectedOrder: ["/auth/guest", "/me"],
   },
 ] as const) {
-  test(`@guest-shell ${failureCase.name} preserves the starter draft and emits no funnel event`, async ({
+  test(`@guest-shell ${failureCase.name} blocks starter admission and emits no funnel event`, async ({
     page,
   }) => {
     const evidence = await mockGuestJourney(page, failureCase.options);
@@ -779,31 +831,67 @@ test("@guest-expiry public account capability offers in-place account creation",
   await expect(page.getByPlaceholder("Name")).toBeVisible();
 });
 
-test("@guest-shell frontend-on server-off mismatch stays on a retry surface", async ({
-  page,
-}) => {
-  await mockGuestJourney(page, {
-    bootstrapFailure: {
-      status: 403,
-      body: {
-        detail: {
-          title: "Guest Access Unavailable",
-          detail: "Guest access is not available.",
-          code: "guest_access_unavailable",
-        },
-      },
+for (const failureCase of [
+  { kind: "bootstrap", expectedOrder: ["/auth/guest"] },
+  { kind: "refresh", expectedOrder: ["/auth/guest", "/me"] },
+] as const) {
+  for (const localizedCase of [
+    {
+      language: "en",
+      text: "Compare Apple with SPY",
+      retry: "Try again",
     },
-  });
+    {
+      language: "es-419",
+      text: "Compara Apple con SPY",
+      retry: "Intentar de nuevo",
+    },
+  ] as const) {
+    test(`@guest-shell ${localizedCase.language} ${failureCase.kind} failure retains the draft without admission`, async ({
+      page,
+    }) => {
+      await page.addInitScript((language) => {
+        window.localStorage.setItem("i18nextLng", language);
+      }, localizedCase.language);
+      const failure = {
+        status: 503,
+        body: {
+          type: "about:blank",
+          title: "Service Unavailable",
+          status: 503,
+          code:
+            failureCase.kind === "bootstrap"
+              ? "guest_bootstrap_unavailable"
+              : "profile_verification_unavailable",
+          detail: "The temporary workspace is unavailable.",
+        },
+      };
+      const evidence = await mockGuestJourney(
+        page,
+        failureCase.kind === "bootstrap"
+          ? { bootstrapFailure: failure }
+          : { profileRefreshFailure: failure },
+      );
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+      await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  const composer = page.getByTestId("chat-input");
-  await composer.fill("Compare Apple with SPY");
-  await composer.press("Enter");
-  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
-  await expect(composer).toHaveValue("Compare Apple with SPY");
-  await expect(page.getByRole("button", { name: "Sign up" })).toHaveCount(0);
-});
+      const composer = page.getByTestId("chat-input");
+      await composer.fill(localizedCase.text);
+      await composer.press("Enter");
+      await expect(
+        page.getByRole("button", { name: localizedCase.retry }),
+      ).toBeVisible();
+      await expect(composer).toHaveValue(localizedCase.text);
+      expect(evidence.requestOrder).toEqual(failureCase.expectedOrder);
+      expect({
+        usage: evidence.usageCalls,
+        conversation: evidence.conversationCreateCalls,
+        stream: evidence.streamCalls,
+        starterEvent: evidence.starterEventCalls,
+      }).toEqual({ usage: 0, conversation: 0, stream: 0, starterEvent: 0 });
+    });
+  }
+}
 
 test("@guest-shell capability chrome stays visible and opens typed conversion", async ({
   page,
