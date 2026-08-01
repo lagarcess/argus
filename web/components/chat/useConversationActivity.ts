@@ -16,6 +16,7 @@ import {
   type HistoryItem,
 } from "@/lib/argus-api";
 import {
+  createConversationActivityCausalClock,
   conversationActivityReducer,
   createConversationActivityState,
   selectAggregateConversationActivityPresentation,
@@ -24,6 +25,8 @@ import {
   selectConversationIsLocked,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
+  type ConversationActivityCausalClock,
+  type ConversationActivityHistorySnapshot,
   type ConversationActivityAnnouncement,
   type ConversationActivityPresentation,
   type ConversationActivityState,
@@ -57,15 +60,17 @@ export type ConversationActivityEffectsAdapter = Readonly<{
 
 type ConversationActivityInputs = Readonly<{
   historyItems: readonly HistoryItem[];
+  historyActivityRevision?: number;
   activeConversationId: string | null;
   accountScopeKey: string | null;
 }>;
 
 type ConversationActivityCallbacks = Readonly<{
   refreshHistory: () =>
+    | ConversationActivityHistorySnapshot
     | readonly HistoryItem[]
     | void
-    | Promise<readonly HistoryItem[] | void>;
+    | Promise<ConversationActivityHistorySnapshot | readonly HistoryItem[] | void>;
   invalidateInactiveTranscript: (conversationId: string) => void;
   onMutationNotice: (notice: ConversationActivityMutationNotice) => void;
 }>;
@@ -76,6 +81,7 @@ export type CreateConversationActivityRuntimeOptions =
     Readonly<{
       patchActivity: ConversationActivityPatchTransport;
       effects: ConversationActivityEffectsAdapter;
+      causalClock?: ConversationActivityCausalClock;
     }>;
 
 export type ConversationActivityRuntime = Readonly<{
@@ -205,18 +211,24 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   private unsubscribeFocus: (() => void) | null = null;
   private unsubscribeVisibility: (() => void) | null = null;
   private callbacks: ConversationActivityCallbacks;
+  private readonly causalClock: ConversationActivityCausalClock;
 
   constructor(private readonly options: CreateConversationActivityRuntimeOptions) {
     this.activeConversationId = options.activeConversationId;
     this.lastInputActiveConversationId = options.activeConversationId;
     this.accountScopeKey = options.accountScopeKey;
+    this.causalClock =
+      options.causalClock ?? createConversationActivityCausalClock();
     this.callbacks = {
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
       onMutationNotice: options.onMutationNotice,
     };
     if (this.accountScopeKey) {
-      this.mergeHistory(options.historyItems);
+      this.mergeHistory(
+        options.historyItems,
+        options.historyActivityRevision,
+      );
     }
   }
 
@@ -268,7 +280,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.activeConversationId = inputs.activeConversationId;
     this.lastInputActiveConversationId = inputs.activeConversationId;
     if (inputs.accountScopeKey) {
-      this.mergeHistory(inputs.historyItems);
+      this.mergeHistory(inputs.historyItems, inputs.historyActivityRevision);
     } else {
       this.loadedConversationIds.clear();
     }
@@ -544,7 +556,10 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   }
 
   private nextResponseRevision(): number {
-    this.responseRevision += 1;
+    this.responseRevision = Math.max(
+      this.responseRevision + 1,
+      this.causalClock.nextRevision(),
+    );
     return this.responseRevision;
   }
 
@@ -603,9 +618,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     const epoch = this.accountEpoch;
     const responseRevision = this.nextResponseRevision();
     let refreshResult:
+      | ConversationActivityHistorySnapshot
       | readonly HistoryItem[]
       | void
-      | Promise<readonly HistoryItem[] | void>;
+      | Promise<
+          ConversationActivityHistorySnapshot | readonly HistoryItem[] | void
+        >;
     try {
       refreshResult = this.callbacks.refreshHistory();
     } catch {
@@ -613,11 +631,15 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     }
     const promise = Promise.resolve(refreshResult)
       .then((historyItems) => {
-        if (
-          epoch === this.accountEpoch &&
-          historyItems !== undefined
-        ) {
+        if (epoch !== this.accountEpoch || historyItems === undefined) return;
+        if (Array.isArray(historyItems)) {
           this.mergeHistory(historyItems, responseRevision, false);
+        } else {
+          this.mergeHistory(
+            historyItems.items,
+            historyItems.revision,
+            false,
+          );
         }
       })
       .catch(() => {
@@ -668,8 +690,9 @@ export const createConversationActivityRuntime = (
 
 export type UseConversationActivityOptions = ConversationActivityInputs &
   ConversationActivityCallbacks &
-  Readonly<{
-    testAdapters?: Readonly<{
+    Readonly<{
+      causalClock?: ConversationActivityCausalClock;
+      testAdapters?: Readonly<{
       patchActivity?: ConversationActivityPatchTransport;
       effects?: ConversationActivityEffectsAdapter;
     }>;
@@ -704,6 +727,7 @@ export function useConversationActivity(
         options.testAdapters?.patchActivity ?? patchConversationActivity,
       effects:
         options.testAdapters?.effects ?? createBrowserEffectsAdapter(),
+      causalClock: options.causalClock,
     }),
   );
   const state = useSyncExternalStore(
@@ -732,12 +756,14 @@ export function useConversationActivity(
   useEffect(() => {
     runtime.updateInputs({
       historyItems: options.historyItems,
+      historyActivityRevision: options.historyActivityRevision,
       activeConversationId: options.activeConversationId,
       accountScopeKey: options.accountScopeKey,
     });
   }, [
     runtime,
     options.historyItems,
+    options.historyActivityRevision,
     options.activeConversationId,
     options.accountScopeKey,
   ]);

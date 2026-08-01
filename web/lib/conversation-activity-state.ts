@@ -3,7 +3,27 @@ import type {
   ConversationActivityPatch,
   ConversationOperationKind,
   ConversationOperationStatus,
+  HistoryItem,
 } from "./argus-api";
+
+export type ConversationActivityCausalClock = Readonly<{
+  nextRevision: () => number;
+}>;
+
+export const createConversationActivityCausalClock = (): ConversationActivityCausalClock => {
+  let revision = 0;
+  return {
+    nextRevision: () => {
+      revision += 1;
+      return revision;
+    },
+  };
+};
+
+export type ConversationActivityHistorySnapshot = Readonly<{
+  items: readonly HistoryItem[];
+  revision: number;
+}>;
 
 export type ConversationActivityPresentation =
   | "working"

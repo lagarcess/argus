@@ -10,6 +10,11 @@ import {
   type ConversationActivityEffectsAdapter,
   type ConversationActivityMutationNotice,
 } from "../components/chat/useConversationActivity";
+import {
+  createConversationActivityCausalClock,
+  type ConversationActivityCausalClock,
+  type ConversationActivityHistorySnapshot,
+} from "../lib/conversation-activity-state";
 
 const idleActivity = (
   attention: ConversationActivity["attention"]["status"] = "none",
@@ -120,6 +125,7 @@ class ControlledEffects implements ConversationActivityEffectsAdapter {
 
 function runtimeHarness(options: Readonly<{
   historyItems?: HistoryItem[];
+  historyActivityRevision?: number;
   activeConversationId?: string | null;
   accountScopeKey?: string | null;
   patchActivity?: (
@@ -128,9 +134,11 @@ function runtimeHarness(options: Readonly<{
     options: Readonly<{ signal: AbortSignal }>,
   ) => Promise<ConversationActivity>;
   refreshHistory?: () =>
+    | ConversationActivityHistorySnapshot
     | readonly HistoryItem[]
     | void
-    | Promise<readonly HistoryItem[] | void>;
+    | Promise<ConversationActivityHistorySnapshot | readonly HistoryItem[] | void>;
+  causalClock?: ConversationActivityCausalClock;
 }> = {}) {
   const effects = new ControlledEffects();
   const refreshes: string[] = [];
@@ -138,6 +146,7 @@ function runtimeHarness(options: Readonly<{
   const notices: ConversationActivityMutationNotice[] = [];
   const runtime = createConversationActivityRuntime({
     historyItems: options.historyItems ?? [],
+    historyActivityRevision: options.historyActivityRevision,
     activeConversationId: options.activeConversationId ?? null,
     accountScopeKey: options.accountScopeKey ?? "account-a",
     refreshHistory: options.refreshHistory ?? (() => {
@@ -153,6 +162,7 @@ function runtimeHarness(options: Readonly<{
       options.patchActivity ??
       (async () => idleActivity()),
     effects,
+    causalClock: options.causalClock,
   });
   return { runtime, effects, refreshes, invalidations, notices };
 }
@@ -223,6 +233,28 @@ describe("conversation activity refresh ownership", () => {
     expect(runtime.selectPresentation("cold-conversation")).toBe("none");
     expect(runtime.isConversationLocked("cold-conversation")).toBe(false);
     expect(effects.hasPoll()).toBe(false);
+  });
+
+  test("contains an async refresh failure and keeps unresolved polling recoverable", async () => {
+    let refreshCount = 0;
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-a", workingActivity("running"))],
+      refreshHistory: () => {
+        refreshCount += 1;
+        return refreshCount === 1
+          ? Promise.reject(new Error("recents unavailable"))
+          : [chat("conversation-a", workingActivity("running"))];
+      },
+    });
+
+    harness.runtime.start();
+    await drainMicrotasks();
+    expect(harness.effects.hasPoll()).toBe(true);
+
+    harness.effects.firePoll();
+    await drainMicrotasks();
+    expect(refreshCount).toBe(2);
+    expect(harness.effects.hasPoll()).toBe(true);
   });
 
   test("refreshes on focus and only on a visible-document resume", async () => {
@@ -504,6 +536,48 @@ describe("conversation activity mutations", () => {
     expect(
       harness.runtime.getState().byConversationId["conversation-a"]?.canonical,
     ).toEqual(idleActivity());
+  });
+
+  test("orders external history request issuance against later mutations", async () => {
+    const causalClock = createConversationActivityCausalClock();
+    const mutationResponse = deferred<ConversationActivity>();
+    const harness = runtimeHarness({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-initial")),
+      ],
+      activeConversationId: "conversation-a",
+      causalClock,
+      patchActivity: () => mutationResponse.promise,
+    });
+    harness.runtime.start();
+    await drainMicrotasks();
+
+    const olderExternalRevision = causalClock.nextRevision();
+    const mutation = harness.runtime.markRead(
+      "conversation-a",
+      "cursor-initial",
+    );
+
+    harness.runtime.updateInputs({
+      historyItems: [
+        chat(
+          "conversation-a",
+          idleActivity("needs_input", "cursor-old-response"),
+        ),
+      ],
+      historyActivityRevision: olderExternalRevision,
+      activeConversationId: "conversation-a",
+      accountScopeKey: "account-a",
+    });
+    expect(
+      harness.runtime.selectPresentation("conversation-a"),
+    ).toBe("none");
+
+    mutationResponse.resolve(idleActivity());
+    await mutation;
+    expect(
+      harness.runtime.selectPresentation("conversation-a"),
+    ).toBe("none");
   });
 
   test("invalidates one inactive transcript when a mutation response settles canonical work", async () => {

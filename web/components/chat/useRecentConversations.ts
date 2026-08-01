@@ -17,9 +17,15 @@ import {
   prepareFirstPageRecentChatsRefresh,
   projectConversationToRecentChat,
 } from "@/lib/chat-recents";
+import {
+  createConversationActivityCausalClock,
+  type ConversationActivityCausalClock,
+  type ConversationActivityHistorySnapshot,
+} from "@/lib/conversation-activity-state";
 
 type UseRecentConversationsOptions = Readonly<{
   guestExpiresAt?: string | null;
+  activityCausalClock?: ConversationActivityCausalClock;
 }>;
 
 type RecentConversationsState = {
@@ -32,15 +38,27 @@ type RecentConversationsState = {
   loadHistoryPage: (
     nextCursor?: string | null,
     append?: boolean,
-  ) => Promise<readonly HistoryItem[]>;
+  ) => Promise<ConversationActivityHistorySnapshot>;
   clearHistory: () => void;
   loadMoreHistory: () => void;
-  refreshHistory: () => Promise<readonly HistoryItem[]>;
+  refreshHistory: () => void;
+  refreshHistoryForActivity: () => Promise<ConversationActivityHistorySnapshot>;
+};
+
+export const runHistoryRefreshSafely = (
+  refresh: () => Promise<ConversationActivityHistorySnapshot>,
+): void => {
+  void refresh().catch(() => undefined);
 };
 
 export function useRecentConversations({
   guestExpiresAt,
+  activityCausalClock,
 }: UseRecentConversationsOptions): RecentConversationsState {
+  const [fallbackActivityCausalClock] = useState(
+    createConversationActivityCausalClock,
+  );
+  const causalClock = activityCausalClock ?? fallbackActivityCausalClock;
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(
     null,
@@ -51,7 +69,7 @@ export function useRecentConversations({
   const [historyLoadMoreError, setHistoryLoadMoreError] = useState(false);
   const paginationInFlightRef = useRef(false);
   const pageRequestsRef = useRef(
-    new Map<string, Promise<readonly HistoryItem[]>>(),
+    new Map<string, Promise<ConversationActivityHistorySnapshot>>(),
   );
   const firstPageConversationIdsRef = useRef<Set<string>>(new Set());
   const guestExpiresAtRef = useRef(guestExpiresAt);
@@ -65,6 +83,7 @@ export function useRecentConversations({
       const requestKey = nextCursor ?? "first-page";
       const existingRequest = pageRequestsRef.current.get(requestKey);
       if (existingRequest) return existingRequest;
+      const activityRevision = causalClock.nextRevision();
 
       const request = listConversations({
         limit: 30,
@@ -93,7 +112,7 @@ export function useRecentConversations({
             firstPageConversationIdsRef.current = refresh.nextFirstPageConversationIds;
           }
           setHistoryNextCursor(next_cursor);
-          return projected;
+          return { items: projected, revision: activityRevision };
         })
         .finally(() => {
           pageRequestsRef.current.delete(requestKey);
@@ -101,10 +120,10 @@ export function useRecentConversations({
       pageRequestsRef.current.set(requestKey, request);
       return request;
     },
-    [],
+    [causalClock],
   );
 
-  const refreshHistory = useCallback(() => {
+  const refreshHistoryForActivity = useCallback(() => {
     const runRefresh = () => loadHistoryPage(null, false);
     const inFlightFirstPage =
       pageRequestsRef.current.get("first-page");
@@ -113,6 +132,10 @@ export function useRecentConversations({
       : runRefresh();
     return refreshRequest;
   }, [loadHistoryPage]);
+
+  const refreshHistory = useCallback(() => {
+    runHistoryRefreshSafely(refreshHistoryForActivity);
+  }, [refreshHistoryForActivity]);
 
   const clearHistory = useCallback(() => {
     setHistoryItems([]);
@@ -153,5 +176,6 @@ export function useRecentConversations({
     clearHistory,
     loadMoreHistory,
     refreshHistory,
+    refreshHistoryForActivity,
   };
 }
