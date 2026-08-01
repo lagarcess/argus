@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
+import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -19,6 +20,10 @@ type SidebarNavButtonProps = {
   className?: string;
   /** Optional right-side content (e.g. chevron for accordion) */
   trailing?: ReactNode;
+  /** A compact keyboard hint shown while the primary modifier is held */
+  shortcutHint?: string;
+  /** Whether the keyboard hint is currently visible */
+  showShortcutHint?: boolean;
   /** Icon size override (default: 22) */
   iconSize?: number;
 };
@@ -38,6 +43,8 @@ export default function SidebarNavButton({
   onClick,
   className = "",
   trailing,
+  shortcutHint,
+  showShortcutHint = false,
   iconSize = 22,
 }: SidebarNavButtonProps) {
   const button = (
@@ -66,9 +73,15 @@ export default function SidebarNavButton({
       >
         {label}
       </span>
-      {trailing && !collapsed && (
-        <div className="ml-auto pr-4">
-          {trailing}
+      {!collapsed && (shortcutHint || trailing) && (
+        <div className="ml-auto flex h-[22px] shrink-0 items-center justify-end pr-4">
+          {showShortcutHint && shortcutHint ? (
+            <KeyboardShortcutKeycap className="select-none">
+              {shortcutHint}
+            </KeyboardShortcutKeycap>
+          ) : (
+            trailing
+          )}
         </div>
       )}
     </button>

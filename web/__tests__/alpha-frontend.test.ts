@@ -1041,11 +1041,17 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const scrollControls = readFileSync(
+      join(root, "components/chat/useChatScrollControls.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
     expect(chat).toContain('aria-label="Jump to latest"');
-    expect(chat).toContain("distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX");
+    expect(scrollControls).toContain(
+      "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
+    );
     expect(chat).toContain("scrollToLatest");
     expect(chat).toContain("shouldAutoScrollRef.current");
   });
@@ -2150,15 +2156,19 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("function schedulePostTurnHistoryRefresh");
     expect(chat).toContain("listConversations");
     expect(chat).toContain("title_source");
     expect(chat).toContain("window.setTimeout");
-    expect(chat).toContain("1500");
-    expect(chat).toContain("5000");
-    expect(chat).toContain("9000");
-    expect(chat).toContain("13000");
+    expect(viewHelpers).toContain("1500");
+    expect(viewHelpers).toContain("5000");
+    expect(viewHelpers).toContain("9000");
+    expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
       "schedulePostTurnHistoryRefresh(targetConversationId);",
     );

@@ -900,6 +900,35 @@
       "confirm": "Eliminar conversación"
     }
   },
+  "keyboard_shortcuts": {
+    "title": "Atajos de teclado",
+    "description": "Formas rápidas de moverte por Argus.",
+    "close": "Cerrar atajos de teclado",
+    "menu_item": "Atajos de teclado",
+    "groups": {
+      "navigation": "Navegación",
+      "chat": "Chat",
+      "quick_jump": "Salto rápido"
+    },
+    "quick_jump_description": "Mantén presionadas las teclas modificadoras para mostrar números en los elementos visibles.",
+    "shortcuts": {
+      "omnisearch": "Abrir búsqueda",
+      "keyboard_shortcuts": "Mostrar atajos de teclado",
+      "new_chat": "Nuevo chat",
+      "open_recents": "Abrir recientes",
+      "delete_focused_chat": "Eliminar chat actual",
+      "rename_focused_chat": "Cambiar nombre del chat actual",
+      "expand_sidebar_recents": "Alternar barra lateral y Recientes",
+      "open_settings": "Abrir configuración",
+      "toggle_pin_focused_chat": "Fijar o desfijar el chat actual",
+      "quick_jump": "Saltar a elementos visibles"
+    }
+  },
+  "recents_quick_peek": {
+    "title": "Recientes",
+    "close": "Cerrar recientes",
+    "empty": "Aún no hay chats recientes."
+  },
   "command_palette": {
     "close": "Cerrar búsqueda",
     "search_placeholder": "Buscar en Argus...",
