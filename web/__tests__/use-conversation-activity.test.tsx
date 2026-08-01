@@ -6,6 +6,7 @@ import type {
   HistoryItem,
 } from "../lib/argus-api";
 import {
+  conversationActivityMutationNoticeDescriptor,
   createConversationActivityRuntime,
   type ConversationActivityEffectsAdapter,
   type ConversationActivityMutationNotice,
@@ -508,6 +509,50 @@ describe("conversation activity mutations", () => {
       },
     ]);
     expect(harness.refreshes).toHaveLength(2);
+  });
+
+  test("silences automatic read success but still reports localized rollback", async () => {
+    const successHarness = runtimeHarness({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-auto")),
+      ],
+    });
+    successHarness.runtime.start();
+
+    await successHarness.runtime.markRead("conversation-a", "cursor-auto", {
+      notifySuccess: false,
+    });
+
+    expect(successHarness.notices).toEqual([]);
+
+    const failureHarness = runtimeHarness({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-auto")),
+      ],
+      patchActivity: async () => {
+        throw new Error("offline");
+      },
+    });
+    failureHarness.runtime.start();
+
+    await failureHarness.runtime.markRead("conversation-a", "cursor-auto", {
+      notifySuccess: false,
+    });
+
+    expect(failureHarness.notices).toEqual([
+      {
+        conversationId: "conversation-a",
+        action: "mark_read",
+        outcome: "error",
+      },
+    ]);
+    expect(
+      conversationActivityMutationNoticeDescriptor(failureHarness.notices[0]!),
+    ).toEqual({
+      key: "chat.activity.mark_read_error",
+      defaultValue: "Couldn’t mark this conversation as read. Try again.",
+      variant: "error",
+    });
   });
 
   test("retires stale pending state so a newer canonical cursor can be marked read", async () => {

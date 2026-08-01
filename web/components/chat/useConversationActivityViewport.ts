@@ -4,7 +4,10 @@ import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
 import type { ChatFinalPayload } from "@/lib/argus-api";
 import type { TranscriptMutation } from "@/lib/chat-transcript-session-cache";
-import type { UseConversationActivityResult } from "./useConversationActivity";
+import type {
+  ConversationActivityMutationOptions,
+  UseConversationActivityResult,
+} from "./useConversationActivity";
 
 export type ConversationActivityViewportInputs = Readonly<{
   accountScopeKey: string | null;
@@ -47,7 +50,11 @@ export type ConversationActivityViewportRuntime = Readonly<{
 type CreateConversationActivityViewportRuntimeOptions = Readonly<{
   inputs: ConversationActivityViewportInputs;
   effects: ConversationActivityViewportEffectsAdapter;
-  markRead: (conversationId: string, throughCursor: string) => Promise<void>;
+  markRead: (
+    conversationId: string,
+    throughCursor: string,
+    options?: ConversationActivityMutationOptions,
+  ) => Promise<void>;
   resetViewEpoch: (conversationId: string) => void;
 }>;
 
@@ -502,7 +509,7 @@ class ConversationActivityViewportOwner
     const lifecycleEpoch = this.lifecycleEpoch;
     this.inFlightReads.set(key, token);
     void this.options
-      .markRead(proof.conversationId, proof.cursor)
+      .markRead(proof.conversationId, proof.cursor, { notifySuccess: false })
       .then(() => {
         if (
           accountEpoch !== this.accountEpoch ||

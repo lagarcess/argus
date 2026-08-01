@@ -54,6 +54,10 @@ export type ConversationActivityMutationNotice = Readonly<{
   outcome: "success" | "error";
 }>;
 
+export type ConversationActivityMutationOptions = Readonly<{
+  notifySuccess?: boolean;
+}>;
+
 export type ConversationActivityMutationNoticeDescriptor = Readonly<{
   key: string;
   defaultValue: string;
@@ -179,6 +183,7 @@ export type ConversationActivityRuntime = Readonly<{
   markRead: (
     conversationId: string,
     throughCursor: string | null,
+    options?: ConversationActivityMutationOptions,
   ) => Promise<void>;
   markUnread: (conversationId: string) => Promise<void>;
   isMutationPending: (
@@ -457,11 +462,16 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   markRead = (
     conversationId: string,
     throughCursor: string | null,
+    options?: ConversationActivityMutationOptions,
   ): Promise<void> =>
-    this.mutateActivity(conversationId, {
-      action: "mark_read",
-      through_attention_cursor: throughCursor,
-    });
+    this.mutateActivity(
+      conversationId,
+      {
+        action: "mark_read",
+        through_attention_cursor: throughCursor,
+      },
+      options,
+    );
 
   markUnread = (conversationId: string): Promise<void> =>
     this.mutateActivity(conversationId, { action: "mark_unread" });
@@ -565,6 +575,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   private mutateActivity(
     conversationId: string,
     patch: ConversationActivityPatch,
+    options: ConversationActivityMutationOptions = {},
   ): Promise<void> {
     const action = patch.action;
     const sequenceKey = JSON.stringify([conversationId, action]);
@@ -613,11 +624,13 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
         ) {
           this.callbacks.invalidateInactiveTranscript(conversationId);
         }
-        this.callbacks.onMutationNotice({
-          conversationId,
-          action,
-          outcome: "success",
-        });
+        if (options.notifySuccess !== false) {
+          this.callbacks.onMutationNotice({
+            conversationId,
+            action,
+            outcome: "success",
+          });
+        }
         void this.refreshCanonicalHistory();
       },
       () => {

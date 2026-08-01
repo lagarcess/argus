@@ -535,6 +535,45 @@ describe("conversation activity viewport read proof", () => {
     }
   });
 
+  test("classifies sentinel-proven reads as automatic", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const effects = controlledEffects();
+    const reads: Array<
+      [string, string, Readonly<{ notifySuccess?: boolean }> | undefined]
+    > = [];
+    const owner = viewport.createConversationActivityViewportRuntime({
+      inputs: {
+        ...canonicalProofContext,
+        activeRouteConversationId: "conversation-a",
+        activeConversationId: "conversation-a",
+        activeConversationIdRef: "conversation-a",
+        readyTranscriptConversationId: "conversation-a",
+        transcriptRoot: transcriptRoot("conversation-a"),
+        sentinel: sentinel(),
+        hydrationComplete: true,
+        attentionCursor: "cursor-a",
+        manualUnreadGuard: false,
+        markReadPending: false,
+      },
+      effects: effects.effects,
+      markRead: async (conversationId, cursor, options) => {
+        reads.push([conversationId, cursor, options]);
+      },
+      resetViewEpoch: () => undefined,
+    });
+
+    owner.start();
+    effects.intersect(true);
+    await drainMicrotasks();
+
+    expect(reads).toEqual([
+      ["conversation-a", "cursor-a", { notifySuccess: false }],
+    ]);
+    owner.dispose();
+  });
+
   test("requires visible focused sentinel proof and acknowledges each cursor once", async () => {
     const viewport = await loadViewportModule();
     expect(viewport).not.toBeNull();
