@@ -25,6 +25,7 @@ export type ConversationActivityMutationRecord = {
   mutationId: string;
   action: ConversationActivityPatch["action"];
   issuedRevision: number;
+  guardGenerationAtStart: number;
 };
 
 export type ConversationActivityAnnouncement = {
@@ -38,6 +39,7 @@ export type ConversationActivityRecord = {
   request: ConversationActivityRequestRecord | null;
   mutation: ConversationActivityMutationRecord | null;
   manualUnreadGuardSource: "server" | string | null;
+  manualUnreadGuardGeneration: number;
   announcement: ConversationActivityAnnouncement | null;
   announcementFingerprint: string;
   announcementGeneration: number;
@@ -110,6 +112,7 @@ const EMPTY_RECORD: ConversationActivityRecord = {
   request: null,
   mutation: null,
   manualUnreadGuardSource: null,
+  manualUnreadGuardGeneration: 0,
   announcement: null,
   announcementFingerprint: "none",
   announcementGeneration: 0,
@@ -221,13 +224,15 @@ const withAnnouncement = (
   const computedFingerprint = announcementFingerprintForRecord(record);
   const preserve =
     preserveIfPresentationUnchanged && presentation === previousPresentation;
-  const fingerprint = preserve
-    ? previous.announcementFingerprint
-    : computedFingerprint;
+  const fingerprint = computedFingerprint;
   const generation =
-    fingerprint === previous.announcementFingerprint
+    preserve || fingerprint === previous.announcementFingerprint
       ? previous.announcementGeneration
       : previous.announcementGeneration + 1;
+  const existingTransitionContinues =
+    presentation !== "none" &&
+    (preserve || fingerprint === previous.announcementFingerprint) &&
+    previous.announcement !== null;
   return {
     ...record,
     announcementFingerprint: fingerprint,
@@ -235,6 +240,8 @@ const withAnnouncement = (
     announcement:
       presentation === "none"
         ? null
+        : existingTransitionContinues
+          ? previous.announcement
         : {
             key: `${conversationId}:${generation}:${fingerprint}`,
             presentation,
@@ -286,18 +293,21 @@ export function conversationActivityReducer(
       const previousAttention = canonicalAttentionPresentation(current.canonical);
       const nextAttention = canonicalAttentionPresentation(action.activity);
       let guardSource = current.manualUnreadGuardSource;
+      let guardGeneration = current.manualUnreadGuardGeneration;
       if (
         action.activeView === true &&
         previousAttention !== "manual_unread" &&
         nextAttention === "manual_unread"
       ) {
         guardSource = "server";
+        guardGeneration += 1;
       }
       return replaceRecord(state, action.conversationId, {
         ...current,
         canonical: action.activity,
         serverRevision: action.revision,
         manualUnreadGuardSource: guardSource,
+        manualUnreadGuardGeneration: guardGeneration,
       });
     }
     case "request_started":
@@ -332,11 +342,16 @@ export function conversationActivityReducer(
           mutationId: action.mutationId,
           action: action.action,
           issuedRevision: action.revision,
+          guardGenerationAtStart: current.manualUnreadGuardGeneration,
         },
         manualUnreadGuardSource:
           action.action === "mark_unread" && action.activeView
             ? action.mutationId
             : current.manualUnreadGuardSource,
+        manualUnreadGuardGeneration:
+          action.action === "mark_unread" && action.activeView
+            ? current.manualUnreadGuardGeneration + 1
+            : current.manualUnreadGuardGeneration,
       });
     case "mutation_succeeded": {
       if (current.mutation?.mutationId !== action.mutationId) {
@@ -351,7 +366,9 @@ export function conversationActivityReducer(
       const responseAttention = canonicalAttentionPresentation(canonical);
       let guardSource = current.manualUnreadGuardSource;
       if (
-        current.mutation.action === "mark_read"
+        current.mutation.action === "mark_read" &&
+        current.manualUnreadGuardGeneration ===
+          current.mutation.guardGenerationAtStart
       ) {
         guardSource = null;
       }

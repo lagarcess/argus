@@ -437,6 +437,48 @@ describe("same-view guard and announcements", () => {
     }
   });
 
+  test("does not let an older successful read clear a newer server guard", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "new_activity", "cursor-1"),
+      revision: 1,
+      activeView: true,
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "stale-read",
+      action: "mark_read",
+      revision: 2,
+      activeView: true,
+    });
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "manual_unread", "cursor-2"),
+      revision: 3,
+      activeView: true,
+    });
+    expect(selectManualUnreadGuard(state, "conversation-a")).toBe(true);
+    expect(selectConversationActivityPresentation(state, "conversation-a")).toBe(
+      "manual_unread",
+    );
+
+    state = conversationActivityReducer(state, {
+      type: "mutation_succeeded",
+      conversationId: "conversation-a",
+      mutationId: "stale-read",
+      activity: activity("idle", "none"),
+    });
+
+    expect(selectManualUnreadGuard(state, "conversation-a")).toBe(true);
+    expect(selectConversationActivityPresentation(state, "conversation-a")).toBe(
+      "manual_unread",
+    );
+  });
+
   test("offers each meaningful transition announcement once", () => {
     let state = createConversationActivityState();
     state = conversationActivityReducer(state, {
@@ -504,7 +546,15 @@ describe("same-view guard and announcements", () => {
       type: "mutation_succeeded",
       conversationId: "conversation-a",
       mutationId: "unread-1",
-      activity: activity("idle", "manual_unread"),
+      activity: activity("idle", "manual_unread", "cursor-confirmed"),
+    });
+    expect(selectConversationAnnouncement(state, "conversation-a")).toBeNull();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "manual_unread", "cursor-confirmed"),
+      revision: 4,
+      activeView: true,
     });
     expect(selectConversationAnnouncement(state, "conversation-a")).toBeNull();
 
@@ -513,7 +563,7 @@ describe("same-view guard and announcements", () => {
       conversationId: "conversation-a",
       mutationId: "read-1",
       action: "mark_read",
-      revision: 3,
+      revision: 5,
       activeView: true,
     });
     state = conversationActivityReducer(state, {
@@ -527,7 +577,7 @@ describe("same-view guard and announcements", () => {
       conversationId: "conversation-a",
       mutationId: "unread-2",
       action: "mark_unread",
-      revision: 4,
+      revision: 6,
       activeView: true,
     });
 
