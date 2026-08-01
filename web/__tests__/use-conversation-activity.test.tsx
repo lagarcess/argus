@@ -10,6 +10,7 @@ import {
   type ConversationActivityEffectsAdapter,
   type ConversationActivityMutationNotice,
 } from "../components/chat/useConversationActivity";
+import { applyRecentHistoryActivityUpdate } from "../components/chat/useRecentConversations";
 import {
   createConversationActivityCausalClock,
   type ConversationActivityCausalClock,
@@ -558,14 +559,25 @@ describe("conversation activity mutations", () => {
       "cursor-initial",
     );
 
-    harness.runtime.updateInputs({
-      historyItems: [
+    const externalResponseState = applyRecentHistoryActivityUpdate(
+      {
+        historyItems: [
+          chat("conversation-a", idleActivity("new_activity", "cursor-initial")),
+        ],
+        historyActivityRevision: 0,
+      },
+      [
         chat(
           "conversation-a",
           idleActivity("needs_input", "cursor-old-response"),
         ),
       ],
-      historyActivityRevision: olderExternalRevision,
+      olderExternalRevision,
+    );
+    harness.runtime.updateInputs({
+      historyItems: externalResponseState.historyItems,
+      historyActivityRevision:
+        externalResponseState.historyActivityRevision,
       activeConversationId: "conversation-a",
       accountScopeKey: "account-a",
     });

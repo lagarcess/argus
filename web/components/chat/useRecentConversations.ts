@@ -30,6 +30,7 @@ type UseRecentConversationsOptions = Readonly<{
 
 type RecentConversationsState = {
   historyItems: HistoryItem[];
+  historyActivityRevision: number;
   setHistoryItems: Dispatch<SetStateAction<HistoryItem[]>>;
   historyNextCursor: string | null;
   isLoadingMoreHistory: boolean;
@@ -45,6 +46,21 @@ type RecentConversationsState = {
   refreshHistoryForActivity: () => Promise<ConversationActivityHistorySnapshot>;
 };
 
+export type RecentHistoryActivityState = Readonly<{
+  historyItems: HistoryItem[];
+  historyActivityRevision: number;
+}>;
+
+export const applyRecentHistoryActivityUpdate = (
+  current: RecentHistoryActivityState,
+  update: SetStateAction<HistoryItem[]>,
+  revision: number,
+): RecentHistoryActivityState => ({
+  historyItems:
+    typeof update === "function" ? update(current.historyItems) : update,
+  historyActivityRevision: revision,
+});
+
 export const runHistoryRefreshSafely = (
   refresh: () => Promise<ConversationActivityHistorySnapshot>,
 ): void => {
@@ -59,7 +75,23 @@ export function useRecentConversations({
     createConversationActivityCausalClock,
   );
   const causalClock = activityCausalClock ?? fallbackActivityCausalClock;
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyActivityState, setHistoryActivityState] =
+    useState<RecentHistoryActivityState>({
+      historyItems: [],
+      historyActivityRevision: 0,
+    });
+  const { historyItems, historyActivityRevision } = historyActivityState;
+  const setHistoryItems = useCallback<
+    Dispatch<SetStateAction<HistoryItem[]>>
+  >(
+    (update) => {
+      const revision = causalClock.nextRevision();
+      setHistoryActivityState((current) =>
+        applyRecentHistoryActivityUpdate(current, update, revision),
+      );
+    },
+    [causalClock],
+  );
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(
     null,
   );
@@ -102,13 +134,25 @@ export function useRecentConversations({
               }),
             );
           if (append) {
-            setHistoryItems((current) => mergeRecentChats(current, projected));
+            setHistoryActivityState((current) =>
+              applyRecentHistoryActivityUpdate(
+                current,
+                (items) => mergeRecentChats(items, projected),
+                activityRevision,
+              ),
+            );
           } else {
             const refresh = prepareFirstPageRecentChatsRefresh(
               firstPageConversationIdsRef.current,
               projected,
             );
-            setHistoryItems(refresh.apply);
+            setHistoryActivityState((current) =>
+              applyRecentHistoryActivityUpdate(
+                current,
+                refresh.apply,
+                activityRevision,
+              ),
+            );
             firstPageConversationIdsRef.current = refresh.nextFirstPageConversationIds;
           }
           setHistoryNextCursor(next_cursor);
@@ -138,14 +182,18 @@ export function useRecentConversations({
   }, [refreshHistoryForActivity]);
 
   const clearHistory = useCallback(() => {
-    setHistoryItems([]);
+    const revision = causalClock.nextRevision();
+    setHistoryActivityState({
+      historyItems: [],
+      historyActivityRevision: revision,
+    });
     setHistoryNextCursor(null);
     setHasRequestedOlderHistory(false);
     setHistoryLoadMoreError(false);
     pageRequestsRef.current.clear();
     firstPageConversationIdsRef.current.clear();
     paginationInFlightRef.current = false;
-  }, []);
+  }, [causalClock]);
 
   const loadMoreHistory = useCallback(() => {
     if (!historyNextCursor || paginationInFlightRef.current) return;
@@ -167,6 +215,7 @@ export function useRecentConversations({
 
   return {
     historyItems,
+    historyActivityRevision,
     setHistoryItems,
     historyNextCursor,
     isLoadingMoreHistory,
