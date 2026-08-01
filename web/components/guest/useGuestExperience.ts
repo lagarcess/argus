@@ -195,7 +195,12 @@ export function useGuestExperience({
             );
             return false;
           }
-          effectiveAccount = await refreshAccount();
+          const refreshedAccount = await refreshAccount();
+          if (refreshedAccount === null) {
+            onGuestBootstrapError();
+            return false;
+          }
+          effectiveAccount = refreshedAccount;
         } catch {
           onGuestBootstrapError();
           return false;

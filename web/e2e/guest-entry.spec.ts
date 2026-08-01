@@ -26,6 +26,8 @@ type GuestBootEvidence = {
   sentMessages: string[];
   bootstrapRequested: Promise<void>;
   releaseBootstrap: () => void;
+  streamRequested: Promise<void>;
+  releaseStream: () => void;
   persistedMessages: Array<{
     id: string;
     conversation_id: string;
@@ -39,6 +41,7 @@ type GuestBootEvidence = {
 type MockGuestJourneyOptions = {
   initiallyAuthenticated?: boolean;
   holdBootstrap?: boolean;
+  holdStageStart?: boolean;
   renewedAfterExpiry?: boolean;
   publicAccountAccessEnabled?: boolean;
   bootstrapFailure?: {
@@ -49,6 +52,7 @@ type MockGuestJourneyOptions = {
     status: number;
     body: unknown;
   };
+  profileRefreshNull?: boolean;
   initialProfileFailure?: {
     status: number;
     body: unknown;
@@ -112,6 +116,14 @@ async function mockGuestJourney(
   const bootstrapRelease = new Promise<void>((resolve) => {
     releaseBootstrap = resolve;
   });
+  let resolveStreamRequested!: () => void;
+  const streamRequested = new Promise<void>((resolve) => {
+    resolveStreamRequested = resolve;
+  });
+  let releaseStream!: () => void;
+  const streamRelease = new Promise<void>((resolve) => {
+    releaseStream = resolve;
+  });
   let authenticated = options.initiallyAuthenticated ?? false;
   let authenticatedByBootstrap = false;
   let language: "en" | "es-419" = "en";
@@ -129,6 +141,8 @@ async function mockGuestJourney(
     sentMessages: [],
     bootstrapRequested,
     releaseBootstrap,
+    streamRequested,
+    releaseStream,
     persistedMessages: [],
   };
   await page.route("**/api/v1/auth/guest", async (route) => {
@@ -191,6 +205,10 @@ async function mockGuestJourney(
     }
     if (authenticatedByBootstrap) {
       evidence.requestOrder.push("/me");
+      if (options.profileRefreshNull) {
+        await fulfillJson(route, null);
+        return;
+      }
       if (options.profileRefreshFailure) {
         await fulfillJson(
           route,
@@ -297,6 +315,8 @@ async function mockGuestJourney(
   await page.route("**/api/v1/chat/stream", async (route) => {
     evidence.streamCalls += 1;
     evidence.requestOrder.push("/chat/stream");
+    resolveStreamRequested();
+    if (options.holdStageStart) await streamRelease;
     const body = route.request().postDataJSON() as { message?: string };
     evidence.sentMessages.push(body.message ?? "");
     evidence.persistedMessages = [
@@ -335,6 +355,56 @@ async function mockGuestJourney(
 
   return evidence;
 }
+
+test("@guest-shell keeps the neutral submission state until the first stream stage", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, { holdStageStart: true });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const composer = page.getByTestId("chat-input");
+  await composer.fill("Compare Apple with SPY");
+  await composer.press("Enter");
+  await evidence.streamRequested;
+
+  await expect(
+    page.getByText("Sending...", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Understanding your idea...", { exact: true }),
+  ).toHaveCount(0);
+  await expect(composer).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("region", { name: "Conversation" })).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+
+  evidence.releaseStream();
+  await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+  await expect(page.getByText("Sending...", { exact: true })).toHaveCount(
+    0,
+  );
+});
+
+test("@guest-shell null profile refresh blocks admission before guest work", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, { profileRefreshNull: true });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const composer = page.getByTestId("chat-input");
+  await composer.fill("Compare Apple with SPY");
+  await composer.press("Enter");
+
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(composer).toHaveText("Compare Apple with SPY");
+  expect(evidence.requestOrder).toEqual(["/auth/guest", "/me"]);
+  expect({
+    usage: evidence.usageCalls,
+    conversation: evidence.conversationCreateCalls,
+    stream: evidence.streamCalls,
+  }).toEqual({ usage: 0, conversation: 0, stream: 0 });
+});
 
 for (const entryCase of [
   {

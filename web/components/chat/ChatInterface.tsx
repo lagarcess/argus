@@ -242,6 +242,7 @@ export default function ChatInterface() {
     useState(false);
   const refreshAccount = useCallback(async () => {
     const nextAccount = await getMe();
+    if (nextAccount === null) return null;
     setAccount(nextAccount);
     setProfileState("established");
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
@@ -1096,6 +1097,7 @@ export default function ChatInterface() {
     options?: SendOptions,
   ) => {
     const trimmed = text.trim();
+    let guestSubmissionHandedToStream = false;
     if (!trimmed) return false;
     if (
       sendAdmissionInFlightRef.current ||
@@ -1126,6 +1128,7 @@ export default function ChatInterface() {
       };
       setGuestSubmissionError(false);
       setGuestSubmissionPending(true);
+      setStreamStatus(t("guest.entry.sending", "Sending..."));
     }
 
     try {
@@ -1249,7 +1252,7 @@ export default function ChatInterface() {
         renderUserMessage,
       });
     });
-    setStreamStatus(null);
+    if (!isDeferredGuestSubmission) setStreamStatus(null);
     activeStreamConversationIdRef.current = targetConversationId;
     setIsStreamingResponse(true);
     guestSubmissionRetryRef.current = null;
@@ -1273,12 +1276,16 @@ export default function ChatInterface() {
       activeStreamConversationIdRef.current ===
         activeStreamTargetConversationId &&
       canApplyConversationOwnedUpdate(activeStreamTargetConversationId);
+    const clearNeutralGuestSubmission = () => {
+      if (isDeferredGuestSubmission) setGuestSubmissionPending(false);
+    };
     const handleStreamEvent = (event: ChatStreamEvent) => {
       throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
       const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
       const canApplyOwnedUpdate = canApplyOwnedStreamUpdate();
       if (event.event === "stage_start") {
         if (!canApplyVisibleUpdate) return;
+        clearNeutralGuestSubmission();
         const stageKey = `chat.status.${event.data.stage}`;
         const detail = event.data.detail;
         setStreamStatus(
@@ -1298,6 +1305,7 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        clearNeutralGuestSubmission();
         if (!canApplyOwnedUpdate) {
           markSettledStreamAttention(activeStreamTargetConversationId);
           return;
@@ -1363,6 +1371,7 @@ export default function ChatInterface() {
         markSettledStreamAttention(activeStreamTargetConversationId);
       }
       if (event.event === "final") {
+        clearNeutralGuestSubmission();
         if (!canApplyOwnedUpdate) {
           markSettledStreamAttention(activeStreamTargetConversationId);
           return;
@@ -1567,6 +1576,7 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "done") {
+        clearNeutralGuestSubmission();
         if (!canApplyOwnedUpdate) {
           markSettledStreamAttention(activeStreamTargetConversationId);
           return;
@@ -1601,6 +1611,7 @@ export default function ChatInterface() {
       );
     };
 
+    guestSubmissionHandedToStream = true;
     void (async () => {
       try {
         await streamToConversation(targetConversationId);
@@ -1621,6 +1632,7 @@ export default function ChatInterface() {
             err = retryErr;
           }
         }
+        clearNeutralGuestSubmission();
         const isOrdinaryTransportAmbiguity =
           action?.type !== "run_backtest" &&
           (!(err instanceof ChatStreamError) || err.status === 0);
@@ -1782,8 +1794,9 @@ export default function ChatInterface() {
     return true;
     } finally {
       sendAdmissionInFlightRef.current = false;
-      if (isDeferredGuestSubmission) {
+      if (isDeferredGuestSubmission && !guestSubmissionHandedToStream) {
         setGuestSubmissionPending(false);
+        setStreamStatus(null);
       }
     }
   };
@@ -2556,7 +2569,7 @@ export default function ChatInterface() {
                   onScroll={updateScrollPositionState}
                   role="region"
                   aria-label={t("common.conversation", "Conversation")}
-                  aria-busy={isHydratingConversation}
+                  aria-busy={isHydratingConversation || guestSubmissionPending}
                   className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
                 >
                   <div className="space-y-8">
