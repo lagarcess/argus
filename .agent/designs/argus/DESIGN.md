@@ -305,6 +305,71 @@ saved-idea recall and decision-state browsing live in Omnisearch/Idea Ledger.
 - **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:
   - *Suggestions*: `Last week`, `Tesla ideas`, `Crypto`, `Pinned`, `Recent chats`.
 
+### Conversation activity and unread presentation
+
+Conversation activity is a typed continuity signal, not a reason to reorder
+Recents or infer state from message text. Each chat row shows at most one marker
+using this locked precedence:
+
+| Priority | Typed state | Left-lane presentation |
+| ---: | --- | --- |
+| 1 | `queued`, `running`, or `checking` | Calm working ring |
+| 2 | `needs_attention` | Existing shared attention/failure treatment |
+| 3 | `needs_input` | Static attention marker |
+| 4 | `new_activity` | Muted teal dot |
+| 5 | `manual_unread` | Muted teal dot |
+| 6 | `none` | No marker |
+
+- **Fixed row geometry**: The existing left `w-11` lane owns the marker. The
+  right trailing slot owns the quick-jump keycap or ellipsis menu. A marker,
+  keycap, hover state, or selection must never move the title, subtitle, or row
+  height.
+- **Selected rows preserve state**: The selected-row wash does not hide,
+  replace, or recolor away the winning marker. Expanded Recents and Quick Peek
+  use the same per-row presentation; the collapsed aggregate uses a ring when
+  any loaded chat is working and otherwise a dot when any loaded chat is
+  unread.
+- **Typed accessible names**: Marker graphics are decorative. The row's
+  accessible name appends exactly one phrase derived from typed state, with
+  catalog-backed English and Latin American Spanish parity:
+
+  | State | English (`en`) | Spanish (`es-419`) |
+  | --- | --- | --- |
+  | Running | Working | En curso |
+  | Queued | Queued | En espera |
+  | Checking | Checking status | Consultando el estado |
+  | New activity | New activity | Actividad nueva |
+  | Manual unread | Marked unread | Marcada como no leída |
+  | Needs input | Needs your input | Necesita tu respuesta |
+  | Needs attention | Needs attention | Necesita atención |
+
+- **One Jump to latest control**: When the latest activity is visible, the
+  control is hidden. Above the latest activity, one unchanged 44px target uses
+  this state machine and always scrolls to the same latest-activity sentinel:
+
+  | Current presentation | Inner treatment | Accessible label |
+  | --- | --- | --- |
+  | Idle/read | Down arrow | Jump to latest |
+  | Queued/running/checking | Restrained three-dot wave | Jump to latest; Argus is working below |
+  | New/manual unread | Down arrow plus teal marker | Jump to new activity |
+  | Needs input | Down arrow plus attention marker | Jump to the latest question |
+  | Needs attention | Down arrow plus shared failure treatment | Jump to the latest recovery |
+
+- **Recents owner menu**: Keep one restrained ellipsis glyph inside a target
+  that is at least 44px in both axes. On fine pointers it appears on row hover,
+  trigger focus, or while open; on coarse pointers it remains visible without
+  hover. Focus uses the standard visible ring. Escape closes the menu and
+  returns focus to its trigger. Mark as read/unread remains the first item, and
+  nested menu actions never activate the row.
+- **Reduced motion**: Under `prefers-reduced-motion`, the working marker is a
+  static open ring and the Jump control uses a static three-dot glyph. Remove
+  rotation, wave, flashing, rapid pulsing, and repeated scale animation without
+  removing the state label or immediate visual meaning.
+- **Polite transitions**: Meaningful typed transitions may be announced once
+  through one polite live region. Polling, token updates, and animated dots are
+  never announced. All row, menu, Jump, toast, and announcement copy comes from
+  the `en` and `es-419` catalogs.
+
 ## 15. Settings and Feedback UX
 
 - **Core Settings**: Visible support for Language, Theme, Feedback, Account, Recently Deleted, and Archived Chats.
