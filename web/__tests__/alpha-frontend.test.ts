@@ -1410,12 +1410,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain(
       'searchParams.append("anchor_message_id", options.anchorMessageId)',
     );
+    const turnAnchor = readFileSync(
+      join(root, "components/chat/useTranscriptTurnAnchor.ts"),
+      "utf-8",
+    );
     expect(chat).toContain(
       "loadAllConversationMessagePages(\n          targetConversationId,",
     );
     expect(chat).toContain("data-message-id={msg.id}");
-    expect(chat).toContain('element.scrollIntoView({ block: "center" })');
-    expect(chat).toContain("element.focus({ preventScroll: true })");
+    expect(chat).toContain("useTranscriptTurnAnchor({");
+    expect(turnAnchor).toContain('element.scrollIntoView({ block: "center" })');
+    expect(turnAnchor).toContain("element.focus({ preventScroll: true })");
     expect(palette).toContain(
       "commandPaletteOpenMessageId(item, openAtLeftOff)",
     );

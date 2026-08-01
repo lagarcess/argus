@@ -451,6 +451,13 @@
     "saved": "Guardada",
     "saving": "Guardando",
     "simulation_complete": "Simulación completa",
+    "activity_rail": {
+      "aria_label": "Actividad de la conversación",
+      "backtest_completed": "Backtest terminado",
+      "needs_attention": "Necesitó atención",
+      "needs_attention_body": "Este turno tuvo un problema y ofreció una forma de seguir.",
+      "jump_hint": "Haz clic para ir a este turno"
+    },
     "backtest_job": {
       "queued_title": "Backtest en cola",
       "queued_status": "En cola",
