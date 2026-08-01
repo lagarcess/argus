@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const primitivePath = join(
@@ -8,6 +8,38 @@ const primitivePath = join(
 );
 
 describe("shared quick-jump primitive", () => {
+  test("keeps the 240px navigation threshold separate from viewport read proof", async () => {
+    const { chatScrollPositionState } = await import(
+      "../components/chat/useChatScrollControls"
+    );
+
+    expect(chatScrollPositionState(240)).toEqual({
+      shouldAutoScroll: true,
+      showJumpToLatest: false,
+    });
+    expect(chatScrollPositionState(241)).toEqual({
+      shouldAutoScroll: false,
+      showJumpToLatest: true,
+    });
+  });
+
+  test("preserves a scrolled-up position across token and completion renders", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf8",
+    );
+    const effectStart = chat.indexOf("if (shouldAutoScrollRef.current) {");
+    const effectEnd = chat.indexOf("// ── Load existing conversation", effectStart);
+    const scrollEffect = chat.slice(effectStart, effectEnd);
+
+    expect(effectStart).toBeGreaterThan(-1);
+    expect(scrollEffect).toContain('scrollToLatest("smooth")');
+    expect(scrollEffect).toContain("} else {");
+    expect(scrollEffect).toContain("updateScrollPositionState();");
+    expect(scrollEffect).toContain("messages.length");
+    expect(scrollEffect).toContain("streamStatus");
+  });
+
   test("numbers pinned visible items first and limits every surface to nine", async () => {
     expect(existsSync(primitivePath)).toBe(true);
     if (!existsSync(primitivePath)) return;

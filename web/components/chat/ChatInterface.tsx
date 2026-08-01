@@ -29,6 +29,7 @@ import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { useConversationActivity } from "@/components/chat/useConversationActivity";
+import { useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import {
@@ -275,6 +276,7 @@ export default function ChatInterface() {
   const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] =
     useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const latestActivitySentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
@@ -351,6 +353,17 @@ export default function ChatInterface() {
     streamStatus,
     isStreamingResponse,
   );
+  useConversationActivityViewport({
+    activity: conversationActivity,
+    activeRouteConversationId:
+      currentView === "chat" ? readActiveConversationRouteState().conversationId : null,
+    activeConversationId: currentView === "chat" ? conversationId : null,
+    activeConversationIdRef,
+    readyTranscriptConversationIdRef,
+    transcriptRootRef: scrollContainerRef,
+    sentinelRef: latestActivitySentinelRef,
+    hydrationComplete: !isHydratingConversation,
+  });
   const handleDurableJobCompletion = useCallback(
     (targetConversationId: string) => {
       invalidateTranscriptForMutation(
@@ -2483,6 +2496,7 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     )}
+                    <div ref={latestActivitySentinelRef} data-testid="latest-activity-sentinel" className="h-px" aria-hidden="true" />
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
