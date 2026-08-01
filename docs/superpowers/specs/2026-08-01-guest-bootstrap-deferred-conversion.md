@@ -170,12 +170,12 @@ these from scratch.
    creation, per decision 4's reactive-detection resolution. `Recents`
    already fails open on an early unauthenticated request and needs no
    change.
-6. **#321 dependency still holds.** #321 remains open, blocked on PR #319
-   landing into this branch (see that spec and the PR #319 reconciliation
-   note). `guest-captcha.ts` stays no-touch for this lane until #321's
-   acquisition changes are actually present on `codex/private-alpha-next`
-   — verify that before Phase 2 starts, don't assume it landed just
-   because time has passed.
+6. **#321 dependency is satisfied.** PR #326 merged into
+   `codex/private-alpha-next` as `8e2a6217`. Phase 2 verified the merged
+   acquisition boundary includes the bounded load/acquisition timeout, the
+   localized widget shell and spinner, interactive-deadline reset, focus
+   containment/restoration, and dark-mode theming. `guest-captcha.ts` remains
+   no-touch for this lane; Phase 2 changes sequencing only.
 
 Phase 2 should build from the current `codex/private-alpha-next` tip at
 the time work starts, not from the Phase 1 audit's checkout — this branch

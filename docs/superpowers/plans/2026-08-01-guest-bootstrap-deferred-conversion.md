@@ -23,7 +23,7 @@ CAPTCHA-acquisition behavior changes.
 ## Constraints
 
 - Base: `origin/codex/private-alpha-next` at
-  `51984a42fec04775472a841c0efca2f45ed98e64`.
+  `8e2a62177f8e2c946c6fd397fe019fd824cbc032`.
 - Source of truth:
   `docs/superpowers/specs/2026-08-01-guest-bootstrap-deferred-conversion.md`,
   including its Phase 1 close-out.
@@ -31,8 +31,10 @@ CAPTCHA-acquisition behavior changes.
   scope; identity creation is not.
 - `web/lib/guest-captcha.ts` is a no-touch file. Reuse
   `acquireGuestCaptchaToken` through `startGuestSession` unchanged.
-- Stop if `acquirePasswordAuthCaptchaToken` appears before this plan lands; that
-  means #321 changed the shared acquisition surface and requires founder review.
+- #321 is present through PR #326 at `8e2a6217`; its timeout wrapper, widget
+  shell, interactive-deadline reset, focus containment, and dark-mode behavior
+  are the reusable acquisition boundary. Stop if this lane would need to change
+  `guest-captcha.ts` rather than sequencing `startGuestSession` around it.
 - Do not add backend runtime, schema, API-contract, allowance-policy,
   onboarding, provider, or hosted configuration changes.
 - Do not change `ExpiredGuestSession` restart internals; change only how the
