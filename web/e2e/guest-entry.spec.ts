@@ -97,6 +97,13 @@ function guestMe(language: "en" | "es-419" = "en") {
   };
 }
 
+function idleConversationActivity() {
+  return {
+    operation: { status: "idle", kind: null, updated_at: null },
+    attention: { status: "none", cursor: null },
+  };
+}
+
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({
     status,
@@ -262,6 +269,10 @@ async function mockGuestJourney(
   await page.route("**/api/v1/conversations**", async (route) => {
     const url = new URL(route.request().url());
     const pathname = url.pathname;
+    if (pathname.endsWith("/activity")) {
+      await fulfillJson(route, idleConversationActivity());
+      return;
+    }
     if (pathname.endsWith("/messages")) {
       await fulfillJson(route, {
         items: evidence.persistedMessages,
@@ -299,6 +310,7 @@ async function mockGuestJourney(
                 created_at: "2026-07-24T18:00:00Z",
                 updated_at: "2026-07-24T18:00:00Z",
                 language: "en",
+                activity: idleConversationActivity(),
               },
             ]
           : [],
@@ -856,6 +868,10 @@ test("@registered-hydration keeps the composer locked until a delayed reload set
   });
   await page.route("**/api/v1/conversations**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/activity")) {
+      await fulfillJson(route, idleConversationActivity());
+      return;
+    }
     if (url.pathname.endsWith(`/${CONVERSATION_ID}/messages`)) {
       messageLoadCount += 1;
       if (messageLoadCount > 1) {
