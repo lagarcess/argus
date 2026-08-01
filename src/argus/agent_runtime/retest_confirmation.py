@@ -123,20 +123,27 @@ def _rule_projection(setup: RetestSetup) -> _RuleProjection:
         # Without canonical indicator truth the rebuilt rules could differ from
         # the run that was actually executed, so the retest is not offered.
         return _RuleProjection()
-    period = int(float(indicator_parameters["indicator_period"]))
+    try:
+        period = int(float(indicator_parameters["indicator_period"]))
+        entry_threshold = float(indicator_parameters["entry_threshold"])
+        exit_threshold = float(indicator_parameters["exit_threshold"])
+    except (TypeError, ValueError):
+        # A malformed stored parameter is an ineligible run, not a request
+        # failure: raising here would 500 the whole dossier search.
+        return _RuleProjection()
     indicator = str(indicator_parameters["indicator"])
     return _RuleProjection(
         entry_rule={
             "indicator": indicator,
             "operator": "below",
             "period": period,
-            "threshold": float(indicator_parameters["entry_threshold"]),
+            "threshold": entry_threshold,
         },
         exit_rule={
             "indicator": indicator,
             "operator": "above",
             "period": period,
-            "threshold": float(indicator_parameters["exit_threshold"]),
+            "threshold": exit_threshold,
         },
         indicator_parameters=indicator_parameters,
     )

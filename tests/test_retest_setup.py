@@ -326,3 +326,50 @@ def test_idealized_runs_stay_offered_while_the_kill_switch_is_off(
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
 
     assert retest_confirmation_payload(setup, language="en") is not None
+
+
+def test_malformed_indicator_parameters_make_a_run_ineligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A legacy or partially malformed indicator run must project as unsupported
+    rather than raising, which would 500 the whole search request."""
+    run = _persisted_run(monkeypatch, _INDICATOR_THRESHOLD)
+    run["config_snapshot"]["resolved_parameters"]["indicator_period"] = "fourteen"
+
+    setup = retest_setup_from_run(run, today=_TODAY)
+
+    assert setup is not None
+    assert retest_confirmation_payload(setup, language="en") is None
+
+
+def test_malformed_indicator_thresholds_make_a_run_ineligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = _persisted_run(monkeypatch, _INDICATOR_THRESHOLD)
+    run["config_snapshot"]["resolved_parameters"]["entry_threshold"] = "oversold"
+
+    setup = retest_setup_from_run(run, today=_TODAY)
+
+    assert setup is not None
+    assert retest_confirmation_payload(setup, language="en") is None
+
+
+def test_malformed_indicator_run_still_projects_a_dossier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dossier projection shares the eligibility helper, so a malformed run must
+    simply drop the action instead of failing the search request."""
+    from argus.domain.run_dossiers import project_retest_action
+
+    run = _persisted_run(monkeypatch, _INDICATOR_THRESHOLD)
+    run["config_snapshot"]["resolved_parameters"]["indicator_period"] = "fourteen"
+    # Without finalized evidence identity the projection short-circuits before
+    # the rule rebuild, so the malformed parameters would never be reached.
+    run["conversation_result_card"] = {
+        **run["conversation_result_card"],
+        "evidence_artifact_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+        "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
+        "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
+    }
+
+    assert project_retest_action(run=run, today=_TODAY) is None

@@ -172,6 +172,21 @@ def test_only_the_bounded_v1_envelope_is_accepted() -> None:
             )
             is None
         ), tampered
+    # Python's UUID parser accepts URN, braced, hyphenless, and uppercase forms
+    # that Postgres either rejects outright or stores canonically, so the id
+    # handed on must be the canonical form rather than whatever was submitted.
+    for variant in (
+        f"urn:uuid:{_SOURCE_RUN_ID}",
+        "{" + _SOURCE_RUN_ID + "}",
+        _SOURCE_RUN_ID.replace("-", ""),
+        _SOURCE_RUN_ID.upper(),
+    ):
+        assert (
+            retest_action_source_run_id(
+                {**_valid_envelope(), "source_run_id": variant}
+            )
+            == _SOURCE_RUN_ID
+        ), variant
 
 
 def test_client_display_copy_never_reaches_storage() -> None:

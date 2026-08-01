@@ -72,15 +72,16 @@ def retest_action_source_run_id(action_payload: Mapping[str, Any]) -> str | None
     source_run_id = action_payload.get("source_run_id")
     if not isinstance(source_run_id, str):
         return None
-    cleaned = source_run_id.strip()
     try:
         # Run ids are UUIDs in both storage modes. Rejecting other shapes here
         # keeps a tampered id on the uniform invalid-state path instead of
-        # reaching Postgres and surfacing a cast error as a 500.
-        UUID(cleaned)
+        # reaching Postgres and surfacing a cast error as a 500. The canonical
+        # form is what is returned: the parser also accepts URN, braced,
+        # hyphenless, and uppercase spellings that Postgres rejects or stores
+        # canonically, and the memory store keys runs by exact string.
+        return str(UUID(source_run_id.strip()))
     except ValueError:
         return None
-    return cleaned
 
 
 def sanitized_retest_action(source_run_id: str) -> dict[str, Any]:
