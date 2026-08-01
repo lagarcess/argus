@@ -249,6 +249,38 @@ describe("Recents projection", () => {
     ]);
   });
 
+  test("keeps a fresh first-page row over its stale retained older-page copy", () => {
+    const staleOlderCopy: HistoryItem = {
+      ...chat("moved-to-first-page", 7, { activity: idleActivity }),
+      title: "Stale title",
+      subtitle: "Stale preview",
+      pinned: false,
+    };
+    const freshFirstPageCopy: HistoryItem = {
+      ...chat("moved-to-first-page", 0, { activity: workingActivity }),
+      title: "Fresh title",
+      subtitle: "Fresh preview",
+      pinned: true,
+    };
+
+    const refreshed = refreshFirstPageRecentChats(
+      [
+        chat("previous-first-page", 0, { activity: idleActivity }),
+        staleOlderCopy,
+        chat("retained-older", 8, { activity: idleActivity }),
+      ],
+      ["previous-first-page"],
+      [freshFirstPageCopy, chat("new-first-page", 0, { activity: idleActivity })],
+    );
+
+    expect(refreshed.map((item) => item.id)).toEqual([
+      "moved-to-first-page",
+      "new-first-page",
+      "retained-older",
+    ]);
+    expect(refreshed[0]).toEqual(freshFirstPageCopy);
+  });
+
   test("uses the first-page membership snapshot when a refresh state update applies later", () => {
     let simulatedFirstPageMembership = new Set(["first-a", "first-b"]);
     const prepared = prepareFirstPageRecentChatsRefresh(

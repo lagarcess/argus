@@ -75,8 +75,17 @@ export function refreshFirstPageRecentChats(
   incomingFirstPage: HistoryItem[],
 ): HistoryItem[] {
   const previousFirstPageIds = new Set(previousFirstPageConversationIds);
+  const incomingFirstPageIds = new Set(
+    incomingFirstPage.map(conversationIdentity),
+  );
   const retainedOlderChats = existing.filter(
-    (item) => !previousFirstPageIds.has(conversationIdentity(item)),
+    (item) => {
+      const conversationId = conversationIdentity(item);
+      return (
+        !previousFirstPageIds.has(conversationId) &&
+        !incomingFirstPageIds.has(conversationId)
+      );
+    },
   );
 
   return mergeRecentChats(incomingFirstPage, retainedOlderChats);
