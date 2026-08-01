@@ -4,7 +4,7 @@ import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createInstance, type i18n } from "i18next";
-import { I18nextProvider, initReactI18next } from "react-i18next";
+import { I18nextProvider } from "react-i18next";
 
 import ChatMessage from "../components/chat/ChatMessage";
 import type { ChatActionOption, Message } from "../components/chat/types";
@@ -21,7 +21,7 @@ const catalogs = {
 
 async function localizedI18n(language: "en" | "es-419"): Promise<i18n> {
   const instance = createInstance();
-  await instance.use(initReactI18next).init({
+  await instance.init({
     lng: language,
     fallbackLng: "en",
     ns: ["common"],
