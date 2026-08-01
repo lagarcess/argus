@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Archive, Edit2, MoreVertical, Pin, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,7 @@ type RecentChatActionsProps = {
   onRename: (id: string) => void;
   onArchive: (id: string) => Promise<void> | void;
   onDelete: (id: string) => Promise<void> | void;
+  quickJumpHint?: ReactNode;
 };
 
 export default function RecentChatActions({
@@ -20,9 +21,11 @@ export default function RecentChatActions({
   onRename,
   onArchive,
   onDelete,
+  quickJumpHint,
 }: RecentChatActionsProps) {
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isTriggerFocused, setIsTriggerFocused] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -72,26 +75,39 @@ export default function RecentChatActions({
       setIsBusy(false);
     }
   };
+  const showActionTrigger =
+    isMenuOpen || isTriggerFocused || !quickJumpHint;
 
   return (
-    <div className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          setIsMenuOpen((open) => !open);
-        }}
-        className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
-          isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-        aria-label={t("common.more", "More")}
-        aria-haspopup="menu"
-        aria-expanded={isMenuOpen}
-        title={t("common.more", "More")}
-      >
-        <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
-      </button>
+    <div className="relative flex h-7 w-[88px] items-center justify-end">
+      {showActionTrigger ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          data-actions
+          onFocus={() => setIsTriggerFocused(true)}
+          onBlur={() => setIsTriggerFocused(false)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsMenuOpen((open) => !open);
+          }}
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
+            isMenuOpen || isTriggerFocused
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100"
+          }`}
+          aria-label={t("common.more", "More")}
+          aria-haspopup="menu"
+          aria-expanded={isMenuOpen}
+          title={t("common.more", "More")}
+        >
+          <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
+        </button>
+      ) : (
+        <span className="pointer-events-none flex items-center justify-end">
+          {quickJumpHint}
+        </span>
+      )}
 
       {isMenuOpen && menuPosition && typeof document !== "undefined" && createPortal(
         <div
