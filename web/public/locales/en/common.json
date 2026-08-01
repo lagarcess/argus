@@ -787,16 +787,17 @@
       "display_name_save_error": "Could not save that name yet.",
       "language_save_error": "Could not update language yet.",
       "avatar_theme": {
-        "label": "Monogram color",
-        "change": "Change monogram color",
-        "close": "Close monogram colors",
-        "save_error": "Could not update your monogram color yet.",
+        "label": "Avatar color",
+        "change": "Edit avatar",
+        "close": "Hide avatar colors",
+        "hide": "Hide",
+        "save_error": "Could not update your avatar color yet.",
         "themes": {
           "ember": "Sienna",
           "gold": "Lichen",
           "slate": "Juniper",
           "teal": "Lagoon",
-          "ocean": "Cobalt",
+          "ocean": "Default",
           "indigo": "Iris",
           "plum": "Mulberry"
         }

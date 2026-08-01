@@ -10,25 +10,42 @@ import {
 } from "@/lib/avatar-theme";
 
 describe("avatar monogram themes", () => {
-  test("uses a curated token set with a deterministic ocean fallback", () => {
+  test("keeps Argus's original neutral avatar as the deterministic default", () => {
     expect(AVATAR_THEMES).toHaveLength(7);
     expect(AVATAR_THEMES.map((theme) => theme.token)).toEqual([
+      "ocean",
       "ember",
       "gold",
       "slate",
       "teal",
-      "ocean",
       "indigo",
       "plum",
     ] satisfies AvatarTheme[]);
-    expect(avatarThemeClassName(undefined)).toBe(avatarThemeClassName("ocean"));
+    expect(avatarThemeClassName(undefined)).toBe(
+      "bg-[#191c1f] text-white dark:bg-white/10",
+    );
+    expect(avatarThemeClassName("ocean")).toBe(
+      "bg-[#191c1f] text-white dark:bg-white/10",
+    );
+    expect(avatarThemeStyle(undefined)).toBeUndefined();
+    expect(avatarThemeStyle("ocean", "picker")).toBeUndefined();
   });
 
   test("derives stronger picker and quieter ambient gradients from one hue system", () => {
-    const hueStep = 360 / AVATAR_THEMES.length;
+    const expectedHues: Record<AvatarTheme, number> = {
+      ember: 28.5,
+      gold: 28.5 + 360 / 7,
+      slate: 28.5 + (360 / 7) * 2,
+      teal: 28.5 + (360 / 7) * 3,
+      ocean: 28.5 + (360 / 7) * 4,
+      indigo: 28.5 + (360 / 7) * 5,
+      plum: 28.5 + (360 / 7) * 6,
+    };
 
-    for (const [index, theme] of AVATAR_THEMES.entries()) {
-      expect(theme.hue).toBeCloseTo(28.5 + index * hueStep);
+    for (const theme of AVATAR_THEMES) {
+      if (theme.token === "ocean") continue;
+
+      expect(theme.hue).toBeCloseTo(expectedHues[theme.token]);
       expect(theme.className).toBe("text-white");
       expect(avatarThemeStyle(theme.token, "picker")).toEqual({
         backgroundImage:
@@ -41,7 +58,7 @@ describe("avatar monogram themes", () => {
     }
   });
 
-  test("renders an avatar-triggered picker submodal without changing initials derivation", () => {
+  test("renders an avatar-triggered inline drawer without changing initials derivation", () => {
     const root = join(import.meta.dir, "..");
     const menu = readFileSync(
       join(root, "components/sidebar/ProfileMenu.tsx"),
@@ -58,33 +75,39 @@ describe("avatar monogram themes", () => {
     expect(menu).toContain("patchMe({ avatar_theme: avatarTheme })");
     expect(menu).toContain('avatarThemeStyle(profile?.avatar_theme, "ambient")');
     expect(menu).toContain('avatarThemeStyle(theme.token, "picker")');
-    expect(menu).toContain("openAvatarPicker");
-    expect(menu).toContain("isAvatarPickerOpen &&");
-    expect(menu).toContain("avatarPickerDialogRef");
-    expect(menu).toContain("avatarPickerShouldRestoreFocusRef");
-    expect(menu).toContain("inert={isAvatarPickerOpen}");
-    expect(menu).toContain('document.addEventListener("keydown", handleKeyDown)');
-    expect(menu).toContain("avatarTriggerRef.current?.focus()");
+    expect(menu).toContain("toggleAvatarPicker");
+    expect(menu).toContain("argus-avatar-theme-drawer");
+    expect(menu).toContain("aria-expanded={isAvatarPickerOpen}");
+    expect(menu).toContain("inert={!isAvatarPickerOpen}");
+    expect(menu).not.toContain("avatarPickerDialogRef");
+    expect(menu).not.toContain("argus-avatar-theme-picker-title");
     expect(menu).toContain("h-11 w-11 items-center justify-center");
-    expect(menu).toContain("grid-cols-8 gap-3");
-    expect(menu).toContain('index === 4 ? "col-start-2" : ""');
-    expect(menu).toContain('"scale-[0.98] opacity-45 blur-[1px]"');
+    expect(menu).toContain("grid-cols-8 place-items-center");
+    expect(menu).toContain("sm:grid-cols-7");
+    expect(menu).toContain("Avatar color");
+    expect(menu).toContain("Hide avatar colors");
     expect(menu).not.toContain("<fieldset");
     expect(menu).toContain("bg-[#191c1f] text-white dark:bg-white/10");
     expect(menu).toContain("profile?.display_name?.trim() ||");
     expect(menu).toContain("profile?.username?.trim() ||");
     expect(menu).toContain("profile?.email?.trim() ||");
-    expect(en.settings.profile.avatar_theme.label).toBe("Monogram color");
-    expect(es.settings.profile.avatar_theme.label).toBe("Color del monograma");
-    expect(Object.keys(en.settings.profile.avatar_theme.themes)).toEqual(
-      AVATAR_THEMES.map((theme) => theme.token),
+    expect(en.settings.profile.avatar_theme.label).toBe("Avatar color");
+    expect(es.settings.profile.avatar_theme.label).toBe("Color del avatar");
+    expect(en.settings.profile.avatar_theme.change).toBe("Edit avatar");
+    expect(es.settings.profile.avatar_theme.change).toBe("Editar avatar");
+    expect(en.settings.profile.avatar_theme.close).toBe("Hide avatar colors");
+    expect(es.settings.profile.avatar_theme.close).toBe(
+      "Ocultar colores del avatar",
     );
-    expect(Object.keys(es.settings.profile.avatar_theme.themes)).toEqual(
-      AVATAR_THEMES.map((theme) => theme.token),
+    expect(new Set(Object.keys(en.settings.profile.avatar_theme.themes))).toEqual(
+      new Set(AVATAR_THEMES.map((theme) => theme.token)),
+    );
+    expect(new Set(Object.keys(es.settings.profile.avatar_theme.themes))).toEqual(
+      new Set(AVATAR_THEMES.map((theme) => theme.token)),
     );
     expect(en.settings.profile.avatar_theme.themes.ember).toBe("Sienna");
-    expect(en.settings.profile.avatar_theme.themes.ocean).toBe("Cobalt");
+    expect(en.settings.profile.avatar_theme.themes.ocean).toBe("Default");
     expect(es.settings.profile.avatar_theme.themes.ember).toBe("Siena");
-    expect(es.settings.profile.avatar_theme.themes.ocean).toBe("Cobalto");
+    expect(es.settings.profile.avatar_theme.themes.ocean).toBe("Predeterminado");
   });
 });

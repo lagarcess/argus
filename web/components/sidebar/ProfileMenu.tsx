@@ -6,6 +6,7 @@ import {
   Activity,
   Archive,
   ChevronRight,
+  ChevronUp,
   Database,
   HelpCircle,
   Keyboard,
@@ -122,11 +123,7 @@ export default function ProfileMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
-  const avatarPickerDialogRef = useRef<HTMLDivElement>(null);
-  const avatarPickerDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const avatarPickerShouldRestoreFocusRef = useRef(false);
+  const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
@@ -143,96 +140,43 @@ export default function ProfileMenu({
   const [isSavingAvatarTheme, setIsSavingAvatarTheme] = useState(false);
   const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
-  const [isAvatarPickerClosing, setIsAvatarPickerClosing] = useState(false);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const resetAvatarPicker = useCallback(() => {
-    if (avatarPickerDismissTimerRef.current) {
-      clearTimeout(avatarPickerDismissTimerRef.current);
-      avatarPickerDismissTimerRef.current = null;
-    }
-    setIsAvatarPickerOpen(false);
-    setIsAvatarPickerClosing(false);
-  }, []);
-
   const closeAvatarPicker = useCallback(() => {
-    if (!isAvatarPickerOpen || isAvatarPickerClosing) return;
+    if (!isAvatarPickerOpen) return;
 
-    setIsAvatarPickerClosing(true);
-    avatarPickerDismissTimerRef.current = setTimeout(() => {
-      avatarPickerShouldRestoreFocusRef.current = true;
-      setIsAvatarPickerOpen(false);
-      setIsAvatarPickerClosing(false);
-      avatarPickerDismissTimerRef.current = null;
-    }, 180);
-  }, [isAvatarPickerClosing, isAvatarPickerOpen]);
-
-  const openAvatarPicker = useCallback(() => {
-    if (accountKind !== "registered" || isAvatarPickerOpen) return;
-    setAvatarThemeError(null);
-    setIsAvatarPickerOpen(true);
-  }, [accountKind, isAvatarPickerOpen]);
-
-  const closeProfileModal = useCallback(() => {
-    resetAvatarPicker();
-    setActiveModal(null);
-  }, [resetAvatarPicker]);
-
-  useEffect(
-    () => () => {
-      if (avatarPickerDismissTimerRef.current) {
-        clearTimeout(avatarPickerDismissTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (isAvatarPickerOpen || !avatarPickerShouldRestoreFocusRef.current) {
-      return;
-    }
-    avatarPickerShouldRestoreFocusRef.current = false;
+    setIsAvatarPickerOpen(false);
     avatarTriggerRef.current?.focus();
   }, [isAvatarPickerOpen]);
+
+  const toggleAvatarPicker = useCallback(() => {
+    if (accountKind !== "registered") return;
+
+    if (isAvatarPickerOpen) {
+      closeAvatarPicker();
+      return;
+    }
+
+    setAvatarThemeError(null);
+    setIsAvatarPickerOpen(true);
+  }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
+
+  const closeProfileModal = useCallback(() => {
+    setIsAvatarPickerOpen(false);
+    setActiveModal(null);
+  }, []);
 
   useEffect(() => {
     if (!isAvatarPickerOpen) return;
 
-    const dialog = avatarPickerDialogRef.current;
-    if (!dialog) return;
-
-    const focusableElements = () =>
-      Array.from(
-        dialog.querySelectorAll<HTMLButtonElement>("button:not([disabled])"),
-      );
-    const selectedTheme = dialog.querySelector<HTMLButtonElement>(
+    const selectedTheme = avatarThemeDrawerRef.current?.querySelector<HTMLButtonElement>(
       '[role="radio"][aria-checked="true"]',
     );
-    (selectedTheme ?? focusableElements()[0])?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-
-      const focusable = focusableElements();
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    selectedTheme?.focus();
   }, [isAvatarPickerOpen]);
 
   // Fetch profile on open
@@ -504,7 +448,7 @@ export default function ProfileMenu({
         setAvatarThemeError(
           t(
             "settings.profile.avatar_theme.save_error",
-            "Could not update your monogram color yet.",
+            "Could not update your avatar color yet.",
           ),
         );
       } finally {
@@ -836,16 +780,10 @@ export default function ProfileMenu({
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
-            className={`relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 transition-[opacity,transform,filter] duration-200 ease-out dark:border-white/10 dark:bg-[#1b1d20] ${
-              isAvatarPickerOpen
-                ? "scale-[0.98] opacity-45 blur-[1px]"
-                : ""
-            }`}
+            className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="argus-profile-modal-title"
-            aria-hidden={isAvatarPickerOpen}
-            inert={isAvatarPickerOpen}
           >
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
@@ -871,16 +809,18 @@ export default function ProfileMenu({
                   <button
                     ref={avatarTriggerRef}
                     type="button"
-                    onClick={openAvatarPicker}
-                    className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50"
+                    onClick={toggleAvatarPicker}
+                    className="group relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50"
                     aria-label={t(
                       "settings.profile.avatar_theme.change",
-                      "Change monogram color",
+                      "Edit avatar",
                     )}
                     title={t(
                       "settings.profile.avatar_theme.change",
-                      "Change monogram color",
+                      "Edit avatar",
                     )}
+                    aria-expanded={isAvatarPickerOpen}
+                    aria-controls="argus-avatar-theme-drawer"
                     data-avatar-theme-trigger
                   >
                     <span
@@ -888,6 +828,12 @@ export default function ProfileMenu({
                       style={avatarStyle}
                     >
                       {profileInitial(profile)}
+                    </span>
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 scale-75 items-center justify-center rounded-full bg-white text-black opacity-0 ring-1 ring-black/10 transition duration-150 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
+                      aria-hidden="true"
+                    >
+                      <Edit2 className="h-2.5 w-2.5" />
                     </span>
                   </button>
                 ) : (
@@ -983,6 +929,104 @@ export default function ProfileMenu({
                 </div>
               </div>
 
+              {accountKind === "registered" && (
+                <div
+                  id="argus-avatar-theme-drawer"
+                  ref={avatarThemeDrawerRef}
+                  className={`grid transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
+                    isAvatarPickerOpen
+                      ? "mt-0 grid-rows-[1fr] opacity-100"
+                      : "mt-0 grid-rows-[0fr] opacity-0"
+                  }`}
+                  aria-hidden={!isAvatarPickerOpen}
+                  inert={!isAvatarPickerOpen}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="border-t border-black/10 pt-1.5 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={closeAvatarPicker}
+                        className="flex h-11 w-full items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30"
+                        aria-label={t(
+                          "settings.profile.avatar_theme.close",
+                          "Hide avatar colors",
+                        )}
+                      >
+                        <span className="whitespace-nowrap text-[13px] text-black/50 dark:text-white/50">
+                          {t(
+                            "settings.profile.avatar_theme.label",
+                            "Avatar color",
+                          )}
+                        </span>
+                        <span
+                          className="h-px flex-1 bg-black/10 dark:bg-white/10"
+                          aria-hidden="true"
+                        />
+                        <span className="text-[11px] text-black/35 dark:text-white/35">
+                          {t(
+                            "settings.profile.avatar_theme.hide",
+                            "Hide",
+                          )}
+                        </span>
+                        <ChevronUp
+                          className="h-3.5 w-3.5 text-black/35 dark:text-white/35"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div
+                        className="grid grid-cols-8 place-items-center gap-y-2 sm:grid-cols-7"
+                        role="radiogroup"
+                        aria-label={t(
+                          "settings.profile.avatar_theme.label",
+                          "Avatar color",
+                        )}
+                      >
+                        {AVATAR_THEMES.map((theme, index) => {
+                          const selected =
+                            (profile?.avatar_theme ?? "ocean") === theme.token;
+                          const themeLabel = t(
+                            `settings.profile.avatar_theme.themes.${theme.token}`,
+                            theme.token,
+                          );
+                          return (
+                            <button
+                              key={theme.token}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              aria-label={themeLabel}
+                              title={themeLabel}
+                              disabled={isSavingAvatarTheme}
+                              onClick={() => void handleAvatarThemeSelect(theme.token)}
+                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 sm:col-span-1 ${
+                                index === 4 ? "col-start-2 sm:col-auto" : ""
+                              } ${
+                                selected
+                                  ? "ring-2 ring-black ring-offset-2 dark:ring-white dark:ring-offset-[#1b1d20]"
+                                  : ""
+                              }`}
+                            >
+                              <span
+                                className={`flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold ${theme.className}`}
+                                style={avatarThemeStyle(theme.token, "picker")}
+                                aria-hidden="true"
+                              >
+                                {profileInitial(profile)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {avatarThemeError && (
+                        <span className="mt-3 block text-[12px] text-[#d66d75]">
+                          {avatarThemeError}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">
               <div
@@ -1048,106 +1092,6 @@ export default function ProfileMenu({
           </div>
         </div>
       </div>
-      {isAvatarPickerOpen && (
-        <div
-          className={`fixed inset-0 z-[80] flex items-center justify-center p-4 transition-opacity duration-200 ${
-            isAvatarPickerClosing ? "opacity-0" : "animate-in fade-in opacity-100"
-          }`}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
-            onClick={closeAvatarPicker}
-            aria-label={t(
-              "settings.profile.avatar_theme.close",
-              "Close monogram colors",
-            )}
-          />
-          <div
-            ref={avatarPickerDialogRef}
-            className={`relative w-full max-w-[280px] rounded-[18px] border border-black/5 bg-white p-5 shadow-[0_20px_56px_rgba(0,0,0,0.2)] transition-all duration-200 dark:border-white/10 dark:bg-[#23262a] ${
-              isAvatarPickerClosing
-                ? "translate-y-1 scale-[0.98] opacity-0"
-                : "animate-in zoom-in-95 opacity-100"
-            }`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="argus-avatar-theme-picker-title"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3
-                id="argus-avatar-theme-picker-title"
-                className="font-display text-[16px] font-medium text-black dark:text-white"
-              >
-                {t(
-                  "settings.profile.avatar_theme.label",
-                  "Monogram color",
-                )}
-              </h3>
-              <button
-                type="button"
-                onClick={closeAvatarPicker}
-                className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                aria-label={t(
-                  "settings.profile.avatar_theme.close",
-                  "Close monogram colors",
-                )}
-              >
-                <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-              </button>
-            </div>
-            <div
-              className="grid grid-cols-8 gap-3"
-              role="radiogroup"
-              aria-label={t(
-                "settings.profile.avatar_theme.label",
-                "Monogram color",
-              )}
-            >
-              {AVATAR_THEMES.map((theme, index) => {
-                const selected =
-                  (profile?.avatar_theme ?? "ocean") === theme.token;
-                const themeLabel = t(
-                  `settings.profile.avatar_theme.themes.${theme.token}`,
-                  theme.token,
-                );
-                return (
-                  <button
-                    key={theme.token}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={themeLabel}
-                    title={themeLabel}
-                    disabled={isSavingAvatarTheme}
-                    onClick={() => void handleAvatarThemeSelect(theme.token)}
-                    className={`col-span-2 flex h-11 w-11 justify-self-center items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 ${
-                      index === 4 ? "col-start-2" : ""
-                    } ${
-                      selected
-                        ? "ring-2 ring-black ring-offset-2 dark:ring-white dark:ring-offset-[#23262a]"
-                        : ""
-                    }`}
-                  >
-                    <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold ${theme.className}`}
-                      style={avatarThemeStyle(theme.token, "picker")}
-                      aria-hidden="true"
-                    >
-                      {profileInitial(profile)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {avatarThemeError && (
-              <span className="mt-4 block text-[12px] text-[#d66d75]">
-                {avatarThemeError}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
       {deleteRequestDialog}
       </>
     );
