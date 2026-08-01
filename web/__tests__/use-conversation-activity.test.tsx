@@ -135,6 +135,7 @@ function runtimeHarness(options: Readonly<{
     patch: ConversationActivityPatch,
     options: Readonly<{ signal: AbortSignal }>,
   ) => Promise<ConversationActivity>;
+  getActivity?: (conversationId: string) => Promise<ConversationActivity>;
   refreshHistory?: () =>
     | ConversationActivityHistorySnapshot
     | readonly HistoryItem[]
@@ -163,6 +164,9 @@ function runtimeHarness(options: Readonly<{
     patchActivity:
       options.patchActivity ??
       (async () => idleActivity()),
+    getActivity:
+      options.getActivity ??
+      (async () => idleActivity()),
     effects,
     causalClock: options.causalClock,
   });
@@ -175,6 +179,126 @@ const drainMicrotasks = async (): Promise<void> => {
 };
 
 describe("conversation activity refresh ownership", () => {
+  test("settles a request from its canonical activity when the first-page refresh omits it", async () => {
+    const firstPage = deferred<readonly HistoryItem[]>();
+    const canonicalActivity = deferred<ConversationActivity>();
+    const activityLookups: string[] = [];
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-older", idleActivity())],
+      activeConversationId: "conversation-older",
+      refreshHistory: () => firstPage.promise,
+      getActivity: (conversationId) => {
+        activityLookups.push(conversationId);
+        return canonicalActivity.promise;
+      },
+    });
+
+    const controller = new AbortController();
+    harness.runtime.startRequest(
+      "conversation-older",
+      "request-rejected-before-persistence",
+      "queued",
+      "chat_turn",
+    );
+    harness.runtime.registerTransport(
+      "conversation-older",
+      "request-rejected-before-persistence",
+      controller,
+    );
+    harness.runtime.start();
+    harness.runtime.finishTransport(
+      "conversation-older",
+      "request-rejected-before-persistence",
+      controller,
+    );
+
+    firstPage.resolve([chat("conversation-first-page", idleActivity())]);
+    await drainMicrotasks();
+
+    expect(activityLookups).toEqual(["conversation-older"]);
+    expect(
+      harness.runtime.isRequestCurrent(
+        "conversation-older",
+        "request-rejected-before-persistence",
+      ),
+    ).toBe(true);
+
+    canonicalActivity.resolve(idleActivity());
+    await drainMicrotasks();
+
+    expect(
+      harness.runtime.isRequestCurrent(
+        "conversation-older",
+        "request-rejected-before-persistence",
+      ),
+    ).toBe(false);
+    expect(harness.runtime.isConversationLocked("conversation-older")).toBe(false);
+    expect(harness.effects.hasPoll()).toBe(false);
+  });
+
+  test("does not settle from an omitted-request activity read started before transport completion", async () => {
+    const activityReads = [
+      deferred<ConversationActivity>(),
+      deferred<ConversationActivity>(),
+    ];
+    let activityReadIndex = 0;
+    const harness = runtimeHarness({
+      historyItems: [chat("conversation-older", idleActivity())],
+      activeConversationId: "conversation-older",
+      refreshHistory: () => [chat("conversation-first-page", idleActivity())],
+      getActivity: () => activityReads[activityReadIndex++]!.promise,
+    });
+
+    const controller = new AbortController();
+    harness.runtime.startRequest(
+      "conversation-older",
+      "request-in-flight",
+      "queued",
+      "chat_turn",
+    );
+    harness.runtime.registerTransport(
+      "conversation-older",
+      "request-in-flight",
+      controller,
+    );
+    harness.runtime.start();
+    await drainMicrotasks();
+    expect(activityReadIndex).toBe(1);
+
+    harness.runtime.finishTransport(
+      "conversation-older",
+      "request-in-flight",
+      controller,
+    );
+    activityReads[0]!.resolve(idleActivity());
+    await drainMicrotasks();
+    await drainMicrotasks();
+    await drainMicrotasks();
+
+    expect(
+      harness.runtime.isRequestCurrent(
+        "conversation-older",
+        "request-in-flight",
+      ),
+    ).toBe(true);
+    expect(harness.effects.hasPoll()).toBe(true);
+
+    harness.effects.firePoll();
+    await drainMicrotasks();
+    expect(activityReadIndex).toBe(2);
+    activityReads[1]!.resolve(idleActivity());
+    await drainMicrotasks();
+    await drainMicrotasks();
+    await drainMicrotasks();
+
+    expect(
+      harness.runtime.isRequestCurrent(
+        "conversation-older",
+        "request-in-flight",
+      ),
+    ).toBe(false);
+  });
+
   test("bootstraps and polls only while loaded canonical or local work is unresolved", async () => {
     const harness = runtimeHarness({
       historyItems: [chat("conversation-a", workingActivity("queued"))],
@@ -244,6 +368,7 @@ describe("conversation activity refresh ownership", () => {
       invalidateInactiveTranscript: () => undefined,
       onMutationNotice: () => undefined,
       patchActivity: async () => idleActivity(),
+      getActivity: async () => idleActivity(),
       effects,
     });
 

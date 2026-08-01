@@ -83,6 +83,7 @@ function requestHarness(options: Readonly<{
     },
     onMutationNotice: () => undefined,
     patchActivity: async () => idleActivity(),
+    getActivity: async () => idleActivity(),
     effects: {
       schedulePoll: () => () => undefined,
       subscribeWindowFocus: () => () => undefined,

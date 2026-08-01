@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import {
+  getConversationActivity,
   patchConversationActivity,
   type ConversationActivity,
   type ConversationActivityPatch,
@@ -99,6 +100,10 @@ export type ConversationActivityPatchTransport = (
   options: Readonly<{ signal: AbortSignal }>,
 ) => Promise<ConversationActivity>;
 
+export type ConversationActivityReadTransport = (
+  conversationId: string,
+) => Promise<ConversationActivity>;
+
 export type ConversationActivityEffectsAdapter = Readonly<{
   schedulePoll: (callback: () => void, delayMs: number) => () => void;
   subscribeWindowFocus: (callback: () => void) => () => void;
@@ -128,6 +133,7 @@ export type CreateConversationActivityRuntimeOptions =
     ConversationActivityCallbacks &
     Readonly<{
       patchActivity: ConversationActivityPatchTransport;
+      getActivity: ConversationActivityReadTransport;
       effects: ConversationActivityEffectsAdapter;
       causalClock?: ConversationActivityCausalClock;
     }>;
@@ -539,37 +545,88 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       const conversationId = item.conversation_id ?? item.id;
       this.loadedConversationIds.add(conversationId);
       if (!item.activity) continue;
-
-      const priorRecord = this.state.byConversationId[conversationId];
-      const priorActivity = priorRecord?.canonical ?? null;
       const revision = responseRevision ?? this.nextResponseRevision();
-      const transportFinishedRevision =
-        priorRecord?.request?.transportFinishedRevision;
-      const canSettleRequest = Boolean(
-        typeof transportFinishedRevision === "number" &&
-        revision > transportFinishedRevision &&
-        item.activity.operation.status === "idle",
-      );
-      if (activitiesAreEqual(priorActivity, item.activity) && !canSettleRequest) continue;
-      const settled =
-        isUnresolvedOperation(priorActivity) &&
-        !isUnresolvedOperation(item.activity);
-      this.dispatch({
-        type: "server_projection_merged",
-        conversationId,
-        activity: item.activity,
-        revision,
-        activeView:
-          conversationId === this.currentActiveConversationId(),
-      });
-      const requestSettled = Boolean(
-        priorRecord?.request &&
-        !this.state.byConversationId[conversationId]?.request,
-      );
-      if ((settled || requestSettled) && conversationId !== this.currentActiveConversationId()) {
-        this.callbacks.invalidateInactiveTranscript(conversationId);
-      }
+      this.mergeCanonicalActivity(conversationId, item.activity, revision);
     }
+  }
+
+  private mergeCanonicalActivity(
+    conversationId: string,
+    activity: ConversationActivity,
+    revision: number,
+  ): void {
+    const priorRecord = this.state.byConversationId[conversationId];
+    const priorActivity = priorRecord?.canonical ?? null;
+    const transportFinishedRevision =
+      priorRecord?.request?.transportFinishedRevision;
+    const canSettleRequest = Boolean(
+      typeof transportFinishedRevision === "number" &&
+      revision > transportFinishedRevision &&
+      activity.operation.status === "idle",
+    );
+    if (activitiesAreEqual(priorActivity, activity) && !canSettleRequest) return;
+    const settled =
+      isUnresolvedOperation(priorActivity) && !isUnresolvedOperation(activity);
+    this.dispatch({
+      type: "server_projection_merged",
+      conversationId,
+      activity,
+      revision,
+      activeView: conversationId === this.currentActiveConversationId(),
+    });
+    const requestSettled = Boolean(
+      priorRecord?.request &&
+      !this.state.byConversationId[conversationId]?.request,
+    );
+    if (
+      (settled || requestSettled) &&
+      conversationId !== this.currentActiveConversationId()
+    ) {
+      this.callbacks.invalidateInactiveTranscript(conversationId);
+    }
+  }
+
+  private refreshOmittedRequestActivities(
+    historyItems: readonly HistoryItem[],
+    epoch: number,
+  ): Promise<void> | undefined {
+    const projectedConversationIds = new Set(
+      historyItems.flatMap((item) =>
+        item.type === "chat" && item.activity
+          ? [item.conversation_id ?? item.id]
+          : [],
+      ),
+    );
+    const omittedRequests = Object.entries(this.state.byConversationId).flatMap(
+      ([conversationId, record]) =>
+        record.request && !projectedConversationIds.has(conversationId)
+          ? [{ conversationId, requestId: record.request.requestId }]
+          : [],
+    );
+    if (omittedRequests.length === 0) return undefined;
+
+    return Promise.all(
+      omittedRequests.map(async ({ conversationId, requestId }) => {
+        const revision = this.nextResponseRevision();
+        let activity: ConversationActivity;
+        try {
+          activity = await this.options.getActivity(conversationId);
+        } catch {
+          return;
+        }
+        if (
+          epoch !== this.accountEpoch ||
+          !this.isRequestCurrent(conversationId, requestId)
+        ) {
+          return;
+        }
+        this.mergeCanonicalActivity(
+          conversationId,
+          activity,
+          revision,
+        );
+      }),
+    ).then(() => undefined);
   }
 
   private mutateActivity(
@@ -739,15 +796,19 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     const promise = Promise.resolve(refreshResult)
       .then((historyItems) => {
         if (epoch !== this.accountEpoch || historyItems === undefined) return;
+        const items = isConversationActivityHistorySnapshot(historyItems)
+          ? historyItems.items
+          : historyItems;
         if (isConversationActivityHistorySnapshot(historyItems)) {
           this.mergeHistory(
-            historyItems.items,
+            items,
             historyItems.revision,
             false,
           );
         } else {
-          this.mergeHistory(historyItems, responseRevision, false);
+          this.mergeHistory(items, responseRevision, false);
         }
+        return this.refreshOmittedRequestActivities(items, epoch);
       })
       .catch(() => {
         // A failed refresh carries no activity truth. Keep the current surface.
@@ -802,6 +863,7 @@ export type UseConversationActivityOptions = ConversationActivityInputs &
       causalClock?: ConversationActivityCausalClock;
       testAdapters?: Readonly<{
       patchActivity?: ConversationActivityPatchTransport;
+      getActivity?: ConversationActivityReadTransport;
       effects?: ConversationActivityEffectsAdapter;
     }>;
   }>;
@@ -833,6 +895,8 @@ export function useConversationActivity(
       onMutationNotice: options.onMutationNotice,
       patchActivity:
         options.testAdapters?.patchActivity ?? patchConversationActivity,
+      getActivity:
+        options.testAdapters?.getActivity ?? getConversationActivity,
       effects:
         options.testAdapters?.effects ?? createBrowserEffectsAdapter(),
       causalClock: options.causalClock,
