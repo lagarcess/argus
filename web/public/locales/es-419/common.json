@@ -1081,7 +1081,7 @@
       "subtitle": "Inicia sesion para continuar",
       "email_placeholder": "Correo electronico",
       "password_placeholder": "Contrasena",
-      "submit": "Iniciar sesion",
+      "submit": "Iniciar sesión",
       "loading": "Iniciando sesion...",
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
@@ -1092,7 +1092,8 @@
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
-      "new_account": "¿nuevo en argus?"
+      "new_account": "¿Nuevo en Argus?",
+      "password_requirement": "Mínimo 8 caracteres."
     },
     "legal": {
       "continuing_prefix": "Al continuar, aceptas nuestros"
@@ -1171,9 +1172,9 @@
     }
   },
   "landing": {
-    "sign_up_email": "Registrarse con Email",
-    "already_account": "¿ya tienes una cuenta?",
-    "sign_in": "inicia sesión",
+    "sign_up_email": "Registrarse con email",
+    "already_account": "¿Ya tienes una cuenta?",
+    "sign_in": "Iniciar sesión",
     "legal_prefix": "Al registrarte, aceptas nuestros",
     "terms": "Términos",
     "privacy": "Política de Privacidad"

@@ -111,6 +111,15 @@ export default function AuthForm({
           </button>
         </div>
 
+        {isSignup && (
+          <p className="-mt-1 px-1 text-[12px] tracking-[0.16px] text-black/55 dark:text-white/55">
+            {t(
+              "auth.signup.password_requirement",
+              "At least 8 characters.",
+            )}
+          </p>
+        )}
+
         {!isSignup && (
           <a
             href="/auth/forgot-password"
@@ -140,7 +149,7 @@ export default function AuthForm({
               : t("auth.login.loading", "Signing in...")
             : isSignup
               ? t("auth.signup.submit", "Sign up")
-              : t("auth.login.submit", "Sign In")}
+              : t("auth.login.submit", "Sign in")}
         </button>
       </form>
 
