@@ -39,6 +39,8 @@ export type ConversationActivityRecord = {
   mutation: ConversationActivityMutationRecord | null;
   manualUnreadGuardSource: "server" | string | null;
   announcement: ConversationActivityAnnouncement | null;
+  announcementFingerprint: string;
+  announcementGeneration: number;
   acknowledgedAnnouncements: Readonly<Record<string, true>>;
 };
 
@@ -109,6 +111,8 @@ const EMPTY_RECORD: ConversationActivityRecord = {
   mutation: null,
   manualUnreadGuardSource: null,
   announcement: null,
+  announcementFingerprint: "none",
+  announcementGeneration: 0,
   acknowledgedAnnouncements: {},
 };
 
@@ -169,10 +173,14 @@ const presentationForRecord = (
   }
 
   const canonical = canonicalAttentionPresentation(record.canonical);
-  if (record.mutation?.action === "mark_read") {
+  const currentMutation =
+    record.mutation && record.serverRevision <= record.mutation.issuedRevision
+      ? record.mutation
+      : null;
+  if (currentMutation?.action === "mark_read") {
     return "none";
   }
-  if (record.mutation?.action === "mark_unread") {
+  if (currentMutation?.action === "mark_unread") {
     return PRESENTATION_RANK[canonical] > PRESENTATION_RANK.manual_unread
       ? canonical
       : "manual_unread";
@@ -180,13 +188,12 @@ const presentationForRecord = (
   return canonical;
 };
 
-const announcementForRecord = (
-  conversationId: string,
+const announcementFingerprintForRecord = (
   record: ConversationActivityRecord,
-): ConversationActivityAnnouncement | null => {
+): string => {
   const presentation = presentationForRecord(record);
   if (presentation === "none") {
-    return null;
+    return "none";
   }
 
   if (presentation === "working") {
@@ -197,25 +204,43 @@ const announcementForRecord = (
           record.canonical?.operation.status ?? "checking",
           record.canonical?.operation.updated_at ?? "unknown",
         ].join(":");
-    return {
-      key: `${conversationId}:working:${identity}`,
-      presentation,
-    };
+    return `working:${identity}`;
   }
 
-  return {
-    key: `${conversationId}:${presentation}:${record.canonical?.attention.cursor ?? "no-cursor"}`,
-    presentation,
-  };
+  return `${presentation}:${record.canonical?.attention.cursor ?? "no-cursor"}`;
 };
 
 const withAnnouncement = (
   conversationId: string,
+  previous: ConversationActivityRecord,
   record: ConversationActivityRecord,
-): ConversationActivityRecord => ({
-  ...record,
-  announcement: announcementForRecord(conversationId, record),
-});
+  preserveIfPresentationUnchanged = false,
+): ConversationActivityRecord => {
+  const presentation = presentationForRecord(record);
+  const previousPresentation = presentationForRecord(previous);
+  const computedFingerprint = announcementFingerprintForRecord(record);
+  const preserve =
+    preserveIfPresentationUnchanged && presentation === previousPresentation;
+  const fingerprint = preserve
+    ? previous.announcementFingerprint
+    : computedFingerprint;
+  const generation =
+    fingerprint === previous.announcementFingerprint
+      ? previous.announcementGeneration
+      : previous.announcementGeneration + 1;
+  return {
+    ...record,
+    announcementFingerprint: fingerprint,
+    announcementGeneration: generation,
+    announcement:
+      presentation === "none"
+        ? null
+        : {
+            key: `${conversationId}:${generation}:${fingerprint}`,
+            presentation,
+          },
+  };
+};
 
 const recordFor = (
   state: ConversationActivityState,
@@ -226,10 +251,16 @@ const replaceRecord = (
   state: ConversationActivityState,
   conversationId: string,
   record: ConversationActivityRecord,
+  preserveAnnouncementIfPresentationUnchanged = false,
 ): ConversationActivityState => ({
   byConversationId: {
     ...state.byConversationId,
-    [conversationId]: withAnnouncement(conversationId, record),
+    [conversationId]: withAnnouncement(
+      conversationId,
+      recordFor(state, conversationId),
+      record,
+      preserveAnnouncementIfPresentationUnchanged,
+    ),
   },
 });
 
@@ -249,7 +280,7 @@ export function conversationActivityReducer(
 
   switch (action.type) {
     case "server_projection_merged": {
-      if (action.revision < current.serverRevision) {
+      if (action.revision <= current.serverRevision) {
         return state;
       }
       const previousAttention = canonicalAttentionPresentation(current.canonical);
@@ -261,12 +292,6 @@ export function conversationActivityReducer(
         nextAttention === "manual_unread"
       ) {
         guardSource = "server";
-      } else if (
-        guardSource === "server" &&
-        previousAttention === "manual_unread" &&
-        nextAttention !== "manual_unread"
-      ) {
-        guardSource = null;
       }
       return replaceRecord(state, action.conversationId, {
         ...current,
@@ -326,18 +351,22 @@ export function conversationActivityReducer(
       const responseAttention = canonicalAttentionPresentation(canonical);
       let guardSource = current.manualUnreadGuardSource;
       if (
-        current.mutation.action === "mark_read" &&
-        responseAttention !== "manual_unread"
+        current.mutation.action === "mark_read"
       ) {
         guardSource = null;
       }
-      return replaceRecord(state, action.conversationId, {
-        ...current,
-        canonical,
-        serverRevision,
-        mutation: null,
-        manualUnreadGuardSource: guardSource,
-      });
+      return replaceRecord(
+        state,
+        action.conversationId,
+        {
+          ...current,
+          canonical,
+          serverRevision,
+          mutation: null,
+          manualUnreadGuardSource: guardSource,
+        },
+        responseAttention === presentationForRecord(current),
+      );
     }
     case "mutation_failed":
       if (current.mutation?.mutationId !== action.mutationId) {
@@ -360,7 +389,11 @@ export function conversationActivityReducer(
         manualUnreadGuardSource: null,
       });
     case "announcement_acknowledged":
-      if (!action.key || current.acknowledgedAnnouncements[action.key]) {
+      if (
+        !state.byConversationId[action.conversationId] ||
+        !action.key ||
+        current.acknowledgedAnnouncements[action.key]
+      ) {
         return state;
       }
       return replaceRecord(state, action.conversationId, {

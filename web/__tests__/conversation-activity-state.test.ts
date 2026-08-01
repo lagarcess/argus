@@ -116,6 +116,51 @@ describe("conversation activity presentation", () => {
     );
   });
 
+  test("uses the same precedence for every pair in the aggregate", () => {
+    const presentations = [
+      "none",
+      "manual_unread",
+      "new_activity",
+      "needs_input",
+      "needs_attention",
+      "working",
+    ] as const;
+    const rank = new Map(presentations.map((presentation, index) => [presentation, index]));
+    let state = createConversationActivityState();
+
+    for (const presentation of presentations) {
+      const conversationId = `pair-${presentation}`;
+      if (presentation === "working") {
+        state = conversationActivityReducer(state, {
+          type: "request_started",
+          conversationId,
+          requestId: "request-working",
+          status: "running",
+          kind: "chat_turn",
+        });
+      } else {
+        state = conversationActivityReducer(state, {
+          type: "server_projection_merged",
+          conversationId,
+          activity: activity("idle", presentation, `cursor-${presentation}`),
+          revision: 1,
+        });
+      }
+    }
+
+    for (const left of presentations) {
+      for (const right of presentations) {
+        const expected = (rank.get(left) ?? 0) >= (rank.get(right) ?? 0) ? left : right;
+        expect(
+          selectAggregateConversationActivityPresentation(state, [
+            `pair-${left}`,
+            `pair-${right}`,
+          ]),
+        ).toBe(expected);
+      }
+    }
+  });
+
   test("fails unknown runtime values safe instead of treating them as complete", () => {
     let state = createConversationActivityState();
     state = conversationActivityReducer(state, {
@@ -229,6 +274,9 @@ describe("optimistic activity mutations", () => {
       revision: 3,
       activeView: true,
     });
+    expect(selectConversationActivityPresentation(state, "conversation-a")).toBe(
+      "needs_attention",
+    );
     state = conversationActivityReducer(state, {
       type: "mutation_succeeded",
       conversationId: "conversation-a",
@@ -238,6 +286,35 @@ describe("optimistic activity mutations", () => {
 
     expect(selectConversationActivityPresentation(state, "conversation-a")).toBe(
       "needs_attention",
+    );
+  });
+
+  test("ignores equal and older server revisions without changing state", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "new_activity", "cursor-new"),
+      revision: 4,
+    });
+
+    const equal = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "none"),
+      revision: 4,
+    });
+    const older = conversationActivityReducer(equal, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "needs_input", "cursor-old"),
+      revision: 3,
+    });
+
+    expect(equal).toBe(state);
+    expect(older).toBe(state);
+    expect(selectConversationActivityPresentation(older, "conversation-a")).toBe(
+      "new_activity",
     );
   });
 
@@ -326,6 +403,40 @@ describe("same-view guard and announcements", () => {
     expect(selectManualUnreadGuard(state, "conversation-a")).toBe(false);
   });
 
+  test("keeps a server-armed guard through every newer terminal projection", () => {
+    for (const attention of [
+      "new_activity",
+      "needs_input",
+      "needs_attention",
+    ] as const) {
+      let state = createConversationActivityState();
+      state = conversationActivityReducer(state, {
+        type: "server_projection_merged",
+        conversationId: attention,
+        activity: activity("idle", "none"),
+        revision: 1,
+        activeView: true,
+      });
+      state = conversationActivityReducer(state, {
+        type: "server_projection_merged",
+        conversationId: attention,
+        activity: activity("idle", "manual_unread", "cursor-manual"),
+        revision: 2,
+        activeView: true,
+      });
+      state = conversationActivityReducer(state, {
+        type: "server_projection_merged",
+        conversationId: attention,
+        activity: activity("idle", attention, `cursor-${attention}`),
+        revision: 3,
+        activeView: true,
+      });
+
+      expect(selectManualUnreadGuard(state, attention)).toBe(true);
+      expect(selectConversationActivityPresentation(state, attention)).toBe(attention);
+    }
+  });
+
   test("offers each meaningful transition announcement once", () => {
     let state = createConversationActivityState();
     state = conversationActivityReducer(state, {
@@ -363,5 +474,85 @@ describe("same-view guard and announcements", () => {
     expect(selectConversationAnnouncement(state, "conversation-a")).toMatchObject({
       presentation: "needs_input",
     });
+  });
+
+  test("announces a repeated manual-unread transition after an intervening read", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "none"),
+      revision: 1,
+      activeView: true,
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "unread-1",
+      action: "mark_unread",
+      revision: 2,
+      activeView: true,
+    });
+    const first = selectConversationAnnouncement(state, "conversation-a");
+    expect(first).toMatchObject({ presentation: "manual_unread" });
+    state = conversationActivityReducer(state, {
+      type: "announcement_acknowledged",
+      conversationId: "conversation-a",
+      key: first?.key ?? "",
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_succeeded",
+      conversationId: "conversation-a",
+      mutationId: "unread-1",
+      activity: activity("idle", "manual_unread"),
+    });
+    expect(selectConversationAnnouncement(state, "conversation-a")).toBeNull();
+
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "read-1",
+      action: "mark_read",
+      revision: 3,
+      activeView: true,
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_succeeded",
+      conversationId: "conversation-a",
+      mutationId: "read-1",
+      activity: activity("idle", "none"),
+    });
+    state = conversationActivityReducer(state, {
+      type: "mutation_started",
+      conversationId: "conversation-a",
+      mutationId: "unread-2",
+      action: "mark_unread",
+      revision: 4,
+      activeView: true,
+    });
+
+    const second = selectConversationAnnouncement(state, "conversation-a");
+    expect(second).toMatchObject({ presentation: "manual_unread" });
+    expect(second?.key).not.toBe(first?.key);
+  });
+
+  test("ignores a late announcement acknowledgment after account reset", () => {
+    let state = createConversationActivityState();
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("idle", "new_activity", "cursor-1"),
+      revision: 1,
+    });
+    const key = selectConversationAnnouncement(state, "conversation-a")?.key ?? "";
+    state = conversationActivityReducer(state, { type: "account_reset" });
+
+    const afterLateAck = conversationActivityReducer(state, {
+      type: "announcement_acknowledged",
+      conversationId: "conversation-a",
+      key,
+    });
+    expect(afterLateAck).toBe(state);
+    expect(afterLateAck.byConversationId).toEqual({});
   });
 });
