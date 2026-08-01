@@ -27,7 +27,24 @@ declare global {
 const TURNSTILE_SCRIPT_ID = "argus-guest-turnstile-script";
 const TURNSTILE_SCRIPT_URL =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+export const CAPTCHA_ACQUISITION_TIMEOUT_MS = 15_000;
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
+let captchaShellSequence = 0;
+
+type CaptchaUnavailableError = Error & { code: "captcha_unavailable" };
+
+type TurnstileShell = {
+  container: HTMLElement;
+  destroy(): void;
+};
+
+function captchaUnavailableError(): CaptchaUnavailableError {
+  const error = new Error(
+    "Browser CAPTCHA could not be verified.",
+  ) as CaptchaUnavailableError;
+  error.code = "captcha_unavailable";
+  return error;
+}
 
 export function guestCaptchaTokenForEnvironment(input: {
   nodeEnv: string | undefined;
@@ -85,7 +102,7 @@ function guestCaptchaPlan(
 export const guestCaptchaConfigured =
   guestCaptchaPlan().kind !== "unavailable";
 
-function loadTurnstile(): Promise<TurnstileApi> {
+function loadTurnstile(timeoutMs: number): Promise<TurnstileApi> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return Promise.reject(new Error("Browser CAPTCHA is unavailable."));
   }
@@ -93,24 +110,42 @@ function loadTurnstile(): Promise<TurnstileApi> {
   if (turnstileScriptPromise) return turnstileScriptPromise;
 
   turnstileScriptPromise = new Promise<TurnstileApi>((resolve, reject) => {
-    const finish = () => {
-      if (window.turnstile) {
-        resolve(window.turnstile);
-      } else {
-        reject(new Error("Browser CAPTCHA could not start."));
-      }
-    };
-    const fail = () => reject(new Error("Browser CAPTCHA could not load."));
-    const existing = document.getElementById(
+    let script = document.getElementById(
       TURNSTILE_SCRIPT_ID,
     ) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", finish, { once: true });
-      existing.addEventListener("error", fail, { once: true });
+    const cleanupListeners = () => {
+      script?.removeEventListener("load", finish);
+      script?.removeEventListener("error", fail);
+    };
+    const timeoutId = window.setTimeout(() => {
+      cleanupListeners();
+      script?.remove();
+      reject(captchaUnavailableError());
+    }, Math.max(0, timeoutMs));
+    const settle = (complete: () => void) => {
+      window.clearTimeout(timeoutId);
+      cleanupListeners();
+      complete();
+    };
+    const finish = () => {
+      if (window.turnstile) {
+        settle(() => resolve(window.turnstile as TurnstileApi));
+      } else {
+        script?.remove();
+        settle(() => reject(new Error("Browser CAPTCHA could not start.")));
+      }
+    };
+    const fail = () => {
+      script?.remove();
+      settle(() => reject(new Error("Browser CAPTCHA could not load.")));
+    };
+    if (script) {
+      script.addEventListener("load", finish, { once: true });
+      script.addEventListener("error", fail, { once: true });
       return;
     }
 
-    const script = document.createElement("script");
+    script = document.createElement("script");
     script.id = TURNSTILE_SCRIPT_ID;
     script.src = TURNSTILE_SCRIPT_URL;
     script.async = true;
@@ -125,6 +160,158 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return turnstileScriptPromise;
 }
 
+async function createTurnstileShell(): Promise<TurnstileShell> {
+  const { default: i18n } = await import("./i18n");
+  captchaShellSequence += 1;
+  const titleId = `argus-captcha-title-${captchaShellSequence}`;
+  const root = document.createElement("div");
+  root.dataset.testid = "turnstile-challenge-shell";
+  root.setAttribute("role", "dialog");
+  root.setAttribute("aria-modal", "true");
+  root.setAttribute("aria-labelledby", titleId);
+  root.setAttribute("aria-hidden", "true");
+  root.className =
+    "pointer-events-none fixed inset-0 z-[120] flex items-center justify-center p-4 opacity-0 transition-opacity duration-200";
+
+  const backdrop = document.createElement("div");
+  backdrop.className =
+    "absolute inset-0 bg-black/25 backdrop-blur-sm dark:bg-black/65";
+
+  const card = document.createElement("div");
+  card.className =
+    "relative w-full max-w-[380px] rounded-[24px] border border-black/10 bg-white p-6 text-black dark:border-white/10 dark:bg-[#1f2225] dark:text-white";
+
+  const headingRow = document.createElement("div");
+  headingRow.className = "flex items-center justify-center gap-3";
+
+  const spinner = document.createElement("span");
+  spinner.setAttribute("aria-hidden", "true");
+  spinner.className =
+    "h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent";
+
+  const heading = document.createElement("h2");
+  heading.id = titleId;
+  heading.className =
+    "font-display text-[17px] font-medium tracking-tight text-black dark:text-white";
+  heading.textContent = i18n.t("auth.captcha.verifying", {
+    defaultValue: "Verifying you’re not a bot…",
+  });
+
+  const container = document.createElement("div");
+  container.className = "mt-5 flex min-h-[65px] items-center justify-center";
+
+  headingRow.append(spinner, heading);
+  card.append(headingRow, container);
+  root.append(backdrop, card);
+  document.body.appendChild(root);
+
+  let revealed = false;
+  let observedFrame: HTMLIFrameElement | null = null;
+  const revealIfInteractive = () => {
+    if (revealed) return;
+    const frame = container.querySelector("iframe");
+    if (!frame) return;
+    if (frame !== observedFrame) {
+      observedFrame = frame;
+      resizeObserver?.observe(frame);
+    }
+    const bounds = frame.getBoundingClientRect();
+    const style = window.getComputedStyle(frame);
+    if (
+      bounds.width < 200 ||
+      bounds.height < 50 ||
+      style.display === "none" ||
+      style.visibility === "hidden"
+    ) {
+      return;
+    }
+    revealed = true;
+    root.classList.remove("pointer-events-none", "opacity-0");
+    root.classList.add("opacity-100");
+    root.setAttribute("aria-hidden", "false");
+  };
+  const mutationObserver = new MutationObserver(revealIfInteractive);
+  const resizeObserver =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(revealIfInteractive);
+  mutationObserver.observe(container, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+  });
+  resizeObserver?.observe(container);
+
+  return {
+    container,
+    destroy() {
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      root.remove();
+    },
+  };
+}
+
+export function acquireTurnstileChallenge(input: {
+  turnstile: TurnstileApi;
+  shell: TurnstileShell;
+  siteKey: string;
+  timeoutMs: number;
+}): Promise<string> {
+  const { turnstile, shell, siteKey, timeoutMs } = input;
+  return new Promise<string>((resolve, reject) => {
+    let widgetId = "";
+    let widgetRemoved = false;
+    let settled = false;
+    const timeoutId = globalThis.setTimeout(() => {
+      fail();
+    }, Math.max(0, timeoutMs));
+    const removeWidget = () => {
+      if (!widgetId || widgetRemoved) return;
+      widgetRemoved = true;
+      try {
+        turnstile.remove(widgetId);
+      } catch {
+        // The provider may already have removed a completed widget.
+      }
+    };
+    const cleanup = () => {
+      globalThis.clearTimeout(timeoutId);
+      removeWidget();
+      shell.destroy();
+    };
+    const succeed = (token: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(token);
+    };
+    function fail() {
+      if (settled) return true;
+      settled = true;
+      cleanup();
+      reject(captchaUnavailableError());
+      return true;
+    }
+
+    try {
+      widgetId = turnstile.render(shell.container, {
+        sitekey: siteKey,
+        appearance: "interaction-only",
+        theme: "auto",
+        callback: succeed,
+        "error-callback": fail,
+        "expired-callback": () => {
+          fail();
+        },
+      });
+      if (settled) removeWidget();
+    } catch {
+      fail();
+    }
+  });
+}
+
 export async function acquireGuestCaptchaToken(
   browserCaptchaToken?: string | null,
 ): Promise<string> {
@@ -136,54 +323,19 @@ export async function acquireGuestCaptchaToken(
     );
   }
 
-  const turnstile = await loadTurnstile();
-  const container = document.createElement("div");
-  container.setAttribute("aria-label", "Security check");
-  container.className =
-    "fixed left-1/2 top-1/2 z-[100] -translate-x-1/2 -translate-y-1/2";
-  document.body.appendChild(container);
-
-  return new Promise<string>((resolve, reject) => {
-    let widgetId = "";
-    let settled = false;
-    const cleanup = () => {
-      if (widgetId) {
-        try {
-          turnstile.remove(widgetId);
-        } catch {
-          // The provider may already have removed a completed widget.
-        }
-      }
-      container.remove();
-    };
-    const succeed = (token: string) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(token);
-    };
-    const fail = () => {
-      if (settled) return true;
-      settled = true;
-      cleanup();
-      reject(new Error("Browser CAPTCHA could not be verified."));
-      return true;
-    };
-
-    try {
-      widgetId = turnstile.render(container, {
-        sitekey: plan.siteKey,
-        appearance: "interaction-only",
-        theme: "auto",
-        callback: succeed,
-        "error-callback": fail,
-        "expired-callback": () => {
-          fail();
-        },
-      });
-    } catch {
-      fail();
-    }
+  const deadline = Date.now() + CAPTCHA_ACQUISITION_TIMEOUT_MS;
+  const turnstile = await loadTurnstile(CAPTCHA_ACQUISITION_TIMEOUT_MS);
+  const shell = await createTurnstileShell();
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) {
+    shell.destroy();
+    throw captchaUnavailableError();
+  }
+  return acquireTurnstileChallenge({
+    turnstile,
+    shell,
+    siteKey: plan.siteKey,
+    timeoutMs: remainingMs,
   });
 }
 

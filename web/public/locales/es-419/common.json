@@ -1106,6 +1106,9 @@
     }
   },
   "auth": {
+    "captcha": {
+      "verifying": "Verificando que no eres un bot…"
+    },
     "access_request": {
       "title": "Solicita acceso a Argus",
       "description": "Argus está en alfa pública. Comparte tu correo para solicitar acceso. Si se aprueba, te enviaremos un correo cuando puedas crear una cuenta.",
