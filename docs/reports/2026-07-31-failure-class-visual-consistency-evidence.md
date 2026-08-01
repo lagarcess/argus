@@ -72,7 +72,7 @@ Nineteen items across seven classes. "Landed" is where each one ended up.
 | 1 | Amber live vs muted footnote after reload (the anchor pair) | External | issue #313 lane, PR #318 |
 | 2 | Retryable failure renders as plain prose when it arrives on the SSE `error` frame | In scope, escalated | PR #320 |
 | 3 | Amber survives reload only when the failure was LLM-voiced | External | issue #313 lane |
-| 4 | Abandoned turns wear the muted footnote | External | issue #313 lane |
+| 4 | Abandoned turns wear the muted footnote | External — **ruled muted by design** | issue #313 lane, PR #318 |
 | 5 | Seven `artifact_action_*` statuses indistinguishable from answers | In scope | PR #320 |
 | 6 | Rejected stale action reads as a benign "Updated" | Deferred | — |
 | 7 | Canceled/expired jobs wear success chrome | Deferred, dead branch logged | — |
@@ -88,6 +88,16 @@ Nineteen items across seven classes. "Landed" is where each one ended up.
 | 17 | Auth owns the best treatment, filled with uncontrolled copy | In scope (styling half) | PR #320 |
 | 18 | Clarifications and unsupported answers are **not** failures | Confirmed correct as-is | no change |
 | 19 | Guest allowance is an upsell, never an apology | Confirmed correct as-is | no change |
+
+Item 4 deserves a correction to this inventory's own suggestion. Phase 1
+proposed that abandoned turns would inherit item 1's treatment once
+`UserTurnRecovery` was restyled. PR #318 ruled otherwise, and more precisely:
+only turns the runtime *accepted* and then failed become assistant-owned amber.
+A turn that was never accepted keeps the muted footnote and its ↻ retry, which
+its guard test pins directly with a `turn_abandoned` fixture. The distinction it
+draws is real — "your message was never picked up, send it again" is not the
+same event as "we accepted this and it broke" — so the muted treatment there is
+the correct outcome, not an unfinished one.
 
 Items 18 and 19 were the guardrail check the scope note required. Both hold:
 clarification requests and unsupported-capability answers render as normal
