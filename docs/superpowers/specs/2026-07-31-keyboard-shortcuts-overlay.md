@@ -1,5 +1,9 @@
 # Keyboard Shortcuts Overlay + Quick-Jump — scope note
 
+Status: **DELIVERED** by PR #317, merged into `codex/private-alpha-next` as
+`2ff6f3c6`. Cmd/Ctrl+K remains Omnisearch, and rename remains F2 on macOS and
+Windows/Linux. This file is retained as implementation evidence.
+
 Light-touch note, not a full argus-lane-delivery spec. Amended 2026-07-31:
 grew from a small reference overlay into a keyboard quick-navigation
 system with a reusable numbered quick-jump primitive, founder-directed.

@@ -6,7 +6,7 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-31
 
-Latest integrated product checkpoint: PR #306 at `b71f1eaf`. Later commits may
+Latest integrated product checkpoint: PR #317 at `2ff6f3c6`. Later commits may
 reconcile roadmap and issue state without changing product behavior. New work
 must branch from the current remote integration head rather than pinning this
 product SHA.
@@ -88,6 +88,16 @@ filters and mutation, and offers provider-free **Run it fresh** composition
 that stops at the ordinary Ready-to-run confirmation. Its memory and Postgres
 paths preserve owner scope, bounded reads, cursor order, deletion refresh, and
 the integrated #232/#252 contracts.
+PR #316 then completed issue #309 as `9aa209d4`: one evidence-backed run anchors
+each dossier, prior finalized runs load through bounded Decision history, and
+decision edits refresh canonical truth without adding a durable dossier model
+or provider work. PR #318 completed issue #313's founder-corrected recovery
+ownership as `f6d0981e`, followed by test isolation at `1ed8d4f0`. PR #315
+added the current-conversation activity rail as `6e20328c`, and PR #317 added
+the centralized localized keyboard overlay and quick-navigation system as
+`2ff6f3c6`. Cmd/Ctrl+K remains Omnisearch; rename remains F2 on macOS and
+Windows/Linux. These navigation surfaces do not add backend, schema, provider,
+or durable-state behavior.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
@@ -162,7 +172,7 @@ deterministic test result by itself.
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
 | 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). PR #300 then completed comparison phrasing, named-target grounding, unsupported-target disclosure, and pending-confirmation discovery continuity (`c21f842f`); PR #303 completed catalog-valid benchmark coverage reconciliation (`da9f8500`); PR #304 added capped, result-aware, typed Try next rows with distinct surface ownership (`59a274c3`). #244 remains open only for the accepted exposure-vehicle product decision plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
-| 6. Omnisearch lives up to its full capability | **Complete** | PR #305 completed the issue #253 decision-first recall slice as `88ab906d`. PR #306 then delivered the founder-locked full memory-inspector journey as `b71f1eaf`: one conversation row, object-first full-transcript recall, jump-to-match, deterministic dossiers, asset-history rollups, exact decision filters/counts, mutation refresh, and provider-free **Run it fresh** composition. The accepted EN/ES desktop/mobile browser matrix, memory/Postgres parity, bounded-read tests, exact-head CI, and zero LLM/provider search path close this outcome without adding RAG, embeddings, or a new durable recall model. |
+| 6. Omnisearch lives up to its full capability | **Complete** | PR #305 completed the issue #253 decision-first recall slice as `88ab906d`. PR #306 then delivered the founder-locked full memory-inspector journey as `b71f1eaf`: one conversation row, object-first full-transcript recall, jump-to-match, deterministic dossiers, asset-history rollups, exact decision filters/counts, mutation refresh, and provider-free **Run it fresh** composition. PR #316 extended that accepted surface with bounded run-anchored dossier history and canonical effective-decision editing as `9aa209d4`, closing #309 without a new durable model or provider path. The accepted EN/ES desktop/mobile browser matrices, memory/Postgres parity, bounded-read tests, exact-head CI, and zero LLM/provider search path close this outcome without adding RAG or embeddings. |
 
 Outcomes 2, 3, 4, and 6 must not be redispatched unless a new regression is
 reproduced. Outcome 5's merged baseline must not be duplicated; its open work

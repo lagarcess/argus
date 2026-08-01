@@ -1,5 +1,8 @@
 # Conversation Activity Rail (the "minimap") — scope note
 
+Status: **DELIVERED** by PR #315, merged into `codex/private-alpha-next` as
+`6e20328c`. This file is retained as implementation evidence.
+
 Researched, not guessed: OpenAI's Codex desktop app has a UI element
 informally called an "activity rail" (confirmed via a live GitHub issue on
 openai/codex, #30275) — a vertical dashed strip alongside a long agent

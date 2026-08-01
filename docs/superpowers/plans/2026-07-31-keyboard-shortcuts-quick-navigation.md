@@ -1,5 +1,9 @@
 # Keyboard Shortcuts Quick-Navigation Implementation Plan
 
+Status: **COMPLETED HISTORICAL PLAN.** PR #317 merged into
+`codex/private-alpha-next` as `2ff6f3c6`. Do not execute these tasks again;
+the active roadmap owns any future shortcut follow-up.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** Extend the existing overlay into localized quick navigation with real chat actions and one numbered quick-jump primitive shared by Recents and nested Settings.
@@ -295,4 +299,3 @@ gh pr create --draft --base codex/private-alpha-next --head codex/keyboard-short
 ~~~
 
 Expected: frontend/docs/test-only diff and a Draft PR; founder retains merge authority.
-

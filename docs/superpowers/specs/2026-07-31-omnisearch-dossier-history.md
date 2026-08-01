@@ -1,6 +1,8 @@
 # Omnisearch run dossiers — browse prior evidence and effective decisions without opening chat
 
-Status: **FOUNDER-LOCKED**
+Status: **DELIVERED** by PR #316, merged into `codex/private-alpha-next` as
+`9aa209d4`; issue #309 is closed. This file is retained as implementation and
+acceptance evidence, not as an active worker instruction.
 
 Depends on the delivered Full Omnisearch contract in
 `docs/superpowers/specs/2026-07-29-omnisearch-memory-recall.md` and PR #306
