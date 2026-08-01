@@ -71,6 +71,24 @@ class RetestSetup:
         return (self.original_end - self.original_start).days
 
 
+EVIDENCE_IDENTITY_KEYS = ("evidence_artifact_id", "idea_id", "idea_version_id")
+
+
+def has_finalized_evidence_identity(result_card: Mapping[str, Any] | None) -> bool:
+    """The finalizer attaches evidence identity last, so its absence means the
+    run/evidence tuple never completed and must not be replayed.
+
+    Eligibility and admission share this predicate so the dossier cannot offer
+    a retest that admission is guaranteed to reject.
+    """
+    if not isinstance(result_card, Mapping):
+        return False
+    return all(
+        isinstance(result_card.get(key), str) and result_card[key].strip()
+        for key in EVIDENCE_IDENTITY_KEYS
+    )
+
+
 def retest_setup_from_run(
     run: Mapping[str, Any] | None,
     *,

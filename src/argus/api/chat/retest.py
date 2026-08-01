@@ -34,6 +34,7 @@ from argus.domain.retest_setup import (
     RETEST_CONTRACT_VERSION,
     RETEST_WINDOW_POLICY,
     RetestSetup,
+    has_finalized_evidence_identity,
     retest_setup_from_run,
 )
 
@@ -42,7 +43,6 @@ RETEST_ACTION_LABEL_KEY = "command_palette.retest_current_data"
 _ENVELOPE_KEYS = frozenset({"source_run_id", "window_policy", "contract_version"})
 # The canonical finalizer refuses to complete a run whose result card lacks
 # these, so their presence is the durable marker of a finalized artifact.
-_EVIDENCE_IDENTITY_KEYS = ("evidence_artifact_id", "idea_id", "idea_version_id")
 _DAYS_PER_YEAR = 365
 _DAYS_PER_MONTH = 30
 
@@ -279,23 +279,12 @@ def _owned_retest_setup(
         run is None
         or run.conversation_id != conversation_id
         or run.status != "completed"
-        or not _finalized_evidence_identity(run.conversation_result_card)
+        or not has_finalized_evidence_identity(run.conversation_result_card)
     ):
         # One uniform outcome for missing, foreign, unfinished, and
         # cross-conversation runs so the caller cannot probe object existence.
         return None
     return retest_setup_from_run(run.model_dump(mode="python"), today=today)
-
-
-def _finalized_evidence_identity(result_card: Mapping[str, Any] | None) -> bool:
-    """The finalizer attaches evidence identity last, so its absence means the
-    run/evidence tuple never completed and must not be replayed."""
-    if not isinstance(result_card, Mapping):
-        return False
-    return all(
-        isinstance(result_card.get(key), str) and result_card[key].strip()
-        for key in _EVIDENCE_IDENTITY_KEYS
-    )
 
 
 def _duration_descriptor(duration_days: int) -> dict[str, Any]:

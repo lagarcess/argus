@@ -3509,7 +3509,12 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
                 "benchmark_symbol": "SPY",
             },
         },
-        conversation_result_card={"title": "Annual GLD buy and hold"},
+        conversation_result_card={
+            "title": "Annual GLD buy and hold",
+            "evidence_artifact_id": "gld-evidence",
+            "idea_id": "gld-idea",
+            "idea_version_id": "gld-idea-version",
+        },
         created_at=now,
     )
     artifact = EvidenceArtifact(
@@ -3594,14 +3599,24 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
                 "capital_amount": 1_000,
             },
         },
-        "conversation_result_card": {"title": "Older AAPL run"},
+        "conversation_result_card": {
+            "title": "Older AAPL run",
+            "evidence_artifact_id": "older-evidence",
+            "idea_id": "older-idea",
+            "idea_version_id": "older-idea-version",
+        },
         "created_at": now - timedelta(days=1),
     }
     latest = {
         **older,
         "id": "latest-run",
         "symbols": ["MSFT"],
-        "conversation_result_card": {"title": "Latest MSFT run"},
+        "conversation_result_card": {
+            "title": "Latest MSFT run",
+            "evidence_artifact_id": "latest-evidence",
+            "idea_id": "latest-idea",
+            "idea_version_id": "latest-idea-version",
+        },
         "created_at": now,
     }
     evidence = [
@@ -3680,6 +3695,18 @@ def _chat_persisted_retest_fixture(
         run_id=f"action-fixture-{request_payload['strategy_type']}",
     )
     assert run is not None
+    # Finalization attaches evidence identity last; model a finalized run so
+    # eligibility sees the same shape admission requires.
+    run = run.model_copy(
+        update={
+            "conversation_result_card": {
+                **(run.conversation_result_card or {}),
+                "evidence_artifact_id": "action-fixture-evidence",
+                "idea_id": "action-fixture-idea",
+                "idea_version_id": "action-fixture-idea-version",
+            }
+        }
+    )
 
     from argus.domain.conversation_recall import project_conversation_recall
 

@@ -2683,7 +2683,12 @@ def test_search_supabase_projects_localized_actions_without_generation(
                         "capital_amount": 10_000,
                     },
                 },
-                "conversation_result_card": {"title": "GLD anual"},
+                "conversation_result_card": {
+                    "title": "GLD anual",
+                    "evidence_artifact_id": "evidence-action-es",
+                    "idea_id": "idea-action-es",
+                    "idea_version_id": "idea-version-action-es",
+                },
                 "created_at": now.isoformat(),
             }
         ],

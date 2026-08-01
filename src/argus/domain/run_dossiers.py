@@ -16,7 +16,10 @@ from argus.api.schemas import (
     SearchRetestAction,
 )
 from argus.domain.evidence import evidence_preview_from_payload
-from argus.domain.retest_setup import retest_setup_from_run
+from argus.domain.retest_setup import (
+    has_finalized_evidence_identity,
+    retest_setup_from_run,
+)
 
 _DECISION_STATES: tuple[DecisionState, ...] = (
     "promising",
@@ -262,6 +265,10 @@ def project_retest_action(
     # and eligibility must not fork from the materializer it mirrors.
     from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
 
+    if not has_finalized_evidence_identity(run.get("conversation_result_card")):
+        # Admission rejects an unfinalized run/evidence tuple, so offering it
+        # here would advertise a button that can only fail.
+        return None
     setup = retest_setup_from_run(run, today=today or date.today())
     if setup is None:
         return None
