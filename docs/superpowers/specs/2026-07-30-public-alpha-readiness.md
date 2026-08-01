@@ -1,5 +1,10 @@
 # Public alpha readiness: capacity split, load proof, spend cap, and an honest conversion wall
 
+Status: **TECHNICAL READINESS DELIVERED** by PR #319, merged into
+`codex/private-alpha-next` as `1c3775aa`. The accepted hosted capacity, plan,
+capped-key, requested-access, approval-email, and browser evidence remains the
+record. Permanent account access remains founder-controlled and disabled.
+
 Founder-locked 2026-07-30. This is not a feature lane; it's the operational
 readiness gate for turning Argus's guest and chat surfaces from
 warm-up/session availability into standing 24/7 availability, ahead of

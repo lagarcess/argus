@@ -5,12 +5,20 @@ import {
   type Page,
   type Route,
 } from "@playwright/test";
+import type {
+  ConversationActivity,
+  ConversationActivityPatch,
+} from "../lib/argus-api";
 
 const TODAY = "2026-07-28T16:00:00.000Z";
 const CURSOR = "issue-245-page-2";
 const EVIDENCE_DIR = process.env.ISSUE_245_EVIDENCE_DIR;
 
 type FixtureState = {
+  activityMutations: Array<{
+    conversationId: string;
+    body: ConversationActivityPatch;
+  }>;
   conversationRequests: string[];
   historyRequests: string[];
   messageRequests: string[];
@@ -39,6 +47,21 @@ type FixtureOptions = {
   streamDelayMs?: number;
 };
 
+const activity = (
+  operation: ConversationActivity["operation"]["status"] = "idle",
+  attention: ConversationActivity["attention"]["status"] = "none",
+  cursor: string | null = null,
+  kind: ConversationActivity["operation"]["kind"] =
+    operation === "idle" ? null : "chat_turn",
+): ConversationActivity => ({
+  operation: {
+    status: operation,
+    kind,
+    updated_at: operation === "idle" ? null : TODAY,
+  },
+  attention: { status: attention, cursor },
+});
+
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
@@ -51,6 +74,7 @@ function conversation(
   id: string,
   updatedAt = TODAY,
   lastMessagePreview: string | null = `Summary ${id}`,
+  conversationActivity: ConversationActivity = activity(),
 ) {
   return {
     id,
@@ -63,6 +87,7 @@ function conversation(
     updated_at: updatedAt,
     last_message_preview: lastMessagePreview,
     language: "en",
+    activity: conversationActivity,
   };
 }
 
@@ -76,6 +101,7 @@ function historyItem(item: ReturnType<typeof conversation>) {
     pinned: item.pinned,
     created_at: item.updated_at,
     conversation_id: item.id,
+    activity: item.activity,
   };
 }
 
@@ -100,6 +126,7 @@ async function installRecentsFixture(
     [...firstPage, ...secondPage].map((item) => [item.id, { ...item }]),
   );
   const state: FixtureState = {
+    activityMutations: [],
     conversationRequests: [],
     historyRequests: [],
     messageRequests: [],
@@ -260,6 +287,43 @@ async function installRecentsFixture(
       });
     }
 
+    const activityMatch = url.pathname.match(
+      /\/api\/v1\/conversations\/([^/]+)\/activity$/,
+    );
+    if (activityMatch) {
+      const conversationId = decodeURIComponent(activityMatch[1]);
+      const item = records.get(conversationId);
+      if (!item) {
+        return json(route, { detail: "Conversation not found" }, 404);
+      }
+      if (request.method() === "GET") {
+        return json(route, item.activity);
+      }
+      if (request.method() === "PATCH") {
+        const body = request.postDataJSON() as ConversationActivityPatch;
+        state.activityMutations.push({ conversationId, body });
+        if (body.action === "mark_unread") {
+          item.activity = activity(
+            item.activity.operation.status,
+            "manual_unread",
+            item.activity.attention.cursor ?? null,
+            item.activity.operation.kind ?? null,
+          );
+        } else if (
+          body.through_attention_cursor === null ||
+          body.through_attention_cursor === item.activity.attention.cursor
+        ) {
+          item.activity = activity(
+            item.activity.operation.status,
+            "none",
+            null,
+            item.activity.operation.kind ?? null,
+          );
+        }
+        return json(route, item.activity);
+      }
+    }
+
     const mutationMatch = url.pathname.match(
       /\/api\/v1\/conversations\/([^/]+)$/,
     );
@@ -293,12 +357,23 @@ async function installRecentsFixture(
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       state.streamRequests.push(body);
+      const conversationId = String(body.conversation_id ?? "today-1");
+      const item = records.get(conversationId);
+      if (item) {
+        item.activity = activity("running", "none", null, "chat_turn");
+      }
       if (options.streamDelayMs) {
         await new Promise((resolve) =>
           setTimeout(resolve, options.streamDelayMs),
         );
       }
-      const conversationId = String(body.conversation_id ?? "today-1");
+      if (item) {
+        item.activity = activity(
+          "idle",
+          "new_activity",
+          `chat_turn:${conversationId}-settled`,
+        );
+      }
       return route.fulfill({
         status: 200,
         contentType: "text/event-stream",
@@ -422,10 +497,19 @@ test("Recents uses bounded chat pages and loads older chats only on request", as
   await expect(page.getByText("Today", { exact: true })).toBeVisible();
 
   await expect
-    .poll(() => fixture.conversationRequests)
-    .toEqual([
-      "/api/v1/conversations?limit=30&archived=false&deleted=false",
-    ]);
+    .poll(
+      () =>
+        fixture.conversationRequests.filter((path) => !path.includes("cursor="))
+          .length,
+    )
+    .toBeGreaterThanOrEqual(1);
+  const bootstrapRequestCount = fixture.conversationRequests.length;
+  expect(
+    fixture.conversationRequests.every(
+      (path) =>
+        path === "/api/v1/conversations?limit=30&archived=false&deleted=false",
+    ),
+  ).toBe(true);
   expect(fixture.historyRequests).toEqual([]);
 
   const todayRows = recentRowsWithPrefix(page, "today-");
@@ -437,15 +521,17 @@ test("Recents uses bounded chat pages and loads older chats only on request", as
   await page.locator("aside").hover();
   await page.mouse.wheel(0, 2_000);
   await page.waitForTimeout(250);
-  expect(fixture.conversationRequests).toHaveLength(1);
+  expect(fixture.conversationRequests).toHaveLength(bootstrapRequestCount);
 
   await page.getByRole("button", { name: "Load older" }).click();
   await expect
-    .poll(() => fixture.conversationRequests)
-    .toHaveLength(2);
-  expect(fixture.conversationRequests[1]).toContain(
-    "cursor=issue-245-page-2",
-  );
+    .poll(
+      () =>
+        fixture.conversationRequests.filter((path) =>
+          path.includes(`cursor=${CURSOR}`),
+        ).length,
+    )
+    .toBe(1);
   await expect(
     page.locator('[data-conversation-id="older-1"]'),
   ).toBeVisible();
@@ -474,7 +560,9 @@ test("an empty visible page keeps explicit access to an older chat page", async 
   await page.getByRole("button", { name: "Load older" }).click();
   await expect(recentRow(page, "older-visible")).toBeVisible();
   await expect(recentRow(page, "blank-chat")).toHaveCount(0);
-  expect(fixture.conversationRequests).toHaveLength(2);
+  expect(
+    fixture.conversationRequests.filter((path) => path.includes(`cursor=${CURSOR}`)),
+  ).toHaveLength(1);
   expect(fixture.historyRequests).toEqual([]);
   expect(fixture.unexpectedRequests).toEqual([]);
 });
@@ -607,8 +695,13 @@ test("a rapid Load older double-click admits one cursor request and exhausts it"
   });
 
   await expect
-    .poll(() => fixture.conversationRequests.length)
-    .toBe(2);
+    .poll(
+      () =>
+        fixture.conversationRequests.filter((path) =>
+          path.includes(`cursor=${CURSOR}`),
+        ).length,
+    )
+    .toBe(1);
   await expect(
     page.getByRole("button", { name: "Loading older chats…" }),
   ).toHaveAttribute("aria-busy", "true");
@@ -619,12 +712,12 @@ test("a rapid Load older double-click admits one cursor request and exhausts it"
     page.getByRole("button", { name: "No older chats" }),
   ).toBeDisabled();
 
-  expect(fixture.conversationRequests).toHaveLength(2);
-  expect(fixture.conversationRequests[1]).toContain(
-    "cursor=issue-245-page-2",
+  const olderRequests = fixture.conversationRequests.filter((path) =>
+    path.includes(`cursor=${CURSOR}`),
   );
-  expect(fixture.conversationRequests[1]).toContain("archived=false");
-  expect(fixture.conversationRequests[1]).toContain("deleted=false");
+  expect(olderRequests).toHaveLength(1);
+  expect(olderRequests[0]).toContain("archived=false");
+  expect(olderRequests[0]).toContain("deleted=false");
   expect(fixture.historyRequests).toEqual([]);
   expect(fixture.unexpectedRequests).toEqual([]);
 });
@@ -658,7 +751,9 @@ test("a failed older-page request reports the error and remains retryable", asyn
   await expect(
     page.getByRole("button", { name: "No older chats" }),
   ).toBeDisabled();
-  expect(fixture.conversationRequests).toHaveLength(3);
+  expect(
+    fixture.conversationRequests.filter((path) => path.includes(`cursor=${CURSOR}`)),
+  ).toHaveLength(2);
   expect(fixture.historyRequests).toEqual([]);
   expect(fixture.unexpectedRequests).toEqual([]);
 });
@@ -677,12 +772,18 @@ test("a completed mutation queues a fresh first-page request behind an in-flight
   await openRecents(page);
   const row = recentRow(page, "today-1");
   await expect(row).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        fixture.conversationRequests.filter((path) => !path.includes("cursor="))
+          .length,
+    )
+    .toBeGreaterThanOrEqual(2);
+  const inFlightRefreshCount = fixture.conversationRequests.length;
 
   await row.getByRole("button", { name: "More" }).click();
   await page.getByRole("menuitem", { name: "Pin" }).click();
-  await expect
-    .poll(() => fixture.conversationRequests.length)
-    .toBe(2);
+  expect(fixture.conversationRequests).toHaveLength(inFlightRefreshCount);
 
   await row.getByRole("button", { name: "More" }).click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
@@ -695,7 +796,7 @@ test("a completed mutation queues a fresh first-page request behind an in-flight
   ).toBeVisible();
   await expect
     .poll(() => fixture.conversationRequests.length)
-    .toBe(3);
+    .toBe(inFlightRefreshCount + 1);
   expect(fixture.mutations).toEqual([
     {
       method: "PATCH",
@@ -827,7 +928,9 @@ for (const scenario of [
     const row = recentRow(page, "today-1");
     const title = row.getByText("Conversation today-1", { exact: true });
     const subtitle = row.getByText("Summary today-1", { exact: true });
-    await expect(row).toHaveAttribute("data-has-attention", "true");
+    await expect(
+      row.locator('[data-conversation-activity="new_activity"]'),
+    ).toBeVisible();
     await expect(row).toHaveAccessibleName(
       new RegExp(`Conversation today-1\\. ${scenario.attentionLabel}\\.`),
     );
@@ -844,7 +947,9 @@ for (const scenario of [
     await expect(hint).toContainText(
       expectedQuickJumpHint(scenario.platform, 1),
     );
-    await expect(row).toHaveAttribute("data-has-attention", "true");
+    await expect(
+      row.locator('[data-conversation-activity="new_activity"]'),
+    ).toBeVisible();
     await expect(row).toHaveAccessibleName(
       new RegExp(`Conversation today-1\\. ${scenario.attentionLabel}\\.`),
     );
@@ -853,7 +958,7 @@ for (const scenario of [
     const titleAfter = await requiredBoundingBox(title);
     const subtitleAfter = await requiredBoundingBox(subtitle);
     const attentionDot = await requiredBoundingBox(
-      row.locator('span[aria-hidden="true"]').first(),
+      row.locator('[data-conversation-activity="new_activity"]'),
     );
     const hintBox = await requiredBoundingBox(hint);
     expect(rowAfter.height).toBeCloseTo(rowBefore.height, 1);
@@ -872,11 +977,22 @@ for (const scenario of [
 
     await releaseQuickJumpModifier(page, scenario.platform);
     await expect(hint).toHaveCount(0);
-    await expect(row).toHaveAttribute("data-has-attention", "true");
+    await expect(
+      row.locator('[data-conversation-activity="new_activity"]'),
+    ).toBeVisible();
 
     await pressQuickJumpNumber(page, scenario.platform, 1);
     await expect(row).toHaveAttribute("aria-current", "page");
-    await expect(row).not.toHaveAttribute("data-has-attention", "true");
+    await expect
+      .poll(() => fixture.activityMutations)
+      .toContainEqual({
+        conversationId: "today-1",
+        body: {
+          action: "mark_read",
+          through_attention_cursor: "chat_turn:today-1-settled",
+        },
+      });
+    await expect(row.locator("[data-conversation-activity]")).toHaveCount(0);
     expect(fixture.streamRequests).toHaveLength(1);
     expect(fixture.historyRequests).toEqual([]);
     expect(fixture.unexpectedRequests).toEqual([]);
@@ -920,6 +1036,41 @@ test("an open or focused Recents action keeps precedence over quick-jump", async
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 
+test("nested Recents menu keys open the menu while row keys still navigate", async ({
+  page,
+}) => {
+  const fixture = await installRecentsFixture(page, {
+    firstPage: [conversation("today-1"), conversation("today-2")],
+    secondPage: [],
+  });
+
+  await page.goto("/chat?conversation=today-2");
+  await openRecents(page);
+  const firstRow = recentRow(page, "today-1");
+  const firstMore = firstRow.getByRole("button", { name: "More" });
+
+  await firstMore.focus();
+  await firstMore.press("Enter");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  await page.keyboard.press("Escape");
+
+  await firstMore.press(" ");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  await page.keyboard.press("Escape");
+
+  await firstRow.focus();
+  await firstRow.press("Enter");
+  await expect(page).toHaveURL(/conversation=today-1(?:&|$)/);
+
+  const secondRow = recentRow(page, "today-2");
+  await secondRow.focus();
+  await secondRow.press(" ");
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
 test("Recents Quick Peek right-aligns exact-chord hints without moving titles", async ({
   page,
 }) => {
@@ -932,8 +1083,8 @@ test("Recents Quick Peek right-aligns exact-chord hints without moving titles", 
 
   await page.goto("/chat");
   await expect
-    .poll(() => fixture.conversationRequests)
-    .toHaveLength(1);
+    .poll(() => fixture.conversationRequests.length)
+    .toBeGreaterThanOrEqual(1);
   await expect(page.getByRole("button", { name: "Recents" })).toBeVisible();
   await page.keyboard.press("Meta+Shift+Comma");
   const dialog = page.getByRole("dialog", { name: "Recents" });
@@ -973,8 +1124,8 @@ test("Settings keeps the exact-chord keycap convention used by Recents", async (
 
   await page.goto("/chat");
   await expect
-    .poll(() => fixture.conversationRequests)
-    .toHaveLength(1);
+    .poll(() => fixture.conversationRequests.length)
+    .toBeGreaterThanOrEqual(1);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: /Preferences/ }).click();
   const preferences = page.locator('[aria-label="Preferences"]');

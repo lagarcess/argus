@@ -1,5 +1,8 @@
 # Guest/Auth CAPTCHA hang and unstyled challenge widget — scope note
 
+Status: **DELIVERED** by PR #326, merged into `codex/private-alpha-next` as
+`8e2a6217`; issue #321 is closed. Retained as implementation evidence.
+
 Reproduced live against the hosted alpha (`argus-app-suz5.onrender.com`, running
 `claude/public-alpha-readiness`) and confirmed against source. The frontend's
 guest bootstrap, signup, and login all share one CAPTCHA acquisition function —

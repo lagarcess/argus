@@ -1,5 +1,8 @@
 # Auth screens — unify on the documented card pattern — scope note
 
+Status: **DELIVERED** by PR #328, merged into `codex/private-alpha-next` as
+`403ea114`. Retained as the card-ownership and containment record.
+
 Companion to
 [2026-07-31-auth-form-copy-polish.md](2026-07-31-auth-form-copy-polish.md)
 (#322). That note is copy/locale content only. This one is layout/visual

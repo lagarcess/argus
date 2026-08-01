@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Edit2, MoreVertical, Pin, Trash2 } from "lucide-react";
+import { Edit2, Mail, MailOpen, MoreVertical, Pin, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 type ChatHeaderMenuProps = {
   isOpen: boolean;
   onToggleOpen: () => void;
   onRequestClose: () => void;
+  isUnread: boolean;
+  isReadMutationPending: boolean;
+  onToggleUnread: () => void;
   isRenaming: boolean;
   renameValue: string;
   onRenameValueChange: (value: string) => void;
@@ -22,11 +25,14 @@ type ChatHeaderMenuProps = {
   onRequestDelete: () => void;
 };
 
-/** Header owner menu for the active conversation: rename, pin, delete. */
+/** Header owner menu for the active conversation. */
 export default function ChatHeaderMenu({
   isOpen,
   onToggleOpen,
   onRequestClose,
+  isUnread,
+  isReadMutationPending,
+  onToggleUnread,
   isRenaming,
   renameValue,
   onRenameValueChange,
@@ -42,6 +48,7 @@ export default function ChatHeaderMenu({
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -49,21 +56,37 @@ export default function ChatHeaderMenu({
         onRequestClose();
       }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onRequestClose();
+        triggerRef.current?.focus();
+      }
+    }
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onRequestClose]);
+
+  const handleToggleUnread = () => {
+    onRequestClose();
+    onToggleUnread();
+  };
 
   return (
     <div className="relative animate-in fade-in duration-300" ref={containerRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={onToggleOpen}
         className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
         aria-label={t("chat.chat_options", "Chat options")}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
       >
         <MoreVertical className="h-5 w-5" />
       </button>
@@ -71,17 +94,24 @@ export default function ChatHeaderMenu({
         <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2">
           <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
           {!isRenaming ? (
-            <div className="py-1">
+            <div role="menu" className="py-1">
               <button
                 type="button"
-                onClick={onStartRename}
-                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                role="menuitem"
+                disabled={isReadMutationPending}
+                onClick={handleToggleUnread}
+                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
               >
-                <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                {t('chat.rename_chat', 'Rename chat')}
+                {isUnread
+                  ? <MailOpen className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                  : <Mail className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />}
+                {isUnread
+                  ? t("chat.activity.mark_read", "Mark as read")
+                  : t("chat.activity.mark_unread", "Mark as unread")}
               </button>
               <button
                 type="button"
+                role="menuitem"
                 disabled={isPinning}
                 onClick={onTogglePin}
                 className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
@@ -91,15 +121,25 @@ export default function ChatHeaderMenu({
                   ? t('chat.unpin_chat', 'Unpin chat')
                   : t('chat.pin_chat', 'Pin chat')}
               </button>
-              <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
               <button
                 type="button"
+                role="menuitem"
+                onClick={onStartRename}
+                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+              >
+                <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                {t('chat.rename_chat', 'Rename chat')}
+              </button>
+              <div role="separator" className="my-1 h-px bg-black/5 dark:bg-white/5" />
+              <button
+                type="button"
+                role="menuitem"
                 disabled={isDeleting}
                 onClick={onRequestDelete}
                 className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
               >
                 <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
-                {t('chat.delete_chat')}
+                {t('chat.delete_chat', 'Delete')}
               </button>
             </div>
           ) : (

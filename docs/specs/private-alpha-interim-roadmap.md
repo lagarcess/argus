@@ -96,8 +96,23 @@ ownership as `f6d0981e`, followed by test isolation at `1ed8d4f0`. PR #315
 added the current-conversation activity rail as `6e20328c`, and PR #317 added
 the centralized localized keyboard overlay and quick-navigation system as
 `2ff6f3c6`. Cmd/Ctrl+K remains Omnisearch; rename remains F2 on macOS and
-Windows/Linux. These navigation surfaces do not add backend, schema, provider,
-or durable-state behavior.
+Windows/Linux. PR #324 then aligned Recents quick-jump hints with that shared
+registry as `812c8fef`, and PR #311 closed issue #310 as `51984a42` with a
+typed, provider-free **Retest with current data** action that reloads canonical
+run truth and stops at the ordinary confirmation. These navigation/retest
+surfaces do not add provider work or automatic execution.
+
+The 2026-08-01 integration group then added registered-only avatar themes
+(PR #312, `40eba1f6`), public-alpha technical readiness and recorded hosted
+capacity/email evidence (PR #319, `1c3775aa`), one frontend failure vocabulary
+(PR #320, `53c36d40`), bounded auth copy/error/card corrections (PRs #323,
+#325, and #328), and the honest removal of the unavailable Release Notes row
+(PR #327). Permanent account access remains explicitly disabled and founder
+controlled. PR #329 added the durable backend/data conversation-activity and
+read-state foundation as `8a5d621b`; its separately specified UI consumer and
+hosted migration application remain later work. PR #326 closed issue #321 as
+`8e2a6217` with bounded Turnstile acquisition and an accessible localized
+interactive challenge. PR #330 remains in flight and is not landed evidence.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
@@ -172,7 +187,7 @@ deterministic test result by itself.
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
 | 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
 | 5. Discovery is grounded and Argus can suggest | **Integrated product work complete; deployment closure open** | #244/PR #276 delivered typed explicit discovery, bounded source-backed Search, provider-resolved candidates across supported asset classes, persisted EN/ES discovery UI, honest kill-switch recovery, provider accounting, review, browser QA, and locked eval cases. Candidate `cc8b5563` landed as `c212107a`; integration policy now treats the flag as a default-on emergency kill switch. PR #281 landed the presentation (`8fde4ac1`), PR #287 the selection identity plus ticker-collision correction (`ea2b3f35`), PR #295 cheap verified rows and the Search exception (`8f17a45e`), and PR #298 visitor/day Guest settlement, honest live progress, and per-row citations (`ba0aa2f6`). PR #300 then completed comparison phrasing, named-target grounding, unsupported-target disclosure, and pending-confirmation discovery continuity (`c21f842f`); PR #303 completed catalog-valid benchmark coverage reconciliation (`da9f8500`); PR #304 added capped, result-aware, typed Try next rows with distinct surface ownership (`59a274c3`). #244 remains open only for the accepted exposure-vehicle product decision plus hosted migrations, Render configuration, and exact-SHA canary evidence before tester exposure. |
-| 6. Omnisearch lives up to its full capability | **Complete** | PR #305 completed the issue #253 decision-first recall slice as `88ab906d`. PR #306 then delivered the founder-locked full memory-inspector journey as `b71f1eaf`: one conversation row, object-first full-transcript recall, jump-to-match, deterministic dossiers, asset-history rollups, exact decision filters/counts, mutation refresh, and provider-free **Run it fresh** composition. PR #316 extended that accepted surface with bounded run-anchored dossier history and canonical effective-decision editing as `9aa209d4`, closing #309 without a new durable model or provider path. The accepted EN/ES desktop/mobile browser matrices, memory/Postgres parity, bounded-read tests, exact-head CI, and zero LLM/provider search path close this outcome without adding RAG or embeddings. |
+| 6. Omnisearch lives up to its full capability | **Complete** | PR #305 completed the issue #253 decision-first recall slice as `88ab906d`. PR #306 then delivered the founder-locked full memory-inspector journey as `b71f1eaf`: one conversation row, object-first full-transcript recall, jump-to-match, deterministic dossiers, asset-history rollups, exact decision filters/counts, mutation refresh, and provider-free **Run it fresh** composition. PR #316 extended that accepted surface with bounded run-anchored dossier history and canonical effective-decision editing as `9aa209d4`, closing #309 without a new durable model or provider path. PR #311 then replaced prompt composition with the typed provider-free **Retest with current data** confirmation action as `51984a42`, closing #310. The accepted EN/ES desktop/mobile browser matrices, memory/Postgres parity, bounded-read tests, exact-head CI, and zero LLM/provider search path close this outcome without adding RAG or embeddings. |
 
 Outcomes 2, 3, 4, and 6 must not be redispatched unless a new regression is
 reproduced. Outcome 5's merged baseline must not be duplicated; its open work
@@ -180,6 +195,20 @@ is limited to the recorded exposure-vehicle decision and pre-activation gates.
 Outcome 1 is a standing quality bar applied to each later slice: fix a
 reproduced violation at its owner, but do not redispatch a broad, open-ended
 continuity program. Existing evidence remains the regression baseline.
+
+### Current Integration Additions And Remaining Work — 2026-08-01
+
+| Surface | Integrated state | Exact remainder |
+| --- | --- | --- |
+| Public-alpha technical readiness | PR #319 landed as `1c3775aa` with capped hosted provider-key policy, measured capacity, requested access, delivered approval email, CAPTCHA wiring, and durable hosted evidence. | Keep permanent-account access disabled until the founder opens it. #233 still owns the one exact-candidate deployed Spanish Golden Path and release evidence; integration does not substitute for that promotion gate. |
+| Conversation activity/read state | PR #329 landed the backend, additive schema, RLS, batch projection, strict cursor, and GET/PATCH contracts as `8a5d621b`. | Deliver the separately specified frontend activity/read-state consumer from the latest integration head, then apply/read back the migration only at an authorized hosted promotion checkpoint. |
+| Guest bootstrap timing | The CAPTCHA boundary is complete through PR #326 at `8e2a6217`. | PR #330 is the current in-flight lane for deferring Guest bootstrap until first submit. Do not record it as delivered until merged. |
+| Rejected artifact-action evidence | Typed retest and current rejection behavior are integrated and allowance-safe. | Issue #314 remains open for one complete operational-evidence record across every rejected artifact-action admission site, without changing HTTP responses, visible transcript, or allowance settlement. |
+| Parked/deferred work | Personalization memory PR #307 remains parked outside the interim; #236 remains a deferred behavior-preserving router extraction; #294 waits for real post-promotion funnel data. | Do not dispatch these as current interim blockers. |
+
+No completed issue-level continuity or Omnisearch lane should be repeated for
+promotion ceremony. The open coordination issues #228 and #237 remain release
+owners only because #233's deployed exact-SHA browser proof is still open.
 
 The bounded [Always Progresses closure evidence](../reports/always-progresses-closure-evidence.md)
 remains valid. The

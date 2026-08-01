@@ -391,6 +391,31 @@ test("@guest-shell keeps the neutral submission state until the first stream sta
   );
 });
 
+test("@guest-shell sign-in cancels a pending first submit before routing", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, { holdBootstrap: true });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const composer = page.getByTestId("chat-input");
+  await composer.fill("Compare Apple with SPY");
+  await composer.press("Enter");
+  await evidence.bootstrapRequested;
+  await expect(page.getByText("Sending...", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/?auth=login$/);
+
+  evidence.releaseBootstrap();
+  await page.waitForLoadState("networkidle");
+  expect(evidence.requestOrder).toEqual(["/auth/guest"]);
+  expect({
+    usage: evidence.usageCalls,
+    conversation: evidence.conversationCreateCalls,
+    stream: evidence.streamCalls,
+  }).toEqual({ usage: 0, conversation: 0, stream: 0 });
+});
+
 test("@guest-shell null profile refresh blocks admission before guest work", async ({
   page,
 }) => {

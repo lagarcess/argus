@@ -136,6 +136,98 @@ const dossierCopy = {
   },
 } as const;
 
+const conversationActivityCopy = {
+  "chat.jump_to_latest": {
+    en: "Jump to latest",
+    es419: "Ir a lo más reciente",
+  },
+  "chat.activity.working": {
+    en: "Working",
+    es419: "En curso",
+  },
+  "chat.activity.queued": {
+    en: "Queued",
+    es419: "En espera",
+  },
+  "chat.activity.checking": {
+    en: "Checking status",
+    es419: "Consultando el estado",
+  },
+  "chat.activity.needs_attention": {
+    en: "Needs attention",
+    es419: "Necesita atención",
+  },
+  "chat.activity.needs_input": {
+    en: "Needs your input",
+    es419: "Necesita tu respuesta",
+  },
+  "chat.activity.new_activity": {
+    en: "New activity",
+    es419: "Actividad nueva",
+  },
+  "chat.activity.manual_unread": {
+    en: "Marked unread",
+    es419: "Marcada como no leída",
+  },
+  "chat.activity.mark_unread": {
+    en: "Mark as unread",
+    es419: "Marcar como no leída",
+  },
+  "chat.activity.mark_read": {
+    en: "Mark as read",
+    es419: "Marcar como leída",
+  },
+  "chat.activity.jump_working": {
+    en: "Jump to latest; Argus is working below",
+    es419: "Ir a lo más reciente; Argus sigue trabajando abajo",
+  },
+  "chat.activity.jump_new": {
+    en: "Jump to new activity",
+    es419: "Ir a la actividad nueva",
+  },
+  "chat.activity.jump_needs_input": {
+    en: "Jump to the latest question",
+    es419: "Ir a la pregunta más reciente",
+  },
+  "chat.activity.jump_needs_attention": {
+    en: "Jump to the latest recovery",
+    es419: "Ir a la recuperación más reciente",
+  },
+  "chat.activity.mark_read_error": {
+    en: "Couldn’t mark this conversation as read. Try again.",
+    es419: "No se pudo marcar esta conversación como leída. Inténtalo de nuevo.",
+  },
+  "chat.activity.mark_unread_error": {
+    en: "Couldn’t mark this conversation as unread. Try again.",
+    es419:
+      "No se pudo marcar esta conversación como no leída. Inténtalo de nuevo.",
+  },
+  "chat.activity.mark_read_success": {
+    en: "Marked as read.",
+    es419: "Marcada como leída.",
+  },
+  "chat.activity.mark_unread_success": {
+    en: "Marked as unread.",
+    es419: "Marcada como no leída.",
+  },
+  "chat.activity.announce_working": {
+    en: "Argus is working on {{title}}.",
+    es419: "Argus está trabajando en {{title}}.",
+  },
+  "chat.activity.announce_needs_attention": {
+    en: "{{title}} needs attention.",
+    es419: "{{title}} necesita atención.",
+  },
+  "chat.activity.announce_needs_input": {
+    en: "{{title}} needs your input.",
+    es419: "{{title}} necesita tu respuesta.",
+  },
+  "chat.activity.announce_new_activity": {
+    en: "{{title}} is ready.",
+    es419: "{{title}} ya está lista.",
+  },
+} as const;
+
 function translationAt(locale: LocaleTree, dottedKey: string): string | undefined {
   let value: unknown = locale;
   for (const segment of dottedKey.split(".")) {
@@ -170,6 +262,28 @@ describe("Omnisearch dossier-history locales", () => {
 
       expect(english, `${key} English copy`).toBeDefined();
       expect(spanish, `${key} es-419 copy`).toBeDefined();
+      expect(interpolationVariables(spanish ?? ""), key).toEqual(
+        interpolationVariables(english ?? ""),
+      );
+    }
+  });
+});
+
+describe("conversation activity locales", () => {
+  test("provides exact English and product-reviewed es-419 activity copy", () => {
+    for (const [key, expected] of Object.entries(conversationActivityCopy)) {
+      expect(translationAt(en, key), `${key} English copy`).toBe(expected.en);
+      expect(translationAt(es419, key), `${key} es-419 copy`).toBe(
+        expected.es419,
+      );
+    }
+  });
+
+  test("keeps activity announcement interpolation equivalent", () => {
+    for (const key of Object.keys(conversationActivityCopy)) {
+      const english = translationAt(en, key);
+      const spanish = translationAt(es419, key);
+
       expect(interpolationVariables(spanish ?? ""), key).toEqual(
         interpolationVariables(english ?? ""),
       );

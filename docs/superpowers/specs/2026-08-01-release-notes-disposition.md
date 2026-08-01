@@ -1,5 +1,9 @@
 # Release Notes Disposition and Public-Beta Re-entry Contract
 
+Status: **CURRENT DISPOSITION DELIVERED** by PR #327, merged into
+`codex/private-alpha-next` as `22bec7da`. The row is absent; section 4 remains
+the founder-controlled contract for any future public-beta return.
+
 Remove the unavailable Release Notes row from Help & Legal now, while keeping
 the conditions for a future public-beta return explicit and founder-controlled.
 

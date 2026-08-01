@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type MutableRefObject,
 } from "react";
@@ -103,6 +104,15 @@ export function useGuestExperience({
   const [isReplacingConversation, setIsReplacingConversation] = useState(false);
   const [resumeDecisionArtifactId, setResumeDecisionArtifactId] =
     useState<string | null>(null);
+  const pendingGuestAdmissionRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      pendingGuestAdmissionRef.current?.abort();
+      pendingGuestAdmissionRef.current = null;
+    },
+    [],
+  );
 
   const resumeGuestAction = useCallback(
     async (action: GuestPendingAction) => {
@@ -160,6 +170,8 @@ export function useGuestExperience({
     onOpenOmnisearch,
     onRequestSignIn: () => {
       if (guestBootstrapRequired) {
+        pendingGuestAdmissionRef.current?.abort();
+        pendingGuestAdmissionRef.current = null;
         onRequestPendingGuestSignIn();
         return;
       }
@@ -185,78 +197,98 @@ export function useGuestExperience({
       starterSelection,
       language,
     }: GuestSendAdmissionInput) => {
-      let effectiveAccount = account;
-      if (guestBootstrapRequired) {
-        try {
-          const bootstrap = await startGuestSession(language);
-          if (bootstrap.renewed_after_expiry) {
-            onGuestBootstrapExpired(
-              bootstrap.public_account_access_enabled ?? false,
-            );
-            return false;
-          }
-          const refreshedAccount = await refreshAccount();
-          if (refreshedAccount === null) {
-            onGuestBootstrapError();
-            return false;
-          }
-          effectiveAccount = refreshedAccount;
-        } catch {
-          onGuestBootstrapError();
-          return false;
-        }
-      }
-      if (effectiveAccount?.account_kind !== "guest") return true;
-
-      if (starterSelection) {
-        captureGuestFunnelEvent({
-          event: "starter_action_selected",
-          language: normalizeEnabledLanguage(language),
-          surface: "starter_actions",
-          strategy_category: starterSelection.strategy_category,
-          terminal_outcome: "selected",
-        });
+      const admissionController = guestBootstrapRequired
+        ? new AbortController()
+        : null;
+      const admissionCancelled = () =>
+        admissionController?.signal.aborted ?? false;
+      if (admissionController) {
+        pendingGuestAdmissionRef.current?.abort();
+        pendingGuestAdmissionRef.current = admissionController;
       }
 
       try {
-        const usage = await getUsageAllowances();
-        if (action?.type === "run_backtest") {
-          const decision = decideGuestSimulationGate({
-            accountKind: "guest",
-            availableNow: usage.allowances.backtests.available_now,
-            exactReplay: isExactGuestRunReplay(messages, action),
-          });
-          if (decision.kind === "convert") {
-            if (!conversationId) return false;
-            conversion.requestConversion(decision.reason, {
-              reason: "second_simulation",
-              conversationId,
-              actionId: crypto.randomUUID(),
-              action,
-            });
-            return false;
-          }
-        } else if (!action?.type) {
-          const decision = decideGuestMessageGate({
-            accountKind: "guest",
-            availableNow: usage.allowances.messages.available_now,
-          });
-          if (decision.kind === "convert") {
-            if (!conversationId) return false;
-            conversion.requestConversion(decision.reason, {
-              reason: "message_limit",
-              conversationId,
-              actionId: crypto.randomUUID(),
-              text,
-              mentions,
-            });
+        let effectiveAccount = account;
+        if (guestBootstrapRequired) {
+          try {
+            const bootstrap = await startGuestSession(language);
+            if (admissionCancelled()) return false;
+            if (bootstrap.renewed_after_expiry) {
+              onGuestBootstrapExpired(
+                bootstrap.public_account_access_enabled ?? false,
+              );
+              return false;
+            }
+            const refreshedAccount = await refreshAccount();
+            if (admissionCancelled()) return false;
+            if (refreshedAccount === null) {
+              onGuestBootstrapError();
+              return false;
+            }
+            effectiveAccount = refreshedAccount;
+          } catch {
+            if (!admissionCancelled()) onGuestBootstrapError();
             return false;
           }
         }
-        return true;
-      } catch {
-        onGateError();
-        return false;
+        if (admissionCancelled()) return false;
+        if (effectiveAccount?.account_kind !== "guest") return true;
+
+        if (starterSelection) {
+          captureGuestFunnelEvent({
+            event: "starter_action_selected",
+            language: normalizeEnabledLanguage(language),
+            surface: "starter_actions",
+            strategy_category: starterSelection.strategy_category,
+            terminal_outcome: "selected",
+          });
+        }
+
+        try {
+          const usage = await getUsageAllowances();
+          if (admissionCancelled()) return false;
+          if (action?.type === "run_backtest") {
+            const decision = decideGuestSimulationGate({
+              accountKind: "guest",
+              availableNow: usage.allowances.backtests.available_now,
+              exactReplay: isExactGuestRunReplay(messages, action),
+            });
+            if (decision.kind === "convert") {
+              if (!conversationId) return false;
+              conversion.requestConversion(decision.reason, {
+                reason: "second_simulation",
+                conversationId,
+                actionId: crypto.randomUUID(),
+                action,
+              });
+              return false;
+            }
+          } else if (!action?.type) {
+            const decision = decideGuestMessageGate({
+              accountKind: "guest",
+              availableNow: usage.allowances.messages.available_now,
+            });
+            if (decision.kind === "convert") {
+              if (!conversationId) return false;
+              conversion.requestConversion(decision.reason, {
+                reason: "message_limit",
+                conversationId,
+                actionId: crypto.randomUUID(),
+                text,
+                mentions,
+              });
+              return false;
+            }
+          }
+          return true;
+        } catch {
+          if (!admissionCancelled()) onGateError();
+          return false;
+        }
+      } finally {
+        if (pendingGuestAdmissionRef.current === admissionController) {
+          pendingGuestAdmissionRef.current = null;
+        }
       }
     },
     [

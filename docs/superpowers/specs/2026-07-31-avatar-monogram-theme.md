@@ -1,5 +1,8 @@
 # Avatar / Monogram Theme — scope note
 
+Status: **DELIVERED** by PR #312, merged into `codex/private-alpha-next` as
+`40eba1f6`. Retained as the durable-state, RLS, and visual decision record.
+
 Light-touch note, not a full argus-lane-delivery spec. Unlike the shortcuts
 feature, this one touches durable state, RLS, and a registered-vs-guest
 boundary — those specific pieces are locked because a wrong guess here is
