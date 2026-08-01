@@ -6,6 +6,7 @@ import {
   getVisibleRecentChats,
   groupRecentChats,
   mergeRecentChats,
+  prepareFirstPageRecentChatsRefresh,
   projectConversationToRecentChat,
   refreshFirstPageRecentChats,
 } from "../lib/chat-recents";
@@ -245,6 +246,33 @@ describe("Recents projection", () => {
     expect(refreshed.slice(2).map((item) => item.id)).toEqual([
       "older-c",
       "older-d",
+    ]);
+  });
+
+  test("uses the first-page membership snapshot when a refresh state update applies later", () => {
+    let simulatedFirstPageMembership = new Set(["first-a", "first-b"]);
+    const prepared = prepareFirstPageRecentChatsRefresh(
+      simulatedFirstPageMembership,
+      [
+        chat("first-a", 0, { activity: workingActivity }),
+        chat("first-new", 0, { activity: idleActivity }),
+      ],
+    );
+    simulatedFirstPageMembership = prepared.nextFirstPageConversationIds;
+
+    const refreshed = prepared.apply([
+      chat("first-a", 0, { activity: idleActivity }),
+      chat("first-b", 0, { activity: idleActivity }),
+      chat("older-c", 1, { activity: workingActivity }),
+    ]);
+
+    expect(simulatedFirstPageMembership).toEqual(
+      new Set(["first-a", "first-new"]),
+    );
+    expect(refreshed.map((item) => item.id)).toEqual([
+      "first-a",
+      "first-new",
+      "older-c",
     ]);
   });
 

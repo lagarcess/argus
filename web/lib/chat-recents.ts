@@ -82,6 +82,26 @@ export function refreshFirstPageRecentChats(
   return mergeRecentChats(incomingFirstPage, retainedOlderChats);
 }
 
+export function prepareFirstPageRecentChatsRefresh(
+  previousFirstPageConversationIds: Iterable<string>,
+  incomingFirstPage: HistoryItem[],
+) {
+  const previousFirstPageSnapshot = new Set(previousFirstPageConversationIds);
+  const nextFirstPageConversationIds = new Set(
+    incomingFirstPage.map(conversationIdentity),
+  );
+
+  return {
+    apply: (existing: HistoryItem[]) =>
+      refreshFirstPageRecentChats(
+        existing,
+        previousFirstPageSnapshot,
+        incomingFirstPage,
+      ),
+    nextFirstPageConversationIds,
+  };
+}
+
 export function groupRecentChats(
   items: HistoryItem[],
   now = new Date(),

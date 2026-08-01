@@ -14,8 +14,8 @@ import {
 } from "@/lib/argus-api";
 import {
   mergeRecentChats,
+  prepareFirstPageRecentChatsRefresh,
   projectConversationToRecentChat,
-  refreshFirstPageRecentChats,
 } from "@/lib/chat-recents";
 
 type UseRecentConversationsOptions = Readonly<{
@@ -83,16 +83,12 @@ export function useRecentConversations({
           if (append) {
             setHistoryItems((current) => mergeRecentChats(current, projected));
           } else {
-            setHistoryItems((current) =>
-              refreshFirstPageRecentChats(
-                current,
-                firstPageConversationIdsRef.current,
-                projected,
-              ),
+            const refresh = prepareFirstPageRecentChatsRefresh(
+              firstPageConversationIdsRef.current,
+              projected,
             );
-            firstPageConversationIdsRef.current = new Set(
-              projected.map((item) => item.conversation_id ?? item.id),
-            );
+            setHistoryItems(refresh.apply);
+            firstPageConversationIdsRef.current = refresh.nextFirstPageConversationIds;
           }
           setHistoryNextCursor(next_cursor);
         })
