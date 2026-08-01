@@ -903,8 +903,7 @@
     "help": {
       "title": "Ayuda y legal",
       "terms": "Términos de uso",
-      "privacy": "Política de privacidad",
-      "release_notes": "Notas de la versión"
+      "privacy": "Política de privacidad"
     },
     "about": {
       "title": "Acerca de",
@@ -1180,7 +1179,28 @@
     },
     "errors": {
       "generic": "Algo salio mal. Intentalo de nuevo.",
-      "captcha_unavailable": "No pudimos completar la verificación de seguridad. Inténtalo de nuevo."
+      "captcha_unavailable": "No pudimos completar la verificación de seguridad. Inténtalo de nuevo.",
+      "unauthorized": "No pudimos verificar los datos de la cuenta. Revísalos e inténtalo de nuevo.",
+      "auth_signup_failed": "No pudimos crear la cuenta. Inténtalo de nuevo.",
+      "too_many_requests": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+      "guest_access_unavailable": "El acceso para invitados no está disponible en este momento.",
+      "internal_error": "Argus no pudo completar esta solicitud de cuenta. Inténtalo de nuevo.",
+      "account_already_registered": "Esta sesión ya pertenece a una cuenta permanente.",
+      "guest_bootstrap_failed": "No pudimos iniciar una conversación temporal. Inténtalo de nuevo.",
+      "guest_identity_link_failed": "No pudimos terminar de crear la cuenta. Tu conversación está segura; inténtalo de nuevo.",
+      "csrf_origin_rejected": "No pudimos verificar esta solicitud. Actualiza la página e inténtalo de nuevo.",
+      "registered_account_required": "Inicia sesión para conservar esta conversación temporal.",
+      "access_request_unavailable": "No pudimos enviar tu solicitud de acceso. Inténtalo de nuevo.",
+      "public_account_access_unavailable": "La creación de cuentas no está disponible en este momento.",
+      "guest_session_expired": "Esta sesión temporal venció. Inicia una nueva o inicia sesión.",
+      "guest_handoff_invalid": "Esta transferencia de conversación ya no es válida. Intenta iniciar sesión de nuevo.",
+      "guest_handoff_consumed": "Esta conversación temporal ya fue reclamada.",
+      "guest_handoff_expired": "La transferencia venció. Inicia el proceso de inicio de sesión de nuevo.",
+      "guest_handoff_wrong_destination": "Inicia sesión con la cuenta a la que se envió esta conversación temporal.",
+      "guest_handoff_source_not_anonymous": "Esta conversación ya no pertenece a una cuenta temporal.",
+      "guest_handoff_unsafe_product_graph": "No pudimos transferir esta conversación de forma segura. La conversación original no cambió.",
+      "guest_handoff_workspace_unavailable": "Esta conversación temporal ya no está disponible.",
+      "guest_handoff_claim_unavailable": "No pudimos conservar la conversación temporal en este momento. Inténtalo de nuevo."
     }
   },
   "account_security": {

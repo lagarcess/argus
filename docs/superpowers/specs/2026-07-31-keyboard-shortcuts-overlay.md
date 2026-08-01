@@ -151,6 +151,12 @@ row height.
    at the current depth remain numbered, up to nine, so the shared primitive
    never advertises an unavailable action.
 
+   **Disposition cross-reference — 2026-08-01:** This paragraph preserves the
+   row's historical state when the shortcut system shipped. The later
+   [Release Notes disposition](./2026-08-01-release-notes-disposition.md)
+   removes that disabled row entirely until a real public-beta note and working
+   page satisfy the re-entry contract.
+
 ### Follow-up intentionally not represented as complete
 
 The later request to replace the `F2` rename binding has **not** been applied

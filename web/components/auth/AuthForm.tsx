@@ -28,6 +28,132 @@ type AuthFormProps = {
   ) => Promise<AuthFormSubmissionResult | void>;
 };
 
+type AuthErrorTranslation = Readonly<{
+  key: string;
+  fallback: string;
+}>;
+
+type AuthErrorTranslator = (key: string, fallback: string) => string;
+
+const GENERIC_AUTH_ERROR: AuthErrorTranslation = {
+  key: "auth.errors.generic",
+  fallback: "Something went wrong. Please try again.",
+};
+
+const AUTH_ERROR_MESSAGE_BY_CODE: Readonly<
+  Record<string, AuthErrorTranslation>
+> = {
+  captcha_unavailable: {
+    key: "auth.errors.captcha_unavailable",
+    fallback: "We couldn’t complete the security check. Please try again.",
+  },
+  unauthorized: {
+    key: "auth.errors.unauthorized",
+    fallback:
+      "We couldn’t verify those account details. Check them and try again.",
+  },
+  auth_signup_failed: {
+    key: "auth.errors.auth_signup_failed",
+    fallback: "We couldn’t create the account. Please try again.",
+  },
+  too_many_requests: {
+    key: "auth.errors.too_many_requests",
+    fallback: "Too many attempts. Wait a moment and try again.",
+  },
+  guest_access_unavailable: {
+    key: "auth.errors.guest_access_unavailable",
+    fallback: "Guest access isn’t available right now.",
+  },
+  internal_error: {
+    key: "auth.errors.internal_error",
+    fallback: "Argus couldn’t complete this account request. Please try again.",
+  },
+  account_already_registered: {
+    key: "auth.errors.account_already_registered",
+    fallback: "This session already belongs to a permanent account.",
+  },
+  guest_bootstrap_failed: {
+    key: "auth.errors.guest_bootstrap_failed",
+    fallback: "We couldn’t start a temporary conversation. Please try again.",
+  },
+  guest_identity_link_failed: {
+    key: "auth.errors.guest_identity_link_failed",
+    fallback:
+      "We couldn’t finish creating the account. Your conversation is safe; try again.",
+  },
+  csrf_origin_rejected: {
+    key: "auth.errors.csrf_origin_rejected",
+    fallback: "We couldn’t verify this request. Refresh the page and try again.",
+  },
+  registered_account_required: {
+    key: "auth.errors.registered_account_required",
+    fallback: "Sign in to claim this temporary conversation.",
+  },
+  access_request_unavailable: {
+    key: "auth.errors.access_request_unavailable",
+    fallback: "We couldn’t send your access request. Please try again.",
+  },
+  public_account_access_unavailable: {
+    key: "auth.errors.public_account_access_unavailable",
+    fallback: "Account creation isn’t available right now.",
+  },
+  guest_session_expired: {
+    key: "auth.errors.guest_session_expired",
+    fallback: "This temporary session has expired. Start a new one or sign in.",
+  },
+  guest_handoff_invalid: {
+    key: "auth.errors.guest_handoff_invalid",
+    fallback:
+      "This conversation transfer is no longer valid. Please try signing in again.",
+  },
+  guest_handoff_consumed: {
+    key: "auth.errors.guest_handoff_consumed",
+    fallback: "This temporary conversation has already been claimed.",
+  },
+  guest_handoff_expired: {
+    key: "auth.errors.guest_handoff_expired",
+    fallback: "The transfer expired. Start the sign-in flow again.",
+  },
+  guest_handoff_wrong_destination: {
+    key: "auth.errors.guest_handoff_wrong_destination",
+    fallback:
+      "Sign in with the account this temporary conversation was sent to.",
+  },
+  guest_handoff_source_not_anonymous: {
+    key: "auth.errors.guest_handoff_source_not_anonymous",
+    fallback: "This conversation no longer belongs to a temporary account.",
+  },
+  guest_handoff_unsafe_product_graph: {
+    key: "auth.errors.guest_handoff_unsafe_product_graph",
+    fallback:
+      "We couldn’t transfer this conversation safely. Your original conversation is unchanged.",
+  },
+  guest_handoff_workspace_unavailable: {
+    key: "auth.errors.guest_handoff_workspace_unavailable",
+    fallback: "This temporary conversation is no longer available.",
+  },
+  guest_handoff_claim_unavailable: {
+    key: "auth.errors.guest_handoff_claim_unavailable",
+    fallback:
+      "We couldn’t claim the temporary conversation right now. Please try again.",
+  },
+};
+
+function authErrorCode(error: unknown): string {
+  if (!(error instanceof Error) || !("code" in error)) return "";
+  const code = (error as Error & { code?: unknown }).code;
+  return typeof code === "string" ? code : "";
+}
+
+export function localizedAuthErrorMessage(
+  error: unknown,
+  translate: AuthErrorTranslator,
+): string {
+  const message =
+    AUTH_ERROR_MESSAGE_BY_CODE[authErrorCode(error)] ?? GENERIC_AUTH_ERROR;
+  return translate(message.key, message.fallback);
+}
+
 export default function AuthForm({
   mode,
   allowModeSwitch = true,
@@ -71,19 +197,10 @@ export default function AuthForm({
         Boolean(result && result.status === "email_confirmation_required"),
       );
     } catch (error) {
-      const errorCode =
-        error instanceof Error && "code" in error
-          ? String((error as Error & { code?: unknown }).code ?? "")
-          : "";
       setAuthError(
-        errorCode === "captcha_unavailable"
-          ? t(
-              "auth.errors.captcha_unavailable",
-              "We couldn’t complete the security check. Please try again.",
-            )
-          : error instanceof Error
-          ? error.message
-          : t("auth.errors.generic", "Something went wrong. Please try again."),
+        localizedAuthErrorMessage(error, (key, fallback) =>
+          String(t(key, fallback)),
+        ),
       );
     } finally {
       setIsSubmitting(false);
