@@ -14,6 +14,7 @@ import type {
 } from "../lib/argus-api";
 
 const NOW = "2026-08-01T16:00:00.000Z";
+const EVIDENCE_DIR = process.env.CONVERSATION_ACTIVITY_EVIDENCE_DIR;
 const IDS = [
   "activity-a",
   "activity-b",
@@ -596,6 +597,14 @@ async function requiredBox(locator: Locator) {
   return box!;
 }
 
+async function captureEvidence(page: Page, filename: string) {
+  if (!EVIDENCE_DIR) return;
+  await page.screenshot({
+    path: `${EVIDENCE_DIR}/${filename}`,
+    fullPage: true,
+  });
+}
+
 test("ordinary work remains owned by A after switching to B and clears only at visible latest", async ({
   page,
 }) => {
@@ -618,6 +627,10 @@ test("ordinary work remains owned by A after switching to B and clears only at v
     "aria-disabled",
     "false",
   );
+  await captureEvidence(
+    page,
+    "01-en-desktop-light-working-a-viewing-b.png",
+  );
   fixture.settleOrdinary("activity-a");
 
   const aRow = recentRow(page, "activity-a");
@@ -625,6 +638,10 @@ test("ordinary work remains owned by A after switching to B and clears only at v
     aRow.locator('[data-conversation-activity="new_activity"]'),
   ).toBeVisible();
   await expect(page.getByText("Terminal response for activity-a")).toHaveCount(0);
+  await captureEvidence(
+    page,
+    "02-en-desktop-light-settled-a-unread.png",
+  );
 
   await openConversation(page, "activity-a");
   await expect(page.getByText("Terminal response for activity-a")).toBeVisible();
@@ -666,6 +683,12 @@ for (const firstToSettle of ["activity-a", "activity-b"] as const) {
         '[data-conversation-activity="working"]',
       ),
     ).toBeVisible();
+    if (firstToSettle === "activity-a") {
+      await captureEvidence(
+        page,
+        "03-en-desktop-light-simultaneous-a-b-working.png",
+      );
+    }
 
     fixture.settleOrdinary(firstToSettle);
     const other =
@@ -718,6 +741,7 @@ test("durable backtest stays working through queued, running, and checking befor
       '[data-conversation-activity="new_activity"]',
     ),
   ).toHaveCount(0);
+  await captureEvidence(page, "04-en-desktop-light-backtest-checking.png");
 
   fixture.stageBacktest("activity-a", "ready");
   await refreshActivity(page, fixture);
@@ -754,6 +778,7 @@ test("completion while scrolled up keeps position and evolves the single Jump to
     name: "Jump to latest; Argus is working below",
   });
   await expect(workingJump).toBeVisible();
+  await captureEvidence(page, "05-en-desktop-light-jump-working-below.png");
 
   fixture.setActivity(
     "activity-a",
@@ -766,6 +791,7 @@ test("completion while scrolled up keeps position and evolves the single Jump to
   const unreadJump = page.getByRole("button", { name: "Jump to new activity" });
   await expect(unreadJump).toBeVisible();
   await expect(page.getByRole("button", { name: /Jump to/ })).toHaveCount(1);
+  await captureEvidence(page, "06-en-desktop-light-jump-unread-below.png");
   await unreadJump.focus();
   await unreadJump.press("Enter");
   await expect
@@ -802,6 +828,10 @@ test("restored older scroll and an older message anchor retain unread until late
   await refreshActivity(page, fixture);
   await openConversation(page, "activity-a");
   await expect(page.getByRole("button", { name: "Jump to new activity" })).toBeVisible();
+  await captureEvidence(
+    page,
+    "07-en-desktop-light-restored-scroll-unread.png",
+  );
   expect(
     fixture.activityMutations.some(
       (mutation) => mutation.conversationId === "activity-a",
@@ -822,6 +852,7 @@ test("restored older scroll and an older message anchor retain unread until late
     transcript.locator('[data-message-id="activity-c-assistant-2"]'),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Jump to new activity" })).toBeVisible();
+  await captureEvidence(page, "08-en-desktop-light-anchor-unread.png");
   expect(
     fixture.activityMutations.some(
       (mutation) => mutation.conversationId === "activity-c",
@@ -850,6 +881,10 @@ test("row and header menus toggle durable unread without reordering or same-view
   expect(moreBox.height).toBeGreaterThanOrEqual(44);
   await more.press("Enter");
   await expect(page.getByRole("menuitem").first()).toHaveText("Mark as unread");
+  await captureEvidence(
+    page,
+    "09-en-desktop-light-recents-menu-mark-unread.png",
+  );
   await page.getByRole("menuitem", { name: "Mark as unread" }).click();
   await expect(
     bRow.locator('[data-conversation-activity="manual_unread"]'),
@@ -863,10 +898,18 @@ test("row and header menus toggle durable unread without reordering or same-view
       .locator('[role="button"][data-conversation-id]')
       .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-conversation-id"))),
   ).toEqual(rowsBefore);
+  await captureEvidence(
+    page,
+    "10-en-desktop-light-recents-manual-unread-no-reorder.png",
+  );
 
   const headerMenu = page.getByRole("button", { name: "Chat options" });
   await headerMenu.click();
   await expect(page.getByRole("menuitem").first()).toHaveText("Mark as unread");
+  await captureEvidence(
+    page,
+    "11-en-desktop-light-header-menu-mark-unread.png",
+  );
   await page.getByRole("menuitem", { name: "Mark as unread" }).click();
   const aRow = recentRow(page, "activity-a");
   await expect(
@@ -876,11 +919,20 @@ test("row and header menus toggle durable unread without reordering or same-view
   await expect(
     aRow.locator('[data-conversation-activity="manual_unread"]'),
   ).toBeVisible();
+  await captureEvidence(
+    page,
+    "12-en-desktop-light-header-manual-unread.png",
+  );
 
   await headerMenu.click();
   await expect(page.getByRole("menuitem").first()).toHaveText("Mark as read");
+  await captureEvidence(
+    page,
+    "13-en-desktop-light-header-menu-mark-read.png",
+  );
   await page.getByRole("menuitem", { name: "Mark as read" }).click();
   await expect(aRow.locator("[data-conversation-activity]")).toHaveCount(0);
+  await captureEvidence(page, "14-en-desktop-light-header-marked-read.png");
 
   await bRow.getByRole("button", { name: "More" }).click();
   await page.keyboard.press("Escape");
@@ -926,6 +978,10 @@ test("expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projec
   expect(await ring.evaluate((node) => getComputedStyle(node).animationName)).toBe(
     "none",
   );
+  await captureEvidence(
+    page,
+    "15-en-desktop-dark-reduced-expanded-selected.png",
+  );
 
   await page.keyboard.press("Meta+Shift+Comma");
   const peek = page.getByRole("dialog", { name: "Recents" });
@@ -935,6 +991,7 @@ test("expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projec
   await expect(
     peek.getByRole("button", { name: "Activity E. Needs attention." }),
   ).toBeVisible();
+  await captureEvidence(page, "16-en-desktop-dark-reduced-quick-peek.png");
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
@@ -945,6 +1002,10 @@ test("expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projec
   await expect(
     recents.locator('[data-conversation-activity="working"]'),
   ).toBeVisible();
+  await captureEvidence(
+    page,
+    "17-en-desktop-dark-reduced-collapsed-aggregate.png",
+  );
 
   const transcript = page.getByTestId("conversation-transcript-region");
   await transcript.evaluate((element) => {
@@ -961,6 +1022,10 @@ test("expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projec
       nodes.map((node) => getComputedStyle(node).animationName),
     );
   expect(dotAnimations).toEqual(["none", "none", "none"]);
+  await captureEvidence(
+    page,
+    "18-en-desktop-dark-reduced-static-working-below.png",
+  );
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 
@@ -1002,6 +1067,7 @@ test.describe("390px coarse pointer", () => {
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+    await captureEvidence(page, "19-es-mobile-coarse-recents.png");
     expect(fixture.unexpectedRequests).toEqual([]);
   });
 });
@@ -1052,6 +1118,10 @@ test("typed needs-input, attention, canceled, expired, and checking states do no
       .getByTestId("conversation-activity-rail")
       .locator("[data-conversation-activity]"),
   ).toHaveCount(0);
+  await captureEvidence(
+    page,
+    "20-en-desktop-light-typed-attention-checking.png",
+  );
   await openConversation(page, "activity-c");
   await expect(
     page.getByText("Backtest not completed", { exact: true }),
@@ -1060,5 +1130,45 @@ test("typed needs-input, attention, canceled, expired, and checking states do no
   await expect(
     page.getByText("Backtest not completed", { exact: true }),
   ).toBeVisible();
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
+test("Spanish desktop exposes the complete typed activity vocabulary", async ({
+  page,
+}) => {
+  const fixture = await installActivityFixture(page, {
+    activities: {
+      "activity-a": activity("running"),
+      "activity-b": activity("idle", "new_activity", "cursor-b"),
+      "activity-c": activity("idle", "manual_unread", "cursor-c"),
+      "activity-d": activity("idle", "needs_input", "cursor-d"),
+      "activity-e": activity("idle", "needs_attention", "cursor-e"),
+      "activity-f": activity("checking", "none", null, "backtest_job"),
+    },
+    language: "es-419",
+  });
+  await page.goto("/chat?conversation=activity-a");
+  await openRecents(page, "es-419");
+  await expect(page.locator("html")).toHaveAttribute("lang", "es-419");
+  await expect(recentRow(page, "activity-a")).toHaveAccessibleName(
+    "Activity A. En curso.",
+  );
+  await expect(recentRow(page, "activity-b")).toHaveAccessibleName(
+    "Activity B. Actividad nueva.",
+  );
+  await expect(recentRow(page, "activity-c")).toHaveAccessibleName(
+    "Activity C. Marcada como no leída.",
+  );
+  await expect(recentRow(page, "activity-d")).toHaveAccessibleName(
+    "Activity D. Necesita tu respuesta.",
+  );
+  await expect(recentRow(page, "activity-e")).toHaveAccessibleName(
+    "Activity E. Necesita atención.",
+  );
+  await page.getByRole("button", { name: "Mostrar más en Hoy" }).click();
+  await expect(recentRow(page, "activity-f")).toHaveAccessibleName(
+    "Activity F. Consultando el estado.",
+  );
+  await captureEvidence(page, "21-es-desktop-activity-labels.png");
   expect(fixture.unexpectedRequests).toEqual([]);
 });
