@@ -298,6 +298,10 @@ describe("chat turn artifact UX", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
     const handleSendStart = chat.indexOf("const handleSend =");
     const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
     const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
@@ -305,9 +309,9 @@ describe("chat turn artifact UX", () => {
     expect(handleSendBlock).toContain("sendAdmissionInFlightRef.current");
     expect(handleSendBlock).toContain("setGuestSubmissionPending(true)");
     expect(handleSendBlock).toContain("guestExperience.admitSend");
-    expect(chat).toContain('t("guest.entry.sending", "Sending...")');
-    expect(chat).toContain("aria-busy={guestSubmissionPending}");
-    expect(chat).toContain('t("common.try_again", "Try again")');
+    expect(emptyChat).toContain('t("guest.entry.sending", "Sending...")');
+    expect(emptyChat).toContain("aria-busy={guestSubmissionPending}");
+    expect(emptyChat).toContain('t("common.try_again", "Try again")');
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {

@@ -19,14 +19,16 @@ import ChatSidebar, {
 } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import StarterActions, {
-  type StarterSelectionMetadata,
-} from "@/components/chat/StarterActions";
+import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import { useChatToast } from "@/components/chat/useChatToast";
-import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
+import EmptyChatSurface from "@/components/chat/EmptyChatSurface";
+import {
+  useInitialChatSession,
+  type ProfileState,
+} from "@/components/chat/useInitialChatSession";
 import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
@@ -55,12 +57,7 @@ import {
   type BacktestRun,
   type SearchConversationItem,
 } from "@/lib/argus-api";
-import {
-  chatExploratorySuggestionsEnabled,
-  omnisearchEnabled,
-  strategiesEnabled,
-} from "@/lib/private-alpha-flags";
-import { guestProfileProbeOutcome } from "@/lib/guest-account";
+import { omnisearchEnabled, strategiesEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -202,8 +199,6 @@ import {
 } from "./artifact-history";
 
 type View = "chat" | "strategies" | "settings";
-type ProfileState =
-  "probing" | "established" | "bootstrap_required" | "expired" | "unavailable";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 type SendSelection =
   | ChatMention[]
@@ -818,79 +813,16 @@ export default function ChatInterface() {
 
   // ── Init conversation ──────────────────────────────────────────────────────
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
-        let probeOutcome: ReturnType<typeof guestProfileProbeOutcome> | null = null;
-        try {
-          meResponse = await getMe();
-          if (meResponse === null) probeOutcome = "fail_closed";
-          if (!cancelled) {
-            setAccount(meResponse);
-          }
-        } catch (error) {
-          probeOutcome = guestProfileProbeOutcome(error);
-        }
-        const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
-        if (resolvedLanguage && resolvedLanguage !== i18n.language) {
-          await i18n.changeLanguage(resolvedLanguage);
-        }
-        if (cancelled) return;
-        if (probeOutcome === null) {
-          setProfileState("established");
-        } else if (probeOutcome === "bootstrap_required") {
-          setProfileState("bootstrap_required");
-        } else if (probeOutcome === "fail_closed") {
-          setProfileState("unavailable");
-          router.replace("/?auth=login");
-          return;
-        }
-        const activeRoute = readActiveConversationRouteState();
-        let activeConversationId = activeRoute.conversationId;
-        if (!activeConversationId && meResponse?.account_kind === "guest") {
-          const { items } = await listConversations({ limit: 2 });
-          if (cancelled || hasAcceptedUserInputRef.current) return;
-          activeConversationId = items[0]?.id ?? null;
-        }
-        if (activeConversationId) {
-          const userId = meResponse?.user.id;
-          if (!userId) {
-            resetToEmptyChatSurface();
-            return;
-          }
-          await navigateConversationTranscript(activeConversationId, userId, {
-            bootstrap: true,
-            messageId: activeRoute.messageId ?? undefined,
-          });
-          return;
-        }
-
-        if (cancelled || hasAcceptedUserInputRef.current) return;
-        resetToEmptyChatSurface();
-      } catch {
-        if (cancelled) return;
-        setProfileState("unavailable");
-        router.replace("/?auth=login");
-        setMessages([
-          {
-            id: "offline",
-            role: "ai",
-            kind: "text",
-            content: t("chat.error_offline"),
-          },
-        ]);
-        setIsHydratingConversation(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      transcriptSessionCache.cancelActiveNavigation();
-    };
-    // Bootstraps the active conversation once; re-running on i18n updates would create noisy chat reloads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useInitialChatSession({
+    hasAcceptedUserInputRef,
+    setAccount,
+    setProfileState,
+    setMessages,
+    setIsHydratingConversation,
+    resetToEmptyChatSurface,
+    navigateConversationTranscript,
+    cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
+  });
 
   const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({
     accountUserId: account?.user.id,
@@ -2181,8 +2113,6 @@ export default function ChatInterface() {
   const showStreamStatus = Boolean(
     streamStatus && latestAssistantContent.length === 0,
   );
-  const showExploratorySuggestions =
-    chatExploratorySuggestionsEnabled && showSuggestions;
   const showConversationDisclaimer = shouldShowConversationDisclaimer(
     messages,
     isStreamingResponse,
@@ -2423,136 +2353,20 @@ export default function ChatInterface() {
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
             {showEmptyChatSurface ? (
-              <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-                <EmptyChatHeading isGuest={isGuest} />
-
-                <div
-                  aria-busy={guestSubmissionPending}
-                  className="w-full max-w-2xl"
-                >
-                  <ChatInput
-                    key="new-conversation"
-                    onSend={handleSend}
-                    disabled={
-                      isStreamingResponse ||
-                      isHydratingConversation ||
-                      guestSubmissionPending
-                    }
-                    placeholder={chatInputPlaceholder}
-                    onToast={showToast}
-                  />
-                  {guestSubmissionPending && (
-                    <div
-                      aria-label={t("guest.entry.sending", "Sending...")}
-                      className="mt-3 flex justify-center"
-                      role="status"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-black/25 border-t-black/70 dark:border-white/25 dark:border-t-white/70"
-                      />
-                      <span className="sr-only">
-                        {t("guest.entry.sending", "Sending...")}
-                      </span>
-                    </div>
-                  )}
-                  {guestSubmissionError && !guestSubmissionPending && (
-                    <div
-                      className="mt-3 flex flex-wrap items-center justify-center gap-2 text-center text-sm text-red-600 dark:text-red-300"
-                      role="alert"
-                    >
-                      <span>{t("guest.entry.error")}</span>
-                      <button
-                        type="button"
-                        className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
-                        onClick={retryGuestSubmission}
-                      >
-                        {t("common.try_again", "Try again")}
-                      </button>
-                    </div>
-                  )}
-                  <ChatLegalNotice
-                    expiresAt={account?.guest?.expires_at}
-                    isGuest={isGuest}
-                    variant="before_message"
-                  />
-                </div>
-
-                <StarterActions
-                  disabled={
-                    isStreamingResponse ||
-                    isHydratingConversation ||
-                    guestSubmissionPending
-                  }
-                  onSelect={handleSend}
-                />
-
-                {chatExploratorySuggestionsEnabled && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => setShowSuggestions(!showSuggestions)}
-                      className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
-                    >
-                      {showSuggestions
-                        ? t("chat.hide_suggestions")
-                        : t("chat.show_suggestions")}
-                    </button>
-                  </div>
-                )}
-
-                {showExploratorySuggestions && (
-                  <div className="mt-8 flex flex-col items-center gap-4 text-center">
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q1",
-                            "What if I bought Apple after big drops?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q1",
-                        "What if I bought Apple after big drops?",
-                      )}
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q2",
-                            "What if I bought Bitcoin when it starts rising?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q2",
-                        "What if I bought Bitcoin when it starts rising?",
-                      )}
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleSend(
-                          t(
-                            "chat.example_queries.q3",
-                            "What if I bought Tesla every month?",
-                          ),
-                        )
-                      }
-                      className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors"
-                    >
-                      {t(
-                        "chat.example_queries.q3",
-                        "What if I bought Tesla every month?",
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <EmptyChatSurface
+                isGuest={isGuest}
+                expiresAt={account?.guest?.expires_at}
+                guestSubmissionPending={guestSubmissionPending}
+                guestSubmissionError={guestSubmissionError}
+                isStreamingResponse={isStreamingResponse}
+                isHydratingConversation={isHydratingConversation}
+                showSuggestions={showSuggestions}
+                placeholder={chatInputPlaceholder}
+                onSend={handleSend}
+                onRetryGuestSubmission={retryGuestSubmission}
+                onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
+                onToast={showToast}
+              />
             ) : (
               <>
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />

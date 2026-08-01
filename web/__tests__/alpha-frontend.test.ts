@@ -191,6 +191,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
     const starterActions = readFileSync(
       join(root, "components/chat/StarterActions.tsx"),
       "utf-8",
@@ -220,13 +224,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(envExample).toContain(
       "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false",
     );
-    expect(chat).toContain("chatExploratorySuggestionsEnabled");
-    expect(chat).toContain("showExploratorySuggestions");
+    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled");
+    expect(emptyChat).toContain("showSuggestions");
     expect(starterActions).toContain("chat.starter_actions.tsla.value");
     expect(starterActions).toContain("chat.starter_actions.btc.value");
     expect(starterActions).toContain("chat.starter_actions.dca.value");
-    expect(chat).toContain("<StarterActions");
-    expect(chat).toContain("showExploratorySuggestions &&");
+    expect(emptyChat).toContain("<StarterActions");
+    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled && showSuggestions &&");
     expect(input).toContain("chatExploratorySuggestionsEnabled");
     expect(input).toContain(
       "const prompts = chatExploratorySuggestionsEnabled",
@@ -1016,15 +1020,20 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
     );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
 
     expect(chat).toContain("sendAdmissionInFlightRef.current ||");
     expect(chat).toContain("activeStreamConversationIdRef.current ||");
     expect(chat).toContain("sendAdmissionInFlightRef.current = true;");
-    expect(chat).toContain("<ChatInput");
+    expect(`${chat}\n${emptyChat}`).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
-    expect(chat).toMatch(
-      /disabled=\{\s*isStreamingResponse \|\|\s*isHydratingConversation \|\|\s*guestSubmissionPending\s*\}/,
+    expect(emptyChat).toMatch(
+      /const disabled =\s*isStreamingResponse \|\| isHydratingConversation \|\| guestSubmissionPending/,
     );
+    expect(emptyChat).toContain("disabled={disabled}");
     expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
@@ -1263,12 +1272,16 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/chat-conversation-routing.ts"),
       "utf-8",
     );
+    const initialSession = readFileSync(
+      join(root, "components/chat/useInitialChatSession.ts"),
+      "utf-8",
+    );
 
     expect(routing).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
-    expect(chat).toContain("readActiveConversationRouteState");
+    expect(`${chat}\n${initialSession}`).toContain("readActiveConversationRouteState");
     expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
     expect(chat).not.toContain("readActiveConversationId()");
-    expect(chat).toContain(
+    expect(initialSession).toContain(
       "await navigateConversationTranscript(activeConversationId, userId, {",
     );
     expect(chat).toContain(

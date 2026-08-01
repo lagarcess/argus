@@ -119,13 +119,14 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("stale or deleted active chats reset to a lazy empty chat instead of creating a new stored conversation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const initBlock = readFileSync(
+      join(root, "components/chat/useInitialChatSession.ts"),
+      "utf-8",
+    );
     const lifecycle = readFileSync(
       join(root, "components/chat/useChatSurfaceLifecycle.ts"),
       "utf-8",
     );
-    const initStart = chat.indexOf("// ── Init conversation");
-    const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
-    const initBlock = chat.slice(initStart, initEnd);
     const removedStart = lifecycle.indexOf("const handleConversationRemoved");
     const removedEnd = lifecycle.indexOf(
       "const handleAllConversationsDeleted",
@@ -264,12 +265,13 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("guest expiry stays composer-owned across empty and active chat layouts", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const emptyChat = readFileSync(join(root, "components/chat/EmptyChatSurface.tsx"), "utf-8");
     const legal = readFileSync(join(root, "components/chat/ChatLegalNotice.tsx"), "utf-8");
     const footer = readFileSync(join(root, "components/guest/GuestLegalFooter.tsx"), "utf-8");
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
 
-    expect(chat.match(/<ChatLegalNotice/g)?.length).toBe(2);
-    expect(chat).not.toContain("temporaryExpiresAt=");
+    expect(`${chat}\n${emptyChat}`.match(/<ChatLegalNotice/g)?.length).toBe(2);
+    expect(`${chat}\n${emptyChat}`).not.toContain("temporaryExpiresAt=");
     expect(legal).toContain("<GuestLegalFooter");
     expect(footer.match(/data-testid="guest-temporary-notice"/g)?.length).toBe(1);
     expect(sidebar).not.toContain("guest-sidebar-expiry");
