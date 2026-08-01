@@ -15,6 +15,7 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
+from typing_extensions import NotRequired, TypedDict
 
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
@@ -45,6 +46,15 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
+ConversationOperationStatus = Literal["idle", "queued", "running", "checking"]
+ConversationOperationKind = Literal["chat_turn", "backtest_job"]
+ConversationAttentionStatus = Literal[
+    "none",
+    "new_activity",
+    "manual_unread",
+    "needs_input",
+    "needs_attention",
+]
 
 DECISION_NOTE_WRITE_MAX_LENGTH = 500
 
@@ -245,6 +255,47 @@ class ConversationPatch(BaseModel):
     deleted_at: datetime | None = None
 
 
+class ConversationOperation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: ConversationOperationStatus
+    kind: ConversationOperationKind | None = None
+    updated_at: datetime | None = None
+
+
+class ConversationAttention(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: ConversationAttentionStatus
+    cursor: str | None = None
+
+
+class ConversationActivity(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    operation: ConversationOperation
+    attention: ConversationAttention
+
+
+class ConversationActivityMarkUnread(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["mark_unread"]
+
+
+class ConversationActivityMarkRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["mark_read"]
+    through_attention_cursor: str | None = Field(default=None, max_length=256)
+
+
+ConversationActivityPatch = Annotated[
+    ConversationActivityMarkUnread | ConversationActivityMarkRead,
+    Field(discriminator="action"),
+]
+
+
 class Conversation(BaseModel):
     id: str
     title: str
@@ -256,6 +307,7 @@ class Conversation(BaseModel):
     updated_at: datetime
     last_message_preview: str | None = None
     language: Language | None = None
+    activity: ConversationActivity | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -515,6 +567,19 @@ class DecisionNoteResponse(BaseModel):
     evidence_artifact: EvidenceArtifact
 
 
+class HistoryItemWire(TypedDict):
+    type: Literal["chat", "strategy", "collection", "run"]
+    id: str
+    title: str
+    title_source: NotRequired[NameSource]
+    subtitle: str
+    pinned: bool
+    created_at: datetime
+    conversation_id: str | None
+    expires_at: datetime | None
+    activity: NotRequired[ConversationActivity]
+
+
 class HistoryItem(BaseModel):
     type: Literal["chat", "strategy", "collection", "run"]
     id: str
@@ -526,15 +591,26 @@ class HistoryItem(BaseModel):
     created_at: datetime
     conversation_id: str | None = None
     expires_at: datetime | None = None
+    # Chat items only; non-chat records omit the additive projection.
+    activity: ConversationActivity | None = None
 
-    @model_serializer(mode="wrap")
-    def _omit_absent_title_source(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> dict[str, Any]:
-        # The contract keeps title_source absent, not null, on non-chat items.
-        data = handler(self)
-        if data.get("title_source") is None:
-            data.pop("title_source", None)
+    @model_serializer(mode="plain", return_type=HistoryItemWire)
+    def _omit_absent_chat_fields(self) -> HistoryItemWire:
+        # Return Python values for Pydantic to serialize against the wire type.
+        data: HistoryItemWire = {
+            "type": self.type,
+            "id": self.id,
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "pinned": self.pinned,
+            "created_at": self.created_at,
+            "conversation_id": self.conversation_id,
+            "expires_at": self.expires_at,
+        }
+        if self.title_source is not None:
+            data["title_source"] = self.title_source
+        if self.activity is not None:
+            data["activity"] = self.activity
         return data
 
 

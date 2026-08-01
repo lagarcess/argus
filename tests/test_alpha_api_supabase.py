@@ -25,6 +25,7 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
+from argus.domain.conversation_activity import Boundary, encode_attention_cursor
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.postgres_history_reader import (
@@ -492,6 +493,17 @@ def mock_gateway():
     gateway.list_message_page_context.return_value = ([], set())
     gateway.reconcile_stale_chat_turns.return_value = []
     gateway.list_projectable_chat_turns.return_value = []
+    gateway.reconcile_conversation_activity_turns.return_value = []
+    gateway.read_conversation_activity_batch.side_effect = (
+        lambda *, user_id, conversation_ids: [
+            {
+                "conversation_id": conversation_id,
+                "sources": [],
+                "read_state": None,
+            }
+            for conversation_id in conversation_ids
+        ]
+    )
     gateway.get_latest_completed_run_for_conversation.return_value = None
     gateway.accept_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
     gateway.transition_chat_turn.return_value = TransitionResult(outcome="applied")
@@ -1105,6 +1117,121 @@ def test_delete_all_conversations_supabase_delegates_with_user_ownership(
     mock_gateway.soft_delete_all_conversations.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001"
     )
+
+
+def test_supabase_activity_get_and_patch_use_verified_source_identity(
+    mock_gateway,
+) -> None:
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    conversation_id = "11111111-1111-4111-8111-111111111111"
+    source_id = "22222222-2222-4222-8222-222222222222"
+    conversation = Conversation(
+        id=conversation_id,
+        title="Activity task",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview="Done",
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    source = {
+        "conversation_id": conversation_id,
+        "source_kind": "chat_turn",
+        "source_id": source_id,
+        "status": "completed",
+        "occurred_at": now.isoformat(),
+        "stage_outcome": "ready_to_respond",
+        "result_hydrateable": False,
+    }
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.read_conversation_activity_batch.side_effect = None
+    mock_gateway.read_conversation_activity_batch.return_value = [
+        {
+            "conversation_id": conversation_id,
+            "sources": [source],
+            "read_state": None,
+        }
+    ]
+
+    current = client.get(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert current.status_code == 200
+    assert current.json()["attention"]["status"] == "new_activity"
+    cursor = current.json()["attention"]["cursor"]
+    assert cursor == encode_attention_cursor(
+        Boundary("chat_turn", source_id, now)
+    )
+
+    mock_gateway.mutate_conversation_activity_read_state.return_value = {
+        "outcome": "applied",
+        "read_state": {},
+    }
+    mock_gateway.read_conversation_activity_batch.return_value = [
+        {
+            "conversation_id": conversation_id,
+            "sources": [source],
+            "read_state": {
+                "read_through_occurred_at": now.isoformat(),
+                "read_through_source_kind": "chat_turn",
+                "read_through_source_id": source_id,
+                "manual_unread_at": None,
+            },
+        }
+    ]
+
+    marked = client.patch(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        json={"action": "mark_read", "through_attention_cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert marked.status_code == 200
+    assert marked.json()["attention"] == {"status": "none", "cursor": None}
+    mock_gateway.mutate_conversation_activity_read_state.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id=conversation_id,
+        action="mark_read",
+        source_kind="chat_turn",
+        source_id=source_id,
+    )
+
+
+def test_supabase_activity_conflict_maps_to_rfc_problem(mock_gateway) -> None:
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    conversation_id = "11111111-1111-4111-8111-111111111111"
+    source_id = "22222222-2222-4222-8222-222222222222"
+    mock_gateway.get_conversation.return_value = Conversation(
+        id=conversation_id,
+        title="Activity task",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.mutate_conversation_activity_read_state.return_value = {
+        "outcome": "conflict",
+        "read_state": None,
+    }
+    cursor = encode_attention_cursor(Boundary("chat_turn", source_id, now))
+
+    response = client.patch(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        json={"action": "mark_read", "through_attention_cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "attention_cursor_conflict"
+    assert response.json()["type"].endswith("/attention-cursor-conflict")
 
 
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
@@ -3361,6 +3488,15 @@ def test_history_supabase_chat_items_carry_title_source(mock_gateway):
     ]
     assert non_chat_items
     assert all("title_source" not in item for item in non_chat_items)
+    assert all("activity" not in item for item in non_chat_items)
+    mock_gateway.reconcile_conversation_activity_turns.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_ids=["22222222-2222-2222-2222-222222222222"],
+    )
+    mock_gateway.read_conversation_activity_batch.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_ids=["22222222-2222-2222-2222-222222222222"],
+    )
 
 
 def test_history_supabase_can_request_archived_rows(mock_gateway):
@@ -3615,8 +3751,13 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
         headers={"Authorization": "Bearer test-token"},
     )
     assert final_page.status_code == 200
+    expected_final = conversations[4].model_dump(mode="json")
+    expected_final["activity"] = {
+        "operation": {"status": "idle", "kind": None, "updated_at": None},
+        "attention": {"status": "none", "cursor": None},
+    }
     assert final_page.json() == {
-        "items": [conversations[4].model_dump(mode="json")],
+        "items": [expected_final],
         "next_cursor": None,
     }
 
@@ -3642,6 +3783,15 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     assert calls[2].kwargs["cursor_id"] == "conv-3"
     assert calls[3].kwargs["cursor_updated_at"] is None
     assert calls[3].kwargs["cursor_id"] is None
+    projected_pages = [
+        call.kwargs["conversation_ids"]
+        for call in mock_gateway.read_conversation_activity_batch.call_args_list
+    ]
+    assert projected_pages == [
+        ["conv-0", "conv-1"],
+        ["conv-2", "conv-3"],
+        ["conv-4"],
+    ]
 
 
 def test_conversation_missing_pivot_uses_existing_invalid_cursor_problem(mock_gateway):

@@ -7,6 +7,7 @@ from typing import cast
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
+from argus.api.conversation_activity import conversation_activity_service
 from argus.api.dependencies import current_user
 from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
@@ -88,6 +89,11 @@ def history(
             or deleted
         ):
             return PaginatedHistory(items=[], next_cursor=None)
+        activity = conversation_activity_service.project(
+            user_id=user.id,
+            conversation_ids=[conversation.id],
+            reconcile=True,
+        )[conversation.id]
         return PaginatedHistory(
             items=[
                 HistoryItem(
@@ -100,6 +106,7 @@ def history(
                     created_at=conversation.updated_at,
                     conversation_id=conversation.id,
                     expires_at=workspace.expires_at,
+                    activity=activity,
                 )
             ],
             next_cursor=None,
@@ -320,6 +327,18 @@ def history(
     page = filtered[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
+    chat_ids = [item.id for item in page_items if item.type == "chat"]
+    activities = conversation_activity_service.project(
+        user_id=user.id,
+        conversation_ids=chat_ids,
+        reconcile=True,
+    )
+    page_items = [
+        item.model_copy(update={"activity": activities[item.id]})
+        if item.type == "chat"
+        else item
+        for item in page_items
+    ]
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
