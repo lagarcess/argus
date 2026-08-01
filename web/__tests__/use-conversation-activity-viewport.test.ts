@@ -18,6 +18,7 @@ type ControlledEffects = {
   effects: ViewportModule["ConversationActivityViewportEffectsAdapter"];
   intersect: (intersecting: boolean) => void;
   snapshotIntersectionCallback: () => ((intersecting: boolean) => void) | null;
+  listenerCounts: () => Readonly<{ focus: number; blur: number; visibility: number; observer: number }>;
   focus: () => void;
   blur: () => void;
   setVisible: (visible: boolean) => void;
@@ -64,6 +65,12 @@ const controlledEffects = (): ControlledEffects => {
     },
     intersect: (intersecting) => intersectionCallback?.(intersecting),
     snapshotIntersectionCallback: () => intersectionCallback,
+    listenerCounts: () => ({
+      focus: focusCallback ? 1 : 0,
+      blur: blurCallback ? 1 : 0,
+      visibility: visibilityCallback ? 1 : 0,
+      observer: intersectionCallback ? 1 : 0,
+    }),
     focus: () => {
       focused = true;
       focusCallback?.();
@@ -84,7 +91,275 @@ const transcriptRoot = (conversationId: string): HTMLElement =>
 
 const sentinel = (): HTMLElement => ({}) as HTMLElement;
 
+const canonicalProofContext = {
+  accountScopeKey: "account-a",
+  transcriptGeneration: 1,
+  transcriptCanonicalReady: true,
+  scrollRestorationComplete: true,
+} as const;
+
 describe("conversation activity viewport read proof", () => {
+  test("requires fresh intersection after reused-DOM ownership and restoration changes", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const effects = controlledEffects();
+    const reads: Array<[string, string]> = [];
+    const root = transcriptRoot("conversation-a");
+    const latest = sentinel();
+    const owner = viewport.createConversationActivityViewportRuntime({
+      inputs: {
+        accountScopeKey: "account-a",
+        activeRouteConversationId: "conversation-a",
+        activeConversationId: "conversation-a",
+        activeConversationIdRef: "conversation-a",
+        readyTranscriptConversationId: "conversation-a",
+        transcriptRoot: root,
+        sentinel: latest,
+        transcriptGeneration: 1,
+        transcriptCanonicalReady: true,
+        scrollRestorationComplete: true,
+        hydrationComplete: true,
+        attentionCursor: "cursor-a",
+        manualUnreadGuard: false,
+        markReadPending: false,
+      },
+      effects: effects.effects,
+      markRead: async (conversationId, cursor) => reads.push([conversationId, cursor]),
+      resetViewEpoch: () => undefined,
+    });
+    owner.start();
+    const observerA = effects.snapshotIntersectionCallback();
+    effects.intersect(true);
+    await drainMicrotasks();
+    expect(reads).toEqual([["conversation-a", "cursor-a"]]);
+
+    root.dataset.conversationId = "conversation-b";
+    owner.updateInputs({
+      accountScopeKey: "account-a",
+      activeRouteConversationId: "conversation-b",
+      activeConversationId: "conversation-b",
+      activeConversationIdRef: "conversation-b",
+      readyTranscriptConversationId: "conversation-b",
+      transcriptRoot: root,
+      sentinel: latest,
+      transcriptGeneration: 2,
+      transcriptCanonicalReady: true,
+      scrollRestorationComplete: false,
+      hydrationComplete: true,
+      attentionCursor: "cursor-b",
+      manualUnreadGuard: false,
+      markReadPending: false,
+    });
+    const observerBPending = effects.snapshotIntersectionCallback();
+    expect(observerBPending).not.toBe(observerA);
+    expect(reads).toHaveLength(1);
+    observerA?.(true);
+    observerBPending?.(true);
+    await drainMicrotasks();
+    expect(reads).toHaveLength(1);
+
+    owner.updateInputs({
+      accountScopeKey: "account-a",
+      activeRouteConversationId: "conversation-b",
+      activeConversationId: "conversation-b",
+      activeConversationIdRef: "conversation-b",
+      readyTranscriptConversationId: "conversation-b",
+      transcriptRoot: root,
+      sentinel: latest,
+      transcriptGeneration: 3,
+      transcriptCanonicalReady: true,
+      scrollRestorationComplete: true,
+      hydrationComplete: true,
+      attentionCursor: "cursor-b",
+      manualUnreadGuard: false,
+      markReadPending: false,
+    });
+    const observerBReady = effects.snapshotIntersectionCallback();
+    expect(observerBReady).not.toBe(observerBPending);
+    expect(reads).toHaveLength(1);
+    observerBPending?.(true);
+    await drainMicrotasks();
+    expect(reads).toHaveLength(1);
+    observerBReady?.(true);
+    await drainMicrotasks();
+    expect(reads).toEqual([
+      ["conversation-a", "cursor-a"],
+      ["conversation-b", "cursor-b"],
+    ]);
+    owner.dispose();
+  });
+
+  test("keeps cached refreshes unread until a canonical generation is restored", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+
+    readiness.stageCached("conversation-a");
+    const cached = readiness.snapshot("conversation-a");
+    expect(cached.canonicalReady).toBe(false);
+
+    readiness.stageCanonical("conversation-a");
+    const canonical = readiness.snapshot("conversation-a");
+    expect(canonical.canonicalReady).toBe(true);
+    expect(canonical.generation).toBeGreaterThan(cached.generation);
+    readiness.clear();
+    expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
+  });
+
+  test("restarts cleanly after StrictMode setup cleanup setup", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const effects = controlledEffects();
+    const reads: string[] = [];
+    const owner = viewport.createConversationActivityViewportRuntime({
+      inputs: {
+        accountScopeKey: "account-a",
+        activeRouteConversationId: "conversation-a",
+        activeConversationId: "conversation-a",
+        activeConversationIdRef: "conversation-a",
+        readyTranscriptConversationId: "conversation-a",
+        transcriptRoot: transcriptRoot("conversation-a"),
+        sentinel: sentinel(),
+        transcriptGeneration: 1,
+        transcriptCanonicalReady: true,
+        scrollRestorationComplete: true,
+        hydrationComplete: true,
+        attentionCursor: "cursor-a",
+        manualUnreadGuard: false,
+        markReadPending: false,
+      },
+      effects: effects.effects,
+      markRead: async (_conversationId, cursor) => reads.push(cursor),
+      resetViewEpoch: () => undefined,
+    });
+
+    owner.start();
+    expect(effects.listenerCounts()).toEqual({ focus: 1, blur: 1, visibility: 1, observer: 1 });
+    owner.dispose();
+    expect(effects.listenerCounts()).toEqual({ focus: 0, blur: 0, visibility: 0, observer: 0 });
+    owner.start();
+    expect(effects.listenerCounts()).toEqual({ focus: 1, blur: 1, visibility: 1, observer: 1 });
+    effects.intersect(true);
+    await drainMicrotasks();
+    expect(reads).toEqual(["cursor-a"]);
+    owner.dispose();
+  });
+
+  test("rebases dedupe and callbacks when account scope changes", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const effects = controlledEffects();
+    const reads: string[] = [];
+    let resolveFirst: (() => void) | null = null;
+    let resolveSecond: (() => void) | null = null;
+    const first = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<void>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const root = transcriptRoot("conversation-a");
+    const latest = sentinel();
+    const base = {
+      activeRouteConversationId: "conversation-a",
+      activeConversationId: "conversation-a",
+      activeConversationIdRef: "conversation-a",
+      readyTranscriptConversationId: "conversation-a",
+      transcriptRoot: root,
+      sentinel: latest,
+      transcriptGeneration: 1,
+      transcriptCanonicalReady: true,
+      scrollRestorationComplete: true,
+      hydrationComplete: true,
+      attentionCursor: "cursor-a",
+      manualUnreadGuard: false,
+      markReadPending: false,
+    } as const;
+    const owner = viewport.createConversationActivityViewportRuntime({
+      inputs: { ...base, accountScopeKey: "account-a" },
+      effects: effects.effects,
+      markRead: async () => {
+        reads.push(reads.length === 0 ? "account-a" : "account-b");
+        if (reads.length === 1) await first;
+        if (reads.length === 2) await second;
+      },
+      resetViewEpoch: () => undefined,
+    });
+    owner.start();
+    const observerA = effects.snapshotIntersectionCallback();
+    observerA?.(true);
+    await drainMicrotasks();
+    expect(reads).toEqual(["account-a"]);
+
+    owner.updateInputs({ ...base, accountScopeKey: "account-b", transcriptGeneration: 2 });
+    const observerB = effects.snapshotIntersectionCallback();
+    expect(observerB).not.toBe(observerA);
+    observerA?.(true);
+    observerB?.(true);
+    await drainMicrotasks();
+    expect(reads).toEqual(["account-a", "account-b"]);
+    resolveFirst?.();
+    await drainMicrotasks();
+    effects.blur();
+    effects.focus();
+    await drainMicrotasks();
+    expect(reads).toEqual(["account-a", "account-b"]);
+    resolveSecond?.();
+    await drainMicrotasks();
+    owner.dispose();
+  });
+
+  test("synchronizes conversation view refs before action-owned work", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const active = { current: "conversation-a" as string | null };
+    const view = { current: "settings" };
+
+    viewport.synchronizeConversationViewRefs(active, view, "conversation-b", "chat");
+
+    expect(active.current).toBe("conversation-b");
+    expect(view.current).toBe("chat");
+  });
+
+  test("wires canonical readiness after anchor restoration and synchronous ref ownership", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf8",
+    );
+    const refSync = chat.indexOf(
+      "useLayoutEffect(() => {\n    synchronizeConversationViewRefs(",
+    );
+    const anchorHook = chat.indexOf("useTranscriptTurnAnchor({");
+    const viewportHook = chat.indexOf("useConversationActivityViewport({");
+    const refreshing = chat.indexOf('state.phase === "refreshing"');
+    const canonical = chat.indexOf('state.phase === "ready"');
+
+    expect(refSync).toBeGreaterThan(-1);
+    expect(anchorHook).toBeGreaterThan(refSync);
+    expect(viewportHook).toBeGreaterThan(anchorHook);
+    expect(chat.slice(refreshing, canonical)).toContain("stageCached");
+    expect(chat.slice(canonical, canonical + 900)).toContain("stageCanonical");
+    expect(chat).toContain("accountScopeKey: account?.user.id ?? null");
+    expect(chat).toContain("pendingScrollRestoreRef");
+    expect(chat).toContain("pendingMessageAnchorRef");
+
+    const saveAction = chat.slice(
+      chat.indexOf("const handleSaveStrategyAction"),
+      chat.indexOf("const handleLogout"),
+    );
+    const cancelAction = chat.slice(
+      chat.indexOf("const handleCancelConfirmationAction"),
+      chat.indexOf("const handleAction"),
+    );
+    expect(saveAction).toContain("synchronizeConversationViewRefs(");
+    expect(cancelAction).toContain("synchronizeConversationViewRefs(");
+  });
+
   test("wires one sentinel after rendered activity and before bottom padding", () => {
     const chat = readFileSync(
       join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
@@ -129,6 +404,7 @@ describe("conversation activity viewport read proof", () => {
       const reads: Array<[string, string]> = [];
       const owner = viewport.createConversationActivityViewportRuntime({
         inputs: {
+          ...canonicalProofContext,
           activeRouteConversationId: "conversation-a",
           activeConversationId: "conversation-a",
           activeConversationIdRef: "conversation-a",
@@ -165,6 +441,7 @@ describe("conversation activity viewport read proof", () => {
     const root = transcriptRoot("conversation-a");
     const latest = sentinel();
     const inputs: ViewportModule["ConversationActivityViewportInputs"] = {
+      ...canonicalProofContext,
       activeRouteConversationId: "conversation-a",
       activeConversationId: "conversation-a",
       activeConversationIdRef: "conversation-a",
@@ -212,6 +489,7 @@ describe("conversation activity viewport read proof", () => {
       const reads: string[] = [];
       const owner = viewport.createConversationActivityViewportRuntime({
         inputs: {
+          ...canonicalProofContext,
           activeRouteConversationId: "conversation-a",
           activeConversationId: "conversation-a",
           activeConversationIdRef: "conversation-a",
@@ -254,6 +532,7 @@ describe("conversation activity viewport read proof", () => {
     const rootA = transcriptRoot("conversation-a");
     const latestA = sentinel();
     const activeA: ViewportModule["ConversationActivityViewportInputs"] = {
+      ...canonicalProofContext,
       activeRouteConversationId: "conversation-a",
       activeConversationId: "conversation-a",
       activeConversationIdRef: "conversation-a",
@@ -306,6 +585,7 @@ describe("conversation activity viewport read proof", () => {
     const effects = controlledEffects();
     let attempts = 0;
     const inputs: ViewportModule["ConversationActivityViewportInputs"] = {
+      ...canonicalProofContext,
       activeRouteConversationId: "conversation-a",
       activeConversationId: "conversation-a",
       activeConversationIdRef: "conversation-a",
@@ -350,6 +630,7 @@ describe("conversation activity viewport read proof", () => {
     const effects = controlledEffects();
     let attempts = 0;
     const inputs: ViewportModule["ConversationActivityViewportInputs"] = {
+      ...canonicalProofContext,
       activeRouteConversationId: "conversation-a",
       activeConversationId: "conversation-a",
       activeConversationIdRef: "conversation-a",
@@ -394,6 +675,7 @@ describe("conversation activity viewport read proof", () => {
     const reads: Array<[string, string]> = [];
     const owner = viewport.createConversationActivityViewportRuntime({
       inputs: {
+        ...canonicalProofContext,
         activeRouteConversationId: "conversation-a",
         activeConversationId: "conversation-a",
         activeConversationIdRef: "conversation-a",
@@ -412,6 +694,7 @@ describe("conversation activity viewport read proof", () => {
     owner.start();
     const firstCallback = effects.snapshotIntersectionCallback();
     owner.updateInputs({
+      ...canonicalProofContext,
       activeRouteConversationId: "conversation-b",
       activeConversationId: "conversation-b",
       activeConversationIdRef: "conversation-b",

@@ -29,7 +29,7 @@ import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { useConversationActivity } from "@/components/chat/useConversationActivity";
-import { useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
+import { clearConversationActivityTranscript, conversationTranscriptUpdateScrollAction, createConversationActivityTranscriptReadiness, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import {
@@ -237,6 +237,7 @@ export default function ChatInterface() {
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [activityCausalClock] = useState(createConversationActivityCausalClock);
+  const [activityTranscriptReadiness] = useState(createConversationActivityTranscriptReadiness);
   const {
     historyItems,
     historyActivityRevision,
@@ -316,10 +317,10 @@ export default function ChatInterface() {
         readyTranscriptConversationIdRef.current === targetConversationId &&
         mutation !== "conversation_rename"
       ) {
-        readyTranscriptConversationIdRef.current = null;
+        clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
       }
     },
-    [account?.user.id, transcriptSessionCache],
+    [account?.user.id, activityTranscriptReadiness, transcriptSessionCache],
   );
   const invalidateInactiveActivityTranscript = useCallback(
     (targetConversationId: string) =>
@@ -353,17 +354,6 @@ export default function ChatInterface() {
     streamStatus,
     isStreamingResponse,
   );
-  useConversationActivityViewport({
-    activity: conversationActivity,
-    activeRouteConversationId:
-      currentView === "chat" ? readActiveConversationRouteState().conversationId : null,
-    activeConversationId: currentView === "chat" ? conversationId : null,
-    activeConversationIdRef,
-    readyTranscriptConversationIdRef,
-    transcriptRootRef: scrollContainerRef,
-    sentinelRef: latestActivitySentinelRef,
-    hydrationComplete: !isHydratingConversation,
-  });
   const handleDurableJobCompletion = useCallback(
     (targetConversationId: string) => {
       invalidateTranscriptForMutation(
@@ -397,10 +387,10 @@ export default function ChatInterface() {
     transcriptSessionCache.cancelActiveNavigation();
     clearColdTranscriptRetrieval();
     pendingScrollRestoreRef.current = null;
-    readyTranscriptConversationIdRef.current = null;
+    clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
     setFailedConversationId(null);
     setIsHydratingConversation(false);
-  }, [clearColdTranscriptRetrieval, transcriptSessionCache]);
+  }, [activityTranscriptReadiness, clearColdTranscriptRetrieval, transcriptSessionCache]);
 
   useLayoutEffect(() => {
     requestSessions.synchronizeAccountScope(account?.user.id ?? null);
@@ -411,9 +401,8 @@ export default function ChatInterface() {
     });
   }, [account?.user.id, conversationId, currentView, requestSessions]);
 
-  useEffect(() => {
-    activeConversationIdRef.current = conversationId;
-    currentViewRef.current = currentView;
+  useLayoutEffect(() => {
+    synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, conversationId, currentView);
   }, [conversationId, currentView]);
 
   const resetToEmptyChatSurface = useCallback(
@@ -426,9 +415,8 @@ export default function ChatInterface() {
         const clearedRoute = clearActiveConversationPointer();
         if (clearedRoute) router.replace(clearedRoute, { scroll: false });
       }
-      activeConversationIdRef.current = nextConversationId;
+      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, nextConversationId, "chat");
       hasAcceptedUserInputRef.current = false;
-      currentViewRef.current = "chat";
       setConversationId(nextConversationId);
       setMessages([]);
       setStreamStatus(null);
@@ -611,7 +599,7 @@ export default function ChatInterface() {
 
   function beginColdTranscriptRetrieval(targetConversationId: string): void {
     clearColdTranscriptRetrieval();
-    readyTranscriptConversationIdRef.current = null;
+    clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
     pendingScrollRestoreRef.current = null;
     setFailedConversationId(null);
     setMessages([]);
@@ -670,6 +658,7 @@ export default function ChatInterface() {
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
         readyTranscriptConversationIdRef.current = targetConversationId;
+        activityTranscriptReadiness.stageCanonical(targetConversationId);
         pendingScrollRestoreRef.current = null;
         pendingMessageAnchorRef.current = {
           conversationId: targetConversationId,
@@ -681,7 +670,7 @@ export default function ChatInterface() {
         if (!isCurrentRequest()) return;
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
-        readyTranscriptConversationIdRef.current = null;
+        clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
         pendingMessageAnchorRef.current = null;
         setMessages([]);
         if (options.bootstrap && isMissingConversationLoadError(error)) {
@@ -712,6 +701,7 @@ export default function ChatInterface() {
         }
         if (state.phase === "refreshing") {
           renderedStaleSnapshot = true;
+          activityTranscriptReadiness.stageCached(targetConversationId);
           stageTranscriptSnapshot(
             targetConversationId,
             userId,
@@ -728,6 +718,7 @@ export default function ChatInterface() {
                   targetConversationId
               ? (scrollContainerRef.current?.scrollTop ?? null)
               : undefined;
+          activityTranscriptReadiness.stageCanonical(targetConversationId);
           stageTranscriptSnapshot(
             targetConversationId,
             userId,
@@ -741,10 +732,11 @@ export default function ChatInterface() {
         setIsHydratingConversation(false);
         if (state.snapshot !== null) {
           readyTranscriptConversationIdRef.current = targetConversationId;
+          activityTranscriptReadiness.stageCached(targetConversationId);
           setMessages(state.snapshot);
           return;
         }
-        readyTranscriptConversationIdRef.current = null;
+        clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
         pendingScrollRestoreRef.current = null;
         setMessages([]);
         if (options.bootstrap && isMissingConversationLoadError(state.error)) {
@@ -852,8 +844,19 @@ export default function ChatInterface() {
     setShowJumpToLatest,
   });
 
+  useConversationActivityViewport({
+    activity: conversationActivity, accountScopeKey: account?.user.id ?? null,
+    activeRouteConversationId: currentView === "chat" ? readActiveConversationRouteState().conversationId : null,
+    activeConversationId: currentView === "chat" ? conversationId : null,
+    activeConversationIdRef, readyTranscriptConversationIdRef,
+    transcriptRootRef: scrollContainerRef, sentinelRef: latestActivitySentinelRef,
+    transcriptReadiness: activityTranscriptReadiness,
+    pendingScrollRestoreRef, pendingMessageAnchorRef,
+    hydrationComplete: !isHydratingConversation,
+  });
+
   useEffect(() => {
-    if (shouldAutoScrollRef.current) {
+    if (conversationTranscriptUpdateScrollAction(shouldAutoScrollRef.current) === "follow_latest") {
       scrollToLatest("smooth");
     } else {
       updateScrollPositionState();
@@ -932,7 +935,7 @@ export default function ChatInterface() {
     },
     onAllConversationsDeleted: () => {
       transcriptSessionCache.clearAuthenticatedState();
-      readyTranscriptConversationIdRef.current = null;
+      clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
       pendingScrollRestoreRef.current = null;
     },
   });
@@ -1098,8 +1101,7 @@ export default function ChatInterface() {
       rememberActiveConversationId(targetConversationId);
       setConversationId(targetConversationId);
     }
-    activeConversationIdRef.current = targetConversationId;
-    currentViewRef.current = "chat";
+    synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, targetConversationId, "chat");
 
     closeTransientSidebar();
     shouldAutoScrollRef.current = true;
@@ -1680,6 +1682,7 @@ export default function ChatInterface() {
     if (!targetConversationId) return;
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
+      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, targetConversationId, "chat");
       setConversationId(targetConversationId);
     }
     if (!strategiesEnabled) {
@@ -1817,6 +1820,7 @@ export default function ChatInterface() {
     invalidateTranscriptForMutation(targetConversationId, "message_send");
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
+      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, targetConversationId, "chat");
       setConversationId(targetConversationId);
     }
     const effect = confirmationActionEffectFromAction(action);

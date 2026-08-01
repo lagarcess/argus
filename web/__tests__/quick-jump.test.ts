@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const primitivePath = join(
@@ -23,21 +23,15 @@ describe("shared quick-jump primitive", () => {
     });
   });
 
-  test("preserves a scrolled-up position across token and completion renders", () => {
-    const chat = readFileSync(
-      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
-      "utf8",
+  test("preserves a scrolled-up position across token and completion renders", async () => {
+    const { conversationTranscriptUpdateScrollAction } = await import(
+      "../components/chat/useConversationActivityViewport"
     );
-    const effectStart = chat.indexOf("if (shouldAutoScrollRef.current) {");
-    const effectEnd = chat.indexOf("// ── Load existing conversation", effectStart);
-    const scrollEffect = chat.slice(effectStart, effectEnd);
 
-    expect(effectStart).toBeGreaterThan(-1);
-    expect(scrollEffect).toContain('scrollToLatest("smooth")');
-    expect(scrollEffect).toContain("} else {");
-    expect(scrollEffect).toContain("updateScrollPositionState();");
-    expect(scrollEffect).toContain("messages.length");
-    expect(scrollEffect).toContain("streamStatus");
+    expect(conversationTranscriptUpdateScrollAction(true)).toBe("follow_latest");
+    expect(conversationTranscriptUpdateScrollAction(false)).toBe(
+      "preserve_position",
+    );
   });
 
   test("numbers pinned visible items first and limits every surface to nine", async () => {
