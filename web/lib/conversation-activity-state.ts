@@ -513,6 +513,17 @@ export const selectConversationAttentionCursor = (
     ? state.byConversationId[conversationId]?.canonical?.attention.cursor ?? null
     : null;
 
+export const selectConversationMutationIsPending = (
+  state: ConversationActivityState,
+  conversationId: string,
+  action?: ConversationActivityPatch["action"],
+): boolean => {
+  const record = state.byConversationId[conversationId];
+  if (!record) return false;
+  const mutation = currentMutationForRecord(record);
+  return Boolean(mutation && (action === undefined || mutation.action === action));
+};
+
 export const selectAggregateConversationActivityPresentation = (
   state: ConversationActivityState,
   conversationIds: readonly string[] = Object.keys(state.byConversationId),

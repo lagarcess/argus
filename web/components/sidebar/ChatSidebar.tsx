@@ -659,6 +659,7 @@ export default function ChatSidebar({
                             onKeyDown={(e) => {
                               if (
                                 (e.key === "Enter" || e.key === " ") &&
+                                e.target === e.currentTarget &&
                                 renamingId !== item.id
                               ) {
                                 e.preventDefault();

@@ -25,6 +25,7 @@ import {
   selectConversationAnnouncement,
   selectConversationHasEffectiveUnread,
   selectConversationIsLocked,
+  selectConversationMutationIsPending,
   selectConversationRequestIsCurrent,
   selectManualUnreadGuard,
   type ConversationActivityCausalClock,
@@ -458,10 +459,8 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   isMutationPending = (
     conversationId: string,
     action?: MutationAction,
-  ): boolean => {
-    const mutation = this.state.byConversationId[conversationId]?.mutation;
-    return Boolean(mutation && (action === undefined || mutation.action === action));
-  };
+  ): boolean =>
+    selectConversationMutationIsPending(this.state, conversationId, action);
 
   registerTransport = (
     conversationId: string,

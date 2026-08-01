@@ -920,6 +920,41 @@ test("an open or focused Recents action keeps precedence over quick-jump", async
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 
+test("nested Recents menu keys open the menu while row keys still navigate", async ({
+  page,
+}) => {
+  const fixture = await installRecentsFixture(page, {
+    firstPage: [conversation("today-1"), conversation("today-2")],
+    secondPage: [],
+  });
+
+  await page.goto("/chat?conversation=today-2");
+  await openRecents(page);
+  const firstRow = recentRow(page, "today-1");
+  const firstMore = firstRow.getByRole("button", { name: "More" });
+
+  await firstMore.focus();
+  await firstMore.press("Enter");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  await page.keyboard.press("Escape");
+
+  await firstMore.press(" ");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  await page.keyboard.press("Escape");
+
+  await firstRow.focus();
+  await firstRow.press("Enter");
+  await expect(page).toHaveURL(/conversation=today-1(?:&|$)/);
+
+  const secondRow = recentRow(page, "today-2");
+  await secondRow.focus();
+  await secondRow.press(" ");
+  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
 test("Recents Quick Peek right-aligns exact-chord hints without moving titles", async ({
   page,
 }) => {

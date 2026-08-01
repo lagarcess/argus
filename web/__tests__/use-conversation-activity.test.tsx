@@ -510,6 +510,68 @@ describe("conversation activity mutations", () => {
     expect(harness.refreshes).toHaveLength(2);
   });
 
+  test("retires stale pending state so a newer canonical cursor can be marked read", async () => {
+    const requests = [
+      deferred<ConversationActivity>(),
+      deferred<ConversationActivity>(),
+    ];
+    const patches: ConversationActivityPatch[] = [];
+    let requestIndex = 0;
+    const harness = runtimeHarness({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-a")),
+      ],
+      activeConversationId: "conversation-a",
+      patchActivity: (_conversationId, patch) => {
+        patches.push(patch);
+        return requests[requestIndex++]!.promise;
+      },
+    });
+    harness.runtime.start();
+    await drainMicrotasks();
+
+    const firstRead = harness.runtime.markRead("conversation-a", "cursor-a");
+    expect(harness.runtime.isMutationPending("conversation-a", "mark_read")).toBe(
+      true,
+    );
+
+    harness.runtime.updateInputs({
+      historyItems: [
+        chat("conversation-a", idleActivity("new_activity", "cursor-b")),
+      ],
+      activeConversationId: "conversation-a",
+      accountScopeKey: "account-a",
+    });
+
+    expect(harness.runtime.selectAttentionCursor("conversation-a")).toBe(
+      "cursor-b",
+    );
+    expect(harness.runtime.hasEffectiveUnread("conversation-a")).toBe(true);
+    expect(harness.runtime.isMutationPending("conversation-a", "mark_read")).toBe(
+      false,
+    );
+    expect(harness.runtime.isMutationPending("conversation-a")).toBe(false);
+
+    const secondRead = harness.runtime.markRead("conversation-a", "cursor-b");
+    expect(patches).toEqual([
+      { action: "mark_read", through_attention_cursor: "cursor-a" },
+      { action: "mark_read", through_attention_cursor: "cursor-b" },
+    ]);
+
+    requests[0]!.resolve(idleActivity());
+    await firstRead;
+    expect(harness.runtime.isMutationPending("conversation-a", "mark_read")).toBe(
+      true,
+    );
+    expect(harness.notices).toEqual([]);
+
+    requests[1]!.resolve(idleActivity());
+    await secondRead;
+    expect(harness.runtime.isMutationPending("conversation-a", "mark_read")).toBe(
+      false,
+    );
+  });
+
   test("scopes stale success, stale failure, and current rollback to mutation identity", async () => {
     const requests = [
       deferred<ConversationActivity>(),
