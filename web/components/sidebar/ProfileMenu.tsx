@@ -815,10 +815,6 @@ export default function ProfileMenu({
                       "settings.profile.avatar_theme.change",
                       "Edit avatar",
                     )}
-                    title={t(
-                      "settings.profile.avatar_theme.change",
-                      "Edit avatar",
-                    )}
                     aria-expanded={isAvatarPickerOpen}
                     aria-controls="argus-avatar-theme-drawer"
                     data-avatar-theme-trigger
@@ -942,7 +938,7 @@ export default function ProfileMenu({
                   inert={!isAvatarPickerOpen}
                 >
                   <div className="min-h-0 overflow-hidden">
-                    <div className="border-t border-black/10 pt-1.5 dark:border-white/10">
+                    <div className="pt-1">
                       <button
                         type="button"
                         onClick={closeAvatarPicker}
@@ -1000,14 +996,18 @@ export default function ProfileMenu({
                               onClick={() => void handleAvatarThemeSelect(theme.token)}
                               className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-white/50 sm:col-span-1 ${
                                 index === 4 ? "col-start-2 sm:col-auto" : ""
-                              } ${
-                                selected
-                                  ? "ring-2 ring-black ring-offset-2 dark:ring-white dark:ring-offset-[#1b1d20]"
-                                  : ""
                               }`}
                             >
                               <span
-                                className={`flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold ${theme.className}`}
+                                className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold ${theme.className} ${
+                                  theme.token === "ocean"
+                                    ? "border-black/20 dark:border-white/20"
+                                    : "border-transparent"
+                                } ${
+                                  selected
+                                    ? "ring-2 ring-black/70 dark:ring-white/80"
+                                    : ""
+                                }`}
                                 style={avatarThemeStyle(theme.token, "picker")}
                                 aria-hidden="true"
                               >

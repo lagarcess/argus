@@ -82,6 +82,12 @@ describe("avatar monogram themes", () => {
     expect(menu).not.toContain("avatarPickerDialogRef");
     expect(menu).not.toContain("argus-avatar-theme-picker-title");
     expect(menu).toContain("h-11 w-11 items-center justify-center");
+    expect(menu).toContain("flex h-9 w-9 items-center justify-center");
+    expect(menu).toContain("ring-2 ring-black/70 dark:ring-white/80");
+    expect(menu).toContain('theme.token === "ocean"');
+    expect(menu).toContain('"border-black/20 dark:border-white/20"');
+    expect(menu).not.toContain("ring-offset-2");
+    expect(menu).not.toContain("border-t border-black/10 pt-1.5");
     expect(menu).toContain("grid-cols-8 place-items-center");
     expect(menu).toContain("sm:grid-cols-7");
     expect(menu).toContain("Avatar color");
