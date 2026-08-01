@@ -40,7 +40,7 @@ export default function ExpiredGuestSession({
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-background px-6 py-10 text-foreground">
-      <section className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white p-7 shadow-xl dark:border-white/10 dark:bg-[#1d1f24] sm:p-9">
+      <section className="w-full max-w-md rounded-[20px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#1d1f24] sm:p-9">
         <p className="text-center font-display text-3xl font-medium tracking-tight">
           argus
         </p>
@@ -70,6 +70,7 @@ export default function ExpiredGuestSession({
             <AuthForm
               mode={authMode}
               allowModeSwitch={publicAccountAccessEnabled}
+              embedded
               onModeChange={setAuthMode}
               onSubmit={async ({ mode, email, password }) => {
                 if (mode === "signup") {

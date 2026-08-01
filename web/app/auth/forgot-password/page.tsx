@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center px-6 py-12">
-      <section className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]">
+      <section className="w-full max-w-md rounded-[20px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]">
         <Link
           href="/?auth=login"
           className="text-sm font-medium text-black/55 hover:text-black dark:text-white/55 dark:hover:text-white"

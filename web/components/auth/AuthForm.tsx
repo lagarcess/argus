@@ -16,6 +16,7 @@ export type AuthFormSubmission = {
 type AuthFormProps = {
   mode: AuthFormMode;
   allowModeSwitch?: boolean;
+  embedded?: boolean;
   onModeChange?: (mode: AuthFormMode) => void;
   onSubmit: (submission: AuthFormSubmission) => Promise<void>;
 };
@@ -23,6 +24,7 @@ type AuthFormProps = {
 export default function AuthForm({
   mode,
   allowModeSwitch = true,
+  embedded = false,
   onModeChange,
   onSubmit,
 }: AuthFormProps) {
@@ -58,7 +60,13 @@ export default function AuthForm({
   };
 
   return (
-    <div className="w-full">
+    <div
+      className={
+        embedded
+          ? "w-full"
+          : "w-full rounded-[20px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]"
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-3">
         {isSignup && (
           <input

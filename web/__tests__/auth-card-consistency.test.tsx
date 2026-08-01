@@ -1,0 +1,93 @@
+import { describe, test } from "bun:test";
+import i18next from "i18next";
+import { doesNotMatch, equal, match } from "node:assert/strict";
+import { createElement, type ComponentProps, type ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { I18nextProvider } from "react-i18next";
+
+import ForgotPasswordPage from "../app/auth/forgot-password/page";
+import AuthForm from "../components/auth/AuthForm";
+import ExpiredGuestSession from "../components/guest/ExpiredGuestSession";
+import GuestConversionModal from "../components/guest/GuestConversionModal";
+import en from "../public/locales/en/common.json";
+
+async function renderLocalized(element: ReactElement): Promise<string> {
+  const i18n = i18next.createInstance();
+  await i18n.init({
+    lng: "en",
+    fallbackLng: false,
+    interpolation: { escapeValue: false },
+    resources: { en: { translation: en } },
+  });
+
+  return renderToStaticMarkup(
+    createElement(I18nextProvider, { i18n }, element),
+  );
+}
+
+function authForm(embedded: boolean): ReactElement {
+  const props = {
+    mode: "login" as const,
+    embedded,
+    onModeChange: () => undefined,
+    onSubmit: async () => undefined,
+  } as ComponentProps<typeof AuthForm> & { embedded: boolean };
+  return createElement(AuthForm, props);
+}
+
+function occurrences(value: string, fragment: string): number {
+  return value.split(fragment).length - 1;
+}
+
+describe("auth card consistency", () => {
+  test("standalone auth owns one canonical card while embedded auth adds none", async () => {
+    const standalone = await renderLocalized(authForm(false));
+    const embedded = await renderLocalized(authForm(true));
+    const canonicalCard =
+      "rounded-[20px] border border-black/10 bg-white p-7";
+
+    equal(occurrences(standalone, canonicalCard), 1);
+    doesNotMatch(standalone, /shadow/);
+    equal(occurrences(embedded, canonicalCard), 0);
+  });
+
+  test("expired guest session uses one 20px zero-shadow card", async () => {
+    const html = await renderLocalized(
+      createElement(ExpiredGuestSession, {
+        publicAccountAccessEnabled: true,
+      }),
+    );
+
+    equal(occurrences(html, "border border-black/10"), 1);
+    match(html, /rounded-\[20px\]/);
+    doesNotMatch(html, /rounded-\[2rem\]/);
+    doesNotMatch(html, /shadow/);
+  });
+
+  test("guest conversion uses one 20px zero-shadow card", async () => {
+    const html = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "new_conversation",
+        initialMode: "login",
+        publicAccountAccessEnabled: true,
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
+
+    equal(occurrences(html, "border border-black/10"), 1);
+    match(html, /rounded-\[20px\]/);
+    doesNotMatch(html, /rounded-\[28px\]/);
+    doesNotMatch(html, /shadow/);
+  });
+
+  test("forgot password uses the canonical 20px card radius", async () => {
+    const html = await renderLocalized(createElement(ForgotPasswordPage));
+
+    equal(occurrences(html, "border border-black/10"), 1);
+    match(html, /rounded-\[20px\]/);
+    doesNotMatch(html, /rounded-\[24px\]/);
+    doesNotMatch(html, /shadow/);
+  });
+});
