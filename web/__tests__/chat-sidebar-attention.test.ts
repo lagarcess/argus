@@ -13,8 +13,17 @@ describe("chat sidebar attention styling", () => {
     const rowClassStart = sidebar.indexOf("className={`group relative flex w-full");
     const rowClassEnd = sidebar.indexOf("}`}", rowClassStart);
     const rowClassBlock = sidebar.slice(rowClassStart, rowClassEnd);
+    const attentionLaneStart = sidebar.indexOf(
+      'className="flex h-6 w-11 flex-shrink-0 items-center justify-center"',
+    );
+    const attentionLaneEnd = sidebar.indexOf("</div>", attentionLaneStart);
+    const attentionLaneBlock = sidebar.slice(
+      attentionLaneStart,
+      attentionLaneEnd,
+    );
 
     expect(rowClassStart).toBeGreaterThan(-1);
+    expect(attentionLaneStart).toBeGreaterThan(-1);
     expect(rowClassBlock).toContain("isActiveConversation");
     expect(rowClassBlock).not.toContain("bg-[#7da0ca]");
     expect(sidebar).toContain('data-has-attention={hasConversationAttention ? "true" : undefined}');
@@ -23,5 +32,9 @@ describe("chat sidebar attention styling", () => {
     expect(sidebar).toContain('<span className="sr-only">{attentionLabel}</span>');
     expect(sidebar).toContain("bg-[#70a38d]");
     expect(sidebar).toContain('hasConversationAttention\n                                    ? "text-black/60 dark:text-white/60"');
+    expect(attentionLaneBlock).not.toContain("QuickJumpBadge");
+    expect(sidebar).toContain("data-quick-jump-hint={quickJumpNumber}");
+    expect(sidebar.indexOf("quickJumpHint={quickJumpHint}", attentionLaneEnd))
+      .toBeGreaterThan(attentionLaneEnd);
   });
 });

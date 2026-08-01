@@ -127,12 +127,7 @@ export default function RecentsQuickPeek({
                       : ""
                   }`}
                 >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                    {isQuickJumpActive && number !== null ? (
-                      <QuickJumpBadge number={number} />
-                    ) : null}
-                  </span>
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="font-display block truncate text-[13px] font-medium">
                       {conversationDisplayTitle(
                         item,
@@ -143,6 +138,18 @@ export default function RecentsQuickPeek({
                       {item.subtitle}
                     </span>
                   </span>
+                  {isQuickJumpActive && number !== null ? (
+                    <span
+                      data-quick-jump-hint={number}
+                      className="pointer-events-none ml-auto flex h-[22px] shrink-0 items-center justify-end"
+                    >
+                      <QuickJumpBadge
+                        number={number}
+                        presentation="shortcut_hint"
+                        usesCommandKey={usesCommandKey}
+                      />
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

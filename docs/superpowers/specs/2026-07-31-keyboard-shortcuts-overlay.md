@@ -162,3 +162,13 @@ founder choice before this branch can claim that follow-up is complete.
 No backend/schema change, shortcut remapping UI, Omnisearch behavior change,
 or unconfirmed delete path was introduced. `Cmd+K` / `Ctrl+K` continues to
 open Omnisearch through the same shared registry match.
+
+### Follow-up correction — Recents quick-jump presentation (2026-08-01)
+
+The accepted Recents endpoint is a right-aligned exact-chord keycap, matching
+Settings, rather than the left numeric badge described by the implementation
+variance above. Expanded Recents keeps its left gutter reserved for the
+conversation attention marker, and Recents Quick Peek uses the same trailing
+presentation. See
+[`2026-07-31-recents-quick-jump-attention-marker.md`](./2026-07-31-recents-quick-jump-attention-marker.md)
+for the locked corrective contract.
