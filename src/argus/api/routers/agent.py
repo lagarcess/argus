@@ -83,6 +83,12 @@ from argus.api.chat.request_admission import (
     reject_invalid_non_run_confirmation_action,
 )
 from argus.api.chat.result_actions import result_action_request_type
+from argus.api.chat.retest import (
+    complete_retest_turn,
+    failed_retest_turn,
+    is_retest_action,
+    prepare_retest_turn,
+)
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.run_action_identity import (
     require_run_action_identity,
@@ -397,6 +403,13 @@ async def chat_stream(
         stale_confirmation_message=stale_confirmation_message,
         language=language,
     )
+    retest_turn = prepare_retest_turn(
+        payload=payload,
+        request=request,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        language=language,
+    )
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,
@@ -407,6 +420,11 @@ async def chat_stream(
         enabled=True,
         language=language,
         owner="message_only" if is_run_backtest_turn else "ordinary_turn",
+        extra_user_metadata=(
+            {"retest_receipt": dict(retest_turn.receipt)}
+            if retest_turn is not None
+            else None
+        ),
     )
     runtime_fallback = RuntimeFallbackContext()
     validated_option_source = request_admission.admit_response_option()
@@ -425,7 +443,7 @@ async def chat_stream(
     lifecycle_hooks = (
         None if is_run_backtest_turn else request_admission.lifecycle_hooks()
     )
-    deterministic_control_turn = cancel_confirmation_action
+    deterministic_control_turn = cancel_confirmation_action or is_retest_action(payload)
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
@@ -731,6 +749,47 @@ async def chat_stream(
                     },
                 }
             )
+            yield sse_done()
+            return
+
+        if retest_turn is not None:
+            try:
+                retest_payload = complete_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    conversation_id=conversation.id,
+                    language=runtime_user.language_preference,
+                    settle_usage=ordinary_turn_settlement(
+                        is_run_backtest_turn=False,
+                        account=turn_account,
+                        visitor_key=(
+                            visitor_key_for(client_identity(request))
+                            if turn_account.kind == "guest"
+                            else None
+                        ),
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Retest confirmation materialization failed",
+                    conversation_id=conversation.id,
+                    source_run_id=retest_turn.source_run_id,
+                )
+                failure_payload = failed_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    request_message=request_message_record,
+                    language=runtime_user.language_preference,
+                )
+                claim_turn_terminal("recoverable_failed", "agent_runtime_failure")
+                record_control_exit("retest_run", "recoverable_failed")
+                persist_turn_evidence()
+                yield sse_data({"type": "final", "payload": failure_payload})
+                yield sse_done()
+                return
+            record_control_exit("retest_run", "finished")
+            persist_turn_evidence()
+            yield sse_data({"type": "final", "payload": retest_payload})
             yield sse_done()
             return
 

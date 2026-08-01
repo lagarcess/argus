@@ -70,11 +70,11 @@ const dossierCopy = {
     en: "Decision note",
     es419: "Nota de decisión",
   },
-  "command_palette.run_fresh_short": {
-    en: "Retest setup",
-    es419: "Volver a probar la configuración",
+  "command_palette.retest_current_data": {
+    en: "Retest with current data",
+    es419: "Volver a probar con datos actuales",
   },
-  "command_palette.run_fresh_tooltip": {
+  "command_palette.retest_tooltip": {
     en: "Reuse this setup with the latest available data. You’ll review it before it runs.",
     es419: "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
   },

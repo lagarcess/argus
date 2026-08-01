@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Route,
+} from "@playwright/test";
 
 const TODAY = "2026-07-28T16:00:00.000Z";
 const CURSOR = "issue-245-page-2";
@@ -18,8 +24,10 @@ type FixtureState = {
 };
 
 type ConversationRecord = ReturnType<typeof conversation>;
+type ShortcutPlatform = "mac" | "other";
 
 type FixtureOptions = {
+  darkMode?: boolean;
   firstPage?: ConversationRecord[];
   firstPageDelayMs?: number;
   firstPageDelayOnRequest?: number;
@@ -27,6 +35,7 @@ type FixtureOptions = {
   secondPage?: ConversationRecord[];
   secondPageDelayMs?: number;
   secondPageFailures?: number;
+  shortcutPlatform?: ShortcutPlatform;
   streamDelayMs?: number;
 };
 
@@ -99,10 +108,29 @@ async function installRecentsFixture(
     unexpectedRequests: [],
   };
 
-  await page.addInitScript((fixtureLanguage) => {
-    window.localStorage.setItem("argus:sidebar_mode", "expanded");
-    window.localStorage.setItem("i18nextLng", fixtureLanguage);
-  }, language);
+  await page.addInitScript(
+    ({ fixtureLanguage, shortcutPlatform, useDarkMode }) => {
+      window.localStorage.setItem("argus:sidebar_mode", "expanded");
+      window.localStorage.setItem("i18nextLng", fixtureLanguage);
+      if (useDarkMode) {
+        window.localStorage.setItem("argus-theme", "dark");
+      }
+      if (shortcutPlatform) {
+        Object.defineProperty(window.navigator, "userAgent", {
+          configurable: true,
+          value:
+            shortcutPlatform === "mac"
+              ? "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/138 Safari/537.36"
+              : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/138 Safari/537.36",
+        });
+      }
+    },
+    {
+      fixtureLanguage: language,
+      shortcutPlatform: options.shortcutPlatform,
+      useDarkMode: options.darkMode ?? false,
+    },
+  );
 
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
@@ -322,6 +350,55 @@ async function captureEvidence(page: Page, filename: string) {
     path: `${EVIDENCE_DIR}/${filename}`,
     fullPage: true,
   });
+}
+
+async function requiredBoundingBox(locator: Locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box!;
+}
+
+async function holdQuickJumpModifier(
+  page: Page,
+  platform: ShortcutPlatform,
+) {
+  if (platform === "mac") {
+    await page.keyboard.down("Meta");
+    return;
+  }
+  await page.keyboard.down("Control");
+  await page.keyboard.down("Shift");
+}
+
+async function releaseQuickJumpModifier(
+  page: Page,
+  platform: ShortcutPlatform,
+) {
+  if (platform === "mac") {
+    await page.keyboard.up("Meta");
+    return;
+  }
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("Control");
+}
+
+async function pressQuickJumpNumber(
+  page: Page,
+  platform: ShortcutPlatform,
+  number: number,
+) {
+  await holdQuickJumpModifier(page, platform);
+  if (platform === "mac") await page.keyboard.down("Alt");
+  await page.keyboard.press(String(number));
+  if (platform === "mac") await page.keyboard.up("Alt");
+  await releaseQuickJumpModifier(page, platform);
+}
+
+function expectedQuickJumpHint(
+  platform: ShortcutPlatform,
+  number: number,
+) {
+  return platform === "mac" ? `⌘⌥${number}` : `Ctrl+Shift+${number}`;
 }
 
 async function openRecents(
@@ -716,41 +793,200 @@ test("rename, pin, unpin, selection, and delete keep their conversation identity
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 
-test("an out-of-focus settled turn keeps its Recents attention marker until reopened", async ({
+for (const scenario of [
+  {
+    language: "en" as const,
+    platform: "mac" as const,
+    attentionLabel: "New activity",
+  },
+  {
+    language: "es-419" as const,
+    platform: "other" as const,
+    attentionLabel: "Actividad nueva",
+  },
+]) {
+  test(`${scenario.language} ${scenario.platform} quick-jump keeps attention and row alignment until open`, async ({
+    page,
+  }) => {
+    const fixture = await installRecentsFixture(page, {
+      darkMode: true,
+      firstPage: [conversation("today-1"), conversation("today-2")],
+      language: scenario.language,
+      secondPage: [],
+      shortcutPlatform: scenario.platform,
+      streamDelayMs: 350,
+    });
+
+    await page.goto("/chat?conversation=today-1");
+    await openRecents(page, scenario.language);
+    await page.getByTestId("chat-input").fill("Settle this turn later");
+    await page.getByTestId("chat-send").click();
+    await recentRow(page, "today-2").click();
+    await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+
+    const row = recentRow(page, "today-1");
+    const title = row.getByText("Conversation today-1", { exact: true });
+    const subtitle = row.getByText("Summary today-1", { exact: true });
+    await expect(row).toHaveAttribute("data-has-attention", "true");
+    await expect(row).toHaveAccessibleName(
+      new RegExp(`Conversation today-1\\. ${scenario.attentionLabel}\\.`),
+    );
+    const rowBefore = await requiredBoundingBox(row);
+    const titleBefore = await requiredBoundingBox(title);
+    const subtitleBefore = await requiredBoundingBox(subtitle);
+    if (scenario.language === "en") {
+      await captureEvidence(page, "01-en-mac-recents-attention-rest.png");
+    }
+
+    await holdQuickJumpModifier(page, scenario.platform);
+    const hint = row.locator('[data-quick-jump-hint="1"]');
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText(
+      expectedQuickJumpHint(scenario.platform, 1),
+    );
+    await expect(row).toHaveAttribute("data-has-attention", "true");
+    await expect(row).toHaveAccessibleName(
+      new RegExp(`Conversation today-1\\. ${scenario.attentionLabel}\\.`),
+    );
+
+    const rowAfter = await requiredBoundingBox(row);
+    const titleAfter = await requiredBoundingBox(title);
+    const subtitleAfter = await requiredBoundingBox(subtitle);
+    const attentionDot = await requiredBoundingBox(
+      row.locator('span[aria-hidden="true"]').first(),
+    );
+    const hintBox = await requiredBoundingBox(hint);
+    expect(rowAfter.height).toBeCloseTo(rowBefore.height, 1);
+    expect(titleAfter.x).toBeCloseTo(titleBefore.x, 1);
+    expect(subtitleAfter.x).toBeCloseTo(subtitleBefore.x, 1);
+    expect(attentionDot.x + attentionDot.width).toBeLessThan(hintBox.x);
+    expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(
+      rowAfter.x + rowAfter.width,
+    );
+    await captureEvidence(
+      page,
+      scenario.language === "en"
+        ? "02-en-mac-recents-attention-shortcut.png"
+        : "05-es-other-recents-attention-shortcut.png",
+    );
+
+    await releaseQuickJumpModifier(page, scenario.platform);
+    await expect(hint).toHaveCount(0);
+    await expect(row).toHaveAttribute("data-has-attention", "true");
+
+    await pressQuickJumpNumber(page, scenario.platform, 1);
+    await expect(row).toHaveAttribute("aria-current", "page");
+    await expect(row).not.toHaveAttribute("data-has-attention", "true");
+    expect(fixture.streamRequests).toHaveLength(1);
+    expect(fixture.historyRequests).toEqual([]);
+    expect(fixture.unexpectedRequests).toEqual([]);
+  });
+}
+
+test("an open or focused Recents action keeps precedence over quick-jump", async ({
   page,
 }) => {
   const fixture = await installRecentsFixture(page, {
+    darkMode: true,
     firstPage: [conversation("today-1"), conversation("today-2")],
     secondPage: [],
-    streamDelayMs: 350,
+    shortcutPlatform: "mac",
   });
 
-  await page.goto("/chat?conversation=today-1");
+  await page.goto("/chat?conversation=today-2");
   await openRecents(page);
-  await page.getByTestId("chat-input").fill("Settle this turn later");
-  await page.getByTestId("chat-send").click();
-  await recentRow(page, "today-2").click();
-  await expect(page).toHaveURL(/conversation=today-2(?:&|$)/);
+  const row = recentRow(page, "today-1");
+  const more = row.getByRole("button", { name: "More" });
+  await row.hover();
+  await more.click();
+  await expect(page.getByRole("menu")).toBeVisible();
 
-  await expect(recentRow(page, "today-1")).toHaveAttribute(
-    "data-has-attention",
-    "true",
-  );
-  await expect(recentRow(page, "today-1")).toHaveAccessibleName(
-    /Conversation today-1\. New activity\./,
-  );
+  await holdQuickJumpModifier(page, "mac");
+  await expect(more).toBeVisible();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(row.locator('[data-quick-jump-hint="1"]')).toHaveCount(0);
+  await expect(page.getByRole("menu")).toBeVisible();
+  await releaseQuickJumpModifier(page, "mac");
 
-  await recentRow(page, "today-1").click();
-  await expect(recentRow(page, "today-1")).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(recentRow(page, "today-1")).not.toHaveAttribute(
-    "data-has-attention",
-    "true",
-  );
-  expect(fixture.streamRequests).toHaveLength(1);
-  expect(fixture.historyRequests).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await more.focus();
+  await holdQuickJumpModifier(page, "mac");
+  await expect(more).toBeFocused();
+  await expect(row.locator('[data-quick-jump-hint="1"]')).toHaveCount(0);
+  await row.focus();
+  await expect(row.locator('[data-quick-jump-hint="1"]')).toBeVisible();
+  await releaseQuickJumpModifier(page, "mac");
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
+test("Recents Quick Peek right-aligns exact-chord hints without moving titles", async ({
+  page,
+}) => {
+  const fixture = await installRecentsFixture(page, {
+    darkMode: true,
+    firstPage: [conversation("today-1"), conversation("today-2")],
+    secondPage: [],
+    shortcutPlatform: "mac",
+  });
+
+  await page.goto("/chat");
+  await expect
+    .poll(() => fixture.conversationRequests)
+    .toHaveLength(1);
+  await expect(page.getByRole("button", { name: "Recents" })).toBeVisible();
+  await page.keyboard.press("Meta+Shift+Comma");
+  const dialog = page.getByRole("dialog", { name: "Recents" });
+  const row = dialog.getByRole("button", { name: /Conversation today-1/ });
+  const title = row.getByText("Conversation today-1", { exact: true });
+  const rowBefore = await requiredBoundingBox(row);
+  const titleBefore = await requiredBoundingBox(title);
+
+  await holdQuickJumpModifier(page, "mac");
+  const hint = row.locator('[data-quick-jump-hint="1"]');
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText("⌘⌥1");
+  const rowAfter = await requiredBoundingBox(row);
+  const titleAfter = await requiredBoundingBox(title);
+  const hintBox = await requiredBoundingBox(hint);
+  expect(rowAfter.height).toBeCloseTo(rowBefore.height, 1);
+  expect(titleAfter.x).toBeCloseTo(titleBefore.x, 1);
+  expect(hintBox.x).toBeGreaterThan(titleAfter.x);
+  await captureEvidence(page, "03-en-mac-recents-quick-peek.png");
+  await releaseQuickJumpModifier(page, "mac");
+
+  await pressQuickJumpNumber(page, "mac", 1);
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/conversation=today-1(?:&|$)/);
+  expect(fixture.unexpectedRequests).toEqual([]);
+});
+
+test("Settings keeps the exact-chord keycap convention used by Recents", async ({
+  page,
+}) => {
+  const fixture = await installRecentsFixture(page, {
+    darkMode: true,
+    firstPage: [conversation("today-1"), conversation("today-2")],
+    secondPage: [],
+    shortcutPlatform: "mac",
+  });
+
+  await page.goto("/chat");
+  await expect
+    .poll(() => fixture.conversationRequests)
+    .toHaveLength(1);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: /Preferences/ }).click();
+  const preferences = page.locator('[aria-label="Preferences"]');
+  await expect(preferences).toBeVisible();
+  const appearance = preferences.getByRole("button", { name: /Appearance/ });
+
+  await holdQuickJumpModifier(page, "mac");
+  await page.keyboard.down("Alt");
+  await expect(appearance).toContainText("⌘⌥1");
+  await captureEvidence(page, "04-en-mac-settings-comparison.png");
+  await page.keyboard.up("Alt");
+  await releaseQuickJumpModifier(page, "mac");
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 

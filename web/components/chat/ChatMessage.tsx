@@ -9,6 +9,7 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import { RetestReceipt } from "./RetestReceipt";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
@@ -263,11 +264,21 @@ export default function ChatMessage({
   );
 
   if (isUser && message.kind === "action") {
+    const actionText =
+      displayContent ||
+      (message.selectedAction ? actionLabel(message.selectedAction) : "");
     return (
       <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
-        </div>
+        {message.retestReceipt ? (
+          <RetestReceipt
+            receipt={message.retestReceipt}
+            actionLabel={actionText}
+          />
+        ) : (
+          <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
+            {actionText}
+          </div>
+        )}
         <UserTurnRecovery
           recoveryText={userRecoveryText}
           retryAction={retryAction}

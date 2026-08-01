@@ -128,7 +128,12 @@ def _hydration_row() -> dict[str, Any]:
                     "capital_amount": 10_000,
                 },
             },
-            "conversation_result_card": {"title": "Latest run"},
+            "conversation_result_card": {
+                "title": "Latest run",
+                "evidence_artifact_id": "latest-evidence",
+                "idea_id": "latest-idea",
+                "idea_version_id": "latest-idea-version",
+            },
             "created_at": ACTIVITY_AT,
             "updated_at": ACTIVITY_AT,
         },
@@ -139,7 +144,12 @@ def _hydration_row() -> dict[str, Any]:
             "symbols": ["MSFT"],
             "benchmark_symbol": "SPY",
             "config_snapshot": {"template": "buy_and_hold"},
-            "conversation_result_card": {"title": "Judged older run"},
+            "conversation_result_card": {
+                "title": "Judged older run",
+                "evidence_artifact_id": "judged-evidence",
+                "idea_id": "judged-idea",
+                "idea_version_id": "judged-idea-version",
+            },
             "created_at": "2025-01-01T12:00:00+00:00",
             "updated_at": "2025-01-01T12:00:00+00:00",
         },
@@ -1048,7 +1058,7 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     assert item.dossier.decision.run_label == "Latest run"
     assert item.dossier.outcome.run_label == "Latest run"
     assert [action.type for action in item.dossier.actions] == [
-        "run_fresh",
+        "retest_run",
         "decision",
     ]
     decision_action = item.dossier.actions[1]

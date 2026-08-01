@@ -92,7 +92,7 @@ type ChatCommandPaletteProps = {
     messageId?: string,
     openAtLeftOff?: boolean,
   ) => void;
-  onRunFresh: (conversationId: string, sendText: string) => Promise<void> | void;
+  onRetest: (conversationId: string, sourceRunId: string) => Promise<void> | void;
   turnInFlight?: boolean;
   activeConversationId: string | null;
   isGuest?: boolean;
@@ -241,7 +241,7 @@ function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
 export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
-  onRunFresh,
+  onRetest,
   turnInFlight = false,
   activeConversationId,
   isGuest = false,
@@ -1726,7 +1726,7 @@ export default function ChatCommandPalette({
                           !selectedPreview.conversationId ||
                           selectedNavigationDisabled
                         }
-                        runFreshDisabled={turnInFlight}
+                        retestDisabled={turnInFlight}
                         onOpenConversation={() => {
                           openSelectedDossierConversation({
                             conversationId: selectedPreview.conversationId,
@@ -1737,11 +1737,11 @@ export default function ChatCommandPalette({
                             onClose,
                           });
                         }}
-                        onRunFresh={(action) => {
+                        onRetest={(sourceRunId) => {
                           if (!selectedPreview.conversationId) return;
-                          return onRunFresh(
+                          return onRetest(
                             selectedPreview.conversationId,
-                            action.send_text,
+                            sourceRunId,
                           );
                         }}
                         onSaveDecision={(action, draft) =>

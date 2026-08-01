@@ -51,6 +51,7 @@ _ACTION_LABELS = {
         "chat.result_card.refine_idea": "Refine idea",
         "chat.result_card.save": "Save",
         "common.retry": "Retry",
+        "command_palette.retest_current_data": "Retest with current data",
         "chat.coverage_recovery.actions.change_dates": "Change dates",
         "chat.coverage_recovery.actions.change_asset": "Change asset",
         "chat.coverage_recovery.actions.change_benchmark": "Change benchmark",
@@ -67,6 +68,7 @@ _ACTION_LABELS = {
         "chat.result_card.refine_idea": "Ajustar idea",
         "chat.result_card.save": "Guardar",
         "common.retry": "Reintentar",
+        "command_palette.retest_current_data": "Volver a probar con datos actuales",
         "chat.coverage_recovery.actions.change_dates": "Cambiar fechas",
         "chat.coverage_recovery.actions.change_asset": "Cambiar activo",
         "chat.coverage_recovery.actions.change_benchmark": "Cambiar referencia",
@@ -85,7 +87,10 @@ _ACTION_TYPE_LABEL_KEYS = {
     "refine_strategy": "chat.result_card.refine_idea",
     "save_strategy": "chat.result_card.save",
     "retry_failed_action": "common.retry",
+    "retest_run": "command_palette.retest_current_data",
 }
+
+_BACKEND_OWNED_LABEL_ACTIONS = frozenset({"retest_run"})
 
 
 @dataclass(frozen=True)
@@ -99,6 +104,13 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if payload.action is None:
         return payload.message or ""
     action_type = payload.action.type
+    if action_type in _BACKEND_OWNED_LABEL_ACTIONS:
+        # Backend-owned product actions: the client's display copy carries no
+        # authority, so the turn text always comes from the canonical label key.
+        return _localized_action_label(
+            _ACTION_TYPE_LABEL_KEYS[action_type],
+            language=language,
+        ) or _ACTION_TYPE_LABEL_KEYS[action_type]
     if action_type == "select_discovery_candidate":
         # The chip label is the exact natural-language turn the user saw and
         # tapped; the runtime interprets it as ordinary text.
@@ -137,8 +149,11 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
 def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") -> str:
     if payload.action is None:
         return payload.message or ""
-    label_key = payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(
-        payload.action.type
+    label_key = (
+        _ACTION_TYPE_LABEL_KEYS[payload.action.type]
+        if payload.action.type in _BACKEND_OWNED_LABEL_ACTIONS
+        else payload.action.label_key
+        or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
     )
     if label_key:
         localized = _localized_action_label(label_key, language=language)
@@ -257,6 +272,18 @@ def persisted_chat_action(payload: ChatStreamRequest) -> dict[str, Any] | None:
     if payload.action is None:
         return None
     action = payload.action.model_dump(mode="python")
+    if payload.action.type == "retest_run":
+        from argus.api.chat.retest import (
+            retest_action_source_run_id,
+            sanitized_retest_action,
+        )
+
+        source_run_id = retest_action_source_run_id(payload.action.payload)
+        return (
+            sanitized_retest_action(source_run_id)
+            if source_run_id is not None
+            else action
+        )
     if payload.action.type != "select_response_option":
         return action
     action["payload"] = {

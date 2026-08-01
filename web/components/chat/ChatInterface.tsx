@@ -37,7 +37,6 @@ import {
 import {
   createConversation,
   deleteConversation,
-  getConversationMessages,
   getBacktestRun,
   listConversations,
   logoutFromApi,
@@ -76,6 +75,8 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
+import { applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
+import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
   clearActiveConversationPointer,
@@ -1298,6 +1299,9 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        setMessages((prev) =>
+          applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
+        );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalAssistantRecoveryCode = retryableAssistantRecoveryCode(
           finalPayload.recovery,
@@ -1937,16 +1941,14 @@ export default function ChatInterface() {
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 
-  const handleOmnisearchRunFresh = async (
-    conversationId: string,
-    sendText: string,
-  ) => {
-    setSearchOverlayOpen(false);
-    await loadConversation(conversationId, undefined, true);
-    if (activeConversationIdRef.current !== conversationId) return;
-    if (readyTranscriptConversationIdRef.current !== conversationId) return;
-    await handleSend(sendText);
-  };
+  const omnisearch = omnisearchActionHandlers(() => ({
+    closeOverlay: () => setSearchOverlayOpen(false),
+    loadConversation,
+    send: handleSend,
+    isSourceConversationReady: (id) =>
+      activeConversationIdRef.current === id &&
+      readyTranscriptConversationIdRef.current === id,
+  }));
 
   // ── Chat options helpers ───────────────────────────────────────────────────
 
@@ -2195,7 +2197,7 @@ export default function ChatInterface() {
               setSearchOverlayOpen(false);
               void loadConversation(convId, messageId, openAtLeftOff);
             }}
-            onRunFresh={handleOmnisearchRunFresh}
+            onRetest={omnisearch.retest}
             turnInFlight={turnInFlight}
             activeConversationId={conversationId}
             isGuest={isGuest}
