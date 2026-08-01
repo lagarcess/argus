@@ -189,6 +189,7 @@ duplicates.
 
 | Export | Failure class it expresses |
 | --- | --- |
+| `retryableNotice*` | retryable interruption: act on it, a retry exists |
 | `quietNotice*` | non-retryable: a failure statement, no alarm, no retry |
 | `terminalStatusToneClass` | terminal failure on artifact cards |
 | `inlineFailureTextClass` | a small failure line under a control |
@@ -196,11 +197,16 @@ duplicates.
 | `degradedValueClass` | a value that is missing, not bad |
 | `panelFailureIconClass` | a failure inside a panel or page state |
 
-`web/components/chat/FailureNotice.tsx` renders the quiet variant. The amber
-retryable family stays defined next to its renderer in `ChatMessage.tsx` on
-purpose: the issue #313 lane owns that pair's reconciliation, and this branch
-keeps that code byte-identical to the integration tip so its PR lands cleanly.
-Folding amber into the shared module is a follow-up once #318 merges.
+`web/components/chat/FailureNotice.tsx` renders the quiet variant.
+
+The amber retryable family was deliberately left inline in `ChatMessage.tsx`
+while the issue #313 lane was in flight, so this branch could not invent a
+competing structure for the same code. That lane landed as PR #318 and fixed
+#313 at the *ownership* layer — accepted-turn failures stay assistant-owned, so
+they reach the existing amber block instead of being coalesced onto the user
+turn — without touching the styling. With nothing to collide with, the amber
+family now lives in the shared source too; rendered markup is unchanged and
+#318's own `chat-retryable-failure-highlight` guard test passes untouched.
 
 **Guardrail, unchanged.** Amber's gate is still `recovery.retryable === true`,
 now applied uniformly across both SSE frames. Reconciling visual weight never
