@@ -1017,7 +1017,12 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("if (isStreamingResponse) return false;");
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(targetConversationId)",
+    );
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(conversationId)",
+    );
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
     expect(chat).toContain(
@@ -1026,7 +1031,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
-    expect(chat).toContain("setIsStreamingResponse(false);");
+    expect(chat).toContain(
+      'canApplyConversationRequestUpdate(identity, "request")',
+    );
+    expect(chat).toContain(
+      "conversationActivity.settleRequest(identity.conversationId, identity.requestId)",
+    );
+    expect(chat).toContain(
+      "if (event.data.conversation_id !== requestIdentity.conversationId) return;",
+    );
+    expect(chat).not.toContain("setIsStreamingResponse(false);");
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
     expect(input).toContain("contentEditable={!disabled}");
@@ -2187,8 +2201,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(viewHelpers).toContain("9000");
     expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
-      "schedulePostTurnHistoryRefresh(targetConversationId);",
+      "schedulePostTurnHistoryRefresh(identity.conversationId);",
     );
+    const settleRequestStart = chat.indexOf("function settleConversationRequest");
+    const settleRequestEnd = chat.indexOf("useEffect(", settleRequestStart);
+    const settleRequest = chat.slice(settleRequestStart, settleRequestEnd);
+    expect(settleRequest).toContain(
+      "conversationActivity.releaseTransport(identity.conversationId, identity.requestId, controller)",
+    );
+    expect(settleRequest).not.toContain("window.clearTimeout");
     expect(chat).toContain("Title/sidebar refresh is fail-open");
     expect(chat).toContain(
       "void refreshAndCheckTitle().catch(() => undefined);",

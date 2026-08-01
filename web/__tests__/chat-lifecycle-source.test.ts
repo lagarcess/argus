@@ -324,9 +324,11 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch.indexOf('setStreamStatus(t("chat.status.checking"))')).toBeLessThan(
       sendCatch.indexOf("await resolveOrdinaryTransportAmbiguityView"),
     );
-    expect(sendCatch).toContain("signal: reconciliationController.signal");
+    expect(sendCatch).toContain("signal: requestController.signal");
     expect(sendCatch).toContain("if (!view.showChecking)");
-    expect(chat).toContain("cancelOrdinaryTransportReconciliation();");
+    expect(sendCatch).toContain("canApplyOwnedStreamUpdate()");
+    expect(sendCatch).toContain("clearActiveStreamState();");
+    expect(chat).not.toContain("cancelOrdinaryTransportReconciliation();");
     expect(hydration).toContain("resolveOrdinaryTransportAmbiguity");
     expect(hydration).toContain('resolution.kind !== "terminal"');
     expect(hydration).toContain("message.id !== fallback.assistantId");

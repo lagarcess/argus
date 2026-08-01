@@ -163,16 +163,37 @@ export function shouldApplyConversationOwnedUpdate({
   return Boolean(target && activeConversationId?.trim() === target);
 }
 
-export function shouldRetireActiveStreamForNavigation({
-  activeStreamConversationId,
-  nextConversationId,
+export function shouldApplyConversationRequestUpdate({
+  targetConversationId,
+  requestId,
+  currentRequestId,
+  scope,
+  activeConversationId,
+  currentView,
+  routeState,
 }: {
-  activeStreamConversationId: string | null | undefined;
-  nextConversationId: string | null | undefined;
-}) {
-  const activeStream = activeStreamConversationId?.trim();
-  if (!activeStream) return false;
-  return activeStream !== (nextConversationId?.trim() ?? "");
+  targetConversationId: string | null | undefined;
+  requestId: string | null | undefined;
+  currentRequestId: string | null | undefined;
+  scope: "request" | "visible";
+  activeConversationId: string | null | undefined;
+  currentView: string;
+  routeState: ActiveConversationRouteState;
+}): boolean {
+  const target = targetConversationId?.trim();
+  const request = requestId?.trim();
+  if (!target || !request || request !== currentRequestId?.trim()) {
+    return false;
+  }
+  if (scope === "request") {
+    return true;
+  }
+  return shouldApplyConversationScopedUpdate({
+    targetConversationId: target,
+    activeConversationId,
+    currentView,
+    routeState,
+  });
 }
 
 export function actionConversationId(action: ChatActionOption | null | undefined) {
