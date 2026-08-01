@@ -1,8 +1,6 @@
 import { describe, test } from "bun:test";
 import i18next from "i18next";
 import { doesNotMatch, equal, match } from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { createElement, type ComponentProps, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
@@ -112,22 +110,6 @@ describe("auth card consistency", () => {
       doesNotMatch(html, /rounded-\[28px\]/);
       doesNotMatch(html, /shadow/);
     }
-  });
-
-  test("confirmation states keep the outer card and the canonical blocking error token", () => {
-    const authSource = readFileSync(
-      join(import.meta.dir, "../components/auth/AuthForm.tsx"),
-      "utf8",
-    );
-    const requestSource = readFileSync(
-      join(import.meta.dir, "../components/auth/RequestAccess.tsx"),
-      "utf8",
-    );
-
-    match(authSource, /needsEmailConfirmation \? \(/);
-    match(authSource, /className=\{blockingErrorBannerClass\}/);
-    doesNotMatch(authSource, /rounded-\[28px\]|shadow-/);
-    doesNotMatch(requestSource, /rounded-\[28px\]|shadow-/);
   });
 
   test("forgot password uses the canonical 20px card radius", async () => {

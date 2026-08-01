@@ -4,6 +4,7 @@ import {
   type Page,
   type Route,
 } from "@playwright/test";
+import { expectOneCanonicalCard } from "./auth-card-assertions";
 
 const GUEST_ID = "00000000-0000-4000-8000-000000000501";
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000502";
@@ -322,9 +323,11 @@ test("landing request route submits a generic request and focuses acceptance", a
   await email.fill("person@example.com");
   await page.getByRole("button", { name: "Request access" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "Request received" }),
-  ).toBeFocused();
+  const acceptedHeading = page.getByRole("heading", {
+    name: "Request received",
+  });
+  await expect(acceptedHeading).toBeFocused();
+  await expectOneCanonicalCard(acceptedHeading.locator("xpath=../.."));
   await expect(page.getByText(/If access is approved/)).toBeVisible();
   expect(bodies).toEqual([
     { email: "person@example.com", language: "en" },
@@ -451,6 +454,7 @@ test("gated guest conversion wraps the mounted conversation and restores focus",
   await expect(
     dialog.getByRole("heading", { name: "Request received" }),
   ).toBeFocused();
+  await expectOneCanonicalCard(dialog);
   await expect(chatInput).toHaveCount(1);
 });
 
