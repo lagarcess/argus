@@ -1,26 +1,19 @@
 "use client";
 
-import {
-  useCallback,
-  useMemo,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { ArrowDown, Plus } from "lucide-react";
+import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
 import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
-import ChatSidebar, {
-  type SidebarMode,
-} from "@/components/sidebar/ChatSidebar";
+import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
+import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
+import { ConversationActivityJumpButton } from "@/components/chat/ConversationActivityJumpButton";
 import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import { useChatToast } from "@/components/chat/useChatToast";
@@ -2120,7 +2113,11 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
+    <ConversationActivityPresentationProvider
+      selectPresentation={conversationActivity.selectPresentation}
+      selectAggregatePresentation={conversationActivity.selectAggregatePresentation}
+    >
+      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
       {/* ── Desktop sidebar ── */}
       <ChatSidebar
         isOpen={isSidebarOpen}
@@ -2516,14 +2513,10 @@ export default function ChatInterface() {
                   <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
                     {showJumpToLatest && (
                       <div className="mb-3 flex justify-center">
-                        <button
-                          type="button"
-                          aria-label="Jump to latest"
-                          onClick={() => scrollToLatest("smooth")}
-                          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/90 text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </button>
+                        <ConversationActivityJumpButton
+                          presentation={conversationActivity.selectPresentation(conversationId)}
+                          onJump={() => scrollToLatest("smooth")}
+                        />
                       </div>
                     )}
                     <ChatInput
@@ -2593,6 +2586,7 @@ export default function ChatInterface() {
           onClose={() => setIsSidebarPreferenceModalOpen(false)}
         />
       )}
-    </div>
+      </div>
+    </ConversationActivityPresentationProvider>
   );
 }

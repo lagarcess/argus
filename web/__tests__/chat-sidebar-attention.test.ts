@@ -5,7 +5,7 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 
 describe("chat sidebar activity ownership", () => {
-  test("removes the legacy Set marker while preserving row and quick-jump geometry", () => {
+  test("renders selected-row markers in the protected left lane while preserving quick-jump geometry", () => {
     const sidebar = readFileSync(
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
@@ -30,11 +30,27 @@ describe("chat sidebar activity ownership", () => {
     expect(sidebar).not.toContain("EMPTY_ATTENTION_IDS");
     expect(sidebar).not.toContain("hasConversationAttention");
     expect(sidebar).not.toContain("data-has-attention");
-    expect(sidebar).toContain("aria-label={displayTitle}");
-    expect(sidebar).not.toContain("bg-[#70a38d]");
+    expect(sidebar).toContain("aria-label={rowAriaLabel}");
+    expect(sidebar).toContain("presentation={itemActivityPresentation}");
+    expect(attentionLaneBlock).toContain("ConversationActivityIndicator");
+    expect(attentionLaneBlock).not.toContain("isActiveConversation &&");
     expect(attentionLaneBlock).not.toContain("QuickJumpBadge");
     expect(sidebar).toContain("data-quick-jump-hint={quickJumpNumber}");
     expect(sidebar.indexOf("quickJumpHint={quickJumpHint}", attentionLaneEnd))
       .toBeGreaterThan(attentionLaneEnd);
+  });
+
+  test("uses existing selectors for row and collapsed aggregate precedence", () => {
+    const sidebar = readFileSync(
+      join(root, "components/sidebar/ChatSidebar.tsx"),
+      "utf-8",
+    );
+
+    expect(sidebar).toContain("useConversationActivityPresentation");
+    expect(sidebar).toContain("selectPresentation(itemConversationId)");
+    expect(sidebar).toContain("selectAggregatePresentation(loadedConversationIds)");
+    expect(sidebar).toContain(
+      "activityPresentation={aggregateActivityPresentation}",
+    );
   });
 });

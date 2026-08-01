@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import {
+  ConversationActivityIndicator,
+  conversationActivityLabelDescriptor,
+  useConversationActivityPresentation,
+} from "@/components/chat/ConversationActivityIndicator";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -149,6 +154,8 @@ export default function ChatSidebar({
   guestExpiresAt = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
+  const { selectPresentation, selectAggregatePresentation } =
+    useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -256,6 +263,11 @@ export default function ChatSidebar({
     () => historyItems.filter((item) => item.type === "chat"),
     [historyItems],
   );
+  const loadedConversationIds = useMemo(
+    () => chatItems.map(historyConversationId),
+    [chatItems],
+  );
+  const aggregateActivityPresentation = selectAggregatePresentation(loadedConversationIds);
 
   // ── Date-grouped history ────────────────────────────────────────────────
   const groupedHistory = useMemo(
@@ -511,6 +523,7 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
+            activityPresentation={aggregateActivityPresentation}
             shortcutHint={keyboardShortcutHintDisplay(
               "expand_sidebar_recents",
               usesCommandKey,
@@ -579,10 +592,17 @@ export default function ChatSidebar({
                         {visibleItems.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
+                        const itemActivityPresentation = selectPresentation(itemConversationId);
                         const displayTitle = conversationDisplayTitle(
                           item,
                           t("chat.new_chat", "New chat"),
                         );
+                        const activityLabel = conversationActivityLabelDescriptor(
+                          itemActivityPresentation,
+                        );
+                        const rowAriaLabel = activityLabel
+                          ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
+                          : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
                         const expiresAt = item.expires_at ?? guestExpiresAt;
@@ -606,7 +626,7 @@ export default function ChatSidebar({
                             key={`chat:${item.id}`}
                             role="button"
                             tabIndex={0}
-                            aria-label={displayTitle}
+                            aria-label={rowAriaLabel}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
                             data-conversation-id={itemConversationId}
@@ -632,7 +652,11 @@ export default function ChatSidebar({
                               isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center"></div>
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                            <ConversationActivityIndicator
+                              presentation={itemActivityPresentation}
+                            />
+                          </div>
                           <div
                             className={`min-w-0 flex-1 pl-3 ${
                               quickJumpHint ? "pr-[104px]" : "pr-10"

@@ -1064,7 +1064,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
-    expect(chat).toContain('aria-label="Jump to latest"');
+    expect(chat.match(/<ConversationActivityJumpButton/g)).toHaveLength(1);
+    expect(chat).not.toContain('aria-label="Jump to latest"');
     expect(scrollControls).toContain(
       "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
     );

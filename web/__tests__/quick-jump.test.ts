@@ -87,6 +87,17 @@ describe("shared quick-jump primitive", () => {
     expect(chat).not.toContain("conversationTranscriptUpdateScrollAction");
   });
 
+  test("evolves the one existing Jump to latest target instead of adding another control", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf8",
+    );
+
+    expect(chat.match(/<ConversationActivityJumpButton/g)).toHaveLength(1);
+    expect(chat).not.toContain('aria-label="Jump to latest"');
+    expect(chat).toContain('onJump={() => scrollToLatest("smooth")}');
+  });
+
   test("numbers pinned visible items first and limits every surface to nine", async () => {
     expect(existsSync(primitivePath)).toBe(true);
     if (!existsSync(primitivePath)) return;

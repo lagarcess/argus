@@ -5,6 +5,11 @@ import { History, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
+import {
+  ConversationActivityIndicator,
+  conversationActivityLabelDescriptor,
+  useConversationActivityPresentation,
+} from "@/components/chat/ConversationActivityIndicator";
 import { conversationDisplayTitle } from "@/lib/chat-title-display";
 import type { HistoryItem } from "@/lib/argus-api";
 
@@ -26,6 +31,7 @@ export default function RecentsQuickPeek({
   onClose,
 }: RecentsQuickPeekProps) {
   const { t } = useTranslation();
+  const { selectPresentation } = useConversationActivityPresentation();
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const visibleItems = useMemo(
     () => historyItems.filter((item) => item.type === "chat").slice(0, 9),
@@ -116,23 +122,42 @@ export default function RecentsQuickPeek({
             {visibleItems.map((item) => {
               const conversationId = historyConversationId(item);
               const number = numberFor(conversationId);
+              const displayTitle = conversationDisplayTitle(
+                item,
+                t("chat.new_chat", "New chat"),
+              );
+              const itemActivityPresentation =
+                selectPresentation(conversationId);
+              const activityLabel = conversationActivityLabelDescriptor(
+                itemActivityPresentation,
+              );
+              const rowAriaLabel = activityLabel
+                ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
+                : displayTitle;
               return (
                 <button
                   key={conversationId}
                   type="button"
+                  aria-label={rowAriaLabel}
+                  aria-current={
+                    activeConversationId === conversationId ? "page" : undefined
+                  }
                   onClick={() => openItem(conversationId)}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-black/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/30 ${
+                  className={`relative flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-black/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/30 ${
                     activeConversationId === conversationId
                       ? "bg-black/[0.05] dark:bg-white/[0.08]"
                       : ""
                   }`}
                 >
+                  <span className="pointer-events-none absolute -left-2 top-1/2 flex h-6 w-4 -translate-y-1/2 items-center justify-center">
+                    <ConversationActivityIndicator
+                      presentation={itemActivityPresentation}
+                      compact
+                    />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="font-display block truncate text-[13px] font-medium">
-                      {conversationDisplayTitle(
-                        item,
-                        t("chat.new_chat", "New chat"),
-                      )}
+                      {displayTitle}
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-black/45 dark:text-white/45">
                       {item.subtitle}
