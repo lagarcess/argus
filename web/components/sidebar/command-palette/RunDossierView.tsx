@@ -12,7 +12,7 @@ import type {
   DecisionState,
   RunDossier,
   SearchDecisionAction,
-  SearchRunFreshAction,
+  SearchRetestAction,
 } from "@/lib/run-dossier-contract";
 import {
   formatRunDossierMetrics,
@@ -30,13 +30,13 @@ type RunDossierViewProps = {
   onBackToLatest?: () => void;
   onOpenHistory?: () => void;
   onOpenConversation: () => void;
-  onRunFresh: (action: SearchRunFreshAction) => Promise<void> | void;
+  onRetest: (sourceRunId: string) => Promise<void> | void;
   onSaveDecision: (
     action: SearchDecisionAction,
     draft: { decision_state: DecisionState; note: string },
   ) => Promise<void>;
   openConversationDisabled?: boolean;
-  runFreshDisabled?: boolean;
+  retestDisabled?: boolean;
 };
 
 export type DecisionDraft = {
@@ -81,18 +81,18 @@ export function RunDossierView({
   onBackToLatest,
   onOpenHistory,
   onOpenConversation,
-  onRunFresh,
+  onRetest,
   onSaveDecision,
   openConversationDisabled = false,
-  runFreshDisabled = false,
+  retestDisabled = false,
 }: RunDossierViewProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const decisionAction = dossier.actions.find(
     (action): action is SearchDecisionAction => action.type === "decision",
   );
-  const runFreshAction = dossier.actions.find(
-    (action): action is SearchRunFreshAction => action.type === "run_fresh",
+  const retestAction = dossier.actions.find(
+    (action): action is SearchRetestAction => action.type === "retest_run",
   );
   const [draft, setDraft] = useState<DecisionDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -193,10 +193,10 @@ export function RunDossierView({
               </span>
             )}
           </div>
-          {runFreshAction ? (
+          {retestAction ? (
             <Tooltip
               content={t(
-                "command_palette.run_fresh_tooltip",
+                "command_palette.retest_tooltip",
                 "Reuse this setup with the latest available data. You’ll review it before it runs.",
               )}
               side="bottom"
@@ -204,13 +204,13 @@ export function RunDossierView({
             >
               <button
                 type="button"
-                data-run-fresh-location="card-header"
-                disabled={runFreshDisabled}
-                onClick={() => void onRunFresh(runFreshAction)}
+                data-retest-location="card-header"
+                disabled={retestDisabled}
+                onClick={() => void onRetest(retestAction.source_run_id)}
                 className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                {t("command_palette.run_fresh_short", "Retest setup")}
+                {t("command_palette.retest_current_data", "Retest with current data")}
               </button>
             </Tooltip>
           ) : null}

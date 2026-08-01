@@ -13,7 +13,7 @@ import {
 import type {
   RunDossier,
   SearchDecisionAction,
-  SearchRunFreshAction,
+  SearchRetestAction,
 } from "../lib/run-dossier-contract";
 import type { RunDossierHistoryState } from "../lib/run-dossier-history-state";
 
@@ -28,33 +28,15 @@ const decisionAction = (
   run_label: runLabel,
 });
 
-const runFreshAction = (
+const retestAction = (
   sourceRunId: string,
   runLabel: string,
-): SearchRunFreshAction => ({
-  type: "run_fresh",
+): SearchRetestAction => ({
+  type: "retest_run",
   source_run_id: sourceRunId,
   run_label: runLabel,
-  canonical_setup: {
-    strategy_type: "buy_and_hold",
-    symbols: ["GLD"],
-    asset_class: "equity",
-    timeframe: "1D",
-    date_range: { start: "2025-01-01", end: "2025-12-31" },
-    sizing_mode: "capital_amount",
-    capital_amount: 10_000,
-    position_size: null,
-    cadence: null,
-    recurring_contribution: null,
-    starting_principal: null,
-    benchmark_symbol: "SPY",
-    entry_rule: { type: "start_of_period" },
-    exit_rule: { type: "end_of_period" },
-    rule_spec: null,
-    parameters: {},
-    execution_realism: null,
-  },
-  send_text: `Run ${runLabel} fresh`,
+  window_policy: "same_duration_ending_today",
+  contract_version: "argus_retest_run/v1",
 });
 
 function dossier(runId: string, metric: number): RunDossier {
@@ -85,7 +67,7 @@ function dossier(runId: string, metric: number): RunDossier {
       run_label: runLabel,
     },
     actions: [
-      runFreshAction(runId, runLabel),
+      retestAction(runId, runLabel),
       decisionAction(`evidence-${runId}`, runLabel),
     ],
   };
@@ -129,7 +111,7 @@ describe("command palette dossier integration", () => {
       selected.actions.find((action) => action.type === "decision"),
     ).toMatchObject({ evidence_artifact_id: "evidence-historical" });
     expect(
-      selected.actions.find((action) => action.type === "run_fresh"),
+      selected.actions.find((action) => action.type === "retest_run"),
     ).toMatchObject({ source_run_id: "historical" });
     expect(selected.result_message_id).toBe("message-historical");
   });

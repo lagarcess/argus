@@ -257,6 +257,7 @@ def prepare_chat_request_admission(
     enabled: bool,
     language: str | None,
     owner: AdmissionOwner = "ordinary_turn",
+    extra_user_metadata: dict[str, Any] | None = None,
 ) -> ChatRequestAdmission:
     candidate = None
     if enabled:
@@ -275,6 +276,7 @@ def prepare_chat_request_admission(
                 conversation_id=conversation_id,
                 display_message=display_message,
                 mention_provenance=mention_provenance,
+                extra_user_metadata=extra_user_metadata,
             )
         )
     return ChatRequestAdmission(
@@ -328,6 +330,7 @@ def _ordinary_request_message(
     conversation_id: str,
     display_message: str,
     mention_provenance: list[ResolutionProvenance],
+    extra_user_metadata: dict[str, Any] | None = None,
 ) -> Message:
     user_metadata: dict[str, Any] = {
         "agent_runtime_turn": {
@@ -346,6 +349,8 @@ def _ordinary_request_message(
         ]
     if payload.action is not None:
         user_metadata["chat_action"] = persisted_chat_action(payload)
+    if extra_user_metadata:
+        user_metadata.update(extra_user_metadata)
     return prepare_message(
         conversation_id=conversation_id,
         role="user",
