@@ -366,11 +366,12 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
   ): boolean => {
     this.releaseTransport(conversationId, requestId, controller);
     if (!this.isRequestCurrent(conversationId, requestId)) return false;
+    const revision = this.nextResponseRevision();
     this.dispatch({
-      type: "request_progressed",
+      type: "request_transport_finished",
       conversationId,
       requestId,
-      status: "checking",
+      revision,
     });
     void this.refreshCanonicalHistory();
     return true;
@@ -472,9 +473,11 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       const priorRecord = this.state.byConversationId[conversationId];
       const priorActivity = priorRecord?.canonical ?? null;
       const revision = responseRevision ?? this.nextResponseRevision();
+      const transportFinishedRevision =
+        priorRecord?.request?.transportFinishedRevision;
       const canSettleRequest = Boolean(
-        priorRecord?.request &&
-        revision > priorRecord.request.issuedRevision &&
+        typeof transportFinishedRevision === "number" &&
+        revision > transportFinishedRevision &&
         item.activity.operation.status === "idle",
       );
       if (activitiesAreEqual(priorActivity, item.activity) && !canSettleRequest) continue;

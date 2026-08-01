@@ -40,6 +40,7 @@ export type ConversationActivityRequestRecord = {
   status: ActiveOperationStatus;
   kind: Exclude<ConversationOperationKind, null>;
   issuedRevision: number;
+  transportFinishedRevision: number | null;
 };
 
 export type ConversationActivityMutationRecord = {
@@ -92,6 +93,12 @@ export type ConversationActivityAction =
       conversationId: string;
       requestId: string;
       status: ActiveOperationStatus;
+    }
+  | {
+      type: "request_transport_finished";
+      conversationId: string;
+      requestId: string;
+      revision: number;
     }
   | {
       type: "request_retired";
@@ -330,7 +337,8 @@ export function conversationActivityReducer(
         serverRevision: action.revision,
         request:
           current.request &&
-          action.revision > current.request.issuedRevision &&
+          current.request.transportFinishedRevision !== null &&
+          action.revision > current.request.transportFinishedRevision &&
           isKnownIdleStatus(action.activity.operation.status)
             ? null
             : current.request,
@@ -346,6 +354,7 @@ export function conversationActivityReducer(
           status: action.status,
           kind: action.kind,
           issuedRevision: action.revision,
+          transportFinishedRevision: null,
         },
       });
     case "request_progressed":
@@ -355,6 +364,18 @@ export function conversationActivityReducer(
       return replaceRecord(state, action.conversationId, {
         ...current,
         request: { ...current.request, status: action.status },
+      });
+    case "request_transport_finished":
+      if (current.request?.requestId !== action.requestId) {
+        return state;
+      }
+      return replaceRecord(state, action.conversationId, {
+        ...current,
+        request: {
+          ...current.request,
+          status: "checking",
+          transportFinishedRevision: action.revision,
+        },
       });
     case "request_retired":
       if (current.request?.requestId !== action.requestId) {

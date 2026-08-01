@@ -253,7 +253,7 @@ describe("conversation-scoped request ownership", () => {
     expect(selectConversationIsLocked(afterCurrentRetirement, "conversation-b")).toBe(true);
   });
 
-  test("settles only from a strictly newer canonical idle projection", () => {
+  test("settles only from canonical idle strictly newer than transport completion", () => {
     let state = createConversationActivityState();
     state = conversationActivityReducer(state, {
       type: "server_projection_merged",
@@ -274,16 +274,29 @@ describe("conversation-scoped request ownership", () => {
       type: "server_projection_merged",
       conversationId: "conversation-a",
       activity: activity(),
-      revision: 4,
+      revision: 6,
     });
     expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
 
     state = conversationActivityReducer(state, {
+      type: "request_transport_finished",
+      conversationId: "conversation-a",
+      requestId: "request-a",
+      revision: 7,
+    });
+    expect(state.byConversationId["conversation-a"]?.request).toMatchObject({
+      status: "checking",
+      transportFinishedRevision: 7,
+    });
+
+    const afterTransportFinished = state;
+    state = conversationActivityReducer(state, {
       type: "server_projection_merged",
       conversationId: "conversation-a",
-      activity: activity("running"),
+      activity: activity(),
       revision: 6,
     });
+    expect(state).toBe(afterTransportFinished);
     expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
 
     state = conversationActivityReducer(state, {
@@ -291,6 +304,30 @@ describe("conversation-scoped request ownership", () => {
       conversationId: "conversation-a",
       activity: activity(),
       revision: 7,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("queued"),
+      revision: 8,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity("running"),
+      revision: 9,
+    });
+    expect(selectConversationIsLocked(state, "conversation-a")).toBe(true);
+
+    state = conversationActivityReducer(state, {
+      type: "server_projection_merged",
+      conversationId: "conversation-a",
+      activity: activity(),
+      revision: 10,
     });
     expect(selectConversationIsLocked(state, "conversation-a")).toBe(false);
   });

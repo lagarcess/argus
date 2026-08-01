@@ -334,11 +334,12 @@ describe("conversation activity refresh ownership", () => {
     expect(harness.runtime.getState().byConversationId["conversation-a"]?.request?.status)
       .toBe("checking");
 
-    const issuedRevision = harness.runtime.getState()
-      .byConversationId["conversation-a"]?.request?.issuedRevision ?? 0;
+    const transportFinishedRevision = harness.runtime.getState()
+      .byConversationId["conversation-a"]?.request?.transportFinishedRevision;
+    expect(transportFinishedRevision).toBeNumber();
     harness.runtime.updateInputs({
       historyItems: [chat("conversation-a", idleActivity())],
-      historyActivityRevision: issuedRevision,
+      historyActivityRevision: transportFinishedRevision,
       activeConversationId: "conversation-b",
       accountScopeKey: "account-a",
     });
@@ -348,8 +349,18 @@ describe("conversation activity refresh ownership", () => {
     expect(harness.invalidations).toEqual([]);
 
     harness.runtime.updateInputs({
+      historyItems: [chat("conversation-a", workingActivity("queued"))],
+      historyActivityRevision: transportFinishedRevision! + 1,
+      activeConversationId: "conversation-b",
+      accountScopeKey: "account-a",
+    });
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-current")).toBe(
+      true,
+    );
+
+    harness.runtime.updateInputs({
       historyItems: [chat("conversation-a", workingActivity("running"))],
-      historyActivityRevision: issuedRevision + 1,
+      historyActivityRevision: transportFinishedRevision! + 2,
       activeConversationId: "conversation-b",
       accountScopeKey: "account-a",
     });
@@ -359,7 +370,7 @@ describe("conversation activity refresh ownership", () => {
 
     harness.runtime.updateInputs({
       historyItems: [chat("conversation-a", idleActivity("new_activity", "cursor-done"))],
-      historyActivityRevision: issuedRevision + 2,
+      historyActivityRevision: transportFinishedRevision! + 3,
       activeConversationId: "conversation-b",
       accountScopeKey: "account-a",
     });
@@ -393,6 +404,10 @@ describe("conversation activity refresh ownership", () => {
     expect(harness.runtime.isRequestCurrent("conversation-a", "request-run")).toBe(
       true,
     );
+    expect(harness.runtime.getState().byConversationId["conversation-a"]?.request)
+      .toMatchObject({ status: "checking" });
+    expect(harness.runtime.getState().byConversationId["conversation-a"]?.request
+      ?.transportFinishedRevision).toBeNumber();
     expect(harness.effects.hasPoll()).toBe(true);
     expect(harness.invalidations).toEqual([]);
   });

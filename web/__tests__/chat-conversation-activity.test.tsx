@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { createConversationActivityRuntime } from "../components/chat/useConversationActivity";
 import type { ConversationActivity, HistoryItem } from "../lib/argus-api";
+import type { ConversationActivityHistorySnapshot } from "../lib/conversation-activity-state";
 import {
   createChatRequestSessionController,
   type ChatRequestCallbackKind,
@@ -26,7 +27,34 @@ const chat = (conversationId: string): HistoryItem => ({
   activity: idleActivity(),
 });
 
-function requestHarness() {
+type Deferred<T> = Readonly<{
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}>;
+
+const deferred = <T,>(): Deferred<T> => {
+  let resolvePromise: ((value: T) => void) | null = null;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return {
+    promise,
+    resolve: (value) => resolvePromise?.(value),
+  };
+};
+
+const drainMicrotasks = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+function requestHarness(options: Readonly<{
+  refreshHistory?: () =>
+    | ConversationActivityHistorySnapshot
+    | readonly HistoryItem[]
+    | void
+    | Promise<ConversationActivityHistorySnapshot | readonly HistoryItem[] | void>;
+}> = {}) {
   let visibleConversationId = "conversation-a";
   let currentView = "chat";
   let routeUrl = "http://localhost:3000/chat?conversation=conversation-a";
@@ -35,7 +63,7 @@ function requestHarness() {
     historyItems: [],
     activeConversationId: "conversation-a",
     accountScopeKey: "account-a",
-    refreshHistory: () => undefined,
+    refreshHistory: options.refreshHistory ?? (() => undefined),
     invalidateInactiveTranscript: (conversationId) => {
       invalidations.push(conversationId);
     },
@@ -161,10 +189,12 @@ describe("production chat request-session ownership", () => {
       true,
     );
 
-    const issuedRevision = requestA!.identity.issuedRevision;
+    const transportFinishedRevision = harness.runtime.getState()
+      .byConversationId["conversation-a"]?.request?.transportFinishedRevision;
+    expect(transportFinishedRevision).toBeNumber();
     harness.runtime.updateInputs({
       historyItems: [chat("conversation-a")],
-      historyActivityRevision: issuedRevision + 1,
+      historyActivityRevision: transportFinishedRevision! + 1,
       activeConversationId: "conversation-b",
       accountScopeKey: "account-a",
     });
@@ -174,6 +204,61 @@ describe("production chat request-session ownership", () => {
       true,
     );
     expect(harness.invalidations).toEqual(["conversation-a"]);
+  });
+
+  test("keeps final authorized when newer idle history arrives before transport finishes", async () => {
+    const preFinalRefresh = deferred<ConversationActivityHistorySnapshot>();
+    const harness = requestHarness({
+      refreshHistory: () => preFinalRefresh.promise,
+    });
+    const request = harness.controller.begin("conversation-a", "chat_turn");
+    expect(request).not.toBeNull();
+
+    preFinalRefresh.resolve({
+      items: [chat("conversation-a")],
+      revision: request!.identity.issuedRevision + 1,
+    });
+    await drainMicrotasks();
+
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-a")).toBe(
+      true,
+    );
+    expect(harness.runtime.isConversationLocked("conversation-a")).toBe(true);
+    expect(harness.controller.authorize(request!, "final")).toBe(true);
+  });
+
+  test("settles on a post-done canonical refresh even when idle truth is identical", async () => {
+    const preFinalRefresh = deferred<ConversationActivityHistorySnapshot>();
+    const postDoneRefresh = deferred<ConversationActivityHistorySnapshot>();
+    const refreshes = [preFinalRefresh, postDoneRefresh];
+    let refreshIndex = 0;
+    const harness = requestHarness({
+      refreshHistory: () => refreshes[refreshIndex++]!.promise,
+    });
+    const request = harness.controller.begin("conversation-a", "chat_turn");
+    expect(request).not.toBeNull();
+
+    preFinalRefresh.resolve({
+      items: [chat("conversation-a")],
+      revision: request!.identity.issuedRevision + 1,
+    });
+    await drainMicrotasks();
+    expect(harness.controller.authorize(request!, "final")).toBe(true);
+    expect(harness.controller.authorize(request!, "done")).toBe(true);
+    expect(harness.controller.finishTransport(request!)).toBe(true);
+
+    const transportFinishedRevision = harness.runtime.getState()
+      .byConversationId["conversation-a"]?.request?.transportFinishedRevision;
+    expect(transportFinishedRevision).toBeNumber();
+    postDoneRefresh.resolve({
+      items: [chat("conversation-a")],
+      revision: transportFinishedRevision! + 1,
+    });
+    await drainMicrotasks();
+
+    expect(harness.runtime.isRequestCurrent("conversation-a", "request-a")).toBe(
+      false,
+    );
   });
 
   test("404 transfer retires only the nonexistent owner and keeps the same request id", () => {
@@ -198,10 +283,13 @@ describe("production chat request-session ownership", () => {
     const harness = requestHarness();
     const oldSave = harness.controller.begin("conversation-a", "chat_turn");
     expect(oldSave).not.toBeNull();
-    const issuedRevision = oldSave!.identity.issuedRevision;
+    expect(harness.controller.finishTransport(oldSave!)).toBe(true);
+    const transportFinishedRevision = harness.runtime.getState()
+      .byConversationId["conversation-a"]?.request?.transportFinishedRevision;
+    expect(transportFinishedRevision).toBeNumber();
     harness.runtime.updateInputs({
       historyItems: [chat("conversation-a")],
-      historyActivityRevision: issuedRevision + 1,
+      historyActivityRevision: transportFinishedRevision! + 1,
       activeConversationId: "conversation-a",
       accountScopeKey: "account-a",
     });
