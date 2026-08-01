@@ -578,3 +578,4 @@ in the SDD ledger. Do not dispatch this task before that line exists.
   proof, screenshots, migration/RLS evidence, and the explicit statement that
   the founder alone merges and later flips public account access after 14 clean
   consecutive days.
+
