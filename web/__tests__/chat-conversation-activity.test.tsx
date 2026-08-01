@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import { createConversationActivityRuntime } from "../components/chat/useConversationActivity";
 import type { ConversationActivity, HistoryItem } from "../lib/argus-api";
@@ -10,6 +11,11 @@ import {
   visibleRequestStatus,
 } from "../lib/chat-request-session";
 import { activeConversationRouteStateFromUrl } from "../lib/chat-conversation-routing";
+import {
+  ConversationActivityLiveRegion,
+  consumeConversationActivityAnnouncement,
+  conversationActivityAnnouncementDescriptor,
+} from "../components/chat/ConversationActivityAnnouncement";
 
 const idleActivity = (): ConversationActivity => ({
   operation: { status: "idle", kind: null, updated_at: null },
@@ -556,5 +562,70 @@ describe("production chat request-session ownership", () => {
     expect(readyRef.current).toBe("conversation-b");
     expect(readiness.snapshot("conversation-b").canonicalReady).toBe(true);
     expect(reconciles).toEqual([]);
+  });
+});
+
+describe("active conversation activity announcements", () => {
+  test("renders one atomic sr-only polite status region", () => {
+    const html = renderToStaticMarkup(
+      <ConversationActivityLiveRegion
+        announcementKey="conversation-a:1:new-activity"
+        message="New activity is ready in Tesla dip idea."
+      />,
+    );
+
+    expect(html).toContain('data-testid="conversation-activity-announcement"');
+    expect(html).toContain('class="sr-only"');
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('aria-atomic="true"');
+    expect(html).toContain("New activity is ready in Tesla dip idea.");
+  });
+
+  test("consumes one localized message per reducer transition key", () => {
+    const harness = requestHarness();
+    const request = harness.controller.begin("conversation-a", "chat_turn");
+    expect(request).not.toBeNull();
+
+    const first = consumeConversationActivityAnnouncement({
+      activity: harness.runtime,
+      conversationId: "conversation-a",
+      title: "Tesla dip idea",
+      translate: (_key, options) => options.defaultValue.replace(
+        "{{title}}",
+        String(options.title),
+      ),
+    });
+    const unchangedPoll = consumeConversationActivityAnnouncement({
+      activity: harness.runtime,
+      conversationId: "conversation-a",
+      title: "Tesla dip idea",
+      translate: (_key, options) => options.defaultValue,
+    });
+
+    expect(first).toMatchObject({
+      conversationId: "conversation-a",
+      message: "Argus is working in Tesla dip idea.",
+    });
+    expect(unchangedPoll).toBeNull();
+  });
+
+  test("uses transition-specific copy and leaves optimistic manual unread to its toast", () => {
+    expect(
+      conversationActivityAnnouncementDescriptor("new_activity", "Tesla dip idea"),
+    ).toEqual({
+      key: "chat.activity.announce_new_activity",
+      defaultValue: "New activity is ready in {{title}}.",
+      title: "Tesla dip idea",
+    });
+    expect(
+      conversationActivityAnnouncementDescriptor("needs_input", "Tesla dip idea"),
+    ).toMatchObject({ key: "chat.activity.announce_needs_input" });
+    expect(
+      conversationActivityAnnouncementDescriptor("needs_attention", "Tesla dip idea"),
+    ).toMatchObject({ key: "chat.activity.announce_needs_attention" });
+    expect(
+      conversationActivityAnnouncementDescriptor("manual_unread", "Tesla dip idea"),
+    ).toBeNull();
   });
 });

@@ -11,6 +11,7 @@ import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar"
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
 import { ConversationActivityJumpButton } from "@/components/chat/ConversationActivityJumpButton";
@@ -2235,7 +2236,6 @@ export default function ChatInterface() {
         onConfirm={() => void handleConfirmHeaderDelete()}
       />
 
-      {/* ── Main panel ── */}
       <section className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]">
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
@@ -2297,9 +2297,9 @@ export default function ChatInterface() {
             </div>
           </header>
         )}
-        {/* ── Chat view ── */}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
+            <ConversationActivityAnnouncement activity={conversationActivity} conversationId={conversationId} title={headerConversationTitle} enabled={!isHydratingConversation} />
             {showEmptyChatSurface ? (
               <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
                 <EmptyChatHeading isGuest={isGuest} />
