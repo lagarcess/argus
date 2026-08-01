@@ -110,7 +110,10 @@ CAPTCHA-acquisition behavior changes.
 **Files:**
 
 - Modify: `web/components/guest/GuestEntry.tsx`
+- Modify: `web/app/page.tsx`
 - Modify: `web/app/chat/page.tsx`
+- Modify: `web/lib/landing-entry.ts`
+- Modify: `web/lib/guest-account.ts`
 - Modify: `web/components/guest/useGuestShellActions.ts`
 - Modify: `web/components/guest/useGuestExperience.ts`
 - Modify: `web/components/guest/GuestHeader.tsx`
@@ -121,24 +124,27 @@ CAPTCHA-acquisition behavior changes.
 
 1. Reduce `GuestEntry` to presentation routing only: it replaces `/` with
    `/chat` and performs no guest bootstrap, retry, expiry, or CAPTCHA work.
-2. Let the `/chat` server page render for an unauthenticated visitor only when
+2. Classify both the landing-page and chat-page session probes through small,
+   testable routing helpers. Preserve missing-session entry, and fail closed on
+   private-alpha denial or any unknown profile error.
+3. Let the `/chat` server page render for an unauthenticated visitor only when
    both guest presentation and CAPTCHA configuration are available. Preserve
    the auth-first redirect when that rollback condition is false.
-3. Add one explicit client state with four meanings: profile probe in progress,
+4. Add one explicit client state with four meanings: profile probe in progress,
    established account, guest bootstrap required, or expired guest. Only a
    missing session (`401`) or `guest_session_expired` (`403`) may enter guest
    bootstrap required. Treat `private_alpha_access_required` and all other
    profile failures as fail-closed errors.
-4. Treat “guest bootstrap required” as guest presentation for the empty heading,
+5. Treat “guest bootstrap required” as guest presentation for the empty heading,
    composer, legal copy, starter actions, local language/theme controls, and
    ordinary Sign-in path, without inventing an expiry timestamp or canonical
    account facts.
-5. Keep a distinct established-guest signal for authenticated guest-only
+6. Keep a distinct established-guest signal for authenticated guest-only
    operations and analytics.
-6. Suppress pre-bootstrap Feedback and Omnisearch affordances. Do not open the
+7. Suppress pre-bootstrap Feedback and Omnisearch affordances. Do not open the
    guest conversion modal before a conversation exists; Sign in routes to the
    preserved auth landing instead.
-7. Run the focused Task 1 tests and keep unrelated registered hydration tests
+8. Run the focused Task 1 tests and keep unrelated registered hydration tests
    green.
 
 ## Task 3: Bootstrap inside first-submit admission
