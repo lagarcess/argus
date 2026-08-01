@@ -1700,6 +1700,8 @@ csrf_origin_rejected` problem response and does not clear cookies.
 }
 ```
 
+Guest sessions omit registered-account preferences, including `avatar_theme`.
+
 ---
 
 # 8. User / Preferences
@@ -1719,6 +1721,7 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
+    "avatar_theme": "ocean",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -1838,7 +1841,8 @@ Update profile preferences. Partial update semantics are supported.
   "display_name": "Lucas",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark"
+  "theme": "dark",
+  "avatar_theme": "plum"
 }
 ```
 
@@ -1853,6 +1857,11 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
+  `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
+- Avatar themes are registered-account preferences. Guests cannot update a
+  profile, and guest-facing `/me` and `/auth/session` responses omit
+  `avatar_theme`.
 - A legacy `onboarding` object from an old client is ignored; the API cannot
   write onboarding state.
 
@@ -2159,6 +2168,24 @@ stores nothing and makes no LLM, provider, or market-data call.
   A valid action reaches LangGraph with the pending strategy and continuity
   artifacts recovered from that exact source message, not from a newer
   checkpoint draft.
+- `retest_run` replays a stored supported experiment onto today's matching
+  window. Its payload is a bounded v1 envelope containing exactly
+  `source_run_id`, `window_policy: "same_duration_ending_today"`, and
+  `contract_version: "argus_retest_run/v1"`; any other key, value, or a
+  `source_run_id` that is not a UUID is rejected. Client display copy is
+  non-authoritative and never persisted. Before persisting the request or
+  invoking the runtime, the backend verifies that the source run and its
+  source conversation belong to the user, that the action conversation equals
+  the source conversation, and that the run is completed with finalized
+  evidence identity; it then reloads every executable field from the stored
+  run rather than from any client value. Missing, malformed, foreign,
+  unfinished, deleted, or cross-conversation sources fail uniformly with `409
+  artifact_action_invalid_state`, so they stay indistinguishable from each
+  other. The action makes no LLM, research, discovery, or market-data provider
+  call, always stops at a Ready-to-run confirmation, and never executes a
+  backtest; a transient materialization failure after the accepted user turn
+  reuses the existing retryable `runtime_failure` recovery whose in-place Retry
+  replays the persisted typed action.
 
 ### Conversation Artifact Continuity Contract
 
@@ -3277,36 +3304,11 @@ the `/search` contract.
         },
         "actions": [
           {
-            "type": "run_fresh",
+            "type": "retest_run",
             "source_run_id": "uuid",
             "run_label": "Weekly GLD pullback",
-            "canonical_setup": {
-              "strategy_type": "indicator_threshold",
-              "symbols": ["GLD"],
-              "asset_class": "equity",
-              "timeframe": "1D",
-              "date_range": {
-                "start": "2025-07-29",
-                "end": "2026-07-29"
-              },
-              "sizing_mode": "capital_amount",
-              "capital_amount": 10000.0,
-              "position_size": null,
-              "cadence": null,
-              "recurring_contribution": null,
-              "starting_principal": null,
-              "benchmark_symbol": "SPY",
-              "entry_rule": null,
-              "exit_rule": null,
-              "rule_spec": {
-                "indicator": "rsi",
-                "operator": "below",
-                "threshold": 30
-              },
-              "parameters": {},
-              "execution_realism": null
-            },
-            "send_text": "Test this exact supported setup again ... Show the Ready-to-run confirmation; do not run it yet."
+            "window_policy": "same_duration_ending_today",
+            "contract_version": "argus_retest_run/v1"
           },
           {
             "type": "decision",
@@ -3371,21 +3373,23 @@ character compatibility bound for legacy notes. `total_runs`
 and `decided_runs` are backend-owned full-lineage counts, not page totals.
 
 `dossier.actions` is a bounded, backend-owned list. It contains at most one
-`run_fresh` action followed by at most one `decision` action:
+`retest_run` action followed by at most one `decision` action:
 
-- `run_fresh` is projected only from the default dossier's selected supported
-  completed evidence-backed run. Its
-  `canonical_setup` contains the public, executable strategy shape rather than
-  raw provider or engine configuration. The backend preserves the original
-  inclusive window length and shifts that window to end on the current date.
-  DCA actions preserve both the recurring contribution and zero starting
-  principal from the persisted engine snapshot. Modeled costs are read from
-  the persisted engine configuration and summarized without exposing provider
-  details. If those stored facts are absent or conflict, the backend omits the
-  action instead of guessing.
-  `send_text` is deterministic and localized from stored facts. The client
-  submits it through the ordinary chat-send path; it must reach the normal
-  Ready-to-run confirmation and must never directly execute a backtest.
+- `retest_run` is projected only from the selected supported completed
+  evidence-backed run dossier. It carries identity and policy only:
+  `source_run_id`, a display-only `run_label`, the fixed
+  `window_policy: "same_duration_ending_today"`, and
+  `contract_version: "argus_retest_run/v1"`. It carries no executable setup and
+  no generated prompt, so a client cannot supply canonical state. The backend
+  reloads every executable field from the owner-scoped stored run when the
+  action is submitted, preserves the original inclusive window length, and
+  shifts that window to end on the current date. Eligibility and admission
+  share one reconstruction, so the action is offered only when the backend can
+  faithfully materialize the confirmation - including under the
+  execution-realism kill switch, which would otherwise idealize a costed run.
+  If the stored facts are absent, conflicting, or unfaithful, the backend omits
+  the action instead of guessing. Submitting it reaches the normal Ready-to-run
+  confirmation and never directly executes a backtest.
 - `decision` targets the latest evidence artifact for that same latest run.
   Its optional state and note describe the current decision on that exact
   artifact. Saving uses the existing owner-checked, idempotent
@@ -3395,7 +3399,7 @@ and `decided_runs` are backend-owned full-lineage counts, not page totals.
 The action ids are narrow, opaque mutation targets for those two explicit
 owner actions. They are not searchable content and do not authorize access by
 themselves. Guest responses omit the `decision` action; asset rollups have no
-`actions` field. Unsupported or incomplete stored run shapes omit `run_fresh`
+`actions` field. Unsupported or incomplete stored run shapes omit `retest_run`
 rather than guessing.
 
 **Ranking Logic:**

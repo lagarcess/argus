@@ -57,29 +57,11 @@ const dossierWithWatchingDecisionAndMultilineNote: RunDossier = {
   },
   actions: [
     {
-      type: "run_fresh",
+      type: "retest_run",
       source_run_id: "run-7",
       run_label: "Weekly GLD pullback",
-      canonical_setup: {
-        strategy_type: "buy_and_hold",
-        symbols: ["GLD"],
-        asset_class: "equity",
-        timeframe: "1D",
-        date_range: { start: "2025-01-01", end: "2025-12-31" },
-        sizing_mode: "capital_amount",
-        capital_amount: 10_000,
-        position_size: null,
-        cadence: null,
-        recurring_contribution: null,
-        starting_principal: null,
-        benchmark_symbol: "SPY",
-        entry_rule: { type: "start_of_period" },
-        exit_rule: { type: "end_of_period" },
-        rule_spec: null,
-        parameters: {},
-        execution_realism: null,
-      },
-      send_text: "Test this exact supported setup again.",
+      window_policy: "same_duration_ending_today",
+      contract_version: "argus_retest_run/v1",
     },
     decisionAction,
   ],
@@ -128,7 +110,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -146,7 +128,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -170,7 +152,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -211,7 +193,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -242,7 +224,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -264,18 +246,18 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
     const text = visibleText(html);
 
-    expect(text).toContain("Retest setup");
+    expect(text).toContain("Retest with current data");
     expect(text).not.toContain("Run it fresh");
-    expect(html.indexOf("Retest setup")).toBeLessThan(
+    expect(html.indexOf("Retest with current data")).toBeLessThan(
       html.indexOf("Weekly GLD pullback"),
     );
-    expect(html).toContain('data-run-fresh-location="card-header"');
+    expect(html).toContain('data-retest-location="card-header"');
   });
 
   test("shows one quiet undecided state and an add action", () => {
@@ -296,7 +278,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -317,7 +299,7 @@ describe("single-run dossier view", () => {
         decidedRuns={5}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );
@@ -336,7 +318,7 @@ describe("single-run dossier view", () => {
         onBackToLatest={() => {}}
         onOpenHistory={() => {}}
         onOpenConversation={() => {}}
-        onRunFresh={() => {}}
+        onRetest={() => {}}
         onSaveDecision={async () => {}}
       />,
     );

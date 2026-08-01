@@ -383,7 +383,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("? t(action.labelKey, {");
     expect(message).toContain("defaultValue: action.label,");
     expect(message).toContain(
-      '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
+      '(message.selectedAction ? actionLabel(message.selectedAction) : "")',
     );
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
@@ -1497,21 +1497,33 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(contract).toContain('type: "run_fresh"');
+    expect(contract).toContain('type: "retest_run"');
+    // The typed envelope carries no client-authoritative setup.
+    expect(contract).not.toContain("canonical_setup");
+    expect(contract).not.toContain("send_text");
     expect(contract).toContain('type: "decision"');
     expect(palette).toContain("createEvidenceDecision");
-    expect(palette).toContain("onRunFresh");
+    expect(palette).toContain("onRetest");
     expect(palette).toContain("canonicalMutationIdRef");
     expect(palette).toContain("searchRequestIdRef");
     expect(palette).toContain("includeLedgerGroups: true");
-    expect(chat).toContain("const handleOmnisearchRunFresh = async");
-    expect(chat).toContain("await loadConversation(conversationId");
-    expect(chat).toContain("await handleSend(sendText)");
-    expect(chat).not.toContain("await handleSend(sendText, action)");
+    const omnisearchActions = readFileSync(
+      join(root, "components/chat/omnisearch-actions.ts"),
+      "utf-8",
+    );
+    expect(chat).toContain("omnisearchActionHandlers(() => ({");
+    expect(chat).toContain("onRetest={omnisearch.retest}");
+    expect(omnisearchActions).toContain(
+      "await deps.loadConversation(conversationId, undefined, true)",
+    );
+    expect(omnisearchActions).toContain(
+      "if (!deps.isSourceConversationReady(conversationId)) return",
+    );
+    expect(omnisearchActions).toContain("void deps.send(action.label, action)");
     expect(palette).not.toContain("run_backtest");
   });
 
-  test("omnisearch disables Run it fresh while another turn owns the stream", () => {
+  test("omnisearch disables Retest while another turn owns the stream", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1530,8 +1542,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
-    expect(palette).toContain("runFreshDisabled={turnInFlight}");
-    expect(dossier).toContain("disabled={runFreshDisabled}");
+    expect(palette).toContain("retestDisabled={turnInFlight}");
+    expect(dossier).toContain("disabled={retestDisabled}");
     expect(dossier).toContain("disabled:cursor-not-allowed");
     expect(dossier).toContain("disabled:opacity-50");
   });

@@ -4,36 +4,12 @@ export type DecisionState =
   | "rejected"
   | "revisit_later";
 
-export type SearchRunFreshSetup = {
-  strategy_type:
-    | "buy_and_hold"
-    | "dca_accumulation"
-    | "indicator_threshold"
-    | "signal_strategy";
-  symbols: string[];
-  asset_class: "equity" | "crypto" | "currency_pair";
-  timeframe: string;
-  date_range: { start: string; end: string };
-  sizing_mode: "capital_amount" | "position_size";
-  capital_amount: number | null;
-  position_size: number | null;
-  cadence: "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | null;
-  recurring_contribution: number | null;
-  starting_principal: number | null;
-  benchmark_symbol: string;
-  entry_rule: Record<string, unknown> | null;
-  exit_rule: Record<string, unknown> | null;
-  rule_spec: Record<string, unknown> | null;
-  parameters: Record<string, unknown>;
-  execution_realism: Record<string, unknown> | null;
-};
-
-export type SearchRunFreshAction = {
-  type: "run_fresh";
+export type SearchRetestAction = {
+  type: "retest_run";
   source_run_id: string;
   run_label: string;
-  canonical_setup: SearchRunFreshSetup;
-  send_text: string;
+  window_policy: "same_duration_ending_today";
+  contract_version: "argus_retest_run/v1";
 };
 
 export type SearchDecisionAction = {
@@ -45,7 +21,7 @@ export type SearchDecisionAction = {
 };
 
 export type SearchDossierAction =
-  | SearchRunFreshAction
+  | SearchRetestAction
   | SearchDecisionAction;
 
 export type RunDossier = {

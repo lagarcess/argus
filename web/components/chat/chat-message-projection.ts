@@ -11,6 +11,7 @@ import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
 } from "@/lib/chat-backtest-jobs";
+import { retestReceiptFromMetadata } from "@/lib/chat-retest";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
 import {
   hydrateTextMessageFromApi,
@@ -247,10 +248,12 @@ export function hydrateMessagesFromApi(
         chatAction &&
         typeof chatAction === "object"
       ) {
+        const retestReceipt = retestReceiptFromMetadata(metadata);
         return {
           ...hydrateTextMessageFromApi(message),
           kind: "action",
           selectedAction: chatAction,
+          ...(retestReceipt ? { retestReceipt } : {}),
         };
       }
       if (

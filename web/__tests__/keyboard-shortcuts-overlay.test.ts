@@ -82,16 +82,32 @@ describe("keyboard shortcuts overlay", () => {
     const sidebarNavButton = source("components/sidebar/SidebarNavButton.tsx");
     const quickJumpBadge = source("components/keyboard/QuickJumpBadge.tsx");
     const keycap = source("components/keyboard/KeyboardShortcutKeycap.tsx");
+    const recentChatActions = source(
+      "components/sidebar/RecentChatActions.tsx",
+    );
     const quickPeekPath = join(
       root,
       "components/sidebar/RecentsQuickPeek.tsx",
     );
+    const quickPeek = source("components/sidebar/RecentsQuickPeek.tsx");
 
     expect(sidebar).toContain("useQuickJump");
     expect(sidebar).toContain("QuickJumpBadge");
     expect(profileMenu).toContain("useQuickJump");
     expect(profileMenu).toContain("QuickJumpBadge");
     expect(profileMenu).toContain('presentation="shortcut_hint"');
+    expect(sidebar).toContain('presentation="shortcut_hint"');
+    expect(sidebar).toContain("usesCommandKey={usesCommandKey}");
+    expect(sidebar).toContain(
+      "data-quick-jump-hint={quickJumpNumber}",
+    );
+    expect(quickPeek).toContain('presentation="shortcut_hint"');
+    expect(quickPeek).toContain("usesCommandKey={usesCommandKey}");
+    expect(quickPeek).toContain("data-quick-jump-hint={number}");
+    expect(recentChatActions).toContain("quickJumpHint?: ReactNode");
+    expect(recentChatActions).toContain(
+      "isMenuOpen || isTriggerFocused || !quickJumpHint",
+    );
     expect(profileMenu).toContain("!isQuickJumpActive && (");
     expect(profileMenu).toContain("min-w-[304px]");
     expect(profileMenu).toContain("h-[294px]");

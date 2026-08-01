@@ -596,6 +596,20 @@ export default function ChatSidebar({
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
                         const expiresAt = item.expires_at ?? guestExpiresAt;
+                        const quickJumpNumber = numberFor(itemConversationId);
+                        const quickJumpHint =
+                          isQuickJumpActive && quickJumpNumber !== null ? (
+                            <span
+                              data-quick-jump-hint={quickJumpNumber}
+                              className="pointer-events-none flex h-[22px] items-center justify-end"
+                            >
+                              <QuickJumpBadge
+                                number={quickJumpNumber}
+                                presentation="shortcut_hint"
+                                usesCommandKey={usesCommandKey}
+                              />
+                            </span>
+                          ) : null;
 
                         return (
                           <div
@@ -638,15 +652,12 @@ export default function ChatSidebar({
                           {hasConversationAttention && (
                             <span className="sr-only">{attentionLabel}</span>
                           )}
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
-                            {isQuickJumpActive &&
-                            numberFor(itemConversationId) !== null ? (
-                              <QuickJumpBadge
-                                number={numberFor(itemConversationId)!}
-                              />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0 flex-1 pl-3 pr-10">
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center"></div>
+                          <div
+                            className={`min-w-0 flex-1 pl-3 ${
+                              quickJumpHint ? "pr-[104px]" : "pr-10"
+                            }`}
+                          >
                             {renamingId === item.id ? (
                               <>
                                 <input
@@ -710,17 +721,23 @@ export default function ChatSidebar({
                               </>
                             )}
                           </div>
-                          {canManageConversation && renamingId !== item.id && (
-                            <div data-actions className="absolute right-2 top-1/2 -translate-y-1/2">
-                              <RecentChatActions
-                                item={conversationActionItem}
-                                onPin={handlePin}
-                                onRename={handleStartRename}
-                                onArchive={handleArchive}
-                                onDelete={handleRequestDelete}
-                              />
-                            </div>
-                          )}
+                          {renamingId !== item.id &&
+                            (canManageConversation || quickJumpHint) && (
+                              <div className="absolute right-2 top-1/2 flex h-7 w-[88px] -translate-y-1/2 items-center justify-end">
+                                {canManageConversation ? (
+                                  <RecentChatActions
+                                    item={conversationActionItem}
+                                    onPin={handlePin}
+                                    onRename={handleStartRename}
+                                    onArchive={handleArchive}
+                                    onDelete={handleRequestDelete}
+                                    quickJumpHint={quickJumpHint}
+                                  />
+                                ) : (
+                                  quickJumpHint
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                         })}

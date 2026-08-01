@@ -3509,7 +3509,12 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
                 "benchmark_symbol": "SPY",
             },
         },
-        conversation_result_card={"title": "Annual GLD buy and hold"},
+        conversation_result_card={
+            "title": "Annual GLD buy and hold",
+            "evidence_artifact_id": "gld-evidence",
+            "idea_id": "gld-idea",
+            "idea_version_id": "gld-idea-version",
+        },
         created_at=now,
     )
     artifact = EvidenceArtifact(
@@ -3551,43 +3556,19 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
     conversation = next(
         item for item in response.json()["items"] if item["type"] == "conversation"
     )
-    run_fresh, change_decision = conversation["dossier"]["actions"]
-    expected_end = date.today()
-    expected_start = expected_end - timedelta(days=365)
-    assert run_fresh == {
-        "type": "run_fresh",
+    retest, change_decision = conversation["dossier"]["actions"]
+    # The dossier projects identity and policy only. The executable setup and
+    # the old generated prompt are gone, so the obsolete send-the-prose path
+    # cannot be driven from this payload even if a client tried.
+    assert retest == {
+        "type": "retest_run",
         "source_run_id": run.id,
         "run_label": "Annual GLD buy and hold",
-        "canonical_setup": {
-            "strategy_type": "buy_and_hold",
-            "symbols": ["GLD"],
-            "asset_class": "equity",
-            "timeframe": "1D",
-            "date_range": {
-                "start": expected_start.isoformat(),
-                "end": expected_end.isoformat(),
-            },
-            "sizing_mode": "capital_amount",
-            "capital_amount": 10_000.0,
-            "position_size": None,
-            "cadence": None,
-            "recurring_contribution": None,
-            "starting_principal": None,
-            "benchmark_symbol": "SPY",
-            "entry_rule": {"type": "start_of_period"},
-            "exit_rule": {"type": "end_of_period"},
-            "rule_spec": None,
-            "parameters": {},
-            "execution_realism": None,
-        },
-        "send_text": (
-            f"Test this exact supported setup again from "
-            f"{expected_start.isoformat()} to {expected_end.isoformat()}: "
-            "buy and hold GLD on 1D with $10000 starting capital, benchmark "
-            "SPY, long only and equal weight. Show the Ready-to-run "
-            "confirmation; do not run it yet."
-        ),
+        "window_policy": "same_duration_ending_today",
+        "contract_version": "argus_retest_run/v1",
     }
+    assert "canonical_setup" not in retest
+    assert "send_text" not in retest
     assert change_decision == {
         "type": "decision",
         "evidence_artifact_id": artifact.id,
@@ -3618,14 +3599,24 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
                 "capital_amount": 1_000,
             },
         },
-        "conversation_result_card": {"title": "Older AAPL run"},
+        "conversation_result_card": {
+            "title": "Older AAPL run",
+            "evidence_artifact_id": "older-evidence",
+            "idea_id": "older-idea",
+            "idea_version_id": "older-idea-version",
+        },
         "created_at": now - timedelta(days=1),
     }
     latest = {
         **older,
         "id": "latest-run",
         "symbols": ["MSFT"],
-        "conversation_result_card": {"title": "Latest MSFT run"},
+        "conversation_result_card": {
+            "title": "Latest MSFT run",
+            "evidence_artifact_id": "latest-evidence",
+            "idea_id": "latest-idea",
+            "idea_version_id": "latest-idea-version",
+        },
         "created_at": now,
     }
     evidence = [
@@ -3670,22 +3661,23 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
     assert projected is not None
     _, item = projected
     assert item.dossier is not None
-    assert [action.type for action in item.dossier.actions] == ["run_fresh"]
+    assert [action.type for action in item.dossier.actions] == ["retest_run"]
     assert item.dossier.actions[0].source_run_id == "latest-run"
     assert item.dossier.decision is None
     assert item.total_runs == 2
     assert item.decided_runs == 1
 
 
-def _chat_persisted_run_fresh_fixture(
+def _chat_persisted_retest_fixture(
     monkeypatch: pytest.MonkeyPatch,
     *,
     request_payload: dict[str, Any],
     language: str = "es-419",
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[Any, Any, dict[str, Any], dict[str, Any]]:
     from argus.api.chat.persistence import build_runtime_backtest_run
     from argus.domain.engine_launch.adapter import run_launch_backtest
     from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from argus.domain.retest_setup import retest_setup_from_run
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
@@ -3703,6 +3695,18 @@ def _chat_persisted_run_fresh_fixture(
         run_id=f"action-fixture-{request_payload['strategy_type']}",
     )
     assert run is not None
+    # Finalization attaches evidence identity last; model a finalized run so
+    # eligibility sees the same shape admission requires.
+    run = run.model_copy(
+        update={
+            "conversation_result_card": {
+                **(run.conversation_result_card or {}),
+                "evidence_artifact_id": "action-fixture-evidence",
+                "idea_id": "action-fixture-idea",
+                "idea_version_id": "action-fixture-idea-version",
+            }
+        }
+    )
 
     from argus.domain.conversation_recall import project_conversation_recall
 
@@ -3737,16 +3741,15 @@ def _chat_persisted_run_fresh_fixture(
         (
             candidate
             for candidate in item.dossier.actions
-            if candidate.type == "run_fresh"
+            if candidate.type == "retest_run"
         ),
         None,
     )
-    assert action is not None
-    return (
-        action.model_dump(mode="python"),
-        envelope,
-        run.model_dump(mode="python"),
-    )
+    stored_run = run.model_dump(mode="python")
+    # The action is now identity-only, so setup fidelity is asserted where it
+    # actually lives: the server-side reconstruction the confirmation uses.
+    setup = retest_setup_from_run(stored_run, today=date.today())
+    return (action, setup, envelope, stored_run)
 
 
 def _run_fresh_spanish_dates() -> tuple[str, str]:
@@ -3759,10 +3762,10 @@ def _stable_test_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def test_search_run_fresh_preserves_chat_dca_contribution_and_principal(
+def test_search_retest_preserves_chat_dca_contribution_and_principal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    action, envelope, _ = _chat_persisted_run_fresh_fixture(
+    action, setup, _, _ = _chat_persisted_retest_fixture(
         monkeypatch,
         request_payload={
             "strategy_type": "dca_accumulation",
@@ -3781,26 +3784,15 @@ def test_search_run_fresh_preserves_chat_dca_contribution_and_principal(
         },
     )
 
-    setup = action["canonical_setup"]
-    assert setup["capital_amount"] == 500.0
-    assert setup["recurring_contribution"] == 500.0
-    assert setup["starting_principal"] == 0.0
-    assert setup["execution_realism"] is None
-    start, end = _run_fresh_spanish_dates()
-    entry_rule = envelope["resolved_strategy"]["entry_rule"]
-    exit_rule = envelope["resolved_strategy"]["exit_rule"]
-    assert action["send_text"] == (
-        "Prueba nuevamente esta configuración compatible exacta del "
-        f"{start} al {end}: acumulación DCA mensual TSLA en 1D con un aporte "
-        "recurrente de $500 mensual y capital inicial de $0, referencia SPY, "
-        "solo posiciones largas y pesos iguales; regla de entrada "
-        f"{_stable_test_json(entry_rule)}; regla de salida "
-        f"{_stable_test_json(exit_rule)}. Muestra la confirmación Lista para "
-        "ejecutar; todavía no la ejecutes."
-    )
+    assert action is not None
+    assert setup is not None
+    assert setup.capital_amount == 500.0
+    assert setup.recurring_contribution == 500.0
+    assert setup.starting_principal == 0.0
+    assert setup.execution_realism is None
 
 
-def test_search_run_fresh_reads_nested_chat_modeled_costs(
+def test_search_retest_reads_nested_chat_modeled_costs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     execution_realism = {
@@ -3808,7 +3800,7 @@ def test_search_run_fresh_reads_nested_chat_modeled_costs(
         "fee_bps": 10.0,
         "slippage_bps": 5.0,
     }
-    action, _, _ = _chat_persisted_run_fresh_fixture(
+    action, setup, _, _ = _chat_persisted_retest_fixture(
         monkeypatch,
         request_payload={
             "strategy_type": "buy_and_hold",
@@ -3828,16 +3820,9 @@ def test_search_run_fresh_reads_nested_chat_modeled_costs(
         },
     )
 
-    assert action["canonical_setup"]["execution_realism"] == execution_realism
-    start, end = _run_fresh_spanish_dates()
-    assert action["send_text"] == (
-        "Prueba nuevamente esta configuración compatible exacta del "
-        f"{start} al {end}: comprar y mantener TSLA en 1D con $10000 de "
-        "capital inicial, referencia SPY, solo posiciones largas y pesos "
-        "iguales; costos modelados "
-        f"{_stable_test_json(execution_realism)}. Muestra la confirmación "
-        "Lista para ejecutar; todavía no la ejecutes."
-    )
+    assert action is not None
+    assert setup is not None
+    assert setup.execution_realism == execution_realism
 
 
 @pytest.mark.parametrize(
@@ -3903,53 +3888,91 @@ def test_search_run_fresh_reads_nested_chat_modeled_costs(
         ),
     ],
 )
-def test_search_run_fresh_localizes_full_spanish_rule_details(
+def test_search_retest_localizes_the_spanish_confirmation_card(
     monkeypatch: pytest.MonkeyPatch,
     request_payload: dict[str, Any],
     strategy_copy: str,
 ) -> None:
-    action, envelope, _ = _chat_persisted_run_fresh_fixture(
+    """Spanish now rides the confirmation card, not a generated prompt.
+
+    The old action carried localized `send_text`; the typed envelope carries
+    none, so this asserts the localization survives where it moved to.
+    """
+    from argus.agent_runtime.retest_confirmation import (
+        retest_confirmation_payload,
+        retest_runtime_result,
+    )
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    action, setup, _, _ = _chat_persisted_retest_fixture(
         monkeypatch,
         request_payload=request_payload,
+        language="es-419",
     )
-    setup = action["canonical_setup"]
-    start, end = _run_fresh_spanish_dates()
-    details = [
-        ("regla de entrada", envelope["resolved_strategy"].get("entry_rule")),
-        ("regla de salida", envelope["resolved_strategy"].get("exit_rule")),
-        (
-            "especificación de reglas",
-            envelope["resolved_strategy"].get("rule_spec")
-            or envelope["resolved_parameters"].get("rule_spec"),
-        ),
-        ("parámetros", setup["parameters"] or None),
-    ]
-    detail_text = "".join(
-        f"; {label} {_stable_test_json(value)}"
-        for label, value in details
-        if value is not None
-    )
-    assert action["send_text"] == (
-        "Prueba nuevamente esta configuración compatible exacta del "
-        f"{start} al {end}: {strategy_copy} TSLA en 1D con $10000 de capital "
-        "inicial, referencia SPY, solo posiciones largas y pesos iguales"
-        f"{detail_text}. Muestra la confirmación Lista para ejecutar; todavía "
-        "no la ejecutes."
-    )
-    for leaked_label in (
-        "entry rule",
-        "exit rule",
-        "rule spec",
-        "parameters",
-        "execution realism",
-    ):
-        assert f"; {leaked_label} " not in action["send_text"]
+    assert action is not None
+    assert setup is not None
+
+    def _card(language: str) -> dict[str, Any]:
+        payload = retest_confirmation_payload(
+            setup,
+            language=language,
+            confirmation_id=f"confirmation-retest-{language}",
+        )
+        assert payload is not None
+        card = runtime_confirmation_card(
+            retest_runtime_result(payload),
+            confirmation_id=f"confirmation-retest-{language}",
+            conversation_id="retest-fixture-conversation",
+            language=language,
+        )
+        assert card is not None
+        return card
+
+    spanish = _card("es-419")
+    english = _card("en")
+
+    assert spanish["status"] == "ready_to_run"
+    # Language reaches the card: the window renders in Spanish.
+    assert " de " in spanish["date_range"]["display"]
+    assert spanish["date_range"]["start"] == setup.start.isoformat()
+
+    def _rule_values(card: dict[str, Any]) -> dict[str, str]:
+        return {
+            row["key"]: row["value"]
+            for row in card["rows"]
+            if row["key"] in {"entry_rule", "exit_rule"}
+        }
+
+    spanish_rules = _rule_values(spanish)
+    english_rules = _rule_values(english)
+    assert spanish_rules, "the confirmation must describe its executable rules"
+    # The retired action localized rules inside a generated prompt. That
+    # localization now lives in the card, so it must still be language-aware.
+    assert spanish_rules != english_rules
+    for value in spanish_rules.values():
+        # Human prose, never the raw rule structure the old prompt embedded.
+        assert "{" not in value and '"type"' not in value
+    for row in spanish["rows"]:
+        assert row.get("labelKey"), "clients localize labels from labelKey"
+    rendered = _stable_test_json(spanish).casefold()
+    assert "muestra la confirmación" not in rendered
+    # NOTE: the card summary/title remain English because
+    # confirmation.py::_confirmation_summary ignores `language` for every
+    # confirmation in the product. That pre-existing gap is recorded on this
+    # PR and deliberately not fixed here, so `strategy_copy` is not asserted
+    # against the summary.
+    assert strategy_copy
 
 
-def test_search_run_fresh_omits_unfaithful_dca_snapshot(
+def test_search_retest_omits_unfaithful_dca_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    action, _, run = _chat_persisted_run_fresh_fixture(
+    """An unfaithful snapshot must not be offered at all.
+
+    Eligibility and admission share one reconstruction, so a run the backend
+    cannot faithfully replay simply has no action on the dossier.
+    """
+    action, setup, _, run = _chat_persisted_retest_fixture(
         monkeypatch,
         request_payload={
             "strategy_type": "dca_accumulation",
@@ -3967,7 +3990,8 @@ def test_search_run_fresh_omits_unfaithful_dca_snapshot(
             "benchmark_symbol": "SPY",
         },
     )
-    assert action["canonical_setup"]["capital_amount"] == 500.0
+    assert action is not None
+    assert setup is not None and setup.capital_amount == 500.0
 
     from argus.domain.conversation_recall import project_conversation_recall
 
@@ -4006,7 +4030,7 @@ def test_search_run_fresh_omits_unfaithful_dca_snapshot(
     _, item = projected
     assert item.dossier is not None
     assert all(
-        candidate.type != "run_fresh" for candidate in item.dossier.actions
+        candidate.type != "retest_run" for candidate in item.dossier.actions
     )
 
 

@@ -14,6 +14,7 @@ import {
 } from "./language-features";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
@@ -632,6 +633,7 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  avatar_theme?: AvatarTheme;
 };
 
 export async function getMe() {

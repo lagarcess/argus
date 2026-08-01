@@ -338,6 +338,22 @@
       "historical_period": "Probarlo en un período histórico",
       "supported_symbol": "Usar un símbolo de acción o cripto compatible"
     },
+    "retest": {
+      "strategy_family": {
+        "buy_and_hold": "Comprar y mantener",
+        "dca_accumulation": "Compras recurrentes",
+        "indicator_threshold": "Umbral de indicador",
+        "signal_strategy": "Reglas de señales"
+      },
+      "duration": {
+        "year_one": "misma duración de {{count}} año",
+        "year_other": "misma duración de {{count}} años",
+        "month_one": "misma duración de {{count}} mes",
+        "month_other": "misma duración de {{count}} meses",
+        "day_one": "misma duración de {{count}} día",
+        "day_other": "misma duración de {{count}} días"
+      }
+    },
     "result_readout": {
       "quick_take": "Lectura rápida"
     },
@@ -786,6 +802,22 @@
       "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
       "language_save_error": "No pudimos actualizar el idioma todavía.",
+      "avatar_theme": {
+        "label": "Color del avatar",
+        "change": "Editar avatar",
+        "close": "Ocultar colores del avatar",
+        "hide": "Ocultar",
+        "save_error": "No pudimos actualizar el color de tu avatar todavía.",
+        "themes": {
+          "ember": "Siena",
+          "gold": "Liquen",
+          "slate": "Enebro",
+          "teal": "Laguna",
+          "ocean": "Predeterminado",
+          "indigo": "Iris",
+          "plum": "Morera"
+        }
+      },
       "close": "Cerrar perfil",
       "title": "Perfil",
       "request_deletion": {
@@ -930,11 +962,9 @@
     "empty": "Aún no hay chats recientes."
   },
   "command_palette": {
-    "close": "Cerrar búsqueda",
-    "search_placeholder": "Buscar en Argus...",
-    "guest": {
-      "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
-    },
+    "add_decision": "Agregar decisión · {{run}}",
+    "add_decision_short": "Agregar decisión",
+    "archive_conversation": "Archivar conversación",
     "asset_rollup": {
       "heading": "Tu historial de Argus",
       "scope_registered": "En todas tus conversaciones",
@@ -943,73 +973,25 @@
       "runs_involving_other": "{{count}} ejecuciones que incluyen {{symbol}}",
       "last_touched": "Última actividad: {{date}}"
     },
-    "no_results": "No se encontraron resultados",
-    "try_searching": "Prueba con un ticker, una frase o una nota que recuerdes.",
-    "keep_typing": "Sigue escribiendo",
-    "keep_typing_detail": "La búsqueda comienza con un ticker de 2 caracteres o una palabra de 3 caracteres.",
-    "read_error": "Argus no pudo cargar estos resultados.",
-    "retry_search": "Intentar la búsqueda de nuevo",
-    "load_more_error": "Argus no pudo cargar más resultados. Tus resultados actuales siguen disponibles.",
-    "retry_load_more": "Intentar cargar más",
-    "no_conversations": "No hay conversaciones aún",
-    "clear_search": "Borrar búsqueda",
-    "rename_conversation": "Renombrar conversación",
-    "archive_conversation": "Archivar conversación",
-    "delete_conversation": "Eliminar conversación",
-    "preview": "Vista previa",
-    "preview_empty": "Abre la conversación fuente para ver más contexto.",
-    "open_conversation": "Abrir conversación",
-    "open_source_conversation": "Abrir conversación fuente",
-    "open_at_match": "Enter abre la coincidencia",
-    "open_at_left_off": "⌘/Ctrl+Enter abre donde lo dejaste",
-    "run_fresh": "Volver a probar · {{run}}",
-    "add_decision": "Agregar decisión · {{run}}",
-    "change_decision": "Cambiar decisión · {{run}}",
-    "save_decision": "Guardar decisión",
     "back_to_latest_run": "Volver a la ejecución más reciente",
     "back_to_run_details": "Volver a los detalles de la ejecución",
+    "change_decision": "Cambiar decisión · {{run}}",
+    "change_decision_short": "Editar",
+    "clear_search": "Borrar búsqueda",
+    "close": "Cerrar búsqueda",
+    "conversation_count_one": "{{count}} conversación",
+    "conversation_count_other": "{{count}} conversaciones",
     "decision_history": "Historial de decisiones",
     "decision_history_count": "{{decided}} de {{total}} con decisión",
+    "decision_history_error": "No se pudo cargar el historial de decisiones",
     "decision_history_loading": "Cargando el historial de decisiones",
     "decision_history_loading_older": "Cargando decisiones anteriores",
-    "decision_history_error": "No se pudo cargar el historial de decisiones",
     "decision_history_retry": "Intentar de nuevo",
-    "no_decision_saved": "Sin decisión guardada",
-    "add_decision_short": "Agregar decisión",
-    "change_decision_short": "Editar",
-    "decision_note_label": "Nota de decisión: ",
-    "decision_note_editor_label": "Nota de decisión",
     "decision_note_count": "{{count}} / {{max}}",
-    "show_full_note": "Mostrar nota completa",
-    "show_less_note": "Mostrar menos",
+    "decision_note_editor_label": "Nota de decisión",
+    "decision_note_label": "Nota de decisión: ",
     "decision_saved": "Guardada",
-    "run_fresh_short": "Volver a probar la configuración",
-    "run_fresh_tooltip": "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
-    "open_in_conversation": "Abrir en la conversación",
-    "load_older": "Cargar anteriores",
-    "select_preview": "Selecciona un resultado para ver sus detalles.",
-    "ledger": {
-      "decision_filters": "Filtros de decisión",
-      "no_saved_ideas": "No hay ideas guardadas en este estado"
-    },
-    "status": {
-      "archived": "Archivado",
-      "captured": "Capturado",
-      "decided": "Decidido",
-      "decision": "Decisión",
-      "discarded": "Descartado",
-      "reviewed": "Revisado",
-      "saved": "Guardado"
-    },
-    "metric_labels": {
-      "benchmark_return_pct": "Rendimiento de referencia",
-      "delta_vs_benchmark_pct": "Contra referencia",
-      "excess_return_pct": "Contra referencia",
-      "max_drawdown_pct": "Peor caída",
-      "sharpe_ratio": "Sharpe",
-      "total_return_pct": "Rendimiento total",
-      "volatility_pct": "Volatilidad"
-    },
+    "delete_conversation": "Eliminar conversación",
     "dossier_values": {
       "decision_on": "{{state}} · en {{run}}",
       "run_count_one": "{{count}} ejecución",
@@ -1040,6 +1022,39 @@
         "unknown": "Siguiente paso guardado"
       }
     },
+    "guest": {
+      "discovery_unavailable": "La búsqueda se limita a esta conversación temporal. El descubrimiento fundamentado más amplio aún no está disponible."
+    },
+    "keep_typing": "Sigue escribiendo",
+    "keep_typing_detail": "La búsqueda comienza con un ticker de 2 caracteres o una palabra de 3 caracteres.",
+    "ledger": {
+      "decision_filters": "Filtros de decisión",
+      "no_saved_ideas": "No hay ideas guardadas en este estado"
+    },
+    "load_more_error": "Argus no pudo cargar más resultados. Tus resultados actuales siguen disponibles.",
+    "load_older": "Cargar anteriores",
+    "match_count_one": "{{count}} coincidencia",
+    "match_count_other": "{{count}} coincidencias",
+    "metric_labels": {
+      "benchmark_return_pct": "Rendimiento de referencia",
+      "delta_vs_benchmark_pct": "Contra referencia",
+      "excess_return_pct": "Contra referencia",
+      "max_drawdown_pct": "Peor caída",
+      "sharpe_ratio": "Sharpe",
+      "total_return_pct": "Rendimiento total",
+      "volatility_pct": "Volatilidad"
+    },
+    "no_conversations": "No hay conversaciones aún",
+    "no_decision_saved": "Sin decisión guardada",
+    "no_results": "No se encontraron resultados",
+    "no_source_conversation": "Sin conversación de origen",
+    "open_at_left_off": "⌘/Ctrl+Enter abre donde lo dejaste",
+    "open_at_match": "Enter abre la coincidencia",
+    "open_conversation": "Abrir conversación",
+    "open_in_conversation": "Abrir en la conversación",
+    "open_source_conversation": "Abrir conversación fuente",
+    "preview": "Vista previa",
+    "preview_empty": "Abre la conversación fuente para ver más contexto.",
     "preview_fields": {
       "assets": "Activos",
       "assumptions": "Supuestos",
@@ -1056,12 +1071,29 @@
       "tested": "Lo que probaste",
       "what_happened": "Qué pasó"
     },
-    "conversation_count_one": "{{count}} conversación",
-    "conversation_count_other": "{{count}} conversaciones",
+    "read_error": "Argus no pudo cargar estos resultados.",
+    "rename_conversation": "Renombrar conversación",
     "result_count_one": "{{count}} resultado",
     "result_count_other": "{{count}} resultados",
-    "match_count_one": "{{count}} coincidencia",
-    "match_count_other": "{{count}} coincidencias",
+    "retest_current_data": "Volver a probar con datos actuales",
+    "retest_tooltip": "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
+    "retry_load_more": "Intentar cargar más",
+    "retry_search": "Intentar la búsqueda de nuevo",
+    "save_decision": "Guardar decisión",
+    "search_placeholder": "Buscar en Argus...",
+    "select_preview": "Selecciona un resultado para ver sus detalles.",
+    "show_full_note": "Mostrar nota completa",
+    "show_less_note": "Mostrar menos",
+    "status": {
+      "archived": "Archivado",
+      "captured": "Capturado",
+      "decided": "Decidido",
+      "decision": "Decisión",
+      "discarded": "Descartado",
+      "reviewed": "Revisado",
+      "saved": "Guardado"
+    },
+    "try_searching": "Prueba con un ticker, una frase o una nota que recuerdes.",
     "type": {
       "backtest": "Backtest",
       "chat": "Conversación",
@@ -1072,8 +1104,7 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    },
-    "no_source_conversation": "Sin conversación de origen"
+    }
   },
   "auth": {
     "login": {
@@ -1081,7 +1112,7 @@
       "subtitle": "Inicia sesion para continuar",
       "email_placeholder": "Correo electronico",
       "password_placeholder": "Contrasena",
-      "submit": "Iniciar sesion",
+      "submit": "Iniciar sesión",
       "loading": "Iniciando sesion...",
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
@@ -1092,7 +1123,8 @@
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
-      "new_account": "¿nuevo en argus?"
+      "new_account": "¿Nuevo en Argus?",
+      "password_requirement": "Mínimo 8 caracteres."
     },
     "legal": {
       "continuing_prefix": "Al continuar, aceptas nuestros"
@@ -1171,9 +1203,9 @@
     }
   },
   "landing": {
-    "sign_up_email": "Registrarse con Email",
-    "already_account": "¿ya tienes una cuenta?",
-    "sign_in": "inicia sesión",
+    "sign_up_email": "Registrarse con email",
+    "already_account": "¿Ya tienes una cuenta?",
+    "sign_in": "Iniciar sesión",
     "legal_prefix": "Al registrarte, aceptas nuestros",
     "terms": "Términos",
     "privacy": "Política de Privacidad"

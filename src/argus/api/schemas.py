@@ -27,6 +27,7 @@ from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
+AvatarTheme = Literal["ocean", "plum", "teal", "ember", "gold", "indigo", "slate"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
 BacktestJobStatus = Literal[
@@ -122,6 +123,7 @@ class User(BaseModel):
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
+    avatar_theme: AvatarTheme = "ocean"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
@@ -151,14 +153,42 @@ class AccountCapabilities(BaseModel):
     can_submit_feedback: bool
 
 
+class GuestUser(BaseModel):
+    """Guest-safe profile projection without registered-only preferences."""
+
+    id: str
+    email: str | None
+    username: str | None = None
+    display_name: str | None = None
+    language: Language = "en"
+    locale: Locale = "en-US"
+    theme: Theme = "dark"
+    is_admin: bool = False
+    onboarding: OnboardingState = Field(default_factory=OnboardingState)
+    created_at: datetime
+    updated_at: datetime
+
+
+def guest_safe_user(user: User) -> GuestUser:
+    """Project a profile for a guest-facing response."""
+
+    return GuestUser.model_validate(user.model_dump())
+
+
 class UserResponse(BaseModel):
-    user: User
+    user: User | GuestUser
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
     public_account_access_enabled: bool = Field(
         description="Server-authoritative permission to expose ordinary account creation."
     )
+
+    @model_validator(mode="after")
+    def _hide_registered_preferences_from_guests(self) -> UserResponse:
+        if self.account_kind == "guest" and isinstance(self.user, User):
+            self.user = guest_safe_user(self.user)
+        return self
 
 
 class UsageWindow(BaseModel):
@@ -200,6 +230,7 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
+    avatar_theme: AvatarTheme = "ocean"
 
 
 class ConversationCreate(BaseModel):
@@ -531,83 +562,21 @@ class SearchDossierOutcome(BaseModel):
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
 
 
-SearchRunFreshStrategyType = Literal[
-    "buy_and_hold",
-    "dca_accumulation",
-    "indicator_threshold",
-    "signal_strategy",
-]
-SearchRunFreshSizingMode = Literal["capital_amount", "position_size"]
-SearchRunFreshCadence = Literal[
-    "daily",
-    "weekly",
-    "biweekly",
-    "monthly",
-    "quarterly",
-]
+class SearchRetestAction(BaseModel):
+    """Bounded typed retest envelope (spec 2.2).
 
+    Carries identity and policy only. The executable setup is reloaded
+    server-side from the owner-scoped source run, so no client value can
+    reach canonical state.
+    """
 
-class SearchRunFreshDateRange(BaseModel):
-    start: date
-    end: date
-
-
-class SearchRunFreshSetup(BaseModel):
-    strategy_type: SearchRunFreshStrategyType
-    symbols: list[str] = Field(min_length=1, max_length=5)
-    asset_class: AssetClass
-    timeframe: str = Field(min_length=1, max_length=24)
-    date_range: SearchRunFreshDateRange
-    sizing_mode: SearchRunFreshSizingMode
-    capital_amount: float | None = Field(default=None, gt=0)
-    position_size: float | None = Field(default=None, gt=0)
-    cadence: SearchRunFreshCadence | None = None
-    recurring_contribution: float | None = Field(default=None, gt=0)
-    starting_principal: float | None = Field(default=None, ge=0)
-    benchmark_symbol: str = Field(min_length=1, max_length=24)
-    entry_rule: dict[str, Any] | None = None
-    exit_rule: dict[str, Any] | None = None
-    rule_spec: dict[str, Any] | None = None
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    execution_realism: dict[str, Any] | None = None
-
-    @model_validator(mode="after")
-    def validate_setup_shape(self) -> SearchRunFreshSetup:
-        if self.sizing_mode == "capital_amount":
-            if self.capital_amount is None or self.position_size is not None:
-                raise ValueError("capital_amount sizing requires only capital_amount")
-        elif self.position_size is None or self.capital_amount is not None:
-            raise ValueError("position_size sizing requires only position_size")
-        if self.strategy_type == "dca_accumulation":
-            if self.cadence is None:
-                raise ValueError("cadence is required for dca_accumulation")
-            if (
-                self.sizing_mode != "capital_amount"
-                or self.recurring_contribution is None
-                or self.starting_principal != 0
-                or self.capital_amount != self.recurring_contribution
-            ):
-                raise ValueError(
-                    "dca_accumulation requires an exact recurring contribution "
-                    "and zero starting principal"
-                )
-        elif (
-            self.cadence is not None
-            or self.recurring_contribution is not None
-            or self.starting_principal is not None
-        ):
-            raise ValueError(
-                "cadence and DCA contribution fields are only for dca_accumulation"
-            )
-        return self
-
-
-class SearchRunFreshAction(BaseModel):
-    type: Literal["run_fresh"] = "run_fresh"
+    type: Literal["retest_run"] = "retest_run"
     source_run_id: str
     run_label: str = Field(max_length=160)
-    canonical_setup: SearchRunFreshSetup
-    send_text: str = Field(max_length=4000)
+    window_policy: Literal["same_duration_ending_today"] = (
+        "same_duration_ending_today"
+    )
+    contract_version: Literal["argus_retest_run/v1"] = "argus_retest_run/v1"
 
 
 class SearchDecisionAction(BaseModel):
@@ -619,7 +588,7 @@ class SearchDecisionAction(BaseModel):
 
 
 SearchDossierAction = Annotated[
-    SearchRunFreshAction | SearchDecisionAction,
+    SearchRetestAction | SearchDecisionAction,
     Field(discriminator="type"),
 ]
 
@@ -742,6 +711,7 @@ ChatActionType = Literal[
     "retry_failed_action",
     "select_response_option",
     "select_discovery_candidate",
+    "retest_run",
 ]
 
 
