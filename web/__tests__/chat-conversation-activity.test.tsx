@@ -334,4 +334,73 @@ describe("production chat request-session ownership", () => {
     }
     expect(harness.runtime.getState().byConversationId).toEqual({});
   });
+
+  test("promotes an authorized ordinary final for existing and newly created visible transcripts", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    expect(viewport.conversationActivityMutationRequiresCanonicalHydration("message_send")).toBe(false);
+    expect(viewport.conversationActivityMutationRequiresCanonicalHydration("retry")).toBe(false);
+    expect(viewport.conversationActivityMutationRequiresCanonicalHydration("recovery")).toBe(false);
+    expect(viewport.conversationActivityMutationRequiresCanonicalHydration("durable_job_completion")).toBe(true);
+    for (const conversationId of ["conversation-a", "conversation-created"]) {
+      const harness = requestHarness();
+      harness.showConversation(conversationId);
+      const request = harness.controller.begin(conversationId, "chat_turn");
+      expect(request).not.toBeNull();
+      const readiness = viewport.createConversationActivityTranscriptReadiness();
+      const readyTranscriptConversationIdRef = { current: null as string | null };
+      const activeConversationIdRef = { current: conversationId as string | null };
+      const currentViewRef = { current: "chat" };
+      if (conversationId === "conversation-a") readiness.stageCanonical(conversationId);
+      const previousGeneration = readiness.snapshot(conversationId).generation;
+
+      const promoted = viewport.promoteVisibleConversationActivityTerminal({
+        conversationId: request!.identity.conversationId,
+        identityAuthorized: harness.controller.authorize(request!, "final"),
+        acceptedTypedFinalArtifact: true,
+        requestKind: request!.kind,
+        activeConversationIdRef,
+        currentViewRef,
+        readyTranscriptConversationIdRef,
+        transcriptReadiness: readiness,
+      });
+
+      expect(promoted).toBe(true);
+      expect(readyTranscriptConversationIdRef.current).toBe(conversationId);
+      expect(readiness.snapshot(conversationId)).toEqual({
+        generation: previousGeneration + 1,
+        canonicalReady: true,
+      });
+    }
+  });
+
+  test("rejects a late ordinary final after its conversation loses visible ownership", async () => {
+    const viewport = await import(
+      "../components/chat/useConversationActivityViewport"
+    );
+    const harness = requestHarness();
+    const requestA = harness.controller.begin("conversation-a", "chat_turn");
+    expect(requestA).not.toBeNull();
+    harness.showConversation("conversation-b");
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    readiness.stageCanonical("conversation-b");
+    const readyTranscriptConversationIdRef = { current: "conversation-b" as string | null };
+
+    const promoted = viewport.promoteVisibleConversationActivityTerminal({
+      conversationId: requestA!.identity.conversationId,
+      identityAuthorized: harness.controller.authorize(requestA!, "final"),
+      acceptedTypedFinalArtifact: true,
+      requestKind: requestA!.kind,
+      activeConversationIdRef: { current: "conversation-b" },
+      currentViewRef: { current: "chat" },
+      readyTranscriptConversationIdRef,
+      transcriptReadiness: readiness,
+    });
+
+    expect(promoted).toBe(false);
+    expect(readyTranscriptConversationIdRef.current).toBe("conversation-b");
+    expect(readiness.snapshot("conversation-a").canonicalReady).toBe(false);
+    expect(readiness.snapshot("conversation-b").canonicalReady).toBe(true);
+  });
 });

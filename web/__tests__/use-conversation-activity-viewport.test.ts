@@ -99,6 +99,75 @@ const canonicalProofContext = {
 } as const;
 
 describe("conversation activity viewport read proof", () => {
+  test("requires a fresh sentinel proof after an ordinary final promotes the visible generation", async () => {
+    const viewport = await loadViewportModule();
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    const effects = controlledEffects();
+    const readiness = viewport.createConversationActivityTranscriptReadiness();
+    readiness.stageCanonical("conversation-a");
+    const root = transcriptRoot("conversation-a");
+    const latest = sentinel();
+    const reads: string[] = [];
+    const base = {
+      accountScopeKey: "account-a",
+      activeRouteConversationId: "conversation-a",
+      activeConversationId: "conversation-a",
+      activeConversationIdRef: "conversation-a",
+      readyTranscriptConversationId: "conversation-a",
+      transcriptRoot: root,
+      sentinel: latest,
+      transcriptCanonicalReady: true,
+      scrollRestorationComplete: true,
+      hydrationComplete: true,
+      manualUnreadGuard: false,
+      markReadPending: false,
+    } as const;
+    const owner = viewport.createConversationActivityViewportRuntime({
+      inputs: {
+        ...base,
+        transcriptGeneration: readiness.snapshot("conversation-a").generation,
+        attentionCursor: null,
+      },
+      effects: effects.effects,
+      markRead: async (_conversationId, cursor) => reads.push(cursor),
+      resetViewEpoch: () => undefined,
+    });
+    owner.start();
+    const preFinalObserver = effects.snapshotIntersectionCallback();
+    preFinalObserver?.(true);
+
+    const readyRef = { current: "conversation-a" as string | null };
+    expect(
+      viewport.promoteVisibleConversationActivityTerminal({
+        conversationId: "conversation-a",
+        identityAuthorized: true,
+        acceptedTypedFinalArtifact: true,
+        requestKind: "chat_turn",
+        activeConversationIdRef: { current: "conversation-a" },
+        currentViewRef: { current: "chat" },
+        readyTranscriptConversationIdRef: readyRef,
+        transcriptReadiness: readiness,
+      }),
+    ).toBe(true);
+    const promoted = readiness.snapshot("conversation-a");
+    owner.updateInputs({
+      ...base,
+      transcriptGeneration: promoted.generation,
+      attentionCursor: "cursor-final",
+    });
+    const finalObserver = effects.snapshotIntersectionCallback();
+    expect(finalObserver).not.toBe(preFinalObserver);
+    await drainMicrotasks();
+    expect(reads).toEqual([]);
+
+    finalObserver?.(true);
+    finalObserver?.(true);
+    await drainMicrotasks();
+    expect(reads).toEqual(["cursor-final"]);
+    owner.dispose();
+  });
+
   test("requires fresh intersection after reused-DOM ownership and restoration changes", async () => {
     const viewport = await loadViewportModule();
     expect(viewport).not.toBeNull();
@@ -338,6 +407,13 @@ describe("conversation activity viewport read proof", () => {
     const viewportHook = chat.indexOf("useConversationActivityViewport({");
     const refreshing = chat.indexOf('state.phase === "refreshing"');
     const canonical = chat.indexOf('state.phase === "ready"');
+    const finalAuthorization = chat.indexOf(
+      'requestSessions.authorize(requestSession, "final")',
+    );
+    const visibleTerminalPromotion = chat.indexOf(
+      "promoteVisibleConversationActivityTerminal({",
+      finalAuthorization,
+    );
 
     expect(refSync).toBeGreaterThan(-1);
     expect(anchorHook).toBeGreaterThan(refSync);
@@ -347,6 +423,11 @@ describe("conversation activity viewport read proof", () => {
     expect(chat).toContain("accountScopeKey: account?.user.id ?? null");
     expect(chat).toContain("pendingScrollRestoreRef");
     expect(chat).toContain("pendingMessageAnchorRef");
+    expect(finalAuthorization).toBeGreaterThan(-1);
+    expect(visibleTerminalPromotion).toBeGreaterThan(finalAuthorization);
+    expect(chat.slice(finalAuthorization, visibleTerminalPromotion + 600)).toContain(
+      "identityAuthorized",
+    );
 
     const saveAction = chat.slice(
       chat.indexOf("const handleSaveStrategyAction"),

@@ -25,11 +25,11 @@ import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
 import ChatToast from "@/components/chat/ChatToast";
 import { useChatToast } from "@/components/chat/useChatToast";
 import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
-import { useChatScrollControls } from "@/components/chat/useChatScrollControls";
+import { executeChatTranscriptUpdateScroll, useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { useConversationActivity } from "@/components/chat/useConversationActivity";
-import { clearConversationActivityTranscript, conversationTranscriptUpdateScrollAction, createConversationActivityTranscriptReadiness, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
+import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTranscriptReadiness, promoteVisibleConversationActivityTerminal, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import {
@@ -258,9 +258,7 @@ export default function ChatInterface() {
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
-  const [failedConversationId, setFailedConversationId] = useState<
-    string | null
-  >(null);
+  const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
   const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
@@ -315,7 +313,7 @@ export default function ChatInterface() {
       });
       if (
         readyTranscriptConversationIdRef.current === targetConversationId &&
-        mutation !== "conversation_rename"
+        conversationActivityMutationRequiresCanonicalHydration(mutation)
       ) {
         clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
       }
@@ -348,12 +346,8 @@ export default function ChatInterface() {
       },
     }),
   );
-  const isStreamingResponse =
-    conversationActivity.isConversationLocked(conversationId);
-  const visibleStreamStatus = visibleRequestStatus(
-    streamStatus,
-    isStreamingResponse,
-  );
+  const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
+  const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
   const handleDurableJobCompletion = useCallback(
     (targetConversationId: string) => {
       invalidateTranscriptForMutation(
@@ -856,11 +850,7 @@ export default function ChatInterface() {
   });
 
   useEffect(() => {
-    if (conversationTranscriptUpdateScrollAction(shouldAutoScrollRef.current) === "follow_latest") {
-      scrollToLatest("smooth");
-    } else {
-      updateScrollPositionState();
-    }
+    executeChatTranscriptUpdateScroll({ shouldAutoScrollRef, scrollToLatest, updateScrollPositionState });
   }, [messages.length, scrollToLatest, streamStatus, updateScrollPositionState]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
@@ -1262,7 +1252,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
-        if (!requestSessions.authorize(requestSession, "final")) return;
+        const identityAuthorized = requestSessions.authorize(requestSession, "final");
+        if (!identityAuthorized) return;
         setStreamStatus(null);
         const finalPayload = event.data as typeof event.data &
           Record<string, unknown>;
@@ -1448,6 +1439,13 @@ export default function ChatInterface() {
             return normalizeDurableRetryActionHistory(nextMessages);
           });
         }
+        promoteVisibleConversationActivityTerminal({
+          conversationId: requestSession.identity.conversationId,
+          identityAuthorized,
+          acceptedTypedFinalArtifact: Boolean(event.data.confirmation || event.data.run || finalBacktestJob || finalText),
+          requestKind: requestSession.kind, activeConversationIdRef, currentViewRef,
+          readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness,
+        });
       }
       if (event.event === "title") {
         if (

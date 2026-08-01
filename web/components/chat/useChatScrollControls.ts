@@ -9,6 +9,18 @@ export const chatScrollPositionState = (distanceFromBottom: number) => ({
   showJumpToLatest: distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX,
 });
 
+export const executeChatTranscriptUpdateScroll = (options: Readonly<{
+  shouldAutoScrollRef: { current: boolean };
+  scrollToLatest: (behavior?: ScrollBehavior) => void;
+  updateScrollPositionState: () => void;
+}>): void => {
+  if (options.shouldAutoScrollRef.current) {
+    options.scrollToLatest("smooth");
+    return;
+  }
+  options.updateScrollPositionState();
+};
+
 type UseChatScrollControlsOptions = {
   accountUserId: string | undefined;
   activeConversationIdRef: { current: string | null };

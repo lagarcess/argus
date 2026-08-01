@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const primitivePath = join(
@@ -23,15 +23,68 @@ describe("shared quick-jump primitive", () => {
     });
   });
 
-  test("preserves a scrolled-up position across token and completion renders", async () => {
-    const { conversationTranscriptUpdateScrollAction } = await import(
-      "../components/chat/useConversationActivityViewport"
+  test("executes token and terminal scroll updates without moving a detached transcript", async () => {
+    const { executeChatTranscriptUpdateScroll } = await import(
+      "../components/chat/useChatScrollControls"
+    );
+    for (const update of ["token", "terminal"] as const) {
+      const container = { scrollTop: 137 };
+      const shouldAutoScrollRef = { current: false };
+      let scrollCalls = 0;
+      let preserveCalls = 0;
+
+      executeChatTranscriptUpdateScroll({
+        shouldAutoScrollRef,
+        scrollToLatest: () => {
+          scrollCalls += 1;
+          container.scrollTop = 999;
+        },
+        updateScrollPositionState: () => {
+          preserveCalls += 1;
+          expect(container.scrollTop).toBe(137);
+        },
+      });
+
+      expect(update).toBeOneOf(["token", "terminal"]);
+      expect(scrollCalls).toBe(0);
+      expect(preserveCalls).toBe(1);
+      expect(container.scrollTop).toBe(137);
+      expect(shouldAutoScrollRef.current).toBe(false);
+    }
+  });
+
+  test("executes a following transcript update through the real scroll owner", async () => {
+    const { executeChatTranscriptUpdateScroll } = await import(
+      "../components/chat/useChatScrollControls"
+    );
+    const shouldAutoScrollRef = { current: true };
+    let scrollCalls = 0;
+    let preserveCalls = 0;
+
+    executeChatTranscriptUpdateScroll({
+      shouldAutoScrollRef,
+      scrollToLatest: (behavior) => {
+        expect(behavior).toBe("smooth");
+        scrollCalls += 1;
+      },
+      updateScrollPositionState: () => {
+        preserveCalls += 1;
+      },
+    });
+
+    expect(scrollCalls).toBe(1);
+    expect(preserveCalls).toBe(0);
+    expect(shouldAutoScrollRef.current).toBe(true);
+  });
+
+  test("wires transcript renders to the tested scroll executor", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf8",
     );
 
-    expect(conversationTranscriptUpdateScrollAction(true)).toBe("follow_latest");
-    expect(conversationTranscriptUpdateScrollAction(false)).toBe(
-      "preserve_position",
-    );
+    expect(chat).toContain("executeChatTranscriptUpdateScroll({ shouldAutoScrollRef");
+    expect(chat).not.toContain("conversationTranscriptUpdateScrollAction");
   });
 
   test("numbers pinned visible items first and limits every surface to nine", async () => {

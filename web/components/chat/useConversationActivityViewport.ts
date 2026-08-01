@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
+import type { TranscriptMutation } from "@/lib/chat-transcript-session-cache";
 import type { UseConversationActivityResult } from "./useConversationActivity";
 
 export type ConversationActivityViewportInputs = Readonly<{
@@ -103,10 +104,33 @@ export const clearConversationActivityTranscript = (
   readyTranscriptConversationIdRef.current = null;
 };
 
-export const conversationTranscriptUpdateScrollAction = (
-  shouldAutoScroll: boolean,
-): "follow_latest" | "preserve_position" =>
-  shouldAutoScroll ? "follow_latest" : "preserve_position";
+export const conversationActivityMutationRequiresCanonicalHydration = (
+  mutation: TranscriptMutation,
+): boolean =>
+  mutation !== "message_send" && mutation !== "retry" &&
+  mutation !== "recovery" && mutation !== "conversation_rename";
+
+export const promoteVisibleConversationActivityTerminal = (options: Readonly<{
+  conversationId: string;
+  identityAuthorized: boolean;
+  acceptedTypedFinalArtifact: boolean;
+  requestKind: "chat_turn" | "backtest_job";
+  activeConversationIdRef: { current: string | null };
+  currentViewRef: { current: string };
+  readyTranscriptConversationIdRef: { current: string | null };
+  transcriptReadiness: ConversationActivityTranscriptReadiness;
+}>): boolean => {
+  if (
+    !options.identityAuthorized ||
+    !options.acceptedTypedFinalArtifact ||
+    options.requestKind !== "chat_turn" ||
+    options.currentViewRef.current !== "chat" ||
+    options.activeConversationIdRef.current !== options.conversationId
+  ) return false;
+  options.transcriptReadiness.stageCanonical(options.conversationId);
+  options.readyTranscriptConversationIdRef.current = options.conversationId;
+  return true;
+};
 
 const createBrowserEffectsAdapter =
   (): ConversationActivityViewportEffectsAdapter => ({
