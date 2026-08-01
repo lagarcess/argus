@@ -1,5 +1,8 @@
 # Recents quick-jump hint alignment + attention-marker preservation
 
+Status: **DELIVERED** by PR #324, merged into `codex/private-alpha-next` as
+`812c8fef`. Retained as the presentation and attention-preservation record.
+
 Make Recents quick-jump hints match Settings without obscuring the existing
 out-of-focus conversation attention marker or moving conversation-row content.
 

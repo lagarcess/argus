@@ -23,7 +23,7 @@ that Argus remembers, compares, and stays honest about staleness.
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
 `main` at `217ead12`. The current integrated product checkpoint runs through PR
-#317 at `2ff6f3c6`; new work must branch from the current remote
+#326 at `8e2a6217`; new work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning that product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
@@ -81,10 +81,36 @@ ownership and reload-stable Retry presentation as `f6d0981e`; the follow-up
 test-isolation checkpoint is `1ed8d4f0`, and issue #313 is closed. PR #315 added
 the conversation activity rail as `6e20328c`, and PR #317 added the centralized
 keyboard overlay and quick-navigation system as `2ff6f3c6` while preserving
-Cmd/Ctrl+K Omnisearch and the existing F2 rename binding. Issue #310 and Draft
-PR #311 are now unblocked by #309's landing, but must reconcile onto the current
-integration head and finish their intentionally deferred schema, palette,
-contract, and exact-head acceptance work before merge review.
+Cmd/Ctrl+K Omnisearch and the existing F2 rename binding. PR #324 subsequently
+aligned Recents quick-jump hints with the shared exact-chord presentation as
+`812c8fef` without displacing attention markers. PR #311 then completed issue
+#310's provider-free typed **Retest with current data** action as `51984a42`;
+it reloads canonical run truth, materializes the ordinary confirmation contract,
+and stops before execution. Issue #310 is closed.
+
+PR #312 added registered-only avatar monogram themes as `40eba1f6`. PR #319
+integrated the public-alpha technical-readiness lane as `1c3775aa`: capped
+registered/Guest provider keys, measured Render capacity, the requested-access
+and approval-email path, CAPTCHA wiring, and recorded hosted evidence. The
+permanent-account gate remains `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, so
+that landing does not authorize public account access or a new tester cohort.
+PR #320 unified the frontend failure vocabulary as `53c36d40`; PRs #323, #325,
+and #328 delivered the bounded auth copy, error-localization, and card-container
+corrections as `c1a13949`, `05fbef06`, and `403ea114`; and PR #327 removed the
+unavailable Release Notes destination as `22bec7da` while preserving its later
+public-beta re-entry contract.
+
+PR #329 then landed the backend/data foundation for durable conversation
+activity and read state as `8a5d621b`. Its additive migration and API projection
+are integrated, but the separately specified conversation-activity UI consumer
+is still a later slice and the migration remains a hosted-promotion operation.
+PR #326 completed issue #321 as `8e2a6217`, bounding invisible and interactive
+Turnstile waits and presenting an accessible localized challenge dialog. Issue
+#321 is closed. PR #330 is the current in-flight deferred Guest-bootstrap lane;
+it is not part of this checkpoint until it merges. Issue #314 remains the only
+new implementation follow-up from typed retest: rejected artifact actions lack
+operational evidence even though their HTTP and allowance behavior is already
+correct.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213

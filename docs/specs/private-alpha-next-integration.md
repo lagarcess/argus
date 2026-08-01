@@ -2,11 +2,11 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-31
+Last reconciled: 2026-08-01
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #317 at `2ff6f3c6`. Later commits may reconcile
+Latest product checkpoint: PR #326 at `8e2a6217`. Later commits may reconcile
 documentation and issue state without changing product behavior. New work must
 branch from the current remote `codex/private-alpha-next` head rather than
 pinning this product SHA. The accepted post-promotion
@@ -52,10 +52,28 @@ by the test-isolation checkpoint `1ed8d4f0`; issue #313 is closed. PR #315 added
 the current-conversation activity rail as `6e20328c`. PR #317 then added one
 central keyboard-shortcut registry, localized help overlay, and shared Recents
 and Settings quick-jump behavior as `2ff6f3c6`, without changing Cmd/Ctrl+K
-Omnisearch or the existing F2 rename binding. The typed-retest Draft PR #311 is
-now unblocked by #309/#316 but remains a worker candidate until it reconciles
-the new dossier, palette, schema, activity-rail, and keyboard surfaces and
-passes its final exact-head gates.
+Omnisearch or the existing F2 rename binding. PR #324 aligned Recents hints with
+that registry as `812c8fef`, and PR #311 then completed the typed, provider-free
+current-data retest action as `51984a42`; issue #310 is closed.
+
+The next integrated group adds bounded product and release-readiness work:
+registered-only avatar themes through PR #312 (`40eba1f6`); public-alpha
+capacity, capped-key, requested-access, approval-email, and hosted-proof
+mechanics through PR #319 (`1c3775aa`); one shared frontend failure vocabulary
+through PR #320 (`53c36d40`); auth copy, localized errors, and consistent card
+containment through PRs #323, #325, and #328 (`c1a13949`, `05fbef06`, and
+`403ea114`); and removal of the unavailable Release Notes row through PR #327
+(`22bec7da`). Public account access remains explicitly disabled and founder
+controlled despite the completed technical-readiness proof.
+
+PR #329 added the durable backend/data conversation-activity and read-state
+foundation as `8a5d621b`; its UI consumer remains a separate later slice and
+its migration is not claimed as hosted by this integration merge. PR #326 then
+closed issue #321 as `8e2a6217` with bounded invisible/interactive CAPTCHA
+deadlines and an accessible localized challenge dialog. PR #330 remains an
+open worker candidate for deferred Guest bootstrap and is not part of the
+checkpoint. Issue #314 remains a separate API evidence gap discovered during
+typed-retest delivery, not unfinished #310 work.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

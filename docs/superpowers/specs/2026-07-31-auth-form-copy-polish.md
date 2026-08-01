@@ -1,5 +1,8 @@
 # Auth form copy polish — password hint + casing consistency — scope note
 
+Status: **DELIVERED** by PR #323, merged into `codex/private-alpha-next` as
+`c1a13949`; issue #322 is closed. Retained as implementation evidence.
+
 Small, low-risk companion to
 [2026-07-31-guest-auth-captcha-ux.md](2026-07-31-guest-auth-captcha-ux.md),
 split out deliberately because it's a different root cause (copy/i18n

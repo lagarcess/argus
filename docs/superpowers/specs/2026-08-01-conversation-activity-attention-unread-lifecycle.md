@@ -4,9 +4,9 @@ Give users one truthful, durable way to understand which conversations are
 working, which finished out of sight, which need attention, and which they
 deliberately marked for later—without adding more chat clutter.
 
-Status: **approval candidate**. The interaction direction was founder-approved
-on 2026-08-01 after the Recents attention audit and follow-up discussion; this
-written end-to-end contract is the review gate before implementation planning.
+Status: **BACKEND/DATA FOUNDATION DELIVERED** by PR #329, merged into
+`codex/private-alpha-next` as `8a5d621b`. The conversation-activity UI PR named
+in section 15 remains the next bounded slice; this file remains its contract.
 
 Implementation base: `codex/private-alpha-next` at
 `403ea11410da2746f132223e44aac70c4a4b5534`. The specification review began

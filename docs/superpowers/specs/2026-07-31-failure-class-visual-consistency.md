@@ -1,5 +1,8 @@
 # Failure-class visual consistency — scope note
 
+Status: **DELIVERED** by PR #320, merged into `codex/private-alpha-next` as
+`53c36d40`. Retained as the shared failure-treatment evidence record.
+
 Anchored by [PR #311, comment 5141228550](https://github.com/lagarcess/argus/pull/311#issuecomment-5141228550)
 — founder's own diagnosis, already root-caused, treated below as the
 proven first item, not the whole scope. Founder direction: this lane is

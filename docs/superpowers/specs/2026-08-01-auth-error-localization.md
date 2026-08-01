@@ -1,5 +1,8 @@
 # Localize backend auth error codes on the frontend — scope note
 
+Status: **DELIVERED** by PR #325, merged into `codex/private-alpha-next` as
+`05fbef06`. Retained as the frontend localization contract.
+
 ## Why
 
 Live QA found backend error text reaching the user raw and unlocalized.

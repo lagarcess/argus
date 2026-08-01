@@ -1,5 +1,8 @@
 # Guest bootstrap deferred to conversion, not page load — scope note
 
+Status: **IN FLIGHT** in PR #330. This is not integration evidence until that
+PR merges; the prerequisite CAPTCHA boundary is delivered through PR #326.
+
 Companion to
 [2026-07-31-guest-auth-captcha-ux.md](2026-07-31-guest-auth-captcha-ux.md)
 (#321). That note fixes the CAPTCHA widget's behavior wherever it fires.
