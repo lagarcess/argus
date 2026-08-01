@@ -60,6 +60,7 @@ def admit_durable_chat_job(
         "source": "api_chat",
         "request_id": context.request_id,
         "payload_hash": payload_digest,
+        "openrouter_traffic_class": context.account_kind,
     }
 
     visitor_key = getattr(context, "visitor_key", None)

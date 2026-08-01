@@ -427,7 +427,10 @@ def _admit_direct_run(
             launch_payload=launch_payload,
             initial_status="running",
             conversation_id=conversation_id,
-            execution_metadata={"source": "api_direct"},
+            execution_metadata={
+                "source": "api_direct",
+                "openrouter_traffic_class": account.kind,
+            },
             allowance_limits=allowance_windows(
                 account,
                 SIMULATION_USAGE_RESOURCE,
@@ -462,7 +465,10 @@ def _admit_direct_run(
             launch_payload=launch_payload,
             initial_status="running",
             conversation_id=conversation_id,
-            execution_metadata={"source": "api_direct"},
+            execution_metadata={
+                "source": "api_direct",
+                "openrouter_traffic_class": account.kind,
+            },
             allowance_limits=allowance_windows(
                 account,
                 SIMULATION_USAGE_RESOURCE,

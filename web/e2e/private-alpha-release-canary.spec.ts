@@ -6,12 +6,14 @@ type StaticLabels = Record<string, string>;
 
 const email = process.env.ARGUS_CANARY_BROWSER_EMAIL;
 const password = process.env.ARGUS_CANARY_BROWSER_PASSWORD;
+const signupEmail = process.env.ARGUS_CANARY_BROWSER_SIGNUP_EMAIL;
 const language = process.env.ARGUS_CANARY_BROWSER_LANGUAGE;
 const prompt = process.env.ARGUS_CANARY_BROWSER_PROMPT;
 const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
 const decisionNote = process.env.ARGUS_CANARY_BROWSER_DECISION_NOTE;
 const searchQuery = process.env.ARGUS_CANARY_BROWSER_SEARCH_QUERY;
 const identityHandoff = process.env.ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF;
+const browserPhase = process.env.ARGUS_CANARY_BROWSER_PHASE ?? "full";
 const labels = JSON.parse(
   process.env.ARGUS_CANARY_STATIC_LABELS_JSON ?? "{}",
 ) as StaticLabels;
@@ -67,10 +69,17 @@ function isApiResponse(response: Response, suffix: string, method: string): bool
 async function loginThroughRenderedUi(
   page: Page,
   verifySignup = false,
-): Promise<string> {
+): Promise<{ userId: string; accessToken: string }> {
   const canaryEmail = requireConfig(email, "email");
   const canaryPassword = requireConfig(password, "password");
+  const canarySignupEmail = requireConfig(signupEmail, "signup email");
   const canaryLanguage = requireConfig(language, "language");
+  if (
+    canarySignupEmail.trim().toLocaleLowerCase() ===
+    canaryEmail.trim().toLocaleLowerCase()
+  ) {
+    throw new Error("Dedicated signup identity must differ from login identity");
+  }
 
   await page.addInitScript((nextLanguage) => {
     window.localStorage.setItem("i18nextLng", nextLanguage);
@@ -90,7 +99,7 @@ async function loginThroughRenderedUi(
       isApiResponse(response, "/auth/signup", "POST"),
     );
     await page.locator('input[type="text"]').fill("Argus Release Canary");
-    await page.locator('input[type="email"]').fill(canaryEmail);
+    await page.locator('input[type="email"]').fill(canarySignupEmail);
     await page.locator('input[type="password"]').fill(canaryPassword);
     await page
       .getByRole("button", { name: label("auth.signup.submit") })
@@ -100,7 +109,32 @@ async function loginThroughRenderedUi(
     if (signupPayload.language !== canaryLanguage) {
       throw new Error("Spanish signup request omitted the canonical language");
     }
-    expect(signupResponse.status()).toBe(400);
+    const signupCaptchaToken = signupPayload.captcha_token;
+    if (
+      typeof signupCaptchaToken !== "string" ||
+      signupCaptchaToken.length < 1 ||
+      signupCaptchaToken.length > 4096
+    ) {
+      throw new Error("Signup CAPTCHA token was missing or unbounded");
+    }
+    expect(signupResponse.status()).toBe(200);
+    const signupResponsePayload = record(
+      await signupResponse.json(),
+      "signup payload",
+    );
+    if (signupResponsePayload.session !== null) {
+      throw new Error("Fresh signup did not return a null session");
+    }
+    const signupUser = record(signupResponsePayload.user, "signup user");
+    if (
+      String(signupUser.email ?? "").trim().toLocaleLowerCase() !==
+      canarySignupEmail.trim().toLocaleLowerCase()
+    ) {
+      throw new Error("Fresh signup response did not preserve its dedicated identity");
+    }
+    const checkEmailState = page.getByTestId("auth-check-email");
+    await expect(checkEmailState).toBeVisible();
+    await expect(checkEmailState.getByRole("heading")).toBeFocused();
     await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
   }
 
@@ -118,9 +152,23 @@ async function loginThroughRenderedUi(
   await page.getByRole("button", { name: label("auth.login.submit") }).click();
 
   const loginResponse = await loginResponsePromise;
+  const loginRequestPayload =
+    loginResponse.request().postDataJSON() as JsonRecord;
+  const loginCaptchaToken = loginRequestPayload.captcha_token;
+  if (
+    typeof loginCaptchaToken !== "string" ||
+    loginCaptchaToken.length < 1 ||
+    loginCaptchaToken.length > 4096
+  ) {
+    throw new Error("Login CAPTCHA token was missing or unbounded");
+  }
   if (!loginResponse.ok()) throw new Error("Rendered login failed");
   const loginPayload = record(await loginResponse.json(), "login payload");
   const userId = privateId(record(loginPayload.user, "login user").id, "user identity");
+  const accessToken = privateId(
+    record(loginPayload.session, "login session").access_token,
+    "browser access token",
+  );
 
   await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
   const profileResponse = await profileResponsePromise;
@@ -135,7 +183,7 @@ async function loginThroughRenderedUi(
     throw new Error("Rendered profile hydration did not preserve Spanish identity");
   }
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  return userId;
+  return { userId, accessToken };
 }
 
 function captureBrowserErrors(page: Page) {
@@ -177,7 +225,59 @@ function successfulJobCapture(page: Page) {
   return capture;
 }
 
+test.describe("private-alpha requested-access denial canary", () => {
+  test.skip(
+    browserPhase !== "access-denial",
+    "Runs only before the shell promotes the requested access row.",
+  );
+
+  test("requested access cannot create an auth identity", async ({ page }) => {
+    test.setTimeout(90_000);
+    const canarySignupEmail = requireConfig(signupEmail, "signup email");
+    const canaryPassword = requireConfig(password, "password");
+    const canaryLanguage = requireConfig(language, "language");
+
+    await page.addInitScript((nextLanguage) => {
+      window.localStorage.setItem("i18nextLng", nextLanguage);
+    }, canaryLanguage);
+    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
+
+    const signupResponsePromise = page.waitForResponse((response) =>
+      isApiResponse(response, "/auth/signup", "POST"),
+    );
+    await page.locator('input[type="text"]').fill("Argus Release Canary");
+    await page.locator('input[type="email"]').fill(canarySignupEmail);
+    await page.locator('input[type="password"]').fill(canaryPassword);
+    await page
+      .getByRole("button", { name: label("auth.signup.submit") })
+      .click();
+    const signupResponse = await signupResponsePromise;
+    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
+    if (signupPayload.language !== canaryLanguage) {
+      throw new Error("Spanish denied signup omitted the canonical language");
+    }
+    const signupCaptchaToken = signupPayload.captcha_token;
+    if (
+      typeof signupCaptchaToken !== "string" ||
+      signupCaptchaToken.length < 1 ||
+      signupCaptchaToken.length > 4096
+    ) {
+      throw new Error("Denied signup CAPTCHA token was missing or unbounded");
+    }
+    expect(signupResponse.status()).toBe(400);
+    expect(record(await signupResponse.json(), "denied signup payload").code).toBe(
+      "auth_signup_failed",
+    );
+    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
+  });
+});
+
 test.describe.serial("private-alpha rendered release canary", () => {
+  test.skip(
+    browserPhase !== "full",
+    "Runs only after the shell promotes the requested access row.",
+  );
+
   test("deterministic/intercepted recovery is not deployed backend proof", async ({ page }) => {
     test.setTimeout(90_000);
     const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";
@@ -293,7 +393,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       }
     });
 
-    const userId = await loginThroughRenderedUi(page);
+    const { userId, accessToken } = await loginThroughRenderedUi(page);
     const conversationResponsePromise = page.waitForResponse((response) =>
       isApiResponse(response, "/conversations", "POST"),
     );
@@ -317,6 +417,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "conversation_created",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
     });
 
@@ -369,6 +470,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "result_captured",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,
@@ -542,6 +644,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "complete",
       user_id: userId,
+      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,

@@ -16,6 +16,7 @@ from argus.api.dependencies import (
     request_id_middleware,
     validation_problem_body,
 )
+from argus.llm.openrouter_key_policy import validate_hosted_openrouter_configuration
 
 DEFAULT_CORS_ALLOW_ORIGINS = (
     "http://localhost:3000",
@@ -42,6 +43,7 @@ def cors_allow_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_hosted_openrouter_configuration()
     checkpointer_cm = None
     if api_state.CHECKPOINTER_MODE == "postgres":
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver

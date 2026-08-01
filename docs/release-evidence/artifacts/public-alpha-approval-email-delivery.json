@@ -1,0 +1,12 @@
+{
+  "source": "Resend sent-email verification readback",
+  "id": "14c92439-e50f-4e3f-846c-228196808349",
+  "message_id": "<0100019fba60171c-666a1d47-1241-49e5-aced-54eec5daec1e-000000@email.amazonses.com>",
+  "from": "\"Argus\" <noreply@get-argus.com>",
+  "to": "delivered@resend.dev",
+  "subject": "Your Argus access is approved",
+  "status": "delivered",
+  "created_at": "2026-07-31T22:51:27.237000Z",
+  "signup_url": "https://argus-app-suz5.onrender.com/?auth=signup",
+  "plain_text": "Your Argus access is approved.\n\nYou can now create your Argus account using the signup form:\nhttps://argus-app-suz5.onrender.com/?auth=signup\n\nArgus"
+}

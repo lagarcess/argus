@@ -76,6 +76,18 @@ def extract_confirmation_run_action(events: list[dict[str, Any]]) -> dict[str, A
     raise RuntimeError("confirmation stream did not include a run_backtest action")
 
 
+def _run_action_headers(action: dict[str, Any]) -> dict[str, str]:
+    payload = action.get("payload")
+    confirmation_id = (
+        str(payload.get("confirmation_id") or "").strip()
+        if isinstance(payload, dict)
+        else ""
+    )
+    if not confirmation_id:
+        raise RuntimeError("run_backtest action did not include confirmation_id")
+    return {"Idempotency-Key": confirmation_id}
+
+
 def extract_run_reference(events: list[dict[str, Any]]) -> RunReference:
     finals = [event.get("payload", {}) for event in events if event.get("type") == "final"]
     for payload in finals:
@@ -395,6 +407,7 @@ def _run_live_case(
                 "language": "en",
             },
             timeout_seconds=timeout_seconds,
+            headers=_run_action_headers(action),
         )
         timings["run_stream"] = run_stream["elapsed_ms"]
         run_events = parse_sse_events(run_stream["text"])
@@ -540,12 +553,19 @@ def _stream_chat(
     url: str,
     body: dict[str, Any],
     timeout_seconds: float,
+    headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     chunks: list[str] = []
     timed_chunks: list[tuple[float, str]] = []
     timeout = httpx.Timeout(timeout_seconds, connect=20.0, read=timeout_seconds)
-    with client.stream("POST", url, json=body, timeout=timeout) as response:
+    with client.stream(
+        "POST",
+        url,
+        json=body,
+        headers=headers,
+        timeout=timeout,
+    ) as response:
         response_headers_ms = _elapsed_ms(started)
         response.raise_for_status()
         for chunk in response.iter_text():
@@ -615,6 +635,7 @@ def _poll_backtest_job(
     job_id: str,
     timeout_seconds: float,
     poll_sleep_seconds: float,
+    require_llm_result_voice: bool = True,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     deadline = time.perf_counter() + timeout_seconds
@@ -647,7 +668,9 @@ def _poll_backtest_job(
                 raise RuntimeError("backtest job succeeded without linked run")
             source = payload.get("result_readout_source")
             fallback_used = payload.get("result_readout_fallback_used")
-            if source != "llm_explain_stage" or fallback_used is not False:
+            if require_llm_result_voice and (
+                source != "llm_explain_stage" or fallback_used is not False
+            ):
                 raise RuntimeError(
                     "backtest job did not preserve LLM result readout voice: "
                     f"source={source!r} fallback_used={fallback_used!r}"
@@ -1019,7 +1042,13 @@ def _timestamp_value(value: Any) -> float | None:
     try:
         return datetime.fromisoformat(normalized).timestamp()
     except ValueError:
-        return None
+        try:
+            return datetime.strptime(
+                normalized,
+                "%Y-%m-%dT%H:%M:%S.%f%z",
+            ).timestamp()
+        except ValueError:
+            return None
 
 
 def _rounded_timings(timings: dict[str, float]) -> dict[str, float]:

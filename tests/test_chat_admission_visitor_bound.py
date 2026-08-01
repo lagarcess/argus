@@ -14,9 +14,10 @@ from argus.api.chat.backtest_jobs import BacktestJobShadowContext
 
 
 def _context() -> BacktestJobShadowContext:
-    return BacktestJobShadowContext(
+    context = BacktestJobShadowContext(
         user_id="00000000-0000-0000-0000-000000000051",
         conversation_id="00000000-0000-0000-0000-000000000052",
+        account_kind="guest",
         idempotency_key="guest-sim-retry",
         request_id="req-1",
         allowance_limits=[
@@ -29,6 +30,7 @@ def _context() -> BacktestJobShadowContext:
         ],
         visitor_key="visitor:test-digest",
     )
+    return context
 
 
 def _gateway(*, reservation: dict[str, Any] | None, decision: str) -> MagicMock:
@@ -88,6 +90,12 @@ def test_fresh_admission_charges_the_visitor_once(monkeypatch) -> None:
 
     assert result.decision == "admitted"
     assert charges == ["visitor:test-digest"]
+    assert (
+        gateway.admit_backtest_job.call_args.kwargs["execution_metadata"][
+            "openrouter_traffic_class"
+        ]
+        == "guest"
+    )
 
 
 def test_replay_decision_never_charges_the_visitor(monkeypatch) -> None:

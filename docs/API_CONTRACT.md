@@ -383,6 +383,7 @@ non-product operations:
 
 - `GET /health`
 - `GET /internal/readiness`
+- `POST /internal/access-requests/approve`
 - `POST /api/v1/dev/reset`
 
 No public `/api/v1` product route may be hidden by a prefix or wildcard
@@ -1429,7 +1430,31 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
 - `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
 - Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
-- The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
+- `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
+  `{"email":"person@example.com","language":"en"}` where `language` is exactly
+  `en` or `es-419`. Every syntactically valid new, duplicate, approved,
+  disabled, or concurrent request returns HTTP `202` with
+  `{"accepted":true}`; it must not reveal allowlist state.
+- Access-request failures use RFC 9457 Problem Details: untrusted browser
+  origins return `403` / `csrf_origin_rejected`, rate limiting returns `429` /
+  `too_many_requests` with `Retry-After`, and unavailable persistence returns
+  `503` / `access_request_unavailable`.
+- An access request may insert only a missing `requested` row with normalized
+  email and the requested language. It must never overwrite an existing
+  requested, approved, privileged, or disabled row. `requested` and unknown
+  roles do not grant permanent access.
+- `POST /internal/access-requests/approve` is an ops-token-protected,
+  non-product operation excluded from the public OpenAPI artifact by exact
+  method and path. It loads one active requested row and its language, sends
+  one localized approval email linking to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`, then compare-and-sets
+  `role=requested AND disabled_at IS NULL` to `role=user`. Missing
+  configuration, missing or disabled state, SMTP failure, and a compare-and-set
+  miss do not return success. Missing or invalid ops authorization returns
+  `404`.
+- The allowlist remains intentionally narrow: `email`, `role`, `language`,
+  `disabled_at`, `created_at`, and `updated_at`. The approval notification does
+  not pre-create an Auth user or create an invite/password-setup flow.
 - Access is not controlled by a frontend flag or comma-separated deployed env var.
 
 **Browser session cookies:**
@@ -1525,9 +1550,11 @@ defaults to `true` and controls presentation only. The independent
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
   update to add verified email/password credentials to the current anonymous
   identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. It is
-  available only when the server enables public account access and preserves
-  the Auth UUID.
+  the original bootstrap cookie is only a backward-compatible fallback. The
+  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
+  its sole permanent-account gate: when public account access is disabled,
+  only active allowlisted roles may link; when enabled, any email not explicitly
+  disabled may link.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action to a ten-minute handoff without resolving whether that account
@@ -1597,11 +1624,18 @@ Create account.
 {
   "email": "user@email.com",
   "password": "string",
+  "captcha_token": "bounded-turnstile-token",
   "display_name": "Lucas",
   "username": "lucas",
   "language": "es-419"
 }
 ```
+
+**CAPTCHA:**
+- `captcha_token` is required and must contain 1–4,096 characters.
+- The browser acquires a fresh token for each signup submission through the
+  existing Turnstile boundary. Argus passes it to Supabase Auth and never logs
+  or persists it.
 
 **Language persistence:**
 - The private-alpha web client sends its selected `language` (`en` or `es-419`)
@@ -1618,9 +1652,13 @@ Create account.
 ```json
 {
   "user": {},
-  "session": {}
+  "session": null
 }
 ```
+
+`session` is an auth-session object when signup immediately establishes a
+session. It is `null` when email confirmation is required; the client must show
+the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
@@ -1644,11 +1682,17 @@ listed emails that fail provider signup.
 **Request:**
 ```json
 {
-  "identifier": "user@email.com",
-  "password": "string"
+  "email": "user@email.com",
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token"
 }
 ```
-*Note: `identifier` may be email. Username login is deferred unless explicitly implemented.*
+
+Username login is deferred unless explicitly implemented.
+
+`captcha_token` is required and bounded to 1–4,096 characters. The browser
+acquires a fresh token for each password-login submission; Argus forwards it to
+Supabase Auth without logging or persistence.
 
 **Response:**
 ```json

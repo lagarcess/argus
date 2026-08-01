@@ -201,17 +201,22 @@ class _MemoryBacktestGateway:
         started_at: str | None = None,
     ) -> dict[str, Any]:
         job = self._owned_job(user_id=user_id, job_id=job_id)
+        claim_started_at = started_at or utcnow().isoformat()
+        claimed_metadata = dict(execution_metadata)
+        workflow_metadata = dict(claimed_metadata.get("workflow_backtest") or {})
+        workflow_metadata["started_at"] = claim_started_at
+        claimed_metadata["workflow_backtest"] = workflow_metadata
         job.update(
             {
                 "status": "running",
-                "started_at": started_at,
+                "started_at": claim_started_at,
                 "attempts": int(job.get("attempts") or 0) + 1,
                 "result_run_id": None,
                 "finished_at": None,
                 "failure_code": None,
                 "failure_detail": None,
                 "retryable": False,
-                "execution_metadata": dict(execution_metadata),
+                "execution_metadata": claimed_metadata,
             }
         )
         return dict(job)

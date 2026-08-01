@@ -424,6 +424,7 @@ def test_public_account_mode_allows_unlisted_signup_without_role_elevation(
             json={
                 "email": "ordinary@example.com",
                 "password": "password-strong",
+                "captcha_token": "captcha-proof",
                 "language": "en",
             },
         )
@@ -448,6 +449,7 @@ def test_public_account_mode_still_blocks_explicitly_disabled_identity(
             json={
                 "email": "disabled@example.com",
                 "password": "password-strong",
+                "captcha_token": "captcha-proof",
                 "language": "en",
             },
         )

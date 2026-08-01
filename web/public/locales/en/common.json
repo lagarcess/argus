@@ -1107,6 +1107,20 @@
     }
   },
   "auth": {
+    "access_request": {
+      "title": "Request access to Argus",
+      "description": "Argus is in public alpha. Share your email to request access. If approved, we’ll email you when you can create an account.",
+      "email_label": "Email address",
+      "submit": "Request access",
+      "submitting": "Requesting access...",
+      "accepted_title": "Request received",
+      "accepted_description": "Thanks — we received your request. If access is approved, we’ll email you with the next step.",
+      "approved_prompt": "Already approved?",
+      "approved_action": "Sign up",
+      "existing_prompt": "Already have an account?",
+      "existing_action": "Sign in",
+      "error": "We couldn’t send your request. Please try again."
+    },
     "login": {
       "brand": "argus",
       "subtitle": "Sign in to continue",
@@ -1124,7 +1138,9 @@
       "submit": "Sign up",
       "loading": "Creating account...",
       "new_account": "New to Argus?",
-      "password_requirement": "At least 8 characters."
+      "password_requirement": "At least 8 characters.",
+      "confirmation_title": "Check your email",
+      "confirmation_description": "Use the confirmation link we sent to finish creating your account. Then return here to sign in."
     },
     "legal": {
       "continuing_prefix": "By continuing, you agree to our"
@@ -1163,7 +1179,8 @@
       "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "captcha_unavailable": "We couldn’t complete the security check. Please try again."
     }
   },
   "account_security": {

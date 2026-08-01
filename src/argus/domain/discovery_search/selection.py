@@ -10,6 +10,7 @@ from argus.domain.discovery_search.openrouter_web_search import (
     OpenRouterWebSearchProvider,
 )
 from argus.domain.discovery_search.perplexity_direct import PerplexityDirectProvider
+from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
 
 def search_provider_for_config(*, provider_id: str) -> SearchProvider:
@@ -21,7 +22,7 @@ def search_provider_for_config(*, provider_id: str) -> SearchProvider:
         )
     if normalized == "openrouter_web_search":
         return OpenRouterWebSearchProvider(
-            api_key=os.getenv("OPENROUTER_API_KEY", ""),
+            api_key=resolve_openrouter_api_key(),
             model=os.getenv("ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL", ""),
         )
     raise SearchUnavailableError(
