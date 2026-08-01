@@ -244,11 +244,11 @@ export default function ChatInterface() {
     const nextAccount = await getMe();
     if (nextAccount === null) return null;
     setAccount(nextAccount);
-    setProfileState("established");
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
     if (resolvedLanguage && resolvedLanguage !== i18n.language) {
       await i18n.changeLanguage(resolvedLanguage);
     }
+    setProfileState("established");
     return nextAccount;
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -830,7 +830,6 @@ export default function ChatInterface() {
           meResponse = await getMe();
           if (!cancelled) {
             setAccount(meResponse);
-            setProfileState("established");
           }
         } catch (error) {
           probeOutcome = guestProfileProbeOutcome(error);
@@ -840,7 +839,9 @@ export default function ChatInterface() {
           await i18n.changeLanguage(resolvedLanguage);
         }
         if (cancelled) return;
-        if (probeOutcome === "bootstrap_required") {
+        if (probeOutcome === null) {
+          setProfileState("established");
+        } else if (probeOutcome === "bootstrap_required") {
           setProfileState("bootstrap_required");
         } else if (probeOutcome === "fail_closed") {
           setProfileState("unavailable");

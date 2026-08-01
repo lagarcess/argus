@@ -1017,11 +1017,13 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("if (isStreamingResponse) return false;");
+    expect(chat).toContain("sendAdmissionInFlightRef.current ||");
+    expect(chat).toContain("activeStreamConversationIdRef.current ||");
+    expect(chat).toContain("sendAdmissionInFlightRef.current = true;");
     expect(chat).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
-    expect(chat).toContain(
-      "disabled={isStreamingResponse || isHydratingConversation}",
+    expect(chat).toMatch(
+      /disabled=\{\s*isStreamingResponse \|\|\s*isHydratingConversation \|\|\s*guestSubmissionPending\s*\}/,
     );
     expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");

@@ -51,6 +51,16 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
   const backend = new BackendController();
   const monitor = new BrowserSafetyMonitor();
   monitor.attach(page);
+  let pageBootstrapCalls = 0;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      request.method() === "POST" &&
+      url.pathname.endsWith("/api/v1/auth/guest")
+    ) {
+      pageBootstrapCalls += 1;
+    }
+  });
   let guestOwner = "";
   try {
     await backend.start(false);
@@ -73,6 +83,20 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
     expect(guest.account_kind).toBe("guest");
     expect(guest.user.email).toBeNull();
     expect(guest.guest).not.toBeNull();
+    expect(pageBootstrapCalls).toBe(0);
+    await expect(page.getByTestId("turnstile-challenge-shell")).toHaveCount(0);
+    expect(ownerSnapshot(guest.user.id)).toMatchObject({
+      conversations: 0,
+      messages: 0,
+      user_messages: 0,
+      assistant_messages: 0,
+      jobs: 0,
+      runs: 0,
+      chat_units: 0,
+      simulation_units: 0,
+      route_receipts: 0,
+      cost_rows: 0,
+    });
     await page.getByRole("button", { name: "Guest settings" }).click();
     await page.getByRole("menuitem", { name: "Language" }).click();
     await page.getByRole("button", { name: /Español/ }).click();
@@ -128,9 +152,12 @@ test("guest entry errors fail promptly without minting an identity", async ({
         }),
       });
     });
-    await expect(freshGuest(page)).rejects.toThrow(
-      "Guest public entry failed before authentication",
-    );
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const composer = page.getByTestId("chat-input");
+    await composer.fill("Compare Apple with SPY");
+    await composer.press("Enter");
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(composer).toHaveText("Compare Apple with SPY");
     expect(zeroStateSnapshot().auth_users).toBe(0);
   } finally {
     await backend.stop();
@@ -492,19 +519,12 @@ test("feedback evidence helper distinguishes consent without private content", a
   }
 });
 
-test("guest entry without a terminal signal fails within its bounded deadline", async ({
+test("guest setup without a local backend fails within its bounded deadline", async ({
   page,
 }) => {
   test.setTimeout(10_000);
   assertExactLocalCandidate();
   assertZeroState();
-  await page.route(`${LOCAL_APP_ORIGIN}/`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Blank local QA entry</title>",
-    });
-  });
   await expect(freshGuest(page, { timeoutMs: 1_000 })).rejects.toThrow(
     "Guest public entry failed before authentication",
   );

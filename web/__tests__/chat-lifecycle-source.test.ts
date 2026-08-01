@@ -48,7 +48,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain('data-conversation-id={conversationId ?? undefined}');
     expect(chat).toContain('role="region"');
     expect(chat).toContain('aria-label={t("common.conversation", "Conversation")}');
-    expect(chat).toContain("aria-busy={isHydratingConversation}");
+    expect(chat).toContain(
+      "aria-busy={isHydratingConversation || guestSubmissionPending}",
+    );
     expect(announcement).toContain(
       'data-testid="conversation-retrieval-announcement"',
     );

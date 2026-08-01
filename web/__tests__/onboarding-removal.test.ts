@@ -96,22 +96,50 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
 
   test("chat first paint waits for the authenticated profile language", () => {
     const chat = read("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("isBootstrappingProfile");
-    const bootstrapFlip = chat.indexOf("setIsBootstrappingProfile(false)");
-    const languageApply = chat.indexOf("await i18n.changeLanguage(resolvedLanguage)");
+    const refreshStart = chat.indexOf("const refreshAccount = useCallback");
+    const refreshEnd = chat.indexOf("const [messages, setMessages]", refreshStart);
+    const refresh = chat.slice(refreshStart, refreshEnd);
+    const initStart = chat.indexOf("// ── Init conversation");
+    const initEnd = chat.indexOf(
+      "const { scrollToLatest, updateScrollPositionState }",
+      initStart,
+    );
+    const init = chat.slice(initStart, initEnd);
+    const languageApply = init.indexOf(
+      "await i18n.changeLanguage(resolvedLanguage)",
+    );
+    const establishedFlip = init.indexOf('setProfileState("established")');
+    const refreshLanguageApply = refresh.indexOf(
+      "await i18n.changeLanguage(resolvedLanguage)",
+    );
+    const refreshEstablishedFlip = refresh.indexOf(
+      'setProfileState("established")',
+    );
+    expect(refreshStart).toBeGreaterThan(-1);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+    expect(refreshLanguageApply).toBeGreaterThan(-1);
+    expect(refreshEstablishedFlip).toBeGreaterThan(refreshLanguageApply);
+    expect(initStart).toBeGreaterThan(-1);
+    expect(initEnd).toBeGreaterThan(initStart);
     expect(languageApply).toBeGreaterThan(-1);
-    expect(bootstrapFlip).toBeGreaterThan(languageApply);
-    expect(chat).toContain("if (isBootstrappingProfile) {");
+    expect(establishedFlip).toBeGreaterThan(languageApply);
+    expect(chat).toContain(
+      'if (profileState === "probing" || profileState === "unavailable") {',
+    );
   });
 
-  test("an unreachable backend surfaces the offline message, not a healthy chat", () => {
+  test("an unreachable backend fails closed to the auth-first surface", () => {
     const chat = read("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("profileUnreachable = status !== 401 && status !== 403");
-    const unreachableBranch = chat.indexOf("if (profileUnreachable) {");
-    expect(unreachableBranch).toBeGreaterThan(-1);
-    expect(
-      chat.slice(unreachableBranch, unreachableBranch + 400),
-    ).toContain("chat.error_offline");
+    const failClosedBranch = chat.indexOf(
+      'else if (probeOutcome === "fail_closed") {',
+    );
+    expect(failClosedBranch).toBeGreaterThan(-1);
+    const failClosed = chat.slice(failClosedBranch, failClosedBranch + 220);
+    expect(failClosed).toContain('setProfileState("unavailable")');
+    expect(failClosed).toContain('router.replace("/?auth=login")');
+    expect(chat).toContain(
+      'if (profileState === "probing" || profileState === "unavailable") {',
+    );
   });
 
   test("legacy persisted marker content still cannot become a retry action", () => {
