@@ -55,3 +55,18 @@ export type UserResponse = {
   capabilities: AccountCapabilities;
   public_account_access_enabled: boolean;
 };
+
+export type GuestProfileProbeOutcome = "bootstrap_required" | "fail_closed";
+
+export function guestProfileProbeOutcome(
+  error: unknown,
+): GuestProfileProbeOutcome {
+  if (typeof error !== "object" || error === null) return "fail_closed";
+  const status = "status" in error ? error.status : undefined;
+  const code = "code" in error ? error.code : undefined;
+  if (status === 401) return "bootstrap_required";
+  if (status === 403 && code === "guest_session_expired") {
+    return "bootstrap_required";
+  }
+  return "fail_closed";
+}

@@ -48,6 +48,7 @@ export function useGuestSendBridge(
 
 type UseGuestExperienceInput = {
   account: UserResponse | null;
+  guestBootstrapRequired: boolean;
   conversationId: string | null;
   messages: Message[];
   sendRef: MutableRefObject<GuestResumeSend | null>;
@@ -57,6 +58,7 @@ type UseGuestExperienceInput = {
   startNewChat: () => Promise<unknown>;
   onOpenFeedback: () => void;
   onOpenOmnisearch: () => void;
+  onRequestPendingGuestSignIn: () => void;
   onAdoptConversation: (conversationId: string) => void;
   onGateError: () => void;
   onStartOverError: () => void;
@@ -71,6 +73,7 @@ type GuestSendAdmissionInput = {
 
 export function useGuestExperience({
   account,
+  guestBootstrapRequired,
   conversationId,
   messages,
   sendRef,
@@ -80,6 +83,7 @@ export function useGuestExperience({
   startNewChat,
   onOpenFeedback,
   onOpenOmnisearch,
+  onRequestPendingGuestSignIn,
   onAdoptConversation,
   onGateError,
   onStartOverError,
@@ -128,6 +132,7 @@ export function useGuestExperience({
 
   const shell = useGuestShellActions({
     account,
+    guestBootstrapRequired,
     hasAcceptedContent: messages.some((message) => message.role === "user"),
     closeTransientSidebar,
     onOpenFeedback,
@@ -143,7 +148,11 @@ export function useGuestExperience({
       });
     },
     onOpenOmnisearch,
-    onRequestSignIn: () =>
+    onRequestSignIn: () => {
+      if (guestBootstrapRequired) {
+        onRequestPendingGuestSignIn();
+        return;
+      }
       conversion.requestConversion(
         "keep_history",
         conversationId
@@ -153,12 +162,14 @@ export function useGuestExperience({
               actionId: crypto.randomUUID(),
             }
           : null,
-      ),
+      );
+    },
     omnisearchShortcutEnabled,
   });
 
   const admitSend = useCallback(
     async ({ text, mentions, action }: GuestSendAdmissionInput) => {
+      if (guestBootstrapRequired) return true;
       if (!shell.isGuest) return true;
       try {
         const usage = await getUsageAllowances();
@@ -201,7 +212,14 @@ export function useGuestExperience({
         return false;
       }
     },
-    [conversationId, conversion, messages, onGateError, shell.isGuest],
+    [
+      conversationId,
+      conversion,
+      guestBootstrapRequired,
+      messages,
+      onGateError,
+      shell.isGuest,
+    ],
   );
 
   const startOver = useCallback(async () => {

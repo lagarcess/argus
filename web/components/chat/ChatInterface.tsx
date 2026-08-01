@@ -57,6 +57,7 @@ import {
   omnisearchEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
+import { guestProfileProbeOutcome } from "@/lib/guest-account";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -92,7 +93,6 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
-  offlineFallbackMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import {
@@ -199,6 +199,8 @@ import {
 } from "./artifact-history";
 
 type View = "chat" | "strategies" | "settings";
+type ProfileState =
+  "probing" | "established" | "bootstrap_required" | "expired" | "unavailable";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -209,9 +211,11 @@ export default function ChatInterface() {
   const [account, setAccount] = useState<Awaited<
     ReturnType<typeof getMe>
   > | null>(null);
+  const [profileState, setProfileState] = useState<ProfileState>("probing");
   const refreshAccount = useCallback(async () => {
     const nextAccount = await getMe();
     setAccount(nextAccount);
+    setProfileState("established");
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
     if (resolvedLanguage && resolvedLanguage !== i18n.language) {
       await i18n.changeLanguage(resolvedLanguage);
@@ -260,7 +264,6 @@ export default function ChatInterface() {
   >(null);
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
-  const [isBootstrappingProfile, setIsBootstrappingProfile] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast, showToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
@@ -787,25 +790,28 @@ export default function ChatInterface() {
     (async () => {
       try {
         let meResponse: Awaited<ReturnType<typeof getMe>> | null = null;
-        let profileUnreachable = false;
+        let probeOutcome: ReturnType<
+          typeof guestProfileProbeOutcome
+        > | null = null;
         try {
           meResponse = await getMe();
-          if (!cancelled) setAccount(meResponse);
+          if (!cancelled) {
+            setAccount(meResponse);
+            setProfileState("established");
+          }
         } catch (error) {
-          const status =
-            typeof error === "object" && error !== null && "status" in error
-              ? (error as { status?: number }).status
-              : undefined;
-          profileUnreachable = status !== 401 && status !== 403;
+          probeOutcome = guestProfileProbeOutcome(error);
         }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
         }
         if (cancelled) return;
-        setIsBootstrappingProfile(false);
-        if (profileUnreachable) {
-          setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
+        if (probeOutcome === "bootstrap_required") {
+          setProfileState("bootstrap_required");
+        } else if (probeOutcome === "fail_closed") {
+          setProfileState("unavailable");
+          router.replace("/?auth=login");
           return;
         }
         const activeRoute = readActiveConversationRouteState();
@@ -832,8 +838,16 @@ export default function ChatInterface() {
         resetToEmptyChatSurface();
       } catch {
         if (cancelled) return;
-        setIsBootstrappingProfile(false);
-        setMessages([offlineFallbackMessage(t("chat.error_offline"))]);
+        setProfileState("unavailable");
+        router.replace("/?auth=login");
+        setMessages([
+          {
+            id: "offline",
+            role: "ai",
+            kind: "text",
+            content: t("chat.error_offline"),
+          },
+        ]);
         setIsHydratingConversation(false);
       }
     })();
@@ -954,8 +968,10 @@ export default function ChatInterface() {
     },
   });
 
+  const guestBootstrapRequired = profileState === "bootstrap_required";
   const guestExperience = useGuestExperience({
     account,
+    guestBootstrapRequired,
     conversationId,
     messages,
     sendRef: guestSendRef,
@@ -970,6 +986,7 @@ export default function ChatInterface() {
         context: { surface: "guest_header", conversation_id: conversationId },
       }),
     onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
@@ -984,10 +1001,12 @@ export default function ChatInterface() {
   });
   const {
     isGuest,
+    isEstablishedGuest,
     canManageConversation,
     canSaveDecision,
     canUseOmnisearch,
     canUseGroundedDiscovery,
+    canSubmitFeedback,
     requestGuestDecision,
     requestGuestFeedback,
     requestGuestSearchUpgrade,
@@ -2095,10 +2114,14 @@ export default function ChatInterface() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (isBootstrappingProfile) {
+  if (profileState === "probing" || profileState === "unavailable") {
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div
+          aria-label={t("guest.entry.loading", "Opening Argus")}
+          className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          role="status"
+        />
       </div>
     );
   }
@@ -2243,6 +2266,7 @@ export default function ChatInterface() {
               {currentView === "chat" && isGuest ? (
                 <GuestHeader
                   expiresAt={account?.guest?.expires_at ?? null}
+                  feedbackEnabled={canSubmitFeedback}
                   onFeedback={requestGuestFeedback}
                   onSignIn={requestGuestSignIn}
                 />
@@ -2303,7 +2327,7 @@ export default function ChatInterface() {
 
                 <StarterActions
                   disabled={isStreamingResponse || isHydratingConversation}
-                  guestAnalyticsEnabled={guestExperience.isGuest}
+                  guestAnalyticsEnabled={isEstablishedGuest}
                   onSelect={handleSend}
                 />
 
