@@ -111,3 +111,73 @@ after or rebased onto #321's PR. Gates: EN/es-419, hermetic frontend
 suite, and recorded evidence (screenshots or a short capture) of a guest
 typing and sending a first message with zero visible auth step, followed
 by a correctly-established guest session.
+
+## Phase 1 close-out (2026-08-01)
+
+Audit complete, reported and reviewed. Findings, and the two open
+questions Phase 1 raised, resolved below. Phase 2 may proceed against
+this close-out plus the original locked decisions above — do not re-derive
+these from scratch.
+
+1. **Premise fully confirmed — there was no real divergence.**
+   `codex/private-alpha-next` and the hosted `claude/public-alpha-readiness`
+   deployment both bootstrap eagerly on mount, identically, via
+   `GuestEntry.tsx`'s mount effect. The original audit trigger (a live
+   reproduction that looked composer-first, no visible auth step) was a
+   false signal: Turnstile resolved invisibly and fast enough that
+   identity had already been established silently before anything was
+   visibly typed or sent. Treat the two branches as behaviorally
+   equivalent on this point going forward.
+2. **Mechanically sound, confirmed live.** `POST /auth/guest` creates the
+   Supabase anonymous identity, profile, and the seven-day
+   `guest_workspaces` row — it does not create a conversation.
+   `ChatInterface.tsx` creates the conversation immediately before
+   streaming the first accepted message, and a database trigger binds it
+   to the guest workspace. The composer needs neither a workspace nor a
+   conversation to render or accept typing. Deferral to first send is
+   mechanically clean.
+3. **`GET /me` is not in scope of the "no auth network activity on load"
+   restriction — narrow decision 1 accordingly.** That restriction was
+   aimed at *identity-creating* and CAPTCHA-requiring calls specifically —
+   the ones that mint a real anonymous user and therefore need a bot-check
+   before the visitor has done anything. A read-only, unauthenticated-safe
+   `GET /me` session probe never triggers Turnstile, never creates
+   anything, and is never visible to the user — it's the same kind of
+   invisible session-restore check any web app does on load. Keep it. It
+   also resolves the registered-user redirect path for free, with no
+   change needed there.
+4. **Expiry detection is deferred too, deliberately — no new pre-check
+   mechanism.** Today, "this temporary chat has expired" only surfaces
+   because eager bootstrap happens to notice the old identity is dead and
+   returns `renewed_after_expiry`. Building a new lightweight probe just
+   to keep that pre-emptive detection on page load would be its own new
+   mechanism, and would reintroduce exactly the kind of "something runs
+   before the user acts" pattern this whole note exists to remove.
+   Instead: a returning guest with a dead workspace looks identical to a
+   brand-new visitor until they act. Their first send naturally surfaces
+   the expired state (bootstrap attempted as part of that submission
+   returns `renewed_after_expiry`), and routes to `ExpiredGuestSession`
+   reactively at that point, not proactively on load. The tradeoff — a
+   bookmarked link to a long-dead guest chat won't announce itself as
+   expired until used — is accepted.
+5. **`ExpiredGuestSession.tsx`'s restart flow needs its trigger condition
+   changed, not its internals.** It currently reaches its authenticated
+   state only because `GuestEntry` eagerly creates the replacement
+   identity first. Under deferral, `/chat` must represent "guest not
+   bootstrapped yet" as its own explicit state (distinct from
+   "registered" and from "expired") and run bootstrap — inline, as part of
+   the user's first submit — before allowance checks and conversation
+   creation, per decision 4's reactive-detection resolution. `Recents`
+   already fails open on an early unauthenticated request and needs no
+   change.
+6. **#321 dependency still holds.** #321 remains open, blocked on PR #319
+   landing into this branch (see that spec and the PR #319 reconciliation
+   note). `guest-captcha.ts` stays no-touch for this lane until #321's
+   acquisition changes are actually present on `codex/private-alpha-next`
+   — verify that before Phase 2 starts, don't assume it landed just
+   because time has passed.
+
+Phase 2 should build from the current `codex/private-alpha-next` tip at
+the time work starts, not from the Phase 1 audit's checkout — this branch
+has kept moving (avatar themes, auth copy polish, and others have landed
+since the audit ran).
