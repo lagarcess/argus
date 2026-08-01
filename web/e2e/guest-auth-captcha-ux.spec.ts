@@ -5,6 +5,12 @@ const SCREENSHOT_DIR =
 
 type FakeTurnstileMode = "visible" | "stuck";
 
+declare global {
+  interface Window {
+    rejectCaptchaForTest?: () => void;
+  }
+}
+
 async function prepareCaptcha(
   page: import("@playwright/test").Page,
   language: "en" | "es-419",
@@ -13,10 +19,23 @@ async function prepareCaptcha(
   await page.addInitScript(
     ({ language: selectedLanguage, mode: selectedMode }) => {
       window.localStorage.setItem("i18nextLng", selectedLanguage);
+      window.localStorage.setItem("argus-theme", "dark");
       Object.defineProperty(window, "turnstile", {
         configurable: true,
         value: {
-          render(container: HTMLElement) {
+          render(
+            container: HTMLElement,
+            options: {
+              theme?: "auto" | "light" | "dark";
+              "before-interactive-callback"?: () => void;
+              "error-callback"?: () => boolean;
+            },
+          ) {
+            document.documentElement.dataset.renderedTurnstileTheme =
+              options.theme;
+            window.rejectCaptchaForTest = () => {
+              options["error-callback"]?.();
+            };
             if (selectedMode === "visible") {
               const frame = document.createElement("iframe");
               frame.title = "Turnstile test challenge";
@@ -24,8 +43,11 @@ async function prepareCaptcha(
               frame.style.height = "65px";
               frame.style.border = "0";
               frame.srcdoc =
-                "<!doctype html><html><body style='margin:0;background:#fff;color:#171717;font:15px system-ui;display:flex;align-items:center;height:65px'><div style='width:22px;height:22px;border:2px solid #666;margin:0 12px 0 16px'></div><strong>Verify you are human</strong></body></html>";
+                options.theme === "dark"
+                  ? "<!doctype html><html><body style='margin:0;background:#222;color:#f5f5f5;font:15px system-ui;display:flex;align-items:center;height:65px'><div style='width:22px;height:22px;border:2px solid #aaa;margin:0 12px 0 16px'></div><strong>Verify you are human</strong></body></html>"
+                  : "<!doctype html><html><body style='margin:0;background:#fff;color:#171717;font:15px system-ui;display:flex;align-items:center;height:65px'><div style='width:22px;height:22px;border:2px solid #666;margin:0 12px 0 16px'></div><strong>Verify you are human</strong></body></html>";
               container.appendChild(frame);
+              options["before-interactive-callback"]?.();
             }
             return "issue-321-test-widget";
           },
@@ -67,11 +89,28 @@ for (const fixture of [
     await expect(shell).toHaveAttribute("role", "dialog");
     await expect(shell.getByRole("heading", { name: fixture.label })).toBeVisible();
     await expect(shell.getByTitle("Turnstile test challenge")).toBeVisible();
+    await expect(shell).toBeFocused();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-rendered-turnstile-theme",
+      "dark",
+    );
+
+    await page.locator('input[type="email"]').evaluate((input) => {
+      (input as HTMLInputElement).focus();
+    });
+    await expect(shell).toBeFocused();
+
     await page.waitForTimeout(250);
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/${fixture.screenshot}`,
       fullPage: true,
     });
+
+    await page.evaluate(() => window.rejectCaptchaForTest?.());
+    await expect(shell).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /Sign in|Iniciar sesión/ }),
+    ).toBeFocused();
   });
 }
 

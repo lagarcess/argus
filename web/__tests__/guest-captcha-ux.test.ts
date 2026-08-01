@@ -11,6 +11,8 @@ type AcquireTurnstileChallenge = (input: {
   shell: ReturnType<typeof challengeHarness>["shell"];
   siteKey: string;
   timeoutMs: number;
+  interactiveTimeoutMs: number;
+  theme: "light" | "dark";
 }) => Promise<string>;
 
 function challengeUnderTest(): AcquireTurnstileChallenge {
@@ -26,11 +28,14 @@ function challengeUnderTest(): AcquireTurnstileChallenge {
 function challengeHarness() {
   let destroyCalls = 0;
   let removeCalls = 0;
+  let revealCalls = 0;
+  let renderedTheme: "auto" | "light" | "dark" | undefined;
   let callbacks:
     | {
         callback: (token: string) => void;
         "error-callback": () => boolean;
         "expired-callback": () => void;
+        "before-interactive-callback": () => void;
       }
     | undefined;
 
@@ -39,17 +44,23 @@ function challengeHarness() {
     destroy() {
       destroyCalls += 1;
     },
+    reveal() {
+      revealCalls += 1;
+    },
   };
   const turnstile = {
     render(
       _container: HTMLElement,
       options: {
+        theme: "auto" | "light" | "dark";
         callback: (token: string) => void;
         "error-callback": () => boolean;
         "expired-callback": () => void;
+        "before-interactive-callback": () => void;
       },
     ) {
       callbacks = options;
+      renderedTheme = options.theme;
       return "widget-1";
     },
     remove(widgetId: string) {
@@ -70,6 +81,12 @@ function challengeHarness() {
     get removeCalls() {
       return removeCalls;
     },
+    get revealCalls() {
+      return revealCalls;
+    },
+    get renderedTheme() {
+      return renderedTheme;
+    },
   };
 }
 
@@ -81,6 +98,8 @@ describe("shared CAPTCHA acquisition UX", () => {
       shell: harness.shell,
       siteKey: "test-site-key",
       timeoutMs: 5,
+      interactiveTimeoutMs: 100,
+      theme: "light",
     });
 
     const error = await pending.catch((caught: unknown) => caught);
@@ -104,6 +123,8 @@ describe("shared CAPTCHA acquisition UX", () => {
       shell: harness.shell,
       siteKey: "test-site-key",
       timeoutMs: 100,
+      interactiveTimeoutMs: 100,
+      theme: "light",
     });
 
     setTimeout(() => harness.callbacks?.callback("verified-token"), 1);
@@ -111,6 +132,46 @@ describe("shared CAPTCHA acquisition UX", () => {
     await expect(pending).resolves.toBe("verified-token");
     expect(harness.removeCalls).toBe(1);
     expect(harness.destroyCalls).toBe(1);
+  });
+
+  test("gives a revealed interactive challenge a fresh completion window", async () => {
+    const harness = challengeHarness();
+    const pending = challengeUnderTest()({
+      turnstile: harness.turnstile,
+      shell: harness.shell,
+      siteKey: "test-site-key",
+      timeoutMs: 10,
+      interactiveTimeoutMs: 100,
+      theme: "dark",
+    });
+
+    setTimeout(
+      () => harness.callbacks?.["before-interactive-callback"]?.(),
+      1,
+    );
+    setTimeout(() => harness.callbacks?.callback("interactive-token"), 30);
+
+    await expect(pending).resolves.toBe("interactive-token");
+    expect(harness.revealCalls).toBe(1);
+    expect(harness.removeCalls).toBe(1);
+    expect(harness.destroyCalls).toBe(1);
+  });
+
+  test("passes the page's resolved theme to Turnstile", async () => {
+    const harness = challengeHarness();
+    const pending = challengeUnderTest()({
+      turnstile: harness.turnstile,
+      shell: harness.shell,
+      siteKey: "test-site-key",
+      timeoutMs: 100,
+      interactiveTimeoutMs: 100,
+      theme: "dark",
+    });
+
+    harness.callbacks?.callback("verified-token");
+
+    await expect(pending).resolves.toBe("verified-token");
+    expect(harness.renderedTheme).toBe("dark");
   });
 
   test("ships the interactive verification label in English and Spanish", () => {

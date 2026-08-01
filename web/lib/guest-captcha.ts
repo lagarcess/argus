@@ -9,10 +9,11 @@ type TurnstileApi = {
     options: {
       sitekey: string;
       appearance: "interaction-only";
-      theme: "auto";
+      theme: "light" | "dark";
       callback: (token: string) => void;
       "error-callback": () => boolean;
       "expired-callback": () => void;
+      "before-interactive-callback": () => void;
     },
   ): string;
   remove(widgetId: string): void;
@@ -28,6 +29,7 @@ const TURNSTILE_SCRIPT_ID = "argus-guest-turnstile-script";
 const TURNSTILE_SCRIPT_URL =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 export const CAPTCHA_ACQUISITION_TIMEOUT_MS = 15_000;
+export const CAPTCHA_INTERACTIVE_TIMEOUT_MS = 300_000;
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
 let captchaShellSequence = 0;
 
@@ -35,6 +37,7 @@ type CaptchaUnavailableError = Error & { code: "captcha_unavailable" };
 
 type TurnstileShell = {
   container: HTMLElement;
+  reveal(): void;
   destroy(): void;
 };
 
@@ -160,7 +163,9 @@ function loadTurnstile(timeoutMs: number): Promise<TurnstileApi> {
   return turnstileScriptPromise;
 }
 
-async function createTurnstileShell(): Promise<TurnstileShell> {
+async function createTurnstileShell(
+  focusBeforeChallenge: HTMLElement | null,
+): Promise<TurnstileShell> {
   const { default: i18n } = await import("./i18n");
   captchaShellSequence += 1;
   const titleId = `argus-captcha-title-${captchaShellSequence}`;
@@ -170,8 +175,9 @@ async function createTurnstileShell(): Promise<TurnstileShell> {
   root.setAttribute("aria-modal", "true");
   root.setAttribute("aria-labelledby", titleId);
   root.setAttribute("aria-hidden", "true");
+  root.tabIndex = -1;
   root.className =
-    "pointer-events-none fixed inset-0 z-[120] flex items-center justify-center p-4 opacity-0 transition-opacity duration-200";
+    "pointer-events-none fixed inset-0 z-[120] flex items-center justify-center p-4 opacity-0 outline-none transition-opacity duration-200";
 
   const backdrop = document.createElement("div");
   backdrop.className =
@@ -205,51 +211,77 @@ async function createTurnstileShell(): Promise<TurnstileShell> {
   root.append(backdrop, card);
   document.body.appendChild(root);
 
+  let destroyed = false;
   let revealed = false;
-  let observedFrame: HTMLIFrameElement | null = null;
-  const revealIfInteractive = () => {
-    if (revealed) return;
-    const frame = container.querySelector("iframe");
-    if (!frame) return;
-    if (frame !== observedFrame) {
-      observedFrame = frame;
-      resizeObserver?.observe(frame);
-    }
-    const bounds = frame.getBoundingClientRect();
-    const style = window.getComputedStyle(frame);
+  const backgroundInertState = new Map<HTMLElement, boolean>();
+  const containFocus = (event: FocusEvent) => {
+    const target = event.target;
     if (
-      bounds.width < 200 ||
-      bounds.height < 50 ||
-      style.display === "none" ||
-      style.visibility === "hidden"
+      destroyed ||
+      !revealed ||
+      (target instanceof Node && root.contains(target))
     ) {
       return;
     }
-    revealed = true;
-    root.classList.remove("pointer-events-none", "opacity-0");
-    root.classList.add("opacity-100");
-    root.setAttribute("aria-hidden", "false");
+    root.focus({ preventScroll: true });
   };
-  const mutationObserver = new MutationObserver(revealIfInteractive);
-  const resizeObserver =
-    typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(revealIfInteractive);
-  mutationObserver.observe(container, {
-    attributes: true,
-    childList: true,
-    subtree: true,
-  });
-  resizeObserver?.observe(container);
 
   return {
     container,
+    reveal() {
+      if (destroyed || revealed) return;
+      revealed = true;
+      for (const sibling of Array.from(document.body.children)) {
+        if (!(sibling instanceof HTMLElement) || sibling === root) continue;
+        backgroundInertState.set(sibling, sibling.inert);
+        sibling.inert = true;
+      }
+      document.addEventListener("focusin", containFocus);
+      root.classList.remove("pointer-events-none", "opacity-0");
+      root.classList.add("opacity-100");
+      root.setAttribute("aria-hidden", "false");
+      root.focus({ preventScroll: true });
+    },
     destroy() {
-      mutationObserver.disconnect();
-      resizeObserver?.disconnect();
+      if (destroyed) return;
+      destroyed = true;
+      document.removeEventListener("focusin", containFocus);
+      for (const [sibling, wasInert] of backgroundInertState) {
+        if (sibling.isConnected) sibling.inert = wasInert;
+      }
+      backgroundInertState.clear();
       root.remove();
+      if (focusBeforeChallenge?.isConnected) {
+        const restoreFocus = () => {
+          if (
+            !focusBeforeChallenge.isConnected ||
+            focusBeforeChallenge.matches(":disabled")
+          ) {
+            return false;
+          }
+          focusBeforeChallenge.focus({ preventScroll: true });
+          return true;
+        };
+        const restoreObserver = new MutationObserver(() => {
+          if (restoreFocus()) restoreObserver.disconnect();
+        });
+        restoreObserver.observe(focusBeforeChallenge, {
+          attributes: true,
+          attributeFilter: ["disabled"],
+        });
+        window.requestAnimationFrame(() => {
+          if (restoreFocus()) restoreObserver.disconnect();
+        });
+        window.setTimeout(() => restoreObserver.disconnect(), 5_000);
+      }
     },
   };
+}
+
+function resolvedTurnstileTheme(): "light" | "dark" {
+  return document.documentElement.classList.contains("dark")
+    ? "dark"
+    : "light";
 }
 
 export function acquireTurnstileChallenge(input: {
@@ -257,15 +289,28 @@ export function acquireTurnstileChallenge(input: {
   shell: TurnstileShell;
   siteKey: string;
   timeoutMs: number;
+  interactiveTimeoutMs: number;
+  theme: "light" | "dark";
 }): Promise<string> {
-  const { turnstile, shell, siteKey, timeoutMs } = input;
+  const {
+    turnstile,
+    shell,
+    siteKey,
+    timeoutMs,
+    interactiveTimeoutMs,
+    theme,
+  } = input;
   return new Promise<string>((resolve, reject) => {
     let widgetId = "";
     let widgetRemoved = false;
     let settled = false;
-    const timeoutId = globalThis.setTimeout(() => {
-      fail();
-    }, Math.max(0, timeoutMs));
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const startTimeout = (durationMs: number) => {
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+      timeoutId = globalThis.setTimeout(() => {
+        fail();
+      }, Math.max(0, durationMs));
+    };
     const removeWidget = () => {
       if (!widgetId || widgetRemoved) return;
       widgetRemoved = true;
@@ -276,7 +321,7 @@ export function acquireTurnstileChallenge(input: {
       }
     };
     const cleanup = () => {
-      globalThis.clearTimeout(timeoutId);
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
       removeWidget();
       shell.destroy();
     };
@@ -295,14 +340,19 @@ export function acquireTurnstileChallenge(input: {
     }
 
     try {
+      startTimeout(timeoutMs);
       widgetId = turnstile.render(shell.container, {
         sitekey: siteKey,
         appearance: "interaction-only",
-        theme: "auto",
+        theme,
         callback: succeed,
         "error-callback": fail,
         "expired-callback": () => {
           fail();
+        },
+        "before-interactive-callback": () => {
+          shell.reveal();
+          startTimeout(interactiveTimeoutMs);
         },
       });
       if (settled) removeWidget();
@@ -315,6 +365,11 @@ export function acquireTurnstileChallenge(input: {
 export async function acquireGuestCaptchaToken(
   browserCaptchaToken?: string | null,
 ): Promise<string> {
+  const focusBeforeChallenge =
+    typeof document !== "undefined" &&
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
   const plan = guestCaptchaPlan(browserCaptchaToken);
   if (plan.kind === "token") return plan.token;
   if (plan.kind === "unavailable") {
@@ -325,7 +380,7 @@ export async function acquireGuestCaptchaToken(
 
   const deadline = Date.now() + CAPTCHA_ACQUISITION_TIMEOUT_MS;
   const turnstile = await loadTurnstile(CAPTCHA_ACQUISITION_TIMEOUT_MS);
-  const shell = await createTurnstileShell();
+  const shell = await createTurnstileShell(focusBeforeChallenge);
   const remainingMs = deadline - Date.now();
   if (remainingMs <= 0) {
     shell.destroy();
@@ -336,6 +391,8 @@ export async function acquireGuestCaptchaToken(
     shell,
     siteKey: plan.siteKey,
     timeoutMs: remainingMs,
+    interactiveTimeoutMs: CAPTCHA_INTERACTIVE_TIMEOUT_MS,
+    theme: resolvedTurnstileTheme(),
   });
 }
 
