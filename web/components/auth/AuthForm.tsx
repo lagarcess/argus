@@ -325,13 +325,22 @@ export default function AuthForm({
               disabled={isSubmitting}
               className="font-display flex w-full items-center justify-center rounded-[9999px] bg-black px-[32px] py-[14px] text-[16px] font-medium text-white transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black disabled:opacity-50 dark:bg-white dark:text-black dark:focus-visible:ring-white"
             >
-              {isSubmitting
-                ? isSignup
-                  ? t("auth.signup.loading", "Creating account...")
-                  : t("auth.login.loading", "Signing in...")
-                : isSignup
-                  ? t("auth.signup.submit", "Sign up")
-                  : t("auth.login.submit", "Sign in")}
+              {isSubmitting ? (
+                <>
+                  <span
+                    data-testid="auth-submit-spinner"
+                    aria-hidden="true"
+                    className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  />
+                  {isSignup
+                    ? t("auth.signup.loading", "Creating account...")
+                    : t("auth.login.loading", "Signing in...")}
+                </>
+              ) : isSignup ? (
+                t("auth.signup.submit", "Sign up")
+              ) : (
+                t("auth.login.submit", "Sign in")
+              )}
             </button>
           </form>
 
