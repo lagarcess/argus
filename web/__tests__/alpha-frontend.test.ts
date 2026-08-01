@@ -2380,6 +2380,8 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "public/locales/es-419/common.json"),
       "utf-8",
     );
+    const enCatalog = JSON.parse(en);
+    const esCatalog = JSON.parse(es);
 
     const dataStart = profileMenu.indexOf('{activeSubmenu === "data"');
     const preferencesStart = profileMenu.indexOf(
@@ -2415,10 +2417,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(preferencesBlock).toContain("settings.app.language");
     expect(preferencesBlock).toContain("settings.app.sidebar");
     expect(preferencesBlock).not.toContain("settings.app.security");
+    expect(legalBlock).toContain("keyboard_shortcuts.menu_item");
+    expect(legalBlock).toContain("settings.help.terms");
+    expect(legalBlock).toContain("settings.help.privacy");
     expect(legalBlock).toContain('href="/terms"');
     expect(legalBlock).toContain('href="/privacy"');
-    expect(legalBlock).toContain("settings.help.release_notes");
-    expect(legalBlock).toContain("disabled");
+    expect(legalBlock).not.toContain("settings.help.release_notes");
+    expect(enCatalog.settings.help).not.toHaveProperty("release_notes");
+    expect(esCatalog.settings.help).not.toHaveProperty("release_notes");
     expect(profileMenu).toContain('href="/terms"');
     expect(profileMenu).toContain('href="/privacy"');
   });
