@@ -262,6 +262,41 @@ function railTranscript(conversationId: ConversationId): ApiMessage[] {
   return messages;
 }
 
+function recoveredClarificationRailTranscript(
+  conversationId: ConversationId,
+): ApiMessage[] {
+  const messages = railTranscript(conversationId);
+  messages[1] = assistantMessage(
+    conversationId,
+    1,
+    "Which asset should I test?",
+    {
+      clarification: {
+        kind: "clarification",
+        prompt_source: "degraded_fallback",
+        requested_field: "asset_universe",
+        semantic_needs: ["asset_target"],
+      },
+    },
+  );
+  messages[10] = userMessage(conversationId, 10, "AAPL");
+  messages[11] = assistantMessage(
+    conversationId,
+    11,
+    "Here is the ready-to-run confirmation.",
+    {
+      confirmation_card: {
+        confirmation_state: "active",
+        title: "AAPL buy and hold",
+        statusLabel: "Ready to run",
+        summary: "AAPL with the supplied dates.",
+        rows: [{ label: "Assets", value: "AAPL" }],
+      },
+    },
+  );
+  return messages;
+}
+
 async function installActivityFixture(
   page: Page,
   options: ActivityFixtureOptions = {},
@@ -1132,6 +1167,31 @@ test("typed needs-input, attention, canceled, expired, and checking states do no
   ).toBeVisible();
   expect(fixture.unexpectedRequests).toEqual([]);
 });
+
+for (const [language, screenshot] of [
+  ["en", "issue-337-en.png"],
+  ["es-419", "issue-337-es-419.png"],
+] as const) {
+  test(`resolved clarification clears its rail marker in ${language}`, async ({
+    page,
+  }) => {
+    const fixture = await installActivityFixture(page, {
+      language,
+      railTranscript: "activity-a",
+    });
+    fixture.messages["activity-a"] = recoveredClarificationRailTranscript(
+      "activity-a",
+    );
+
+    await page.goto("/chat?conversation=activity-a");
+
+    const rail = page.getByTestId("conversation-activity-rail");
+    await expect(rail).toBeVisible();
+    await expect(rail.getByRole("button")).toHaveCount(2);
+    await captureEvidence(page, screenshot);
+    expect(fixture.unexpectedRequests).toEqual([]);
+  });
+}
 
 test("Spanish desktop exposes the complete typed activity vocabulary", async ({
   page,
