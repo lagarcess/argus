@@ -124,6 +124,43 @@ def _context(rows: list[dict[str, Any]]) -> str:
     )
 
 
+def _extraction_asset_resolution(
+    *,
+    query: str,
+    field: str,
+    source: str,
+    symbol: str | None,
+) -> AssetResolution:
+    asset = (
+        None
+        if symbol is None
+        else ResolvedAssetStub(
+            canonical_symbol=symbol,
+            asset_class="equity",
+            name=query,
+            raw_symbol=symbol,
+        )
+    )
+    status = "resolved" if asset is not None else "unsupported"
+    return AssetResolution(
+        status=status,
+        raw_text=query,
+        asset=asset,
+        candidates=(() if asset is None else (asset,)),
+        provenance=ResolutionProvenance(
+            field=field,
+            raw_text=query,
+            source=source,
+            candidate_kind="asset",
+            resolution_status=status,
+            canonical_symbol=(None if asset is None else asset.canonical_symbol),
+            asset_class=(None if asset is None else asset.asset_class),
+            validated_by="provider_catalog",
+            confidence="high",
+        ),
+    )
+
+
 def test_model_supplied_provider_records_are_stripped_without_runtime_context() -> None:
     normalized = response_with_provider_context_assets(
         _refusal_response_with_model_records(),
@@ -294,33 +331,11 @@ def test_resolved_and_unsupported_extracted_mentions_keep_stale_asset_blocker() 
         source: str,
         **_: Any,
     ) -> AssetResolution:
-        asset = (
-            ResolvedAssetStub(
-                canonical_symbol="AAPL",
-                asset_class="equity",
-                name="Apple Inc.",
-                raw_symbol="AAPL",
-            )
-            if query == "Apple"
-            else None
-        )
-        status = "resolved" if asset is not None else "unsupported"
-        return AssetResolution(
-            status=status,
-            raw_text=query,
-            asset=asset,
-            candidates=(() if asset is None else (asset,)),
-            provenance=ResolutionProvenance(
-                field=field,
-                raw_text=query,
-                source=source,
-                candidate_kind="asset",
-                resolution_status=status,
-                canonical_symbol=(None if asset is None else asset.canonical_symbol),
-                asset_class=(None if asset is None else asset.asset_class),
-                validated_by="provider_catalog",
-                confidence="high",
-            ),
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=("AAPL" if query == "Apple" else None),
         )
 
     context = provider_asset_resolution_context_from_extraction(
@@ -371,6 +386,52 @@ def test_resolved_and_unsupported_extracted_mentions_keep_stale_asset_blocker() 
     assert normalized.requires_clarification is True
     assert normalized.assistant_response == "Which asset should I test?"
     assert "provider_context_resolved_missing_asset" not in normalized.reason_codes
+
+
+def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None:
+    symbols = {
+        "Apple": "AAPL",
+        "Microsoft": "MSFT",
+        "NVIDIA": "NVDA",
+        "Amazon": "AMZN",
+        "Meta": "META",
+    }
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbols.get(query),
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": name,
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                }
+                for name in [*symbols, "fictional moon fund"]
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert [row["symbol"] for row in payload["asset_resolution_candidates"]] == list(
+        symbols.values()
+    )
+    assert payload["all_traded_asset_mentions_accounted_for"] is False
 
 
 def test_underfilled_provider_context_keeps_stale_asset_blocker() -> None:

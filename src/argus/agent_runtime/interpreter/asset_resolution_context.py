@@ -95,6 +95,10 @@ def provider_asset_resolution_context_from_extraction(
         role = (
             mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
         )
+        if len(rows) >= 5:
+            if role in {"traded_asset", "unknown"}:
+                all_traded_asset_mentions_accounted_for = False
+            continue
         field = (
             "comparison_baseline"
             if role == "benchmark"
@@ -124,8 +128,6 @@ def provider_asset_resolution_context_from_extraction(
             rows.append(row)
         elif role in {"traded_asset", "unknown"}:
             all_traded_asset_mentions_accounted_for = False
-        if len(rows) >= 5:
-            break
     if not rows:
         return None
     payload = {
