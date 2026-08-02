@@ -242,6 +242,48 @@ describe("conversation rail tick derivation", () => {
     ]);
   });
 
+  test("uses matching source-result identity for a refinement recovery", () => {
+    const recovery = textMessage("refinement-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "refinement",
+        semanticNeeds: ["refinement"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "refinement",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+        },
+        sourceResultRunId: "run-aapl",
+      },
+    });
+    const confirmation = (sourceResultRunId: string) =>
+      confirmationMessage("refined-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          capital_amount: 20_000,
+        },
+        sourceResultRunId,
+      });
+
+    expect(
+      deriveConversationRailTicks([
+        recovery,
+        confirmation("run-aapl"),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        recovery,
+        confirmation("run-msft"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["refinement-question", "error_recovery"]]);
+  });
+
   test("keeps clarification attention when a later confirmation belongs to an unrelated strategy path", () => {
     const clarificationPath = {
       strategyPathContext: {

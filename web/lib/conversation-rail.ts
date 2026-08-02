@@ -204,8 +204,7 @@ function confirmationContinuesClarification(
   if (
     pending?.kind !== "clarification" ||
     confirmed?.kind !== "confirmation" ||
-    !pending.requestedField ||
-    !meaningfulPathValue(confirmed.strategy[pending.requestedField])
+    !pending.requestedField
   ) {
     return false;
   }
@@ -214,6 +213,9 @@ function confirmationContinuesClarification(
       pending.sourceResultRunId &&
         pending.sourceResultRunId === confirmed.sourceResultRunId,
     );
+  }
+  if (!meaningfulPathValue(confirmed.strategy[pending.requestedField])) {
+    return false;
   }
 
   let strongMatches = 0;
