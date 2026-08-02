@@ -1581,7 +1581,7 @@ defaults to `true` and controls presentation only. The independent
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+expiry plus limits `1/10/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search

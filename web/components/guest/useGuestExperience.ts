@@ -255,12 +255,17 @@ export function useGuestExperience({
             });
             if (decision.kind === "convert") {
               if (!conversationId) return false;
-              conversion.requestConversion(decision.reason, {
-                reason: "second_simulation",
-                conversationId,
-                actionId: crypto.randomUUID(),
-                action,
-              });
+              conversion.requestConversion(
+                decision.reason,
+                {
+                  reason: "second_simulation",
+                  conversationId,
+                  actionId: crypto.randomUUID(),
+                  action,
+                },
+                "signup",
+                usage.allowances.backtests.day?.period_end ?? null,
+              );
               return false;
             }
           } else if (!action?.type) {

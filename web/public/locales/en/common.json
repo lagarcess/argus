@@ -1295,6 +1295,7 @@
       "sign_in_title": "Sign in",
       "create_title": "Create your account",
       "second_simulation": "Sign in to run another simulation.",
+      "simulation_limit_reset": "Your two temporary simulations are used. This temporary session can run simulations again after {{date}}.",
       "message_limit": "Sign in to keep this conversation and continue.",
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",

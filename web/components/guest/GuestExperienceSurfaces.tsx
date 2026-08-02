@@ -17,6 +17,8 @@ export default function GuestExperienceSurfaces({
           isOpen
           reason={conversion.reason}
           initialMode={conversion.initialMode}
+          resetAt={conversion.resetAt}
+          locale={conversion.locale}
           publicAccountAccessEnabled={conversion.publicAccountAccessEnabled}
           onClose={conversion.close}
           onAuthenticate={conversion.authenticate}

@@ -112,6 +112,25 @@ describe("auth card consistency", () => {
     }
   });
 
+  test("simulation exhaustion names the authoritative reset time and conversion path", async () => {
+    const html = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "second_simulation",
+        initialMode: "signup",
+        publicAccountAccessEnabled: true,
+        resetAt: "2026-08-03T00:00:00.000Z",
+        locale: "en-US",
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
+
+    match(html, /Your two temporary simulations are used/);
+    match(html, /Aug 3, 2026/);
+    match(html, /Create your account/);
+  });
+
   test("forgot password uses the canonical 20px card radius", async () => {
     const html = await renderLocalized(createElement(ForgotPasswordPage));
 

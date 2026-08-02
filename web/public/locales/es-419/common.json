@@ -1295,6 +1295,7 @@
       "sign_in_title": "Iniciar sesión",
       "create_title": "Crea tu cuenta",
       "second_simulation": "Inicia sesión para ejecutar otra simulación.",
+      "simulation_limit_reset": "Ya usaste tus dos simulaciones temporales. Esta sesión temporal podrá ejecutar simulaciones de nuevo después del {{date}}.",
       "message_limit": "Inicia sesión para conservar esta conversación y continuar.",
       "save_decision": "Inicia sesión para guardar esta decisión.",
       "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",

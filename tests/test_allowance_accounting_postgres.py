@@ -391,7 +391,7 @@ def test_guest_cannot_bypass_lifetime_policy_with_registered_windows(guest_owner
         )
 
 
-def test_guest_unique_simulation_charges_once_replay_zero_and_second_stops(
+def test_guest_unique_simulation_charges_once_replay_zero_and_third_stops(
     guest_owner,
 ):
     with _connect() as connection:
@@ -400,35 +400,41 @@ def test_guest_unique_simulation_charges_once_replay_zero_and_second_stops(
             connection,
             guest_owner,
             idempotency_key=key,
-            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 2)),
         )
         replay = _admit(
             connection,
             guest_owner,
             idempotency_key=key,
-            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 2)),
         )
         second = _admit(
             connection,
             guest_owner,
-            allowance_limits=json.dumps(_guest_limits(guest_owner, 1)),
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 2)),
+        )
+        third = _admit(
+            connection,
+            guest_owner,
+            allowance_limits=json.dumps(_guest_limits(guest_owner, 2)),
         )
 
         assert first["decision"] == "admitted"
         assert replay["decision"] == "replay"
-        assert second == {"decision": "conversion_required"}
+        assert second["decision"] == "admitted"
+        assert third == {"decision": "conversion_required"}
         windows = _usage_rows(
             connection,
             guest_owner["user_id"],
             "backtest_runs",
         )
-        assert windows["guest_session"]["used_count"] == 1
+        assert windows["guest_session"]["used_count"] == 2
         with connection.cursor() as cursor:
             cursor.execute(
                 "select count(*) from public.backtest_jobs where user_id = %s",
                 (guest_owner["user_id"],),
             )
-            assert cursor.fetchone()[0] == 1
+            assert cursor.fetchone()[0] == 2
 
 
 def test_guest_five_feedback_submissions_allowed_and_sixth_rejected(guest_owner):
@@ -507,7 +513,7 @@ def test_guest_feedback_concurrent_exact_replay_charges_once(guest_owner):
                 "select count(*) from public.feedback where id = %s",
                 (feedback_id,),
             )
-            assert cursor.fetchone()[0] == 1
+            assert cursor.fetchone()[0] == 2
 
 
 def test_guest_feedback_concurrent_identity_collision_is_rejected(guest_owner):
