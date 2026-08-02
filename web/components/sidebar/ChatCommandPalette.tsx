@@ -624,11 +624,7 @@ export default function ChatCommandPalette({
     selectedPreview?.conversationId ?? "",
     dossierContextKey,
   );
-  useDossierDecisionResumeRefresh(
-    decisionResumeTarget,
-    setRetryNonce,
-    history.refresh,
-  );
+  useDossierDecisionResumeRefresh(decisionResumeTarget, setRetryNonce, history.refresh);
   const selectedDossier = selectedPreview?.dossier
     ? selectedDossierForPane({
         latestDossier: selectedPreview.dossier,
