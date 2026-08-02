@@ -185,6 +185,47 @@ def test_runtime_context_rows_still_inject_and_conserve_real_assets() -> None:
     assert draft.asset_universe == ["BTC"]
 
 
+def test_runtime_context_asset_clears_stale_missing_asset_clarification() -> None:
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Apple with $10,000.",
+        assistant_response="Which asset should I test?",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="let's test apple with 10K",
+            strategy_type="buy_and_hold",
+            capital_amount=10000,
+        ),
+        missing_required_fields=["asset_universe", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+    apple_context_row = {
+        "raw_text": "apple",
+        "role": "traded_asset",
+        "status": "resolved",
+        "symbol": "AAPL",
+        "asset_class": "equity",
+        "name": "Apple Inc.",
+        "raw_symbol": "AAPL",
+        "provider": "alpaca",
+        "exchange": "NASDAQ",
+    }
+
+    normalized = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=_context([apple_context_row]),
+    )
+
+    draft = normalized.candidate_strategy_draft
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.asset_class == "equity"
+    assert normalized.missing_required_fields == ["date_range"]
+    assert normalized.requires_clarification is True
+    assert normalized.assistant_response is None
+    assert "provider_context_resolved_missing_asset" in normalized.reason_codes
+
+
 def test_ambiguous_runtime_context_never_becomes_executable_identity() -> None:
     ambiguous_row = {
         "raw_text": "Sun",

@@ -98,9 +98,7 @@ def response_with_provider_context_assets(
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     draft_assets = [
-        str(value).strip()
-        for value in draft.asset_universe
-        if str(value).strip()
+        str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
     context_is_partial = len(resolved_symbols) < len(draft_assets)
     preserved_fuller_draft = context_is_partial
@@ -142,6 +140,38 @@ def response_with_provider_context_assets(
     ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    resolved_missing_asset = (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and "asset_universe" in response.missing_required_fields
+        and bool(resolved_symbols)
+        and not ambiguous_fields
+        and not preserved_fuller_draft
+    )
+    if resolved_missing_asset:
+        remaining_missing_fields = [
+            field
+            for field in response.missing_required_fields
+            if field != "asset_universe"
+        ]
+        update.update(
+            {
+                "missing_required_fields": remaining_missing_fields,
+                "requires_clarification": bool(
+                    remaining_missing_fields
+                    or response.ambiguous_fields
+                    or response.unsupported_constraints
+                ),
+                "assistant_response": None,
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "provider_context_resolved_missing_asset",
+                        ]
+                    )
+                ),
+            }
+        )
     if preserved_fuller_draft:
         update["reason_codes"] = list(
             dict.fromkeys(
@@ -312,9 +342,7 @@ def response_with_canonical_interpreter_assets(
             and resolution.status == "resolved"
             and resolution.asset is not None
         ):
-            resolved_symbol = str(
-                resolution.asset.canonical_symbol or ""
-            ).strip().upper()
+            resolved_symbol = str(resolution.asset.canonical_symbol or "").strip().upper()
             if resolved_symbol:
                 symbol = resolved_symbol
             asset_class = str(resolution.asset.asset_class or "").strip().lower()
@@ -399,8 +427,7 @@ def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool
         str(record.get("name") or "").strip().upper(),
     }
     return any(
-        candidate and candidate.replace("/", "") == compact
-        for candidate in candidates
+        candidate and candidate.replace("/", "") == compact for candidate in candidates
     )
 
 
