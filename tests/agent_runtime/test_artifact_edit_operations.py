@@ -849,6 +849,8 @@ async def test_issue_339_compound_edit_retries_wrong_or_extra_values(
         "invented-capital-model",
         "invented-asset-model",
         "wrong-asset-model",
+        "wrong-asset-missing-operation-model",
+        "append-instead-of-replace-model",
     ],
 )
 async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
@@ -857,7 +859,11 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
 ):
     from argus.agent_runtime import llm_interpreter
 
-    is_asset_request = invalid_model == "wrong-asset-model"
+    is_asset_request = invalid_model in {
+        "wrong-asset-model",
+        "wrong-asset-missing-operation-model",
+        "append-instead-of-replace-model",
+    }
     fallback_model = "requested-asset-model" if is_asset_request else "complete-model"
     monkeypatch.setattr(
         artifact_edit_planner,
@@ -875,11 +881,25 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
         del kwargs
         seen_models.append(model_name)
         if is_asset_request:
-            symbol = "TSLA" if model_name == invalid_model else "MSFT"
+            symbol = (
+                "TSLA"
+                if model_name == invalid_model
+                and invalid_model != "append-instead-of-replace-model"
+                else "MSFT"
+            )
             return ArtifactAssumptionEditPlan(
                 outcome="ready_to_confirm",
                 operations=[
-                    EditOperation(op="replace", target="asset", symbols=[symbol]),
+                    EditOperation(
+                        op=(
+                            "add"
+                            if model_name == invalid_model
+                            and invalid_model == "append-instead-of-replace-model"
+                            else "replace"
+                        ),
+                        target="asset",
+                        symbols=[symbol],
+                    ),
                 ],
                 confidence=0.9,
             )
@@ -934,7 +954,11 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
         primary_draft=(
             LLMStrategyDraft(
                 asset_universe=["MSFT"],
-                asset_universe_operation="replace",
+                asset_universe_operation=(
+                    None
+                    if invalid_model == "wrong-asset-missing-operation-model"
+                    else "replace"
+                ),
                 field_provenance={"asset_universe": "explicit_user"},
             )
             if is_asset_request

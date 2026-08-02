@@ -567,12 +567,11 @@ def materialized_artifact_edit_targets(
     if primary_draft is None:
         return materialized_targets
     current_strategy = _current_artifact_strategy(request)
-    if not _primary_draft_has_material_delta(
+    primary_has_material_delta = _primary_draft_has_material_delta(
         primary_draft,
         current_strategy=current_strategy,
         request=request,
-    ):
-        return materialized_targets
+    )
     requested_targets = _required_edit_targets_from_primary_draft(
         primary_draft,
         current_strategy=current_strategy,
@@ -591,19 +590,26 @@ def materialized_artifact_edit_targets(
             current_strategy.asset_universe if current_strategy else []
         )
     )
-    if "asset" in materialized_targets and grounded_asset_symbols - current_assets:
+    primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
+    if (
+        "asset" in materialized_targets
+        and (grounded_asset_symbols | primary_assets) - current_assets
+    ):
         requested_targets.add("asset")
     matching_targets = {
         target
         for target in materialized_targets
-        if (target != "asset" or target in requested_targets)
-        and _materialized_target_matches_primary_delta(
-            target,
-            materialized_draft=draft,
-            primary_draft=primary_draft,
-            current_strategy=current_strategy,
-            request=request,
-            grounded_asset_symbols=grounded_asset_symbols,
+        if (not primary_has_material_delta and target != "asset")
+        or (
+            (target != "asset" or target in requested_targets)
+            and _materialized_target_matches_primary_delta(
+                target,
+                materialized_draft=draft,
+                primary_draft=primary_draft,
+                current_strategy=current_strategy,
+                request=request,
+                grounded_asset_symbols=grounded_asset_symbols,
+            )
         )
     }
     if any(
@@ -650,6 +656,8 @@ def _materialized_target_matches_primary_delta(
         )
         if not requested or materialized == current:
             return False
+        if operation == "replace" and primary_requested - current:
+            return materialized == primary_requested
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested
         if operation == "replace" and materialized == primary_requested:
