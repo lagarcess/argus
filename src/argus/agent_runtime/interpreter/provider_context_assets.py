@@ -34,9 +34,8 @@ def response_with_runtime_context_assets(
     )
 
 
-def response_with_incomplete_asset_context_blocker(
+def carry_incomplete_asset_blocker(
     response: LLMInterpretationResponse,
-    *,
     asset_resolution_context: str | None,
 ) -> LLMInterpretationResponse:
     """Carry explicit provider incompleteness across response replacement.
@@ -49,8 +48,7 @@ def response_with_incomplete_asset_context_blocker(
 
     if (
         response.intent not in {"strategy_drafting", "backtest_execution"}
-        or _all_traded_asset_mentions_accounted_for(asset_resolution_context)
-        is not False
+        or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
     ):
         return response
     return response.model_copy(update=_incomplete_asset_context_update(response))

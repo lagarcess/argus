@@ -996,6 +996,7 @@ async def test_model_failure_artifact_edit_keeps_incomplete_asset_blocker(
             invoke_stub,
         )
     else:
+
         class TimeoutStructuredModel:
             async def ainvoke(self, _messages: Any) -> None:
                 raise TimeoutError("structured model timed out")
@@ -1053,9 +1054,7 @@ def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     )
 
     prompt = _asset_mention_extraction_messages(request)[0]["content"]
-    schema = LLMAssetMentionExtraction.model_json_schema()["properties"][
-        "asset_mentions"
-    ]
+    schema = LLMAssetMentionExtraction.model_json_schema()["properties"]["asset_mentions"]
 
     assert "Return at most six distinct mentions" in prompt
     assert "preserve traded-asset and unknown spans before benchmark spans" in prompt
