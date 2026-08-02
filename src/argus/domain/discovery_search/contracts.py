@@ -12,13 +12,20 @@ MAX_RESULTS = 5
 
 SearchUnavailableReason = Literal[
     "not_configured",
+    "authentication_failed",
     "timeout",
     "http_error",
     "malformed_response",
 ]
 
 _ALLOWED_UNAVAILABLE_REASONS: frozenset[str] = frozenset(
-    ("not_configured", "timeout", "http_error", "malformed_response")
+    (
+        "not_configured",
+        "authentication_failed",
+        "timeout",
+        "http_error",
+        "malformed_response",
+    )
 )
 
 

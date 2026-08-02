@@ -113,11 +113,24 @@ class TestPerplexityDirect:
         assert packet.cost_usd == DOCUMENTED_PERPLEXITY_SEARCH_COST_USD
         assert packet.latency_ms >= 0
 
-    def test_http_error_raises_typed_unavailable(self) -> None:
-        transport = httpx.MockTransport(lambda request: httpx.Response(500, text="boom"))
+    @pytest.mark.parametrize(
+        ("status_code", "expected_reason"),
+        (
+            (401, "authentication_failed"),
+            (403, "authentication_failed"),
+            (429, "http_error"),
+            (503, "http_error"),
+        ),
+    )
+    def test_http_status_raises_typed_unavailable(
+        self, status_code: int, expected_reason: str
+    ) -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(status_code, text="boom")
+        )
         with pytest.raises(SearchUnavailableError) as excinfo:
             _perplexity(transport).search("q", max_results=5, timeout_seconds=8.0)
-        assert excinfo.value.reason == "http_error"
+        assert excinfo.value.reason == expected_reason
 
     def test_timeout_raises_typed_unavailable(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
