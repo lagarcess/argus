@@ -11,12 +11,13 @@ function source(relativePath: string): string {
 describe("Omnisearch shortcut legend", () => {
   test("uses the shared keycap and only reveals a footer legend for modifier plus hover", () => {
     const palette = source("components/sidebar/ChatCommandPalette.tsx");
+    const legend = source("components/sidebar/command-palette/CommandPaletteShortcutLegend.tsx");
 
-    expect(palette).toContain("KeyboardShortcutKeycap");
-    expect(palette).toContain("isKeyboardShortcutHintModifierActive");
-    expect(palette).toContain("data-command-palette-shortcut-legend");
+    expect(legend).toContain("KeyboardShortcutKeycap");
+    expect(legend).toContain("isKeyboardShortcutHintModifierActive");
+    expect(legend).toContain("data-command-palette-shortcut-legend");
     expect(palette).toContain("data-command-palette-action-region");
-    expect(palette).toContain("isShortcutLegendHovered && isShortcutHintModifierActive");
+    expect(legend).toContain("isHovered && isModifierActive");
     expect(palette).not.toContain('"command_palette.open_at_match"');
     expect(palette).not.toContain('"command_palette.open_at_left_off"');
   });

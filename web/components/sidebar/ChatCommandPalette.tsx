@@ -28,13 +28,9 @@ import { DecisionHistoryView } from "@/components/sidebar/command-palette/Decisi
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
+import { CommandPaletteShortcutLegend, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
-import {
-  isKeyboardShortcutHintModifierActive,
-  keyboardShortcutHintDisplay,
-} from "@/lib/keyboard-shortcuts";
 import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
 import {
   commitDossierDecision,
@@ -283,10 +279,7 @@ export default function ChatCommandPalette({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
-  const [usesCommandKey, setUsesCommandKey] = useState(false);
-  const [isShortcutHintModifierActive, setIsShortcutHintModifierActive] =
-    useState(false);
-  const [isShortcutLegendHovered, setIsShortcutLegendHovered] = useState(false);
+  const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
   );
@@ -311,25 +304,6 @@ export default function ChatCommandPalette({
     } else if (saved === "expanded" || saved === "collapsed") {
       setLayoutMode(saved);
     }
-  }, []);
-
-  useEffect(() => {
-    const nextUsesCommandKey = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-    setUsesCommandKey(nextUsesCommandKey);
-    const updateShortcutHintModifier = (event: KeyboardEvent) => {
-      setIsShortcutHintModifierActive(
-        isKeyboardShortcutHintModifierActive(event, nextUsesCommandKey),
-      );
-    };
-    const clearShortcutHintModifier = () => setIsShortcutHintModifierActive(false);
-    document.addEventListener("keydown", updateShortcutHintModifier);
-    document.addEventListener("keyup", updateShortcutHintModifier);
-    window.addEventListener("blur", clearShortcutHintModifier);
-    return () => {
-      document.removeEventListener("keydown", updateShortcutHintModifier);
-      document.removeEventListener("keyup", updateShortcutHintModifier);
-      window.removeEventListener("blur", clearShortcutHintModifier);
-    };
   }, []);
 
   useEffect(() => {
@@ -625,12 +599,7 @@ export default function ChatCommandPalette({
     previewItem,
     groupedItems,
   );
-  const selectedNavigationDisabled =
-    commandPaletteConversationNavigationDisabled({
-      turnInFlight,
-      activeConversationId,
-      targetConversationId: selectedPreview?.conversationId ?? null,
-    });
+  const selectedNavigationDisabled = commandPaletteConversationNavigationDisabled({ turnInFlight, activeConversationId, targetConversationId: selectedPreview?.conversationId ?? null });
   const dossierContextKey = JSON.stringify([
     query.trim(),
     isLedgerMode,
@@ -1183,15 +1152,9 @@ export default function ChatCommandPalette({
     });
   };
 
-  const isLoading = isResultMode
-    ? isSearching || isLedgerLoading
-    : isColdStartLoading;
+  const isLoading = isResultMode ? isSearching || isLedgerLoading : isColdStartLoading;
   const footerCount = displayItems.length;
-  const showShortcutLegend =
-    isShortcutLegendHovered && isShortcutHintModifierActive;
-  const selectedCanManageShortcutActions = Boolean(
-    canManageConversation && selectedPreview?.canManageConversation,
-  );
+  const selectedCanManageShortcutActions = Boolean(canManageConversation && selectedPreview?.canManageConversation);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
@@ -1323,8 +1286,7 @@ export default function ChatCommandPalette({
                 : ""
             }`}
             data-command-palette-action-region
-            onMouseEnter={() => setIsShortcutLegendHovered(true)}
-            onMouseLeave={() => setIsShortcutLegendHovered(false)}
+            {...shortcutLegend.actionRegionProps}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
@@ -1902,57 +1864,7 @@ export default function ChatCommandPalette({
                 },
               )}
           </span>
-          {showShortcutLegend && (
-            <div
-              className="flex min-w-0 items-center justify-center gap-1.5 text-[11px] text-black/45 dark:text-white/50"
-              data-command-palette-shortcut-legend
-            >
-              <span className="whitespace-nowrap">
-                {t("command_palette.shortcut_legend.go", "Go")}
-              </span>
-              <KeyboardShortcutKeycap>↵</KeyboardShortcutKeycap>
-              <span className="whitespace-nowrap">
-                {t(
-                  "command_palette.shortcut_legend.open_left_off",
-                  "Continue",
-                )}
-              </span>
-              <KeyboardShortcutKeycap>
-                {usesCommandKey ? "⌘↵" : "Ctrl+Enter"}
-              </KeyboardShortcutKeycap>
-              {selectedCanManageShortcutActions && (
-                <>
-                  <span className="whitespace-nowrap">
-                    {t("command_palette.shortcut_legend.rename", "Rename")}
-                  </span>
-                  <KeyboardShortcutKeycap>
-                    {keyboardShortcutHintDisplay(
-                      "command_palette_rename",
-                      usesCommandKey,
-                    )}
-                  </KeyboardShortcutKeycap>
-                  <span className="whitespace-nowrap">
-                    {t("command_palette.shortcut_legend.archive", "Archive")}
-                  </span>
-                  <KeyboardShortcutKeycap>
-                    {keyboardShortcutHintDisplay(
-                      "command_palette_archive",
-                      usesCommandKey,
-                    )}
-                  </KeyboardShortcutKeycap>
-                  <span className="whitespace-nowrap">
-                    {t("command_palette.shortcut_legend.delete", "Delete")}
-                  </span>
-                  <KeyboardShortcutKeycap>
-                    {keyboardShortcutHintDisplay(
-                      "command_palette_delete",
-                      usesCommandKey,
-                    )}
-                  </KeyboardShortcutKeycap>
-                </>
-              )}
-            </div>
-          )}
+          {shortcutLegend.isVisible && <CommandPaletteShortcutLegend hasManageActions={selectedCanManageShortcutActions} usesCommandKey={shortcutLegend.usesCommandKey} />}
           <button
             type="button"
             onClick={toggleLayout}
