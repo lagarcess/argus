@@ -91,6 +91,67 @@ async def test_discovery_payload_does_not_override_an_explicit_other_act(
     assert repaired.semantic_turn_act == "educational_question"
 
 
+@pytest.mark.asyncio
+async def test_missing_discovery_act_does_not_override_a_backtest_response(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Backtest Nvidia over the last year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Backtest Nvidia over the last year.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Nvidia.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"start": "2025-08-02", "end": "2026-08-02"},
+        ),
+        semantic_turn_act=None,
+        asset_discovery=AssetDiscoveryRequest(
+            relationship="category",
+            category_description="semiconductor stocks",
+            asset_class_hint="equity",
+            needs_current_facts=False,
+        ),
+    )
+    audited = False
+
+    async def audited_response(**kwargs):
+        nonlocal audited
+        audited = True
+        return interpreter_module._normalize_response_for_runtime_context(
+            kwargs["response"],
+            request=kwargs["request"],
+            asset_resolution_context=kwargs["asset_resolution_context"],
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audited_response_ready_for_runtime",
+        audited_response,
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Backtest Nvidia over the last year.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert audited is True
+    assert repaired.intent == "backtest_execution"
+    assert repaired.semantic_turn_act == "new_idea"
+    assert "coerced_missing_turn_act_to_new_idea" in repaired.reason_codes
+
+
 def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     monkeypatch,
 ) -> None:

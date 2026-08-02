@@ -2190,7 +2190,8 @@ async def _response_ready_for_runtime(
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
     primary_act_typed = response.semantic_turn_act == "asset_discovery" or (
-        response.semantic_turn_act is None and response.asset_discovery is not None
+        response.semantic_turn_act is None
+        and _response_has_unambiguous_missing_act_discovery(response)
     )
     primary_discovery = response.asset_discovery if primary_act_typed else None
     if primary_act_typed:
@@ -2214,6 +2215,37 @@ async def _response_ready_for_runtime(
         primary_act_typed=primary_act_typed,
         primary_discovery=primary_discovery,
         audited=audited,
+    )
+
+
+def _response_has_unambiguous_missing_act_discovery(
+    response: LLMInterpretationResponse,
+) -> bool:
+    discovery = response.asset_discovery
+    if discovery is None or response.intent != "conversation_followup":
+        return False
+    category = (discovery.category_description or "").strip()
+    anchors = [symbol for symbol in discovery.anchor_symbols if symbol.strip()]
+    if discovery.relationship == "category" and not category:
+        return False
+    if discovery.relationship != "category" and not (anchors or category):
+        return False
+    if response.requires_clarification or _llm_strategy_draft_has_extractable_fields(
+        response.candidate_strategy_draft
+    ):
+        return False
+    return not any(
+        (
+            response.missing_required_fields,
+            response.ambiguous_fields,
+            response.unsupported_constraints,
+            response.uses_latest_result_context is True,
+            response.result_followup_focus,
+            response.result_followup_fact_key,
+            response.capability_question_focus,
+            response.context_question_focus,
+            response.artifact_target not in {None, "none"},
+        )
     )
 
 
