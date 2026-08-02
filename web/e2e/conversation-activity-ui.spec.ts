@@ -13,7 +13,7 @@ import type {
   ConversationActivityPatch,
 } from "../lib/argus-api";
 
-const NOW = "2026-08-01T16:00:00.000Z";
+const NOW = new Date().toISOString();
 const EVIDENCE_DIR = process.env.CONVERSATION_ACTIVITY_EVIDENCE_DIR;
 const IDS = [
   "activity-a",
