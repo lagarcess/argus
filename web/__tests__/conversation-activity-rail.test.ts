@@ -243,16 +243,17 @@ describe("conversation rail tick derivation", () => {
 });
 
 describe("conversation rail visibility threshold", () => {
-  test("only long conversations with enough ticks earn the rail", () => {
+  test("a long Guest conversation keeps its one completed-backtest tick", () => {
     expect(
       conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES - 1, 5),
     ).toBe(false);
     expect(
-      conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, RAIL_MIN_TICKS - 1),
+      conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, 0),
     ).toBe(false);
     expect(
       conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, RAIL_MIN_TICKS),
     ).toBe(true);
+    expect(conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, 1)).toBe(true);
   });
 });
 

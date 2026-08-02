@@ -23,7 +23,9 @@ import {
   seedDistinctGuestConfirmation,
   seedDurableRetryableFailure,
   seedGuestActiveConfirmationFixture,
+  seedGuestResolvedClarificationRailHistory,
   seedGuestSimulationExhaustionFixture,
+  safeScreenshot,
   workspaceFacts,
   zeroStateSnapshot,
 } from "./support/guest-qa";
@@ -339,6 +341,87 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
       if (key === "messages") continue;
       expect(afterGraph[key]).toEqual(beforeGraph[key]);
     }
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  const monitor = new BrowserSafetyMonitor();
+  monitor.attach(page);
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    expect(guest.account_kind).toBe("guest");
+    const created = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(created.status).toBe(200);
+    const conversationId = created.body.conversation.id;
+    seedGuestSimulationExhaustionFixture({
+      userId: guestOwner,
+      conversationId,
+    });
+    seedGuestResolvedClarificationRailHistory({
+      userId: guestOwner,
+      conversationId,
+    });
+    seedGuestActiveConfirmationFixture({
+      userId: guestOwner,
+      conversationId,
+    });
+
+    const assertRecoveredRail = async () => {
+      await expect(page.getByTestId("guest-temporary-notice")).toBeVisible();
+      const rail = page.getByTestId("conversation-activity-rail");
+      await expect(rail).toBeVisible();
+      await expect(rail.getByRole("button")).toHaveCount(1);
+      await expect(
+        rail.getByRole("button", { name: /Backtest finished — MSFT/ }),
+      ).toBeVisible();
+      await expect(
+        rail.getByRole("button", { name: /Needed attention/ }),
+      ).toHaveCount(0);
+    };
+
+    await page.goto(`/chat?conversation=${conversationId}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await assertRecoveredRail();
+    await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+    await safeScreenshot(page, "issue-337-guest-recovered");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await assertRecoveredRail();
+    await safeScreenshot(page, "issue-337-guest-recovered-reload");
+
+    expect(ownerSnapshot(guestOwner)).toMatchObject({
+      messages: 12,
+      runs: 1,
+      simulation_units: 1,
+      route_receipts: 0,
+      cost_rows: 0,
+    });
+    expect(monitor.detailSnapshot()).toEqual([]);
+    expect(monitor.hostedWrites).toBe(0);
+    expect(monitor.credentialExposure).toBe(0);
   } finally {
     await backend.stop();
     if (guestOwner) await deleteDisposableIdentity(guestOwner);

@@ -35,7 +35,7 @@ export type ConversationRailTick = {
 
 /** The rail only earns space on longer conversations. */
 export const RAIL_MIN_TRANSCRIPT_MESSAGES = 12;
-export const RAIL_MIN_TICKS = 2;
+export const RAIL_MIN_TICKS = 1;
 
 const RAIL_PREVIEW_METRIC_LIMIT = 3;
 

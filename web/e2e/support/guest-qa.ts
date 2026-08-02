@@ -1716,6 +1716,144 @@ export function seedGuestSimulationExhaustionFixture(params: {
   return { sourceMessageId, confirmationId };
 }
 
+export function seedGuestResolvedClarificationRailHistory(params: {
+  userId: string;
+  conversationId: string;
+}): { clarificationMessageId: string } {
+  const owner = requireUuid(params.userId, "rail history owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "rail history conversation",
+  );
+  const clarificationMessageId = randomUUID();
+  const records = [
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "Reviewing the first result.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Show me the assumptions.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "The run uses daily data.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Keep the benchmark.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "SPY remains the benchmark.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Try another idea.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "Tell me which asset to use.",
+      metadata: {},
+    },
+    {
+      id: clarificationMessageId,
+      role: "assistant",
+      content: "Which asset should I test?",
+      metadata: {
+        clarification: {
+          kind: "clarification",
+          prompt_source: "degraded_fallback",
+          requested_field: "asset_universe",
+          semantic_needs: ["asset_target"],
+        },
+      },
+    },
+    { id: randomUUID(), role: "user", content: "AAPL", metadata: {} },
+  ].map((record, index) => ({ ...record, offset_ms: index + 1 }));
+  const encodedRecords = Buffer.from(
+    JSON.stringify(records),
+    "utf8",
+  ).toString("base64");
+  const seeded = psqlJson<{ inserted: number }>(`
+    with active_owner as (
+      select 1
+      from public.guest_workspaces as workspace
+      join auth.users as auth_user on auth_user.id = workspace.user_id
+      join public.conversations as conversation
+        on conversation.id = workspace.conversation_id
+       and conversation.user_id = workspace.user_id
+      where workspace.user_id = '${owner}'
+        and workspace.conversation_id = '${conversation}'
+        and workspace.status = 'active'
+        and workspace.expires_at > now()
+        and auth_user.is_anonymous
+        and (
+          select count(*)
+          from public.backtest_runs
+          where user_id = '${owner}'
+            and conversation_id = '${conversation}'
+            and status = 'completed'
+        ) = 1
+    ),
+    baseline as (
+      select coalesce(max(created_at), now()) as created_at
+      from public.messages
+      where conversation_id = '${conversation}'
+        and user_id = '${owner}'
+    ),
+    fixture_rows as (
+      select *
+      from jsonb_to_recordset(
+        convert_from(decode('${encodedRecords}', 'base64'), 'UTF8')::jsonb
+      ) as item(
+        id uuid,
+        role text,
+        content text,
+        metadata jsonb,
+        offset_ms integer
+      )
+    ),
+    inserted as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        fixture_rows.id,
+        '${conversation}',
+        '${owner}',
+        fixture_rows.role,
+        fixture_rows.content,
+        fixture_rows.metadata,
+        baseline.created_at
+          + (fixture_rows.offset_ms || ' milliseconds')::interval
+      from fixture_rows
+      cross join active_owner
+      cross join baseline
+      returning 1
+    )
+    select json_build_object('inserted', count(*))::text
+    from inserted
+  `);
+  if (seeded.inserted !== records.length) {
+    throw new Error("Resolved Guest rail history fixture was incomplete");
+  }
+  return { clarificationMessageId };
+}
+
 export function seedGuestActiveConfirmationFixture(params: {
   userId: string;
   conversationId: string;

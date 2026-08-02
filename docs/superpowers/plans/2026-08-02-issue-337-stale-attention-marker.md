@@ -8,6 +8,29 @@
 
 **Tech Stack:** TypeScript, React/Next.js, Bun, existing rail test harness, Playwright.
 
+## Founder acceptance correction — 2026-08-02
+
+The first browser fixture used a registered account and two completed runs.
+That did not represent the locked G-01/G-02 Guest session, and it masked the
+rail visibility failure that occurs when a Guest's single allowed completed
+run is the only legitimate tick left after clarification recovery.
+
+The corrected acceptance path is:
+
+- identify the deterministic EN/es-419 fixture as Guest;
+- keep exactly one completed result in the recovered transcript;
+- prove red while the `>=2` tick visibility gate hides the rail;
+- lower only the tick-count gate to one while retaining the 12-message and
+  desktop thresholds;
+- replay the same shape through disposable local Supabase Guest Auth and
+  durable messages/runs, including reload, with zero provider or hosted writes.
+
+This addendum expands the allowed test surfaces to
+`web/e2e/conversation-activity-ui.spec.ts`,
+`web/e2e/guest-experience.preflight.spec.ts`, and
+`web/e2e/support/guest-qa.ts`. Backend product behavior and API/data contracts
+remain unchanged.
+
 ## Global Constraints
 
 - Modify only `web/lib/conversation-rail.ts` and `web/__tests__/conversation-activity-rail.test.ts` for behavior.

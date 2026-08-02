@@ -32,6 +32,7 @@ type PendingStream = {
 };
 
 type ActivityFixtureOptions = {
+  accountKind?: "guest" | "registered";
   activities?: Partial<Record<ConversationId, ConversationActivity>>;
   darkMode?: boolean;
   language?: "en" | "es-419";
@@ -265,7 +266,10 @@ function railTranscript(conversationId: ConversationId): ApiMessage[] {
 function recoveredClarificationRailTranscript(
   conversationId: ConversationId,
 ): ApiMessage[] {
-  const messages = railTranscript(conversationId);
+  const messages = Array.from({ length: 12 }, (_, index) =>
+    assistantMessage(conversationId, index),
+  );
+  messages[3] = resultMessage(conversationId, 3);
   messages[1] = assistantMessage(
     conversationId,
     1,
@@ -301,6 +305,7 @@ async function installActivityFixture(
   page: Page,
   options: ActivityFixtureOptions = {},
 ): Promise<ActivityFixture> {
+  const accountKind = options.accountKind ?? "registered";
   const language = options.language ?? "en";
   const activities = Object.fromEntries(
     IDS.map((conversationId) => [
@@ -407,28 +412,38 @@ async function installActivityFixture(
       return json(route, {
         user: {
           id: "conversation-activity-user",
-          email: "activity@example.com",
-          username: "activity",
-          display_name: "Activity QA",
+          email: accountKind === "guest" ? null : "activity@example.com",
+          username: accountKind === "guest" ? null : "activity",
+          display_name: accountKind === "guest" ? null : "Activity QA",
           language,
           locale: language === "es-419" ? "es-419" : "en-US",
           onboarding: {
-            completed: true,
-            stage: "completed",
-            language_confirmed: true,
+            completed: accountKind === "registered",
+            stage:
+              accountKind === "guest" ? "language_selection" : "completed",
+            language_confirmed: accountKind === "registered",
             primary_goal: null,
           },
         },
-        account_kind: "registered",
-        guest: null,
+        account_kind: accountKind,
+        guest:
+          accountKind === "guest"
+            ? {
+                expires_at: "2026-08-08T16:00:00.000Z",
+                conversation_limit: 1,
+                message_limit: 10,
+                simulation_limit: 1,
+                feedback_limit: 5,
+              }
+            : null,
         capabilities: {
-          can_create_additional_conversation: true,
-          can_manage_conversation: true,
-          can_save_decision: true,
-          can_manage_account: true,
-          can_use_omnisearch: true,
-          can_search_current_workspace: true,
-          can_use_grounded_discovery: true,
+          can_create_additional_conversation: accountKind === "registered",
+          can_manage_conversation: accountKind === "registered",
+          can_save_decision: accountKind === "registered",
+          can_manage_account: accountKind === "registered",
+          can_use_omnisearch: accountKind === "registered",
+          can_search_current_workspace: accountKind === "registered",
+          can_use_grounded_discovery: accountKind === "registered",
           can_submit_feedback: true,
         },
         public_account_access_enabled: false,
@@ -1168,14 +1183,23 @@ test("typed needs-input, attention, canceled, expired, and checking states do no
   expect(fixture.unexpectedRequests).toEqual([]);
 });
 
-for (const [language, screenshot] of [
-  ["en", "issue-337-en.png"],
-  ["es-419", "issue-337-es-419.png"],
+for (const [language, screenshot, completedLabel] of [
+  [
+    "en",
+    "issue-337-en.png",
+    "Backtest finished — AAPL · Buy and hold",
+  ],
+  [
+    "es-419",
+    "issue-337-es-419.png",
+    "Backtest terminado — AAPL · Buy and hold",
+  ],
 ] as const) {
   test(`resolved clarification clears its rail marker in ${language}`, async ({
     page,
   }) => {
     const fixture = await installActivityFixture(page, {
+      accountKind: "guest",
       language,
       railTranscript: "activity-a",
     });
@@ -1185,9 +1209,13 @@ for (const [language, screenshot] of [
 
     await page.goto("/chat?conversation=activity-a");
 
+    await expect(page.getByTestId("guest-temporary-notice")).toBeVisible();
     const rail = page.getByTestId("conversation-activity-rail");
     await expect(rail).toBeVisible();
-    await expect(rail.getByRole("button")).toHaveCount(2);
+    await expect(rail.getByRole("button")).toHaveCount(1);
+    await expect(
+      rail.getByRole("button", { name: completedLabel }),
+    ).toBeVisible();
     await captureEvidence(page, screenshot);
     expect(fixture.unexpectedRequests).toEqual([]);
   });

@@ -6,6 +6,12 @@ recovers into a usable confirmation, without hiding independent failures.
 Founder-locked 2026-08-02, after the August 1 checkpoint evidence identified
 G-02's marker persisting after the G-01 recovery.
 
+Founder acceptance correction, 2026-08-02: G-01/G-02 came from a Guest
+session. Acceptance must therefore preserve the Guest's one legitimate
+completed-backtest tick after the resolved clarification tick clears. A
+registered-account fixture with two completed runs is not representative proof
+because the Guest contract permits one simulation.
+
 ## 1. Why
 
 The conversation is Argus's primary product surface, and `docs/PRODUCT.md`
@@ -30,6 +36,9 @@ outcome: the marker clears after successful recovery.
 5. Regression coverage uses the G-01/G-02 shape: an attention-producing
    clarification/recovery followed by the user-supplied facts and a successful
    confirmation.
+6. A long Guest transcript with one completed backtest keeps that result tick
+   visible after the resolved clarification tick clears. The rail must not
+   disappear merely because only one legitimate tick remains.
 
 ## 3. Reserved / parked scope
 
@@ -44,7 +53,8 @@ outcome: the marker clears after successful recovery.
 ## 4. Contract gates
 
 - `web/lib/conversation-rail.ts` -- adjust only the render-time rail tick
-  derivation.
+  derivation and the minimum legitimate tick count needed to keep the rail
+  visible on a long Guest transcript.
 - `web/__tests__/conversation-activity-rail.test.ts` -- add the exact
   transcript regression and protect unrelated recoveries.
 - No API, OpenAPI, persistence, or localization contract changes are expected.
@@ -53,9 +63,11 @@ outcome: the marker clears after successful recovery.
 
 - **PR shape:** one focused frontend PR targeting `codex/private-alpha-next`.
 - **Proof required before ready:** test-first red/green evidence for the
-  G-01/G-02 regression; focused Bun test suite; relevant frontend lint/type
-  checks; EN and es-419 browser screenshots showing the marker clears; a
-  proportional independent code review; exact-head GitHub CI status.
+  G-01/G-02 regression; a real local Guest/Auth/persistence replay showing one
+  completed-backtest tick and no stale clarification tick before and after
+  reload; focused Bun test suite; relevant frontend lint/type checks; EN and
+  es-419 browser screenshots showing the marker clears; a proportional
+  independent code review; exact-head GitHub CI status.
 - **Where it stops:** a Draft or posted PR. The founder merges; no production
   deployment, migration, or integration-branch merge is part of this lane.
 
