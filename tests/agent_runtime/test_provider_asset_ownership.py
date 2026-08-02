@@ -838,6 +838,212 @@ async def test_artifact_edit_planning_cannot_drop_incomplete_asset_blocker(
     assert "provider_context_incomplete_asset_mentions" in planned.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_artifact_edit_planning_does_not_reconcile_inherited_assets_against_current_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    complete_current_message_context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "Microsoft",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "MSFT",
+                    "asset_class": "equity",
+                    "name": "Microsoft Corporation",
+                    "raw_symbol": "MSFT",
+                    "provider": "alpaca",
+                    "exchange": "NASDAQ",
+                }
+            ],
+            "all_traded_asset_mentions_accounted_for": True,
+        }
+    )
+
+    async def planned_response_stub(**kwargs: Any) -> LLMInterpretationResponse:
+        normalized = kwargs["response"]
+        assert normalized.candidate_strategy_draft.asset_universe == ["MSFT"]
+        assert normalized.requires_clarification is False
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User added Microsoft to the active Apple idea.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL", "MSFT"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_ready_active_artifact_edit_planned_response",
+        planned_response_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User mentioned Microsoft.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    planned = await interpreter_module._audited_response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Add Microsoft.",
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=complete_current_message_context,
+    )
+
+    assert planned.intent == "backtest_execution"
+    assert planned.requires_clarification is False
+    assert planned.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
+    assert planned.missing_required_fields == []
+    assert planned.ambiguous_fields == []
+    assert planned.reason_codes == ["artifact_assumption_edit_planned"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model_name", [None, "primary/model"])
+async def test_model_failure_artifact_edit_keeps_incomplete_asset_blocker(
+    monkeypatch: pytest.MonkeyPatch,
+    model_name: str | None,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+
+    symbols = ["AAPL", "MSFT", "NVDA", "AMZN", "META"]
+    incomplete_context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": symbol,
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": symbol,
+                    "asset_class": "equity",
+                    "name": symbol,
+                    "raw_symbol": symbol,
+                    "provider": "alpaca",
+                    "exchange": "NASDAQ",
+                }
+                for symbol in symbols
+            ],
+            "all_traded_asset_mentions_accounted_for": False,
+        }
+    )
+
+    async def provider_context_stub(**_: Any) -> str:
+        return incomplete_context
+
+    async def planner_stub(**_: Any) -> LLMInterpretationResponse:
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User refined the active five-asset idea.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=symbols,
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "provider_asset_resolution_context_for_request",
+        provider_context_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_plan_pending_artifact_assumption_edit",
+        planner_stub,
+    )
+    if model_name is None:
+        monkeypatch.setattr(
+            interpreter_module,
+            "openrouter_structured_model_candidates",
+            lambda: ["primary/model"],
+        )
+
+        async def invoke_stub(**_: Any) -> None:
+            raise TimeoutError("structured model timed out")
+
+        monkeypatch.setattr(
+            interpreter_module,
+            "invoke_openrouter_json_schema",
+            invoke_stub,
+        )
+    else:
+        class TimeoutStructuredModel:
+            async def ainvoke(self, _messages: Any) -> None:
+                raise TimeoutError("structured model timed out")
+
+        class TimeoutChatModel:
+            def with_structured_output(self, _schema: Any) -> TimeoutStructuredModel:
+                return TimeoutStructuredModel()
+
+        def resolve_model(
+            requested_model: str | None = None,
+            fallback: bool = False,
+            *,
+            task: Any = None,
+        ) -> str:
+            del task
+            if requested_model:
+                return requested_model
+            return "fallback/model" if fallback else "primary/model"
+
+        monkeypatch.setattr(
+            interpreter_module,
+            "build_openrouter_model",
+            lambda *args, **kwargs: TimeoutChatModel(),
+        )
+        monkeypatch.setattr(
+            "argus.llm.openrouter.resolve_openrouter_model",
+            resolve_model,
+        )
+
+    result = await interpreter_module.OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+        model_name=model_name,
+    ).ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "Keep those five and add fictional moon fund for 2024."
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert result.requires_clarification is True
+    assert result.missing_required_fields == ["asset_universe"]
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+    assert "provider_context_incomplete_asset_mentions" in result.reason_codes
+
+
 def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     request = InterpretationRequest(
         current_user_message=(

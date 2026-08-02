@@ -34,6 +34,28 @@ def response_with_runtime_context_assets(
     )
 
 
+def response_with_incomplete_asset_context_blocker(
+    response: LLMInterpretationResponse,
+    *,
+    asset_resolution_context: str | None,
+) -> LLMInterpretationResponse:
+    """Carry explicit provider incompleteness across response replacement.
+
+    Artifact planning can replace the normalized model response with a full
+    active-artifact draft. Reconcile only the provider-owned completeness flag
+    at that boundary; the current message's provider rows do not describe
+    inherited artifact assets and must not be used to normalize that full draft.
+    """
+
+    if (
+        response.intent not in {"strategy_drafting", "backtest_execution"}
+        or _all_traded_asset_mentions_accounted_for(asset_resolution_context)
+        is not False
+    ):
+        return response
+    return response.model_copy(update=_incomplete_asset_context_update(response))
+
+
 def _response_without_model_authored_provider_records(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:

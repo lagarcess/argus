@@ -486,6 +486,12 @@ class OpenRouterStructuredInterpreter:
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
+                repaired_response = (
+                    provider_context_assets.response_with_incomplete_asset_context_blocker(
+                        repaired_response,
+                        asset_resolution_context=asset_resolution_context,
+                    )
+                )
                 return self._to_runtime_interpretation(
                     repaired_response,
                     request=request,
@@ -625,6 +631,12 @@ class OpenRouterStructuredInterpreter:
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
+            repaired_response = (
+                provider_context_assets.response_with_incomplete_asset_context_blocker(
+                    repaired_response,
+                    asset_resolution_context=asset_resolution_context,
+                )
+            )
             return self._to_runtime_interpretation(repaired_response, request=request)
         repaired_response = await _focused_strategy_repair_after_candidate_failures(
             request=request,
@@ -2221,9 +2233,8 @@ async def _audited_response_ready_for_runtime(
         request=request,
     )
     if planned_artifact_edit is not None:
-        return _normalize_response_for_runtime_context(
+        return provider_context_assets.response_with_incomplete_asset_context_blocker(
             planned_artifact_edit,
-            request=request,
             asset_resolution_context=asset_resolution_context,
         )
     if _response_can_skip_optional_runtime_readiness_audits(
