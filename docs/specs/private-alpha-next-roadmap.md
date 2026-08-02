@@ -120,6 +120,14 @@ preserving the DESIGN.md body/UI and display-font ownership. Issue #350 is a
 separate low-priority fallback-order alignment; it is not unfinished font
 delivery or a promotion gate.
 
+PR #362 then repaired the sanctioned live-eval environment as `b2e8975c`,
+closing issue #361: `ARGUS_EVAL_ENV_FILE` now preloads before Argus imports,
+so calendar-aware cases exercise live market sessions instead of the synthetic
+fixture calendar and report `calendar_alignment` truthfully. The 17
+calendar-alignment failures lanes had waived as pre-existing are expected
+green from this SHA forward. Deployed runtime behavior is unchanged; the
+change is confined to `tests/evals/` and adds no configuration.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
