@@ -2610,7 +2610,7 @@ async def _audited_response_ready_for_runtime(
             primary_draft=response.candidate_strategy_draft,
         )
         if planned_response is not None:
-            return planned_response
+            return _carry_asset_blocker(planned_response, asset_resolution_context)
         raise ValueError(
             "OpenRouter interpretation replayed the active artifact without a "
             "material current-turn update"
@@ -2660,7 +2660,7 @@ async def _audited_response_ready_for_runtime(
         primary_draft=response.candidate_strategy_draft,
     )
     if planned_response is not None:
-        return planned_response
+        return _carry_asset_blocker(planned_response, asset_resolution_context)
     repaired_response = await _repair_incomplete_strategy_extraction(
         failed_response=response,
         preferred_model=preferred_model,
