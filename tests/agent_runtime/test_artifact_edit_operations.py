@@ -126,6 +126,46 @@ def test_moving_average_family_edit_is_a_typed_artifact_operation():
     assert resolved.unsupported == []
 
 
+def test_compound_strategy_family_and_benchmark_are_both_required_targets():
+    from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+        _required_edit_targets_from_primary_draft,
+    )
+
+    crossover_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    draft = LLMStrategyDraft(
+        requested_strategy_template="moving_average_crossover",
+        strategy_type="signal_strategy",
+        comparison_baseline="QQQ",
+        entry_rule=crossover_rule,
+        exit_rule={**crossover_rule, "direction": "bearish"},
+        field_provenance={
+            "requested_strategy_template": "explicit_user",
+            "strategy_type": "explicit_user",
+            "entry_rule": "explicit_user",
+            "exit_rule": "explicit_user",
+            "comparison_baseline": "explicit_user",
+        },
+    )
+
+    targets = _required_edit_targets_from_primary_draft(
+        draft,
+        current_strategy=StrategySummary(
+            requested_strategy_template="buy_and_hold",
+            strategy_type="buy_and_hold",
+            comparison_baseline="SPY",
+        ),
+    )
+
+    assert targets == {"strategy_family", "benchmark"}
+
+
 @pytest.mark.parametrize(
     "entry_rule",
     [
@@ -296,6 +336,45 @@ async def test_planner_keeps_company_name_asset_remove_for_later_resolution(
 
 
 @pytest.mark.asyncio
+async def test_required_benchmark_accepts_materialized_legacy_flat_plan(monkeypatch):
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: [],
+    )
+
+    async def invoke_stub(**kwargs):
+        del kwargs
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            comparison_baseline="QQQ",
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await plan_artifact_assumption_edit(
+        current_user_message="change the benchmark to QQQ",
+        prior_strategy={
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["LOW", "HD"],
+            "comparison_baseline": "SPY",
+        },
+        active_confirmation=None,
+        preferred_model="legacy-model",
+        required_targets={"benchmark"},
+    )
+
+    assert plan is not None
+    assert plan.operations == []
+    assert plan.comparison_baseline == "QQQ"
+
+
+@pytest.mark.asyncio
 async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_changes(
     monkeypatch,
 ):
@@ -379,6 +458,88 @@ async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_cha
     )
 
     assert seen_models == ["partial-model", "complete-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
+
+
+@pytest.mark.asyncio
+async def test_issue_339_compound_edit_retries_date_operation_that_cannot_materialize(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["complete-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        benchmark = EditOperation(op="set", target="benchmark", value="QQQ")
+        date_window = LLMDateRangeIntent(
+            kind="endpoint_patch",
+            endpoint="start",
+            start=(None if model_name == "malformed-model" else "2026-04-01"),
+        )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                benchmark,
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=date_window,
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "change the benchmark to QQQ and change the beginning of the period "
+                "to April 1, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["LOW", "HD"],
+                    asset_class="equity",
+                    date_range={"start": "2026-03-02", "end": "2026-07-30"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="malformed-model",
+        primary_draft=LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range={"start": "2026-04-01"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start="2026-04-01",
+            ),
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                "date_range": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["malformed-model", "complete-model"]
     assert response is not None
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}

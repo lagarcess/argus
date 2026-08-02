@@ -43,6 +43,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _required_edit_targets_from_primary_draft,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
+    materialized_artifact_edit_targets,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -3434,11 +3435,8 @@ async def _plan_pending_artifact_assumption_edit(
         reconstructed = _current_artifact_strategy(request)
         if reconstructed is not None:
             prior_strategy = reconstructed.model_dump(mode="json")
-    active_confirmation = (
-        snapshot.active_confirmation_reference.model_dump(mode="json")
-        if snapshot is not None and snapshot.active_confirmation_reference is not None
-        else None
-    )
+    active_confirmation = snapshot.active_confirmation_reference.model_dump(mode="json") if snapshot is not None and snapshot.active_confirmation_reference is not None else None
+    resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     plan = await plan_artifact_assumption_edit(
         current_user_message=request.current_user_message,
         prior_strategy=prior_strategy,
@@ -3446,6 +3444,7 @@ async def _plan_pending_artifact_assumption_edit(
         preferred_model=preferred_model,
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request)),
+        materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, primary_draft=primary_draft),
     )
     if plan is None:
         return None
@@ -3459,7 +3458,6 @@ async def _plan_pending_artifact_assumption_edit(
             prior_strategy_type=prior.strategy_type if prior is not None else None,
         ):
             return None
-    resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     return _response_from_artifact_assumption_edit_plan(
         plan=plan,
         request=request,

@@ -204,6 +204,28 @@ def _required_edit_targets_from_primary_draft(
     if has_explicit_date and not date_matches_current:
         targets.add("date_window")
 
+    strategy_family_fields = (
+        "requested_strategy_template",
+        "strategy_type",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+    )
+    has_explicit_strategy_family = any(
+        provenance.get(field_name) == "explicit_user"
+        for field_name in strategy_family_fields
+    )
+    strategy_family_changed = current_strategy is None or any(
+        getattr(draft, field_name) != getattr(current_strategy, field_name, None)
+        for field_name in strategy_family_fields
+    )
+    if (
+        draft.requested_strategy_template is not None
+        and has_explicit_strategy_family
+        and strategy_family_changed
+    ):
+        targets.add("strategy_family")
+
     capital_source = str(provenance.get("capital_amount") or "").strip()
     initial_capital_source = str(provenance.get("initial_capital") or "").strip()
     current_capital = current_strategy.capital_amount if current_strategy else None
@@ -496,31 +518,62 @@ def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
     return indicator == "rsi"
 
 
-def _response_from_artifact_assumption_edit_plan(
-    *,
+_MATERIALIZED_FIELD_TARGETS = {
+    "asset_universe": "asset",
+    "comparison_baseline": "benchmark",
+    "date_range": "date_window",
+    "requested_strategy_template": "strategy_family",
+    "initial_capital": "capital",
+    "recurring_contribution": "recurring_contribution",
+    "cadence": "cadence",
+    "timeframe": "timeframe",
+    "fee_rate": "fees",
+    "slippage": "slippage",
+    "indicator_period": "indicator_period",
+    "entry_threshold": "indicator_entry_threshold",
+    "exit_threshold": "indicator_exit_threshold",
+}
+
+
+def materialized_artifact_edit_targets(
     plan: ArtifactAssumptionEditPlan,
+    *,
     request: InterpretationRequest,
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
     primary_draft: LLMStrategyDraft | None = None,
-) -> LLMInterpretationResponse:
-    draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
-    artifact_target = (
-        "latest_result"
-        if _request_targets_post_result_artifact_edit(request)
-        else (
-            "active_confirmation"
-            if request.latest_task_snapshot is not None
-            and request.latest_task_snapshot.active_confirmation_reference is not None
-            else None
-        )
+) -> set[str]:
+    """Return targets that survive the exact draft-materialization path."""
+
+    draft, field_provenance, _ = _materialized_artifact_edit(
+        plan,
+        request=request,
+        asset_symbol_resolver=asset_symbol_resolver,
+        primary_draft=primary_draft,
     )
+    targets = {
+        target
+        for field_name, target in _MATERIALIZED_FIELD_TARGETS.items()
+        if field_name in field_provenance
+    }
+    if draft.date_range_intent is not None:
+        targets.add("date_window")
+    return targets
+
+
+def _materialized_artifact_edit(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    request: InterpretationRequest,
+    asset_symbol_resolver: Callable[[str], str | None] | None,
+    primary_draft: LLMStrategyDraft | None,
+) -> tuple[LLMStrategyDraft, dict[str, str], dict[str, Any]]:
+    draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     current_strategy = _current_artifact_strategy(request)
     if current_strategy is not None and current_strategy.strategy_type:
         draft.strategy_type = current_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
     if plan.operations:
-        allow_indicator_parameters = _current_artifact_uses_rsi(request)
         resolved = apply_edit_operations(
             plan.operations,
             current_asset_universe=_current_artifact_asset_universe(request),
@@ -531,7 +584,7 @@ def _response_from_artifact_assumption_edit_plan(
             draft=draft,
             field_provenance=field_provenance,
             extra_parameters=extra_parameters,
-            allow_indicator_parameters=allow_indicator_parameters,
+            allow_indicator_parameters=_current_artifact_uses_rsi(request),
             latest_result_window=_latest_result_date_window(request),
         )
     else:
@@ -551,6 +604,32 @@ def _response_from_artifact_assumption_edit_plan(
         primary_draft=primary_draft,
         extra_parameters=extra_parameters,
         field_provenance=field_provenance,
+    )
+    return draft, field_provenance, extra_parameters
+
+
+def _response_from_artifact_assumption_edit_plan(
+    *,
+    plan: ArtifactAssumptionEditPlan,
+    request: InterpretationRequest,
+    asset_symbol_resolver: Callable[[str], str | None] | None = None,
+    primary_draft: LLMStrategyDraft | None = None,
+) -> LLMInterpretationResponse:
+    artifact_target = (
+        "latest_result"
+        if _request_targets_post_result_artifact_edit(request)
+        else (
+            "active_confirmation"
+            if request.latest_task_snapshot is not None
+            and request.latest_task_snapshot.active_confirmation_reference is not None
+            else None
+        )
+    )
+    draft, field_provenance, extra_parameters = _materialized_artifact_edit(
+        plan,
+        request=request,
+        asset_symbol_resolver=asset_symbol_resolver,
+        primary_draft=primary_draft,
     )
 
     if plan.outcome == "ready_to_confirm":

@@ -84,6 +84,8 @@ async def plan_artifact_assumption_edit(
     preferred_model: str,
     language: str | None = None,
     required_targets: set[str] | None = None,
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str]]
+    | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
@@ -120,6 +122,7 @@ async def plan_artifact_assumption_edit(
         if plan.outcome == "ready_to_confirm" and not _covers_required_targets(
             plan,
             required_targets=required_target_set,
+            materialized_targets_for_plan=materialized_targets_for_plan,
         ):
             continue
         if plan.outcome != "ready_to_confirm" and not plan.assistant_response:
@@ -247,15 +250,64 @@ def _covers_required_targets(
     plan: ArtifactAssumptionEditPlan,
     *,
     required_targets: set[str],
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str]]
+    | None = None,
 ) -> bool:
     if not required_targets:
         return True
-    covered_targets = {
-        operation.target
-        for operation in plan.operations
-        if _operation_has_supported_carrier(operation)
-    }
+    if materialized_targets_for_plan is None:
+        covered_targets = _materialized_legacy_flat_targets(plan)
+    else:
+        try:
+            covered_targets = materialized_targets_for_plan(plan)
+        except Exception:
+            return False
     return required_targets.issubset(covered_targets)
+
+
+def _materialized_legacy_flat_targets(
+    plan: ArtifactAssumptionEditPlan,
+) -> set[str]:
+    """Name flat fields that the legacy application path really materializes.
+
+    Typed operations need request context (date resolution, asset resolution,
+    active strategy family) to prove applicability, so callers must supply the
+    real materializer for them. Flat fields remain context-free compatibility
+    inputs and can be checked here without pretending a carrier is a mutation.
+    """
+
+    if plan.operations:
+        return set()
+    targets: set[str] = set()
+    if plan.asset_universe:
+        targets.add("asset")
+    if str(plan.comparison_baseline or "").strip():
+        targets.add("benchmark")
+    if plan.initial_capital is not None:
+        targets.add("capital")
+    if plan.recurring_contribution_amount is not None:
+        targets.add("recurring_contribution")
+    if str(plan.cadence or "").strip().casefold() in {
+        "daily",
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+    }:
+        targets.add("cadence")
+    if plan.timeframe is not None:
+        targets.add("timeframe")
+    if (
+        plan.fee_rate is not None
+        and supported_cost_rate_value(plan.fee_rate, field_name="fee_rate") is not None
+    ):
+        targets.add("fees")
+    if (
+        plan.slippage is not None
+        and supported_cost_rate_value(plan.slippage, field_name="slippage") is not None
+    ):
+        targets.add("slippage")
+    return targets
 
 
 def _has_supported_edit(
