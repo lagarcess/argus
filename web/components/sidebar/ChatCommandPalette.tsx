@@ -503,6 +503,11 @@ export default function ChatCommandPalette({
     };
   }, [decisionStateFilter, isLedgerMode, query, retryNonce]);
 
+  useEffect(() => {
+    if (decisionResumeTarget?.surface !== "omnisearch_dossier") return;
+    setRetryNonce((current) => current + 1);
+  }, [decisionResumeTarget]);
+
   const isFiltering = query.trim().length > 0;
   const isWaitingForIndexableQuery =
     isFiltering && !searchQueryIsIndexable(query);
