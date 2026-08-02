@@ -28,6 +28,7 @@ export type KeyboardShortcutEvent = Pick<
 
 type KeyboardShortcutMatch =
   | "primary_key"
+  | "primary_shift_key"
   | "primary_shift_code"
   | "shift_code"
   | "code"
@@ -111,8 +112,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.delete_focused_chat",
     defaultLabel: "Delete current chat",
-    match: "primary_shift_code",
-    code: "KeyD",
+    match: "primary_shift_key",
+    key: "d",
     macDisplay: ["⌘", "Shift", "D"],
     otherDisplay: ["Ctrl", "Shift", "D"],
   },
@@ -121,8 +122,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.rename_focused_chat",
     defaultLabel: "Rename current chat",
-    match: "primary_shift_code",
-    code: "KeyR",
+    match: "primary_shift_key",
+    key: "r",
     macDisplay: ["⌘", "Shift", "R"],
     otherDisplay: ["Ctrl", "Shift", "R"],
   },
@@ -131,8 +132,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.archive_focused_chat",
     defaultLabel: "Archive current chat",
-    match: "primary_shift_code",
-    code: "KeyA",
+    match: "primary_shift_key",
+    key: "a",
     macDisplay: ["⌘", "Shift", "A"],
     otherDisplay: ["Ctrl", "Shift", "A"],
   },
@@ -141,8 +142,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.toggle_read_focused_chat",
     defaultLabel: "Mark current chat as read or unread",
-    match: "primary_shift_code",
-    code: "KeyU",
+    match: "primary_shift_key",
+    key: "u",
     macDisplay: ["⌘", "Shift", "U"],
     otherDisplay: ["Ctrl", "Shift", "U"],
   },
@@ -170,8 +171,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.rename",
     defaultLabel: "Rename",
-    match: "primary_shift_code",
-    code: "KeyR",
+    match: "primary_shift_key",
+    key: "r",
     macDisplay: ["⌘", "Shift", "R"],
     otherDisplay: ["Ctrl", "Shift", "R"],
   },
@@ -180,8 +181,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.archive",
     defaultLabel: "Archive",
-    match: "primary_shift_code",
-    code: "KeyA",
+    match: "primary_shift_key",
+    key: "a",
     macDisplay: ["⌘", "Shift", "A"],
     otherDisplay: ["Ctrl", "Shift", "A"],
   },
@@ -190,8 +191,8 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.delete",
     defaultLabel: "Delete",
-    match: "primary_shift_code",
-    code: "KeyD",
+    match: "primary_shift_key",
+    key: "d",
     macDisplay: ["⌘", "Shift", "D"],
     otherDisplay: ["Ctrl", "Shift", "D"],
   },
@@ -220,6 +221,15 @@ export function matchesKeyboardShortcut(
   if (shortcut.match === "primary_key") {
     return (
       hasPrimaryModifier(event) &&
+      event.key.toLowerCase() === shortcut.key?.toLowerCase()
+    );
+  }
+
+  if (shortcut.match === "primary_shift_key") {
+    return (
+      hasPrimaryModifier(event) &&
+      event.shiftKey &&
+      !event.altKey &&
       event.key.toLowerCase() === shortcut.key?.toLowerCase()
     );
   }

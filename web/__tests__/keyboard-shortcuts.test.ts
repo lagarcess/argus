@@ -181,7 +181,7 @@ describe("keyboard shortcut registry", () => {
     ).toBe(false);
   });
 
-  test("matches finalized action bindings by physical key code", () => {
+  test("matches punctuation positions and finalized action bindings", () => {
     expect(
       matchesKeyboardShortcut("open_recents", {
         key: "<",
@@ -241,23 +241,46 @@ describe("keyboard shortcut registry", () => {
     ).toBe(false);
   });
 
+  test("matches mnemonic letters by the logical key on non-US layouts", () => {
+    expect(
+      matchesKeyboardShortcut("archive_focused_chat", {
+        key: "A",
+        code: "KeyQ",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      matchesKeyboardShortcut("archive_focused_chat", {
+        key: "Q",
+        code: "KeyA",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(false);
+  });
+
   test("owns the intuitive Omnisearch row actions in the shared registry", () => {
     expect(KEYBOARD_SHORTCUTS).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: "command_palette_rename",
           group: "omnisearch",
-          code: "KeyR",
+          key: "r",
         }),
         expect.objectContaining({
           id: "command_palette_archive",
           group: "omnisearch",
-          code: "KeyA",
+          key: "a",
         }),
         expect.objectContaining({
           id: "command_palette_delete",
           group: "omnisearch",
-          code: "KeyD",
+          key: "d",
         }),
       ]),
     );
