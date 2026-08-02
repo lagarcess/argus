@@ -16,7 +16,7 @@ from loguru import logger
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
-    preserve_typed_discovery_act,
+    discovery_response_ready_for_runtime,
 )
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,
@@ -2189,63 +2189,19 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
-    primary_act_typed = response.semantic_turn_act == "asset_discovery" or (
-        response.semantic_turn_act is None
-        and _response_has_unambiguous_missing_act_discovery(response)
+    discovery_response = discovery_response_ready_for_runtime(
+        response=response,
+        request=request,
+        asset_resolution_context=asset_resolution_context,
+        normalize=_normalize_response_for_runtime_context,
     )
-    primary_discovery = response.asset_discovery if primary_act_typed else None
-    if primary_act_typed:
-        normalized = _normalize_response_for_runtime_context(
-            response,
-            request=request,
-            asset_resolution_context=asset_resolution_context,
-        )
-        return preserve_typed_discovery_act(
-            primary_act_typed=True,
-            primary_discovery=primary_discovery,
-            audited=normalized,
-        )
-    audited = await _audited_response_ready_for_runtime(
+    if discovery_response is not None:
+        return discovery_response
+    return await _audited_response_ready_for_runtime(
         response=response,
         preferred_model=preferred_model,
         request=request,
         asset_resolution_context=asset_resolution_context,
-    )
-    return preserve_typed_discovery_act(
-        primary_act_typed=primary_act_typed,
-        primary_discovery=primary_discovery,
-        audited=audited,
-    )
-
-
-def _response_has_unambiguous_missing_act_discovery(
-    response: LLMInterpretationResponse,
-) -> bool:
-    discovery = response.asset_discovery
-    if discovery is None or response.intent != "conversation_followup":
-        return False
-    category = (discovery.category_description or "").strip()
-    anchors = [symbol for symbol in discovery.anchor_symbols if symbol.strip()]
-    if discovery.relationship == "category" and not category:
-        return False
-    if discovery.relationship != "category" and not (anchors or category):
-        return False
-    if response.requires_clarification or _llm_strategy_draft_has_extractable_fields(
-        response.candidate_strategy_draft
-    ):
-        return False
-    return not any(
-        (
-            response.missing_required_fields,
-            response.ambiguous_fields,
-            response.unsupported_constraints,
-            response.uses_latest_result_context is True,
-            response.result_followup_focus,
-            response.result_followup_fact_key,
-            response.capability_question_focus,
-            response.context_question_focus,
-            response.artifact_target not in {None, "none"},
-        )
     )
 
 
