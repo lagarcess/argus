@@ -234,16 +234,25 @@ def _required_edit_targets_from_primary_draft(
 
     capital_source = str(provenance.get("capital_amount") or "").strip()
     initial_capital_source = str(provenance.get("initial_capital") or "").strip()
+    total_capital_source = str(provenance.get("total_capital") or "").strip()
     current_capital = current_strategy.capital_amount if current_strategy else None
     if (
-        draft.initial_capital is not None
-        and initial_capital_source in _TOTAL_CAPITAL_SOURCES
-        and draft.initial_capital != current_capital
-    ) or (
-        draft.capital_amount is not None
-        and capital_source in _TOTAL_CAPITAL_SOURCES
-        and canonical_strategy_type(draft.strategy_type) != "dca_accumulation"
-        and draft.capital_amount != current_capital
+        (
+            draft.initial_capital is not None
+            and initial_capital_source in _TOTAL_CAPITAL_SOURCES
+            and draft.initial_capital != current_capital
+        )
+        or (
+            draft.total_capital is not None
+            and total_capital_source in _TOTAL_CAPITAL_SOURCES
+            and draft.total_capital != current_capital
+        )
+        or (
+            draft.capital_amount is not None
+            and capital_source in _TOTAL_CAPITAL_SOURCES
+            and canonical_strategy_type(draft.strategy_type) != "dca_accumulation"
+            and draft.capital_amount != current_capital
+        )
     ):
         targets.add("capital")
     recurring_source = str(provenance.get("recurring_contribution") or "").strip()
@@ -764,9 +773,17 @@ def _materialized_target_matches_primary_delta(
         requested = (
             primary_draft.initial_capital
             if primary_draft.initial_capital is not None
-            else primary_draft.capital_amount
+            else (
+                primary_draft.total_capital
+                if primary_draft.total_capital is not None
+                else primary_draft.capital_amount
+            )
         )
-        materialized = materialized_draft.initial_capital
+        materialized = (
+            materialized_draft.initial_capital
+            if materialized_draft.initial_capital is not None
+            else materialized_draft.total_capital
+        )
         current = current_strategy.capital_amount if current_strategy else None
     elif target == "recurring_contribution":
         requested = (

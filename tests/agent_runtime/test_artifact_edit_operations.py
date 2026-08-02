@@ -541,7 +541,22 @@ async def test_issue_339_accepts_primary_matching_delta_without_provenance(
 
 
 @pytest.mark.asyncio
-async def test_issue_339_audits_primary_delta_with_empty_provenance(monkeypatch):
+@pytest.mark.parametrize(
+    ("primary_field", "field_provenance"),
+    [
+        pytest.param("initial_capital", {}, id="initial-capital-without-provenance"),
+        pytest.param(
+            "total_capital",
+            {"total_capital": "explicit_user"},
+            id="grounded-total-capital",
+        ),
+    ],
+)
+async def test_issue_339_audits_primary_capital_delta_without_required_target(
+    monkeypatch,
+    primary_field,
+    field_provenance,
+):
     from argus.agent_runtime import llm_interpreter
 
     monkeypatch.setattr(
@@ -588,7 +603,10 @@ async def test_issue_339_audits_primary_delta_with_empty_provenance(monkeypatch)
             user=UserState(user_id="u-339"),
         ),
         preferred_model="wrong-model",
-        primary_draft=LLMStrategyDraft(initial_capital=5000),
+        primary_draft=LLMStrategyDraft(
+            **{primary_field: 5000},
+            field_provenance=field_provenance,
+        ),
     )
 
     assert seen_models == ["wrong-model", "matching-model"]
