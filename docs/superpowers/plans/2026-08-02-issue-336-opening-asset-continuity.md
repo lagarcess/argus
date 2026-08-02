@@ -92,9 +92,10 @@ git commit -m "fix(chat): preserve opening-turn resolved assets"
 
 **Files:**
 - Modify: `tests/evals/measurement_cases/messy_english.yaml`
+- Modify: `tests/evals/measurement_eval_harness.py`
 
 **Interfaces:**
-- Consumes: the existing measurement-eval fields `intent`, `capability_verdict`, `assets`, `asset_class`, `strategy_type`, `capital_amount`, `stage_outcomes`, and typed `clarification` subset.
+- Consumes: the measurement-eval fields `intent`, `capability_verdict`, `assets`, `asset_class`, `strategy_type`, `capital_amount`, `stage_outcomes`, and the added typed `requested_field` measurement.
 - Produces: permanent case `messy_english_opening_apple_capital_missing_period_issue_336` used by mocked manifest validation and sanctioned live evaluation.
 
 - [ ] **Step 1: Add the exact acceptance fixture**

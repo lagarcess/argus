@@ -19,7 +19,7 @@ Authority:
 1. The opening turn `let's test apple with 10K` must preserve Apple as the traded asset and canonicalize it to `AAPL` through provider-backed resolution.
 2. The same turn must preserve `10000` as starting capital.
 3. Because the turn supplies no date window, Argus must ask only for the missing period; it must not claim the draft is executable.
-4. The fix stays LLM-first. It may improve asset-mention extraction guidance, but it must not add regexes, localized aliases, company-name tables, or an early deterministic route.
+4. The fix stays LLM-first. Post-LLM reconciliation may correct stale typed state only from provider-owned resolution facts; it must not add regexes, localized aliases, company-name tables, or an early deterministic route.
 5. The regression becomes a typed live-eval case that asserts asset, capital, missing-period clarification, and stage outcomes rather than exact prose.
 6. Existing provider-backed canonicalization and clarification owners remain unchanged.
 
@@ -40,7 +40,7 @@ Authority:
 ## 5. Execution contract
 
 - **PR shape:** one focused PR targeting `codex/private-alpha-next`, with a spec commit followed by the test-first implementation commit(s).
-- **Proof required before the PR counts as ready:** focused red/green tests for the asset-mention prompt contract and exact eval fixture; provider-free agent-runtime and mocked eval gates; the hermetic interpreter regression sweep; one sanctioned full live eval on the exact PR head, including the new issue #336 case; proportional code review; exact-head GitHub CI.
+- **Proof required before the PR counts as ready:** focused red/green tests for the typed provider-context reconciliation contract and exact eval fixture; provider-free agent-runtime and mocked eval gates; the hermetic interpreter regression sweep; one sanctioned full live eval on the exact PR head, including the new issue #336 case; proportional code review; exact-head GitHub CI.
 - **Where it stops:** a Draft PR ready for founder review. The founder merges. This lane does not deploy, promote, or expose testers.
 
 ## 6. Stop conditions
@@ -48,7 +48,7 @@ Authority:
 - If the exact case requires a deterministic scan of the user's text, a localized alias, or a company-name lookup before LLM extraction, stop and report.
 - If Apple resolves ambiguously or cannot be validated by the existing provider-backed catalog, stop and report rather than hardcoding `Apple -> AAPL`.
 - If the smallest fix changes date interpretation, model routing, provider selection, API/data contracts, or frontend behavior, stop and report the scope expansion.
-- If the exact live case still re-asks for the asset after the bounded prompt correction, stop and bring back the typed outcome and route-receipt evidence before adding another repair layer.
+- If the exact live case still re-asks for the asset after the bounded typed provider-context reconciliation, stop and bring back the typed outcome and route-receipt evidence before adding another repair layer.
 
 ## Sources
 
@@ -70,4 +70,4 @@ Authority:
 
 ### Inference
 
-- Code inspection shows that provider-context normalization already canonicalizes a resolved company name and preserves it through missing-period clarification. The remaining bounded failure surface is the LLM asset-mention extraction guidance for a terse lowercased company-name request. The exact-head live gate must confirm that this diagnosis fixes the observed path.
+- Code inspection shows that provider-context normalization canonicalizes a resolved company name, but previously left the model's stale `asset_universe` missing-field blocker and asset-question prose intact. The bounded failure surface is post-LLM reconciliation of that stale typed state from provider-owned facts. The exact-head live gate must confirm that this diagnosis fixes the observed path without changing natural-language interpretation.
