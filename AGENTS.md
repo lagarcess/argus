@@ -132,6 +132,44 @@ Integration guardrails:
 
 - Worker branches start from `codex/private-alpha-next`, not directly from
   `main`, unless the task is an urgent hotfix.
+- At lane start, record the fetched `origin/codex/private-alpha-next` SHA as the
+  lane's integration base. Before a READY claim, fetch integration again and
+  record both the original base and current remote integration SHA.
+- Reconciliation is one-way: merge current
+  `origin/codex/private-alpha-next` into the worker branch. Never merge a worker
+  branch into the canonical integration checkout by hand; worker delivery goes
+  through its GitHub PR targeting `codex/private-alpha-next`.
+- Once a worker branch is published or has browser, live-eval, or other
+  exact-head evidence, do not rebase it. Use a normal integration merge so the
+  reviewed/evidenced lineage remains inspectable. Do not merge `main` into an
+  ordinary Private Alpha Next worker.
+- When integration advanced after the worker's recorded base, compare the
+  worker diff with the intervening integration diff and report semantic
+  overlap by shared runtime owner, API/data contract, UI state owner, migration,
+  environment variable, and directly affected tests—not merely Git conflict
+  status. No textual conflict is not proof of behavioral independence.
+- If there is no semantic overlap, preserve the lane's accepted evidence and
+  rerun the normal exact-head deterministic/CI gates after reconciliation. If
+  overlap exists, audit the overlap and rerun only the affected acceptance
+  surface. Do not repeat paid evals, provider turns, real backtests, or broad
+  browser matrices unless the overlap invalidates that specific evidence.
+- Every final READY report must include the original integration base, current
+  integration SHA, reconciliation merge SHA if any, overlap disposition,
+  evidence retained or invalidated, exact PR head, and terminal CI state.
+- After the founder merges a worker PR, the active agent should run
+  `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
+  permit it. A cloud agent may perform that workflow; the local
+  `argus-integration-landing` skill is helpful but not required. If the agent
+  cannot complete the landing workflow, it must post the following conspicuous
+  handoff once in both its final response and the merged PR when PR commenting
+  is available:
+
+  ```text
+  🚨🚨🚨 FOUNDER ACTION REQUIRED — INTEGRATION LANDING NOT RUN 🚨🚨🚨
+  PR #<number> merged as <sha>, but roadmap/issues/env parity and exact-head
+  integration verification are still pending. Run the Argus integration
+  landing workflow from the canonical codex/private-alpha-next checkout.
+  ```
 - `codex/private-alpha-next` is the clean integration gate. Quarantine branches
   such as `codex/private-alpha-next-quarantine-fc231e8` and
   `codex/private-alpha-next-p2.1-quarantine` are read-only reference material
@@ -142,9 +180,12 @@ Integration guardrails:
 - Jules work is decommissioned for the near term. Do not create or maintain
   `jules/**` branches, `codex/private-alpha-next-jules-intake`, or Jules intake
   PRs unless the founder explicitly reactivates that workflow.
-- External async agents, if reintroduced later, must work from a fresh
-  founder-approved delegation model and must not push directly to `main` or
-  `codex/private-alpha-next`.
+- External async implementation agents, if reintroduced later, must work from
+  a fresh founder-approved delegation model and must not push product code
+  directly to `main` or `codex/private-alpha-next`. After a founder-confirmed
+  merge, an agent explicitly assigned the repository-owned integration-landing
+  workflow may push only its bounded documentation/configuration housekeeping
+  directly to `codex/private-alpha-next`.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
 - Apply review proportionality to local, cloud, subagent, acceptance, and
@@ -338,6 +379,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 | `/verify` | Full suite: pytest + Bun lint + coverage check (63%+) + backtest perf (<3s)  |
 | `/pr`     | Create PR: include API contract link if schema changed, mark scope (api/web) |
 | `/perf`   | Benchmark: Numba analysis, backtest latency, Bun build time                  |
+| `/integration-landing` | Reconcile a confirmed integration merge, docs, issues, env templates, and exact-head CI |
 
 ### Discovery & Ops
 
@@ -733,7 +775,11 @@ Never do this:
 8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh`.
 9. **Critical Findings Only**: Only PR/Journal critical improvements (security bugs, >20% perf gain).
 10. **Postgres Performance**: All SQL/RLS must be audited against `postgres-best-practices`.
-11. **Branch Sync & Goal Realignment**: Every agent session must fetch/rebase `main` and re-verify original mission against any architectural drift before completion.
+11. **Branch Sync & Goal Realignment**: Private Alpha Next workers must fetch
+    `origin/codex/private-alpha-next`, reconcile it one-way into the worker, and
+    re-verify the mission and affected evidence before completion. Do not rebase
+    a published or evidenced lane, and do not use `main` as the ordinary worker
+    base.
 
 ---
 
