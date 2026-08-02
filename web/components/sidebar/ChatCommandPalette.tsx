@@ -79,13 +79,14 @@ import type {
   DecisionState as RunDossierDecisionState,
   SearchDecisionAction,
 } from "@/lib/run-dossier-contract";
-import type { GuestDecisionResumeTarget } from "@/lib/guest-conversion";
+import { dossierDecisionResumeTarget, type GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 import {
   isRecentRecallResponse,
   loadCommandPaletteRecentRecall,
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
+import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type ChatCommandPaletteProps = {
@@ -296,6 +297,7 @@ export default function ChatCommandPalette({
   const canonicalMutationIdRef = useRef(0);
   const decisionMutationInFlightRef = useRef(false);
   const searchSignatureRef = useRef(RECENTS_SEARCH_SIGNATURE);
+  useDossierDecisionResumeRefresh(decisionResumeTarget, setRetryNonce);
   const isRecentsMode =
     query.trim() === "" &&
     !isLedgerMode &&
@@ -502,11 +504,6 @@ export default function ChatCommandPalette({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [decisionStateFilter, isLedgerMode, query, retryNonce]);
-
-  useEffect(() => {
-    if (decisionResumeTarget?.surface !== "omnisearch_dossier") return;
-    setRetryNonce((current) => current + 1);
-  }, [decisionResumeTarget]);
 
   const isFiltering = query.trim().length > 0;
   const isWaitingForIndexableQuery =
@@ -1765,21 +1762,10 @@ export default function ChatCommandPalette({
                         onSaveDecision={(action, draft) =>
                           saveDecision(selectedDossier.run_id, action, draft)
                         }
-                        onDecisionUnavailable={(action, draft) =>
-                          onDecisionUnavailable?.({
-                            surface: "omnisearch_dossier",
-                            artifactId: action.evidence_artifact_id,
-                            runId: selectedDossier.run_id,
-                            decisionState: draft.state,
-                            note: draft.note,
-                          })
-                        }
-                        resumeDecisionTarget={
-                          decisionResumeTarget?.surface ===
-                          "omnisearch_dossier"
-                            ? decisionResumeTarget
-                            : null
-                        }
+                        onDecisionUnavailable={onDecisionUnavailable}
+                        resumeDecisionTarget={dossierDecisionResumeTarget(
+                          decisionResumeTarget,
+                        )}
                         onDecisionResumeHandled={onDecisionResumeHandled}
                       />
                     )

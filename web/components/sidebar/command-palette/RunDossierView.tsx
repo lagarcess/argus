@@ -18,6 +18,7 @@ import {
   formatRunDossierMetrics,
   formatRunDossierSetup,
 } from "@/lib/run-dossier-items";
+import type { GuestDossierDecisionResumeTarget } from "@/lib/guest-conversion";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 import { DecisionEditor } from "./DecisionEditor";
@@ -35,10 +36,7 @@ type RunDossierViewProps = {
     action: SearchDecisionAction,
     draft: { decision_state: DecisionState; note: string },
   ) => Promise<void>;
-  onDecisionUnavailable?: (
-    action: SearchDecisionAction,
-    draft: DecisionDraft,
-  ) => void;
+  onDecisionUnavailable?: (target: DossierDecisionResumeTarget) => void;
   resumeDecisionTarget?: DossierDecisionResumeTarget | null;
   onDecisionResumeHandled?: () => void;
   openConversationDisabled?: boolean;
@@ -50,12 +48,7 @@ export type DecisionDraft = {
   note: string;
 };
 
-export type DossierDecisionResumeTarget = {
-  artifactId: string;
-  runId: string;
-  decisionState: DecisionState;
-  note: string;
-};
+export type DossierDecisionResumeTarget = GuestDossierDecisionResumeTarget;
 
 export function matchingDecisionResumeDraft({
   action,
@@ -186,7 +179,13 @@ export function RunDossierView({
       note: decisionAction.note ?? "",
     };
     if (decisionAction.availability === "account_conversion_required") {
-      onDecisionUnavailable?.(decisionAction, nextDraft);
+      onDecisionUnavailable?.({
+        surface: "omnisearch_dossier",
+        artifactId: decisionAction.evidence_artifact_id,
+        runId: dossier.run_id,
+        decisionState: nextDraft.state,
+        note: nextDraft.note,
+      });
       return;
     }
     setSaved(false);

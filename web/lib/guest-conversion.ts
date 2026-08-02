@@ -27,6 +27,17 @@ export type GuestDecisionResumeTarget =
       note: string;
     };
 
+export type GuestDossierDecisionResumeTarget = Extract<
+  GuestDecisionResumeTarget,
+  { surface: "omnisearch_dossier" }
+>;
+
+export function dossierDecisionResumeTarget(
+  target: GuestDecisionResumeTarget | null | undefined,
+): GuestDossierDecisionResumeTarget | null {
+  return target?.surface === "omnisearch_dossier" ? target : null;
+}
+
 type GuestPendingActionBase = {
   reason: GuestConversionReason;
   conversationId: string;

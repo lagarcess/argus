@@ -5,6 +5,7 @@ import { join } from "node:path";
 import GuestExperienceSurfaces from "../components/guest/GuestExperienceSurfaces";
 import type { GuestExperience } from "../components/guest/useGuestExperience";
 import {
+  dossierDecisionResumeTarget,
   guestConversionBenefitKey,
   latestDecisionResumeMessageId,
   newConversationConversionMode,
@@ -139,6 +140,13 @@ describe("guest conversion contract", () => {
       artifact_id: "artifact-1",
     });
     expect(new SingleUseGuestAction(action).take()).toEqual(action);
+    expect(dossierDecisionResumeTarget(action.target)).toEqual(action.target);
+    expect(
+      dossierDecisionResumeTarget({
+        surface: "result_card",
+        artifactId: "artifact-1",
+      }),
+    ).toBeNull();
   });
 
   test("resumes a decision on only the newest matching result projection", () => {
