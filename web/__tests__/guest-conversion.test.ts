@@ -65,7 +65,10 @@ describe("guest conversion contract", () => {
         reason: "save_decision",
         conversationId: "conversation-1",
         actionId: "decision-1",
-        artifactId: "artifact-1",
+        target: {
+          surface: "result_card",
+          artifactId: "artifact-1",
+        },
       },
       {
         reason: "new_conversation",
@@ -104,12 +107,38 @@ describe("guest conversion contract", () => {
       reason: "save_decision",
       conversationId: "conversation-1",
       actionId: "decision-1",
-      artifactId: "artifact-1",
+      target: {
+        surface: "result_card",
+        artifactId: "artifact-1",
+      },
     };
     const latch = new SingleUseGuestAction(action);
 
     expect(latch.take()).toEqual(action);
     expect(latch.take()).toBeNull();
+  });
+
+  test("keeps dossier resume context ephemeral while binding the handoff to evidence", () => {
+    const action: GuestPendingAction = {
+      reason: "save_decision",
+      conversationId: "conversation-1",
+      actionId: "decision-1",
+      target: {
+        surface: "omnisearch_dossier",
+        artifactId: "artifact-1",
+        runId: "run-1",
+        decisionState: "watching",
+        note: "Keep this exact note",
+      },
+    };
+
+    expect(pendingGuestActionSummary(action)).toEqual({
+      reason: "save_decision",
+      conversation_id: "conversation-1",
+      action_id: "decision-1",
+      artifact_id: "artifact-1",
+    });
+    expect(new SingleUseGuestAction(action).take()).toEqual(action);
   });
 
   test("resumes a decision on only the newest matching result projection", () => {

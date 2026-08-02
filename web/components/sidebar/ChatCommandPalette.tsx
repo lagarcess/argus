@@ -79,6 +79,7 @@ import type {
   DecisionState as RunDossierDecisionState,
   SearchDecisionAction,
 } from "@/lib/run-dossier-contract";
+import type { GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 import {
   isRecentRecallResponse,
   loadCommandPaletteRecentRecall,
@@ -100,6 +101,9 @@ type ChatCommandPaletteProps = {
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
   canManageConversation?: boolean;
+  onDecisionUnavailable?: (target: GuestDecisionResumeTarget) => void;
+  decisionResumeTarget?: GuestDecisionResumeTarget | null;
+  onDecisionResumeHandled?: () => void;
   onMutated?: () => void;
   onConversationRemoved?: (conversationId: string) => void;
 };
@@ -249,6 +253,9 @@ export default function ChatCommandPalette({
   isGuest = false,
   groundedDiscoveryAvailable = true,
   canManageConversation = true,
+  onDecisionUnavailable,
+  decisionResumeTarget,
+  onDecisionResumeHandled,
   onMutated,
   onConversationRemoved,
 }: ChatCommandPaletteProps) {
@@ -1753,6 +1760,22 @@ export default function ChatCommandPalette({
                         onSaveDecision={(action, draft) =>
                           saveDecision(selectedDossier.run_id, action, draft)
                         }
+                        onDecisionUnavailable={(action, draft) =>
+                          onDecisionUnavailable?.({
+                            surface: "omnisearch_dossier",
+                            artifactId: action.evidence_artifact_id,
+                            runId: selectedDossier.run_id,
+                            decisionState: draft.state,
+                            note: draft.note,
+                          })
+                        }
+                        resumeDecisionTarget={
+                          decisionResumeTarget?.surface ===
+                          "omnisearch_dossier"
+                            ? decisionResumeTarget
+                            : null
+                        }
+                        onDecisionResumeHandled={onDecisionResumeHandled}
                       />
                     )
                   ) : (
