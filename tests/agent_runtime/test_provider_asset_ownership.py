@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime.interpreter.asset_resolution_context import (
+    _asset_mention_extraction_messages,
     provider_asset_resolution_context_from_extraction,
 )
 from argus.agent_runtime.interpreter.provider_context_assets import (
@@ -32,6 +33,7 @@ from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
 )
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     ResolutionProvenance,
     RunState,
@@ -432,6 +434,25 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
         symbols.values()
     )
     assert payload["all_traded_asset_mentions_accounted_for"] is False
+
+
+def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
+    request = InterpretationRequest(
+        current_user_message=(
+            "Test Apple, Microsoft, NVIDIA, Amazon, Meta, and fictional moon fund."
+        ),
+        user=UserState(user_id="u1"),
+    )
+
+    prompt = _asset_mention_extraction_messages(request)[0]["content"]
+    schema_description = LLMAssetMentionExtraction.model_json_schema()["properties"][
+        "asset_mentions"
+    ]["description"]
+
+    assert "Return up to six distinct mentions" in prompt
+    assert "Prioritize traded-asset and unknown spans" in prompt
+    assert "sixth mention is overflow evidence" in prompt
+    assert "up to six distinct asset-like mentions" in schema_description
 
 
 def test_underfilled_provider_context_keeps_stale_asset_blocker() -> None:

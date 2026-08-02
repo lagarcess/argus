@@ -47,7 +47,7 @@ Production mutation caught: removing typed-blocker reconciliation while leaving 
 
 Add a negative case that sends provider extraction one resolved mention (`Apple`) and one unsupported traded-asset mention (`fictional moon fund`) while the model draft remains stale and empty. Assert the provider context records `all_traded_asset_mentions_accounted_for == False`, preserves `AAPL` as grounded partial context, keeps `asset_universe` in `missing_required_fields`, and never adds `provider_context_resolved_missing_asset`. Removing the completeness guard must fail this test by silently dropping the unsupported basket member.
 
-Add a cap-boundary negative with five provider rows followed by a sixth distinct traded/unknown mention. Assert the first five rows remain bounded but `all_traded_asset_mentions_accounted_for == False`; the extractor schema describes the five-mention limit but does not enforce it.
+Add a cap-boundary negative with five provider rows followed by a sixth distinct traded/unknown mention. Assert the first five rows remain bounded but `all_traded_asset_mentions_accounted_for == False`. Assert the production extractor prompt and schema allow up to six mentions and prioritize traded/unknown spans, so the sixth is bounded overflow evidence rather than being truncated before the completeness check.
 
 - [ ] **Step 2: Run the focused test to verify RED**
 
@@ -74,7 +74,7 @@ resolved_missing_asset = (
 )
 ```
 
-The asset-resolution preflight sets `all_traded_asset_mentions_accounted_for` to false whenever a traded/unknown extracted mention cannot produce a resolved or ambiguous provider row or remains uninspected after the five-row cap. When the full condition is true, remove only `asset_universe` from `missing_required_fields`, clear `assistant_response`, retain clarification when another typed blocker such as `date_range` remains, and append `provider_context_resolved_missing_asset` once to `reason_codes`. Do not apply this reconciliation to unsupported turns, ambiguous rows, or partial provider context.
+The extraction contract returns up to six distinct mentions, prioritizing traded/unknown spans; provider context retains at most five rows. The asset-resolution preflight sets `all_traded_asset_mentions_accounted_for` to false whenever a traded/unknown extracted mention cannot produce a resolved or ambiguous provider row or the sixth overflow mention remains uninspected after the five-row cap. When the full condition is true, remove only `asset_universe` from `missing_required_fields`, clear `assistant_response`, retain clarification when another typed blocker such as `date_range` remains, and append `provider_context_resolved_missing_asset` once to `reason_codes`. Do not apply this reconciliation to unsupported turns, ambiguous rows, overflowed extraction, or partial provider context.
 
 - [ ] **Step 4: Run focused GREEN and the owning module**
 

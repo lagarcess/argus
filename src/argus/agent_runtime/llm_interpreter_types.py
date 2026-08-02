@@ -60,7 +60,8 @@ class LLMAssetMentionExtraction(BaseModel):
         default_factory=list,
         description=(
             "Provider-resolution candidates identified by the LLM from the current "
-            "message. Keep at most five distinct asset-like mentions."
+            "message. Keep up to six distinct asset-like mentions so the sixth can "
+            "report overflow beyond the five-row provider context."
         ),
     )
 
@@ -126,8 +127,8 @@ class LLMStrategyDraft(BaseModel):
     # reach a private attribute. A str span is fidelity-audit evidence bound to a
     # quote from the current message; a None span is typed edit-plan evidence,
     # which has no bounded quote.
-    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = (
-        PrivateAttr(default_factory=dict)
+    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = PrivateAttr(
+        default_factory=dict
     )
 
     raw_user_phrasing: str | None = None
