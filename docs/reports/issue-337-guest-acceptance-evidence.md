@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Status: **PASS on exact candidate head**
 
-Candidate SHA: `ba3d3911123a0d0c77d8f6cd0dfaf8d1718160b7`
+Candidate SHA: `0e07299fe93fd5e9af3148dd89a970f6b228bbf5`
 
 Source evidence: G-01/G-02 in
 `docs/reports/2026-08-01-current-checkpoint-experience-feedback.md`.
@@ -39,8 +39,8 @@ transcript metadata:
 - the marker clears only when the confirmation fills the requested field and
   typed strategy facts or the source-result artifact prove continuity;
 - a relative date fact may match its backend-canonicalized `{start, end}` form
-  only when the confirmation preserves the same raw date text and its effective
-  date-range metadata agrees with the rendered strategy;
+  only when both sides preserve the same raw date text and requested date range,
+  and the confirmation's effective range agrees with the rendered strategy;
 - missing or conflicting relationship evidence keeps the marker visible.
 
 Focused regression coverage includes an AAPL clarification followed by an
@@ -61,9 +61,10 @@ prose:
 2. The long transcript contains the earlier typed clarification, “Which asset
    should I test?”
 3. The user supplies `AAPL`.
-4. The pending path carries the relative date “past year”; a later active AAPL
-   confirmation carries the same raw date provenance plus backend-requested and
-   effective date ranges, proving that its canonical dates continue that path.
+4. The pending path carries the relative date “past year” plus its requested
+   range; a later active AAPL confirmation carries the same raw and requested
+   provenance plus its effective range, proving that its canonical dates
+   continue that path.
 5. The page hydrates from the durable API, then reloads and hydrates again.
 
 Observed and asserted before and after reload:
@@ -85,7 +86,7 @@ Observed and asserted before and after reload:
 Command:
 
 ```bash
-ARGUS_EXPECTED_CANDIDATE_SHA=ba3d3911123a0d0c77d8f6cd0dfaf8d1718160b7 \
+ARGUS_EXPECTED_CANDIDATE_SHA=0e07299fe93fd5e9af3148dd89a970f6b228bbf5 \
   ARGUS_GUEST_QA_APP_PORT=3105 \
   ARGUS_GUEST_QA_API_PORT=8015 \
   bash scripts/qa/run-guest-experience-qa.sh preflight \
@@ -98,14 +99,14 @@ Result: `1 passed`.
 
 Local evidence pack:
 
-- `temp/qa-evidence-guest/ba3d3911123a0d0c77d8f6cd0dfaf8d1718160b7/authoritative/issue-337-guest-recovered.png`
-- `temp/qa-evidence-guest/ba3d3911123a0d0c77d8f6cd0dfaf8d1718160b7/authoritative/issue-337-guest-recovered-reload.png`
+- `temp/qa-evidence-guest/0e07299fe93fd5e9af3148dd89a970f6b228bbf5/authoritative/issue-337-guest-recovered.png`
+- `temp/qa-evidence-guest/0e07299fe93fd5e9af3148dd89a970f6b228bbf5/authoritative/issue-337-guest-recovered-reload.png`
 
 SHA-256 before reload:
 `a097a27c1c70af6a66d6cd38ae6fa1fa8297721573dade9bd19b80b159a6895a`.
 
 SHA-256 after reload:
-`5448bb108519183f91cd36ee7d39d3fca9912871c6cfc4830a43c92edda0a627`.
+`664a7b107e13bf55ee9311c0e52f9c7dd8784af082c522039c92dea74af5e7e7`.
 
 The different framing reflects scroll restoration after reload; both captures
 show the same single completed-backtest rail marker and no attention marker.
