@@ -50,12 +50,12 @@ echo "🔵 [Setup] Provisioning worktree environment files..."
 # a newer local Python resolves different dependency wheels and fakes test results.
 PINNED_PYTHON="$(cat .python-version 2>/dev/null || echo 3.10)"
 PINNED_MINOR="$(echo "$PINNED_PYTHON" | cut -d. -f1-2)"
-echo "🔵 [Setup] Resolving pinned Python ${PINNED_MINOR} (.python-version: ${PINNED_PYTHON})..."
+echo "🔵 [Setup] Resolving pinned Python ${PINNED_PYTHON}..."
 
 PYTHON_CMD=""
 if command -v uv &> /dev/null; then
-    uv python install "$PINNED_MINOR" >/dev/null 2>&1 || true
-    PYTHON_CMD="$(uv python find "$PINNED_MINOR" 2>/dev/null || true)"
+    uv python install "$PINNED_PYTHON" >/dev/null 2>&1 || true
+    PYTHON_CMD="$(uv python find "$PINNED_PYTHON" 2>/dev/null || true)"
 fi
 if [ -z "$PYTHON_CMD" ] && command -v "python$PINNED_MINOR" &> /dev/null; then
     PYTHON_CMD="python$PINNED_MINOR"
@@ -64,16 +64,16 @@ if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 fi
 if [ -z "$PYTHON_CMD" ]; then
-    echo "❌ [Setup] Python not found. Install Python ${PINNED_MINOR} (e.g. 'uv python install ${PINNED_MINOR}')."
+    echo "❌ [Setup] Python not found. Install Python ${PINNED_PYTHON} (e.g. 'uv python install ${PINNED_PYTHON}')."
     exit 1
 fi
 
 PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
 echo "🔵 [Setup] Python version: $PYTHON_VERSION (command: $PYTHON_CMD)"
 
-if ! $PYTHON_CMD -c "import sys; sys.exit(0 if f'{sys.version_info[0]}.{sys.version_info[1]}' == '$PINNED_MINOR' else 1)"; then
-    echo "❌ [Setup] Python ${PINNED_MINOR} required (repo pin). Found: $PYTHON_VERSION"
-    echo "   Install it with: uv python install ${PINNED_MINOR}"
+if ! $PYTHON_CMD -c "import platform, sys; sys.exit(0 if platform.python_version() == '$PINNED_PYTHON' else 1)"; then
+    echo "❌ [Setup] Python ${PINNED_PYTHON} required (repo pin). Found: $PYTHON_VERSION"
+    echo "   Install it with: uv python install ${PINNED_PYTHON}"
     exit 1
 fi
 

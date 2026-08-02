@@ -122,6 +122,15 @@ def test_setup_pins_poetry_and_bun_to_ci_versions() -> None:
     assert 'bash -s "bun-v$PINNED_BUN_VERSION"' in source
 
 
+def test_setup_binds_poetry_to_exact_repo_python_version() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'uv python install "$PINNED_PYTHON"' in source
+    assert 'uv python find "$PINNED_PYTHON"' in source
+    assert "== '$PINNED_PYTHON'" in source
+    assert 'poetry env use "$PYTHON_CMD"' in source
+
+
 def test_setup_persists_cloud_toolchain_path_and_disables_next_telemetry() -> None:
     source = SETUP.read_text(encoding="utf-8")
 
