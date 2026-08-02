@@ -17,14 +17,17 @@
   provider credentials blanked for the launched process
 - Frontend overrides: `NEXT_PUBLIC_ARGUS_API_URL=http://localhost:8001/api/v1`,
   `NEXT_PUBLIC_MOCK_AUTH=false`,
-  `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN=argus-local-browser-qa`, and
+  `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN=argus-local-browser-qa` (the public,
+  non-secret local-QA fixture token), and
   `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true`
 - Provider turn and cost cap: zero turns; zero cost
 
-The checked-in product, API, migration, test, and environment templates were
-not changed. Local fixture rows were inserted only into the reset loopback
-database so the real UI could render lifecycle states without submitting a
-chat turn.
+The checked-in production/runtime, API/schema, migration, and environment
+templates were not changed. The branch includes one test-only clock repair in
+`web/e2e/conversation-activity-ui.spec.ts`:
+`const NOW = new Date().toISOString()`. Local fixture rows were inserted only
+into the reset loopback database so the real UI could render lifecycle states
+without submitting a chat turn.
 
 ## Verification tuple
 
@@ -46,8 +49,10 @@ chat turn.
 | Guest boundary stability | GET after rejected manual unread | `200`, still `needs_attention` |
 | Cost/execution | Rows owned by the two personas | 0 CostLedger entries, 0 jobs, 0 runs |
 
-No UUID, token, cookie, email address, password, provider key, or database URL
-is retained in this report or its screenshots.
+No UUID, secret, bearer token, session token, provider token, cookie, email
+address, password, provider key, or database URL is retained in this report or
+its screenshots. The recorded local-QA CAPTCHA value is a public fixture token,
+not a secret or session credential.
 
 ## Scenario register
 
@@ -214,7 +219,10 @@ Guest-policy tests after the same local reset.
 - Hosted mutations: `0`
 - Local mutations: two disposable identities, three conversations, and typed
   fixture/read-state rows in the reset loopback database only
-- Product/API/migration/test/env-template changes: `0`
+- Production/runtime/API/schema/migration/env-template changes: `0`
+- Test-only change: `web/e2e/conversation-activity-ui.spec.ts` uses
+  `const NOW = new Date().toISOString()` so the current-day browser fixture is
+  stable
 
 ## Cleanup
 
