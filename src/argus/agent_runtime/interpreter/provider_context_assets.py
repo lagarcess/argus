@@ -71,6 +71,9 @@ def response_with_provider_context_assets(
     if response.intent not in supported_intents:
         return response
     rows = _asset_context_rows(asset_resolution_context)
+    all_traded_asset_mentions_accounted_for = _all_traded_asset_mentions_accounted_for(
+        asset_resolution_context
+    )
     candidate_rows = [
         row
         for row in rows
@@ -146,6 +149,7 @@ def response_with_provider_context_assets(
         and bool(resolved_symbols)
         and not ambiguous_fields
         and not preserved_fuller_draft
+        and all_traded_asset_mentions_accounted_for
     )
     if resolved_missing_asset:
         remaining_missing_fields = [
@@ -386,6 +390,18 @@ def _asset_context_rows(asset_resolution_context: str | None) -> list[dict[str, 
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict)]
+
+
+def _all_traded_asset_mentions_accounted_for(
+    asset_resolution_context: str | None,
+) -> bool:
+    if not asset_resolution_context:
+        return False
+    try:
+        payload = json.loads(asset_resolution_context)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return payload.get("all_traded_asset_mentions_accounted_for") is True
 
 
 def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, Any]:

@@ -14,20 +14,26 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from argus.agent_runtime.interpreter.asset_resolution_context import (
+    provider_asset_resolution_context_from_extraction,
+)
 from argus.agent_runtime.interpreter.provider_context_assets import (
     response_with_provider_context_assets,
 )
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.llm_interpreter_types import (
+    LLMAssetMentionExtraction,
     LLMInterpretationResponse,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
+from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
 )
 from argus.agent_runtime.state.models import (
+    ResolutionProvenance,
     RunState,
     UnsupportedConstraint,
     UserState,
@@ -110,7 +116,12 @@ def _refusal_response_with_model_records() -> LLMInterpretationResponse:
 
 
 def _context(rows: list[dict[str, Any]]) -> str:
-    return json.dumps({"asset_resolution_candidates": rows})
+    return json.dumps(
+        {
+            "asset_resolution_candidates": rows,
+            "all_traded_asset_mentions_accounted_for": True,
+        }
+    )
 
 
 def test_model_supplied_provider_records_are_stripped_without_runtime_context() -> None:
@@ -272,6 +283,93 @@ def test_mixed_resolved_and_ambiguous_context_keeps_stale_asset_blocker() -> Non
     assert normalized.requires_clarification is True
     assert normalized.assistant_response is None
     assert normalized.ambiguous_fields
+    assert "provider_context_resolved_missing_asset" not in normalized.reason_codes
+
+
+def test_resolved_and_unsupported_extracted_mentions_keep_stale_asset_blocker() -> None:
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        asset = (
+            ResolvedAssetStub(
+                canonical_symbol="AAPL",
+                asset_class="equity",
+                name="Apple Inc.",
+                raw_symbol="AAPL",
+            )
+            if query == "Apple"
+            else None
+        )
+        status = "resolved" if asset is not None else "unsupported"
+        return AssetResolution(
+            status=status,
+            raw_text=query,
+            asset=asset,
+            candidates=(() if asset is None else (asset,)),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status=status,
+                canonical_symbol=(None if asset is None else asset.canonical_symbol),
+                asset_class=(None if asset is None else asset.asset_class),
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "Apple",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                },
+                {
+                    "raw_text": "fictional moon fund",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                },
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+    assert context is not None
+    payload = json.loads(context)
+    assert payload["all_traded_asset_mentions_accounted_for"] is False
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Apple and fictional moon fund in 2024.",
+        assistant_response="Which asset should I test?",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="test Apple and fictional moon fund in 2024",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        missing_required_fields=["asset_universe"],
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+    )
+
+    assert normalized.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert normalized.missing_required_fields == ["asset_universe"]
+    assert normalized.requires_clarification is True
+    assert normalized.assistant_response == "Which asset should I test?"
     assert "provider_context_resolved_missing_asset" not in normalized.reason_codes
 
 

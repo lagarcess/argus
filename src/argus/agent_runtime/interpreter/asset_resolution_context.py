@@ -84,6 +84,7 @@ def provider_asset_resolution_context_from_extraction(
     resolve_asset_candidate: Callable[..., AssetResolution],
 ) -> str | None:
     rows: list[dict[str, object]] = []
+    all_traded_asset_mentions_accounted_for = True
     seen: set[str] = set()
     for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
@@ -91,7 +92,9 @@ def provider_asset_resolution_context_from_extraction(
         if not raw_key or raw_key in seen:
             continue
         seen.add(raw_key)
-        role = mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
+        role = (
+            mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
+        )
         field = (
             "comparison_baseline"
             if role == "benchmark"
@@ -108,6 +111,8 @@ def provider_asset_resolution_context_from_extraction(
                 resolution_kwargs["asset_class_hint"] = asset_class_hint
             resolution = resolve_asset_candidate(raw_text, **resolution_kwargs)
         except ValueError:
+            if role in {"traded_asset", "unknown"}:
+                all_traded_asset_mentions_accounted_for = False
             continue
         row = _provider_asset_resolution_context_row(
             resolution=resolution,
@@ -117,12 +122,17 @@ def provider_asset_resolution_context_from_extraction(
         )
         if row is not None:
             rows.append(row)
+        elif role in {"traded_asset", "unknown"}:
+            all_traded_asset_mentions_accounted_for = False
         if len(rows) >= 5:
             break
     if not rows:
         return None
     payload = {
         "asset_resolution_candidates": rows,
+        "all_traded_asset_mentions_accounted_for": (
+            all_traded_asset_mentions_accounted_for
+        ),
         "extraction_contract": (
             "Use resolved traded_asset/unknown rows as asset_universe candidates "
             "when the user is buying, holding, testing, or including them. Use "

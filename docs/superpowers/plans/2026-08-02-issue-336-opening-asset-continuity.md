@@ -4,7 +4,7 @@
 
 **Goal:** Preserve provider-resolved opening-turn assets and ask only for the genuinely missing period in the exact issue #336 reproduction.
 
-**Architecture:** Fix the shared provider-context normalization boundary so a resolved traded asset clears the stale typed `asset_universe` blocker and invalidates stale clarification prose. Keep the LLM as the only natural-language interpreter; deterministic code reconciles only provider-owned typed facts. Add the exact prompt to the permanent typed eval manifest and prove it through the full live interpreter gate.
+**Architecture:** Fix the shared provider-context normalization boundary so a resolved traded asset clears the stale typed `asset_universe` blocker and invalidates stale clarification prose only when provider context explicitly proves that every extracted traded-asset mention was accounted for. Keep the LLM as the only natural-language interpreter; deterministic code reconciles only provider-owned typed facts. Add the exact prompt to the permanent typed eval manifest and prove it through the full live interpreter gate.
 
 **Tech Stack:** Python 3.10.20, Pydantic v2, LangGraph runtime, pytest, YAML measurement eval fixtures, OpenRouter live eval.
 
@@ -22,11 +22,12 @@
 ### Task 1: Reconcile Provider-Resolved Asset State
 
 **Files:**
+- Modify: `src/argus/agent_runtime/interpreter/asset_resolution_context.py`
 - Modify: `src/argus/agent_runtime/interpreter/provider_context_assets.py`
 - Test: `tests/agent_runtime/test_provider_asset_ownership.py`
 
 **Interfaces:**
-- Consumes: `response_with_provider_context_assets(response, *, asset_resolution_context, include_unsupported_request=False) -> LLMInterpretationResponse` and provider-owned `asset_resolution_candidates` rows.
+- Consumes: `response_with_provider_context_assets(response, *, asset_resolution_context, include_unsupported_request=False) -> LLMInterpretationResponse`, provider-owned `asset_resolution_candidates` rows, and the runtime-owned `all_traded_asset_mentions_accounted_for` completeness flag produced by asset extraction/resolution.
 - Produces: the same response type with a canonical asset, stale `asset_universe` missing-field state removed, stale assistant clarification prose cleared, and remaining typed blockers preserved.
 
 - [ ] **Step 1: Write the failing normalization regression test**
@@ -43,6 +44,8 @@ assert "provider_context_resolved_missing_asset" in normalized.reason_codes
 ```
 
 Production mutation caught: removing typed-blocker reconciliation while leaving asset injection intact must fail this test.
+
+Add a negative case that sends provider extraction one resolved mention (`Apple`) and one unsupported traded-asset mention (`fictional moon fund`) while the model draft remains stale and empty. Assert the provider context records `all_traded_asset_mentions_accounted_for == False`, preserves `AAPL` as grounded partial context, keeps `asset_universe` in `missing_required_fields`, and never adds `provider_context_resolved_missing_asset`. Removing the completeness guard must fail this test by silently dropping the unsupported basket member.
 
 - [ ] **Step 2: Run the focused test to verify RED**
 
@@ -65,10 +68,11 @@ resolved_missing_asset = (
     and bool(resolved_symbols)
     and not ambiguous_fields
     and not preserved_fuller_draft
+    and all_traded_asset_mentions_accounted_for
 )
 ```
 
-When true, remove only `asset_universe` from `missing_required_fields`, clear `assistant_response`, retain clarification when another typed blocker such as `date_range` remains, and append `provider_context_resolved_missing_asset` once to `reason_codes`. Do not apply this reconciliation to unsupported turns, ambiguous rows, or partial provider context.
+The asset-resolution preflight sets `all_traded_asset_mentions_accounted_for` to false whenever a traded/unknown extracted mention cannot produce a resolved or ambiguous provider row. When the full condition is true, remove only `asset_universe` from `missing_required_fields`, clear `assistant_response`, retain clarification when another typed blocker such as `date_range` remains, and append `provider_context_resolved_missing_asset` once to `reason_codes`. Do not apply this reconciliation to unsupported turns, ambiguous rows, or partial provider context.
 
 - [ ] **Step 4: Run focused GREEN and the owning module**
 
@@ -84,7 +88,7 @@ Expected: both commands pass with zero failures.
 - [ ] **Step 5: Commit the shared-boundary fix**
 
 ```bash
-git add src/argus/agent_runtime/interpreter/provider_context_assets.py tests/agent_runtime/test_provider_asset_ownership.py
+git add src/argus/agent_runtime/interpreter/asset_resolution_context.py src/argus/agent_runtime/interpreter/provider_context_assets.py tests/agent_runtime/test_provider_asset_ownership.py
 git commit -m "fix(chat): preserve opening-turn resolved assets"
 ```
 
@@ -154,6 +158,7 @@ Verify every spec decision against the diff: provider-owned identity only, no te
 git diff --check origin/codex/private-alpha-next...HEAD
 git diff --stat origin/codex/private-alpha-next...HEAD
 git diff origin/codex/private-alpha-next...HEAD -- \
+  src/argus/agent_runtime/interpreter/asset_resolution_context.py \
   src/argus/agent_runtime/interpreter/provider_context_assets.py \
   tests/agent_runtime/test_provider_asset_ownership.py \
   tests/evals/measurement_cases/messy_english.yaml \
