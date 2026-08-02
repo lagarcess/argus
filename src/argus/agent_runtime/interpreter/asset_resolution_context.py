@@ -87,6 +87,7 @@ def provider_asset_resolution_context_from_extraction(
     all_traded_asset_mentions_accounted_for = True
     traded_candidate_row_count = 0
     seen: set[str] = set()
+    seen_traded_symbols: set[str] = set()
     for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
         raw_key = raw_text.casefold()
@@ -96,9 +97,6 @@ def provider_asset_resolution_context_from_extraction(
         role = (
             mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
         )
-        if role in {"traded_asset", "unknown"} and traded_candidate_row_count >= 5:
-            all_traded_asset_mentions_accounted_for = False
-            continue
         field = (
             "comparison_baseline"
             if role == "benchmark"
@@ -125,9 +123,21 @@ def provider_asset_resolution_context_from_extraction(
             confidence=mention.confidence,
         )
         if row is not None:
-            rows.append(row)
             if role in {"traded_asset", "unknown"}:
+                resolved_symbol = (
+                    str(row.get("symbol") or "").strip().upper()
+                    if row.get("status") == "resolved"
+                    else ""
+                )
+                if resolved_symbol and resolved_symbol in seen_traded_symbols:
+                    continue
+                if traded_candidate_row_count >= 5:
+                    all_traded_asset_mentions_accounted_for = False
+                    continue
+                if resolved_symbol:
+                    seen_traded_symbols.add(resolved_symbol)
                 traded_candidate_row_count += 1
+            rows.append(row)
         elif role in {"traded_asset", "unknown"}:
             all_traded_asset_mentions_accounted_for = False
     if not rows and all_traded_asset_mentions_accounted_for:

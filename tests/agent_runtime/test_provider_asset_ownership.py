@@ -539,6 +539,67 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
     assert unsupported_stage_result.patch.get("confirmation_payload") is None
 
 
+def test_duplicate_resolved_symbol_does_not_consume_traded_asset_slot() -> None:
+    symbols = {
+        "Apple": "AAPL",
+        "AAPL": "AAPL",
+        "Microsoft": "MSFT",
+        "NVIDIA": "NVDA",
+        "Amazon": "AMZN",
+        "Meta": "META",
+    }
+    resolved_fields: list[str] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        resolved_fields.append(field)
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbols[query],
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": name,
+                    "role": "traded_asset",
+                    "mention_kind": ("ticker" if name == "AAPL" else "company_name"),
+                    "confidence": 0.9,
+                }
+                for name in symbols
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert [row["symbol"] for row in payload["asset_resolution_candidates"]] == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "AMZN",
+        "META",
+    ]
+    assert payload["all_traded_asset_mentions_accounted_for"] is True
+    assert resolved_fields == [
+        "asset_universe[0]",
+        "asset_universe[1]",
+        "asset_universe[1]",
+        "asset_universe[2]",
+        "asset_universe[3]",
+        "asset_universe[4]",
+    ]
+
+
 def test_benchmark_does_not_consume_five_traded_asset_rows() -> None:
     symbols = {
         "SPY": "SPY",
