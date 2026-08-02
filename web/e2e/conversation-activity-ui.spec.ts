@@ -287,6 +287,13 @@ function recoveredClarificationRailTranscript(
           strategy_type: "buy_and_hold",
           date_range: "past year",
           capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
         },
       },
     },

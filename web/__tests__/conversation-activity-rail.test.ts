@@ -304,11 +304,9 @@ describe("conversation rail tick derivation", () => {
             capital_amount: 10_000,
             extra_parameters: {
               date_range_raw_text: "past year",
-              date_range_intent: {
-                kind: "rolling_window",
-                count: 1,
-                unit: "year",
-                anchor: "today",
+              requested_date_range: {
+                start: "2025-08-01",
+                end: "2026-08-01",
               },
             },
           },
@@ -324,12 +322,6 @@ describe("conversation rail tick derivation", () => {
           capital_amount: 10_000,
           extra_parameters: {
             date_range_raw_text: "past year",
-            date_range_intent: {
-              kind: "rolling_window",
-              count: 1,
-              unit: "year",
-              anchor: "today",
-            },
             requested_date_range: {
               start: "2025-08-01",
               end: "2026-08-01",
@@ -346,7 +338,7 @@ describe("conversation rail tick derivation", () => {
     expect(ticks).toEqual([]);
   });
 
-  test("keeps clarification when a mixed date representation lacks canonicalization evidence", () => {
+  test("keeps clarification when pending canonicalization evidence is missing", () => {
     const ticks = deriveConversationRailTicks([
       textMessage("asset-question", "ai", {
         recoveryDisplay: {
@@ -369,6 +361,67 @@ describe("conversation rail tick derivation", () => {
           asset_universe: ["AAPL"],
           date_range: { start: "2025-08-01", end: "2026-08-01" },
           capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+            effective_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification when canonical requested-date provenance conflicts", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            date_range: "past year",
+            capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2025-08-01",
+                end: "2026-08-01",
+              },
+            },
+          },
+        },
+      }),
+      confirmationMessage("stale-requested-date-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-08-01", end: "2026-08-01" },
+          capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2020-01-01",
+              end: "2021-01-01",
+            },
+            effective_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
         },
       }),
     ]);
@@ -392,6 +445,13 @@ describe("conversation rail tick derivation", () => {
           strategy: {
             date_range: "past year",
             capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2026-07-01",
+                end: "2026-08-01",
+              },
+            },
           },
         },
       }),

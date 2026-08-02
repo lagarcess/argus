@@ -140,39 +140,58 @@ function normalizedDateRangeText(value: unknown): string | null {
 
 function sameCanonicalizedDateRange(
   pendingValue: unknown,
+  pendingStrategy: Record<string, unknown>,
   confirmedStrategy: Record<string, unknown>,
 ): boolean {
   const pendingText = normalizedDateRangeText(pendingValue);
+  const pendingExtra = strategyExtraParameters(pendingStrategy);
   const confirmedExtra = strategyExtraParameters(confirmedStrategy);
-  if (!pendingText || !confirmedExtra) return false;
+  if (!pendingText || !pendingExtra || !confirmedExtra) return false;
 
-  const requested = canonicalDateRange(confirmedExtra.requested_date_range);
+  const pendingRequested = canonicalDateRange(
+    pendingExtra.requested_date_range,
+  );
+  const confirmedRequested = canonicalDateRange(
+    confirmedExtra.requested_date_range,
+  );
   const effective = canonicalDateRange(confirmedExtra.effective_date_range);
   const confirmed = canonicalDateRange(confirmedStrategy.date_range);
   if (
-    !requested ||
+    !pendingRequested ||
+    !confirmedRequested ||
     !effective ||
     !confirmed ||
+    !samePathValue(pendingRequested, confirmedRequested) ||
     !samePathValue(confirmed, effective)
   ) {
     return false;
   }
 
+  const pendingRawText = normalizedDateRangeText(
+    pendingExtra.date_range_raw_text,
+  );
   return (
-    normalizedDateRangeText(confirmedExtra.date_range_raw_text) === pendingText
+    pendingRawText === pendingText &&
+    normalizedDateRangeText(confirmedExtra.date_range_raw_text) ===
+      pendingRawText
   );
 }
 
 function sameStrategyPathFact(
   field: (typeof STRATEGY_PATH_FIELDS)[number],
   pendingValue: unknown,
+  pendingStrategy: Record<string, unknown>,
   confirmedStrategy: Record<string, unknown>,
 ): boolean {
   const confirmedValue = confirmedStrategy[field];
   return (
     samePathValue(pendingValue, confirmedValue) ||
     (field === "date_range" &&
-      sameCanonicalizedDateRange(pendingValue, confirmedStrategy))
+      sameCanonicalizedDateRange(
+        pendingValue,
+        pendingStrategy,
+        confirmedStrategy,
+      ))
   );
 }
 
@@ -202,7 +221,14 @@ function confirmationContinuesClarification(
     if (field === pending.requestedField) continue;
     const pendingValue = pending.strategy[field];
     if (!meaningfulPathValue(pendingValue)) continue;
-    if (!sameStrategyPathFact(field, pendingValue, confirmed.strategy)) {
+    if (
+      !sameStrategyPathFact(
+        field,
+        pendingValue,
+        pending.strategy,
+        confirmed.strategy,
+      )
+    ) {
       return false;
     }
     if (STRONG_STRATEGY_PATH_FIELDS.has(field)) strongMatches += 1;
