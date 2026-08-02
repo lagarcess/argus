@@ -23,6 +23,7 @@ from argus.agent_runtime.strategy_requirements import (
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.confirmation_preflight import (
+    materialize_confirmation_strategy,
     prepare_confirmation_launch,
 )
 from argus.domain.engine_launch.display import format_data_through_label
@@ -136,12 +137,8 @@ def confirm_stage(
             },
         )
     launch_payload = dict(coverage_result["launch_payload"])
-    canonical_strategy = _strategy_with_launch_benchmark(
+    canonical_strategy = materialize_confirmation_strategy(
         strategy,
-        launch_payload=launch_payload,
-    )
-    canonical_strategy = _strategy_with_effective_date_range(
-        canonical_strategy,
         launch_payload=launch_payload,
     )
     card_assumptions = _visible_card_assumptions(
@@ -236,25 +233,6 @@ def _coverage_preflight(
     return {
         "outcome": "ready_to_confirm",
         "launch_payload": preflight.launch_payload,
-    }
-
-
-def _strategy_with_effective_date_range(
-    strategy: dict[str, Any],
-    *,
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    effective = launch_payload.get("date_range")
-    requested = launch_payload.get("requested_date_range")
-    if not isinstance(effective, dict) or not isinstance(requested, dict):
-        return strategy
-    extra_parameters = dict(strategy.get("extra_parameters") or {})
-    extra_parameters["requested_date_range"] = dict(requested)
-    extra_parameters["effective_date_range"] = dict(effective)
-    return {
-        **strategy,
-        "date_range": dict(effective),
-        "extra_parameters": extra_parameters,
     }
 
 
@@ -521,20 +499,6 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
     return dict(strategy)
-
-
-def _strategy_with_launch_benchmark(
-    strategy: dict[str, Any],
-    *,
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    benchmark = launch_payload.get("benchmark_symbol")
-    if not isinstance(benchmark, str) or not benchmark.strip():
-        return strategy
-    return {
-        **strategy,
-        "comparison_baseline": benchmark.strip().upper(),
-    }
 
 
 def _strategy_with_runtime_language(

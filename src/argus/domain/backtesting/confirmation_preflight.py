@@ -18,6 +18,31 @@ class ConfirmationLaunchPreflight:
     error_code: str | None = None
 
 
+def materialize_confirmation_strategy(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Project canonical launch facts onto the visible confirmation strategy."""
+    canonical = dict(strategy)
+    benchmark = launch_payload.get("benchmark_symbol")
+    if isinstance(benchmark, str) and benchmark.strip():
+        canonical["comparison_baseline"] = benchmark.strip().upper()
+
+    effective = launch_payload.get("date_range")
+    requested = launch_payload.get("requested_date_range")
+    if not isinstance(effective, dict) or not isinstance(requested, dict):
+        return canonical
+    extra_parameters = dict(canonical.get("extra_parameters") or {})
+    extra_parameters["requested_date_range"] = dict(requested)
+    extra_parameters["effective_date_range"] = dict(effective)
+    return {
+        **canonical,
+        "date_range": dict(effective),
+        "extra_parameters": extra_parameters,
+    }
+
+
 def prepare_confirmation_launch(
     launch_payload: dict[str, Any],
 ) -> ConfirmationLaunchPreflight:

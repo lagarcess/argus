@@ -15,6 +15,7 @@ from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.confirmation_preflight import (
+    materialize_confirmation_strategy,
     prepare_confirmation_launch,
 )
 from argus.domain.retest_setup import RetestSetup
@@ -114,7 +115,7 @@ def prepare_retest_confirmation_payload(
         return RetestConfirmationPreparation()
 
     launch_payload = preflight.launch_payload
-    strategy = _strategy_with_effective_date_range(
+    strategy = materialize_confirmation_strategy(
         dict(payload["strategy"]),
         launch_payload=launch_payload,
     )
@@ -151,25 +152,6 @@ def retest_runtime_result(
     return {
         "stage_outcome": "await_approval",
         "confirmation_payload": confirmation_payload,
-    }
-
-
-def _strategy_with_effective_date_range(
-    strategy: dict[str, Any],
-    *,
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    effective = launch_payload.get("date_range")
-    requested = launch_payload.get("requested_date_range")
-    if not isinstance(effective, dict) or not isinstance(requested, dict):
-        return strategy
-    extra_parameters = dict(strategy.get("extra_parameters") or {})
-    extra_parameters["requested_date_range"] = dict(requested)
-    extra_parameters["effective_date_range"] = dict(effective)
-    return {
-        **strategy,
-        "date_range": dict(effective),
-        "extra_parameters": extra_parameters,
     }
 
 

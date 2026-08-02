@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from datetime import date
 from typing import Any
 
 import pytest
+from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
 from argus.api import state as api_state
 from argus.api.chat.actions import chat_display_message, persisted_chat_action
 from argus.api.chat.recovery import _recent_messages_for_conversation
@@ -26,12 +29,14 @@ from argus.domain.backtesting.coverage import MarketDataCoverageError
 from argus.domain.retest_setup import retest_setup_from_run
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 _USER_ID = "retest-owner"
 _OTHER_USER_ID = "retest-intruder"
 _CONVERSATION_ID = "retest-conversation"
 _TODAY = date(2026, 7, 31)
 _SOURCE_RUN_ID = "8f14e45f-ea1c-4b3a-9d2f-1a2b3c4d5e6f"
+_ALIAS_SOURCE_RUN_ID = "2e9c6f17-9eaf-4d40-bd20-a628714b4ad8"
 _MISSING_RUN_ID = "00000000-0000-4000-8000-000000000000"
 _BUY_AND_HOLD = {
     "strategy_type": "buy_and_hold",
@@ -116,6 +121,24 @@ def _stream_payloads(stream: str, event_type: str) -> list[dict[str, Any]]:
     return payloads
 
 
+def _client_with_owned_run(stored_run: Any) -> tuple[TestClient, str, Any]:
+    client = TestClient(app)
+    assert client.post("/api/v1/dev/reset").status_code == 200
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={"language": "en"},
+    )
+    assert conversation_response.status_code == 200
+    conversation_id = str(conversation_response.json()["conversation"]["id"])
+    user_response = client.get("/api/v1/me")
+    assert user_response.status_code == 200
+    user_id = str(user_response.json()["user"]["id"])
+    source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
+    api_state.store.backtest_runs[source_run.id] = source_run
+    api_state.store.backtest_run_owners[source_run.id] = user_id
+    return client, conversation_id, source_run
+
+
 @pytest.fixture
 def stored_run() -> Any:
     from argus.api.chat.persistence import build_runtime_backtest_run
@@ -140,6 +163,34 @@ def stored_run() -> Any:
                 "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
                 "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
             }
+        }
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = _USER_ID
+    yield run
+    api_state.store.backtest_runs.pop(run.id, None)
+    api_state.store.backtest_run_owners.pop(run.id, None)
+
+
+@pytest.fixture
+def alias_benchmark_run(stored_run: Any) -> Any:
+    config_snapshot = dict(stored_run.config_snapshot)
+    resolved_strategy = dict(config_snapshot["resolved_strategy"])
+    resolved_strategy["asset_universe"] = ["ETH"]
+    resolved_strategy["symbol"] = "ETH"
+    resolved_parameters = dict(config_snapshot["resolved_parameters"])
+    resolved_parameters["benchmark_symbol"] = "BTC/USD"
+    config_snapshot["symbols"] = ["ETH"]
+    config_snapshot["benchmark_symbol"] = "BTC/USD"
+    config_snapshot["resolved_strategy"] = resolved_strategy
+    config_snapshot["resolved_parameters"] = resolved_parameters
+    run = stored_run.model_copy(
+        update={
+            "id": _ALIAS_SOURCE_RUN_ID,
+            "asset_class": "crypto",
+            "symbols": ["ETH"],
+            "benchmark_symbol": "BTC/USD",
+            "config_snapshot": config_snapshot,
         }
     )
     api_state.store.backtest_runs[run.id] = run
@@ -332,20 +383,7 @@ def test_current_retest_run_action_reaches_canonical_approval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
-    client = TestClient(app)
-    assert client.post("/api/v1/dev/reset").status_code == 200
-    conversation_response = client.post(
-        "/api/v1/conversations",
-        json={"language": "en"},
-    )
-    assert conversation_response.status_code == 200
-    conversation_id = str(conversation_response.json()["conversation"]["id"])
-    user_response = client.get("/api/v1/me")
-    assert user_response.status_code == 200
-    user_id = str(user_response.json()["user"]["id"])
-    source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
-    api_state.store.backtest_runs[source_run.id] = source_run
-    api_state.store.backtest_run_owners[source_run.id] = user_id
+    client, conversation_id, source_run = _client_with_owned_run(stored_run)
 
     retest_response = client.post(
         "/api/v1/chat/stream",
@@ -405,6 +443,137 @@ def test_current_retest_run_action_reaches_canonical_approval(
         message.get("metadata", {}).get("recovery", {}).get("code")
         == "confirmation_action_stale_card"
         for message in persisted
+    )
+
+
+@pytest.mark.asyncio
+async def test_retest_coverage_does_not_block_an_unrelated_async_request(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.backtesting import coverage as coverage_module
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    original_prepare_market_data = coverage_module.prepare_market_data
+    coverage_started = threading.Event()
+    release_coverage = threading.Event()
+
+    def blocking_prepare_market_data(*args: Any, **kwargs: Any) -> Any:
+        coverage_started.set()
+        if not release_coverage.wait(timeout=5):
+            raise AssertionError("coverage preflight was not released")
+        return original_prepare_market_data(*args, **kwargs)
+
+    monkeypatch.setattr(
+        coverage_module,
+        "prepare_market_data",
+        blocking_prepare_market_data,
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        assert (await client.post("/api/v1/dev/reset")).status_code == 200
+        conversation_response = await client.post(
+            "/api/v1/conversations",
+            json={"language": "en"},
+        )
+        assert conversation_response.status_code == 200
+        conversation_id = str(conversation_response.json()["conversation"]["id"])
+        user_response = await client.get("/api/v1/me")
+        assert user_response.status_code == 200
+        user_id = str(user_response.json()["user"]["id"])
+        source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
+        api_state.store.backtest_runs[source_run.id] = source_run
+        api_state.store.backtest_run_owners[source_run.id] = user_id
+
+        release_timer = threading.Timer(2, release_coverage.set)
+        release_timer.start()
+        try:
+            retest_task = asyncio.create_task(
+                client.post(
+                    "/api/v1/chat/stream",
+                    json={
+                        "conversation_id": conversation_id,
+                        "action": {
+                            "type": "retest_run",
+                            "payload": _valid_envelope(source_run.id),
+                        },
+                        "language": "en",
+                    },
+                )
+            )
+            assert await asyncio.to_thread(coverage_started.wait, 2)
+
+            unrelated_response = await client.get("/api/v1/me")
+            unrelated_completed_while_coverage_blocked = not release_coverage.is_set()
+            release_coverage.set()
+            retest_response = await retest_task
+        finally:
+            release_coverage.set()
+            release_timer.cancel()
+
+    assert unrelated_response.status_code == 200
+    assert unrelated_completed_while_coverage_blocked
+    assert retest_response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "action_payload_factory",
+    [_valid_envelope, _legacy_envelope],
+    ids=["current-v2", "legacy-v1"],
+)
+def test_alias_benchmark_retest_remains_eligible_and_reaches_approval(
+    alias_benchmark_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    action_payload_factory: Any,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    setup = retest_setup_from_run(
+        alias_benchmark_run.model_dump(mode="python"),
+        today=_TODAY,
+    )
+    assert setup is not None
+    assert setup.benchmark_symbol == "BTC/USD"
+    assert retest_confirmation_payload(setup) is not None
+
+    client, conversation_id, source_run = _client_with_owned_run(alias_benchmark_run)
+
+    retest_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": action_payload_factory(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert retest_response.status_code == 200
+    [retest_final] = _stream_payloads(retest_response.text, "final")
+    confirmation = retest_final["confirmation"]
+    confirmation_payload = retest_final["confirmation_payload"]
+    assert confirmation["display_facts"]["benchmark_symbol"] == "BTC"
+    assert confirmation_payload["strategy"]["comparison_baseline"] == "BTC"
+    assert confirmation_payload["launch_payload"]["benchmark_symbol"] == "BTC"
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
+
+    run_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": confirmation["confirmation_id"]},
+        json={
+            "conversation_id": conversation_id,
+            "action": run_action,
+            "language": "en",
+        },
+    )
+
+    assert run_response.status_code == 200
+    assert any(
+        outcome.get("outcome") == "approved_for_execution"
+        for outcome in _stream_payloads(run_response.text, "stage_outcome")
     )
 
 
