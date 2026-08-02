@@ -507,7 +507,7 @@ def _all_traded_asset_mentions_accounted_for(
 
 def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, Any]:
     symbol = str(row.get("symbol") or "").strip().upper()
-    return {
+    record = {
         "raw_text": str(row.get("raw_text") or "").strip(),
         "symbol": symbol,
         "asset_class": str(row.get("asset_class") or "").strip().lower(),
@@ -516,6 +516,12 @@ def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, An
         "provider": str(row.get("provider") or "provider_catalog").strip(),
         "exchange": str(row.get("exchange") or "").strip(),
     }
+    aliases = row.get("aliases")
+    if isinstance(aliases, list):
+        record["aliases"] = [
+            str(alias).strip() for alias in aliases if str(alias).strip()
+        ]
+    return record
 
 
 def _resolved_asset_record_for_symbol(
@@ -543,6 +549,9 @@ def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool
         str(record.get("raw_text") or "").strip().upper(),
         str(record.get("name") or "").strip().upper(),
     }
+    aliases = record.get("aliases")
+    if isinstance(aliases, list):
+        candidates.update(str(alias or "").strip().upper() for alias in aliases)
     return any(
         candidate and candidate.replace("/", "") == compact for candidate in candidates
     )

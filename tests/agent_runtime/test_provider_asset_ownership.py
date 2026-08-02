@@ -669,6 +669,85 @@ def test_duplicate_draft_aliases_do_not_make_provider_context_partial() -> None:
     )
 
 
+def test_ticker_first_provider_identity_retains_later_company_alias() -> None:
+    symbols = {
+        "AAPL": "AAPL",
+        "Apple": "AAPL",
+        "Microsoft": "MSFT",
+        "NVIDIA": "NVDA",
+        "Amazon": "AMZN",
+        "Meta": "META",
+    }
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbols[query],
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": name,
+                    "role": "traded_asset",
+                    "mention_kind": ("ticker" if name == "AAPL" else "company_name"),
+                    "confidence": 0.9,
+                }
+                for name in symbols
+            ],
+            all_traded_asset_mentions_included=True,
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert payload["asset_resolution_candidates"][0]["aliases"] == ["Apple"]
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test five companies with an Apple alias.",
+        assistant_response="Which assets should I test?",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=list(symbols),
+            asset_class="equity",
+            capital_amount=10_000,
+        ),
+        missing_required_fields=["asset_universe", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+    normalized = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+    )
+
+    assert normalized.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "AMZN",
+        "META",
+    ]
+    assert normalized.missing_required_fields == ["date_range"]
+    assert normalized.ambiguous_fields == []
+    assert "provider_context_resolved_missing_asset" in normalized.reason_codes
+    assert (
+        "provider_context_partial_preserved_fuller_draft" not in normalized.reason_codes
+    )
+
+
 def test_same_symbol_across_asset_classes_remains_a_mixed_asset_candidate() -> None:
     assets = {
         "BTC equity": ("BTC", "equity"),
