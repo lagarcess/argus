@@ -29,19 +29,20 @@
 - Modify: `docs/api/openapi.yaml`
 - Test: `tests/test_retest_setup.py`
 - Test: `tests/test_retest_action.py`
-- Test: `tests/test_search_api.py`
+- Test: `tests/test_run_dossiers.py`
 
 **Step 1: Write failing tests**
 
 - Assert a reconstructed Retest keeps `original_start` as `start` and requests `today` only as the candidate end.
-- Assert emitted actions use `argus_retest_run/v2` plus an extended-window policy.
+- Assert emitted actions use `argus_retest_run/v2` plus
+  `preserve_start_ending_latest_available`.
 - Assert exact legacy v1 envelopes remain admissible while unknown versions, policies, and extra authority are rejected.
 - Assert the API/OpenAPI projection exposes the v2 literals.
 
 **Step 2: Run the focused tests and confirm RED**
 
 ```bash
-poetry run pytest tests/test_retest_setup.py tests/test_retest_action.py tests/test_search_api.py -q --no-cov
+poetry run pytest tests/test_retest_setup.py tests/test_retest_action.py tests/test_run_dossiers.py -q --no-cov
 ```
 
 **Step 3: Implement the smallest contract change**
@@ -56,7 +57,7 @@ poetry run pytest tests/test_retest_setup.py tests/test_retest_action.py tests/t
 **Step 5: Commit**
 
 ```bash
-git add src/argus/domain/retest_setup.py src/argus/api/schemas.py src/argus/api/chat/retest.py docs/API_CONTRACT.md docs/api/openapi.yaml tests/test_retest_setup.py tests/test_retest_action.py tests/test_search_api.py
+git add src/argus/domain/retest_setup.py src/argus/api/schemas.py src/argus/api/chat/retest.py docs/API_CONTRACT.md docs/api/openapi.yaml tests/test_retest_setup.py tests/test_retest_action.py tests/test_run_dossiers.py
 git commit -m "fix(retest): preserve the original current-data window"
 ```
 
