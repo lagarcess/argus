@@ -464,6 +464,83 @@ async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_cha
 
 
 @pytest.mark.asyncio
+async def test_issue_339_accepts_primary_matching_delta_without_provenance(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="set", target="benchmark", value="QQQ"),
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch",
+                        endpoint="start",
+                        start="2026-04-01",
+                    ),
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "change the benchmark to QQQ and change the beginning of the period "
+                "to April 1, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["LOW", "HD"],
+                    asset_class="equity",
+                    date_range={"start": "2026-03-02", "end": "2026-07-30"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range={"start": "2026-04-01", "end": "2026-07-30"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2026-04-01",
+                end="2026-07-30",
+            ),
+            field_provenance={"comparison_baseline": "explicit_user"},
+        ),
+    )
+
+    assert seen_models == ["primary-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
+
+
+@pytest.mark.asyncio
 async def test_issue_339_compound_edit_retries_date_operation_that_cannot_materialize(
     monkeypatch,
 ):
@@ -635,3 +712,115 @@ async def test_issue_339_compound_edit_retries_wrong_or_extra_values(
     assert response is not None
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid_model",
+    [
+        "invented-capital-model",
+        "invented-asset-model",
+        "wrong-asset-model",
+    ],
+)
+async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
+    monkeypatch,
+    invalid_model,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    is_asset_request = invalid_model == "wrong-asset-model"
+    fallback_model = "requested-asset-model" if is_asset_request else "complete-model"
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: [fallback_model],
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        if is_asset_request:
+            symbol = "TSLA" if model_name == invalid_model else "MSFT"
+            return ArtifactAssumptionEditPlan(
+                outcome="ready_to_confirm",
+                operations=[
+                    EditOperation(op="replace", target="asset", symbols=[symbol]),
+                ],
+                confidence=0.9,
+            )
+        operations = [
+            EditOperation(op="set", target="benchmark", value="QQQ"),
+        ]
+        if model_name == "invented-capital-model":
+            operations.append(
+                EditOperation(op="set", target="capital", number=5000),
+            )
+        elif model_name == "invented-asset-model":
+            operations.append(
+                EditOperation(op="clear", target="asset"),
+            )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=operations,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "replace AAPL with MSFT"
+                if is_asset_request
+                else "change AAPL's benchmark to QQQ"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    capital_amount=1000,
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": (
+                    "asset_universe" if is_asset_request else "assumption"
+                )
+            },
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model=invalid_model,
+        primary_draft=(
+            LLMStrategyDraft(
+                asset_universe=["MSFT"],
+                asset_universe_operation="replace",
+                field_provenance={"asset_universe": "explicit_user"},
+            )
+            if is_asset_request
+            else LLMStrategyDraft(
+                comparison_baseline="QQQ",
+                field_provenance={"comparison_baseline": "explicit_user"},
+            )
+        ),
+    )
+
+    assert seen_models == [invalid_model, fallback_model]
+    assert response is not None
+    if is_asset_request:
+        assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
+    else:
+        assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+        assert response.candidate_strategy_draft.initial_capital is None

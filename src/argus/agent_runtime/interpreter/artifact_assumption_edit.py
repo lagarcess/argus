@@ -16,6 +16,9 @@ from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
     normalized_asset_universe_operation,
 )
+from argus.agent_runtime.asset_text_grounding import (
+    provider_grounded_asset_evidence_from_text,
+)
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
     supported_cost_rate_value,
@@ -543,6 +546,7 @@ def materialized_artifact_edit_targets(
     *,
     request: InterpretationRequest,
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
+    resolve_asset_candidate: ResolveAssetCandidate | None = None,
     primary_draft: LLMStrategyDraft | None = None,
 ) -> set[str]:
     """Return requested deltas that survive the exact materialization path."""
@@ -561,17 +565,51 @@ def materialized_artifact_edit_targets(
     if draft.date_range_intent is not None:
         materialized_targets.add("date_window")
     current_strategy = _current_artifact_strategy(request)
-    return {
+    requested_targets = _required_edit_targets_from_primary_draft(
+        primary_draft,
+        current_strategy=current_strategy,
+    )
+    grounded_asset_symbols = _grounded_asset_symbols_from_message(
+        request.current_user_message,
+        resolve_asset_candidate=resolve_asset_candidate,
+    )
+    if primary_draft is not None:
+        grounded_asset_symbols.discard(
+            _normalized_ticker_symbol(primary_draft.comparison_baseline)
+        )
+    grounded_asset_symbols.discard(_normalized_ticker_symbol(draft.comparison_baseline))
+    current_assets = set(
+        normalized_asset_symbols(
+            current_strategy.asset_universe if current_strategy else []
+        )
+    )
+    if "asset" in materialized_targets and grounded_asset_symbols - current_assets:
+        requested_targets.add("asset")
+    matching_targets = {
         target
         for target in materialized_targets
-        if _materialized_target_matches_primary_delta(
+        if (target != "asset" or target in requested_targets)
+        and _materialized_target_matches_primary_delta(
             target,
             materialized_draft=draft,
             primary_draft=primary_draft,
             current_strategy=current_strategy,
             request=request,
+            grounded_asset_symbols=grounded_asset_symbols,
         )
     }
+    if any(
+        target not in matching_targets
+        and _materialized_target_mutates_current(
+            target,
+            materialized_draft=draft,
+            current_strategy=current_strategy,
+            request=request,
+        )
+        for target in materialized_targets
+    ):
+        return set()
+    return matching_targets
 
 
 def _materialized_target_matches_primary_delta(
@@ -581,20 +619,45 @@ def _materialized_target_matches_primary_delta(
     primary_draft: LLMStrategyDraft | None,
     current_strategy: StrategySummary | None,
     request: InterpretationRequest,
+    grounded_asset_symbols: set[str] | None = None,
 ) -> bool:
     """Prove the candidate applied the primary interpreter's requested value."""
 
     if primary_draft is None:
         return False
     if target == "asset":
-        # The primary interpreter only establishes that the user explicitly
-        # targeted assets. The specialized edit planner owns add/remove
-        # composition and can be more precise than the primary draft.
-        current = normalized_asset_symbols(
-            current_strategy.asset_universe if current_strategy else []
+        current = set(
+            normalized_asset_symbols(
+                current_strategy.asset_universe if current_strategy else []
+            )
         )
-        materialized = normalized_asset_symbols(materialized_draft.asset_universe)
-        return set(materialized) != set(current)
+        primary_requested = set(normalized_asset_symbols(primary_draft.asset_universe))
+        requested = primary_requested | set(grounded_asset_symbols or set())
+        materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
+        operation = normalized_asset_universe_operation(
+            primary_draft.asset_universe_operation
+        )
+        materialized_operation = normalized_asset_universe_operation(
+            materialized_draft.asset_universe_operation
+        )
+        if not requested or materialized == current:
+            return False
+        if materialized_operation == "append":
+            return bool(materialized - current) and materialized <= requested
+        if operation == "replace" and materialized == primary_requested:
+            return True
+        if operation == "append":
+            return (
+                current <= materialized
+                and primary_requested <= materialized
+                and (current ^ materialized) <= requested
+            )
+        changed_symbols = current ^ materialized
+        return changed_symbols <= requested and (
+            not primary_requested
+            or bool(changed_symbols & primary_requested)
+            or materialized == primary_requested
+        )
     if target == "benchmark":
         requested = _normalized_ticker_symbol(primary_draft.comparison_baseline)
         current = _normalized_ticker_symbol(
@@ -727,6 +790,64 @@ def _materialized_target_matches_primary_delta(
     else:
         return False
     return requested is not None and requested != current and materialized == requested
+
+
+def _materialized_target_mutates_current(
+    target: str,
+    *,
+    materialized_draft: LLMStrategyDraft,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest,
+) -> bool:
+    if target == "asset":
+        current = set(
+            normalized_asset_symbols(
+                current_strategy.asset_universe if current_strategy else []
+            )
+        )
+        materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
+        if (
+            normalized_asset_universe_operation(
+                materialized_draft.asset_universe_operation
+            )
+            == "append"
+        ):
+            materialized |= current
+        return materialized != current
+    return _materialized_target_matches_primary_delta(
+        target,
+        materialized_draft=materialized_draft,
+        primary_draft=materialized_draft,
+        current_strategy=current_strategy,
+        request=request,
+    )
+
+
+def _grounded_asset_symbols_from_message(
+    message: str,
+    *,
+    resolve_asset_candidate: ResolveAssetCandidate | None,
+) -> set[str]:
+    if resolve_asset_candidate is None:
+        return set()
+
+    def resolve_candidate(query: str) -> AssetResolution | None:
+        try:
+            return resolve_asset_candidate(
+                query,
+                field="asset_edit",
+                source="user_mention",
+            )
+        except Exception:
+            return None
+
+    return {
+        evidence["symbol"]
+        for evidence in provider_grounded_asset_evidence_from_text(
+            message,
+            resolve_candidate=resolve_candidate,
+        )
+    }
 
 
 def _canonical_draft_date_request(

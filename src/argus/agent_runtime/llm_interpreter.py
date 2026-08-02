@@ -1055,7 +1055,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
-        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)
+        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(
@@ -2732,6 +2732,7 @@ async def _ready_active_artifact_edit_planned_response(
         draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
     ):
         return None
+
     async def _planned_with_primary() -> LLMInterpretationResponse | None:
         return await _plan_pending_artifact_assumption_edit(
             request=request,
@@ -3435,8 +3436,9 @@ async def _plan_pending_artifact_assumption_edit(
         reconstructed = _current_artifact_strategy(request)
         if reconstructed is not None:
             prior_strategy = reconstructed.model_dump(mode="json")
-    active_confirmation = snapshot.active_confirmation_reference.model_dump(mode="json") if snapshot is not None and snapshot.active_confirmation_reference is not None else None
+    active_confirmation = snapshot.active_confirmation_reference.model_dump(mode="json") if snapshot is not None and snapshot.active_confirmation_reference is not None else None  # fmt: skip
     resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
+    # fmt: off
     plan = await plan_artifact_assumption_edit(
         current_user_message=request.current_user_message,
         prior_strategy=prior_strategy,
@@ -3444,8 +3446,9 @@ async def _plan_pending_artifact_assumption_edit(
         preferred_model=preferred_model,
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request)),
-        materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, primary_draft=primary_draft),
+        materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
     )
+    # fmt: on
     if plan is None:
         return None
     if _selected_requested_field_base(request) == "refinement":
