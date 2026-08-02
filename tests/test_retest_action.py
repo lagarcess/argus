@@ -317,14 +317,34 @@ def test_client_display_copy_never_reaches_storage(
     )
 
 
-def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
+def test_receipt_carries_provider_effective_period_and_natural_duration(
+    stored_run: Any,
+) -> None:
     setup = retest_setup_from_run(
         stored_run.model_dump(mode="python"),
         today=_TODAY,
     )
     assert setup is not None
+    confirmation_payload = retest_confirmation_payload(setup)
+    assert confirmation_payload is not None
+    effective_date_range = {"start": "2024-01-01", "end": "2026-06-30"}
+    requested_date_range = {"start": "2024-01-01", "end": "2026-07-31"}
+    confirmation_payload["strategy"]["date_range"] = dict(effective_date_range)
+    confirmation_payload["launch_payload"]["date_range"] = dict(effective_date_range)
+    confirmation_payload["launch_payload"]["requested_date_range"] = dict(
+        requested_date_range
+    )
+    confirmation_payload["launch_payload"]["coverage_preflight"] = {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "requested_date_range": dict(requested_date_range),
+        "effective_date_range": dict(effective_date_range),
+    }
 
-    receipt = retest_receipt(setup)
+    receipt = retest_receipt(
+        setup,
+        confirmation_payload=confirmation_payload,
+    )
 
     assert receipt == {
         "contract_version": "argus_retest_run/v2",
@@ -333,8 +353,12 @@ def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
         "symbols": ["TSLA"],
         "strategy_family": "buy_and_hold",
         "timeframe": "1D",
-        "duration_days": 365,
-        "duration": {"unit": "year", "count": 1},
+        "original_date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        "requested_date_range": requested_date_range,
+        "effective_date_range": effective_date_range,
+        "duration_days": 911,
+        "duration": {"unit": "year", "count": 2.5, "approximate": True},
+        "same_period": False,
     }
 
 
@@ -376,6 +400,16 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
         turn.confirmation_payload["strategy"]["date_range"]
         == launch_payload["date_range"]
     )
+    retest_period = turn.confirmation_payload["retest_period"]
+    assert retest_period["original_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    assert retest_period["requested_date_range"] == launch_payload["requested_date_range"]
+    assert retest_period["effective_date_range"] == launch_payload["date_range"]
+    assert retest_period["same_period"] is False
+    assert turn.receipt["effective_date_range"] == retest_period["effective_date_range"]
+    assert turn.receipt["duration"] == retest_period["duration"]
 
 
 def test_current_retest_run_action_reaches_canonical_approval(
@@ -715,6 +749,14 @@ def test_completed_turn_persists_a_ready_to_run_confirmation(
     assert final_payload["stage_outcome"] == "await_approval"
     assert final_payload["confirmation"]["status"] == "ready_to_run"
     assert final_payload["retest_receipt"]["symbols"] == ["TSLA"]
+    assert (
+        final_payload["confirmation"]["retest_period"]
+        == (final_payload["confirmation_payload"]["retest_period"])
+    )
+    assert (
+        final_payload["retest_receipt"]["effective_date_range"]
+        == (final_payload["confirmation"]["retest_period"]["effective_date_range"])
+    )
     assert "run" not in final_payload and "result_card" not in final_payload
     # Private durable identity stays out of transport.
     assert "canonical_launch_payload_hash" not in final_payload["confirmation"]
@@ -728,7 +770,14 @@ def test_completed_turn_persists_a_ready_to_run_confirmation(
         if message.id == final_payload["message_id"]
     )
     assert persisted.metadata["confirmation_card"]["status"] == "ready_to_run"
-    assert persisted.metadata["retest_receipt"]["duration_days"] == 365
+    assert (
+        persisted.metadata["retest_receipt"]["duration_days"]
+        == (final_payload["confirmation"]["retest_period"]["duration_days"])
+    )
+    assert (
+        persisted.metadata["confirmation_card"]["retest_period"]
+        == (final_payload["confirmation"]["retest_period"])
+    )
     assert persisted.metadata["chat_action"]["labelKey"] == RETEST_ACTION_LABEL_KEY
     assert persisted.metadata["confirmation_payload"]["launch_payload"]["symbols"] == [
         "TSLA"

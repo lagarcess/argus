@@ -378,7 +378,27 @@
         "month_other": "misma duración de {{count}} meses",
         "day_one": "misma duración de {{count}} día",
         "day_other": "misma duración de {{count}} días"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} año",
+          "year_other": "{{formattedCount}} años",
+          "month_one": "{{formattedCount}} mes",
+          "month_other": "{{formattedCount}} meses",
+          "day_one": "{{formattedCount}} día",
+          "day_other": "{{formattedCount}} días"
+        },
+        "approximate": {
+          "year_one": "aproximadamente {{formattedCount}} año",
+          "year_other": "aproximadamente {{formattedCount}} años",
+          "month_one": "aproximadamente {{formattedCount}} mes",
+          "month_other": "aproximadamente {{formattedCount}} meses",
+          "day_one": "aproximadamente {{formattedCount}} día",
+          "day_other": "aproximadamente {{formattedCount}} días"
+        }
+      },
+      "updated_duration": "Duración actualizada: {{duration}}",
+      "same_period": "No hay datos nuevos desde la ejecución original."
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
@@ -705,6 +725,7 @@
       },
       "actions": {
         "run_backtest": "Ejecutar backtest",
+        "run_backtest_same_period": "Ejecutar de todos modos — no hay datos nuevos",
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
         "adjust_assumptions": "Ajustar supuestos",

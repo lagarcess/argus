@@ -18,9 +18,10 @@ type RetestReceiptProps = {
  * a system recovery response rendered beneath it.
  */
 export function RetestReceipt({ receipt, actionLabel }: RetestReceiptProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const contextLine = retestReceiptContextLine(receipt, (key, defaultValue, options) =>
     t(key, { defaultValue, ...(options ?? {}) }),
+    i18n.language,
   );
   return (
     <div className="max-w-[85%] rounded-[20px] border border-black/10 bg-black/[0.03] px-4 py-2.5 text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">

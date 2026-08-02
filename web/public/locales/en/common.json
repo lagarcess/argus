@@ -378,7 +378,27 @@
         "month_other": "same {{count}}-month duration",
         "day_one": "same {{count}}-day duration",
         "day_other": "same {{count}}-day duration"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} year",
+          "year_other": "{{formattedCount}} years",
+          "month_one": "{{formattedCount}} month",
+          "month_other": "{{formattedCount}} months",
+          "day_one": "{{formattedCount}} day",
+          "day_other": "{{formattedCount}} days"
+        },
+        "approximate": {
+          "year_one": "about {{formattedCount}} year",
+          "year_other": "about {{formattedCount}} years",
+          "month_one": "about {{formattedCount}} month",
+          "month_other": "about {{formattedCount}} months",
+          "day_one": "about {{formattedCount}} day",
+          "day_other": "about {{formattedCount}} days"
+        }
+      },
+      "updated_duration": "Updated span: {{duration}}",
+      "same_period": "No new data since the original run."
     },
     "result_readout": {
       "quick_take": "Quick take"
@@ -705,6 +725,7 @@
       },
       "actions": {
         "run_backtest": "Run backtest",
+        "run_backtest_same_period": "Run anyway — no new data",
         "change_dates": "Change dates",
         "change_asset": "Change asset",
         "adjust_assumptions": "Adjust assumptions",

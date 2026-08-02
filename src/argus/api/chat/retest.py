@@ -103,8 +103,13 @@ def sanitized_retest_action(source_run_id: str) -> dict[str, Any]:
     }
 
 
-def retest_receipt(setup: RetestSetup) -> dict[str, Any]:
+def retest_receipt(
+    setup: RetestSetup,
+    *,
+    confirmation_payload: Mapping[str, Any],
+) -> dict[str, Any]:
     """Structured display context; the transcript localizes it on render."""
+    period = _retest_period(setup, confirmation_payload=confirmation_payload)
     receipt: dict[str, Any] = {
         "contract_version": RETEST_CONTRACT_VERSION,
         "window_policy": RETEST_WINDOW_POLICY,
@@ -112,8 +117,7 @@ def retest_receipt(setup: RetestSetup) -> dict[str, Any]:
         "symbols": list(setup.symbols),
         "strategy_family": setup.strategy_type,
         "timeframe": setup.timeframe,
-        "duration_days": setup.duration_days,
-        "duration": _duration_descriptor(setup.duration_days),
+        **period,
     }
     if setup.cadence is not None:
         receipt["cadence"] = setup.cadence
@@ -166,11 +170,19 @@ def prepare_retest_turn(
             title="Action No Longer Active",
             detail=recovery_message("artifact_action_invalid_state", language=language),
         )
+    period = _retest_period(setup, confirmation_payload=confirmation_payload)
+    confirmation_payload = {
+        **confirmation_payload,
+        "retest_period": period,
+    }
     return RetestTurn(
         source_run_id=setup.source_run_id,
         setup=setup,
         confirmation_payload=confirmation_payload,
-        receipt=retest_receipt(setup),
+        receipt=retest_receipt(
+            setup,
+            confirmation_payload=confirmation_payload,
+        ),
     )
 
 
@@ -297,9 +309,74 @@ def _owned_retest_setup(
     return retest_setup_from_run(run.model_dump(mode="python"), today=today)
 
 
+def _retest_period(
+    setup: RetestSetup,
+    *,
+    confirmation_payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    launch_payload = confirmation_payload.get("launch_payload")
+    if not isinstance(launch_payload, Mapping):
+        raise ValueError("retest_confirmation_launch_payload_missing")
+    coverage = launch_payload.get("coverage_preflight")
+    if not isinstance(coverage, Mapping):
+        raise ValueError("retest_confirmation_coverage_missing")
+
+    requested = _validated_date_range(coverage.get("requested_date_range"))
+    effective = _validated_date_range(coverage.get("effective_date_range"))
+    if requested is None or effective is None:
+        raise ValueError("retest_confirmation_period_invalid")
+    if requested != _validated_date_range(launch_payload.get("requested_date_range")):
+        raise ValueError("retest_confirmation_requested_period_mismatch")
+    if effective != _validated_date_range(launch_payload.get("date_range")):
+        raise ValueError("retest_confirmation_effective_period_mismatch")
+
+    effective_start = date.fromisoformat(effective["start"])
+    effective_end = date.fromisoformat(effective["end"])
+    duration_days = (effective_end - effective_start).days
+    original = {
+        "start": setup.original_start.isoformat(),
+        "end": setup.original_end.isoformat(),
+    }
+    return {
+        "original_date_range": original,
+        "requested_date_range": requested,
+        "effective_date_range": effective,
+        "duration_days": duration_days,
+        "duration": _duration_descriptor(duration_days),
+        "same_period": original == effective,
+    }
+
+
+def _validated_date_range(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, Mapping):
+        return None
+    start_value = value.get("start")
+    end_value = value.get("end")
+    if not isinstance(start_value, str) or not isinstance(end_value, str):
+        return None
+    try:
+        start = date.fromisoformat(start_value)
+        end = date.fromisoformat(end_value)
+    except ValueError:
+        return None
+    if start > end:
+        return None
+    return {"start": start.isoformat(), "end": end.isoformat()}
+
+
 def _duration_descriptor(duration_days: int) -> dict[str, Any]:
-    if duration_days >= _DAYS_PER_YEAR and duration_days % _DAYS_PER_YEAR == 0:
-        return {"unit": "year", "count": duration_days // _DAYS_PER_YEAR}
-    if duration_days >= _DAYS_PER_MONTH and duration_days % _DAYS_PER_MONTH == 0:
-        return {"unit": "month", "count": duration_days // _DAYS_PER_MONTH}
-    return {"unit": "day", "count": duration_days}
+    if duration_days >= _DAYS_PER_YEAR:
+        count = round(duration_days / _DAYS_PER_YEAR, 1)
+        return {
+            "unit": "year",
+            "count": int(count) if count.is_integer() else count,
+            "approximate": duration_days % _DAYS_PER_YEAR != 0,
+        }
+    if duration_days >= _DAYS_PER_MONTH:
+        count = round(duration_days / _DAYS_PER_MONTH, 1)
+        return {
+            "unit": "month",
+            "count": int(count) if count.is_integer() else count,
+            "approximate": duration_days % _DAYS_PER_MONTH != 0,
+        }
+    return {"unit": "day", "count": duration_days, "approximate": False}

@@ -34,8 +34,12 @@ const RECEIPT_METADATA = {
   symbols: ["GLD"],
   strategy_family: "buy_and_hold",
   timeframe: "1D",
-  duration_days: 365,
-  duration: { unit: "year", count: 1 },
+  original_date_range: { start: "2024-01-01", end: "2024-12-31" },
+  requested_date_range: { start: "2024-01-01", end: "2026-07-31" },
+  effective_date_range: { start: "2024-01-01", end: "2026-06-30" },
+  duration_days: 911,
+  duration: { unit: "year", count: 2.5, approximate: true },
+  same_period: false,
 };
 const PERSISTED_ACTION = {
   type: "retest_run",
@@ -79,7 +83,11 @@ function translator(language: "en" | "es-419") {
         : undefined) ??
       strings[key] ??
       defaultValue;
-    return resolved.replace(/\{\{count\}\}/g, String(count ?? ""));
+    return Object.entries(options ?? {}).reduce(
+      (text, [name, value]) =>
+        text.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), String(value)),
+      resolved,
+    );
   };
 }
 
@@ -102,12 +110,16 @@ describe("typed retest transport", () => {
   test("submitted action carries identity and policy only", () => {
     const action = retestActionOption("run-42");
 
+    expect(RETEST_CONTRACT_VERSION).toBe("argus_retest_run/v2");
+    expect(RETEST_WINDOW_POLICY).toBe(
+      "preserve_start_ending_latest_available",
+    );
     expect(action.type).toBe("retest_run");
     expect(action.labelKey).toBe(RETEST_ACTION_LABEL_KEY);
     expect(action.payload).toEqual({
       source_run_id: "run-42",
-      window_policy: RETEST_WINDOW_POLICY,
-      contract_version: RETEST_CONTRACT_VERSION,
+      window_policy: "preserve_start_ending_latest_available",
+      contract_version: "argus_retest_run/v2",
     });
     expect(Object.keys(action.payload ?? {})).toHaveLength(3);
   });
@@ -144,10 +156,18 @@ describe("retest receipt projection", () => {
       sourceRunId: "run-42",
       symbols: ["GLD"],
       strategyFamily: "buy_and_hold",
-      durationDays: 365,
-      duration: { unit: "year", count: 1 },
+      durationDays: 911,
+      duration: { unit: "year", count: 2.5, approximate: true },
       cadence: null,
       timeframe: "1D",
+      period: {
+        originalDateRange: { start: "2024-01-01", end: "2024-12-31" },
+        requestedDateRange: { start: "2024-01-01", end: "2026-07-31" },
+        effectiveDateRange: { start: "2024-01-01", end: "2026-06-30" },
+        durationDays: 911,
+        duration: { unit: "year", count: 2.5, approximate: true },
+        samePeriod: false,
+      },
     });
   });
 
@@ -165,11 +185,33 @@ describe("retest receipt projection", () => {
       retest_receipt: RECEIPT_METADATA,
     })!;
 
-    expect(retestReceiptContextLine(receipt, translator("en"))).toBe(
-      "GLD · Buy and hold · same 1-year duration",
+    expect(retestReceiptContextLine(receipt, translator("en"), "en")).toBe(
+      "GLD · Buy and hold · Jan 1, 2024 – Dec 31, 2024 → Jan 1, 2024 – Jun 30, 2026 · about 2.5 years",
     );
-    expect(retestReceiptContextLine(receipt, translator("es-419"))).toBe(
-      "GLD · Comprar y mantener · misma duración de 1 año",
+    expect(
+      retestReceiptContextLine(receipt, translator("es-419"), "es-419"),
+    ).toBe(
+      "GLD · Comprar y mantener · 1 ene 2024 – 31 dic 2024 → 1 ene 2024 – 30 jun 2026 · aproximadamente 2.5 años",
+    );
+  });
+
+  test("legacy persisted receipts keep their reload-safe duration context", () => {
+    const receipt = retestReceiptFromMetadata({
+      retest_receipt: {
+        contract_version: "argus_retest_run/v1",
+        window_policy: "same_duration_ending_today",
+        source_run_id: "run-legacy",
+        symbols: ["GLD"],
+        strategy_family: "buy_and_hold",
+        timeframe: "1D",
+        duration_days: 365,
+        duration: { unit: "year", count: 1 },
+      },
+    });
+
+    expect(receipt?.period).toBeNull();
+    expect(retestReceiptContextLine(receipt!, translator("en"), "en")).toBe(
+      "GLD · Buy and hold · same 1-year duration",
     );
   });
 
@@ -179,6 +221,10 @@ describe("retest receipt projection", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].kind).toBe("action");
     expect(messages[0].retestReceipt?.sourceRunId).toBe("run-42");
+    expect(messages[0].retestReceipt?.period?.effectiveDateRange).toEqual({
+      start: "2024-01-01",
+      end: "2026-06-30",
+    });
     expect(messages[0].content).not.toContain("Test this exact supported setup");
     expect(messages[0].selectedAction?.labelKey).toBe(RETEST_ACTION_LABEL_KEY);
   });
