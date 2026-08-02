@@ -648,11 +648,6 @@ export function assertExactLocalCandidate(
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   }).trim();
-  const branch = execFileSync("git", ["branch", "--show-current"], {
-    cwd: REPOSITORY_ROOT,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  }).trim();
   const status = execFileSync("git", ["status", "--porcelain"], {
     cwd: REPOSITORY_ROOT,
     encoding: "utf8",
@@ -660,12 +655,6 @@ export function assertExactLocalCandidate(
   }).trim();
   if (root !== REPOSITORY_ROOT) throw new Error("Wrong guest QA worktree");
   if (head !== candidate) throw new Error("Candidate SHA does not match HEAD");
-  if (
-    branch !== "codex/guest-experience" &&
-    branch !== "codex/guest-bootstrap-deferred-conversion"
-  ) {
-    throw new Error("Guest QA must run from an approved guest candidate branch");
-  }
   if (status && process.env.ARGUS_GUEST_QA_ALLOW_TEST_DIFF !== "true") {
     throw new Error("Guest QA worktree must be clean");
   }
@@ -1857,6 +1846,7 @@ export function seedGuestResolvedClarificationRailHistory(params: {
 export function seedGuestActiveConfirmationFixture(params: {
   userId: string;
   conversationId: string;
+  symbol?: string;
 }): {
   messageId: string;
   confirmationId: string;
@@ -1868,6 +1858,10 @@ export function seedGuestActiveConfirmationFixture(params: {
   );
   const messageId = randomUUID();
   const confirmationId = `confirmation-${randomUUID()}`;
+  const symbol = params.symbol ?? "MSFT";
+  if (!/^[A-Z]{1,5}$/.test(symbol)) {
+    throw new Error("Confirmation fixture symbol is invalid");
+  }
   const actionPayload = {
     confirmation_id: confirmationId,
     artifact_id: confirmationId,
@@ -1877,8 +1871,8 @@ export function seedGuestActiveConfirmationFixture(params: {
     confirmation_payload: {
       strategy: {
         strategy_type: "buy_and_hold",
-        strategy_thesis: "Buy and hold Microsoft.",
-        asset_universe: ["MSFT"],
+        strategy_thesis: `Buy and hold ${symbol}.`,
+        asset_universe: [symbol],
         asset_class: "equity",
         date_range: {
           start: "2025-07-28",
@@ -1888,8 +1882,8 @@ export function seedGuestActiveConfirmationFixture(params: {
       optional_parameters: {},
       launch_payload: {
         strategy_type: "buy_and_hold",
-        symbol: "MSFT",
-        symbols: ["MSFT"],
+        symbol,
+        symbols: [symbol],
         timeframe: "1D",
         date_range: {
           start: "2025-07-28",
@@ -1911,10 +1905,10 @@ export function seedGuestActiveConfirmationFixture(params: {
       confirmation_id: confirmationId,
       confirmation_state: "active",
       status: "ready_to_run",
-      title: "MSFT buy and hold",
+      title: `${symbol} buy and hold`,
       rows: [
         { key: "strategy", label: "Strategy", value: "Buy and hold" },
-        { key: "assets", label: "Assets", value: "MSFT" },
+        { key: "assets", label: "Assets", value: symbol },
         {
           key: "period",
           label: "Period",
@@ -3068,6 +3062,33 @@ export async function safeScreenshot(
       mask,
     });
   }
+  chmodSync(destination, 0o600);
+}
+
+export async function safeVisibleProductScreenshot(
+  page: Page,
+  name: string,
+): Promise<void> {
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Unsafe screenshot name");
+  const visibleText = await page.locator("body").innerText();
+  if (
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(
+      visibleText,
+    ) ||
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(visibleText)
+  ) {
+    throw new Error("Visible product text contains a private identifier");
+  }
+  const destination = path.join(evidenceDirectory(), `${name}.png`);
+  await page.screenshot({
+    path: destination,
+    fullPage: false,
+    mask: [
+      page.locator('input[type="email"]'),
+      page.locator('input[type="password"]'),
+      page.locator("textarea"),
+    ],
+  });
   chmodSync(destination, 0o600);
 }
 

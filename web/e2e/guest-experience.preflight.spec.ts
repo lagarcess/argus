@@ -25,7 +25,7 @@ import {
   seedGuestActiveConfirmationFixture,
   seedGuestResolvedClarificationRailHistory,
   seedGuestSimulationExhaustionFixture,
-  safeScreenshot,
+  safeVisibleProductScreenshot,
   workspaceFacts,
   zeroStateSnapshot,
 } from "./support/guest-qa";
@@ -386,6 +386,7 @@ test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
     seedGuestActiveConfirmationFixture({
       userId: guestOwner,
       conversationId,
+      symbol: "AAPL",
     });
 
     const assertRecoveredRail = async () => {
@@ -393,24 +394,41 @@ test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
       const rail = page.getByTestId("conversation-activity-rail");
       await expect(rail).toBeVisible();
       await expect(rail.getByRole("button")).toHaveCount(1);
-      await expect(
-        rail.getByRole("button", { name: /Backtest finished — MSFT/ }),
-      ).toBeVisible();
+      const completedTick = rail.getByRole("button", {
+        name: /Backtest finished — MSFT/,
+      });
+      await expect(completedTick).toBeVisible();
       await expect(
         rail.getByRole("button", { name: /Needed attention/ }),
       ).toHaveCount(0);
+      return completedTick;
     };
 
     await page.goto(`/chat?conversation=${conversationId}`, {
       waitUntil: "domcontentloaded",
     });
-    await assertRecoveredRail();
+    const completedTick = await assertRecoveredRail();
     await expect(page.getByTestId("result-equity-chart")).toBeVisible();
-    await safeScreenshot(page, "issue-337-guest-recovered");
+    await completedTick.hover();
+    await expect(
+      page
+        .getByTestId("conversation-activity-rail-preview")
+        .getByText("Backtest finished", { exact: true }),
+    ).toBeVisible();
+    await safeVisibleProductScreenshot(page, "issue-337-guest-recovered");
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await assertRecoveredRail();
-    await safeScreenshot(page, "issue-337-guest-recovered-reload");
+    const reloadedCompletedTick = await assertRecoveredRail();
+    await reloadedCompletedTick.hover();
+    await expect(
+      page
+        .getByTestId("conversation-activity-rail-preview")
+        .getByText("Backtest finished", { exact: true }),
+    ).toBeVisible();
+    await safeVisibleProductScreenshot(
+      page,
+      "issue-337-guest-recovered-reload",
+    );
 
     expect(ownerSnapshot(guestOwner)).toMatchObject({
       messages: 12,
