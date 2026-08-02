@@ -138,7 +138,7 @@ def _serialized_response(page: RunDossierSourcePage) -> dict[str, Any]:
                 artifact=row.artifact,
                 decision=row.decision,
                 result_message_id=row.result_message_id,
-                allow_decision_action=True,
+                decision_action_availability="available",
                 language="en",
             )
             for row in page.rows

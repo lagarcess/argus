@@ -44,6 +44,10 @@ ArtifactLifecycle = Literal[
 ]
 EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
+DecisionActionAvailability = Literal[
+    "available",
+    "account_conversion_required",
+]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 ConversationOperationStatus = Literal["idle", "queued", "running", "checking"]
@@ -657,6 +661,7 @@ class SearchRetestAction(BaseModel):
 
 class SearchDecisionAction(BaseModel):
     type: Literal["decision"] = "decision"
+    availability: DecisionActionAvailability = "available"
     evidence_artifact_id: str
     decision_state: DecisionState | None = None
     note: str | None = Field(default=None, max_length=2000)

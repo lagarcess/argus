@@ -1063,6 +1063,7 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
     ]
     decision_action = item.dossier.actions[1]
     assert decision_action.type == "decision"
+    assert decision_action.availability == "available"
     assert decision_action.evidence_artifact_id == (
         "00000000-0000-0000-0000-000000000301"
     )

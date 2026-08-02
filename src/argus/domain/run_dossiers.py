@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from typing import Any, cast
 
 from argus.api.schemas import (
+    DecisionActionAvailability,
     DecisionState,
     RunDossier,
     RunDossierTested,
@@ -59,7 +60,7 @@ def project_run_dossier(
     artifact: Mapping[str, Any],
     decision: Mapping[str, Any] | None,
     result_message_id: str | None,
-    allow_decision_action: bool,
+    decision_action_availability: DecisionActionAvailability,
     language: str,
 ) -> RunDossier:
     """Project one run and its artifact into the bounded public dossier shape."""
@@ -114,23 +115,23 @@ def project_run_dossier(
     retest_action = project_retest_action(run=run)
     if retest_action is not None:
         actions.append(retest_action)
-    if allow_decision_action:
-        actions.append(
-            SearchDecisionAction(
-                evidence_artifact_id=artifact_id,
-                decision_state=(
-                    cast(DecisionState, decision_state)
-                    if decision_state in _DECISION_STATES
-                    else None
-                ),
-                note=(
-                    _bounded_note(current_decision.get("note"), 2000)
-                    if current_decision is not None
-                    else None
-                ),
-                run_label=run_label,
-            )
+    actions.append(
+        SearchDecisionAction(
+            availability=decision_action_availability,
+            evidence_artifact_id=artifact_id,
+            decision_state=(
+                cast(DecisionState, decision_state)
+                if decision_state in _DECISION_STATES
+                else None
+            ),
+            note=(
+                _bounded_note(current_decision.get("note"), 2000)
+                if current_decision is not None
+                else None
+            ),
+            run_label=run_label,
         )
+    )
 
     config = mapping(run.get("config_snapshot"))
     resolved_parameters = mapping(config.get("resolved_parameters"))

@@ -182,7 +182,11 @@ def search(
             scored_supabase_search_items(
                 raw=raw,
                 query=query,
-                allow_decision_action=context.capabilities.can_save_decision,
+                decision_action_availability=(
+                    "available"
+                    if context.capabilities.can_save_decision
+                    else "account_conversion_required"
+                ),
                 language=user.language,
             )
         )
@@ -196,7 +200,11 @@ def search(
                     if id_scoped_recall
                     else limit + 1
                 ),
-                allow_decision_action=context.capabilities.can_save_decision,
+                decision_action_availability=(
+                    "available"
+                    if context.capabilities.can_save_decision
+                    else "account_conversion_required"
+                ),
                 include_conversation_rows=conversation_search_enabled,
                 cursor_updated_at=cursor_dt,
                 cursor_id=cursor_id,

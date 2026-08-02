@@ -597,7 +597,11 @@ def list_run_dossiers(
             artifact=row.artifact,
             decision=row.decision,
             result_message_id=row.result_message_id,
-            allow_decision_action=context.capabilities.can_save_decision,
+            decision_action_availability=(
+                "available"
+                if context.capabilities.can_save_decision
+                else "account_conversion_required"
+            ),
             language=user.language,
         )
         for row in selected_rows
