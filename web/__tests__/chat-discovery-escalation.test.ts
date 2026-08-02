@@ -100,10 +100,26 @@ describe("grounded-discovery escalation copy", () => {
     );
 
     expect(await translate(en, englishPlan)).toBe(
-      "Search for current stocks in the pharmaceutical sector",
+      "Search for current stocks for this category: the pharmaceutical sector",
     );
     expect(await translate(es419, spanishPlan)).toBe(
-      "Buscar acciones actuales en el sector farmacéutico",
+      "Buscar acciones actuales para esta categoría: el sector farmacéutico",
+    );
+  });
+
+  test("keeps live-shaped category summaries grammatical in both languages", async () => {
+    const englishPlan = discoveryEscalationCopyPlan(
+      sidecar([candidate("equity")], "category", "pharmaceutical stocks"),
+    );
+    const spanishPlan = discoveryEscalationCopyPlan(
+      sidecar([candidate("equity")], "category", "acciones farmacéuticas"),
+    );
+
+    expect(await translate(en, englishPlan)).toBe(
+      "Search for current stocks for this category: pharmaceutical stocks",
+    );
+    expect(await translate(es419, spanishPlan)).toBe(
+      "Buscar acciones actuales para esta categoría: acciones farmacéuticas",
     );
   });
 

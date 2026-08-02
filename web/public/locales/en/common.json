@@ -391,7 +391,7 @@
       "search_current_asset_crypto": "cryptocurrencies",
       "search_current_asset_currency_pair": "currency pairs",
       "search_current_asset_asset": "assets",
-      "search_current_send_category": "Search for current {{assetKind}} in {{query}}",
+      "search_current_send_category": "Search for current {{assetKind}} for this category: {{query}}",
       "search_current_send_peer": "Search for current {{assetKind}} similar to {{query}}",
       "search_current_send_comparison": "Search for current {{assetKind}} comparable to {{query}}",
       "sources_panel_open_one": "{{count}} source ›",

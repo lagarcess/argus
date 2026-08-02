@@ -391,7 +391,7 @@
       "search_current_asset_crypto": "criptomonedas",
       "search_current_asset_currency_pair": "pares de divisas",
       "search_current_asset_asset": "activos",
-      "search_current_send_category": "Buscar {{assetKind}} actuales en {{query}}",
+      "search_current_send_category": "Buscar {{assetKind}} actuales para esta categoría: {{query}}",
       "search_current_send_peer": "Buscar {{assetKind}} actuales similares a {{query}}",
       "search_current_send_comparison": "Buscar {{assetKind}} actuales comparables con {{query}}",
       "sources_panel_open_one": "{{count}} fuente ›",

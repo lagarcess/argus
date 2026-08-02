@@ -18,7 +18,7 @@ const ASSET_KIND_DEFAULTS: Record<DiscoveryEscalationAssetKind, string> = {
 };
 
 const MESSAGE_DEFAULTS: Record<DiscoverySidecar["relationship"], string> = {
-  category: "Search for current {{assetKind}} in {{query}}",
+  category: "Search for current {{assetKind}} for this category: {{query}}",
   peer: "Search for current {{assetKind}} similar to {{query}}",
   comparison: "Search for current {{assetKind}} comparable to {{query}}",
 };
