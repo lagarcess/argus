@@ -769,3 +769,50 @@ ambiguity register. It does not rewrite the evidence or claim new root causes.
 2. S-12 default meaning of “Retest with current data.”
 3. S-13 Omnisearch shortcut treatment after applying the `docs/PRODUCT.md`
    decision filter.
+
+## Cloud topology and deferred-surface addendum — 2026-08-01
+
+This append-only clarification supersedes the earlier proposal for one
+credentialed all-purpose Cloud environment. It does not alter any captured
+product evidence.
+
+### Minimal execution topology
+
+1. **Argus Build** is the normal Codex Cloud environment. It uses the universal
+   image, repository setup, synthetic market data, no Supabase configuration,
+   no provider secrets, and agent internet access off. It owns implementation,
+   deterministic tests, builds, documentation, and ordinary PR delivery.
+2. **Argus QA** is created only if a provider-free capability probe proves that
+   the Cloud runner can host the repository's isolated Supabase stack and
+   browser-accessible app. It owns disposable Guest/registered browser QA and
+   starts with synthetic or recorded providers. It never points at hosted
+   Supabase by default.
+3. **Argus Research** is optional, not required for normal delivery. Create it
+   only when repeated read-only external research justifies a separate
+   environment. It carries no secrets and limits internet access to approved
+   domains with `GET`, `HEAD`, and `OPTIONS`.
+4. **Protected CI is not a Codex Cloud environment.** A fixed GitHub Actions
+   workflow owns exact-SHA provider-backed acceptance, protected OpenRouter,
+   Alpaca, Perplexity, or privileged Supabase credentials, approval gates, and
+   cost caps.
+5. If the QA capability probe fails, keep only Argus Build in Cloud and use
+   protected CI for the missing acceptance surface.
+
+Environment routing stays lightweight: no environment label means ordinary
+Build-compatible or local work. Add an environment label only when an issue
+requires QA infrastructure, read-only internet research, or protected-CI
+credentials.
+
+### Deferred disabled-surface issue register
+
+1. Create a bounded issue to audit and remove the disabled **Saved Strategies
+   product surface**. Protect active strategy interpretation, backtest
+   execution, canonical Run/history state, Idea Ledger, EvidenceArtifacts, and
+   DecisionNotes.
+2. Create a separate bounded issue to audit and remove the deferred
+   **Collections product surface**. Audit UI, routes, tables, migrations, RLS,
+   tests, and canon before deletion. Do not include hosted-data deletion or
+   destructive schema changes without separate founder approval.
+3. The two Cloud Build flags may be omitted because their code defaults are
+   false. Removing the flags from Cloud configuration does not itself remove
+   either product surface from the repository.
