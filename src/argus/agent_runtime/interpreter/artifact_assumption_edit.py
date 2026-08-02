@@ -18,6 +18,8 @@ from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     supported_cost_rate_value,
 )
 from argus.agent_runtime.interpreter.shared import (
+    _RECURRING_CAPITAL_SOURCES,
+    _TOTAL_CAPITAL_SOURCES,
     _date_window_intent_bound_to_latest_result,
     _field_path_base,
     _latest_result_date_window,
@@ -154,6 +156,129 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
         if reconstructed.asset_universe:
             return reconstructed
     return prior
+
+
+def _required_edit_targets_from_primary_draft(
+    draft: LLMStrategyDraft | None,
+    *,
+    current_strategy: StrategySummary | None = None,
+) -> set[str]:
+    """Translate current-turn typed extraction into planner coverage requirements.
+
+    The primary interpreter and edit planner are independent structured reads of
+    the same turn. Requiring the planner to cover fields the primary interpreter
+    marked explicit prevents a partial operation list from becoming a silent edit.
+    """
+
+    if draft is None:
+        return set()
+    provenance = draft.field_provenance or {}
+    targets: set[str] = set()
+    if (
+        draft.asset_universe
+        and normalized_asset_universe_operation(draft.asset_universe_operation)
+        is not None
+    ):
+        targets.add("asset")
+    if (
+        str(draft.comparison_baseline or "").strip()
+        and provenance.get("comparison_baseline") == "explicit_user"
+        and _normalized_ticker_symbol(draft.comparison_baseline)
+        != _normalized_ticker_symbol(
+            current_strategy.comparison_baseline if current_strategy else None
+        )
+    ):
+        targets.add("benchmark")
+    has_explicit_date = (
+        draft.date_range is not None
+        or draft.date_range_intent is not None
+        or str(draft.date_range_raw_text or "").strip()
+    ) and provenance.get("date_range") == "explicit_user"
+    date_matches_current = bool(
+        draft.date_range is not None
+        and current_strategy is not None
+        and draft.date_range == current_strategy.date_range
+        and draft.date_range_intent is None
+        and not str(draft.date_range_raw_text or "").strip()
+    )
+    if has_explicit_date and not date_matches_current:
+        targets.add("date_window")
+
+    capital_source = str(provenance.get("capital_amount") or "").strip()
+    initial_capital_source = str(provenance.get("initial_capital") or "").strip()
+    current_capital = current_strategy.capital_amount if current_strategy else None
+    if (
+        draft.initial_capital is not None
+        and initial_capital_source in _TOTAL_CAPITAL_SOURCES
+        and draft.initial_capital != current_capital
+    ) or (
+        draft.capital_amount is not None
+        and capital_source in _TOTAL_CAPITAL_SOURCES
+        and canonical_strategy_type(draft.strategy_type) != "dca_accumulation"
+        and draft.capital_amount != current_capital
+    ):
+        targets.add("capital")
+    recurring_source = str(provenance.get("recurring_contribution") or "").strip()
+    is_recurring_strategy = (
+        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+    )
+    recurring_amount = draft.recurring_contribution
+    if recurring_amount is None and is_recurring_strategy:
+        recurring_amount = draft.capital_amount
+    if (
+        (
+            draft.recurring_contribution is not None
+            and recurring_source in _RECURRING_CAPITAL_SOURCES
+        )
+        or (
+            draft.capital_amount is not None
+            and capital_source in _RECURRING_CAPITAL_SOURCES
+            and is_recurring_strategy
+        )
+    ) and recurring_amount != current_capital:
+        targets.add("recurring_contribution")
+
+    current_indicator_parameters = (
+        indicator_parameters_from_strategy(current_strategy)
+        if current_strategy is not None
+        else {}
+    )
+    for field_name, target in (
+        ("cadence", "cadence"),
+        ("timeframe", "timeframe"),
+    ):
+        value = getattr(draft, field_name)
+        current_value = getattr(current_strategy, field_name, None)
+        if (
+            value is not None
+            and value != current_value
+            and provenance.get(field_name) == "explicit_user"
+        ):
+            targets.add(target)
+    for field_name, target in (
+        ("indicator_period", "indicator_period"),
+        ("entry_threshold", "indicator_entry_threshold"),
+        ("exit_threshold", "indicator_exit_threshold"),
+    ):
+        value = getattr(draft, field_name)
+        if (
+            value is not None
+            and value != current_indicator_parameters.get(field_name)
+            and provenance.get(field_name) == "explicit_user"
+        ):
+            targets.add(target)
+    for field_name, target in (("fee_rate", "fees"), ("slippage", "slippage")):
+        if (
+            field_name in draft.extra_parameters
+            and provenance.get(field_name) == "explicit_user"
+            and (
+                current_strategy is None
+                or draft.extra_parameters[field_name]
+                != current_strategy.extra_parameters.get(field_name)
+            )
+        ):
+            targets.add(target)
+    return targets
 
 
 def asset_edit_symbol_resolver(

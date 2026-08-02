@@ -83,17 +83,20 @@ async def plan_artifact_assumption_edit(
     active_confirmation: dict[str, Any] | None,
     preferred_model: str,
     language: str | None = None,
+    required_targets: set[str] | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
     if prior_strategy is None and active_confirmation is None:
         return None
 
+    required_target_set = set(required_targets or ())
     messages = _artifact_assumption_edit_messages(
         current_user_message=current_user_message,
         prior_strategy=prior_strategy,
         active_confirmation=active_confirmation,
         language=language,
+        required_targets=required_target_set,
     )
     for model_name in _unique_models(preferred_model):
         try:
@@ -114,6 +117,11 @@ async def plan_artifact_assumption_edit(
             active_confirmation=active_confirmation,
         ):
             continue
+        if plan.outcome == "ready_to_confirm" and not _covers_required_targets(
+            plan,
+            required_targets=required_target_set,
+        ):
+            continue
         if plan.outcome != "ready_to_confirm" and not plan.assistant_response:
             continue
         return plan
@@ -126,11 +134,19 @@ def _artifact_assumption_edit_messages(
     prior_strategy: dict[str, Any] | None,
     active_confirmation: dict[str, Any] | None,
     language: str | None = None,
+    required_targets: set[str] | None = None,
 ) -> list[dict[str, str]]:
     language_line = (
         f"Write assistant_response in the user's language ({language})."
         if language
         else "Write assistant_response in the user's language."
+    )
+    required_targets_line = (
+        "Required typed targets for this turn: "
+        f"{', '.join(sorted(required_targets))}. "
+        "A ready_to_confirm operation list must cover every required target.\n\n"
+        if required_targets
+        else ""
     )
     return [
         {
@@ -145,6 +161,7 @@ def _artifact_assumption_edit_messages(
                 "(add | remove | replace | set | clear) and target, plus the value "
                 "carrier for that target. Resolve references such as 'that', 'it', "
                 "or 'the second one' against the current card.\n\n"
+                f"{required_targets_line}"
                 "Targets and their value carriers:\n"
                 "- asset (traded tickers, use symbols): add new tickers, remove "
                 "named tickers, replace the whole traded set, or clear. For add and "
@@ -224,6 +241,21 @@ def _artifact_assumption_edit_messages(
         },
         {"role": "user", "content": current_user_message},
     ]
+
+
+def _covers_required_targets(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    required_targets: set[str],
+) -> bool:
+    if not required_targets:
+        return True
+    covered_targets = {
+        operation.target
+        for operation in plan.operations
+        if _operation_has_supported_carrier(operation)
+    }
+    return required_targets.issubset(covered_targets)
 
 
 def _has_supported_edit(

@@ -40,6 +40,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _request_targets_post_result_artifact_edit,
+    _required_edit_targets_from_primary_draft,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
 )
@@ -3444,6 +3445,10 @@ async def _plan_pending_artifact_assumption_edit(
         active_confirmation=active_confirmation,
         preferred_model=preferred_model,
         language=request.user.language_preference,
+        required_targets=_required_edit_targets_from_primary_draft(
+            primary_draft,
+            current_strategy=_current_artifact_strategy(request),
+        ),
     )
     if plan is None:
         return None

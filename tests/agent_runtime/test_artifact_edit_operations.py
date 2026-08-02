@@ -8,7 +8,12 @@ from argus.agent_runtime.artifact_edit_planner import (
     apply_edit_operations,
     plan_artifact_assumption_edit,
 )
-from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.llm_interpreter_types import (
+    LLMDateRangeIntent,
+    LLMStrategyDraft,
+)
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
 
 
 def test_add_and_remove_in_one_turn():
@@ -288,3 +293,92 @@ async def test_planner_keeps_company_name_asset_remove_for_later_resolution(
         (operation.op, operation.target, operation.symbols)
         for operation in plan.operations
     ] == [("remove", "asset", ["Microsoft"])]
+
+
+@pytest.mark.asyncio
+async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_changes(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["complete-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, messages, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        prompt = "\n".join(message["content"] for message in messages)
+        assert "Required typed targets for this turn: benchmark, date_window." in prompt
+        benchmark = EditOperation(op="set", target="benchmark", value="QQQ")
+        if model_name == "partial-model":
+            return ArtifactAssumptionEditPlan(
+                outcome="ready_to_confirm",
+                operations=[benchmark],
+                confidence=0.9,
+            )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                benchmark,
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch",
+                        endpoint="start",
+                        start="2026-04-01",
+                    ),
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "change the benchmark to QQQ and change the beginning of the period "
+                "to April 1, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["LOW", "HD"],
+                    asset_class="equity",
+                    date_range={"start": "2026-03-02", "end": "2026-07-30"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="partial-model",
+        primary_draft=LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range={"start": "2026-04-01"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start="2026-04-01",
+            ),
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                "date_range": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["partial-model", "complete-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
