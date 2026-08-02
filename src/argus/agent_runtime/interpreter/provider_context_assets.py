@@ -137,7 +137,13 @@ def response_with_provider_context_assets(
     draft_assets = [
         str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
-    context_is_partial = len(resolved_symbols) < len(draft_assets)
+    context_is_partial = len(draft_assets) > len(resolved_symbols) and any(
+        not any(
+            _provider_record_matches_symbol(record, draft_asset)
+            for record in resolved_records
+        )
+        for draft_asset in draft_assets
+    )
     preserved_fuller_draft = context_is_partial
     if not context_is_partial:
         draft.asset_universe = resolved_symbols
