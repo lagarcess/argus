@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Status: **PASS on exact candidate head**
 
-Candidate SHA: `220824ba775883f28b138b9cb7d8fdd5c716831e`
+Candidate SHA: `ee04bc8fe93c629116ba527a7a1f6d7200a097d4`
 
 Source evidence: G-01/G-02 in
 `docs/reports/2026-08-01-current-checkpoint-experience-feedback.md`.
@@ -26,6 +26,24 @@ Red proof reproduced both failures:
 The correction retains the 12-message and desktop thresholds and lowers only
 the legitimate tick threshold from two to one.
 
+## Review correction: prove the recovered path
+
+The first implementation treated any later active confirmation as recovery.
+That could hide an earlier clarification when the confirmation belonged to an
+unrelated idea. The corrected projection uses only existing backend-owned
+transcript metadata:
+
+- the clarification supplies `pending_strategy.strategy` and its
+  `requested_field`;
+- the active confirmation supplies `confirmation_payload.strategy`;
+- the marker clears only when the confirmation fills the requested field and
+  typed strategy facts or the source-result artifact prove continuity;
+- missing or conflicting relationship evidence keeps the marker visible.
+
+Focused regression coverage includes an AAPL clarification followed by an
+unrelated MSFT confirmation, an active confirmation with no typed path, and a
+confirmation that still lacks the requested field.
+
 ## Exact-head acceptance replay
 
 Mode: local production build, real disposable Supabase Guest Auth, durable
@@ -39,7 +57,8 @@ prose:
 2. The long transcript contains the earlier typed clarification, “Which asset
    should I test?”
 3. The user supplies `AAPL`.
-4. A later active AAPL confirmation resolves the clarification.
+4. A later active AAPL confirmation carries the matching typed strategy path
+   and resolves the clarification.
 5. The page hydrates from the durable API, then reloads and hydrates again.
 
 Observed and asserted before and after reload:
@@ -61,7 +80,9 @@ Observed and asserted before and after reload:
 Command:
 
 ```bash
-ARGUS_EXPECTED_CANDIDATE_SHA=220824ba775883f28b138b9cb7d8fdd5c716831e \
+ARGUS_EXPECTED_CANDIDATE_SHA=ee04bc8fe93c629116ba527a7a1f6d7200a097d4 \
+  ARGUS_GUEST_QA_APP_PORT=3105 \
+  ARGUS_GUEST_QA_API_PORT=8015 \
   bash scripts/qa/run-guest-experience-qa.sh preflight \
   --grep "issue 337 Guest recovery"
 ```
@@ -72,14 +93,17 @@ Result: `1 passed`.
 
 Local evidence pack:
 
-- `temp/qa-evidence-guest/220824ba775883f28b138b9cb7d8fdd5c716831e/authoritative/issue-337-guest-recovered.png`
-- `temp/qa-evidence-guest/220824ba775883f28b138b9cb7d8fdd5c716831e/authoritative/issue-337-guest-recovered-reload.png`
+- `temp/qa-evidence-guest/ee04bc8fe93c629116ba527a7a1f6d7200a097d4/authoritative/issue-337-guest-recovered.png`
+- `temp/qa-evidence-guest/ee04bc8fe93c629116ba527a7a1f6d7200a097d4/authoritative/issue-337-guest-recovered-reload.png`
 
-Both files have SHA-256:
+SHA-256 before reload:
 `a097a27c1c70af6a66d6cd38ae6fa1fa8297721573dade9bd19b80b159a6895a`.
 
-The identical hashes are expected: reload preserves the same durable transcript
-and rail state.
+SHA-256 after reload:
+`3d06d3c1c3301dfbc5914f19b2fba927b771c92c2af6a0ce2ef9725b7a41d10a`.
+
+The different framing reflects scroll restoration after reload; both captures
+show the same single completed-backtest rail marker and no attention marker.
 
 ## Disposition
 
