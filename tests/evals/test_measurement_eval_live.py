@@ -1,12 +1,19 @@
+# ruff: noqa: E402, I001 -- live-eval env must load before Argus imports
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-import pytest
-from argus.domain.market_data.assets import clear_asset_cache
 from dotenv import load_dotenv
+import pytest
 
+_EVAL_ENV_FILE = os.getenv("ARGUS_EVAL_ENV_FILE")
+if _EVAL_ENV_FILE:
+    # Argus imports load the shared project environment. Preload the explicit
+    # live-eval environment so override=False preserves this suite's provider.
+    load_dotenv(Path(_EVAL_ENV_FILE), override=False)
+
+from argus.domain.market_data.assets import clear_asset_cache
 from tests.evals.measurement_eval_harness import (
     blocking_eval_results,
     expected_fail_issue_for_result,
@@ -17,10 +24,6 @@ from tests.evals.measurement_eval_harness import (
 
 
 def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
-    env_file = os.getenv("ARGUS_EVAL_ENV_FILE")
-    if env_file:
-        load_dotenv(Path(env_file), override=False)
-
     if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
         pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
     if not os.getenv("OPENROUTER_API_KEY"):
