@@ -694,3 +694,78 @@ The findings above are sufficiently concrete for technical diagnosis except for 
 2. Historical PRs and commits document intent and prior acceptance only. They do not authorize reverting, cherry-picking, or reconstructing historical implementations.
 3. Root causes remain unproven unless this report explicitly states otherwise.
 4. Future corrections, diagnoses, or product decisions should be recorded in linked GitHub issues or an append-only addendum rather than rewriting the observations above.
+
+## Founder clarification addendum — 2026-08-01
+
+This addendum supersedes only the corresponding entries in the lock-time
+ambiguity register. It does not rewrite the evidence or claim new root causes.
+
+### S-03 usage meter is governed by the Argus design system
+
+1. S-03 no longer requires a founder threshold decision.
+2. `.agent/designs/argus/DESIGN.md` now owns the deterministic traffic-meter
+   contract: the most constrained active hourly/daily window governs; more than
+   50% remaining is muted teal, more than 20% through 50% is dusty gold, and
+   20% or less is muted rose.
+3. Exact remaining counts and truthful reset times remain visible so color is
+   never the only signal. The treatment must remain calm and non-gamified.
+
+### S-08 discovery category diagnosis and requested IPO coverage
+
+1. Before changing recovery or provider code, diagnose whether recent-IPO and
+   trending-crypto requests reached the typed discovery route, whether the
+   category is supported, and whether the configured search provider was
+   available.
+2. Do not assume the IPO failure was a provider outage or runtime crash if
+   recent IPOs are currently outside the allowed discovery category contract.
+3. If recent IPO lookup is not supported, add it as an explicit desired
+   grounded-discovery category with source freshness and candidate-validation
+   acceptance. The existing screenshot is evidence of the requested outcome,
+   not proof of the missing boundary.
+4. Broader earnings, corporate-event, and central-bank expansion remains
+   separate future product slicing. Do not combine all categories into one
+   repair merely because they share a search provider.
+
+### G-04 disposition accepted
+
+1. The March 1 to March 2, 2026 shift remains expected quiet Sunday-to-session
+   calendar alignment.
+2. G-04 stays closed within this report and must not become a GitHub defect.
+
+### Cloud execution disposition
+
+1. Do not introduce a new issue-label taxonomy for this audit.
+2. Determine cloud suitability from the task's actual dependencies and stop
+   conditions. A task is cloud-runnable end to end when its expected behavior
+   is locked, the safe QA environment can exercise its dependencies, and it
+   needs no hosted or destructive mutation.
+3. The approved all-purpose environment includes an isolated Supabase stack,
+   disposable Guest and registered identities, a browser-accessible app,
+   synthetic deterministic mode, budget-scoped OpenRouter/Perplexity/market
+   data credentials, integration feature flags, and sanitized artifact
+   storage. Production credentials and hosted writes remain excluded.
+4. Agents own disposable QA wiring. They may correct process flags, CORS,
+   ports, local CAPTCHA tokens, database-reset ordering, stale services, and
+   fixtures, then rerun provider-free preflights without asking the founder.
+5. Stop only for an unresolved product decision, unavailable external
+   capability, hosted/destructive authority, or exhausted provider cap. Do not
+   present ordinary QA setup as a product blocker.
+
+### Reusable audit workflow
+
+1. The approved reusable workflow is stored at
+   `.agent/skills/argus-experience-audit/SKILL.md` so cloud agents can load it
+   from the repository.
+2. It requires founder intent, exact actions, Guest/signed-in personas, visible
+   and typed evidence, screenshot hashes, protected commendations, prohibited
+   outcomes, current-head revalidation, cleanup, and provider-budget limits.
+3. Historical PR and commit lineage remains reference evidence only.
+4. Figma duplication is intentionally skipped; the locked Markdown report is
+   the engineering source of truth.
+
+### Founder decisions that remain
+
+1. S-10 fractional-month arithmetic or clarification policy.
+2. S-12 default meaning of “Retest with current data.”
+3. S-13 Omnisearch shortcut treatment after applying the `docs/PRODUCT.md`
+   decision filter.

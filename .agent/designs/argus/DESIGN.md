@@ -433,7 +433,21 @@ Argus is **NOT**:
   must stay on the entry surface with one honest retry and no fake local
   conversation.
 
-## 23. Design Decision Filter
+## 23. Usage Allowance Meter
+
+- Use the lowest normalized remaining capacity across the active hourly and
+  daily allowance windows. The window closest to exhaustion governs the meter
+  because it is the user's real near-term constraint.
+- **Green / Muted Teal** (`--rui-color-teal`): more than 50% remains.
+- **Amber / Dusty Gold** (`--rui-color-warning`): more than 20% and at most 50%
+  remains.
+- **Red / Muted Rose** (`--rui-color-danger`): 20% or less remains, including
+  exhaustion.
+- Color is supporting information only. Always retain the exact remaining
+  count and truthful reset time, and use calm localized language with no pulse,
+  flashing, or casino-terminal treatment.
+
+## 24. Design Decision Filter
 
 When designing any Argus surface, ask:
 

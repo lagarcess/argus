@@ -314,6 +314,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 | `apple-hig-expert/`                  | Premium UI/UX aesthetics, Argus/Apple-grade physics                         |
 | `skill-security-auditor/`           | Automated security gating for agent skills and external plugins               |
 | `playwright-pro/`                   | Advanced E2E testing framework, target 63% coverage                          |
+| `argus-experience-audit/`           | Guest/signed-in checkpoint audits, cloud QA, and locked evidence packs       |
 | `senior-architect/`                 | Principal-level system guidance and Institutional-grade reliability         |
 | `saas-metrics-coach/`               | Fintech quota throughput and monetization logic                              |
 
