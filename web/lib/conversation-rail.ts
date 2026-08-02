@@ -42,11 +42,12 @@ const RAIL_PREVIEW_METRIC_LIMIT = 3;
 const FAILED_JOB_STATUSES = new Set(["failed", "canceled", "expired"]);
 
 function activeConfirmation(message: Message): boolean {
+  const confirmation = message.confirmation;
   return (
     message.role === "ai" &&
     message.kind === "strategy_confirmation" &&
-    Boolean(message.confirmation) &&
-    (message.confirmation.confirmation_state ?? "active") === "active"
+    confirmation !== undefined &&
+    (confirmation.confirmation_state ?? "active") === "active"
   );
 }
 
