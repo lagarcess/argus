@@ -69,6 +69,83 @@ cases:
       criteria:
         ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
 
+  - id: asset_discovery_recent_ipo_exact_issue_344
+    prompt: "find me stocks that have recently IPO'ed"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: conversation_followup
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      asset_discovery:
+        relationship: category
+        anchor_symbols: []
+        asset_class_hint: equity
+        category_description_includes_any: ["ipo", "public"]
+        needs_current_facts: true
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+
+  - id: asset_discovery_trending_crypto_exact_issue_344
+    prompt: "find me cryptos that are trending"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: conversation_followup
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      asset_discovery:
+        relationship: category
+        anchor_symbols: []
+        asset_class_hint: crypto
+        category_description_includes_any: ["trend", "crypto"]
+        needs_current_facts: true
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+
+  - id: asset_discovery_old_pharma_escalation_exact_issue_344
+    prompt: "Search current sources for: pharmaceutical sector"
+    user_language: en
+    ui_language: en
+    recent_thread_history:
+      - role: user
+        content: "find me pharmaceutical stocks that I could test"
+      - role: assistant
+        content: "Here are resolver-verified pharmaceutical stocks from general knowledge, not a current search."
+    expected:
+      intent: conversation_followup
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      asset_discovery:
+        relationship: category
+        anchor_symbols: []
+        asset_class_hint: equity
+        category_description_includes_any: ["pharma", "pharmaceutical"]
+        needs_current_facts: true
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+
+  - id: asset_discovery_semantic_pharma_escalation_issue_344
+    prompt: "Search for current stocks in the pharmaceutical sector"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: conversation_followup
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      asset_discovery:
+        relationship: category
+        anchor_symbols: []
+        asset_class_hint: equity
+        category_description_includes_any: ["pharma", "pharmaceutical"]
+        needs_current_facts: true
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+
   - id: asset_discovery_not_direct_backtest_issue_244
     # A direct request to test a named asset is never asset_discovery. The
     # executable confirmation pipeline is the misroute proof: the discovery

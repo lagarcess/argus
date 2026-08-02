@@ -1029,6 +1029,13 @@ def _compare_asset_discovery(
         actual.get("asset_class_hint"),
         failures,
     )
+    if "needs_current_facts" in expected:
+        _compare(
+            "asset_discovery.needs_current_facts",
+            expected["needs_current_facts"],
+            actual.get("needs_current_facts"),
+            failures,
+        )
     expected_anchors = expected.get("anchor_symbols")
     if expected_anchors is not None:
         actual_anchors = sorted(

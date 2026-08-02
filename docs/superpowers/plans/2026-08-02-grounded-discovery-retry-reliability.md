@@ -194,10 +194,13 @@ In `docs/API_CONTRACT.md`, state that missing or unauthorized configured Search 
 - [ ] **Step 6: Run mocked eval/regression checks**
 
 ```bash
-poetry run pytest tests/evals/test_measurement_eval_harness.py -q --no-cov
 OPENROUTER_API_KEY= PERPLEXITY_API_KEY= ALPACA_API_KEY= ALPACA_SECRET_KEY= \
 ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture \
-poetry run pytest tests/evals/test_measurement_eval_mocked.py -q --no-cov
+poetry run pytest \
+  tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_chat_runtime_eval_manifest.py \
+  tests/evals/test_chat_runtime_trajectory_harness.py \
+  -q --no-cov
 ```
 
 These checks prove the comparator and deterministic path only; record them separately from live acceptance.
