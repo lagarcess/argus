@@ -51,10 +51,10 @@ def retest_confirmation_payload(
     language: str = "en",
     confirmation_id: str | None = None,
 ) -> dict[str, Any] | None:
-    """Materialize an executable confirmation payload, or None when unsupported.
+    """Project a structurally eligible candidate, or None when unsupported.
 
-    Eligibility and admission call this same function, so an offered retest is
-    always one the backend can actually confirm.
+    Eligibility uses this structural projection. Admission must pass the
+    candidate through provider coverage before persisting a runnable card.
     """
     if _costs_the_engine_would_drop(setup):
         # The kill switch idealizes execution, so a costed source run cannot be

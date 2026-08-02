@@ -2327,11 +2327,15 @@ stores nothing and makes no LLM, provider, or market-data call.
   run rather than from any client value. Missing, malformed, foreign,
   unfinished, deleted, or cross-conversation sources fail uniformly with `409
   artifact_action_invalid_state`, so they stay indistinguishable from each
-  other. The action makes no LLM, research, discovery, or market-data provider
-  call, always stops at a Ready-to-run confirmation, and never executes a
-  backtest; a transient materialization failure after the accepted user turn
-  reuses the existing retryable `runtime_failure` recovery whose in-place Retry
-  replays the persisted typed action.
+  other. The action itself makes no LLM, research, or discovery call. Before a
+  runnable confirmation is persisted, admission performs a provider-backed
+  coverage preflight. A failed preflight returns `503 market_data_unavailable`,
+  `422 no_common_data_window`, or `422 insufficient_common_data` with no
+  runnable card. After coverage succeeds, the action stops at a Ready-to-run
+  confirmation and never executes a backtest; a transient materialization
+  failure after the accepted user turn reuses the existing retryable
+  `runtime_failure` recovery whose in-place Retry replays the persisted typed
+  action.
 
 ### Conversation Artifact Continuity Contract
 

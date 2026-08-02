@@ -100,6 +100,26 @@ def test_api_contract_documents_backend_owned_retest_period_truth() -> None:
         assert exact_rule in message_contract
 
 
+def test_api_contract_documents_retest_provider_coverage_admission() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    action_start = contract.index("\n### Structured Action Semantics\n")
+    action_end = contract.index(
+        "\n### Conversation Artifact Continuity Contract\n",
+        action_start,
+    )
+    action_contract = " ".join(contract[action_start:action_end].split())
+
+    for exact_rule in (
+        "makes no LLM, research, or discovery call",
+        "provider-backed coverage preflight",
+        "`503 market_data_unavailable`",
+        "`422 no_common_data_window`",
+        "`422 insufficient_common_data`",
+        "never executes a backtest",
+    ):
+        assert exact_rule in action_contract
+
+
 def test_reliability_contract_locks_stale_direct_job_reconciliation() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")

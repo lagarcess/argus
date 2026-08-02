@@ -29,7 +29,10 @@ import {
   hydrateResultActions,
 } from "@/lib/chat-result-actions";
 import { retainCanonicalResultProjectionOwners } from "@/lib/chat-result-projection-ownership";
-import { visibleComposerResponseActions } from "@/lib/chat-recovery-display";
+import {
+  type RecoveryDisplay,
+  visibleComposerResponseActions,
+} from "@/lib/chat-recovery-display";
 import {
   applyConsumedResultActions,
   applyConfirmationActionEffects,
@@ -366,4 +369,23 @@ export function chatStreamErrorText(
   fallback: string,
 ): string {
   return detail || fallback;
+}
+
+const RETEST_COVERAGE_PROBLEM_CODES: ReadonlySet<string> = new Set([
+  "market_data_unavailable",
+  "insufficient_common_data",
+  "no_common_data_window",
+]);
+
+export function chatHttpErrorDisplay(
+  problemCode: string | null,
+  backendMessage: string,
+): { content: string; recoveryDisplay: RecoveryDisplay | null } {
+  if (!problemCode || !RETEST_COVERAGE_PROBLEM_CODES.has(problemCode)) {
+    return { content: backendMessage, recoveryDisplay: null };
+  }
+  return {
+    content: "",
+    recoveryDisplay: { kind: "coverage_recovery", code: problemCode },
+  };
 }

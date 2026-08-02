@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { chatHttpErrorDisplay } from "../components/chat/chat-message-projection";
 import {
   coverageRecoveryActionsFromMetadata,
   noProgressActionsFromMetadata,
@@ -54,6 +55,55 @@ function flattenedKeys(value: unknown, prefix = ""): string[] {
 }
 
 describe("chat recovery display", () => {
+  test.each([
+    {
+      code: "no_common_data_window",
+      en: "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      es: "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+    },
+    {
+      code: "insufficient_common_data",
+      en: "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      es: "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+    },
+    {
+      code: "market_data_unavailable",
+      en: "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      es: "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+    },
+  ])(
+    "maps Retest HTTP $code to typed English and Spanish coverage recovery",
+    ({ code, en, es }) => {
+      const rawBackendMessage = "Provider-specific English detail.";
+      const projected = chatHttpErrorDisplay(code, rawBackendMessage);
+
+      expect(projected.content).toBe("");
+      expect(projected.recoveryDisplay).toEqual({
+        kind: "coverage_recovery",
+        code,
+      });
+      expect(
+        recoveryDisplayText(projected.recoveryDisplay, tFromCatalog(enCatalog)),
+      ).toBe(en);
+      expect(
+        recoveryDisplayText(projected.recoveryDisplay, tFromCatalog(esCatalog)),
+      ).toBe(es);
+      expect(
+        recoveryDisplayText(projected.recoveryDisplay, tFromCatalog(esCatalog)),
+      ).not.toContain(rawBackendMessage);
+    },
+  );
+
+  test("preserves raw backend detail for an unrelated HTTP error", () => {
+    const rawBackendMessage = "This unrelated request is not available.";
+    expect(
+      chatHttpErrorDisplay("artifact_action_invalid_state", rawBackendMessage),
+    ).toEqual({
+      content: rawBackendMessage,
+      recoveryDisplay: null,
+    });
+  });
+
   test("hydrates only the safe typed no-progress choices", () => {
     const metadata = {
       response_intent: {

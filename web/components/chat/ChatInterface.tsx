@@ -168,6 +168,7 @@ import {
 } from "./types";
 import {
   chatActionRequestFromAction,
+  chatHttpErrorDisplay,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -1649,6 +1650,10 @@ export default function ChatInterface() {
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
+        const httpErrorDisplay = chatHttpErrorDisplay(
+          rejectionCode,
+          fallbackMessage,
+        );
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
@@ -1661,13 +1666,16 @@ export default function ChatInterface() {
                           ? ""
                           : isRateLimit
                             ? t("chat.rate_limit_error")
-                            : fallbackMessage,
+                            : httpErrorDisplay.content,
                         recoveryDisplay: staleConfirmationRejected
                           ? {
                               kind: "recovery_code" as const,
                               code: rejectionCode,
                             }
-                          : m.recoveryDisplay,
+                          : isRateLimit
+                            ? m.recoveryDisplay
+                            : httpErrorDisplay.recoveryDisplay ??
+                              m.recoveryDisplay,
                         actions: m.actions,
                       }
                     : m,
