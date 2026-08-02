@@ -33,7 +33,9 @@ regression repair, not a reopened discovery program.
    table, or pre-interpreter shortcut may be added. When the interpreter emits
    a complete `asset_discovery` payload with no competing semantic act, the
    shared post-interpretation guard canonicalizes that internally consistent
-   typed result to `semantic_turn_act=asset_discovery`.
+   typed result to `semantic_turn_act=asset_discovery`. Strategy-readiness
+   audits do not own discovery turns and must not delay, demote, or reject that
+   typed output.
 3. Search configuration and authorization failures are not user-retryable.
    Missing configuration and HTTP 401/403 map to honest, non-retryable
    `discovery_unavailable` recovery.

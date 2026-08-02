@@ -3,7 +3,7 @@ from tests.agent_runtime._llm_interpreter_common import *
 
 
 @pytest.mark.asyncio
-async def test_discovery_payload_restores_missing_semantic_act_after_audits(
+async def test_discovery_payload_restores_missing_semantic_act_without_strategy_audits(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -23,10 +23,8 @@ async def test_discovery_payload_restores_missing_semantic_act_after_audits(
         asset_discovery=discovery,
     )
 
-    async def audited_response(**kwargs):
-        return kwargs["response"].model_copy(
-            update={"semantic_turn_act": None, "asset_discovery": None}
-        )
+    async def audited_response(**_kwargs):
+        raise AssertionError("typed discovery must bypass strategy-readiness audits")
 
     monkeypatch.setattr(
         interpreter_module,

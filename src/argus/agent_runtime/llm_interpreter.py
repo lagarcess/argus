@@ -2193,6 +2193,17 @@ async def _response_ready_for_runtime(
         response.semantic_turn_act is None and response.asset_discovery is not None
     )
     primary_discovery = response.asset_discovery if primary_act_typed else None
+    if primary_act_typed:
+        normalized = _normalize_response_for_runtime_context(
+            response,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+        )
+        return preserve_typed_discovery_act(
+            primary_act_typed=True,
+            primary_discovery=primary_discovery,
+            audited=normalized,
+        )
     audited = await _audited_response_ready_for_runtime(
         response=response,
         preferred_model=preferred_model,
