@@ -456,6 +456,44 @@ describe("command palette conversation dossier", () => {
     }
   });
 
+  test("routes scoped row actions only for a selected manageable row outside editable controls", () => {
+    const base = {
+      itemCount: 3,
+      hasSelection: true,
+      selectedCanManageConversation: true,
+      targetIsEditable: false,
+      targetIsSearchInput: false,
+      isEditing: false,
+      metaKey: false,
+      ctrlKey: false,
+    };
+
+    expect(commandPaletteKeyboardAction({ ...base, key: "F2" })).toEqual({
+      type: "rename",
+    });
+    expect(commandPaletteKeyboardAction({ ...base, key: "F2", shiftKey: true })).toEqual({
+      type: "archive",
+    });
+    expect(commandPaletteKeyboardAction({ ...base, key: "Delete" })).toEqual({
+      type: "delete",
+    });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "Delete",
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+      }),
+    ).toEqual({ type: "none" });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "F2",
+        selectedCanManageConversation: false,
+      }),
+    ).toEqual({ type: "none" });
+  });
+
   test("rejects deferred More pages after query or decision-chip changes", async () => {
     for (const nextSignature of [
       JSON.stringify(["new query", false, null]),

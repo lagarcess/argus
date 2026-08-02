@@ -8,9 +8,16 @@ export type KeyboardShortcutId =
   | "expand_sidebar_recents"
   | "open_settings"
   | "toggle_pin_focused_chat"
-  | "quick_jump";
+  | "quick_jump"
+  | "command_palette_rename"
+  | "command_palette_archive"
+  | "command_palette_delete";
 
-export type KeyboardShortcutGroup = "navigation" | "chat" | "quick_jump";
+export type KeyboardShortcutGroup =
+  | "navigation"
+  | "chat"
+  | "quick_jump"
+  | "omnisearch";
 
 export type KeyboardShortcutEvent = Pick<
   KeyboardEvent,
@@ -20,6 +27,7 @@ export type KeyboardShortcutEvent = Pick<
 type KeyboardShortcutMatch =
   | "primary_key"
   | "primary_shift_code"
+  | "shift_code"
   | "code"
   | "quick_jump";
 
@@ -124,6 +132,33 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     macDisplay: ["⌘", "⌥", "1–9"],
     otherDisplay: ["Ctrl", "Shift", "1–9"],
   },
+  {
+    id: "command_palette_rename",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.rename",
+    match: "code",
+    code: "F2",
+    macDisplay: ["F2"],
+    otherDisplay: ["F2"],
+  },
+  {
+    id: "command_palette_archive",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.archive",
+    match: "shift_code",
+    code: "F2",
+    macDisplay: ["Shift", "F2"],
+    otherDisplay: ["Shift", "F2"],
+  },
+  {
+    id: "command_palette_delete",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.delete",
+    match: "code",
+    code: "Delete",
+    macDisplay: ["Delete"],
+    otherDisplay: ["Delete"],
+  },
 ];
 
 function keyboardShortcut(id: KeyboardShortcutId): KeyboardShortcutDefinition {
@@ -162,6 +197,16 @@ export function matchesKeyboardShortcut(
     );
   }
 
+  if (shortcut.match === "shift_code") {
+    return (
+      event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      event.code === shortcut.code
+    );
+  }
+
   return (
     event.code === shortcut.code &&
     !event.altKey &&
@@ -169,6 +214,25 @@ export function matchesKeyboardShortcut(
     !event.metaKey &&
     !event.shiftKey
   );
+}
+
+export type CommandPaletteRowAction = "rename" | "archive" | "delete";
+
+const COMMAND_PALETTE_ROW_ACTIONS: ReadonlyArray<
+  readonly [KeyboardShortcutId, CommandPaletteRowAction]
+> = [
+  ["command_palette_rename", "rename"],
+  ["command_palette_archive", "archive"],
+  ["command_palette_delete", "delete"],
+];
+
+export function commandPaletteRowActionForEvent(
+  event: KeyboardShortcutEvent,
+): CommandPaletteRowAction | null {
+  for (const [shortcutId, action] of COMMAND_PALETTE_ROW_ACTIONS) {
+    if (matchesKeyboardShortcut(shortcutId, event)) return action;
+  }
+  return null;
 }
 
 export function keyboardShortcutDisplay(

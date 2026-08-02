@@ -7,6 +7,7 @@ const {
   keyboardShortcutHintDisplay,
   keyboardShortcutDisplay,
   matchesKeyboardShortcut,
+  commandPaletteRowActionForEvent,
   quickJumpHintDisplay,
 } = keyboardShortcuts;
 const quickJumpIndexForEvent = (
@@ -31,6 +32,9 @@ describe("keyboard shortcut registry", () => {
       "rename_focused_chat",
       "toggle_pin_focused_chat",
       "quick_jump",
+      "command_palette_rename",
+      "command_palette_archive",
+      "command_palette_delete",
     ]);
     expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.labelKey)).toBe(true);
   });
@@ -176,6 +180,68 @@ describe("keyboard shortcut registry", () => {
         altKey: false,
       }),
     ).toBe(true);
+  });
+
+  test("owns Omnisearch row actions in the shared registry without using browser commands", () => {
+    expect(KEYBOARD_SHORTCUTS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "command_palette_rename",
+          group: "omnisearch",
+          code: "F2",
+        }),
+        expect.objectContaining({
+          id: "command_palette_archive",
+          group: "omnisearch",
+          code: "F2",
+        }),
+        expect.objectContaining({
+          id: "command_palette_delete",
+          group: "omnisearch",
+          code: "Delete",
+        }),
+      ]),
+    );
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "F2",
+        code: "F2",
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+      }),
+    ).toBe("rename");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "F2",
+        code: "F2",
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe("archive");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "Delete",
+        code: "Delete",
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+      }),
+    ).toBe("delete");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "x",
+        code: "KeyX",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   test("matches quick-jump digits by code across shifted layouts", () => {

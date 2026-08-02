@@ -6,6 +6,7 @@ import type {
   SearchLedgerGroup,
 } from "./argus-api";
 import type { SearchDossierAction } from "./run-dossier-contract";
+import { commandPaletteRowActionForEvent } from "./keyboard-shortcuts";
 
 export type CommandPaletteDisplayItem = {
   id: string;
@@ -231,32 +232,57 @@ export function commandPaletteDigitSelectionIndex(
 export type CommandPaletteKeyboardAction =
   | { type: "none" }
   | { type: "select"; index: number }
-  | { type: "open"; openAtLeftOff: boolean };
+  | { type: "open"; openAtLeftOff: boolean }
+  | { type: "rename" }
+  | { type: "archive" }
+  | { type: "delete" };
 
 export function commandPaletteKeyboardAction({
   key,
   itemCount,
   hasSelection,
+  selectedCanManageConversation,
   targetIsEditable,
   targetIsSearchInput,
   isEditing,
   metaKey,
   ctrlKey,
+  shiftKey = false,
+  altKey = false,
+  code = key,
+  repeat = false,
 }: {
   key: string;
   itemCount: number;
   hasSelection: boolean;
+  selectedCanManageConversation?: boolean;
   targetIsEditable: boolean;
   targetIsSearchInput: boolean;
   isEditing: boolean;
   metaKey: boolean;
   ctrlKey: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  code?: string;
+  repeat?: boolean;
 }): CommandPaletteKeyboardAction {
   if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
     return { type: "none" };
   }
   if (key === "Enter" && hasSelection) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };
+  }
+  const rowAction = commandPaletteRowActionForEvent({
+    key,
+    code,
+    metaKey,
+    ctrlKey,
+    shiftKey,
+    altKey,
+    repeat,
+  });
+  if (hasSelection && selectedCanManageConversation && !targetIsEditable && rowAction) {
+    return { type: rowAction };
   }
   const index = commandPaletteDigitSelectionIndex(
     key,

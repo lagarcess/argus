@@ -1073,8 +1073,13 @@
     "no_decision_saved": "No decision saved",
     "no_results": "No results found",
     "no_source_conversation": "No source conversation",
-    "open_at_left_off": "⌘/Ctrl+Enter opens where you left off",
-    "open_at_match": "Enter opens the match",
+    "shortcut_legend": {
+      "archive": "Archive",
+      "delete": "Delete",
+      "go": "Go",
+      "open_left_off": "Continue",
+      "rename": "Rename"
+    },
     "open_conversation": "Open conversation",
     "open_in_conversation": "Open in conversation",
     "open_source_conversation": "Open source conversation",
