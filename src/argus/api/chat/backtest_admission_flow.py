@@ -23,7 +23,11 @@ from argus.domain.usage_limits import (
     GUEST_SIMULATION_VISITOR_LIMITS,
     SIMULATION_USAGE_RESOURCE,
 )
-from argus.domain.visitor_usage import settle_visitor_usage, visitor_within_limits
+from argus.domain.visitor_usage import (
+    read_visitor_used,
+    settle_visitor_usage,
+    visitor_within_limits,
+)
 
 BACKPRESSURE_RECONCILE_SCAN_LIMIT = 16
 
@@ -64,6 +68,7 @@ def admit_durable_chat_job(
     }
 
     visitor_key = getattr(context, "visitor_key", None)
+    is_first_guest_simulation = False
     if visitor_key:
         # Replay resolves before allowance: a retry of an admitted run must
         # return its existing job, never a conversion wall.
@@ -72,12 +77,24 @@ def admit_durable_chat_job(
             operation_scope=CHAT_RUN_SCOPE,
             idempotency_key=idempotency_key,
         )
+        now = datetime.now(timezone.utc)
+        is_first_guest_simulation = all(
+            read_visitor_used(
+                gateway.client,
+                visitor_key=visitor_key,
+                resource=SIMULATION_USAGE_RESOURCE,
+                period=period,
+                now=now,
+            )
+            == 0
+            for period, _ in GUEST_SIMULATION_VISITOR_LIMITS
+        )
         if existing_reservation is None and not visitor_within_limits(
             gateway.client,
             visitor_key=visitor_key,
             resource=SIMULATION_USAGE_RESOURCE,
             limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
-            now=datetime.now(timezone.utc),
+            now=now,
         ):
             emit_verified_guest_funnel_event(
                 "guest_limit_reached",
@@ -123,8 +140,10 @@ def admit_durable_chat_job(
                         error=str(exc),
                         failure_classification="telemetry_only",
                     )
-            if decision == "admitted" and guest_session_allowance_present(
-                context.allowance_limits
+            if (
+                decision == "admitted"
+                and is_first_guest_simulation
+                and guest_session_allowance_present(context.allowance_limits)
             ):
                 emit_verified_guest_funnel_event(
                     "first_simulation_admitted",

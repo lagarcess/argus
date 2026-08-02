@@ -264,7 +264,7 @@ export function useGuestExperience({
                   action,
                 },
                 "signup",
-                usage.allowances.backtests.day?.period_end ?? null,
+                effectiveAccount.guest?.expires_at ?? null,
               );
               return false;
             }

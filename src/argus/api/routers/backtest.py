@@ -13,7 +13,10 @@ from argus.api.chat.backtest_jobs import (
 )
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
-from argus.api.guest_observability import emit_guest_funnel_event
+from argus.api.guest_observability import (
+    emit_first_guest_simulation_event,
+    emit_guest_funnel_event,
+)
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
@@ -310,15 +313,13 @@ def run_backtest(
             ),
             context={"backtest_job_id": job_id, "retryable": True},
         )
-    emit_guest_funnel_event(
+    emit_first_guest_simulation_event(
         account=account_context(request),
         kind="first_result_completed",
         user_id=user.id,
         conversation_id=finalized.run.conversation_id,
         job_id=job_id,
         backtest_run_id=finalized.run.id,
-        surface="backtest",
-        capability_category="simulation",
         terminal_outcome="completed",
     )
     return BacktestRunResponse(run=finalized.run)
@@ -479,14 +480,12 @@ def _admit_direct_run(
 
     if decision in ("admitted", "replay"):
         if decision == "admitted":
-            emit_guest_funnel_event(
+            emit_first_guest_simulation_event(
                 account=account,
                 kind="first_simulation_admitted",
                 user_id=user.id,
                 conversation_id=conversation_id,
                 job_id=str((job or {}).get("id") or "") or None,
-                surface="backtest",
-                capability_category="simulation",
                 terminal_outcome="admitted",
             )
         return decision, job

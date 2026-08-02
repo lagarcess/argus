@@ -119,15 +119,15 @@ describe("auth card consistency", () => {
         reason: "second_simulation",
         initialMode: "signup",
         publicAccountAccessEnabled: true,
-        resetAt: "2026-08-03T00:00:00.000Z",
+        resetAt: "2026-08-09T00:00:00.000Z",
         locale: "en-US",
         onClose: () => undefined,
         onAuthenticate: async () => undefined,
       }),
     );
 
-    match(html, /Your two temporary simulations are used/);
-    match(html, /Aug 3, 2026/);
+    match(html, /This temporary chat can’t run more simulations/);
+    match(html, /Aug 9, 2026/);
     match(html, /Create your account/);
   });
 

@@ -196,6 +196,18 @@ describe("guest conversion contract", () => {
     expect(modal).toContain("mode={mode}");
   });
 
+  test("uses the fixed workspace expiry for exhausted-simulation recovery", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+
+    expect(experience).toContain("effectiveAccount.guest?.expires_at ?? null");
+    expect(experience).not.toContain(
+      "usage.allowances.backtests.day?.period_end ?? null",
+    );
+  });
+
   test("derives the New-chat auth mode from server-owned public access truth", () => {
     expect(newConversationConversionMode(false)).toBe("login");
     expect(newConversationConversionMode(true)).toBe("signup");

@@ -23,7 +23,7 @@ def _context() -> BacktestJobShadowContext:
         allowance_limits=[
             {
                 "period": "guest_session",
-                "limit": 1,
+                "limit": 2,
                 "period_start": "2026-07-28T00:00:00+00:00",
                 "period_end": "2026-08-04T00:00:00+00:00",
             }
@@ -112,3 +112,24 @@ def test_replay_decision_never_charges_the_visitor(monkeypatch) -> None:
 
     assert result.decision == "replay"
     assert charges == []
+
+
+def test_only_first_fresh_admission_emits_first_simulation(monkeypatch) -> None:
+    monkeypatch.setattr(flow, "visitor_within_limits", lambda *a, **k: True)
+    monkeypatch.setattr(flow, "settle_visitor_usage", lambda *a, **k: None)
+    events: list[str] = []
+    monkeypatch.setattr(
+        flow,
+        "emit_verified_guest_funnel_event",
+        lambda kind, **kwargs: events.append(kind),
+    )
+
+    first = _gateway(reservation=None, decision="admitted")
+    monkeypatch.setattr(flow, "read_visitor_used", lambda *a, **k: 0)
+    _admit(first)
+
+    second = _gateway(reservation=None, decision="admitted")
+    monkeypatch.setattr(flow, "read_visitor_used", lambda *a, **k: 1)
+    _admit(second)
+
+    assert events == ["first_simulation_admitted"]

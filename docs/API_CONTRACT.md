@@ -1828,18 +1828,19 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `day` set to
-`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
-expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
-simulation counter reports `available_now: false`. Guest responses never
-fabricate registered hour/day windows.
+Guests receive the same typed resource keys with `hour` and `guest_session`
+set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
+as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
+reports `available_now: false`. The separate workspace-lifetime ceiling is
+enforced during admission and is not misrepresented as another UI reset
+window.
 
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
 - Registered accounts receive both active UTC calendar windows. Guests receive
-  only the fixed `guest_session` window. Every populated window carries the
+  only the visitor-owned UTC `day` window. Every populated window carries the
   exact backend-owned `period_end`; clients may localize its display, but must
   not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement

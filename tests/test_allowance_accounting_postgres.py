@@ -513,7 +513,7 @@ def test_guest_feedback_concurrent_exact_replay_charges_once(guest_owner):
                 "select count(*) from public.feedback where id = %s",
                 (feedback_id,),
             )
-            assert cursor.fetchone()[0] == 2
+            assert cursor.fetchone()[0] == 1
 
 
 def test_guest_feedback_concurrent_identity_collision_is_rejected(guest_owner):
