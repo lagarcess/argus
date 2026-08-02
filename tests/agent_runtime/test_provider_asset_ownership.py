@@ -904,6 +904,67 @@ async def test_artifact_edit_clarification_cannot_drop_incomplete_asset_blocker(
 
 
 @pytest.mark.asyncio
+async def test_artifact_edit_unsupported_followup_keeps_planner_explanation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def unsupported_plan_stub(**_: Any) -> LLMInterpretationResponse:
+        return LLMInterpretationResponse(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The requested artifact edit is unsupported.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL", "MSFT", "NVDA", "AMZN", "META"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            assistant_response="I cannot apply that change to this artifact.",
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="unsupported_request",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_ready_active_artifact_edit_planned_response",
+        unsupported_plan_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User requested an unsupported artifact edit.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL", "MSFT", "NVDA", "AMZN", "META"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    planned = await interpreter_module._audited_response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Add a setting this artifact cannot represent.",
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=json.dumps(
+            {"all_traded_asset_mentions_accounted_for": False}
+        ),
+    )
+
+    assert planned.intent == "conversation_followup"
+    assert planned.semantic_turn_act == "unsupported_request"
+    assert planned.assistant_response == "I cannot apply that change to this artifact."
+    assert planned.missing_required_fields == []
+    assert planned.reason_codes == ["artifact_assumption_edit_planned"]
+
+
+@pytest.mark.asyncio
 async def test_late_artifact_edit_clarification_keeps_incomplete_asset_blocker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
