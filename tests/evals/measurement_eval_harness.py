@@ -97,6 +97,7 @@ class TypedExpectations:
     cost_provenance: dict[str, str] | None = None
     launch_execution_realism: dict[str, Any] | None = None
     stage_outcomes: tuple[str, ...] = ()
+    requested_field: str | None = None
     clarification: dict[str, Any] | None = None
     semantic_turn_act: str | None = None
     asset_discovery: dict[str, Any] | None = None
@@ -368,6 +369,12 @@ def typed_expectation_failures(
             outcome.get("stage_outcomes"),
             failures,
         )
+    _compare(
+        "requested_field",
+        expected.requested_field,
+        outcome.get("requested_field"),
+        failures,
+    )
     if expected.clarification is not None:
         _compare_subset(
             "clarification",
@@ -681,6 +688,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             cost_provenance=expected.get("cost_provenance"),
             launch_execution_realism=expected.get("launch_execution_realism"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
+            requested_field=expected.get("requested_field"),
             clarification=expected.get("clarification"),
             semantic_turn_act=expected.get("semantic_turn_act"),
             asset_discovery=expected.get("asset_discovery"),
@@ -923,6 +931,7 @@ def _typed_outcome(
             ),
             patch=final_patch,
         ),
+        "requested_field": final_patch.get("requested_field"),
         "clarification": final_patch.get("clarification"),
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
         "asset_discovery": interpret_patch.get("asset_discovery"),

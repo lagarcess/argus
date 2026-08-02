@@ -114,11 +114,7 @@ Add this case to `messy_english.yaml`:
       strategy_type: buy_and_hold
       capital_amount: 10000
       stage_outcomes: ["needs_clarification", "await_user_reply"]
-      clarification:
-        kind: clarification
-        reason_code: missing_period
-        requested_field: date_range
-        semantic_needs: ["period"]
+      requested_field: date_range
 ```
 
 Production mutation caught: dropping the opening asset or re-requesting `asset_universe` fails the typed asset and clarification assertions without relying on prose.
@@ -168,6 +164,7 @@ Run:
 
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 ARGUS_EVAL_ENV_FILE=.env \
+ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q --no-cov
 ```
 

@@ -12,11 +12,7 @@ cases:
       strategy_type: buy_and_hold
       capital_amount: 10000
       stage_outcomes: ["needs_clarification", "await_user_reply"]
-      clarification:
-        kind: clarification
-        reason_code: missing_period
-        requested_field: date_range
-        semantic_needs: ["period"]
+      requested_field: date_range
 
   - id: messy_english_aapl_simple_hold_2024
     prompt: "ok can you just test if apple, like simply holding it, from jan 2024 through dec 2024 did better than the market"
