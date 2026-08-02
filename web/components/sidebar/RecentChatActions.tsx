@@ -139,7 +139,7 @@ export default function RecentChatActions({
               event.stopPropagation();
               handleToggleUnread();
             }}
-            className="font-display mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
+            className="font-display mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
           >
             {isUnread ? <MailOpen className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
             {isUnread
@@ -154,7 +154,7 @@ export default function RecentChatActions({
               event.stopPropagation();
               void runAction(() => onPin(item.id, !item.pinned));
             }}
-            className="font-display mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
+            className="font-display mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
           >
             <Pin className="h-3.5 w-3.5" />
             {item.pinned ? t("common.unpin", "Unpin") : t("common.pin", "Pin")}
@@ -168,7 +168,7 @@ export default function RecentChatActions({
               onRename(item.id);
               setIsMenuOpen(false);
             }}
-            className="font-display mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
+            className="font-display mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
           >
             <Edit2 className="h-3.5 w-3.5" />
             {t("common.rename", "Rename")}
@@ -181,7 +181,7 @@ export default function RecentChatActions({
               event.stopPropagation();
               void runAction(() => onArchive(item.id));
             }}
-            className="font-display mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
+            className="font-display mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-black hover:bg-black/5 disabled:opacity-50 dark:text-white dark:hover:bg-white/5"
           >
             <Archive className="h-3.5 w-3.5" />
             {t("common.archive", "Archive")}
@@ -195,7 +195,7 @@ export default function RecentChatActions({
               event.stopPropagation();
               void runAction(() => onDelete(item.id));
             }}
-            className="font-display mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-[#d66d75] hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/5"
+            className="font-display mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] text-[#d66d75] hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/5"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {t("common.delete", "Delete")}
