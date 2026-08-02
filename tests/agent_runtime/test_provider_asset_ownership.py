@@ -435,6 +435,32 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
     )
     assert payload["all_traded_asset_mentions_accounted_for"] is False
 
+    truncated_response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test a six-asset basket.",
+        assistant_response="Ready to test the five resolved assets.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=list(symbols.values()),
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = response_with_provider_context_assets(
+        truncated_response,
+        asset_resolution_context=context,
+    )
+
+    assert normalized.candidate_strategy_draft.asset_universe == list(symbols.values())
+    assert normalized.missing_required_fields == ["asset_universe"]
+    assert normalized.requires_clarification is True
+    assert normalized.assistant_response is None
+    assert "provider_context_incomplete_asset_mentions" in normalized.reason_codes
+
 
 def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     request = InterpretationRequest(

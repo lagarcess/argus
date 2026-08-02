@@ -594,7 +594,8 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
                     "name": "Costco Wholesale Corporation",
                     "confidence": 0.95,
                 },
-            ]
+            ],
+            "all_traded_asset_mentions_accounted_for": True,
         }
     )
     message = (

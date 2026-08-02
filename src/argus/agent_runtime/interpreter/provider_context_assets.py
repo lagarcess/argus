@@ -136,9 +136,14 @@ def response_with_provider_context_assets(
         draft.asset_universe = resolved_symbols
         preserved_fuller_draft = False
         ambiguous_fields = []
+    incomplete_asset_context = (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and not all_traded_asset_mentions_accounted_for
+    )
     if (
         not ambiguous_fields
         and not preserved_fuller_draft
+        and not incomplete_asset_context
         and draft == response.candidate_strategy_draft
     ):
         return response
@@ -184,6 +189,35 @@ def response_with_provider_context_assets(
                     "provider_context_partial_preserved_fuller_draft",
                 ]
             )
+        )
+    if incomplete_asset_context:
+        remaining_missing_fields = [
+            field
+            for field in response.missing_required_fields
+            if field != "asset_universe"
+        ]
+        update.update(
+            {
+                "missing_required_fields": [
+                    "asset_universe",
+                    *remaining_missing_fields,
+                ],
+                "requires_clarification": True,
+                "assistant_response": (
+                    response.assistant_response
+                    if response.requires_clarification
+                    and "asset_universe" in response.missing_required_fields
+                    else None
+                ),
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *update.get("reason_codes", response.reason_codes),
+                            "provider_context_incomplete_asset_mentions",
+                        ]
+                    )
+                ),
+            }
         )
     if ambiguous_fields:
         update.update(
