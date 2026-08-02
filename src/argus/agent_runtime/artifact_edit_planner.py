@@ -84,7 +84,7 @@ async def plan_artifact_assumption_edit(
     preferred_model: str,
     language: str | None = None,
     required_targets: set[str] | None = None,
-    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str]]
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
     | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
@@ -250,18 +250,20 @@ def _covers_required_targets(
     plan: ArtifactAssumptionEditPlan,
     *,
     required_targets: set[str],
-    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str]]
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
     | None = None,
 ) -> bool:
-    if not required_targets:
-        return True
-    if materialized_targets_for_plan is None:
-        covered_targets = _materialized_legacy_flat_targets(plan)
-    else:
+    if materialized_targets_for_plan is not None:
         try:
             covered_targets = materialized_targets_for_plan(plan)
         except Exception:
             return False
+        if covered_targets is None:
+            return False
+    elif required_targets:
+        covered_targets = _materialized_legacy_flat_targets(plan)
+    else:
+        return True
     return required_targets.issubset(covered_targets)
 
 
@@ -546,17 +548,13 @@ def apply_edit_operations(
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount
                 elif target == "fees":
-                    fee_rate = supported_cost_rate_value(
-                        amount, field_name="fee_rate"
-                    )
+                    fee_rate = supported_cost_rate_value(amount, field_name="fee_rate")
                     if fee_rate is None:
                         resolved.unsupported.append(f"{op}.{target}")
                         continue
                     resolved.fee_rate = fee_rate
                 elif target == "slippage":
-                    slippage = supported_cost_rate_value(
-                        amount, field_name="slippage"
-                    )
+                    slippage = supported_cost_rate_value(amount, field_name="slippage")
                     if slippage is None:
                         resolved.unsupported.append(f"{op}.{target}")
                         continue

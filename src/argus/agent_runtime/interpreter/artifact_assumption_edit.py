@@ -548,7 +548,7 @@ def materialized_artifact_edit_targets(
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
     resolve_asset_candidate: ResolveAssetCandidate | None = None,
     primary_draft: LLMStrategyDraft | None = None,
-) -> set[str]:
+) -> set[str] | None:
     """Return requested deltas that survive the exact materialization path."""
 
     draft, field_provenance, _ = _materialized_artifact_edit(
@@ -564,7 +564,15 @@ def materialized_artifact_edit_targets(
     }
     if draft.date_range_intent is not None:
         materialized_targets.add("date_window")
+    if primary_draft is None:
+        return materialized_targets
     current_strategy = _current_artifact_strategy(request)
+    if not _primary_draft_has_material_delta(
+        primary_draft,
+        current_strategy=current_strategy,
+        request=request,
+    ):
+        return materialized_targets
     requested_targets = _required_edit_targets_from_primary_draft(
         primary_draft,
         current_strategy=current_strategy,
@@ -608,7 +616,7 @@ def materialized_artifact_edit_targets(
         )
         for target in materialized_targets
     ):
-        return set()
+        return None
     return matching_targets
 
 
@@ -652,6 +660,9 @@ def _materialized_target_matches_primary_delta(
                 and primary_requested <= materialized
                 and (current ^ materialized) <= requested
             )
+        if materialized_operation == "replace":
+            additions = materialized - current
+            return bool(additions) and additions <= requested
         changed_symbols = current ^ materialized
         return changed_symbols <= requested and (
             not primary_requested
@@ -790,6 +801,24 @@ def _materialized_target_matches_primary_delta(
     else:
         return False
     return requested is not None and requested != current and materialized == requested
+
+
+def _primary_draft_has_material_delta(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest,
+) -> bool:
+    return any(
+        _materialized_target_matches_primary_delta(
+            target,
+            materialized_draft=draft,
+            primary_draft=draft,
+            current_strategy=current_strategy,
+            request=request,
+        )
+        for target in set(_MATERIALIZED_FIELD_TARGETS.values()) | {"date_window"}
+    )
 
 
 def _materialized_target_mutates_current(
