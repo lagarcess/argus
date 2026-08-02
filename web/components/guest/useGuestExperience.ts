@@ -59,6 +59,7 @@ type UseGuestExperienceInput = {
   sendRef: MutableRefObject<GuestResumeSend | null>;
   refreshAccount: () => Promise<UserResponse | null>;
   refreshHistory: () => void;
+  refreshHistoryForActivity: () => Promise<unknown>;
   closeTransientSidebar: () => void;
   startNewChat: () => Promise<unknown>;
   onOpenFeedback: () => void;
@@ -88,6 +89,7 @@ export function useGuestExperience({
   sendRef,
   refreshAccount,
   refreshHistory,
+  refreshHistoryForActivity,
   closeTransientSidebar,
   startNewChat,
   onOpenFeedback,
@@ -147,7 +149,7 @@ export function useGuestExperience({
     account,
     conversationId,
     refreshAccount,
-    refreshHistory,
+    refreshHistory: refreshHistoryForActivity,
     onResume: resumeGuestAction,
   });
 

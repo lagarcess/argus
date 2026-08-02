@@ -263,6 +263,10 @@ describe("guest conversion contract", () => {
       join(root, "components/guest/GuestExperienceSurfaces.tsx"),
       "utf-8",
     );
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
     expect(existsSync(hookPath)).toBe(true);
     if (!existsSync(hookPath)) return;
     const hook = readFileSync(hookPath, "utf-8");
@@ -283,6 +287,8 @@ describe("guest conversion contract", () => {
     expect(authenticate.indexOf("await refreshHistory()")).toBeLessThan(
       authenticate.indexOf("await onResume(action)"),
     );
+    expect(experience).toContain("refreshHistoryForActivity");
+    expect(experience).toContain("refreshHistory: refreshHistoryForActivity");
     expect(chat).toContain("<GuestExperienceSurfaces");
     expect(surfaces).toContain("<GuestConversionModal");
     expect(surfaces).toContain("publicAccountAccessEnabled");
