@@ -100,7 +100,7 @@ export default function ChatHeaderMenu({
                 role="menuitem"
                 disabled={isReadMutationPending}
                 onClick={handleToggleUnread}
-                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-5 md:py-3 md:text-[15px]"
               >
                 {isUnread
                   ? <MailOpen className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
@@ -114,7 +114,7 @@ export default function ChatHeaderMenu({
                 role="menuitem"
                 disabled={isPinning}
                 onClick={onTogglePin}
-                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-5 md:py-3 md:text-[15px]"
               >
                 <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                 {pinned
@@ -125,7 +125,7 @@ export default function ChatHeaderMenu({
                 type="button"
                 role="menuitem"
                 onClick={onStartRename}
-                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-5 md:py-3 md:text-[15px]"
               >
                 <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                 {t('chat.rename_chat', 'Rename chat')}
@@ -136,7 +136,7 @@ export default function ChatHeaderMenu({
                 role="menuitem"
                 disabled={isDeleting}
                 onClick={onRequestDelete}
-                className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
+                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-5 md:py-3 md:text-[15px]"
               >
                 <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
                 {t('chat.delete_chat', 'Delete')}
