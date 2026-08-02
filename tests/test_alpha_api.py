@@ -3630,8 +3630,8 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
         "type": "retest_run",
         "source_run_id": run.id,
         "run_label": "Annual GLD buy and hold",
-        "window_policy": "same_duration_ending_today",
-        "contract_version": "argus_retest_run/v1",
+        "window_policy": "preserve_start_ending_latest_available",
+        "contract_version": "argus_retest_run/v2",
     }
     assert "canonical_setup" not in retest
     assert "send_text" not in retest

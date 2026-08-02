@@ -3136,8 +3136,8 @@ def test_search_supabase_projects_localized_actions_without_generation(
         "type": "retest_run",
         "source_run_id": "run-action-es",
         "run_label": retest["run_label"],
-        "window_policy": "same_duration_ending_today",
-        "contract_version": "argus_retest_run/v1",
+        "window_policy": "preserve_start_ending_latest_available",
+        "contract_version": "argus_retest_run/v2",
     }
     assert decision == {
         "type": "decision",

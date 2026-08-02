@@ -2290,11 +2290,14 @@ stores nothing and makes no LLM, provider, or market-data call.
   A valid action reaches LangGraph with the pending strategy and continuity
   artifacts recovered from that exact source message, not from a newer
   checkpoint draft.
-- `retest_run` replays a stored supported experiment onto today's matching
-  window. Its payload is a bounded v1 envelope containing exactly
-  `source_run_id`, `window_policy: "same_duration_ending_today"`, and
-  `contract_version: "argus_retest_run/v1"`; any other key, value, or a
-  `source_run_id` that is not a UUID is rejected. Client display copy is
+- `retest_run` replays a stored supported experiment through the latest
+  available data while preserving its original start. New actions use a
+  bounded v2 envelope containing exactly `source_run_id`,
+  `window_policy: "preserve_start_ending_latest_available"`, and
+  `contract_version: "argus_retest_run/v2"`. Admission also accepts the exact
+  legacy pair `argus_retest_run/v1` + `same_duration_ending_today` for durable
+  transcripts. Crossed pairs, unknown versions or policies, any extra key, or a
+  `source_run_id` that is not a UUID are rejected. Client display copy is
   non-authoritative and never persisted. Before persisting the request or
   invoking the runtime, the backend verifies that the source run and its
   source conversation belong to the user, that the action conversation equals
@@ -3445,8 +3448,8 @@ the `/search` contract.
             "type": "retest_run",
             "source_run_id": "uuid",
             "run_label": "Weekly GLD pullback",
-            "window_policy": "same_duration_ending_today",
-            "contract_version": "argus_retest_run/v1"
+            "window_policy": "preserve_start_ending_latest_available",
+            "contract_version": "argus_retest_run/v2"
           },
           {
             "type": "decision",
@@ -3516,12 +3519,13 @@ and `decided_runs` are backend-owned full-lineage counts, not page totals.
 - `retest_run` is projected only from the selected supported completed
   evidence-backed run dossier. It carries identity and policy only:
   `source_run_id`, a display-only `run_label`, the fixed
-  `window_policy: "same_duration_ending_today"`, and
-  `contract_version: "argus_retest_run/v1"`. It carries no executable setup and
+  `window_policy: "preserve_start_ending_latest_available"`, and
+  `contract_version: "argus_retest_run/v2"`. It carries no executable setup and
   no generated prompt, so a client cannot supply canonical state. The backend
   reloads every executable field from the owner-scoped stored run when the
-  action is submitted, preserves the original inclusive window length, and
-  shifts that window to end on the current date. Eligibility and admission
+  action is submitted, preserves the original start, and requests the current
+  date only as the candidate end before provider coverage resolves the latest
+  available bar. Eligibility and admission
   share one reconstruction, so the action is offered only when the backend can
   faithfully materialize the confirmation - including under the
   execution-realism kill switch, which would otherwise idealize a costed run.

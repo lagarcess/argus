@@ -31,6 +31,7 @@ from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.dependencies import problem
 from argus.api.schemas import ChatStreamRequest, Message
 from argus.domain.retest_setup import (
+    RETEST_CONTRACT_PAIRS,
     RETEST_CONTRACT_VERSION,
     RETEST_WINDOW_POLICY,
     RetestSetup,
@@ -62,12 +63,14 @@ def is_retest_action(payload: ChatStreamRequest) -> bool:
 
 
 def retest_action_source_run_id(action_payload: Mapping[str, Any]) -> str | None:
-    """Accept only the bounded v1 envelope; anything else is client authority."""
-    if set(action_payload) - _ENVELOPE_KEYS:
+    """Accept only exact legacy or current identity-only envelopes."""
+    if set(action_payload) != _ENVELOPE_KEYS:
         return None
-    if action_payload.get("contract_version") != RETEST_CONTRACT_VERSION:
+    contract_version = action_payload.get("contract_version")
+    window_policy = action_payload.get("window_policy")
+    if not isinstance(contract_version, str) or not isinstance(window_policy, str):
         return None
-    if action_payload.get("window_policy") != RETEST_WINDOW_POLICY:
+    if (contract_version, window_policy) not in RETEST_CONTRACT_PAIRS:
         return None
     source_run_id = action_payload.get("source_run_id")
     if not isinstance(source_run_id, str):

@@ -8,11 +8,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, cast
 
-RETEST_CONTRACT_VERSION = "argus_retest_run/v1"
-RETEST_WINDOW_POLICY = "same_duration_ending_today"
+RETEST_CONTRACT_VERSION = "argus_retest_run/v2"
+RETEST_WINDOW_POLICY = "preserve_start_ending_latest_available"
+LEGACY_RETEST_CONTRACT_VERSION = "argus_retest_run/v1"
+LEGACY_RETEST_WINDOW_POLICY = "same_duration_ending_today"
+RETEST_CONTRACT_PAIRS: frozenset[tuple[str, str]] = frozenset(
+    {
+        (RETEST_CONTRACT_VERSION, RETEST_WINDOW_POLICY),
+        (LEGACY_RETEST_CONTRACT_VERSION, LEGACY_RETEST_WINDOW_POLICY),
+    }
+)
 
 RETEST_STRATEGY_TYPES = (
     "buy_and_hold",
@@ -42,7 +50,7 @@ _MAX_SYMBOLS = 5
 
 @dataclass(frozen=True)
 class RetestSetup:
-    """Executable truth reloaded from a stored run, moved to a fresh window."""
+    """Executable truth reloaded from a stored run with a candidate new end."""
 
     source_run_id: str
     strategy_type: str
@@ -94,7 +102,7 @@ def retest_setup_from_run(
     *,
     today: date,
 ) -> RetestSetup | None:
-    """Rebuild a stored run's supported setup on a window ending at ``today``."""
+    """Rebuild a stored run from its original start through candidate ``today``."""
     if run is None:
         return None
     run_id = _text(run.get("id"))
@@ -193,7 +201,7 @@ def retest_setup_from_run(
         timeframe=timeframe,
         original_start=original_start,
         original_end=original_end,
-        start=today - timedelta(days=(original_end - original_start).days),
+        start=original_start,
         end=today,
         sizing_mode=sizing_mode,
         benchmark_symbol=benchmark_symbol,

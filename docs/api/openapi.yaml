@@ -3361,12 +3361,12 @@ components:
           maxLength: 160
         window_policy:
           type: string
-          const: same_duration_ending_today
-          default: same_duration_ending_today
+          const: preserve_start_ending_latest_available
+          default: preserve_start_ending_latest_available
         contract_version:
           type: string
-          const: argus_retest_run/v1
-          default: argus_retest_run/v1
+          const: argus_retest_run/v2
+          default: argus_retest_run/v2
       type: object
       required:
       - source_run_id

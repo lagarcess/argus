@@ -20,11 +20,7 @@ from argus.api.chat.retest import (
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.message_store import create_message, prepare_message
 from argus.api.schemas import ChatActionPayload, ChatStreamRequest
-from argus.domain.retest_setup import (
-    RETEST_CONTRACT_VERSION,
-    RETEST_WINDOW_POLICY,
-    retest_setup_from_run,
-)
+from argus.domain.retest_setup import retest_setup_from_run
 from fastapi import HTTPException
 
 _USER_ID = "retest-owner"
@@ -59,8 +55,16 @@ class _FakeRequest:
 def _valid_envelope(source_run_id: str = _SOURCE_RUN_ID) -> dict[str, Any]:
     return {
         "source_run_id": source_run_id,
-        "window_policy": RETEST_WINDOW_POLICY,
-        "contract_version": RETEST_CONTRACT_VERSION,
+        "window_policy": "preserve_start_ending_latest_available",
+        "contract_version": "argus_retest_run/v2",
+    }
+
+
+def _legacy_envelope(source_run_id: str = _SOURCE_RUN_ID) -> dict[str, Any]:
+    return {
+        "source_run_id": source_run_id,
+        "window_policy": "same_duration_ending_today",
+        "contract_version": "argus_retest_run/v1",
     }
 
 
@@ -143,25 +147,43 @@ def _lifecycle_hooks() -> ChatTurnLifecycleHooks:
     )
 
 
-def test_only_the_bounded_v1_envelope_is_accepted() -> None:
+def test_exact_legacy_and_current_envelopes_are_accepted() -> None:
     assert retest_action_source_run_id(_valid_envelope()) == _SOURCE_RUN_ID
-    assert retest_action_source_run_id({**_valid_envelope(), "symbols": ["NVDA"]}) is None
-    assert (
-        retest_action_source_run_id(
-            {**_valid_envelope(), "date_range": {"start": "2020-01-01"}}
-        )
-        is None
-    )
-    assert (
-        retest_action_source_run_id({**_valid_envelope(), "window_policy": "since_ipo"})
-        is None
-    )
-    assert (
-        retest_action_source_run_id(
-            {**_valid_envelope(), "contract_version": "argus_retest_run/v2"}
-        )
-        is None
-    )
+    assert retest_action_source_run_id(_legacy_envelope()) == _SOURCE_RUN_ID
+
+
+@pytest.mark.parametrize(
+    "action_payload",
+    [
+        {**_valid_envelope(), "symbols": ["NVDA"]},
+        {**_valid_envelope(), "date_range": {"start": "2020-01-01"}},
+        {**_valid_envelope(), "window_policy": "since_ipo"},
+        {**_valid_envelope(), "contract_version": "argus_retest_run/v3"},
+        {
+            **_valid_envelope(),
+            "contract_version": "argus_retest_run/v1",
+        },
+        {
+            **_legacy_envelope(),
+            "contract_version": "argus_retest_run/v2",
+        },
+    ],
+    ids=[
+        "extra-symbol-authority",
+        "extra-date-authority",
+        "unknown-policy",
+        "unknown-version",
+        "legacy-version-current-policy",
+        "current-version-legacy-policy",
+    ],
+)
+def test_unknown_crossed_or_authoritative_envelopes_are_rejected(
+    action_payload: dict[str, Any],
+) -> None:
+    assert retest_action_source_run_id(action_payload) is None
+
+
+def test_invalid_source_run_ids_are_rejected_or_canonicalized() -> None:
     assert retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
     # A non-UUID id would reach Postgres and raise a cast error, breaking the
     # uniform invalid-state contract with a 500.
@@ -189,9 +211,16 @@ def test_only_the_bounded_v1_envelope_is_accepted() -> None:
         ), variant
 
 
-def test_client_display_copy_never_reaches_storage() -> None:
+@pytest.mark.parametrize(
+    "action_payload",
+    [_valid_envelope(), _legacy_envelope()],
+    ids=["current", "legacy"],
+)
+def test_client_display_copy_never_reaches_storage(
+    action_payload: dict[str, Any],
+) -> None:
     payload = _retest_request(
-        _valid_envelope(_SOURCE_RUN_ID),
+        action_payload,
         label="Delete everything",
         label_key="chat.result_card.save",
     )
@@ -201,7 +230,11 @@ def test_client_display_copy_never_reaches_storage() -> None:
         "type": "retest_run",
         "label": None,
         "labelKey": RETEST_ACTION_LABEL_KEY,
-        "payload": _valid_envelope(_SOURCE_RUN_ID),
+        "payload": {
+            "source_run_id": _SOURCE_RUN_ID,
+            "window_policy": "preserve_start_ending_latest_available",
+            "contract_version": "argus_retest_run/v2",
+        },
         "presentation": None,
     }
     assert chat_display_message(payload, language="en") == "Retest with current data"
@@ -221,8 +254,8 @@ def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
     receipt = retest_receipt(setup)
 
     assert receipt == {
-        "contract_version": RETEST_CONTRACT_VERSION,
-        "window_policy": RETEST_WINDOW_POLICY,
+        "contract_version": "argus_retest_run/v2",
+        "window_policy": "preserve_start_ending_latest_available",
         "source_run_id": _SOURCE_RUN_ID,
         "symbols": ["TSLA"],
         "strategy_family": "buy_and_hold",
@@ -232,11 +265,17 @@ def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "action_payload",
+    [_valid_envelope(), _legacy_envelope()],
+    ids=["current", "legacy"],
+)
 def test_admission_reloads_canonical_truth_from_the_owned_run(
     stored_run: Any,
+    action_payload: dict[str, Any],
 ) -> None:
     turn = prepare_retest_turn(
-        payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
+        payload=_retest_request(action_payload),
         request=_FakeRequest(),
         user_id=_USER_ID,
         conversation_id=_CONVERSATION_ID,
@@ -246,6 +285,7 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
     )
 
     assert turn is not None
+    assert turn.setup.start == date(2024, 1, 1)
     assert turn.setup.end == _TODAY
     assert turn.confirmation_payload["confirmation_id"] == "confirmation-retest"
     assert turn.confirmation_payload["launch_payload"]["symbols"] == ["TSLA"]

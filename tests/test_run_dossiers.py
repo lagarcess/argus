@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from importlib import import_module
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from argus.api import state as api_state
 from argus.api.guest_access import guest_account_context, store_account_context
 from argus.api.memory_run_dossiers import list_memory_run_dossier_source_rows
@@ -126,12 +128,34 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
     assert dossier.actions[0].source_run_id == dossier.run_id
     # The typed envelope carries identity and policy only; the executable
     # setup is reloaded server-side from the owner-scoped source run.
-    assert dossier.actions[0].window_policy == "same_duration_ending_today"
-    assert dossier.actions[0].contract_version == "argus_retest_run/v1"
+    assert (
+        dossier.actions[0].window_policy
+        == "preserve_start_ending_latest_available"
+    )
+    assert dossier.actions[0].contract_version == "argus_retest_run/v2"
     assert not hasattr(dossier.actions[0], "canonical_setup")
     assert not hasattr(dossier.actions[0], "send_text")
     assert dossier.actions[1].type == "decision"
     assert dossier.actions[1].evidence_artifact_id == artifact["id"]
+
+
+def test_retest_action_api_and_checked_openapi_expose_only_v2_literals() -> None:
+    from argus.api.main import app
+
+    generated = app.openapi()["components"]["schemas"]["SearchRetestAction"]
+    checked = yaml.safe_load(
+        (Path(__file__).parents[1] / "docs/api/openapi.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["components"]["schemas"]["SearchRetestAction"]
+
+    for schema in (generated, checked):
+        contract_version = schema["properties"]["contract_version"]
+        assert contract_version["const"] == "argus_retest_run/v2"
+        assert contract_version["default"] == "argus_retest_run/v2"
+        window_policy = schema["properties"]["window_policy"]
+        assert window_policy["const"] == "preserve_start_ending_latest_available"
+        assert window_policy["default"] == "preserve_start_ending_latest_available"
 
 
 def test_unfinalized_evidence_identity_is_not_offered_a_retest() -> None:

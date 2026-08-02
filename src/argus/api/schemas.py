@@ -649,10 +649,10 @@ class SearchRetestAction(BaseModel):
     type: Literal["retest_run"] = "retest_run"
     source_run_id: str
     run_label: str = Field(max_length=160)
-    window_policy: Literal["same_duration_ending_today"] = (
-        "same_duration_ending_today"
+    window_policy: Literal["preserve_start_ending_latest_available"] = (
+        "preserve_start_ending_latest_available"
     )
-    contract_version: Literal["argus_retest_run/v1"] = "argus_retest_run/v1"
+    contract_version: Literal["argus_retest_run/v2"] = "argus_retest_run/v2"
 
 
 class SearchDecisionAction(BaseModel):

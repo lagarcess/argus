@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 import pytest
@@ -160,7 +160,7 @@ def test_confirmation_card_is_ready_to_run_without_provider_calls(
     }
 
 
-def test_window_preserves_the_original_calendar_day_span(
+def test_window_preserves_original_start_and_requests_today_as_candidate_end(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
@@ -171,11 +171,11 @@ def test_window_preserves_the_original_calendar_day_span(
     assert setup.original_start == date(2024, 1, 1)
     assert setup.original_end == date(2024, 12, 31)
     assert setup.duration_days == 365
+    assert setup.start == setup.original_start
     assert setup.end == _TODAY
-    assert setup.start == _TODAY - timedelta(days=365)
 
 
-def test_injected_clock_moves_the_window_without_changing_the_span(
+def test_injected_clock_moves_only_the_candidate_end(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
@@ -185,9 +185,9 @@ def test_injected_clock_moves_the_window_without_changing_the_span(
 
     assert earlier is not None and later is not None
     assert earlier.duration_days == later.duration_days == 365
+    assert earlier.start == later.start == date(2024, 1, 1)
     assert earlier.end == date(2026, 1, 15)
     assert later.end == date(2027, 3, 2)
-    assert (earlier.end - earlier.start) == (later.end - later.start)
 
 
 @pytest.mark.parametrize(
@@ -248,8 +248,8 @@ def test_window_shorter_than_the_indicator_warmup_is_not_confirmable(
 ) -> None:
     run = _persisted_run(monkeypatch, _SIGNAL_STRATEGY)
     run["config_snapshot"]["date_range"] = {
-        "start": "2024-01-01",
-        "end": "2024-01-08",
+        "start": "2026-07-24",
+        "end": "2026-07-31",
     }
 
     setup = retest_setup_from_run(run, today=_TODAY)
