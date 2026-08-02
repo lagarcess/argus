@@ -97,10 +97,6 @@ _EXPLORATION_KINDS = frozenset(
 CONTINUITY_NEXT_EXPERIMENT_KINDS = frozenset(
     {"change_date_range", "compare_buy_and_hold"}
 )
-_DATE_RANGE_RECOMMENDATION_PROMPTS = {
-    "en": "What date window should I use for this test?",
-    "es-419": "¿Qué rango de fechas debo usar para esta prueba?",
-}
 _DEEP_DRAWDOWN_THRESHOLD_PCT = -15.0
 
 _PEER_ASSETS: dict[str, str] = {
@@ -302,15 +298,6 @@ def continuity_next_experiment_label_key(kind: str) -> str | None:
     if kind not in CONTINUITY_NEXT_EXPERIMENT_KINDS:
         return None
     return f"{_LABEL_KEY_PREFIX}{kind}"
-
-
-def date_range_recommendation_prompt(language: str) -> str:
-    """Return presentation copy without making locale part of routing."""
-
-    return _DATE_RANGE_RECOMMENDATION_PROMPTS.get(
-        language,
-        _DATE_RANGE_RECOMMENDATION_PROMPTS["en"],
-    )
 
 
 def detect_next_experiment_acceptance(

@@ -6,6 +6,9 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.llm_clarifier import ClarificationRequest
+from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -19,6 +22,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.api.chat.actions import chat_request_message
 from argus.api.schemas import ChatStreamRequest
+from langgraph.checkpoint.memory import MemorySaver
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,16 @@ class _ResolvedAssetStub:
     asset_class: str
     name: str = ""
     raw_symbol: str = ""
+
+
+class _RecordingClarifier:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.requests: list[ClarificationRequest] = []
+
+    def __call__(self, request: ClarificationRequest) -> str:
+        self.requests.append(request)
+        return self.response
 
 
 def _source_result() -> ArtifactReference:
@@ -75,19 +89,23 @@ def _source_result() -> ArtifactReference:
     )
 
 
+def _recommendation_action(kind: str, label: str) -> dict[str, object]:
+    return {
+        "type": "refine_strategy",
+        "label": label,
+        "presentation": "result",
+        "payload": {
+            "run_id": "run-345-source",
+            "next_experiment_kind": kind,
+        },
+    }
+
+
 def _recommendation_state(kind: str, label: str) -> RunState:
     return RunState.new(
         current_user_message=label,
         recent_thread_history=[],
-        action_context={
-            "type": "refine_strategy",
-            "label": label,
-            "presentation": "result",
-            "payload": {
-                "run_id": "run-345-source",
-                "next_experiment_kind": kind,
-            },
-        },
+        action_context=_recommendation_action(kind, label),
     )
 
 
@@ -207,24 +225,21 @@ def test_dca_compare_recommendation_builds_buy_and_hold_confirmation_from_source
 
 
 @pytest.mark.parametrize(
-    ("language", "expected_prompt", "date_reply"),
+    ("language", "date_reply"),
     [
         (
             "en",
-            "What date window should I use for this test?",
             "Use January 3 through December 29, 2023.",
         ),
         (
             "es-419",
-            "¿Qué rango de fechas debo usar para esta prueba?",
             "Usa del 3 de enero al 29 de diciembre de 2023.",
         ),
     ],
 )
-def test_date_range_recommendation_opens_anchored_date_clarification(
+def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
     monkeypatch: pytest.MonkeyPatch,
     language: str,
-    expected_prompt: str,
     date_reply: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -252,8 +267,8 @@ def test_date_range_recommendation_opens_anchored_date_clarification(
         ),
     )
 
-    assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == expected_prompt
+    assert result.outcome == "needs_clarification"
+    assert "assistant_prompt" not in result.patch
     assert result.patch["requested_field"] == "date_range"
     assert result.patch["missing_required_fields"] == ["date_range"]
     strategy = StrategySummary.model_validate(result.patch["candidate_strategy_draft"])
@@ -318,3 +333,96 @@ def test_date_range_recommendation_opens_anchored_date_clarification(
     }
     _assert_owned_facts(patched)
     _assert_source_is_unchanged(source, source_before)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("language", "model_prompt"),
+    [
+        ("en", "Which dates should anchor the follow-up experiment?"),
+        ("es-419", "¿Qué fechas deben definir el experimento de seguimiento?"),
+    ],
+)
+async def test_date_range_recommendation_uses_model_voice_with_provenance(
+    language: str,
+    model_prompt: str,
+) -> None:
+    source = _source_result()
+    clarifier = _RecordingClarifier(model_prompt)
+    workflow = build_workflow(
+        structured_interpreter=lambda _: pytest.fail(
+            "the typed recommendation must not call the interpreter"
+        ),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id=f"u-345-{language}", language_preference=language),
+        thread_id=f"issue-345-model-voice-{language}",
+        message="Test a different date range",
+        action_context=_recommendation_action(
+            "change_date_range",
+            "Test a different date range",
+        ),
+        fallback_latest_task_snapshot=_snapshot(source),
+        fallback_selected_thread_metadata={
+            "next_experiments_offered_kinds": ["change_date_range"],
+        },
+        fallback_artifact_references=[source],
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert result["assistant_prompt"] == model_prompt
+    assert result["assistant_response"] == model_prompt
+    assert len(clarifier.requests) == 1
+    request = clarifier.requests[0]
+    assert request.language == language
+    assert request.missing_required_fields == ["date_range"]
+    assert request.candidate_strategy_draft.date_range == {
+        "start": "2021-01-04",
+        "end": "2025-12-31",
+    }
+    _assert_owned_facts(request.candidate_strategy_draft)
+    assert result["clarification"]["prompt_source"] == "llm_generated"
+    assert result["clarification"]["requested_field"] == "date_range"
+
+
+@pytest.mark.asyncio
+async def test_date_range_recommendation_declares_degraded_fallback_provenance() -> (
+    None
+):
+    source = _source_result()
+    workflow = build_workflow(
+        structured_interpreter=lambda _: pytest.fail(
+            "the typed recommendation must not call the interpreter"
+        ),
+        clarification_generator=None,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u-345-fallback", language_preference="es-419"),
+        thread_id="issue-345-degraded-fallback",
+        message="Probar otro rango de fechas",
+        action_context=_recommendation_action(
+            "change_date_range",
+            "Probar otro rango de fechas",
+        ),
+        fallback_latest_task_snapshot=_snapshot(source),
+        fallback_selected_thread_metadata={
+            "next_experiments_offered_kinds": ["change_date_range"],
+        },
+        fallback_artifact_references=[source],
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert result["assistant_prompt"]
+    assert result["clarification"]["prompt_source"] == "degraded_fallback"
+    assert result["clarification"]["requested_field"] == "date_range"
+    assert result["clarification"]["payload"]["strategy"]["date_range"] == {
+        "start": "2021-01-04",
+        "end": "2025-12-31",
+    }

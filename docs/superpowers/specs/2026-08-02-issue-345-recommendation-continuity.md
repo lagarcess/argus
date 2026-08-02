@@ -34,7 +34,9 @@ a narrow patch, and leave the completed source run immutable.
 5. A valid recommendation follow-up produces the ordinary new confirmation
    artifact once its intended patch is fully specified. A date-range row may
    ask only for the missing new period first; generic Try next guidance must
-   not replace that bounded clarification or the resulting confirmation.
+   not replace that bounded clarification or the resulting confirmation. The
+   ordinary clarification is model-voiced; deterministic copy is permitted only
+   as a typed `degraded_fallback` with explicit prompt provenance.
 6. The completed source result remains immutable and visible as history; the
    new confirmation becomes the active artifact.
 7. Both behaviors require regression tests that fail against the pre-fix code

@@ -3064,7 +3064,10 @@ the user's bounded date answer to the anchored draft. All omitted,
 still-applicable owned facts carry forward, including modeled fees, slippage,
 and their provenance. Other Try next kinds keep the ordinary conversational
 turn path. The action label remains localized presentation copy; it is not the
-source of recommendation semantics.
+source of recommendation semantics. The date-only question follows the normal
+model-voiced clarification path with `prompt_source = llm_generated` when the
+clarifier succeeds. Deterministic copy is limited to the existing typed offline
+path and must declare `prompt_source = degraded_fallback`.
 
 ```json
 "next_experiments": {

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from argus.agent_runtime.artifacts.continuity import resolve_artifact_anchor
-from argus.agent_runtime.next_experiments import date_range_recommendation_prompt
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
     _stage_result_from_result_artifact_patch,
@@ -67,10 +66,9 @@ def change_date_range_recommendation_result(
         "options": [],
     }
     return StageResult(
-        outcome="await_user_reply",
+        outcome="needs_clarification",
         stage_patch={
             "candidate_strategy_draft": strategy.model_dump(mode="python"),
-            "assistant_prompt": date_range_recommendation_prompt(language),
             "requested_field": "date_range",
             "missing_required_fields": ["date_range"],
             "response_intent": response_intent,
