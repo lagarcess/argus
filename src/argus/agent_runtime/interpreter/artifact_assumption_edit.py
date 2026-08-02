@@ -632,9 +632,22 @@ def _materialized_target_matches_primary_delta(
                     or requested[1][endpoint] != current_range.get(endpoint)
                 )
             }
-            return bool(changed_endpoints) and all(
-                materialized[1].get(endpoint) == value
-                for endpoint, value in changed_endpoints.items()
+            materialized_changed_endpoints = {
+                endpoint
+                for endpoint in ("start", "end")
+                if endpoint in materialized[1]
+                and (
+                    not isinstance(current_range, dict)
+                    or materialized[1][endpoint] != current_range.get(endpoint)
+                )
+            }
+            return (
+                bool(changed_endpoints)
+                and materialized_changed_endpoints == set(changed_endpoints)
+                and all(
+                    materialized[1].get(endpoint) == value
+                    for endpoint, value in changed_endpoints.items()
+                )
             )
         current = ("range", current_range) if current_range is not None else None
         return (

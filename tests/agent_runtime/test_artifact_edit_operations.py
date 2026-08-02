@@ -546,7 +546,14 @@ async def test_issue_339_compound_edit_retries_date_operation_that_cannot_materi
 
 
 @pytest.mark.asyncio
-async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch):
+@pytest.mark.parametrize(
+    "invalid_model",
+    ["noop-model", "extra-end-model"],
+)
+async def test_issue_339_compound_edit_retries_wrong_or_extra_values(
+    monkeypatch,
+    invalid_model,
+):
     from argus.agent_runtime import llm_interpreter
 
     monkeypatch.setattr(
@@ -560,6 +567,7 @@ async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch
         del kwargs
         seen_models.append(model_name)
         is_noop = model_name == "noop-model"
+        has_extra_end = model_name == "extra-end-model"
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
@@ -572,9 +580,10 @@ async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch
                     op="set",
                     target="date_window",
                     date_window=LLMDateRangeIntent(
-                        kind="endpoint_patch",
-                        endpoint="start",
+                        kind="explicit_range" if has_extra_end else "endpoint_patch",
+                        endpoint=None if has_extra_end else "start",
                         start="2026-03-02" if is_noop else "2026-04-01",
+                        end="2026-06-30" if has_extra_end else None,
                     ),
                 ),
             ],
@@ -606,7 +615,7 @@ async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch
             selected_thread_metadata={"requested_field": "assumption"},
             user=UserState(user_id="u-339"),
         ),
-        preferred_model="noop-model",
+        preferred_model=invalid_model,
         primary_draft=LLMStrategyDraft(
             comparison_baseline="QQQ",
             date_range={"start": "2026-04-01", "end": "2026-07-30"},
@@ -622,7 +631,7 @@ async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch
         ),
     )
 
-    assert seen_models == ["noop-model", "complete-model"]
+    assert seen_models == [invalid_model, "complete-model"]
     assert response is not None
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
