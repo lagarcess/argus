@@ -1,5 +1,9 @@
 # Self-host canonical Argus fonts
 
+Status: **COMPLETED** — PR #348 merged into `codex/private-alpha-next` as
+`38874baecde59ebab9416dd6d7816c6859d44a71` on 2026-08-02. This file is retained
+as implementation and verification evidence, not an active dispatch plan.
+
 Bundle the canonical Inter and Space Grotesk web fonts in Argus so every build,
 runtime, and browser QA path is offline with respect to font delivery.
 

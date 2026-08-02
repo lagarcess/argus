@@ -114,6 +114,12 @@ implementation follow-up from typed retest: rejected artifact actions lack
 operational evidence even though their HTTP and allowance behavior is already
 correct.
 
+PR #348 self-hosted the canonical Inter and Space Grotesk variable fonts as
+`38874bae`, removing Google Fonts from build, runtime, and browser QA while
+preserving the DESIGN.md body/UI and display-font ownership. Issue #350 is a
+separate low-priority fallback-order alignment; it is not unfinished font
+delivery or a promotion gate.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

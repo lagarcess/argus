@@ -2,11 +2,13 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-08-01
+Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product changes: PR #331 at `ec3a0a52` and PR #330 at `94476226`.
+Latest product change: PR #348 at `38874bae`, which self-hosts canonical Inter
+and Space Grotesk fonts without changing typography ownership. The preceding
+runtime changes remain PR #331 at `ec3a0a52` and PR #330 at `94476226`.
 Later commits may reconcile documentation and issue state without changing
 product behavior. New work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning either product SHA. The
@@ -76,6 +78,11 @@ dialog. PR #330 then completed deferred Guest bootstrap as `94476226`, keeping
 anonymous identity and CAPTCHA acquisition behind the first submission while
 preserving #331 activity ownership. Issue #314 remains a separate API evidence
 gap discovered during typed-retest delivery, not unfinished #310 work.
+PR #348 then self-hosted the canonical Inter and Space Grotesk variable fonts
+as `38874bae`, removing the Google Fonts network dependency from build,
+runtime, and provider-free browser QA. It added no environment variable,
+deployment, API, schema, or migration requirement. The separate low-priority
+fallback-order alignment remains issue #350.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
