@@ -253,7 +253,7 @@ describe("guest conversion contract", () => {
     );
   });
 
-  test("claims in place before refreshing and resumes through a single-use latch", () => {
+  test("refreshes Recents after the claim before a pending action resumes", () => {
     const hookPath = join(root, "components/guest/useGuestConversion.ts");
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
@@ -276,6 +276,13 @@ describe("guest conversion contract", () => {
     );
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
+    expect(authenticate).toContain("await refreshHistory()");
+    expect(authenticate.indexOf("await refreshAccount()")).toBeLessThan(
+      authenticate.indexOf("await refreshHistory()"),
+    );
+    expect(authenticate.indexOf("await refreshHistory()")).toBeLessThan(
+      authenticate.indexOf("await onResume(action)"),
+    );
     expect(chat).toContain("<GuestExperienceSurfaces");
     expect(surfaces).toContain("<GuestConversionModal");
     expect(surfaces).toContain("publicAccountAccessEnabled");

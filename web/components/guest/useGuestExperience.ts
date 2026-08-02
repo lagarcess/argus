@@ -147,6 +147,7 @@ export function useGuestExperience({
     account,
     conversationId,
     refreshAccount,
+    refreshHistory,
     onResume: resumeGuestAction,
   });
 
