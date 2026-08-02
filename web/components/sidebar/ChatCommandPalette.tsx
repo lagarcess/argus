@@ -624,7 +624,6 @@ export default function ChatCommandPalette({
     selectedPreview?.conversationId ?? "",
     dossierContextKey,
   );
-  useDossierDecisionResumeRefresh(decisionResumeTarget, setRetryNonce, history.refresh);
   const selectedDossier = selectedPreview?.dossier
     ? selectedDossierForPane({
         latestDossier: selectedPreview.dossier,
@@ -722,7 +721,7 @@ export default function ChatCommandPalette({
   );
 
   const refreshAfterCanonicalMutation = useCallback(
-    async (mutationId: number) => {
+    async (mutationId = ++canonicalMutationIdRef.current) => {
       const currentSignature = searchSignatureRef.current;
       const [currentQuery, currentLedgerMode] = JSON.parse(
         currentSignature,
@@ -753,6 +752,7 @@ export default function ChatCommandPalette({
     },
     [refreshCanonicalSearch],
   );
+  useDossierDecisionResumeRefresh(decisionResumeTarget, refreshAfterCanonicalMutation, history.refresh);
 
   const saveDecision = useCallback(
     async (

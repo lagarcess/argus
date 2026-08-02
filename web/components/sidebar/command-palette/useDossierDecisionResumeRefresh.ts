@@ -1,15 +1,21 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 import type { GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 
 export function useDossierDecisionResumeRefresh(
   target: GuestDecisionResumeTarget | null | undefined,
-  requestSearchRefresh: Dispatch<SetStateAction<number>>,
+  refreshCanonicalProjection: () => Promise<void>,
   refreshLoadedHistory: () => Promise<void>,
 ) {
+  const refreshResumeSurface = useEffectEvent(() => {
+    void Promise.allSettled([
+      refreshCanonicalProjection(),
+      refreshLoadedHistory(),
+    ]);
+  });
+
   useEffect(() => {
     if (target?.surface !== "omnisearch_dossier") return;
-    requestSearchRefresh((current) => current + 1);
-    void refreshLoadedHistory();
-  }, [refreshLoadedHistory, requestSearchRefresh, target]);
+    refreshResumeSurface();
+  }, [target]);
 }

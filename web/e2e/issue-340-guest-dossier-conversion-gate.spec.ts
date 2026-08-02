@@ -142,7 +142,7 @@ function searchPayload(accountKind: "guest" | "registered") {
         },
       },
     ],
-    ledger_groups: [],
+    ledger_groups: [{ decision_state: "watching", count: 2 }],
     next_cursor: null,
   };
 }
@@ -403,3 +403,38 @@ for (const locale of [
     expect(consoleErrors).toEqual([]);
   });
 }
+
+test("conversion resumes the latest dossier from a queryless decision ledger", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("i18nextLng", "en");
+  });
+  const evidence = await mockJourney(page, "en");
+  await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+    waitUntil: "networkidle",
+  });
+
+  await page.getByRole("button", { name: "Search" }).click();
+  const searchInput = page.getByPlaceholder("Search Argus...");
+  const search = page.locator("div.fixed.inset-0").filter({ has: searchInput });
+  await searchInput.fill("gold");
+  await search.getByRole("button", { name: "Watching2", exact: true }).click();
+  await expect(searchInput).toHaveValue("");
+  await expect(
+    search.getByText("Weekly GLD pullback", { exact: true }),
+  ).toBeVisible();
+
+  await search.locator('[data-decision-edit="true"]').click();
+  await expect(evidence.decisionWrites()).toBe(0);
+  const conversion = page.getByRole("dialog", { name: "Sign in" });
+  await conversion.getByPlaceholder("Email address").fill("owner@example.com");
+  await conversion.getByPlaceholder("Password").fill("test-password");
+  await conversion.getByRole("button", { name: "Sign in", exact: true }).click();
+
+  await expect(conversion).toHaveCount(0);
+  await expect(
+    search.getByPlaceholder("Optional note for future you"),
+  ).toHaveValue(NOTE);
+  await expect(evidence.decisionWrites()).toBe(0);
+});
