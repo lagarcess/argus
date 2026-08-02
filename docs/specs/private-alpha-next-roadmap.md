@@ -18,13 +18,13 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-31
+## Active Post-Promotion Pointer — 2026-08-01
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current integrated product checkpoint runs through PR
-#326 at `8e2a6217`; new work must branch from the current remote
-`codex/private-alpha-next` head rather than pinning that product SHA.
+`main` at `217ead12`. The latest integrated product changes are PR #331 at
+`ec3a0a52` and PR #330 at `94476226`; new work must branch from the current
+remote `codex/private-alpha-next` head rather than pinning either product SHA.
 It contains the founder-accepted graph-range, account-security, Usage,
 capability-truth, and Always Progresses baseline slices from PRs #264, #261,
 #259, #266, and #268, plus the bounded calendar-materiality correction from
@@ -100,15 +100,17 @@ corrections as `c1a13949`, `05fbef06`, and `403ea114`; and PR #327 removed the
 unavailable Release Notes destination as `22bec7da` while preserving its later
 public-beta re-entry contract.
 
-PR #329 then landed the backend/data foundation for durable conversation
-activity and read state as `8a5d621b`. Its additive migration and API projection
-are integrated, but the separately specified conversation-activity UI consumer
-is still a later slice and the migration remains a hosted-promotion operation.
-PR #326 completed issue #321 as `8e2a6217`, bounding invisible and interactive
+PR #329 landed the backend/data foundation for durable conversation activity
+and read state as `8a5d621b`. PR #331 then completed its frontend consumer as
+`ec3a0a52`: activity and manually unread state now hydrate and render through
+chat and Recents without restoring the retired global stream-state machinery.
+The additive #329 migration remains a hosted-promotion operation. PR #326
+completed issue #321 as `8e2a6217`, bounding invisible and interactive
 Turnstile waits and presenting an accessible localized challenge dialog. Issue
-#321 is closed. PR #330 is the current in-flight deferred Guest-bootstrap lane;
-it is not part of this checkpoint until it merges. Issue #314 remains the only
-new implementation follow-up from typed retest: rejected artifact actions lack
+#321 is closed. PR #330 then completed deferred Guest bootstrap as `94476226`:
+anonymous identity and CAPTCHA acquisition wait for the first submission while
+preserving #331's durable activity ownership. Issue #314 remains the only new
+implementation follow-up from typed retest: rejected artifact actions lack
 operational evidence even though their HTTP and allowance behavior is already
 correct.
 

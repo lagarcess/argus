@@ -6,10 +6,10 @@ Original roadmap date: 2026-07-16
 
 Last reconciled: 2026-07-31
 
-Latest integrated product checkpoint: PR #317 at `2ff6f3c6`. Later commits may
-reconcile roadmap and issue state without changing product behavior. New work
-must branch from the current remote integration head rather than pinning this
-product SHA.
+Latest integrated product changes: PR #331 at `ec3a0a52` and PR #330 at
+`94476226`. Later commits may reconcile roadmap and issue state without changing
+product behavior. New work must branch from the current remote integration head
+rather than pinning either product SHA.
 
 That checkpoint contains the founder-accepted outcome baselines delivered
 through independently revertible vertical slices:
@@ -109,10 +109,13 @@ capacity/email evidence (PR #319, `1c3775aa`), one frontend failure vocabulary
 #325, and #328), and the honest removal of the unavailable Release Notes row
 (PR #327). Permanent account access remains explicitly disabled and founder
 controlled. PR #329 added the durable backend/data conversation-activity and
-read-state foundation as `8a5d621b`; its separately specified UI consumer and
-hosted migration application remain later work. PR #326 closed issue #321 as
-`8e2a6217` with bounded Turnstile acquisition and an accessible localized
-interactive challenge. PR #330 remains in flight and is not landed evidence.
+read-state foundation as `8a5d621b`; PR #331 completed the chat/Recents UI
+consumer as `ec3a0a52`, including manually unread controls and durable activity
+projection. Its hosted migration application remains later promotion work. PR
+#326 closed issue #321 as `8e2a6217` with bounded Turnstile acquisition and an
+accessible localized interactive challenge. PR #330 then completed deferred
+Guest bootstrap as `94476226`, moving anonymous identity and CAPTCHA acquisition
+to first submission while preserving the integrated activity contract.
 
 Two issue closures after that product checkpoint required no new application
 commit. Issue #251 is closed: PRs #262, #267, and #268 collectively own
@@ -201,8 +204,8 @@ continuity program. Existing evidence remains the regression baseline.
 | Surface | Integrated state | Exact remainder |
 | --- | --- | --- |
 | Public-alpha technical readiness | PR #319 landed as `1c3775aa` with capped hosted provider-key policy, measured capacity, requested access, delivered approval email, CAPTCHA wiring, and durable hosted evidence. | Keep permanent-account access disabled until the founder opens it. #233 still owns the one exact-candidate deployed Spanish Golden Path and release evidence; integration does not substitute for that promotion gate. |
-| Conversation activity/read state | PR #329 landed the backend, additive schema, RLS, batch projection, strict cursor, and GET/PATCH contracts as `8a5d621b`. | Deliver the separately specified frontend activity/read-state consumer from the latest integration head, then apply/read back the migration only at an authorized hosted promotion checkpoint. |
-| Guest bootstrap timing | The CAPTCHA boundary is complete through PR #326 at `8e2a6217`. | PR #330 is the current in-flight lane for deferring Guest bootstrap until first submit. Do not record it as delivered until merged. |
+| Conversation activity/read state | PR #329 landed the backend, additive schema, RLS, batch projection, strict cursor, and GET/PATCH contracts as `8a5d621b`; PR #331 completed the chat/Recents UI consumer as `ec3a0a52`. | Apply and read back the #329 migration only at an authorized hosted promotion checkpoint. |
+| Guest bootstrap timing | PR #326 completed the bounded CAPTCHA boundary as `8e2a6217`; PR #330 completed first-submit Guest bootstrap as `94476226` while preserving durable activity ownership. | No integration implementation remains; tester exposure still follows the ordinary promotion/canary gates. |
 | Rejected artifact-action evidence | Typed retest and current rejection behavior are integrated and allowance-safe. | Issue #314 remains open for one complete operational-evidence record across every rejected artifact-action admission site, without changing HTTP responses, visible transcript, or allowance settlement. |
 | Parked/deferred work | Personalization memory PR #307 remains parked outside the interim; #236 remains a deferred behavior-preserving router extraction; #294 waits for real post-promotion funnel data. | Do not dispatch these as current interim blockers. |
 

@@ -6,10 +6,11 @@ Last reconciled: 2026-08-01
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #326 at `8e2a6217`. Later commits may reconcile
-documentation and issue state without changing product behavior. New work must
-branch from the current remote `codex/private-alpha-next` head rather than
-pinning this product SHA. The accepted post-promotion
+Latest product changes: PR #331 at `ec3a0a52` and PR #330 at `94476226`.
+Later commits may reconcile documentation and issue state without changing
+product behavior. New work must branch from the current remote
+`codex/private-alpha-next` head rather than pinning either product SHA. The
+accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -67,13 +68,14 @@ containment through PRs #323, #325, and #328 (`c1a13949`, `05fbef06`, and
 controlled despite the completed technical-readiness proof.
 
 PR #329 added the durable backend/data conversation-activity and read-state
-foundation as `8a5d621b`; its UI consumer remains a separate later slice and
-its migration is not claimed as hosted by this integration merge. PR #326 then
-closed issue #321 as `8e2a6217` with bounded invisible/interactive CAPTCHA
-deadlines and an accessible localized challenge dialog. PR #330 remains an
-open worker candidate for deferred Guest bootstrap and is not part of the
-checkpoint. Issue #314 remains a separate API evidence gap discovered during
-typed-retest delivery, not unfinished #310 work.
+foundation as `8a5d621b`; PR #331 completed its chat/Recents frontend consumer
+as `ec3a0a52`. The #329 migration is not claimed as hosted by these integration
+merges. PR #326 closed issue #321 as `8e2a6217` with bounded
+invisible/interactive CAPTCHA deadlines and an accessible localized challenge
+dialog. PR #330 then completed deferred Guest bootstrap as `94476226`, keeping
+anonymous identity and CAPTCHA acquisition behind the first submission while
+preserving #331 activity ownership. Issue #314 remains a separate API evidence
+gap discovered during typed-retest delivery, not unfinished #310 work.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
