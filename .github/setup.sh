@@ -17,6 +17,21 @@ export ENVIRONMENT=DEV
 export DONT_WRITE_BYTECODE=1
 export PYTHONUNBUFFERED=1
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+export NEXT_TELEMETRY_DISABLED=1
+
+# Codex Cloud runs setup and agent phases in separate shells. Persist the
+# pinned tool locations and telemetry setting so the agent phase uses the
+# versions installed here without writing Next.js CLI state into the checkout.
+SHELL_PROFILE="$HOME/.bashrc"
+touch "$SHELL_PROFILE"
+for shell_export in \
+    'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' \
+    'export NEXT_TELEMETRY_DISABLED=1'
+do
+    if ! grep -Fqx "$shell_export" "$SHELL_PROFILE"; then
+        printf '%s\n' "$shell_export" >> "$SHELL_PROFILE"
+    fi
+done
 
 # Keep local and Cloud setup aligned with the exact toolchain used by CI.
 PINNED_POETRY_VERSION="2.1.3"
@@ -136,9 +151,6 @@ cd ..
 # 9. VALIDATE FRONTEND BUILD
 # ============================================================================
 echo "🔵 [Setup] Validating Next.js frontend setup..."
-cd web
-bun run --silent next telemetry disable >/dev/null 2>&1 || true  # Disable telemetry silently
-cd ..
 echo "🟢 [Setup] Next.js frontend is ready"
 
 # ============================================================================

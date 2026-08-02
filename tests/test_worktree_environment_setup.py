@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / ".github" / "setup-worktree-env.sh"
 SETUP = ROOT / ".github" / "setup.sh"
 CODEX_ENVIRONMENT = ROOT / ".codex" / "environments" / "environment.toml"
+GITIGNORE = ROOT / ".gitignore"
 BACKEND_SECRET = "backend-secret-value"
 FRONTEND_SECRET = "frontend-secret-value"
 
@@ -119,6 +120,21 @@ def test_setup_pins_poetry_and_bun_to_ci_versions() -> None:
     assert 'POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -' in source
     assert 'PINNED_BUN_VERSION="1.3.14"' in source
     assert 'bash -s "bun-v$PINNED_BUN_VERSION"' in source
+
+
+def test_setup_persists_cloud_toolchain_path_and_disables_next_telemetry() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'SHELL_PROFILE="$HOME/.bashrc"' in source
+    assert 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' in source
+    assert 'export NEXT_TELEMETRY_DISABLED=1' in source
+    assert "next telemetry disable" not in source
+
+
+def test_next_telemetry_cache_cannot_dirty_cloud_checkouts() -> None:
+    source = GITIGNORE.read_text(encoding="utf-8")
+
+    assert "web/cache/config.json" in source.splitlines()
 
 
 def test_codex_environment_delegates_to_tracked_setup_and_cleanup() -> None:
