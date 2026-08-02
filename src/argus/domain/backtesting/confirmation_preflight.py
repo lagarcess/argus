@@ -93,6 +93,8 @@ def prepare_confirmation_launch(
         )
     except coverage_service.MarketDataCoverageError as exc:
         return _coverage_failure(exc.code)
+    except OSError:
+        return _coverage_failure("market_data_unavailable")
     except ValidationError as exc:
         return _validation_failure(_validation_error_code(exc))
     except ValueError as exc:

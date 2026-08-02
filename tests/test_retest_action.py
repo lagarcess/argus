@@ -121,8 +121,12 @@ def _stream_payloads(stream: str, event_type: str) -> list[dict[str, Any]]:
     return payloads
 
 
-def _client_with_owned_run(stored_run: Any) -> tuple[TestClient, str, Any]:
-    client = TestClient(app)
+def _client_with_owned_run(
+    stored_run: Any,
+    *,
+    raise_server_exceptions: bool = True,
+) -> tuple[TestClient, str, Any]:
+    client = TestClient(app, raise_server_exceptions=raise_server_exceptions)
     assert client.post("/api/v1/dev/reset").status_code == 200
     conversation_response = client.post(
         "/api/v1/conversations",
@@ -645,6 +649,44 @@ def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
 
     assert excinfo.value.detail["code"] == failure_code
     assert list(api_state.store.messages.get(_CONVERSATION_ID, [])) == messages_before
+    assert not any(
+        isinstance(message.metadata.get("confirmation_payload"), dict)
+        for message in messages_before
+    )
+
+
+def test_provider_timeout_returns_typed_unavailable_without_persisting_turn(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _provider_timeout(*_: Any, **__: Any) -> Any:
+        raise TimeoutError("provider connection timed out")
+
+    monkeypatch.setattr(
+        "argus.domain.backtesting.coverage.prepare_market_data",
+        _provider_timeout,
+    )
+    client, conversation_id, source_run = _client_with_owned_run(
+        stored_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "market_data_unavailable"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
     assert not any(
         isinstance(message.metadata.get("confirmation_payload"), dict)
         for message in messages_before
