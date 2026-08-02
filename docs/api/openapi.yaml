@@ -3168,6 +3168,11 @@ components:
           type: string
           const: decision
           default: decision
+        availability:
+          type: string
+          enum:
+          - available
+          - account_conversion_required
         evidence_artifact_id:
           type: string
         decision_state:
@@ -3189,6 +3194,7 @@ components:
           maxLength: 160
       type: object
       required:
+      - availability
       - evidence_artifact_id
       - run_label
     SearchDossierDecision:

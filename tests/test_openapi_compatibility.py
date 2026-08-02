@@ -87,6 +87,17 @@ def test_decision_note_write_schema_caps_new_notes_without_narrowing_reads(
     assert action_note["maxLength"] == 2000
 
 
+def test_dossier_decision_action_requires_typed_availability(generated: dict) -> None:
+    schema = generated["components"]["schemas"]["SearchDecisionAction"]
+
+    assert "availability" in schema["required"]
+    assert schema["properties"]["availability"] == {
+        "type": "string",
+        "enum": ["available", "account_conversion_required"],
+        "title": "Availability",
+    }
+
+
 def test_prefix_appears_exactly_once_per_public_operation(
     generated: dict, checked: dict
 ) -> None:

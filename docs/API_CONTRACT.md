@@ -2194,6 +2194,7 @@ or no-longer-eligible cursor pivots return `400 validation_error` with
       "actions": [
         {
           "type": "decision",
+          "availability": "available",
           "evidence_artifact_id": "uuid",
           "decision_state": "watching",
           "note": "Hold through earnings.\nReview risk first.",
@@ -3450,6 +3451,7 @@ the `/search` contract.
           },
           {
             "type": "decision",
+            "availability": "available",
             "evidence_artifact_id": "uuid",
             "decision_state": "watching",
             "note": "Hold through earnings.\nReview risk first.",
@@ -3530,15 +3532,22 @@ and `decided_runs` are backend-owned full-lineage counts, not page totals.
   confirmation and never directly executes a backtest.
 - `decision` targets the latest evidence artifact for that same latest run.
   Its optional state and note describe the current decision on that exact
-  artifact. Saving uses the existing owner-checked, idempotent
-  `POST /evidence-artifacts/{artifact_id}/decision` contract, then the client
-  re-reads `/search` as canonical truth.
+  artifact. Its required `availability` is either `available` or
+  `account_conversion_required`. Only `available` may reach the existing
+  owner-checked, idempotent
+  `POST /evidence-artifacts/{artifact_id}/decision` contract; the client then
+  re-reads `/search` as canonical truth. Activating
+  `account_conversion_required` opens the account-conversion gate without
+  attempting the mutation. After successful conversion, the client re-reads
+  canonical dossier truth and may resume the same run/artifact action once.
 
 The action ids are narrow, opaque mutation targets for those two explicit
 owner actions. They are not searchable content and do not authorize access by
-themselves. Guest responses omit the `decision` action; asset rollups have no
-`actions` field. Unsupported or incomplete stored run shapes omit `retest_run`
-rather than guessing.
+themselves. Eligible guest dossiers retain the `decision` action with
+`availability: "account_conversion_required"`; `can_save_decision` remains
+false and direct guest writes still fail with `403 account_conversion_required`.
+Asset rollups have no `actions` field. Unsupported or incomplete stored run
+shapes omit `retest_run` rather than guessing.
 
 **Ranking Logic:**
 Results are ranked by:

@@ -99,28 +99,24 @@ def scored_supabase_search_items(
             raw_item = row.get("item")
             if not isinstance(raw_item, dict):
                 continue
-            item = SearchItem.model_validate(raw_item)
-            if item.dossier is not None:
-                item = item.model_copy(
-                    update={
-                        "dossier": item.dossier.model_copy(
-                            update={
-                                "actions": [
-                                    action.model_copy(
-                                        update={
-                                            "availability": (
-                                                decision_action_availability
-                                            )
-                                        }
-                                    )
-                                    if action.type == "decision"
-                                    else action
-                                    for action in item.dossier.actions
-                                ]
-                            }
-                        )
-                    }
-                )
+            normalized_item = dict(raw_item)
+            raw_dossier = normalized_item.get("dossier")
+            if isinstance(raw_dossier, dict):
+                normalized_dossier = dict(raw_dossier)
+                raw_actions = normalized_dossier.get("actions")
+                if isinstance(raw_actions, list):
+                    normalized_dossier["actions"] = [
+                        {
+                            **action,
+                            "availability": decision_action_availability,
+                        }
+                        if isinstance(action, dict)
+                        and action.get("type") == "decision"
+                        else action
+                        for action in raw_actions
+                    ]
+                normalized_item["dossier"] = normalized_dossier
+            item = SearchItem.model_validate(normalized_item)
             projected.append((int(row.get("score") or 0), item))
         return projected
 

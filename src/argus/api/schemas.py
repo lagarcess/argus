@@ -661,7 +661,7 @@ class SearchRetestAction(BaseModel):
 
 class SearchDecisionAction(BaseModel):
     type: Literal["decision"] = "decision"
-    availability: DecisionActionAvailability = "available"
+    availability: DecisionActionAvailability
     evidence_artifact_id: str
     decision_state: DecisionState | None = None
     note: str | None = Field(default=None, max_length=2000)
