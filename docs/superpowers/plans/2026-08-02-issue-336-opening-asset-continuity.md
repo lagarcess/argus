@@ -156,7 +156,8 @@ git diff --stat origin/codex/private-alpha-next...HEAD
 git diff origin/codex/private-alpha-next...HEAD -- \
   src/argus/agent_runtime/interpreter/provider_context_assets.py \
   tests/agent_runtime/test_provider_asset_ownership.py \
-  tests/evals/measurement_cases/messy_english.yaml
+  tests/evals/measurement_cases/messy_english.yaml \
+  tests/evals/measurement_eval_harness.py
 ```
 
 - [ ] **Step 5: Run the sanctioned full live eval once on the exact candidate**
@@ -174,7 +175,7 @@ Expected: full suite passes with no unexpected failures; the scorecard records t
 - [ ] **Step 6: Commit the permanent eval case**
 
 ```bash
-git add tests/evals/measurement_cases/messy_english.yaml
+git add tests/evals/measurement_cases/messy_english.yaml tests/evals/measurement_eval_harness.py
 git commit -m "test(chat): cover issue 336 opening asset"
 ```
 
