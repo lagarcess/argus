@@ -54,7 +54,9 @@ regression repair, not a reopened discovery program.
 7. The existing `openrouter_web_search` adapter may be used only as a
    process-local acceptance surface when explicitly configured. A successful
    local override is not evidence that the default Perplexity configuration is
-   healthy or deployed.
+   healthy or deployed. OpenRouter citation annotations do not guarantee a
+   `content` field; when it is absent, the adapter may use only bounded message
+   text around valid citation indices as untrusted extraction evidence.
 8. The general-to-grounded escalation turn must read as inferred user intent.
    It uses the sidecar's resolver-validated candidate asset classes to produce
    localized, semantic text such as "Search for current stocks in the

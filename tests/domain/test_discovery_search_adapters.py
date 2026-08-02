@@ -199,6 +199,41 @@ class TestOpenRouterWebSearch:
         assert packet.results[0].source_date is None
         assert packet.cost_usd == 0.0123
 
+    def test_uses_cited_message_context_when_annotation_omits_content(self) -> None:
+        content = (
+            "Recent market coverage identifies Example Corp (EXM) as a newly "
+            "listed public company."
+        )
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/exm",
+                                    "title": "Example Corp listing",
+                                    "start_index": content.index("Example Corp"),
+                                    "end_index": len(content),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert packet.results[0].snippet == content
+
     def test_missing_model_fails_closed_without_http(self) -> None:
         calls: list[int] = []
 

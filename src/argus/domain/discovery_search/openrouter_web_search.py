@@ -80,9 +80,13 @@ def _message(payload: Any) -> dict[str, Any]:
 
 
 def _sanitized_citations(payload: Any) -> list[SearchResult]:
-    annotations = _message(payload).get("annotations")
+    message = _message(payload)
+    annotations = message.get("annotations")
     if not isinstance(annotations, list):
         annotations = []
+    message_content = message.get("content")
+    if not isinstance(message_content, str):
+        message_content = ""
     sanitized: list[SearchResult] = []
     for annotation in annotations:
         if not isinstance(annotation, dict):
@@ -93,12 +97,32 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
         result = sanitize_search_result(
             title=str(citation.get("title") or ""),
             url=str(citation.get("url") or ""),
-            snippet=str(citation.get("content") or ""),
+            snippet=str(citation.get("content") or "")
+            or _cited_message_context(message_content, citation),
             source_date=None,
         )
         if result is not None:
             sanitized.append(result)
     return sanitized
+
+
+def _cited_message_context(content: str, citation: dict[str, Any]) -> str:
+    """Recover bounded evidence when OpenRouter omits citation content."""
+    start = citation.get("start_index")
+    end = citation.get("end_index")
+    if (
+        isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or start < 0
+        or end < start
+        or end > len(content)
+    ):
+        return ""
+    context_start = max(0, start - 400)
+    context_end = min(len(content), end + 400)
+    return content[context_start:context_end]
 
 
 def _reported_cost(payload: Any) -> float | None:
