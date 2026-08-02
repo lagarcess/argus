@@ -58,10 +58,10 @@ class LLMAssetMentionCandidate(BaseModel):
 class LLMAssetMentionExtraction(BaseModel):
     asset_mentions: list[LLMAssetMentionCandidate] = Field(
         default_factory=list,
+        max_length=6,
         description=(
             "Provider-resolution candidates identified by the LLM from the current "
-            "message. Keep up to six distinct asset-like mentions so the sixth can "
-            "report overflow beyond the five-traded-asset-row provider context."
+            "message. Keep at most six distinct asset-like mentions."
         ),
     )
 

@@ -765,16 +765,17 @@ def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     )
 
     prompt = _asset_mention_extraction_messages(request)[0]["content"]
-    schema_description = LLMAssetMentionExtraction.model_json_schema()["properties"][
+    schema = LLMAssetMentionExtraction.model_json_schema()["properties"][
         "asset_mentions"
-    ]["description"]
+    ]
 
-    assert "Return up to six distinct mentions" in prompt
-    assert "Prioritize traded-asset and unknown spans" in prompt
-    assert "sixth traded-asset or unknown mention" in prompt
-    assert "five-traded-asset-row provider context" in prompt
-    assert "up to six distinct asset-like mentions" in schema_description
-    assert "five-traded-asset-row provider context" in schema_description
+    assert "Return at most six distinct mentions" in prompt
+    assert "preserve traded-asset and unknown spans before benchmark spans" in prompt
+    assert "overflow evidence" not in prompt
+    assert "provider context" not in prompt
+    assert schema["maxItems"] == 6
+    assert "at most six distinct asset-like mentions" in schema["description"]
+    assert "overflow" not in schema["description"]
 
 
 def test_underfilled_provider_context_keeps_stale_asset_blocker() -> None:

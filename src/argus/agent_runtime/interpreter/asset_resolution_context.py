@@ -177,11 +177,9 @@ def _asset_mention_extraction_messages(
                 "short raw text span and whether the user framed it as a traded asset, "
                 "a benchmark/comparison, or unknown. Also classify whether the span "
                 "is a company_name, ticker, crypto asset, currency_pair, or unknown. "
-                "Return up to six distinct mentions; a sixth traded-asset or unknown "
-                "mention is overflow evidence for the five-traded-asset-row provider "
-                "context. Prioritize traded-asset and unknown spans over benchmark "
-                "spans if more than six possible mentions are visible. If none are "
-                "visible, return an empty list."
+                "Return at most six distinct mentions. If more than six are visible, "
+                "preserve traded-asset and unknown spans before benchmark spans. If "
+                "none are visible, return an empty list."
             ),
         },
         {"role": "user", "content": request.current_user_message},
