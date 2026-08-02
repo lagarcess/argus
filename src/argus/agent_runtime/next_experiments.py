@@ -94,6 +94,13 @@ _REFINEMENT_KINDS = frozenset(
 _EXPLORATION_KINDS = frozenset(
     {"change_date_range", "same_setup_peer_asset", "same_rule_peer_asset"}
 )
+CONTINUITY_NEXT_EXPERIMENT_KINDS = frozenset(
+    {"change_date_range", "compare_buy_and_hold"}
+)
+_DATE_RANGE_RECOMMENDATION_PROMPTS = {
+    "en": "What date window should I use for this test?",
+    "es-419": "¿Qué rango de fechas debo usar para esta prueba?",
+}
 _DEEP_DRAWDOWN_THRESHOLD_PCT = -15.0
 
 _PEER_ASSETS: dict[str, str] = {
@@ -269,6 +276,41 @@ def offered_kinds_from_thread_metadata(metadata: dict[str, Any] | None) -> list[
     if not isinstance(kinds, list):
         return []
     return [str(kind) for kind in kinds if isinstance(kind, str) and kind]
+
+
+def continuity_next_experiment_kind(
+    *,
+    action_type: str,
+    action_payload: dict[str, Any],
+) -> str | None:
+    """Resolve only the two issue-345 rows from typed action metadata."""
+
+    if action_type != "refine_strategy":
+        return None
+    raw_kind = action_payload.get("next_experiment_kind")
+    if not isinstance(raw_kind, str):
+        return None
+    kind = raw_kind.strip()
+    if kind not in CONTINUITY_NEXT_EXPERIMENT_KINDS:
+        return None
+    return kind
+
+
+def continuity_next_experiment_label_key(kind: str) -> str | None:
+    """Return the canonical presentation key for a validated continuity kind."""
+
+    if kind not in CONTINUITY_NEXT_EXPERIMENT_KINDS:
+        return None
+    return f"{_LABEL_KEY_PREFIX}{kind}"
+
+
+def date_range_recommendation_prompt(language: str) -> str:
+    """Return presentation copy without making locale part of routing."""
+
+    return _DATE_RANGE_RECOMMENDATION_PROMPTS.get(
+        language,
+        _DATE_RANGE_RECOMMENDATION_PROMPTS["en"],
+    )
 
 
 def detect_next_experiment_acceptance(

@@ -2,9 +2,9 @@
  * Typed Try next rows for a completed result (issue #249).
  *
  * The backend's Stage-0 policy composes `next_experiments` metadata; a
- * tapped row sends its localized label as an ordinary conversational
- * turn (a type-less action takes the plain send path — the response-
- * option claim contract is for typed field edits, not experiments).
+ * Most rows send their localized label as an ordinary conversational turn.
+ * The two issue-345 continuity rows carry a typed refine action anchored to
+ * the source run, so their labels remain presentation rather than semantics.
  * Rows render only from typed metadata — never inferred from prose.
  */
 
@@ -12,6 +12,10 @@ import type { ChatActionOption } from "@/components/chat/types";
 
 export const NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1";
 const MAX_ROWS = 3;
+const CONTINUITY_KINDS = new Set([
+  "change_date_range",
+  "compare_buy_and_hold",
+]);
 
 export type NextExperimentReason = {
   code: string;
@@ -72,10 +76,25 @@ export function nextExperimentRowsFromMetadata(
 export function nextExperimentAction(
   row: NextExperimentRow,
   localizedLabel?: string,
+  sourceRunId?: string,
 ): ChatActionOption {
   // A prebaked row sends its fully specified ask; nothing is missing, so
   // the normal lifecycle answers with the next confirmation card.
   const send = row.sendText || localizedLabel || row.label;
+  const runId = sourceRunId?.trim();
+  if (runId && CONTINUITY_KINDS.has(row.kind)) {
+    return {
+      label: send,
+      labelKey: row.sendText ? undefined : row.labelKey,
+      value: send,
+      type: "refine_strategy",
+      presentation: "result",
+      payload: {
+        run_id: runId,
+        next_experiment_kind: row.kind,
+      },
+    };
+  }
   return {
     label: send,
     labelKey: row.sendText ? undefined : row.labelKey,

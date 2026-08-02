@@ -622,7 +622,15 @@ export default function ChatMessage({
                         key={row.kind}
                         ariaLabel={rowLabel}
                         disabled={turnInFlight}
-                        onClick={() => onAction?.(nextExperimentAction(row, rowLabel))}
+                        onClick={() =>
+                          onAction?.(
+                            nextExperimentAction(
+                              row,
+                              rowLabel,
+                              message.result?.runId,
+                            ),
+                          )
+                        }
                       >
                         <NextMoveTitle>{rowLabel}</NextMoveTitle>
                         {row.detail ? (

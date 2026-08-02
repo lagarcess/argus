@@ -64,7 +64,7 @@ describe("Try next rows (issue #249)", () => {
     expect(rows).toHaveLength(3);
   });
 
-  test("a tapped row sends its localized label as an ordinary turn", () => {
+  test("issue 345 recommendations carry their source run as typed refinements", () => {
     const action = nextExperimentAction(
       {
         kind: "change_date_range",
@@ -73,12 +73,31 @@ describe("Try next rows (issue #249)", () => {
         why: null,
       },
       "Cambiar el rango de fechas",
+      "run-345-source",
     );
-    // No type: the plain send path carries the label as the user's turn.
-    expect(action.type).toBeUndefined();
-    expect(action.payload).toBeUndefined();
+    expect(action.type).toBe("refine_strategy");
+    expect(action.presentation).toBe("result");
+    expect(action.payload).toEqual({
+      run_id: "run-345-source",
+      next_experiment_kind: "change_date_range",
+    });
     expect(action.label).toBe("Cambiar el rango de fechas");
     expect(action.value).toBe("Cambiar el rango de fechas");
+  });
+
+  test("unrelated recommendation kinds keep the ordinary turn path", () => {
+    const action = nextExperimentAction(
+      {
+        kind: "same_setup_peer_asset",
+        label: "Test a similar asset",
+        labelKey: "chat.next_experiments.labels.same_setup_peer_asset",
+        why: null,
+      },
+      "Test a similar asset",
+      "run-345-source",
+    );
+    expect(action.type).toBeUndefined();
+    expect(action.payload).toBeUndefined();
   });
 
   test("every experiment kind is localized in both languages", () => {
@@ -115,7 +134,6 @@ describe("Try next rows (issue #249)", () => {
     expect(source).toContain(
       'aria-label={t("chat.next_experiments.section", "Try next")}',
     );
-    expect(source).toContain("nextExperimentAction(row, rowLabel)");
     // Infrastructure failure renders as visibly-a-failure, never under
     // result chrome.
     expect(source).toContain("message.assistantRecoveryCode ? (");
