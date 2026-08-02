@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
 
@@ -18,10 +19,13 @@ from argus.api.chat.retest import (
     sanitized_retest_action,
 )
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
+from argus.api.main import app
 from argus.api.message_store import create_message, prepare_message
 from argus.api.schemas import ChatActionPayload, ChatStreamRequest
+from argus.domain.backtesting.coverage import MarketDataCoverageError
 from argus.domain.retest_setup import retest_setup_from_run
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 _USER_ID = "retest-owner"
 _OTHER_USER_ID = "retest-intruder"
@@ -92,6 +96,24 @@ def _retest_request(
         mentions=[],
         language=language,
     )
+
+
+def _stream_payloads(stream: str, event_type: str) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            continue
+        event = json.loads(raw)
+        if event.get("type") == event_type:
+            payloads.append(event.get("payload", event))
+    return payloads
 
 
 @pytest.fixture
@@ -288,7 +310,142 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
     assert turn.setup.start == date(2024, 1, 1)
     assert turn.setup.end == _TODAY
     assert turn.confirmation_payload["confirmation_id"] == "confirmation-retest"
-    assert turn.confirmation_payload["launch_payload"]["symbols"] == ["TSLA"]
+    launch_payload = turn.confirmation_payload["launch_payload"]
+    assert launch_payload["symbols"] == ["TSLA"]
+    assert launch_payload["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2026-07-31",
+    }
+    coverage = launch_payload["coverage_preflight"]
+    assert coverage["schema_version"] == "market_data_coverage_v1"
+    assert coverage["requested_date_range"] == launch_payload["requested_date_range"]
+    assert coverage["effective_date_range"] == launch_payload["date_range"]
+    assert coverage["preflight_id"].startswith("sha256:")
+    assert (
+        turn.confirmation_payload["strategy"]["date_range"]
+        == launch_payload["date_range"]
+    )
+
+
+def test_current_retest_run_action_reaches_canonical_approval(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    client = TestClient(app)
+    assert client.post("/api/v1/dev/reset").status_code == 200
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={"language": "en"},
+    )
+    assert conversation_response.status_code == 200
+    conversation_id = str(conversation_response.json()["conversation"]["id"])
+    user_response = client.get("/api/v1/me")
+    assert user_response.status_code == 200
+    user_id = str(user_response.json()["user"]["id"])
+    source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
+    api_state.store.backtest_runs[source_run.id] = source_run
+    api_state.store.backtest_run_owners[source_run.id] = user_id
+
+    retest_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert retest_response.status_code == 200
+    [retest_final] = _stream_payloads(retest_response.text, "final")
+    confirmation = retest_final["confirmation"]
+    confirmation_payload = retest_final["confirmation_payload"]
+    confirmation_id = confirmation["confirmation_id"]
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
+    assert run_action["payload"]["confirmation_id"] == confirmation_id
+    assert confirmation_payload["confirmation_id"] == confirmation_id
+
+    run_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": confirmation_id},
+        json={
+            "conversation_id": conversation_id,
+            "action": run_action,
+            "language": "en",
+        },
+    )
+
+    assert run_response.status_code == 200
+    stage_outcomes = _stream_payloads(run_response.text, "stage_outcome")
+    assert any(
+        outcome.get("outcome") == "approved_for_execution" for outcome in stage_outcomes
+    )
+    assert not any(
+        outcome.get("outcome") in {"ready_for_confirmation", "await_approval"}
+        for outcome in stage_outcomes
+    )
+    assert isinstance(
+        confirmation_payload["launch_payload"]["coverage_preflight"],
+        dict,
+    )
+    [run_final] = _stream_payloads(run_response.text, "final")
+    assert run_final.get("recovery", {}).get("code") not in {
+        "confirmation_action_stale_card",
+        "confirmation_state_lost",
+    }
+    persisted = client.get(f"/api/v1/conversations/{conversation_id}/messages").json()[
+        "items"
+    ]
+    assert not any(
+        message.get("metadata", {}).get("recovery", {}).get("code")
+        == "confirmation_action_stale_card"
+        for message in persisted
+    )
+
+
+@pytest.mark.parametrize(
+    "failure_code",
+    [
+        "market_data_unavailable",
+        "no_common_data_window",
+        "insufficient_common_data",
+    ],
+)
+def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_code: str,
+) -> None:
+    def _coverage_failure(*_: Any, **__: Any) -> Any:
+        raise MarketDataCoverageError(failure_code)
+
+    monkeypatch.setattr(
+        "argus.domain.backtesting.coverage.prepare_market_data",
+        _coverage_failure,
+    )
+    messages_before = list(api_state.store.messages.get(_CONVERSATION_ID, []))
+
+    with pytest.raises(HTTPException) as excinfo:
+        prepare_retest_turn(
+            payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
+            request=_FakeRequest(),
+            user_id=_USER_ID,
+            conversation_id=_CONVERSATION_ID,
+            language="en",
+            today=_TODAY,
+        )
+
+    assert excinfo.value.detail["code"] == failure_code
+    assert list(api_state.store.messages.get(_CONVERSATION_ID, [])) == messages_before
+    assert not any(
+        isinstance(message.metadata.get("confirmation_payload"), dict)
+        for message in messages_before
+    )
 
 
 @pytest.mark.parametrize(

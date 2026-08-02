@@ -2,7 +2,7 @@
 
 The client submits identity and policy only. Everything executable is reloaded
 from the owner-scoped stored run, so a tampered payload cannot change or expose
-canonical state, and no provider is consulted before the user confirms.
+canonical state. Provider coverage is resolved before a runnable card persists.
 """
 
 from __future__ import annotations
@@ -18,9 +18,10 @@ from fastapi import Request
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.retest_confirmation import (
-    retest_confirmation_payload,
+    prepare_retest_confirmation_payload,
     retest_runtime_result,
 )
+from argus.api.backtest_service import raise_backtest_problem
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.confirmation import (
     public_confirmation_projection,
@@ -143,14 +144,19 @@ def prepare_retest_turn(
         if source_run_id is not None
         else None
     )
-    confirmation_payload = (
-        retest_confirmation_payload(
+    confirmation = (
+        prepare_retest_confirmation_payload(
             setup,
             language=language or "en",
             confirmation_id=confirmation_id,
         )
         if setup is not None
         else None
+    )
+    if confirmation is not None and confirmation.coverage_error_code is not None:
+        raise_backtest_problem(request, confirmation.coverage_error_code)
+    confirmation_payload = (
+        confirmation.confirmation_payload if confirmation is not None else None
     )
     if setup is None or confirmation_payload is None:
         raise problem(

@@ -22,6 +22,9 @@ from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.confirmation_preflight import (
+    prepare_confirmation_launch,
+)
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -221,94 +224,18 @@ def _coverage_preflight(
     *,
     optional_parameter_status: dict[str, Any],
 ) -> dict[str, Any]:
-    from argus.domain.backtesting.coverage import (
-        MarketDataCoverageError,
-        prepare_market_data,
-    )
-    from argus.domain.engine_launch.adapter import (
-        validate_request_benchmark,
-        validate_request_symbols,
-    )
-
-    try:
-        request = LaunchBacktestRequest.model_validate(launch_payload)
-        symbol_validation = validate_request_symbols(request)
-        if symbol_validation.outcome == "unavailable":
-            return coverage_recovery_stage_patch(
-                error_code="market_data_unavailable",
-                launch_payload=launch_payload,
-                optional_parameter_status=optional_parameter_status,
-            )
-        if symbol_validation.outcome != "resolved":
-            return _launch_validation_failure(
-                symbol_validation.error_code or "invalid_symbol"
-            )
-        symbols = list(symbol_validation.symbols)
-        asset_class = symbol_validation.asset_class
-        if asset_class is None:
-            return _launch_validation_failure("invalid_asset_class")
-        benchmark_validation = validate_request_benchmark(
-            request,
-            asset_class=asset_class,
-        )
-        if benchmark_validation.outcome == "unavailable":
-            return coverage_recovery_stage_patch(
-                error_code="market_data_unavailable",
-                launch_payload=launch_payload,
-                optional_parameter_status=optional_parameter_status,
-            )
-        if (
-            benchmark_validation.outcome != "resolved"
-            or benchmark_validation.benchmark_symbol is None
-        ):
-            return _launch_validation_failure(
-                benchmark_validation.error_code or "invalid_benchmark_symbol"
-            )
-        canonical_launch_payload = {
-            **launch_payload,
-            "benchmark_symbol": benchmark_validation.benchmark_symbol,
-        }
-        request = LaunchBacktestRequest.model_validate(canonical_launch_payload)
-        requested_range = request.requested_date_range or request.date_range
-        config = {
-            "asset_class": asset_class,
-            "symbols": symbols,
-            "timeframe": request.timeframe,
-            "start_date": request.date_range.start,
-            "end_date": request.date_range.end,
-            "requested_date_range": requested_range.model_dump(),
-            "benchmark_symbol": request.benchmark_symbol,
-        }
-        prepared = prepare_market_data(config)
-    except MarketDataCoverageError as exc:
+    preflight = prepare_confirmation_launch(launch_payload)
+    if preflight.outcome == "coverage_failure":
         return coverage_recovery_stage_patch(
-            error_code=exc.code,
+            error_code=preflight.error_code or "market_data_unavailable",
             launch_payload=launch_payload,
             optional_parameter_status=optional_parameter_status,
         )
-    except ValueError as exc:
-        return _launch_validation_failure(str(exc))
-
-    requested = prepared.requested_date_range.model_dump()
-    effective = prepared.effective_date_range.model_dump()
-    coverage = prepared.coverage_payload()
-    coverage["preflight_id"] = coverage.pop("dataset_id")
-    adjusted_launch_payload = {
-        **canonical_launch_payload,
-        "date_range": effective,
-        "requested_date_range": requested,
-        "coverage_preflight": coverage,
-    }
-    try:
-        adjusted_request = LaunchBacktestRequest.model_validate(adjusted_launch_payload)
-        validate_launch_supported(adjusted_request)
-    except ValidationError as exc:
-        return _launch_validation_failure(_validation_error_code(exc))
-    except ValueError as exc:
-        return _launch_validation_failure(str(exc))
+    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
+        return _launch_validation_failure(preflight.error_code or "missing_rule_group")
     return {
         "outcome": "ready_to_confirm",
-        "launch_payload": adjusted_launch_payload,
+        "launch_payload": preflight.launch_payload,
     }
 
 

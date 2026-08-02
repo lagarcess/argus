@@ -1,9 +1,4 @@
-"""Deterministic Ready-to-run confirmation materialization for a stored run.
-
-The retest action replays canonical run truth, so the confirmation artifact is
-built from the reloaded setup alone: no LLM, research, discovery, or market-data
-provider is consulted before the user approves the ordinary confirmation.
-"""
+"""Deterministic Ready-to-run confirmation materialization for a stored run."""
 
 from __future__ import annotations
 
@@ -19,6 +14,9 @@ from argus.agent_runtime.presentation_i18n import confirmation_rule_display_valu
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.confirmation_preflight import (
+    prepare_confirmation_launch,
+)
 from argus.domain.retest_setup import RetestSetup
 
 _INDICATOR_PARAMETER_KEYS = (
@@ -38,6 +36,12 @@ class _RuleProjection:
     exit_rule: dict[str, Any] | None = None
     rule_spec: dict[str, Any] | None = None
     indicator_parameters: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class RetestConfirmationPreparation:
+    confirmation_payload: dict[str, Any] | None = None
+    coverage_error_code: str | None = None
 
 
 def retest_confirmation_payload(
@@ -86,6 +90,60 @@ def retest_confirmation_payload(
     return payload
 
 
+def prepare_retest_confirmation_payload(
+    setup: RetestSetup,
+    *,
+    language: str = "en",
+    confirmation_id: str | None = None,
+) -> RetestConfirmationPreparation:
+    """Materialize a Retest card with provider-actual coverage truth."""
+    payload = retest_confirmation_payload(
+        setup,
+        language=language,
+        confirmation_id=confirmation_id,
+    )
+    if payload is None:
+        return RetestConfirmationPreparation()
+
+    preflight = prepare_confirmation_launch(dict(payload["launch_payload"]))
+    if preflight.outcome == "coverage_failure":
+        return RetestConfirmationPreparation(
+            coverage_error_code=(preflight.error_code or "market_data_unavailable")
+        )
+    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
+        return RetestConfirmationPreparation()
+
+    launch_payload = preflight.launch_payload
+    strategy = _strategy_with_effective_date_range(
+        dict(payload["strategy"]),
+        launch_payload=launch_payload,
+    )
+    covered_payload = {
+        **payload,
+        "strategy": strategy,
+        "launch_payload": launch_payload,
+    }
+    validation = validate_confirmation_execution_payload(covered_payload)
+    if not validation.executable or validation.launch_payload is None:
+        return RetestConfirmationPreparation()
+    try:
+        pending_strategy = StrategySummary.model_validate(strategy)
+    except ValueError:
+        return RetestConfirmationPreparation()
+    if not strategy_can_be_approved(pending_strategy):
+        return RetestConfirmationPreparation()
+
+    covered_payload["launch_payload"] = validation.launch_payload
+    covered_payload["validation"] = {
+        "status": "ready_to_run",
+        "executable": True,
+        "date_adjusted": _has_effective_window_adjustment(validation.launch_payload),
+    }
+    return RetestConfirmationPreparation(
+        confirmation_payload=covered_payload,
+    )
+
+
 def retest_runtime_result(
     confirmation_payload: dict[str, Any],
 ) -> dict[str, Any]:
@@ -94,6 +152,30 @@ def retest_runtime_result(
         "stage_outcome": "await_approval",
         "confirmation_payload": confirmation_payload,
     }
+
+
+def _strategy_with_effective_date_range(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    effective = launch_payload.get("date_range")
+    requested = launch_payload.get("requested_date_range")
+    if not isinstance(effective, dict) or not isinstance(requested, dict):
+        return strategy
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    extra_parameters["requested_date_range"] = dict(requested)
+    extra_parameters["effective_date_range"] = dict(effective)
+    return {
+        **strategy,
+        "date_range": dict(effective),
+        "extra_parameters": extra_parameters,
+    }
+
+
+def _has_effective_window_adjustment(launch_payload: dict[str, Any]) -> bool:
+    coverage = launch_payload.get("coverage_preflight")
+    return isinstance(coverage, dict) and coverage.get("outcome") == ("adjusted_coverage")
 
 
 def _costs_the_engine_would_drop(setup: RetestSetup) -> bool:
