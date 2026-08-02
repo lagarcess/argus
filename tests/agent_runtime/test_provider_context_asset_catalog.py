@@ -82,7 +82,10 @@ def _provider_context_rows(
     mentions: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     context = provider_asset_resolution_context_from_extraction(
-        LLMAssetMentionExtraction(asset_mentions=mentions),
+        LLMAssetMentionExtraction(
+            asset_mentions=mentions,
+            all_traded_asset_mentions_included=True,
+        ),
         resolve_asset_candidate=resolve_asset_candidate,
     )
     assert context is not None

@@ -3015,7 +3015,7 @@ def _canonicalized_strategy(
                 invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        asset_classes.update(provider_context_assets.resolved_asset_classes_from_strategy_context(updated, symbol) or {resolution.asset.asset_class})
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))

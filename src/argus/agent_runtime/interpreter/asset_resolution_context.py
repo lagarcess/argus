@@ -84,7 +84,9 @@ def provider_asset_resolution_context_from_extraction(
     resolve_asset_candidate: Callable[..., AssetResolution],
 ) -> str | None:
     rows: list[dict[str, object]] = []
-    all_traded_asset_mentions_accounted_for = True
+    all_traded_asset_mentions_accounted_for = (
+        extraction.all_traded_asset_mentions_included
+    )
     traded_candidate_row_count = 0
     seen: set[str] = set()
     seen_traded_assets: set[tuple[str, str]] = set()
@@ -200,7 +202,9 @@ def _asset_mention_extraction_messages(
                 "is a company_name, ticker, crypto asset, currency_pair, or unknown. "
                 "Return at most six distinct mentions. If more than six are visible, "
                 "preserve traded-asset and unknown spans before benchmark spans. If "
-                "none are visible, return an empty list."
+                "the six-item limit omits any traded-asset or unknown span, set "
+                "all_traded_asset_mentions_included to false; otherwise set it to "
+                "true. If none are visible, return an empty list and true."
             ),
         },
         {"role": "user", "content": request.current_user_message},

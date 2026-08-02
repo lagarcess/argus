@@ -113,6 +113,7 @@ def response_with_provider_context_assets(
 
     resolved_symbols: list[str] = []
     resolved_records: list[dict[str, Any]] = []
+    resolved_record_identities: set[tuple[str, str]] = set()
     asset_classes: set[str] = set()
     ambiguous_fields: list[LLMAmbiguousField] = []
     for row in candidate_rows[:5]:
@@ -120,10 +121,15 @@ def response_with_provider_context_assets(
             ambiguous_fields.append(_ambiguous_field_from_context_row(row))
             continue
         symbol = str(row.get("symbol") or "").strip().upper()
+        asset_class = str(row.get("asset_class") or "").strip().lower()
         if symbol and symbol not in resolved_symbols:
             resolved_symbols.append(symbol)
-            resolved_records.append(_resolved_asset_record_from_context_row(row))
-        asset_class = str(row.get("asset_class") or "").strip().lower()
+        if symbol:
+            resolved_record = _resolved_asset_record_from_context_row(row)
+            resolved_record_identity = (symbol, asset_class)
+            if resolved_record_identity not in resolved_record_identities:
+                resolved_record_identities.add(resolved_record_identity)
+                resolved_records.append(resolved_record)
         if asset_class:
             asset_classes.add(asset_class)
 
@@ -333,6 +339,21 @@ def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
     return symbols
 
 
+def resolved_asset_classes_from_strategy_context(
+    strategy: Any,
+    symbol: str,
+) -> set[str]:
+    """Provider-owned asset classes for every record matching ``symbol``."""
+
+    return {
+        asset_class
+        for record in resolved_asset_records_from_strategy_context(strategy)
+        if _provider_record_matches_symbol(record, symbol)
+        and (asset_class := str(record.get("asset_class") or "").strip().lower())
+        in {"equity", "crypto", "currency_pair"}
+    }
+
+
 def resolution_from_strategy_context(
     strategy: Any,
     symbol: str,
@@ -395,6 +416,10 @@ def response_with_canonical_interpreter_assets(
             changed = True
             continue
         symbol = raw_text
+        context_asset_classes = resolved_asset_classes_from_strategy_context(
+            draft,
+            raw_text,
+        )
         try:
             resolution = resolution_from_strategy_context(
                 draft,
@@ -417,7 +442,9 @@ def response_with_canonical_interpreter_assets(
             if resolved_symbol:
                 symbol = resolved_symbol
             asset_class = str(resolution.asset.asset_class or "").strip().lower()
-            if asset_class:
+            if context_asset_classes:
+                asset_classes.update(context_asset_classes)
+            elif asset_class:
                 asset_classes.add(asset_class)
         if symbol != raw_text:
             changed = True

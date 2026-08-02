@@ -5229,7 +5229,10 @@ def _validate_capability_boundaries(
             invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        context_asset_classes = (
+            provider_context_assets.resolved_asset_classes_from_strategy_context(strategy, symbol)
+        )
+        asset_classes.update(context_asset_classes or {resolution.asset.asset_class})
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
     if field_owned_indicator_symbols and (
         "field_owned_indicator_asset_token_removed" not in response.reason_codes

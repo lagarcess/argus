@@ -64,6 +64,13 @@ class LLMAssetMentionExtraction(BaseModel):
             "message. Keep at most six distinct asset-like mentions."
         ),
     )
+    all_traded_asset_mentions_included: bool = Field(
+        description=(
+            "True only when every traded-asset or unknown asset-like mention in "
+            "the current message is present in asset_mentions. Set false when the "
+            "six-item limit omits any such mention."
+        )
+    )
 
 
 class LLMDateRangeIntent(BaseModel):

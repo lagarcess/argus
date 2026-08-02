@@ -83,7 +83,8 @@ def test_provider_asset_context_resolves_only_llm_identified_mentions(
                 {"raw_text": "target", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "costco", "role": "traded_asset", "confidence": 0.9},
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         )
     )
 
@@ -127,7 +128,8 @@ def test_provider_asset_context_dedupes_before_the_five_mention_cap(
                 {"raw_text": "walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "nvidia", "role": "traded_asset", "confidence": 0.9},
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         )
     )
 
@@ -182,7 +184,8 @@ def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
                     "mention_kind": "company_name",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -243,7 +246,8 @@ def test_provider_asset_context_uses_name_search_for_crypto_name_mentions() -> N
                     "mention_kind": "crypto",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )

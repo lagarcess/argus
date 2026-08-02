@@ -19,6 +19,7 @@ from argus.agent_runtime.interpreter.asset_resolution_context import (
     provider_asset_resolution_context_from_extraction,
 )
 from argus.agent_runtime.interpreter.provider_context_assets import (
+    response_with_canonical_interpreter_assets,
     response_with_provider_context_assets,
 )
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
@@ -356,7 +357,8 @@ def test_resolved_and_unsupported_extracted_mentions_keep_stale_asset_blocker() 
                     "mention_kind": "company_name",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -424,7 +426,8 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
                     "confidence": 0.9,
                 }
                 for name in [*symbols, "fictional moon fund"]
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -576,7 +579,8 @@ def test_duplicate_resolved_symbol_does_not_consume_traded_asset_slot() -> None:
                     "confidence": 0.9,
                 }
                 for name in symbols
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -640,7 +644,8 @@ def test_same_symbol_across_asset_classes_remains_a_mixed_asset_candidate() -> N
                     "mention_kind": "crypto",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -670,7 +675,98 @@ def test_same_symbol_across_asset_classes_remains_a_mixed_asset_candidate() -> N
         ),
         asset_resolution_context=context,
     )
-    assert normalized.candidate_strategy_draft.asset_class == "mixed"
+    canonicalized = response_with_canonical_interpreter_assets(
+        normalized,
+        resolve_asset_candidate=lambda *_args, **_kwargs: pytest.fail(
+            "provider-backed strategy context should own canonicalization"
+        ),
+    )
+    draft = canonicalized.candidate_strategy_draft
+    assert draft.asset_class == "mixed"
+    records = (draft.extra_parameters or {}).get("provider_resolved_assets") or []
+    assert {(record["symbol"], record["asset_class"]) for record in records} == {
+        ("BTC", "equity"),
+        ("BTC", "crypto"),
+    }
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    strategy = _strategy_from_llm(draft)
+    runtime_response = canonicalized.model_copy(deep=True)
+    request = InterpretationRequest(
+        current_user_message="Test the BTC equity and Bitcoin together.",
+        user=UserState(user_id="u1"),
+    )
+    interpreter_module._validate_capability_boundaries(
+        strategy=strategy,
+        response=runtime_response,
+        request=request,
+    )
+    assert strategy.asset_class == "mixed"
+    assert any(
+        item.category == "unsupported_asset_mix"
+        for item in runtime_response.unsupported_constraints
+    )
+
+    stage_strategy = interpret_module._canonicalized_strategy(
+        strategy,
+        current_user_message=request.current_user_message,
+        selected_thread_metadata={},
+    )
+    assert stage_strategy.asset_class == "mixed"
+
+
+def test_extractor_truncation_signal_survives_alias_deduplication() -> None:
+    symbols = {
+        "Apple": "AAPL",
+        "AAPL": "AAPL",
+        "Microsoft": "MSFT",
+        "NVIDIA": "NVDA",
+        "Amazon": "AMZN",
+        "Meta": "META",
+    }
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbols[query],
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": name,
+                    "role": "traded_asset",
+                    "mention_kind": ("ticker" if name == "AAPL" else "company_name"),
+                    "confidence": 0.9,
+                }
+                for name in symbols
+            ],
+            all_traded_asset_mentions_included=False,
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert [row["symbol"] for row in payload["asset_resolution_candidates"]] == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "AMZN",
+        "META",
+    ]
+    assert payload["all_traded_asset_mentions_accounted_for"] is False
 
 
 def test_benchmark_does_not_consume_five_traded_asset_rows() -> None:
@@ -717,7 +813,8 @@ def test_benchmark_does_not_consume_five_traded_asset_rows() -> None:
                     }
                     for name in ["Apple", "Microsoft", "NVIDIA", "Amazon", "Meta"]
                 ],
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -773,7 +870,8 @@ def test_benchmark_only_rows_cannot_bypass_incomplete_asset_context() -> None:
                     "mention_kind": "company_name",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -871,7 +969,8 @@ def test_unsupported_only_extraction_preserves_explicit_incompleteness() -> None
                     "mention_kind": "company_name",
                     "confidence": 0.9,
                 }
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -1388,7 +1487,8 @@ def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     )
 
     prompt = _asset_mention_extraction_messages(request)[0]["content"]
-    schema = LLMAssetMentionExtraction.model_json_schema()["properties"]["asset_mentions"]
+    extraction_schema = LLMAssetMentionExtraction.model_json_schema()
+    schema = extraction_schema["properties"]["asset_mentions"]
 
     assert "Return at most six distinct mentions" in prompt
     assert "preserve traded-asset and unknown spans before benchmark spans" in prompt
@@ -1397,6 +1497,8 @@ def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     assert schema["maxItems"] == 6
     assert "at most six distinct asset-like mentions" in schema["description"]
     assert "overflow" not in schema["description"]
+    assert "all_traded_asset_mentions_included" in extraction_schema["required"]
+    assert "all_traded_asset_mentions_included" in prompt
 
 
 def test_underfilled_provider_context_keeps_stale_asset_blocker() -> None:
