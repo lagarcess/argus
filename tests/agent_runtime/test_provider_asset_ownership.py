@@ -839,6 +839,71 @@ async def test_artifact_edit_planning_cannot_drop_incomplete_asset_blocker(
 
 
 @pytest.mark.asyncio
+async def test_artifact_edit_clarification_cannot_drop_incomplete_asset_blocker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def planned_response_stub(**kwargs: Any) -> LLMInterpretationResponse:
+        normalized = kwargs["response"]
+        assert normalized.missing_required_fields == ["asset_universe"]
+        return LLMInterpretationResponse(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The artifact edit needs another assumption.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL", "MSFT", "NVDA", "AMZN", "META"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            missing_required_fields=["assumption"],
+            assistant_response="Which fee should I use?",
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_ready_active_artifact_edit_planned_response",
+        planned_response_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User refined an incomplete six-asset basket.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL", "MSFT", "NVDA", "AMZN", "META"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    planned = await interpreter_module._audited_response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Keep those and add fictional moon fund with fees.",
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=json.dumps(
+            {"all_traded_asset_mentions_accounted_for": False}
+        ),
+    )
+
+    assert planned.intent == "conversation_followup"
+    assert planned.requires_clarification is True
+    assert planned.missing_required_fields == ["asset_universe", "assumption"]
+    assert planned.assistant_response is None
+    assert "artifact_assumption_edit_planned" in planned.reason_codes
+    assert "provider_context_incomplete_asset_mentions" in planned.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_artifact_edit_planning_does_not_reconcile_inherited_assets_against_current_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

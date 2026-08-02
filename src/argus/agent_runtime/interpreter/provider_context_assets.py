@@ -47,7 +47,8 @@ def carry_incomplete_asset_blocker(
     """
 
     if (
-        response.intent not in {"strategy_drafting", "backtest_execution"}
+        response.intent
+        not in {"strategy_drafting", "backtest_execution", "conversation_followup"}
         or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
     ):
         return response
