@@ -2189,7 +2189,9 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
-    primary_act_typed = response.semantic_turn_act == "asset_discovery"
+    primary_act_typed = response.semantic_turn_act == "asset_discovery" or (
+        response.semantic_turn_act is None and response.asset_discovery is not None
+    )
     primary_discovery = response.asset_discovery if primary_act_typed else None
     audited = await _audited_response_ready_for_runtime(
         response=response,

@@ -30,7 +30,10 @@ regression repair, not a reopened discovery program.
    discovery-category registry.
 2. The exact prompts from S-02, S-05, and S-08 must enter the typed discovery
    route through the real interpreter. No regex, phrase gate, localized alias
-   table, or pre-interpreter shortcut may be added.
+   table, or pre-interpreter shortcut may be added. When the interpreter emits
+   a complete `asset_discovery` payload with no competing semantic act, the
+   shared post-interpretation guard canonicalizes that internally consistent
+   typed result to `semantic_turn_act=asset_discovery`.
 3. Search configuration and authorization failures are not user-retryable.
    Missing configuration and HTTP 401/403 map to honest, non-retryable
    `discovery_unavailable` recovery.
