@@ -325,7 +325,10 @@ export function hydrateMessagesFromApi(
           kind: "strategy_confirmation",
           content: message.content,
           confirmation,
-          strategyPathContext: strategyPathContextFromMetadata(metadata),
+          strategyPathContext: strategyPathContextFromMetadata(
+            metadata,
+            message.id,
+          ),
           actions: confirmation.actions ?? [],
         };
       }

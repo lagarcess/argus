@@ -1050,6 +1050,7 @@ async def chat_stream(
                 for key in (
                     "latest_run_id",
                     "source_result_run_id",
+                    "strategy_path_id",
                     "result_run_id",
                     "result_strategy_id",
                     "result_conversation_id",

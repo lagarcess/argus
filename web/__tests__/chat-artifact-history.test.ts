@@ -141,6 +141,7 @@ describe("chat artifact history", () => {
         content: "",
         created_at: "2026-08-02T00:00:00Z",
         metadata: {
+          strategy_path_id: "assistant-capital-question",
           confirmation_card: confirmation,
           confirmation_payload: {
             strategy: {
@@ -148,6 +149,13 @@ describe("chat artifact history", () => {
               asset_universe: ["AAPL"],
               date_range: { start: "2025-01-02", end: "2025-07-31" },
               capital_amount: 10_000,
+            },
+            optional_parameters: {
+              initial_capital: {
+                value: 10_000,
+                source: "user",
+                label: "Initial capital",
+              },
             },
           },
         },
@@ -163,6 +171,14 @@ describe("chat artifact history", () => {
         capital_amount: 10_000,
       },
       sourceResultRunId: null,
+      strategyPathId: "assistant-capital-question",
+      optionalParameters: {
+        initial_capital: {
+          value: 10_000,
+          source: "user",
+          label: "Initial capital",
+        },
+      },
     });
   });
 

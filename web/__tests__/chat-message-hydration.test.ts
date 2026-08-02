@@ -63,6 +63,7 @@ describe("chat message hydration", () => {
         capital_amount: 10_000,
       },
       sourceResultRunId: null,
+      strategyPathId: "assistant-asset-question",
     });
   });
 

@@ -329,6 +329,98 @@ describe("conversation rail tick derivation", () => {
     ]);
   });
 
+  test("requires a matching transcript path when a new idea reuses the same symbol", () => {
+    const clarification = textMessage("aapl-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "date_range",
+        semanticNeeds: ["period"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "date_range",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId: "assistant-aapl-question",
+      } as StrategyPathContext & { strategyPathId: string },
+    });
+    const confirmation = (strategyPathId?: string) =>
+      confirmationMessage("same-symbol-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-01-01", end: "2025-12-31" },
+        },
+        ...(strategyPathId ? { strategyPathId } : {}),
+      } as StrategyPathContext & { strategyPathId?: string });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation()]).map((tick) => [
+        tick.messageId,
+        tick.kind,
+      ]),
+    ).toEqual([["aapl-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("assistant-other-question"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["aapl-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("assistant-aapl-question"),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        {
+          ...confirmation("assistant-aapl-question"),
+          strategyPathContext: {
+            kind: "confirmation",
+            strategy: {
+              asset_universe: ["MSFT"],
+              date_range: { start: "2025-01-01", end: "2025-12-31" },
+            },
+            strategyPathId: "assistant-aapl-question",
+          },
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  test("resolves a requested optional parameter from its canonical confirmation location", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("capital-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "initial_capital",
+          semanticNeeds: ["capital_amount"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "initial_capital",
+          strategy: { asset_universe: ["AAPL"] },
+        },
+      }),
+      confirmationMessage("capital-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        optionalParameters: {
+          initial_capital: {
+            value: 10_000,
+            source: "user",
+            label: "Initial capital",
+          },
+        },
+      } as StrategyPathContext & {
+        optionalParameters: Record<string, unknown>;
+      }),
+    ]);
+
+    expect(ticks).toEqual([]);
+  });
+
   test("clears clarification when confirmation canonicalizes an unchanged relative date fact", () => {
     const ticks = deriveConversationRailTicks([
       textMessage("asset-question", "ai", {

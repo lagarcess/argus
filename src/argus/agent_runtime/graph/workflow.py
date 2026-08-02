@@ -733,9 +733,10 @@ def _build_thread_metadata(
         and run_state.task_relation in {"continue", "refine"}
         and isinstance(prior_metadata, dict)
     ):
-        source_result_run_id = prior_metadata.get("source_result_run_id")
-        if isinstance(source_result_run_id, str) and source_result_run_id:
-            metadata["source_result_run_id"] = source_result_run_id
+        for key in ("source_result_run_id", "strategy_path_id"):
+            value = prior_metadata.get(key)
+            if isinstance(value, str) and value:
+                metadata[key] = value
     if run_state.response_intent is not None:
         metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
     clarification = workflow_state.get("clarification")

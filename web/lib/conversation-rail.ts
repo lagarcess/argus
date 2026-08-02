@@ -195,6 +195,23 @@ function sameStrategyPathFact(
   );
 }
 
+function confirmedRequestedFieldValue(
+  context: NonNullable<Message["strategyPathContext"]>,
+  requestedField: string,
+): unknown {
+  const strategyValue = context.strategy[requestedField];
+  if (meaningfulPathValue(strategyValue)) return strategyValue;
+  const optionalParameter = context.optionalParameters?.[requestedField];
+  if (
+    typeof optionalParameter !== "object" ||
+    optionalParameter === null ||
+    Array.isArray(optionalParameter)
+  ) {
+    return undefined;
+  }
+  return (optionalParameter as Record<string, unknown>).value;
+}
+
 function confirmationContinuesClarification(
   clarification: Message,
   confirmation: Message,
@@ -214,9 +231,24 @@ function confirmationContinuesClarification(
         pending.sourceResultRunId === confirmed.sourceResultRunId,
     );
   }
-  if (!meaningfulPathValue(confirmed.strategy[pending.requestedField])) {
+  const hasMatchingStrategyPathId = Boolean(
+    pending.strategyPathId &&
+      pending.strategyPathId === confirmed.strategyPathId,
+  );
+  if (
+    (pending.strategyPathId || confirmed.strategyPathId) &&
+    !hasMatchingStrategyPathId
+  ) {
     return false;
   }
+  if (
+    !meaningfulPathValue(
+      confirmedRequestedFieldValue(confirmed, pending.requestedField),
+    )
+  ) {
+    return false;
+  }
+  if (hasMatchingStrategyPathId) return true;
 
   let strongMatches = 0;
   for (const field of STRATEGY_PATH_FIELDS) {

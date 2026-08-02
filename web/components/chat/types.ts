@@ -235,6 +235,8 @@ export type StrategyPathContext = {
   requestedField?: string | null;
   strategy: Record<string, unknown>;
   sourceResultRunId?: string | null;
+  strategyPathId?: string | null;
+  optionalParameters?: Record<string, unknown> | null;
 };
 
 export type Message = {

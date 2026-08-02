@@ -376,6 +376,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "latest_failed_action_reference",
         "latest_run_id",
         "source_result_run_id",
+        "strategy_path_id",
         "result_run_id",
         "result_strategy_id",
         "result_conversation_id",
@@ -391,12 +392,12 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         for key, value in result.items()
         if key in allowed_keys and value is not None
     }
-    if "source_result_run_id" not in serialized:
-        selected_thread_metadata = result.get("selected_thread_metadata")
-        if isinstance(selected_thread_metadata, dict):
-            source_result_run_id = selected_thread_metadata.get("source_result_run_id")
-            if isinstance(source_result_run_id, str) and source_result_run_id:
-                serialized["source_result_run_id"] = source_result_run_id
+    selected_thread_metadata = result.get("selected_thread_metadata")
+    if isinstance(selected_thread_metadata, dict):
+        for key in ("source_result_run_id", "strategy_path_id"):
+            value = selected_thread_metadata.get(key)
+            if key not in serialized and isinstance(value, str) and value:
+                serialized[key] = value
     run_state = result.get("run_state")
     if run_state is not None:
         if (

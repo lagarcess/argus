@@ -306,6 +306,7 @@ def test_refinement_source_result_identity_survives_confirmation_projection() ->
             "last_stage_outcome": "await_user_reply",
             "requested_field": "refinement",
             "source_result_run_id": "run-refined",
+            "strategy_path_id": "assistant-refinement",
         },
     }
 
@@ -329,7 +330,11 @@ def test_refinement_source_result_identity_survives_confirmation_projection() ->
     assert confirmed["selected_thread_metadata"]["source_result_run_id"] == (
         "run-refined"
     )
+    assert confirmed["selected_thread_metadata"]["strategy_path_id"] == (
+        "assistant-refinement"
+    )
     assert _public_result(confirmed)["source_result_run_id"] == "run-refined"
+    assert _public_result(confirmed)["strategy_path_id"] == "assistant-refinement"
 
 
 def test_new_strategy_does_not_inherit_prior_refinement_source_result() -> None:
@@ -349,13 +354,16 @@ def test_new_strategy_does_not_inherit_prior_refinement_source_result() -> None:
             "selected_thread_metadata": {
                 "last_stage_outcome": "await_approval",
                 "source_result_run_id": "run-aapl",
+                "strategy_path_id": "assistant-aapl-clarification",
             },
         },
         StageResult(outcome="ready_for_confirmation", stage_patch={}),
     )
 
     assert "source_result_run_id" not in updated["selected_thread_metadata"]
+    assert "strategy_path_id" not in updated["selected_thread_metadata"]
     assert "source_result_run_id" not in _public_result(updated)
+    assert "strategy_path_id" not in _public_result(updated)
 
 
 def test_interpret_decision_patch_normalizes_dict_resolution_provenance() -> None:
