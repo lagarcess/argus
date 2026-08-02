@@ -112,6 +112,15 @@ def test_setup_calls_worktree_env_helper_before_dependency_setup() -> None:
     assert "git ls-files -- .env web/.env.local" in source
 
 
+def test_setup_pins_poetry_and_bun_to_ci_versions() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'PINNED_POETRY_VERSION="2.1.3"' in source
+    assert 'POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -' in source
+    assert 'PINNED_BUN_VERSION="1.3.14"' in source
+    assert 'bash -s "bun-v$PINNED_BUN_VERSION"' in source
+
+
 def test_codex_environment_delegates_to_tracked_setup_and_cleanup() -> None:
     source = CODEX_ENVIRONMENT.read_text(encoding="utf-8")
 

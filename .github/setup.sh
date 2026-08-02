@@ -16,6 +16,11 @@ echo "🔵 [Setup] Enforcing safe environment variables..."
 export ENVIRONMENT=DEV
 export DONT_WRITE_BYTECODE=1
 export PYTHONUNBUFFERED=1
+export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+
+# Keep local and Cloud setup aligned with the exact toolchain used by CI.
+PINNED_POETRY_VERSION="2.1.3"
+PINNED_BUN_VERSION="1.3.14"
 
 # ============================================================================
 # 1A. WORKTREE ENVIRONMENT FILES
@@ -58,28 +63,43 @@ if ! $PYTHON_CMD -c "import sys; sys.exit(0 if f'{sys.version_info[0]}.{sys.vers
 fi
 
 # ============================================================================
-# 3. INSTALL POETRY (if needed)
+# 3. INSTALL PINNED POETRY
 # ============================================================================
-echo "🔵 [Setup] Checking Poetry..."
-if ! command -v poetry &> /dev/null; then
-    echo "🔵 [Setup] Installing Poetry (Official Installer)..."
-    curl -sSL https://install.python-poetry.org | python3 -
-    export PATH="$HOME/.local/bin:$PATH"
-else
-    echo "🟢 [Setup] Poetry is already installed: $(poetry --version)"
+echo "🔵 [Setup] Checking Poetry ${PINNED_POETRY_VERSION}..."
+CURRENT_POETRY_VERSION=""
+if command -v poetry &> /dev/null; then
+    CURRENT_POETRY_VERSION="$(poetry --version 2>/dev/null | sed -E 's/^Poetry \(version ([^)]+)\)$/\1/')"
 fi
+if [ "$CURRENT_POETRY_VERSION" != "$PINNED_POETRY_VERSION" ]; then
+    echo "🔵 [Setup] Installing Poetry ${PINNED_POETRY_VERSION} (Official Installer)..."
+    curl -sSL https://install.python-poetry.org | \
+        POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -
+fi
+CURRENT_POETRY_VERSION="$(poetry --version 2>/dev/null | sed -E 's/^Poetry \(version ([^)]+)\)$/\1/')"
+if [ "$CURRENT_POETRY_VERSION" != "$PINNED_POETRY_VERSION" ]; then
+    echo "❌ [Setup] Poetry ${PINNED_POETRY_VERSION} required. Found: ${CURRENT_POETRY_VERSION:-missing}"
+    exit 1
+fi
+echo "🟢 [Setup] Poetry is ready: $(poetry --version)"
 
 # ============================================================================
-# 4. INSTALL BUN (if needed)
+# 4. INSTALL PINNED BUN
 # ============================================================================
-echo "🔵 [Setup] Checking Bun..."
-if ! command -v bun &> /dev/null; then
-    echo "🔵 [Setup] Installing Bun..."
-    curl -fsSL https://bun.sh/install | bash
-    export PATH="$HOME/.bun/bin:$PATH"
-else
-    echo "🟢 [Setup] Bun is already installed: $(bun --version)"
+echo "🔵 [Setup] Checking Bun ${PINNED_BUN_VERSION}..."
+CURRENT_BUN_VERSION=""
+if command -v bun &> /dev/null; then
+    CURRENT_BUN_VERSION="$(bun --version 2>/dev/null || true)"
 fi
+if [ "$CURRENT_BUN_VERSION" != "$PINNED_BUN_VERSION" ]; then
+    echo "🔵 [Setup] Installing Bun ${PINNED_BUN_VERSION}..."
+    curl -fsSL https://bun.com/install | bash -s "bun-v$PINNED_BUN_VERSION"
+fi
+CURRENT_BUN_VERSION="$(bun --version 2>/dev/null || true)"
+if [ "$CURRENT_BUN_VERSION" != "$PINNED_BUN_VERSION" ]; then
+    echo "❌ [Setup] Bun ${PINNED_BUN_VERSION} required. Found: ${CURRENT_BUN_VERSION:-missing}"
+    exit 1
+fi
+echo "🟢 [Setup] Bun is ready: ${CURRENT_BUN_VERSION}"
 
 # ============================================================================
 # 5. CONFIGURE POETRY
