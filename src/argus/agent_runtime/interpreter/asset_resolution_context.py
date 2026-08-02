@@ -87,7 +87,7 @@ def provider_asset_resolution_context_from_extraction(
     all_traded_asset_mentions_accounted_for = True
     traded_candidate_row_count = 0
     seen: set[str] = set()
-    seen_traded_symbols: set[str] = set()
+    seen_traded_assets: set[tuple[str, str]] = set()
     for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
         raw_key = raw_text.casefold()
@@ -129,13 +129,24 @@ def provider_asset_resolution_context_from_extraction(
                     if row.get("status") == "resolved"
                     else ""
                 )
-                if resolved_symbol and resolved_symbol in seen_traded_symbols:
+                resolved_asset_identity = (
+                    (
+                        resolved_symbol,
+                        str(row.get("asset_class") or "").strip().lower(),
+                    )
+                    if resolved_symbol
+                    else None
+                )
+                if (
+                    resolved_asset_identity
+                    and resolved_asset_identity in seen_traded_assets
+                ):
                     continue
                 if traded_candidate_row_count >= 5:
                     all_traded_asset_mentions_accounted_for = False
                     continue
-                if resolved_symbol:
-                    seen_traded_symbols.add(resolved_symbol)
+                if resolved_asset_identity:
+                    seen_traded_assets.add(resolved_asset_identity)
                 traded_candidate_row_count += 1
             rows.append(row)
         elif role in {"traded_asset", "unknown"}:

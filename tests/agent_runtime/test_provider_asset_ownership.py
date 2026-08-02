@@ -132,13 +132,14 @@ def _extraction_asset_resolution(
     field: str,
     source: str,
     symbol: str | None,
+    asset_class: str = "equity",
 ) -> AssetResolution:
     asset = (
         None
         if symbol is None
         else ResolvedAssetStub(
             canonical_symbol=symbol,
-            asset_class="equity",
+            asset_class=asset_class,
             name=query,
             raw_symbol=symbol,
         )
@@ -598,6 +599,78 @@ def test_duplicate_resolved_symbol_does_not_consume_traded_asset_slot() -> None:
         "asset_universe[3]",
         "asset_universe[4]",
     ]
+
+
+def test_same_symbol_across_asset_classes_remains_a_mixed_asset_candidate() -> None:
+    assets = {
+        "BTC equity": ("BTC", "equity"),
+        "Bitcoin": ("BTC", "crypto"),
+    }
+    resolved_fields: list[str] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        resolved_fields.append(field)
+        symbol, asset_class = assets[query]
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbol,
+            asset_class=asset_class,
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "BTC equity",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                },
+                {
+                    "raw_text": "Bitcoin",
+                    "role": "traded_asset",
+                    "mention_kind": "crypto",
+                    "confidence": 0.9,
+                },
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert [
+        (row["symbol"], row["asset_class"])
+        for row in payload["asset_resolution_candidates"]
+    ] == [("BTC", "equity"), ("BTC", "crypto")]
+    assert payload["all_traded_asset_mentions_accounted_for"] is True
+    assert resolved_fields == ["asset_universe[0]", "asset_universe[1]"]
+
+    normalized = response_with_provider_context_assets(
+        LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="Test the BTC equity and Bitcoin together.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["BTC"],
+                asset_class="equity",
+                capital_amount=10_000,
+            ),
+            semantic_turn_act="new_idea",
+        ),
+        asset_resolution_context=context,
+    )
+    assert normalized.candidate_strategy_draft.asset_class == "mixed"
 
 
 def test_benchmark_does_not_consume_five_traded_asset_rows() -> None:
