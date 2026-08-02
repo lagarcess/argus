@@ -31,9 +31,26 @@ This addendum expands the allowed test surfaces to
 `web/e2e/support/guest-qa.ts`. Backend product behavior and API/data contracts
 remain unchanged.
 
+## Review correction — typed continuity required — 2026-08-02
+
+The original positional predicate in Task 1 was insufficient: any later active
+confirmation could clear every earlier clarification, including a recovery for
+an unrelated idea. The locked spec requires transcript evidence that the
+confirmation continues the clarification.
+
+The corrected implementation projects existing backend-owned
+`pending_strategy` and `confirmation_payload.strategy` metadata onto hydrated
+messages. A clarification clears only when the requested field is present in a
+later active confirmation and typed strategy facts prove the same path. Missing
+or conflicting relationship evidence fails closed, so the marker stays
+visible. This expands the frontend behavior surface to the existing stream and
+reload hydration helpers and their focused tests; it does not add or change a
+backend, API, data, localization, provider, or LLM contract.
+
 ## Global Constraints
 
-- Modify only `web/lib/conversation-rail.ts` and `web/__tests__/conversation-activity-rail.test.ts` for behavior.
+- Keep behavior frontend-only: rail derivation plus projection of existing
+  persisted/streamed typed metadata. Do not create a new backend relationship.
 - No backend/API/data/localization/provider/LLM changes.
 - Active confirmation means `confirmation_state` is `"active"` or omitted; cancelled/superseded confirmations never resolve.
 - Preserve result, decision-saved, failed-job, retryable, coverage, unsupported, and artifact-action ticks.
@@ -97,27 +114,16 @@ Expected: fail because both clarification messages are currently emitted as `err
 
 Test that cancelled and superseded confirmation states leave the clarification tick visible. Test that a `coverage_recovery` after an active confirmation remains an `error_recovery` tick. These catch the two invalid implementations: treating every confirmation as resolution and suppressing unrelated recovery classes.
 
-- [ ] **Step 4: Implement the smallest predicate**
+- [ ] **Step 4: Implement the smallest proven-link predicate**
 
-In `web/lib/conversation-rail.ts`, add private helpers equivalent to:
-
-```ts
-function activeConfirmation(message: Message): boolean {
-  return message.role === "ai" &&
-    message.kind === "strategy_confirmation" &&
-    Boolean(message.confirmation) &&
-    (message.confirmation.confirmation_state ?? "active") === "active";
-}
-
-function clarificationResolvedByLaterConfirmation(
-  messages: readonly Message[],
-  recoveryIndex: number,
-): boolean {
-  return messages.slice(recoveryIndex + 1).some(activeConfirmation);
-}
-```
-
-When deriving a `recoveryDisplay` tick, skip it only if its kind is `clarification` and the second helper returns true. Do not change the failed-job, assistant-recovery-code, superseded-runtime-failure, coverage, unsupported, or artifact-action branches.
+Project existing `pending_strategy` and `confirmation_payload.strategy`
+metadata through both reload and streamed-final message paths. When deriving a
+`recoveryDisplay` tick, skip it only if its kind is `clarification`, the later
+confirmation is active, its strategy supplies the requested field, and the
+typed strategy path or source-result artifact proves continuity. Missing or
+conflicting relationship evidence must keep the tick. Do not change the
+failed-job, assistant-recovery-code, superseded-runtime-failure, coverage,
+unsupported, or artifact-action branches.
 
 - [ ] **Step 5: Prove green and commit**
 

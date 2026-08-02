@@ -230,6 +230,13 @@ export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
 };
 
+export type StrategyPathContext = {
+  kind: "clarification" | "confirmation";
+  requestedField?: string | null;
+  strategy: Record<string, unknown>;
+  sourceResultRunId?: string | null;
+};
+
 export type Message = {
   id: string;
   /** Hidden durable message ids that should focus this projected transcript row. */
@@ -262,6 +269,8 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  /** Existing backend-owned strategy facts used to prove turn continuity. */
+  strategyPathContext?: StrategyPathContext | null;
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;

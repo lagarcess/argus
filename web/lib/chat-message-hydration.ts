@@ -18,7 +18,11 @@ import {
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
-import type { ChatActionOption, Message } from "@/components/chat/types";
+import type {
+  ChatActionOption,
+  Message,
+  StrategyPathContext,
+} from "@/components/chat/types";
 
 type TextMessageHydrationOptions = {
   contentPresentation?: Message["contentPresentation"];
@@ -365,6 +369,38 @@ export function isHydratableResultCard(
   );
 }
 
+export function strategyPathContextFromMetadata(
+  metadata: Record<string, unknown>,
+): StrategyPathContext | null {
+  const pendingStrategy = recordOrNull(metadata.pending_strategy);
+  const sourceResult = recordOrNull(pendingStrategy?.source_result);
+  const sourceResultRunId =
+    stringOrNull(metadata.source_result_run_id) ??
+    stringOrNull(sourceResult?.run_id) ??
+    stringOrNull(sourceResult?.runId);
+  const confirmationPayload = recordOrNull(metadata.confirmation_payload);
+  const confirmedStrategy = recordOrNull(confirmationPayload?.strategy);
+  if (confirmedStrategy) {
+    return {
+      kind: "confirmation",
+      strategy: confirmedStrategy,
+      sourceResultRunId,
+    };
+  }
+  const pendingStrategyFacts = recordOrNull(pendingStrategy?.strategy);
+  const clarification = recordOrNull(metadata.clarification);
+  const requestedField =
+    stringOrNull(pendingStrategy?.requested_field) ??
+    stringOrNull(clarification?.requested_field);
+  if (!pendingStrategyFacts || !requestedField) return null;
+  return {
+    kind: "clarification",
+    requestedField,
+    strategy: pendingStrategyFacts,
+    sourceResultRunId,
+  };
+}
+
 export function hydrateTextMessageFromApi(
   message: ApiMessage,
   options: TextMessageHydrationOptions = {},
@@ -428,6 +464,7 @@ export function hydrateTextMessageFromApi(
       ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    strategyPathContext: strategyPathContextFromMetadata(metadata),
     assistantRecoveryCode: isAssistant
       ? retryableAssistantRecoveryCode(metadata.recovery)
       : null,

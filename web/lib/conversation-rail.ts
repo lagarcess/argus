@@ -41,6 +41,108 @@ const RAIL_PREVIEW_METRIC_LIMIT = 3;
 
 const FAILED_JOB_STATUSES = new Set(["failed", "canceled", "expired"]);
 
+const STRATEGY_PATH_FIELDS = [
+  "strategy_type",
+  "asset_universe",
+  "asset_class",
+  "date_range",
+  "capital_amount",
+  "sizing_mode",
+  "timeframe",
+  "cadence",
+  "comparison_baseline",
+  "indicators",
+  "constraints",
+  "fee_bps",
+  "slippage_bps",
+] as const;
+
+const STRONG_STRATEGY_PATH_FIELDS = new Set<string>([
+  "asset_universe",
+  "date_range",
+  "capital_amount",
+  "timeframe",
+  "cadence",
+  "comparison_baseline",
+  "indicators",
+  "constraints",
+  "fee_bps",
+  "slippage_bps",
+]);
+
+function meaningfulPathValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function samePathValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => samePathValue(value, right[index]))
+    );
+  }
+  if (
+    typeof left !== "object" ||
+    left === null ||
+    typeof right !== "object" ||
+    right === null
+  ) {
+    return false;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) =>
+        key === rightKeys[index] &&
+        samePathValue(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
+function confirmationContinuesClarification(
+  clarification: Message,
+  confirmation: Message,
+): boolean {
+  const pending = clarification.strategyPathContext;
+  const confirmed = confirmation.strategyPathContext;
+  if (
+    pending?.kind !== "clarification" ||
+    confirmed?.kind !== "confirmation" ||
+    !pending.requestedField ||
+    !meaningfulPathValue(confirmed.strategy[pending.requestedField])
+  ) {
+    return false;
+  }
+  if (pending.sourceResultRunId || confirmed.sourceResultRunId) {
+    return Boolean(
+      pending.sourceResultRunId &&
+        pending.sourceResultRunId === confirmed.sourceResultRunId,
+    );
+  }
+
+  let strongMatches = 0;
+  for (const field of STRATEGY_PATH_FIELDS) {
+    if (field === pending.requestedField) continue;
+    const pendingValue = pending.strategy[field];
+    if (!meaningfulPathValue(pendingValue)) continue;
+    const confirmedValue = confirmed.strategy[field];
+    if (!samePathValue(pendingValue, confirmedValue)) return false;
+    if (STRONG_STRATEGY_PATH_FIELDS.has(field)) strongMatches += 1;
+  }
+  return strongMatches > 0;
+}
+
 function activeConfirmation(message: Message): boolean {
   const confirmation = message.confirmation;
   return (
@@ -53,9 +155,16 @@ function activeConfirmation(message: Message): boolean {
 
 function clarificationResolvedByLaterConfirmation(
   messages: readonly Message[],
+  recovery: Message,
   recoveryIndex: number,
 ): boolean {
-  return messages.slice(recoveryIndex + 1).some(activeConfirmation);
+  return messages
+    .slice(recoveryIndex + 1)
+    .some(
+      (message) =>
+        activeConfirmation(message) &&
+        confirmationContinuesClarification(recovery, message),
+    );
 }
 
 function unresolvedClarification(
@@ -65,7 +174,7 @@ function unresolvedClarification(
 ): boolean {
   return (
     message.recoveryDisplay?.kind !== "clarification" ||
-    !clarificationResolvedByLaterConfirmation(messages, messageIndex)
+    !clarificationResolvedByLaterConfirmation(messages, message, messageIndex)
   );
 }
 

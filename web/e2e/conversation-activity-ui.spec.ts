@@ -281,6 +281,13 @@ function recoveredClarificationRailTranscript(
         requested_field: "asset_universe",
         semantic_needs: ["asset_target"],
       },
+      pending_strategy: {
+        requested_field: "asset_universe",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          capital_amount: 10_000,
+        },
+      },
     },
   );
   messages[10] = userMessage(conversationId, 10, "AAPL");
@@ -295,6 +302,13 @@ function recoveredClarificationRailTranscript(
         statusLabel: "Ready to run",
         summary: "AAPL with the supplied dates.",
         rows: [{ label: "Assets", value: "AAPL" }],
+      },
+      confirmation_payload: {
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          capital_amount: 10_000,
+        },
       },
     },
   );

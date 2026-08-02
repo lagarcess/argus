@@ -1769,6 +1769,13 @@ export function seedGuestResolvedClarificationRailHistory(params: {
           requested_field: "asset_universe",
           semantic_needs: ["asset_target"],
         },
+        pending_strategy: {
+          requested_field: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            capital_amount: 10_000,
+          },
+        },
       },
     },
     { id: randomUUID(), role: "user", content: "AAPL", metadata: {} },
@@ -1874,6 +1881,7 @@ export function seedGuestActiveConfirmationFixture(params: {
         strategy_thesis: `Buy and hold ${symbol}.`,
         asset_universe: [symbol],
         asset_class: "equity",
+        capital_amount: 10_000,
         date_range: {
           start: "2025-07-28",
           end: "2026-07-24",

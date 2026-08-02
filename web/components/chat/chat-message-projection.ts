@@ -19,6 +19,7 @@ import {
   isHydratableResultCard,
   recordOrNull,
   retryRequestMessageForAssistant,
+  strategyPathContextFromMetadata,
   stringArrayOrNull,
   stringOrNull,
 } from "@/lib/chat-message-hydration";
@@ -324,6 +325,7 @@ export function hydrateMessagesFromApi(
           kind: "strategy_confirmation",
           content: message.content,
           confirmation,
+          strategyPathContext: strategyPathContextFromMetadata(metadata),
           actions: confirmation.actions ?? [],
         };
       }

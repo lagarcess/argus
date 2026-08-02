@@ -32,6 +32,40 @@ function applyViewMessages(
 }
 
 describe("chat message hydration", () => {
+  test("hydrates backend-owned strategy context for a clarification path", () => {
+    const hydrated = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "assistant-asset-question",
+        content: "Which asset should I test?",
+        metadata: {
+          clarification: {
+            kind: "clarification",
+            prompt_source: "degraded_fallback",
+            requested_field: "asset_universe",
+            semantic_needs: ["asset_target"],
+          },
+          pending_strategy: {
+            requested_field: "asset_universe",
+            strategy: {
+              strategy_type: "buy_and_hold",
+              capital_amount: 10_000,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(hydrated.strategyPathContext).toEqual({
+      kind: "clarification",
+      requestedField: "asset_universe",
+      strategy: {
+        strategy_type: "buy_and_hold",
+        capital_amount: 10_000,
+      },
+      sourceResultRunId: null,
+    });
+  });
+
   test("reload hydrates no-progress choices on their owning assistant", () => {
     const hydrated = hydrateTextMessageFromApi(
       apiMessage({

@@ -12,6 +12,7 @@ type MergeFinalTextOptions = {
   contentPresentation?: Message["contentPresentation"];
   resultFactHeadingKey?: string | null;
   recoveryDisplay?: RecoveryDisplay | null;
+  strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
   discovery?: DiscoverySidecar | null;
 };
@@ -25,6 +26,7 @@ export function mergeFinalTextMessage(
     contentPresentation,
     resultFactHeadingKey,
     recoveryDisplay,
+    strategyPathContext,
     assistantRecoveryCode,
     discovery,
   }: MergeFinalTextOptions,
@@ -40,6 +42,8 @@ export function mergeFinalTextMessage(
     contentPresentation: contentPresentation ?? message.contentPresentation,
     resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
     recoveryDisplay: recoveryDisplay ?? message.recoveryDisplay,
+    strategyPathContext:
+      strategyPathContext ?? message.strategyPathContext,
     assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
     discovery: discovery ?? message.discovery,
   };

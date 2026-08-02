@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type {
   Message,
   StrategyConfirmationPayload,
+  StrategyPathContext,
   StrategyResultPayload,
 } from "@/components/chat/types";
 import type { BacktestJob } from "@/lib/argus-api";
@@ -84,6 +85,7 @@ function confirmationMessage(
   confirmationState: NonNullable<
     StrategyConfirmationPayload["confirmation_state"]
   > = "active",
+  strategyPathContext?: StrategyPathContext,
 ): Message {
   return {
     id,
@@ -96,6 +98,7 @@ function confirmationMessage(
       summary: "AAPL with the supplied dates.",
       rows: [{ label: "Assets", value: "AAPL" }],
     },
+    strategyPathContext,
   };
 }
 
@@ -109,6 +112,14 @@ describe("conversation rail tick derivation", () => {
           requestedField: "asset_universe",
           semanticNeeds: ["asset_target"],
         },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            capital_amount: 10_000,
+          },
+        },
       }),
       textMessage("user-asset", "user"),
       textMessage("date-question", "ai", {
@@ -117,9 +128,26 @@ describe("conversation rail tick derivation", () => {
           requestedField: "date_range",
           semanticNeeds: ["period"],
         },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "date_range",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        },
       }),
       textMessage("user-dates", "user"),
-      confirmationMessage("recovered-confirmation"),
+      confirmationMessage("recovered-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-01-02", end: "2025-07-31" },
+          capital_amount: 10_000,
+        },
+      }),
       jobMessage("independent-failed-job", "failed"),
     ];
 
@@ -140,14 +168,123 @@ describe("conversation rail tick derivation", () => {
             requestedField: "asset_universe",
             semanticNeeds: ["asset_target"],
           },
+          strategyPathContext: {
+            kind: "clarification",
+            requestedField: "asset_universe",
+            strategy: { capital_amount: 10_000 },
+          },
         }),
-        confirmationMessage("inactive-confirmation", confirmationState),
+        confirmationMessage("inactive-confirmation", confirmationState, {
+          kind: "confirmation",
+          strategy: {
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        }),
       ]);
 
       expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
         ["asset-question", "error_recovery"],
       ]);
     }
+  });
+
+  test("keeps clarification attention when a later active confirmation has no typed path", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: { capital_amount: 10_000 },
+        },
+      }),
+      confirmationMessage("unproven-confirmation"),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification attention when the confirmation still lacks the requested field", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "date_range",
+          strategy: {
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        },
+      }),
+      confirmationMessage("incomplete-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          capital_amount: 10_000,
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["date-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification attention when a later confirmation belongs to an unrelated strategy path", () => {
+    const clarificationPath = {
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "date_range",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          capital_amount: 10_000,
+        },
+      },
+    } as Partial<Message>;
+    const unrelatedConfirmationPath = {
+      strategyPathContext: {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["MSFT"],
+          date_range: { start: "2025-01-02", end: "2025-07-31" },
+          capital_amount: 5_000,
+        },
+      },
+    } as Partial<Message>;
+
+    const ticks = deriveConversationRailTicks([
+      textMessage("idea-a-date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+        ...clarificationPath,
+      }),
+      textMessage("user-starts-idea-b", "user"),
+      {
+        ...confirmationMessage("idea-b-confirmation"),
+        ...unrelatedConfirmationPath,
+      },
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["idea-a-date-question", "error_recovery"],
+    ]);
   });
 
   test("keeps an unrelated recovery visible after confirmation", () => {
