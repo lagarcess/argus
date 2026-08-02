@@ -288,6 +288,76 @@ def test_public_result_normalizes_dict_resolution_provenance() -> None:
     ]
 
 
+def test_refinement_source_result_identity_survives_confirmation_projection() -> None:
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    state = {
+        "run_state": RunState(
+            current_user_message="increase the amount",
+            candidate_strategy_draft=strategy,
+            task_relation="continue",
+        ),
+        "user": UserState(user_id="u1"),
+        "selected_thread_metadata": {
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-refined",
+        },
+    }
+
+    interpreted = _apply_stage_result(
+        state,
+        StageResult(outcome="ready_for_confirmation", stage_patch={}),
+    )
+    confirmed = _apply_stage_result(
+        interpreted,
+        StageResult(
+            outcome="await_approval",
+            stage_patch={
+                "confirmation_payload": {
+                    "strategy": strategy.model_dump(mode="python"),
+                    "optional_parameters": {},
+                }
+            },
+        ),
+    )
+
+    assert confirmed["selected_thread_metadata"]["source_result_run_id"] == (
+        "run-refined"
+    )
+    assert _public_result(confirmed)["source_result_run_id"] == "run-refined"
+
+
+def test_new_strategy_does_not_inherit_prior_refinement_source_result() -> None:
+    updated = _apply_stage_result(
+        {
+            "run_state": RunState(
+                current_user_message="test MSFT instead",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                    date_range="past year",
+                ),
+                task_relation="new_task",
+            ),
+            "user": UserState(user_id="u1"),
+            "selected_thread_metadata": {
+                "last_stage_outcome": "await_approval",
+                "source_result_run_id": "run-aapl",
+            },
+        },
+        StageResult(outcome="ready_for_confirmation", stage_patch={}),
+    )
+
+    assert "source_result_run_id" not in updated["selected_thread_metadata"]
+    assert "source_result_run_id" not in _public_result(updated)
+
+
 def test_interpret_decision_patch_normalizes_dict_resolution_provenance() -> None:
     decision = InterpretDecision(
         intent="backtest_execution",

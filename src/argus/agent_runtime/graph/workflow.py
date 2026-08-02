@@ -721,6 +721,21 @@ def _build_thread_metadata(
             requested_field = prior_metadata.get("requested_field")
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
+    prior_metadata = workflow_state.get("selected_thread_metadata")
+    if (
+        stage_outcome_value
+        in {
+            "needs_clarification",
+            "ready_for_confirmation",
+            "await_user_reply",
+            "await_approval",
+        }
+        and run_state.task_relation in {"continue", "refine"}
+        and isinstance(prior_metadata, dict)
+    ):
+        source_result_run_id = prior_metadata.get("source_result_run_id")
+        if isinstance(source_result_run_id, str) and source_result_run_id:
+            metadata["source_result_run_id"] = source_result_run_id
     if run_state.response_intent is not None:
         metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
     clarification = workflow_state.get("clarification")

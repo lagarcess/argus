@@ -3296,8 +3296,9 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
         yield {
             "type": "final",
             "payload": {
-                "stage_outcome": "ready_for_confirmation",
+                "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL recurring buys.",
+                "source_result_run_id": run.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "dca_accumulation",
@@ -3326,6 +3327,18 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
 
     assert response.status_code == 200
     assert captured["message"].startswith("i want to do recurrent biweekly")
+    [final] = _stream_payloads(response.text, "final")
+    assert final["source_result_run_id"] == run.id
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_confirmation = persisted[-1]
+    assert persisted_confirmation["role"] == "assistant"
+    assert persisted_confirmation["metadata"]["source_result_run_id"] == run.id
+    assert persisted_confirmation["metadata"]["confirmation_payload"] == final[
+        "confirmation_payload"
+    ]
 
 
 def test_refine_strategy_action_uses_card_run_before_runtime_memory(
