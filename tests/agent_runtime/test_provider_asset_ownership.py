@@ -756,6 +756,88 @@ def test_unsupported_only_extraction_preserves_explicit_incompleteness() -> None
     }
 
 
+@pytest.mark.asyncio
+async def test_artifact_edit_planning_cannot_drop_incomplete_asset_blocker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    symbols = ["AAPL", "MSFT", "NVDA", "AMZN", "META"]
+    incomplete_context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": symbol,
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": symbol,
+                    "asset_class": "equity",
+                    "name": symbol,
+                    "raw_symbol": symbol,
+                    "provider": "alpaca",
+                    "exchange": "NASDAQ",
+                }
+                for symbol in symbols
+            ],
+            "all_traded_asset_mentions_accounted_for": False,
+        }
+    )
+
+    async def planned_response_stub(**kwargs: Any) -> LLMInterpretationResponse:
+        normalized = kwargs["response"]
+        assert normalized.missing_required_fields == ["asset_universe"]
+        assert "provider_context_incomplete_asset_mentions" in normalized.reason_codes
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User refined the five resolved assets.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=symbols,
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_ready_active_artifact_edit_planned_response",
+        planned_response_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User refined a six-asset basket.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=symbols,
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    planned = await interpreter_module._audited_response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Keep those five and add fictional moon fund.",
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=incomplete_context,
+    )
+
+    assert planned.requires_clarification is True
+    assert planned.missing_required_fields == ["asset_universe"]
+    assert planned.assistant_response is None
+    assert "artifact_assumption_edit_planned" in planned.reason_codes
+    assert "provider_context_incomplete_asset_mentions" in planned.reason_codes
+
+
 def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     request = InterpretationRequest(
         current_user_message=(

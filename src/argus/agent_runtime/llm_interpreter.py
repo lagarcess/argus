@@ -2221,7 +2221,11 @@ async def _audited_response_ready_for_runtime(
         request=request,
     )
     if planned_artifact_edit is not None:
-        return planned_artifact_edit
+        return _normalize_response_for_runtime_context(
+            planned_artifact_edit,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+        )
     if _response_can_skip_optional_runtime_readiness_audits(
         response=response,
         request=request,
