@@ -41,6 +41,33 @@ const RAIL_PREVIEW_METRIC_LIMIT = 3;
 
 const FAILED_JOB_STATUSES = new Set(["failed", "canceled", "expired"]);
 
+function activeConfirmation(message: Message): boolean {
+  return (
+    message.role === "ai" &&
+    message.kind === "strategy_confirmation" &&
+    Boolean(message.confirmation) &&
+    (message.confirmation.confirmation_state ?? "active") === "active"
+  );
+}
+
+function clarificationResolvedByLaterConfirmation(
+  messages: readonly Message[],
+  recoveryIndex: number,
+): boolean {
+  return messages.slice(recoveryIndex + 1).some(activeConfirmation);
+}
+
+function unresolvedClarification(
+  messages: readonly Message[],
+  message: Message,
+  messageIndex: number,
+): boolean {
+  return (
+    message.recoveryDisplay?.kind !== "clarification" ||
+    !clarificationResolvedByLaterConfirmation(messages, messageIndex)
+  );
+}
+
 export function deriveConversationRailTicks(
   messages: Message[],
 ): ConversationRailTick[] {
@@ -50,7 +77,10 @@ export function deriveConversationRailTicks(
       // Retry-history normalization can move a coalesced assistant failure's
       // recovery onto its owning user turn — that turn is then the failure's
       // only visible carrier.
-      if (message.recoveryDisplay) {
+      if (
+        message.recoveryDisplay &&
+        unresolvedClarification(messages, message, index)
+      ) {
         ticks.push({
           messageId: message.id,
           messageIndex: index,
@@ -105,7 +135,8 @@ export function deriveConversationRailTicks(
       return;
     }
     if (
-      message.recoveryDisplay ||
+      (message.recoveryDisplay &&
+        unresolvedClarification(messages, message, index)) ||
       message.assistantRecoveryCode ||
       message.contentPresentation === "superseded_runtime_failure"
     ) {

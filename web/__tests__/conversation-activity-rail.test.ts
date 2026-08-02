@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Message, StrategyResultPayload } from "@/components/chat/types";
+import type {
+  Message,
+  StrategyConfirmationPayload,
+  StrategyResultPayload,
+} from "@/components/chat/types";
 import type { BacktestJob } from "@/lib/argus-api";
 import {
   conversationRailVisible,
@@ -75,7 +79,90 @@ function jobMessage(id: string, status: BacktestJob["status"]): Message {
   };
 }
 
+function confirmationMessage(
+  id: string,
+  confirmationState: NonNullable<
+    StrategyConfirmationPayload["confirmation_state"]
+  > = "active",
+): Message {
+  return {
+    id,
+    role: "ai",
+    kind: "strategy_confirmation",
+    confirmation: {
+      confirmation_state: confirmationState,
+      title: "AAPL buy and hold",
+      statusLabel: "Ready to run",
+      summary: "AAPL with the supplied dates.",
+      rows: [{ label: "Assets", value: "AAPL" }],
+    },
+  };
+}
+
 describe("conversation rail tick derivation", () => {
+  test("clears clarification attention after the same transcript reaches an active confirmation", () => {
+    const messages: Message[] = [
+      textMessage("user-idea", "user"),
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+      }),
+      textMessage("user-asset", "user"),
+      textMessage("date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+      }),
+      textMessage("user-dates", "user"),
+      confirmationMessage("recovered-confirmation"),
+      jobMessage("independent-failed-job", "failed"),
+    ];
+
+    expect(
+      deriveConversationRailTicks(messages).map((tick) => [
+        tick.messageId,
+        tick.kind,
+      ]),
+    ).toEqual([["independent-failed-job", "error_recovery"]]);
+  });
+
+  test("keeps clarification attention without a later active confirmation", () => {
+    for (const confirmationState of ["superseded", "cancelled"] as const) {
+      const ticks = deriveConversationRailTicks([
+        textMessage("asset-question", "ai", {
+          recoveryDisplay: {
+            kind: "clarification",
+            requestedField: "asset_universe",
+            semanticNeeds: ["asset_target"],
+          },
+        }),
+        confirmationMessage("inactive-confirmation", confirmationState),
+      ]);
+
+      expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+        ["asset-question", "error_recovery"],
+      ]);
+    }
+  });
+
+  test("keeps an unrelated recovery visible after confirmation", () => {
+    const ticks = deriveConversationRailTicks([
+      confirmationMessage("recovered-confirmation"),
+      textMessage("coverage-recovery", "ai", {
+        recoveryDisplay: { kind: "coverage_recovery", code: "partial_window" },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["coverage-recovery", "error_recovery"],
+    ]);
+  });
+
   test("derives typed ticks from existing turn payloads only", () => {
     const messages: Message[] = [
       textMessage("u1", "user"),
