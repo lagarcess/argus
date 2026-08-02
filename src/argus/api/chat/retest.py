@@ -21,7 +21,6 @@ from argus.agent_runtime.retest_confirmation import (
     prepare_retest_confirmation_payload,
     retest_runtime_result,
 )
-from argus.api.backtest_service import raise_backtest_problem
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.confirmation import (
     public_confirmation_projection,
@@ -158,6 +157,8 @@ def prepare_retest_turn(
         else None
     )
     if confirmation is not None and confirmation.coverage_error_code is not None:
+        from argus.api.backtest_service import raise_backtest_problem
+
         raise_backtest_problem(request, confirmation.coverage_error_code)
     confirmation_payload = (
         confirmation.confirmation_payload if confirmation is not None else None

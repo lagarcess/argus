@@ -5,11 +5,6 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from argus.domain.backtesting import coverage as coverage_service
-from argus.domain.engine_launch import adapter as launch_adapter
-from argus.domain.engine_launch.models import LaunchBacktestRequest
-from argus.domain.engine_launch.strategies import validate_launch_supported
-
 
 @dataclass(frozen=True)
 class ConfirmationLaunchPreflight:
@@ -47,6 +42,11 @@ def prepare_confirmation_launch(
     launch_payload: dict[str, Any],
 ) -> ConfirmationLaunchPreflight:
     """Validate a launch and resolve its provider-backed coverage truth."""
+    from argus.domain.backtesting import coverage as coverage_service
+    from argus.domain.engine_launch import adapter as launch_adapter
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from argus.domain.engine_launch.strategies import validate_launch_supported
+
     try:
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
