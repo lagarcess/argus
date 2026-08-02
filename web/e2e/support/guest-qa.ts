@@ -1773,6 +1773,7 @@ export function seedGuestResolvedClarificationRailHistory(params: {
           requested_field: "asset_universe",
           strategy: {
             strategy_type: "buy_and_hold",
+            date_range: "past year",
             capital_amount: 10_000,
           },
         },
@@ -1885,6 +1886,17 @@ export function seedGuestActiveConfirmationFixture(params: {
         date_range: {
           start: "2025-07-28",
           end: "2026-07-24",
+        },
+        extra_parameters: {
+          date_range_raw_text: "past year",
+          requested_date_range: {
+            start: "2025-07-26",
+            end: "2026-07-26",
+          },
+          effective_date_range: {
+            start: "2025-07-28",
+            end: "2026-07-24",
+          },
         },
       },
       optional_parameters: {},

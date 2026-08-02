@@ -110,6 +110,72 @@ function samePathValue(left: unknown, right: unknown): boolean {
   );
 }
 
+function canonicalDateRange(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const dateRange = value as Record<string, unknown>;
+  return typeof dateRange.start === "string" &&
+    dateRange.start.trim() &&
+    typeof dateRange.end === "string" &&
+    dateRange.end.trim()
+    ? dateRange
+    : null;
+}
+
+function strategyExtraParameters(
+  strategy: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const value = strategy.extra_parameters;
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizedDateRangeText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  return normalized || null;
+}
+
+function sameCanonicalizedDateRange(
+  pendingValue: unknown,
+  confirmedStrategy: Record<string, unknown>,
+): boolean {
+  const pendingText = normalizedDateRangeText(pendingValue);
+  const confirmedExtra = strategyExtraParameters(confirmedStrategy);
+  if (!pendingText || !confirmedExtra) return false;
+
+  const requested = canonicalDateRange(confirmedExtra.requested_date_range);
+  const effective = canonicalDateRange(confirmedExtra.effective_date_range);
+  const confirmed = canonicalDateRange(confirmedStrategy.date_range);
+  if (
+    !requested ||
+    !effective ||
+    !confirmed ||
+    !samePathValue(confirmed, effective)
+  ) {
+    return false;
+  }
+
+  return (
+    normalizedDateRangeText(confirmedExtra.date_range_raw_text) === pendingText
+  );
+}
+
+function sameStrategyPathFact(
+  field: (typeof STRATEGY_PATH_FIELDS)[number],
+  pendingValue: unknown,
+  confirmedStrategy: Record<string, unknown>,
+): boolean {
+  const confirmedValue = confirmedStrategy[field];
+  return (
+    samePathValue(pendingValue, confirmedValue) ||
+    (field === "date_range" &&
+      sameCanonicalizedDateRange(pendingValue, confirmedStrategy))
+  );
+}
+
 function confirmationContinuesClarification(
   clarification: Message,
   confirmation: Message,
@@ -136,8 +202,9 @@ function confirmationContinuesClarification(
     if (field === pending.requestedField) continue;
     const pendingValue = pending.strategy[field];
     if (!meaningfulPathValue(pendingValue)) continue;
-    const confirmedValue = confirmed.strategy[field];
-    if (!samePathValue(pendingValue, confirmedValue)) return false;
+    if (!sameStrategyPathFact(field, pendingValue, confirmed.strategy)) {
+      return false;
+    }
     if (STRONG_STRATEGY_PATH_FIELDS.has(field)) strongMatches += 1;
   }
   return strongMatches > 0;
