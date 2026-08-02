@@ -17,6 +17,7 @@ from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_e
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
+    preserve_typed_discovery_act,
 )
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,

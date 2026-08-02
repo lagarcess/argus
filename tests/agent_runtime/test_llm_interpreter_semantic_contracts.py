@@ -2,6 +2,15 @@
 from tests.agent_runtime._llm_interpreter_common import *
 
 
+def test_interpreter_facade_reexports_discovery_act_guard() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.interpreter.discovery_act_guard import (
+        preserve_typed_discovery_act,
+    )
+
+    assert interpreter_module.preserve_typed_discovery_act is preserve_typed_discovery_act
+
+
 @pytest.mark.asyncio
 async def test_discovery_payload_restores_missing_semantic_act_without_strategy_audits(
     monkeypatch,
