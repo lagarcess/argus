@@ -493,6 +493,121 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
     assert stage_result.decision.missing_required_fields[0] == "asset_universe"
     assert stage_result.patch.get("confirmation_payload") is None
 
+    unsupported_stage_result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Test Apple, Microsoft, NVIDIA, Amazon, Meta, and fictional moon "
+                "fund using lunar volatility."
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent=normalized.intent,
+                task_relation=normalized.task_relation,
+                requires_clarification=normalized.requires_clarification,
+                user_goal_summary=normalized.user_goal_summary,
+                candidate_strategy_draft=_strategy_from_llm(
+                    normalized.candidate_strategy_draft
+                ),
+                missing_required_fields=normalized.missing_required_fields,
+                unsupported_constraints=[
+                    UnsupportedConstraint(
+                        category="unsupported_strategy_logic",
+                        raw_value="lunar volatility",
+                        explanation="That strategy logic is not executable.",
+                    )
+                ],
+                assistant_response=normalized.assistant_response,
+                reason_codes=[
+                    *normalized.reason_codes,
+                    "draft_only_indicator_text_preserved",
+                ],
+                semantic_turn_act=normalized.semantic_turn_act,
+            )
+        ),
+    )
+
+    assert unsupported_stage_result.outcome == "needs_clarification"
+    assert unsupported_stage_result.decision is not None
+    assert unsupported_stage_result.decision.missing_required_fields[0] == (
+        "asset_universe"
+    )
+    assert unsupported_stage_result.patch.get("confirmation_payload") is None
+
+
+def test_benchmark_does_not_consume_five_traded_asset_rows() -> None:
+    symbols = {
+        "SPY": "SPY",
+        "Apple": "AAPL",
+        "Microsoft": "MSFT",
+        "NVIDIA": "NVDA",
+        "Amazon": "AMZN",
+        "Meta": "META",
+    }
+    resolved_fields: list[str] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        resolved_fields.append(field)
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=symbols[query],
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "SPY",
+                    "role": "benchmark",
+                    "mention_kind": "ticker",
+                    "confidence": 0.9,
+                },
+                *[
+                    {
+                        "raw_text": name,
+                        "role": "traded_asset",
+                        "mention_kind": "company_name",
+                        "confidence": 0.9,
+                    }
+                    for name in ["Apple", "Microsoft", "NVIDIA", "Amazon", "Meta"]
+                ],
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    payload = json.loads(context)
+    assert [row["symbol"] for row in payload["asset_resolution_candidates"]] == [
+        "SPY",
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "AMZN",
+        "META",
+    ]
+    assert payload["all_traded_asset_mentions_accounted_for"] is True
+    assert resolved_fields == [
+        "comparison_baseline",
+        "asset_universe[0]",
+        "asset_universe[1]",
+        "asset_universe[2]",
+        "asset_universe[3]",
+        "asset_universe[4]",
+    ]
+
 
 def test_benchmark_only_rows_cannot_bypass_incomplete_asset_context() -> None:
     def resolve_candidate(
@@ -656,8 +771,10 @@ def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
 
     assert "Return up to six distinct mentions" in prompt
     assert "Prioritize traded-asset and unknown spans" in prompt
-    assert "sixth mention is overflow evidence" in prompt
+    assert "sixth traded-asset or unknown mention" in prompt
+    assert "five-traded-asset-row provider context" in prompt
     assert "up to six distinct asset-like mentions" in schema_description
+    assert "five-traded-asset-row provider context" in schema_description
 
 
 def test_underfilled_provider_context_keeps_stale_asset_blocker() -> None:

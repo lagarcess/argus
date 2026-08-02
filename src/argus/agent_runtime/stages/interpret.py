@@ -925,7 +925,12 @@ async def _stage_result_from_interpretation(
         unsupported_strategy_logic_owns_pending_need
         and "draft_only_indicator_text_preserved" in interpretation.reason_codes
     ):
-        missing_required_fields = []
+        missing_required_fields = (
+            ["asset_universe"]
+            if "provider_context_incomplete_asset_mentions"
+            in interpretation.reason_codes
+            else []
+        )
     pending_date_edit_reason_codes: list[str] = []
     # A planned edit or an explicit money answer may change another field
     # while reusing the prior window; that is not a date-answer noop.

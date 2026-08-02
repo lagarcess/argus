@@ -61,7 +61,7 @@ class LLMAssetMentionExtraction(BaseModel):
         description=(
             "Provider-resolution candidates identified by the LLM from the current "
             "message. Keep up to six distinct asset-like mentions so the sixth can "
-            "report overflow beyond the five-row provider context."
+            "report overflow beyond the five-traded-asset-row provider context."
         ),
     )
 

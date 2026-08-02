@@ -85,6 +85,7 @@ def provider_asset_resolution_context_from_extraction(
 ) -> str | None:
     rows: list[dict[str, object]] = []
     all_traded_asset_mentions_accounted_for = True
+    traded_candidate_row_count = 0
     seen: set[str] = set()
     for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
@@ -95,14 +96,13 @@ def provider_asset_resolution_context_from_extraction(
         role = (
             mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
         )
-        if len(rows) >= 5:
-            if role in {"traded_asset", "unknown"}:
-                all_traded_asset_mentions_accounted_for = False
+        if role in {"traded_asset", "unknown"} and traded_candidate_row_count >= 5:
+            all_traded_asset_mentions_accounted_for = False
             continue
         field = (
             "comparison_baseline"
             if role == "benchmark"
-            else f"asset_universe[{len(rows)}]"
+            else f"asset_universe[{traded_candidate_row_count}]"
         )
         try:
             resolution_kwargs: dict[str, Any] = {
@@ -126,6 +126,8 @@ def provider_asset_resolution_context_from_extraction(
         )
         if row is not None:
             rows.append(row)
+            if role in {"traded_asset", "unknown"}:
+                traded_candidate_row_count += 1
         elif role in {"traded_asset", "unknown"}:
             all_traded_asset_mentions_accounted_for = False
     if not rows and all_traded_asset_mentions_accounted_for:
@@ -175,10 +177,11 @@ def _asset_mention_extraction_messages(
                 "short raw text span and whether the user framed it as a traded asset, "
                 "a benchmark/comparison, or unknown. Also classify whether the span "
                 "is a company_name, ticker, crypto asset, currency_pair, or unknown. "
-                "Return up to six distinct mentions; the sixth mention is overflow "
-                "evidence for the five-row provider context. Prioritize traded-asset "
-                "and unknown spans over benchmark spans if more than six possible "
-                "mentions are visible. If none are visible, return an empty list."
+                "Return up to six distinct mentions; a sixth traded-asset or unknown "
+                "mention is overflow evidence for the five-traded-asset-row provider "
+                "context. Prioritize traded-asset and unknown spans over benchmark "
+                "spans if more than six possible mentions are visible. If none are "
+                "visible, return an empty list."
             ),
         },
         {"role": "user", "content": request.current_user_message},
