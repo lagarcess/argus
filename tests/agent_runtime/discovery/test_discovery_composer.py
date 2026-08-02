@@ -239,10 +239,11 @@ class TestFlagOnPipeline:
         assert provider.calls[0]["max_results"] == 5
 
     @pytest.mark.asyncio()
-    async def test_provider_unavailable_yields_search_failed_recovery(
-        self, flag_on: pytest.MonkeyPatch
+    @pytest.mark.parametrize("reason", ("timeout", "http_error", "malformed_response"))
+    async def test_temporary_provider_failure_yields_retryable_search_recovery(
+        self, flag_on: pytest.MonkeyPatch, reason: str
     ) -> None:
-        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        provider = _FakeProvider(SearchUnavailableError(reason=reason))
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision())
         patch = result.patch
@@ -250,6 +251,7 @@ class TestFlagOnPipeline:
         assert patch["recovery"]["retryable"] is True
         assert "discovery" not in patch
         assert patch["discovery_usage"]["search_attempted"] is True
+        assert patch["discovery_usage"]["fallback_code"] == f"search_{reason}"
 
     @pytest.mark.asyncio()
     async def test_not_configured_failure_does_not_count_as_attempt(
@@ -259,8 +261,49 @@ class TestFlagOnPipeline:
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision())
         patch = result.patch
-        assert patch["recovery"]["code"] == "discovery_search_failed"
+        assert patch["recovery"]["code"] == "discovery_unavailable"
+        assert patch["recovery"]["retryable"] is False
         assert patch["discovery_usage"]["search_attempted"] is False
+
+    @pytest.mark.asyncio()
+    async def test_authentication_failure_is_non_retryable_after_attempt(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(
+            SearchUnavailableError(reason="authentication_failed")
+        )
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision())
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_unavailable"
+        assert patch["recovery"]["retryable"] is False
+        assert patch["discovery_usage"] == {
+            "search_attempted": True,
+            "fallback_code": "search_authentication_failed",
+        }
+
+    @pytest.mark.asyncio()
+    async def test_same_request_succeeds_when_temporary_provider_recovers(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        decision = _decision()
+
+        failed = await _run(decision)
+        provider._packet = _packet()
+        recovered = await _run(decision)
+
+        assert failed.patch["recovery"] == {
+            "code": "discovery_search_failed",
+            "retryable": True,
+        }
+        assert "recovery" not in recovered.patch
+        assert [
+            candidate["symbol"] for candidate in recovered.patch["discovery"]["candidates"]
+        ] == ["CRWD"]
+        assert len(provider.calls) == 2
+        assert provider.calls[0]["query"] == provider.calls[1]["query"]
 
     @pytest.mark.asyncio()
     async def test_zero_validated_candidates_yields_no_verified_recovery(

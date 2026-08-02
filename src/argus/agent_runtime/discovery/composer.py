@@ -116,6 +116,10 @@ async def discovery_stage_result_if_applicable(
         if exc.reason == "not_configured":
             usage["search_attempted"] = False
         usage["fallback_code"] = f"search_{exc.reason}"
+        permanently_unavailable = exc.reason in {
+            "not_configured",
+            "authentication_failed",
+        }
         logger.warning(
             "Grounded discovery search unavailable",
             reason=exc.reason,
@@ -123,8 +127,12 @@ async def discovery_stage_result_if_applicable(
         )
         return await _recovery_result(
             decision=decision,
-            code="discovery_search_failed",
-            retryable=True,
+            code=(
+                "discovery_unavailable"
+                if permanently_unavailable
+                else "discovery_search_failed"
+            ),
+            retryable=not permanently_unavailable,
             current_user_message=current_user_message,
             language=language,
             usage=usage,
