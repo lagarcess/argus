@@ -12,7 +12,10 @@ from argus.agent_runtime.artifact_edit_planner import (
     ResolvedArtifactEdit,
     apply_edit_operations,
 )
-from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
+from argus.agent_runtime.artifacts.asset_edits import (
+    normalized_asset_symbols,
+    normalized_asset_universe_operation,
+)
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
     supported_cost_rate_value,
@@ -542,7 +545,7 @@ def materialized_artifact_edit_targets(
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
     primary_draft: LLMStrategyDraft | None = None,
 ) -> set[str]:
-    """Return targets that survive the exact draft-materialization path."""
+    """Return requested deltas that survive the exact materialization path."""
 
     draft, field_provenance, _ = _materialized_artifact_edit(
         plan,
@@ -550,14 +553,193 @@ def materialized_artifact_edit_targets(
         asset_symbol_resolver=asset_symbol_resolver,
         primary_draft=primary_draft,
     )
-    targets = {
+    materialized_targets = {
         target
         for field_name, target in _MATERIALIZED_FIELD_TARGETS.items()
         if field_name in field_provenance
     }
     if draft.date_range_intent is not None:
-        targets.add("date_window")
-    return targets
+        materialized_targets.add("date_window")
+    current_strategy = _current_artifact_strategy(request)
+    return {
+        target
+        for target in materialized_targets
+        if _materialized_target_matches_primary_delta(
+            target,
+            materialized_draft=draft,
+            primary_draft=primary_draft,
+            current_strategy=current_strategy,
+            request=request,
+        )
+    }
+
+
+def _materialized_target_matches_primary_delta(
+    target: str,
+    *,
+    materialized_draft: LLMStrategyDraft,
+    primary_draft: LLMStrategyDraft | None,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest,
+) -> bool:
+    """Prove the candidate applied the primary interpreter's requested value."""
+
+    if primary_draft is None:
+        return False
+    if target == "asset":
+        # The primary interpreter only establishes that the user explicitly
+        # targeted assets. The specialized edit planner owns add/remove
+        # composition and can be more precise than the primary draft.
+        current = normalized_asset_symbols(
+            current_strategy.asset_universe if current_strategy else []
+        )
+        materialized = normalized_asset_symbols(materialized_draft.asset_universe)
+        return set(materialized) != set(current)
+    if target == "benchmark":
+        requested = _normalized_ticker_symbol(primary_draft.comparison_baseline)
+        current = _normalized_ticker_symbol(
+            current_strategy.comparison_baseline if current_strategy else None
+        )
+        return bool(
+            requested
+            and requested != current
+            and _normalized_ticker_symbol(materialized_draft.comparison_baseline)
+            == requested
+        )
+    if target == "date_window":
+        requested = _canonical_draft_date_request(primary_draft, request=request)
+        materialized = _canonical_draft_date_request(
+            materialized_draft,
+            request=request,
+        )
+        current_range = (
+            current_strategy.date_range if current_strategy is not None else None
+        )
+        if (
+            requested is not None
+            and requested[0] == "range"
+            and isinstance(requested[1], dict)
+            and materialized is not None
+            and materialized[0] == "range"
+            and isinstance(materialized[1], dict)
+        ):
+            changed_endpoints = {
+                endpoint: requested[1][endpoint]
+                for endpoint in ("start", "end")
+                if endpoint in requested[1]
+                and (
+                    not isinstance(current_range, dict)
+                    or requested[1][endpoint] != current_range.get(endpoint)
+                )
+            }
+            return bool(changed_endpoints) and all(
+                materialized[1].get(endpoint) == value
+                for endpoint, value in changed_endpoints.items()
+            )
+        current = ("range", current_range) if current_range is not None else None
+        return (
+            requested is not None and requested != current and materialized == requested
+        )
+    if target == "strategy_family":
+        fields = (
+            "requested_strategy_template",
+            "strategy_type",
+            "entry_rule",
+            "exit_rule",
+            "rule_spec",
+        )
+        requested = {
+            field_name: getattr(primary_draft, field_name)
+            for field_name in fields
+            if getattr(primary_draft, field_name) is not None
+        }
+        return (
+            bool(requested)
+            and any(
+                requested[field_name] != getattr(current_strategy, field_name, None)
+                for field_name in requested
+            )
+            and all(
+                getattr(materialized_draft, field_name) == value
+                for field_name, value in requested.items()
+            )
+        )
+
+    if target == "capital":
+        requested = (
+            primary_draft.initial_capital
+            if primary_draft.initial_capital is not None
+            else primary_draft.capital_amount
+        )
+        materialized = materialized_draft.initial_capital
+        current = current_strategy.capital_amount if current_strategy else None
+    elif target == "recurring_contribution":
+        requested = (
+            primary_draft.recurring_contribution
+            if primary_draft.recurring_contribution is not None
+            else primary_draft.capital_amount
+        )
+        materialized = materialized_draft.recurring_contribution
+        current = current_strategy.capital_amount if current_strategy else None
+    elif target in {"cadence", "timeframe"}:
+        requested = getattr(primary_draft, target)
+        materialized = getattr(materialized_draft, target)
+        current = getattr(current_strategy, target, None)
+    elif target in {"fees", "slippage"}:
+        field_name = "fee_rate" if target == "fees" else "slippage"
+        requested = primary_draft.extra_parameters.get(field_name)
+        materialized = materialized_draft.extra_parameters.get(field_name)
+        current = (
+            current_strategy.extra_parameters.get(field_name)
+            if current_strategy is not None
+            else None
+        )
+    elif target in {
+        "indicator_period",
+        "indicator_entry_threshold",
+        "indicator_exit_threshold",
+    }:
+        field_name = {
+            "indicator_period": "indicator_period",
+            "indicator_entry_threshold": "entry_threshold",
+            "indicator_exit_threshold": "exit_threshold",
+        }[target]
+        requested = getattr(primary_draft, field_name)
+        materialized = getattr(materialized_draft, field_name)
+        current = (
+            indicator_parameters_from_strategy(current_strategy).get(field_name)
+            if current_strategy is not None
+            else None
+        )
+    else:
+        return False
+    return requested is not None and requested != current and materialized == requested
+
+
+def _canonical_draft_date_request(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> tuple[str, Any] | None:
+    if draft.date_range_intent is not None:
+        intent = _date_window_intent_bound_to_latest_result(
+            draft.date_range_intent,
+            latest_result_window=_latest_result_date_window(request),
+        )
+        resolution = resolve_date_range_intent(intent) if intent is not None else None
+        if resolution is not None:
+            return ("range", resolution.payload)
+        if intent is not None and intent.kind == "future_window":
+            return (
+                "intent",
+                intent.model_dump(
+                    mode="json",
+                    exclude={"confidence", "evidence"},
+                ),
+            )
+    if draft.date_range is not None:
+        return ("range", draft.date_range)
+    return None
 
 
 def _materialized_artifact_edit(

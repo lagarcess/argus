@@ -543,3 +543,86 @@ async def test_issue_339_compound_edit_retries_date_operation_that_cannot_materi
     assert response is not None
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
+
+
+@pytest.mark.asyncio
+async def test_issue_339_compound_edit_retries_wrong_value_noop_plan(monkeypatch):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["complete-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        is_noop = model_name == "noop-model"
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="benchmark",
+                    value="SPY" if is_noop else "QQQ",
+                ),
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch",
+                        endpoint="start",
+                        start="2026-03-02" if is_noop else "2026-04-01",
+                    ),
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "change the benchmark to QQQ and change the beginning of the period "
+                "to April 1, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["LOW", "HD"],
+                    asset_class="equity",
+                    date_range={"start": "2026-03-02", "end": "2026-07-30"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="noop-model",
+        primary_draft=LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range={"start": "2026-04-01", "end": "2026-07-30"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2026-04-01",
+                end="2026-07-30",
+            ),
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                "date_range": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["noop-model", "complete-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
