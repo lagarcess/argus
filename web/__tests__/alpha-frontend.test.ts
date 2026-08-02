@@ -1531,6 +1531,11 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(contract).toContain('type: "retest_run"');
+    expect(contract).toContain(
+      'window_policy: "preserve_start_ending_latest_available"',
+    );
+    expect(contract).toContain('contract_version: "argus_retest_run/v2"');
+    expect(contract).not.toContain('contract_version: "argus_retest_run/v1"');
     // The typed envelope carries no client-authoritative setup.
     expect(contract).not.toContain("canonical_setup");
     expect(contract).not.toContain("send_text");

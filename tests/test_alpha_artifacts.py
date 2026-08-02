@@ -79,6 +79,27 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
     )
 
 
+def test_api_contract_documents_backend_owned_retest_period_truth() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    message_start = contract.index("\n## Message\n")
+    message_end = contract.index("\n## Strategy\n", message_start)
+    message_contract = " ".join(contract[message_start:message_end].split())
+
+    for exact_rule in (
+        "`retest_period`: optional backend-owned typed sidecar",
+        "`original_date_range`",
+        "`requested_date_range`",
+        "`effective_date_range`",
+        "`duration_days`",
+        "`duration = { unit, count, approximate }`",
+        "`same_period` compares the original and provider-effective ranges",
+        "never the wall-clock candidate end",
+        "changes only the Run action's `label` and `labelKey`",
+        "Run action identity, `type`, `presentation`, and `payload` remain unchanged",
+    ):
+        assert exact_rule in message_contract
+
+
 def test_reliability_contract_locks_stale_direct_job_reconciliation() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")

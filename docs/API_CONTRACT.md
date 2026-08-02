@@ -786,6 +786,27 @@ machine-readable fields alongside display labels:
   `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
 - `date_range`: optional canonical `{ start, end, display }` range for cards
   whose period row is visually compacted from ISO fields.
+- `retest_period`: optional backend-owned typed sidecar for Retest
+  confirmations. Its canonical shape is:
+  - `original_date_range`: the source Run's immutable `{ start, end }` range.
+  - `requested_date_range`: the preserve-start candidate range requested from
+    coverage validation.
+  - `effective_date_range`: the provider-covered `{ start, end }` range used by
+    the visible strategy and executable launch.
+  - `duration_days`: the effective range's integer day span.
+  - `duration = { unit, count, approximate }`: the backend-derived natural
+    duration descriptor rendered by the client; `unit` is `year`, `month`, or
+    `day`.
+  - `same_period`: backend boolean truth. `same_period` compares the original
+    and provider-effective ranges, never the wall-clock candidate end. Clients
+    must not infer this value from today's date.
+
+  The client renders the original-to-effective transformation and the natural
+  effective duration. When `same_period = true`, the existing Run action
+  changes only the Run action's `label` and `labelKey` to the localized
+  explicit acknowledgment (`Run anyway — no new data` in English). Run action
+  identity, `type`, `presentation`, and `payload` remain unchanged; there is no
+  second action, modal, toast, or client-owned execution state.
 - `period_adjustment`: optional typed sidecar with
   `code = effective_window_adjusted`, `requested_date_range`, and
   `effective_date_range`. The frontend renders one localized, provider-neutral

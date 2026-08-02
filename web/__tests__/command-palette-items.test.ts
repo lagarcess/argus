@@ -69,8 +69,8 @@ const conversationDossier = {
         type: "retest_run",
         source_run_id: "run-2",
         run_label: "Weekly GLD pullback",
-        window_policy: "same_duration_ending_today",
-        contract_version: "argus_retest_run/v1",
+        window_policy: "preserve_start_ending_latest_available",
+        contract_version: "argus_retest_run/v2",
       },
       {
         type: "decision",

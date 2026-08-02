@@ -8,8 +8,8 @@ export type SearchRetestAction = {
   type: "retest_run";
   source_run_id: string;
   run_label: string;
-  window_policy: "same_duration_ending_today";
-  contract_version: "argus_retest_run/v1";
+  window_policy: "preserve_start_ending_latest_available";
+  contract_version: "argus_retest_run/v2";
 };
 
 export type SearchDecisionAction = {
