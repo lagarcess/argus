@@ -123,6 +123,68 @@ completion. The retired issue dependency map and waves are preserved in
 A1b, A2, and A4 are paused—not cancelled—until the interim exit criteria are
 met and the founder resumes P2.
 
+## Resumption Signal And Pillar Sequencing — 2026-08-01
+
+The interim roadmap is substantively complete: four of its six founder
+outcomes are marked Complete, one (Argus always progresses) is a standing
+quality bar rather than open work, and one (grounded discovery) has only
+promotion/deployment gates left, not product work. Real promotion — the
+Guest Main-Promotion And Public-Exposure Register in the interim roadmap —
+is close, not speculative. This section amends how P2 resumes once that
+gate clears; it does not reopen or correct the interim roadmap itself.
+
+Founder-reviewed external user feedback (2026-08-01) validated the existing
+direction rather than changing it: do not delay public exposure to build
+memory/comparison features first, close the safety/reliability bar, launch
+a controlled Guest canary, and let real usage decide what to build next.
+This matches the interim roadmap's own sequencing already. What it adds is
+new information about *how* to resume, not *whether* to.
+
+**Locked decision: P2 does not resume in its original planned order by
+default.** The prior assumption was that closing the interim hands control
+straight back to the A1b → A2 → A4 sequence as originally planned. Instead:
+after promotion, run a real Guest-canary/public-exposure window (target
+2–4 weeks, per the same external validation) before committing engineering
+time to any of A1b, A2, A4, or personalization memory. Prioritize among
+them using observed signal — return-visit rate, decision-note save rate,
+refinement/version-creation rate, Omnisearch return-recall usage — not the
+original planning order alone. If that signal is weak across the board,
+that itself is the finding, and the response is strengthening reliability
+and the core loop, not building further ahead of evidence.
+
+**Three pillars govern what comes after the interim, not two:**
+
+1. **Safety and reliability** — the interim roadmap itself. Already
+   substantively closed; the remaining gate is #233's exact-candidate
+   deployed Golden Path canary plus the operational checklist in
+   `GUEST_PUBLIC_LAUNCH_SAFETY.md`. This pillar is not being reopened by
+   this amendment.
+2. **Product memory** — A1b (linked versions) and A2 (comparison), the P2
+   compounding-loop items already named above. Paused pending founder
+   resume; sequenced by the signal-driven rule above once resumed, not
+   built in isolation from usage data.
+3. **Personalization memory** — the incubation lane (`codex/personalization-
+   memory-incubation-persistence-v1` and its planned successors), tracked
+   separately in
+   [`docs/specs/lanes/personalization-memory-contract.md`](lanes/personalization-memory-contract.md).
+   Continues independently in the background regardless of interim/P2
+   status — it is not gated on promotion or on P2 resumption, and should
+   not be redispatched with either's urgency.
+
+**Options-capability idea (2026-08-01, founder-raised): deferred, not
+roadmap work.** Real user interest in options strategies surfaced in the
+same feedback pass. Reliable options backtesting needs historical option
+chains with Greeks/IV, correct expiration/assignment/multiplier/fee
+handling, and realistic wide-spread fill assumptions — none of which the
+current equity/crypto data path provides or should be stretched to cover.
+If this is ever built, it must be a separate capability registry and engine
+slice, never an incremental flag on the equity engine, mirroring how
+capability truth already fails closed on unsupported requests elsewhere in
+the product. No vendor (Polygon, Tradier, ORATS, or otherwise) should be
+selected before there is a real, demonstrated user cohort asking for it —
+this is explicitly a wait-for-signal item, not a candidate for the next
+planning cycle.
+
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
 active pointer.
