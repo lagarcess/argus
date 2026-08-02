@@ -128,7 +128,7 @@ def provider_asset_resolution_context_from_extraction(
             rows.append(row)
         elif role in {"traded_asset", "unknown"}:
             all_traded_asset_mentions_accounted_for = False
-    if not rows:
+    if not rows and all_traded_asset_mentions_accounted_for:
         return None
     payload = {
         "asset_resolution_candidates": rows,

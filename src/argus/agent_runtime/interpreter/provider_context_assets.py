@@ -74,6 +74,10 @@ def response_with_provider_context_assets(
     all_traded_asset_mentions_accounted_for = _all_traded_asset_mentions_accounted_for(
         asset_resolution_context
     )
+    incomplete_asset_context = (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and all_traded_asset_mentions_accounted_for is False
+    )
     candidate_rows = [
         row
         for row in rows
@@ -81,6 +85,8 @@ def response_with_provider_context_assets(
         and row.get("status") in {"resolved", "ambiguous"}
     ]
     if not candidate_rows:
+        if incomplete_asset_context:
+            return response.model_copy(update=_incomplete_asset_context_update(response))
         return response
 
     resolved_symbols: list[str] = []
@@ -136,10 +142,6 @@ def response_with_provider_context_assets(
         draft.asset_universe = resolved_symbols
         preserved_fuller_draft = False
         ambiguous_fields = []
-    incomplete_asset_context = (
-        response.intent in {"strategy_drafting", "backtest_execution"}
-        and not all_traded_asset_mentions_accounted_for
-    )
     if (
         not ambiguous_fields
         and not preserved_fuller_draft
@@ -154,7 +156,7 @@ def response_with_provider_context_assets(
         and bool(resolved_symbols)
         and not ambiguous_fields
         and not preserved_fuller_draft
-        and all_traded_asset_mentions_accounted_for
+        and all_traded_asset_mentions_accounted_for is True
     )
     if resolved_missing_asset:
         remaining_missing_fields = [
@@ -191,33 +193,11 @@ def response_with_provider_context_assets(
             )
         )
     if incomplete_asset_context:
-        remaining_missing_fields = [
-            field
-            for field in response.missing_required_fields
-            if field != "asset_universe"
-        ]
         update.update(
-            {
-                "missing_required_fields": [
-                    "asset_universe",
-                    *remaining_missing_fields,
-                ],
-                "requires_clarification": True,
-                "assistant_response": (
-                    response.assistant_response
-                    if response.requires_clarification
-                    and "asset_universe" in response.missing_required_fields
-                    else None
-                ),
-                "reason_codes": list(
-                    dict.fromkeys(
-                        [
-                            *update.get("reason_codes", response.reason_codes),
-                            "provider_context_incomplete_asset_mentions",
-                        ]
-                    )
-                ),
-            }
+            _incomplete_asset_context_update(
+                response,
+                reason_codes=update.get("reason_codes"),
+            )
         )
     if ambiguous_fields:
         update.update(
@@ -231,6 +211,37 @@ def response_with_provider_context_assets(
             }
         )
     return response.model_copy(update=update)
+
+
+def _incomplete_asset_context_update(
+    response: LLMInterpretationResponse,
+    *,
+    reason_codes: list[str] | None = None,
+) -> dict[str, Any]:
+    remaining_missing_fields = [
+        field for field in response.missing_required_fields if field != "asset_universe"
+    ]
+    return {
+        "missing_required_fields": [
+            "asset_universe",
+            *remaining_missing_fields,
+        ],
+        "requires_clarification": True,
+        "assistant_response": (
+            response.assistant_response
+            if response.requires_clarification
+            and "asset_universe" in response.missing_required_fields
+            else None
+        ),
+        "reason_codes": list(
+            dict.fromkeys(
+                [
+                    *(reason_codes or response.reason_codes),
+                    "provider_context_incomplete_asset_mentions",
+                ]
+            )
+        ),
+    }
 
 
 def response_with_grounded_partial_context(
@@ -428,14 +439,15 @@ def _asset_context_rows(asset_resolution_context: str | None) -> list[dict[str, 
 
 def _all_traded_asset_mentions_accounted_for(
     asset_resolution_context: str | None,
-) -> bool:
+) -> bool | None:
     if not asset_resolution_context:
-        return False
+        return None
     try:
         payload = json.loads(asset_resolution_context)
     except (TypeError, json.JSONDecodeError):
-        return False
-    return payload.get("all_traded_asset_mentions_accounted_for") is True
+        return None
+    measurement = payload.get("all_traded_asset_mentions_accounted_for")
+    return measurement if isinstance(measurement, bool) else None
 
 
 def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, Any]:

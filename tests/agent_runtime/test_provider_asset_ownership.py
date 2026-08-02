@@ -461,6 +461,185 @@ def test_capped_extraction_marks_uninspected_asset_mentions_incomplete() -> None
     assert normalized.assistant_response is None
     assert "provider_context_incomplete_asset_mentions" in normalized.reason_codes
 
+    stage_result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Test Apple, Microsoft, NVIDIA, Amazon, Meta, and fictional moon fund."
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent=normalized.intent,
+                task_relation=normalized.task_relation,
+                requires_clarification=normalized.requires_clarification,
+                user_goal_summary=normalized.user_goal_summary,
+                candidate_strategy_draft=_strategy_from_llm(
+                    normalized.candidate_strategy_draft
+                ),
+                missing_required_fields=normalized.missing_required_fields,
+                assistant_response=normalized.assistant_response,
+                reason_codes=normalized.reason_codes,
+                semantic_turn_act=normalized.semantic_turn_act,
+            )
+        ),
+    )
+
+    assert stage_result.outcome == "needs_clarification"
+    assert stage_result.decision is not None
+    assert stage_result.decision.missing_required_fields[0] == "asset_universe"
+    assert stage_result.patch.get("confirmation_payload") is None
+
+
+def test_benchmark_only_rows_cannot_bypass_incomplete_asset_context() -> None:
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=("SPY" if query == "SPY" else None),
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "SPY",
+                    "role": "benchmark",
+                    "mention_kind": "ticker",
+                    "confidence": 0.9,
+                },
+                {
+                    "raw_text": "fictional moon fund",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                },
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+    assert context is not None
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test fictional moon fund against SPY.",
+        assistant_response="Ready to test AAPL against SPY.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+    )
+
+    assert normalized.missing_required_fields == ["asset_universe"]
+    assert normalized.requires_clarification is True
+    assert normalized.assistant_response is None
+    assert "provider_context_incomplete_asset_mentions" in normalized.reason_codes
+
+
+def test_missing_completeness_measurement_is_not_explicit_incompleteness() -> None:
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test Apple in 2024.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+    legacy_context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "Apple",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "AAPL",
+                    "asset_class": "equity",
+                    "name": "Apple Inc.",
+                    "raw_symbol": "AAPL",
+                    "provider": "alpaca",
+                    "exchange": "NASDAQ",
+                }
+            ]
+        }
+    )
+
+    normalized = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=legacy_context,
+    )
+
+    assert normalized.requires_clarification is False
+    assert normalized.missing_required_fields == []
+    assert "provider_context_incomplete_asset_mentions" not in normalized.reason_codes
+
+
+def test_unsupported_only_extraction_preserves_explicit_incompleteness() -> None:
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        **_: Any,
+    ) -> AssetResolution:
+        return _extraction_asset_resolution(
+            query=query,
+            field=field,
+            source=source,
+            symbol=None,
+        )
+
+    context = provider_asset_resolution_context_from_extraction(
+        LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "fictional moon fund",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                }
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert context is not None
+    assert json.loads(context) == {
+        "all_traded_asset_mentions_accounted_for": False,
+        "asset_resolution_candidates": [],
+        "extraction_contract": (
+            "Use resolved traded_asset/unknown rows as asset_universe candidates "
+            "when the user is buying, holding, testing, or including them. Use "
+            "benchmark rows only as comparison_baseline. If status is ambiguous, "
+            "keep the raw_text in the relevant structured field and require an "
+            "asset clarification instead of choosing a symbol."
+        ),
+    }
+
 
 def test_extractor_contract_can_report_sixth_overflow_mention() -> None:
     request = InterpretationRequest(
