@@ -297,7 +297,6 @@ export default function ChatCommandPalette({
   const canonicalMutationIdRef = useRef(0);
   const decisionMutationInFlightRef = useRef(false);
   const searchSignatureRef = useRef(RECENTS_SEARCH_SIGNATURE);
-  useDossierDecisionResumeRefresh(decisionResumeTarget, setRetryNonce);
   const isRecentsMode =
     query.trim() === "" &&
     !isLedgerMode &&
@@ -624,6 +623,11 @@ export default function ChatCommandPalette({
   const history = useRunDossierHistory(
     selectedPreview?.conversationId ?? "",
     dossierContextKey,
+  );
+  useDossierDecisionResumeRefresh(
+    decisionResumeTarget,
+    setRetryNonce,
+    history.refresh,
   );
   const selectedDossier = selectedPreview?.dossier
     ? selectedDossierForPane({

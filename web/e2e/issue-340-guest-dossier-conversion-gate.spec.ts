@@ -4,6 +4,9 @@ const CONVERSATION_ID = "00000000-0000-4000-8000-000000000340";
 const RUN_ID = "00000000-0000-4000-8000-000000000341";
 const ARTIFACT_ID = "00000000-0000-4000-8000-000000000342";
 const NOTE = "Recheck after the next inflation report.";
+const HISTORICAL_RUN_ID = "00000000-0000-4000-8000-000000000347";
+const HISTORICAL_ARTIFACT_ID = "00000000-0000-4000-8000-000000000348";
+const HISTORICAL_NOTE = "Revisit after the prior earnings report.";
 
 type LocaleFixture = {
   language: "en" | "es-419";
@@ -15,6 +18,7 @@ type LocaleFixture = {
   passwordPlaceholder: string;
   notePlaceholder: string;
   watching: string;
+  decisionHistory: string;
 };
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -91,8 +95,8 @@ function searchPayload(accountKind: "guest" | "registered") {
           message_id: "00000000-0000-4000-8000-000000000345",
         },
         decision_states: ["watching"],
-        total_runs: 1,
-        decided_runs: 1,
+        total_runs: 2,
+        decided_runs: 2,
         dossier: {
           run_id: RUN_ID,
           run_label: "Weekly GLD pullback",
@@ -143,6 +147,52 @@ function searchPayload(accountKind: "guest" | "registered") {
   };
 }
 
+function historicalDossier(accountKind: "guest" | "registered") {
+  return {
+    run_id: HISTORICAL_RUN_ID,
+    run_label: "Historical GLD pullback",
+    completed_at: "2026-07-15T15:00:00Z",
+    result_message_id: "00000000-0000-4000-8000-000000000349",
+    tested: {
+      symbols: ["GLD"],
+      strategy_family: "buy_and_hold",
+      cadence: "weekly",
+      timeframe: "1D",
+      start_date: "2024-01-01",
+      end_date: "2025-07-14",
+    },
+    outcome: {
+      run_label: "Historical GLD pullback",
+      completed_at: "2026-07-15T15:00:00Z",
+      benchmark_symbol: "SPY",
+      quick_take: "The earlier GLD run trailed SPY.",
+      metrics: [
+        { name: "total_return_pct", value: 4.2 },
+        { name: "benchmark_return_pct", value: 6.4 },
+        { name: "delta_vs_benchmark_pct", value: -2.2 },
+      ],
+    },
+    decision: {
+      state: "watching",
+      note: HISTORICAL_NOTE,
+      run_label: "Historical GLD pullback",
+    },
+    actions: [
+      {
+        type: "decision",
+        availability:
+          accountKind === "guest"
+            ? "account_conversion_required"
+            : "available",
+        evidence_artifact_id: HISTORICAL_ARTIFACT_ID,
+        decision_state: "watching",
+        note: HISTORICAL_NOTE,
+        run_label: "Historical GLD pullback",
+      },
+    ],
+  };
+}
+
 async function mockJourney(page: Page, language: LocaleFixture["language"]) {
   let accountKind: "guest" | "registered" = "guest";
   let decisionWrites = 0;
@@ -161,6 +211,18 @@ async function mockJourney(page: Page, language: LocaleFixture["language"]) {
   );
   await page.route("**/api/v1/conversations**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/run-dossiers")) {
+      await fulfillJson(route, {
+        items: [
+          searchPayload(accountKind).items[0].dossier,
+          historicalDossier(accountKind),
+        ],
+        next_cursor: null,
+        total_runs: 2,
+        decided_runs: 2,
+      });
+      return;
+    }
     if (path.endsWith("/activity")) {
       await fulfillJson(route, {
         operation: { status: "idle", kind: null, updated_at: null },
@@ -249,6 +311,7 @@ for (const locale of [
     passwordPlaceholder: "Password",
     notePlaceholder: "Optional note for future you",
     watching: "Watching",
+    decisionHistory: "Decision history",
   },
   {
     language: "es-419",
@@ -260,6 +323,7 @@ for (const locale of [
     passwordPlaceholder: "Contrasena",
     notePlaceholder: "Nota opcional para tu yo futuro",
     watching: "Observando",
+    decisionHistory: "Historial de decisiones",
   },
 ] satisfies LocaleFixture[]) {
   test(`guest dossier conversion resumes the exact preserved decision in ${locale.language}`, async ({
@@ -295,6 +359,16 @@ for (const locale of [
       search.locator('[data-dossier-metric-span="full"]'),
     ).toHaveClass(/col-span-2/);
 
+    await search
+      .getByRole("button", { name: new RegExp(locale.decisionHistory) })
+      .click();
+    await search
+      .getByRole("option", { name: /Historical GLD pullback/ })
+      .click();
+    await expect(
+      search.getByText("Historical GLD pullback", { exact: true }),
+    ).toBeVisible();
+
     await search.locator('[data-decision-edit="true"]').click();
     await expect(evidence.decisionWrites()).toBe(0);
 
@@ -313,7 +387,7 @@ for (const locale of [
 
     await expect(conversion).toHaveCount(0);
     const editor = search.getByPlaceholder(locale.notePlaceholder);
-    await expect(editor).toHaveValue(NOTE);
+    await expect(editor).toHaveValue(HISTORICAL_NOTE);
     await expect(
       search.getByRole("button", { name: locale.watching, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
