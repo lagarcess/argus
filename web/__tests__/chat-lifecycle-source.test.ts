@@ -221,15 +221,15 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
-    expect(chat).toMatch(
-      /const \[pendingHeaderDeleteId, setPendingHeaderDeleteId\] = useState<\s*string \| null\s*>\(null\);/,
-    );
+    expect(chat).toContain("const [pendingHeaderDelete, setPendingHeaderDelete] = useState<{");
+    expect(chat).toContain("conversationId: string; showKeyboardHints: boolean;");
     expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
     expect(chat).toContain("if (!conversationId) return;");
-    expect(chat).toContain("setPendingHeaderDeleteId(conversationId);");
-    expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
-    expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
-    expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
+    expect(chat).toContain("setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });");
+    expect(chat).toContain("deleteConversation(pendingHeaderDelete.conversationId)");
+    expect(chat).toContain("handleConversationRemoved(pendingHeaderDelete.conversationId);");
+    expect(chat).toContain("isOpen={Boolean(pendingHeaderDelete)}");
+    expect(chat).toContain("showKeyboardHints={pendingHeaderDelete?.showKeyboardHints}");
     expect(chat).toContain(') : currentView === "chat" &&');
     expect(chat).toContain("conversationId &&");
     expect(chat).toContain("canManageConversation ? (");

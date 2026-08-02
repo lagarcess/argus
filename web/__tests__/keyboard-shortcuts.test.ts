@@ -30,6 +30,8 @@ describe("keyboard shortcut registry", () => {
       "new_chat",
       "delete_focused_chat",
       "rename_focused_chat",
+      "archive_focused_chat",
+      "toggle_read_focused_chat",
       "toggle_pin_focused_chat",
       "quick_jump",
       "command_palette_rename",
@@ -37,6 +39,7 @@ describe("keyboard shortcut registry", () => {
       "command_palette_delete",
     ]);
     expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.labelKey)).toBe(true);
+    expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.defaultLabel)).toBe(true);
   });
 
   test("matches Command or Control without matching a bare modifier", () => {
@@ -93,7 +96,7 @@ describe("keyboard shortcut registry", () => {
     ]);
     expect(keyboardShortcutDisplay("open_recents", true)).toEqual([
       "⌘",
-      "Shift",
+      "⇧",
       ",",
     ]);
     expect(keyboardShortcutDisplay("quick_jump", false)).toEqual([
@@ -103,6 +106,35 @@ describe("keyboard shortcut registry", () => {
     ]);
     expect(keyboardShortcutHintDisplay("new_chat", true)).toBe("⌘⇧.");
     expect(keyboardShortcutHintDisplay("omnisearch", false)).toBe("Ctrl+K");
+    expect(keyboardShortcutHintDisplay("command_palette_rename", true)).toBe(
+      "⌘⇧R",
+    );
+    expect(keyboardShortcutHintDisplay("command_palette_archive", false)).toBe(
+      "Ctrl⇧A",
+    );
+    expect(keyboardShortcutHintDisplay("command_palette_delete", true)).toBe(
+      "⌘⇧D",
+    );
+    expect(keyboardShortcutDisplay("rename_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "R",
+    ]);
+    expect(keyboardShortcutDisplay("archive_focused_chat", false)).toEqual([
+      "Ctrl",
+      "Shift",
+      "A",
+    ]);
+    expect(keyboardShortcutDisplay("delete_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "D",
+    ]);
+    expect(keyboardShortcutDisplay("toggle_read_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "U",
+    ]);
     expect(quickJumpHintDisplay(1, true)).toBe("⌘⌥1");
     expect(quickJumpHintDisplay(9, false)).toBe("Ctrl+Shift+9");
   });
@@ -170,6 +202,23 @@ describe("keyboard shortcut registry", () => {
         altKey: false,
       }),
     ).toBe(false);
+    for (const [id, code] of [
+      ["rename_focused_chat", "KeyR"],
+      ["archive_focused_chat", "KeyA"],
+      ["delete_focused_chat", "KeyD"],
+      ["toggle_read_focused_chat", "KeyU"],
+    ] as const) {
+      expect(
+        matchesKeyboardShortcut(id, {
+          key: code.slice(-1),
+          code,
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: true,
+          altKey: false,
+        }),
+      ).toBe(true);
+    }
     expect(
       matchesKeyboardShortcut("rename_focused_chat", {
         key: "F2",
@@ -179,56 +228,66 @@ describe("keyboard shortcut registry", () => {
         shiftKey: false,
         altKey: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      matchesKeyboardShortcut("delete_focused_chat", {
+        key: "X",
+        code: "KeyX",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(false);
   });
 
-  test("owns Omnisearch row actions in the shared registry without using browser commands", () => {
+  test("owns the intuitive Omnisearch row actions in the shared registry", () => {
     expect(KEYBOARD_SHORTCUTS).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: "command_palette_rename",
           group: "omnisearch",
-          code: "F2",
+          code: "KeyR",
         }),
         expect.objectContaining({
           id: "command_palette_archive",
           group: "omnisearch",
-          code: "F2",
+          code: "KeyA",
         }),
         expect.objectContaining({
           id: "command_palette_delete",
           group: "omnisearch",
-          code: "Delete",
+          code: "KeyD",
         }),
       ]),
     );
     expect(
       commandPaletteRowActionForEvent({
-        key: "F2",
-        code: "F2",
-        metaKey: false,
+        key: "R",
+        code: "KeyR",
+        metaKey: true,
         ctrlKey: false,
-        shiftKey: false,
+        shiftKey: true,
         altKey: false,
       }),
     ).toBe("rename");
     expect(
       commandPaletteRowActionForEvent({
-        key: "F2",
-        code: "F2",
+        key: "A",
+        code: "KeyA",
         metaKey: false,
-        ctrlKey: false,
+        ctrlKey: true,
         shiftKey: true,
         altKey: false,
       }),
     ).toBe("archive");
     expect(
       commandPaletteRowActionForEvent({
-        key: "Delete",
-        code: "Delete",
-        metaKey: false,
+        key: "D",
+        code: "KeyD",
+        metaKey: true,
         ctrlKey: false,
-        shiftKey: false,
+        shiftKey: true,
         altKey: false,
       }),
     ).toBe("delete");

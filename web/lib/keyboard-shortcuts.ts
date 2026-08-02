@@ -5,6 +5,8 @@ export type KeyboardShortcutId =
   | "open_recents"
   | "delete_focused_chat"
   | "rename_focused_chat"
+  | "archive_focused_chat"
+  | "toggle_read_focused_chat"
   | "expand_sidebar_recents"
   | "open_settings"
   | "toggle_pin_focused_chat"
@@ -35,6 +37,7 @@ export type KeyboardShortcutDefinition = {
   id: KeyboardShortcutId;
   group: KeyboardShortcutGroup;
   labelKey: string;
+  defaultLabel: string;
   match: KeyboardShortcutMatch;
   key?: string;
   code?: string;
@@ -47,6 +50,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "omnisearch",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.omnisearch",
+    defaultLabel: "Open search",
     match: "primary_key",
     key: "k",
     macDisplay: ["⌘", "K"],
@@ -56,6 +60,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "keyboard_shortcuts",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.keyboard_shortcuts",
+    defaultLabel: "Show keyboard shortcuts",
     match: "primary_key",
     key: "/",
     macDisplay: ["⌘", "/"],
@@ -65,6 +70,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "open_recents",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.open_recents",
+    defaultLabel: "Open Recents",
     match: "primary_shift_code",
     code: "Comma",
     macDisplay: ["⌘", "Shift", ","],
@@ -74,6 +80,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "expand_sidebar_recents",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.expand_sidebar_recents",
+    defaultLabel: "Toggle sidebar and Recents",
     match: "primary_shift_code",
     code: "Backslash",
     macDisplay: ["⌘", "Shift", "\\"],
@@ -83,6 +90,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "open_settings",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.open_settings",
+    defaultLabel: "Open Settings",
     match: "primary_shift_code",
     code: "Semicolon",
     macDisplay: ["⌘", "Shift", ";"],
@@ -92,6 +100,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "new_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.new_chat",
+    defaultLabel: "New chat",
     match: "primary_shift_code",
     code: "Period",
     macDisplay: ["⌘", "Shift", "."],
@@ -101,24 +110,47 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "delete_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.delete_focused_chat",
+    defaultLabel: "Delete current chat",
     match: "primary_shift_code",
-    code: "KeyX",
-    macDisplay: ["⌘", "Shift", "X"],
-    otherDisplay: ["Ctrl", "Shift", "X"],
+    code: "KeyD",
+    macDisplay: ["⌘", "Shift", "D"],
+    otherDisplay: ["Ctrl", "Shift", "D"],
   },
   {
     id: "rename_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.rename_focused_chat",
-    match: "code",
-    code: "F2",
-    macDisplay: ["F2"],
-    otherDisplay: ["F2"],
+    defaultLabel: "Rename current chat",
+    match: "primary_shift_code",
+    code: "KeyR",
+    macDisplay: ["⌘", "Shift", "R"],
+    otherDisplay: ["Ctrl", "Shift", "R"],
+  },
+  {
+    id: "archive_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.archive_focused_chat",
+    defaultLabel: "Archive current chat",
+    match: "primary_shift_code",
+    code: "KeyA",
+    macDisplay: ["⌘", "Shift", "A"],
+    otherDisplay: ["Ctrl", "Shift", "A"],
+  },
+  {
+    id: "toggle_read_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.toggle_read_focused_chat",
+    defaultLabel: "Mark current chat as read or unread",
+    match: "primary_shift_code",
+    code: "KeyU",
+    macDisplay: ["⌘", "Shift", "U"],
+    otherDisplay: ["Ctrl", "Shift", "U"],
   },
   {
     id: "toggle_pin_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.toggle_pin_focused_chat",
+    defaultLabel: "Pin or unpin current chat",
     match: "primary_shift_code",
     code: "Quote",
     macDisplay: ["⌘", "Shift", "'"],
@@ -128,6 +160,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "quick_jump",
     group: "quick_jump",
     labelKey: "keyboard_shortcuts.shortcuts.quick_jump",
+    defaultLabel: "Quick-jump visible items",
     match: "quick_jump",
     macDisplay: ["⌘", "⌥", "1–9"],
     otherDisplay: ["Ctrl", "Shift", "1–9"],
@@ -136,28 +169,31 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "command_palette_rename",
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.rename",
-    match: "code",
-    code: "F2",
-    macDisplay: ["F2"],
-    otherDisplay: ["F2"],
+    defaultLabel: "Rename",
+    match: "primary_shift_code",
+    code: "KeyR",
+    macDisplay: ["⌘", "Shift", "R"],
+    otherDisplay: ["Ctrl", "Shift", "R"],
   },
   {
     id: "command_palette_archive",
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.archive",
-    match: "shift_code",
-    code: "F2",
-    macDisplay: ["Shift", "F2"],
-    otherDisplay: ["Shift", "F2"],
+    defaultLabel: "Archive",
+    match: "primary_shift_code",
+    code: "KeyA",
+    macDisplay: ["⌘", "Shift", "A"],
+    otherDisplay: ["Ctrl", "Shift", "A"],
   },
   {
     id: "command_palette_delete",
     group: "omnisearch",
     labelKey: "command_palette.shortcut_legend.delete",
-    match: "code",
-    code: "Delete",
-    macDisplay: ["Delete"],
-    otherDisplay: ["Delete"],
+    defaultLabel: "Delete",
+    match: "primary_shift_code",
+    code: "KeyD",
+    macDisplay: ["⌘", "Shift", "D"],
+    otherDisplay: ["Ctrl", "Shift", "D"],
   },
 ];
 
@@ -240,7 +276,9 @@ export function keyboardShortcutDisplay(
   usesCommandKey: boolean,
 ): readonly string[] {
   const shortcut = keyboardShortcut(id);
-  return usesCommandKey ? shortcut.macDisplay : shortcut.otherDisplay;
+  return usesCommandKey
+    ? shortcut.macDisplay.map((key) => (key === "Shift" ? "⇧" : key))
+    : shortcut.otherDisplay;
 }
 
 export function keyboardShortcutHintDisplay(
@@ -248,7 +286,12 @@ export function keyboardShortcutHintDisplay(
   usesCommandKey: boolean,
 ): string {
   const keys = keyboardShortcutDisplay(id, usesCommandKey);
-  if (!usesCommandKey) return keys.join("+");
+  if (!usesCommandKey) {
+    return keys
+      .map((key) => (key === "Shift" ? "⇧" : key))
+      .join("+")
+      .replace("+⇧+", "⇧");
+  }
 
   return keys
     .map((key) => {

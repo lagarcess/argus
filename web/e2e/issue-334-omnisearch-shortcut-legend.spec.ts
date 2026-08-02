@@ -135,6 +135,18 @@ async function installFixture(page: Page): Promise<FixtureState> {
       });
     }
     if (url.pathname.endsWith("/activity")) {
+      if (request.method() === "PATCH") {
+        const body = request.postDataJSON();
+        const conversationId = url.pathname.split("/").at(-2) ?? "";
+        state.mutations.push({ conversationId, method: "PATCH_ACTIVITY", body });
+        return json(route, {
+          operation: { status: "idle", kind: null, updated_at: null },
+          attention: {
+            status: body.action === "mark_unread" ? "manual_unread" : "none",
+            cursor: null,
+          },
+        });
+      }
       return json(route, { operation: { status: "idle", kind: null, updated_at: null }, attention: { status: "none", cursor: null } });
     }
     return json(route, { detail: `Unexpected ${request.method()} ${url.pathname}` }, 501);
@@ -148,34 +160,56 @@ async function openOmnisearch(page: Page) {
   await expect(page.locator('[data-palette-row-index="0"]')).toBeVisible();
 }
 
-test("keeps the legend quiet at rest, reveals it only on Ctrl hover, and executes every advertised action", async ({ page }) => {
+async function primaryModifier(page: Page) {
+  return page.evaluate(() =>
+    /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? "Meta" : "Control",
+  );
+}
+
+test("keeps the legend quiet at rest, reveals it on primary-modifier hover, and executes every advertised action", async ({ page }) => {
   const fixture = await installFixture(page);
   await page.goto("/chat?conversation=legend-a");
   await openOmnisearch(page);
+  const modifier = await primaryModifier(page);
 
   const region = page.locator("[data-command-palette-action-region]");
   await region.hover();
   await expect(page.locator("[data-command-palette-shortcut-legend]")).toHaveCount(0);
   await capture(page, "01-hidden-at-rest.png");
 
-  await page.keyboard.down("Control");
-  await expect(page.locator("[data-command-palette-shortcut-legend]")).toContainText("Go");
-  await expect(page.locator("[data-command-palette-shortcut-legend]")).toContainText("Rename");
-  await expect(page.locator("[data-command-palette-shortcut-legend]")).toContainText("Archive");
-  await expect(page.locator("[data-command-palette-shortcut-legend]")).toContainText("Delete");
+  await page.keyboard.down(modifier);
+  const legend = page.locator("[data-command-palette-shortcut-legend]");
+  await expect(legend).toContainText("Go");
+  await expect(legend).toContainText("Rename");
+  await expect(legend).toContainText("Archive");
+  await expect(legend).toContainText("Delete");
+  await expect(legend).toContainText(
+    modifier === "Meta" ? "⌘⇧R" : "Ctrl⇧R",
+  );
+  await expect(legend).toContainText(
+    modifier === "Meta" ? "⌘⇧A" : "Ctrl⇧A",
+  );
+  await expect(legend).toContainText(
+    modifier === "Meta" ? "⌘⇧D" : "Ctrl⇧D",
+  );
+  await expect(legend).not.toContainText("Continue");
   await capture(page, "02-revealed-on-ctrl-hover.png");
-  await page.keyboard.up("Control");
+  await page.keyboard.up(modifier);
   await expect(page.locator("[data-command-palette-shortcut-legend]")).toHaveCount(0);
 
-  const firstRow = page.locator('[data-palette-row-index="0"]');
-  await firstRow.focus();
-  await firstRow.press("F2");
+  const search = page.getByPlaceholder("Search Argus...");
+  await search.press(
+    modifier === "Meta" ? "Meta+Alt+Digit2" : "Control+Shift+Digit2",
+  );
+  const secondRow = page.locator('[data-palette-row-index="1"]');
+  await expect(secondRow).toBeFocused();
+
+  await secondRow.press(`${modifier}+Shift+KeyR`);
   await expect(page.getByRole("textbox", { name: "Rename conversation" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  const secondRow = page.locator('[data-palette-row-index="1"]');
   await secondRow.focus();
-  await secondRow.press("Shift+F2");
+  await secondRow.press(`${modifier}+Shift+KeyA`);
   await expect.poll(() => fixture.mutations).toContainEqual({
     conversationId: "legend-b",
     method: "PATCH",
@@ -185,15 +219,245 @@ test("keeps the legend quiet at rest, reveals it only on Ctrl hover, and execute
   const row = page.locator('[data-palette-row-index="0"]');
   await row.focus();
   await expect(page.locator("h2")).toHaveText("Legend A");
-  await row.press("Delete");
-  await expect(page.getByRole("alertdialog")).toContainText("Delete this conversation?");
-  await page.getByRole("alertdialog").getByText("Cancel", { exact: true }).click();
 
-  await row.press("Enter");
-  await expect(page).toHaveURL(/conversation=legend-a(?:&|$)/);
+  await row.getByRole("button", { name: "Delete conversation" }).click();
+  const pointerDialog = page.getByRole("alertdialog");
+  await expect(pointerDialog).toContainText("Delete this conversation?");
+  await expect(pointerDialog).not.toContainText("Esc");
+  await expect(pointerDialog).not.toContainText("↵");
+  await capture(page, "05-pointer-delete-confirmation.png");
+  await pointerDialog.getByRole("button", { name: "Cancel" }).click();
+
+  await row.focus();
+  await row.press(`${modifier}+Shift+KeyD`);
+  await expect(page.getByRole("alertdialog")).toContainText("Delete this conversation?");
+  await expect(page.getByRole("alertdialog")).toContainText("Esc");
+  await expect(page.getByRole("alertdialog")).toContainText("↵");
+  await capture(page, "05-delete-confirmation.png");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await row.press(`${modifier}+Shift+KeyD`);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => fixture.mutations).toContainEqual({
+    conversationId: "legend-a",
+    method: "DELETE",
+  });
+
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await openOmnisearch(page);
   await page.locator('[data-palette-row-index="1"]').focus();
   await expect(page.locator("h2")).toHaveText("Legend B");
-  await page.keyboard.press("Control+Enter");
+  await page.keyboard.press(`${modifier}+Enter`);
   await expect(page).toHaveURL(/conversation=legend-b(?:&|$)/);
+});
+
+test("keeps background sidebar shortcut hints hidden while Omnisearch owns focus", async ({ page }) => {
+  await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  const modifier = await primaryModifier(page);
+
+  await openOmnisearch(page);
+  await page.keyboard.down(modifier);
+
+  const sidebar = page.locator("aside");
+  await expect(sidebar).not.toContainText(
+    modifier === "Meta" ? "⌘K" : "Ctrl+K",
+  );
+  await page.keyboard.up(modifier);
+});
+
+test("renders the OS-aware shortcut contract consistently in Help", async ({ page }) => {
+  await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  const modifier = await primaryModifier(page);
+  const composer = page.getByRole("combobox");
+  await expect(composer).toBeVisible();
+
+  await composer.press(`${modifier}+/`);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Rename current chat");
+  await expect(dialog).toContainText("Archive current chat");
+  await expect(dialog).toContainText("Delete current chat");
+  await expect(dialog).toContainText("Mark current chat as read or unread");
+  const platformShift = dialog.locator("kbd").filter({
+    hasText: modifier === "Meta" ? "⇧" : "Shift",
+  });
+  expect(await platformShift.count()).toBeGreaterThan(0);
+  if (modifier === "Meta") {
+    await expect(dialog.locator("kbd").filter({ hasText: "Shift" })).toHaveCount(0);
+  }
+  await capture(page, "07-keyboard-shortcuts-consistent.png");
+});
+
+test("uses the same management bindings on the active chat", async ({ page }) => {
+  const fixture = await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  const modifier = await primaryModifier(page);
+  const composer = page.getByRole("combobox");
+  await expect(composer).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.dataset.argusCapturedShortcuts = "";
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          ["KeyR", "KeyD", "KeyU", "KeyA"].includes(event.code) &&
+          (event.metaKey || event.ctrlKey) &&
+          event.shiftKey
+        ) {
+          const captured =
+            document.documentElement.dataset.argusCapturedShortcuts;
+          document.documentElement.dataset.argusCapturedShortcuts = [
+            captured,
+            `${event.code}:${event.defaultPrevented}`,
+          ]
+            .filter(Boolean)
+            .join(",");
+        }
+      },
+      true,
+    );
+  });
+
+  await composer.press(`${modifier}+Shift+KeyR`);
+  await expect(page.getByRole("textbox")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press(`${modifier}+Shift+KeyD`);
+  await expect(page.getByRole("alertdialog")).toContainText(
+    "Delete this conversation?",
+  );
+  await expect(page.getByRole("alertdialog")).toContainText("Esc");
+  await expect(page.getByRole("alertdialog")).toContainText("↵");
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press(`${modifier}+Shift+KeyU`);
+  await expect.poll(() => fixture.mutations).toContainEqual({
+    conversationId: "legend-a",
+    method: "PATCH_ACTIVITY",
+    body: { action: "mark_unread" },
+  });
+
+  await page.keyboard.press(`${modifier}+Shift+KeyA`);
+  await expect.poll(() => fixture.mutations).toContainEqual({
+    conversationId: "legend-a",
+    method: "PATCH",
+    body: { archived: true },
+  });
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-argus-captured-shortcuts",
+    "KeyR:true,KeyD:true,KeyU:true,KeyA:true",
+  );
+});
+
+test("keeps Collapse at the far edge while the shortcut legend is hidden", async ({ page }) => {
+  await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  await openOmnisearch(page);
+
+  const collapse = page.getByRole("button", {
+    name: "Collapse",
+    exact: true,
+  });
+  await expect(collapse).toBeVisible();
+  await capture(page, "03-collapse-at-right.png");
+  const rightOffset = await collapse.evaluate(
+    (element) => {
+      const footer = element.parentElement?.parentElement;
+      if (!footer) {
+        throw new Error("Command palette footer was not found");
+      }
+
+      return footer.getBoundingClientRect().right - element.getBoundingClientRect().right;
+    },
+  );
+
+  expect(rightOffset).toBeLessThanOrEqual(16);
+});
+
+test("uses arrow keys to move between the search field and visible rows", async ({ page }) => {
+  await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  await openOmnisearch(page);
+
+  const search = page.getByPlaceholder("Search Argus...");
+  const firstRow = page.locator('[data-palette-row-index="0"]');
+  const secondRow = page.locator('[data-palette-row-index="1"]');
+
+  await expect(search).toBeFocused();
+  await search.press("ArrowDown");
+  await expect(firstRow).toBeFocused();
+  await expect(page.locator("h2")).toHaveText("Legend A");
+  const focusTreatment = await firstRow.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+    };
+  });
+  expect(focusTreatment.outlineStyle).toBe("none");
+  expect(focusTreatment.boxShadow).not.toBe("none");
+  await capture(page, "06-neutral-keyboard-focus.png");
+
+  await firstRow.press("ArrowDown");
+  await expect(secondRow).toBeFocused();
+  await expect(page.locator("h2")).toHaveText("Legend B");
+
+  await secondRow.press("ArrowUp");
+  await expect(firstRow).toBeFocused();
+  await firstRow.press("ArrowUp");
+  await expect(search).toBeFocused();
+});
+
+test("replaces the count with the shortcut legend in collapsed mode", async ({ page }) => {
+  await installFixture(page);
+  await page.goto("/chat?conversation=legend-a");
+  await openOmnisearch(page);
+
+  await page
+    .getByRole("button", { name: "Collapse", exact: true })
+    .click();
+  const expand = page.getByRole("button", { name: "Expand", exact: true });
+  await expect(expand).toBeVisible();
+  await expect(page.getByText("2 conversations", { exact: true })).toBeVisible();
+
+  await page.locator("[data-command-palette-action-region]").hover();
+  const modifier = await primaryModifier(page);
+  await page.keyboard.down(modifier);
+
+  const legend = page.locator("[data-command-palette-shortcut-legend]");
+  await expect(legend).toBeVisible();
+  await expect(page.getByText("2 conversations", { exact: true })).toHaveCount(0);
+  const spacing = await legend.evaluate((element) => {
+    const expandButton = element.parentElement?.querySelector("button");
+    if (!expandButton) {
+      throw new Error("Expand button was not found beside the shortcut legend");
+    }
+
+    const legendRect = element.getBoundingClientRect();
+    const expandRect = expandButton.getBoundingClientRect();
+    const actionRects = Array.from(
+      element.querySelectorAll("[data-command-palette-shortcut-action]"),
+      (action) => action.getBoundingClientRect(),
+    );
+    return {
+      horizontalGap: expandRect.left - legendRect.right,
+      contentOverflow:
+        Math.max(...actionRects.map((rect) => rect.right)) - legendRect.right,
+      verticalCenterDelta: Math.abs(
+        legendRect.top + legendRect.height / 2 -
+          (expandRect.top + expandRect.height / 2),
+      ),
+    };
+  });
+  expect(spacing.horizontalGap).toBeGreaterThanOrEqual(8);
+  expect(spacing.contentOverflow).toBeLessThanOrEqual(0.5);
+  expect(spacing.verticalCenterDelta).toBeLessThanOrEqual(2);
+  await capture(page, "04-collapsed-revealed.png");
+
+  await page.keyboard.up(modifier);
+  await expect(legend).toHaveCount(0);
+  await expect(page.getByText("2 conversations", { exact: true })).toBeVisible();
 });

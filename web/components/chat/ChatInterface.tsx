@@ -25,6 +25,8 @@ import {
 } from "@/components/chat/useInitialChatSession";
 import { executeChatTranscriptUpdateScroll, useChatScrollControls } from "@/components/chat/useChatScrollControls";
 import { useChatSurfaceLifecycle } from "@/components/chat/useChatSurfaceLifecycle";
+import { useArchiveActiveConversation } from "@/components/chat/useArchiveActiveConversation";
+import { toggleConversationUnread } from "@/components/chat/toggleConversationUnread";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
 import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
@@ -247,9 +249,9 @@ export default function ChatInterface() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
-  const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<
-    string | null
-  >(null);
+  const [pendingHeaderDelete, setPendingHeaderDelete] = useState<{
+    conversationId: string; showKeyboardHints: boolean;
+  } | null>(null);
   const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);
   const [headerRenameValue, setHeaderRenameValue] = useState("");
   const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
@@ -894,6 +896,11 @@ export default function ChatInterface() {
       clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
       pendingScrollRestoreRef.current = null;
     },
+  });
+  const archiveActiveConversation = useArchiveActiveConversation({
+    conversationId, onArchived: handleConversationRemoved,
+    onSuccess: () => showToast(t("common.archive", "Archive")),
+    onError: () => showToast(t("common.error_occurred"), "error"),
   });
 
   const guestBootstrapRequired = profileState === "bootstrap_required";
@@ -2078,24 +2085,24 @@ export default function ChatInterface() {
     }
   };
 
-  const handleRequestHeaderDelete = () => {
+  const handleRequestHeaderDelete = (fromKeyboardShortcut = false) => {
     if (!conversationId) return;
-    setPendingHeaderDeleteId(conversationId);
+    setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });
     closeChatOptions();
   };
 
   const handleConfirmHeaderDelete = async () => {
-    if (!pendingHeaderDeleteId || isDeletingHeaderChat) return;
+    if (!pendingHeaderDelete || isDeletingHeaderChat) return;
     setIsDeletingHeaderChat(true);
     try {
-      await deleteConversation(pendingHeaderDeleteId);
+      await deleteConversation(pendingHeaderDelete.conversationId);
       showToast(t("common.delete"));
-      handleConversationRemoved(pendingHeaderDeleteId);
+      handleConversationRemoved(pendingHeaderDelete.conversationId);
     } catch {
       showToast(t("common.error_occurred"), "error");
     } finally {
       setIsDeletingHeaderChat(false);
-      setPendingHeaderDeleteId(null);
+      setPendingHeaderDelete(null);
     }
   };
 
@@ -2142,20 +2149,21 @@ export default function ChatInterface() {
     conversationId,
     isGuest,
     searchOverlayOpen,
-    deleteConfirmationOpen: Boolean(pendingHeaderDeleteId),
-    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen,
+    deleteConfirmationOpen: Boolean(pendingHeaderDelete),
+    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen || showChatOptions,
     sidebarOpen: isSidebarOpen,
     setSidebarOpen: setIsSidebarOpen,
     recentsExpanded: isRecentsExpanded,
     setRecentsExpanded: setIsRecentsExpanded,
     requestNewChat,
     closeTransientSidebar,
-    requestDelete: handleRequestHeaderDelete,
+    requestDelete: () => handleRequestHeaderDelete(true),
     startRename: handleStartHeaderRename,
+    archiveConversation: archiveActiveConversation,
+    toggleRead: () => toggleConversationUnread(conversationActivity, conversationId),
     togglePin: handleToggleHeaderPin,
     showChatOptions: () => setShowChatOptions(true),
   });
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (profileState === "probing" || profileState === "unavailable") {
@@ -2241,6 +2249,7 @@ export default function ChatInterface() {
         omnisearchEnabled={
           omnisearchEnabled && (!isGuest || canUseOmnisearch)
         }
+        shortcutHintsSuppressed={searchOverlayOpen}
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
         isGuest={guestExperience.isEstablishedGuest}
@@ -2282,7 +2291,7 @@ export default function ChatInterface() {
         )}
 
       <ConfirmDialog
-        isOpen={Boolean(pendingHeaderDeleteId)}
+        isOpen={Boolean(pendingHeaderDelete)}
         title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
         description={t(
           "sidebar.delete_confirm.description",
@@ -2295,8 +2304,9 @@ export default function ChatInterface() {
         )}
         cancelLabel={t("common.cancel", "Cancel")}
         isBusy={isDeletingHeaderChat}
+        showKeyboardHints={pendingHeaderDelete?.showKeyboardHints}
         onCancel={() => {
-          if (!isDeletingHeaderChat) setPendingHeaderDeleteId(null);
+          if (!isDeletingHeaderChat) setPendingHeaderDelete(null);
         }}
         onConfirm={() => void handleConfirmHeaderDelete()}
       />
@@ -2336,7 +2346,7 @@ export default function ChatInterface() {
                   onRequestClose={closeChatOptions}
                   isUnread={conversationActivity.hasEffectiveUnread(conversationId)}
                   isReadMutationPending={conversationActivity.hasEffectiveUnread(conversationId) ? conversationActivity.isMutationPending(conversationId, "mark_read") : conversationActivity.isMutationPending(conversationId, "mark_unread")}
-                  onToggleUnread={() => conversationActivity.hasEffectiveUnread(conversationId) ? void conversationActivity.markRead(conversationId, conversationActivity.selectAttentionCursor(conversationId)) : void conversationActivity.markUnread(conversationId)}
+                  onToggleUnread={() => void toggleConversationUnread(conversationActivity, conversationId)}
                   isRenaming={isRenamingHeaderChat}
                   renameValue={headerRenameValue}
                   onRenameValueChange={setHeaderRenameValue}
@@ -2348,7 +2358,7 @@ export default function ChatInterface() {
                   isPinning={isPinningHeaderChat}
                   onTogglePin={() => void handleToggleHeaderPin()}
                   isDeleting={isDeletingHeaderChat}
-                  onRequestDelete={handleRequestHeaderDelete}
+                  onRequestDelete={() => handleRequestHeaderDelete()}
                 />
               ) : null}
               {strategiesEnabled && currentView === "strategies" && (

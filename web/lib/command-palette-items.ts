@@ -6,7 +6,10 @@ import type {
   SearchLedgerGroup,
 } from "./argus-api";
 import type { SearchDossierAction } from "./run-dossier-contract";
-import { commandPaletteRowActionForEvent } from "./keyboard-shortcuts";
+import {
+  commandPaletteRowActionForEvent,
+  quickJumpIndexForEvent,
+} from "./keyboard-shortcuts";
 
 export type CommandPaletteDisplayItem = {
   id: string;
@@ -219,19 +222,10 @@ export function commandPaletteConversationNavigationDisabled({
   );
 }
 
-export function commandPaletteDigitSelectionIndex(
-  key: string,
-  itemCount: number,
-  isEditableTarget: boolean,
-) {
-  if (isEditableTarget || !/^[1-9]$/.test(key)) return null;
-  const index = Number(key) - 1;
-  return index < itemCount ? index : null;
-}
-
 export type CommandPaletteKeyboardAction =
   | { type: "none" }
   | { type: "select"; index: number }
+  | { type: "focus_search" }
   | { type: "open"; openAtLeftOff: boolean }
   | { type: "rename" }
   | { type: "archive" }
@@ -251,6 +245,8 @@ export function commandPaletteKeyboardAction({
   altKey = false,
   code = key,
   repeat = false,
+  focusedRowIndex = -1,
+  usesCommandKey = false,
 }: {
   key: string;
   itemCount: number;
@@ -265,9 +261,25 @@ export function commandPaletteKeyboardAction({
   altKey?: boolean;
   code?: string;
   repeat?: boolean;
+  focusedRowIndex?: number;
+  usesCommandKey?: boolean;
 }): CommandPaletteKeyboardAction {
   if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
     return { type: "none" };
+  }
+  if (key === "ArrowDown" && itemCount > 0) {
+    if (targetIsSearchInput) return { type: "select", index: 0 };
+    if (focusedRowIndex >= 0) {
+      return {
+        type: "select",
+        index: Math.min(focusedRowIndex + 1, itemCount - 1),
+      };
+    }
+  }
+  if (key === "ArrowUp" && focusedRowIndex >= 0) {
+    return focusedRowIndex === 0
+      ? { type: "focus_search" }
+      : { type: "select", index: focusedRowIndex - 1 };
   }
   if (key === "Enter" && hasSelection) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };
@@ -281,15 +293,29 @@ export function commandPaletteKeyboardAction({
     altKey,
     repeat,
   });
-  if (hasSelection && selectedCanManageConversation && !targetIsEditable && rowAction) {
+  if (
+    hasSelection &&
+    selectedCanManageConversation &&
+    (!targetIsEditable || targetIsSearchInput) &&
+    rowAction
+  ) {
     return { type: rowAction };
   }
-  const index = commandPaletteDigitSelectionIndex(
-    key,
-    itemCount,
-    targetIsEditable,
+  const index = quickJumpIndexForEvent(
+    {
+      key,
+      code,
+      metaKey,
+      ctrlKey,
+      shiftKey,
+      altKey,
+      repeat,
+    },
+    usesCommandKey,
   );
-  return index === null ? { type: "none" } : { type: "select", index };
+  return index === null || index >= itemCount
+    ? { type: "none" }
+    : { type: "select", index };
 }
 
 export function commandPaletteRequestIsCurrent({

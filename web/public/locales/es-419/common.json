@@ -975,6 +975,8 @@
       "open_recents": "Abrir recientes",
       "delete_focused_chat": "Eliminar chat actual",
       "rename_focused_chat": "Cambiar nombre del chat actual",
+      "archive_focused_chat": "Archivar chat actual",
+      "toggle_read_focused_chat": "Marcar el chat actual como leído o no leído",
       "expand_sidebar_recents": "Alternar barra lateral y Recientes",
       "open_settings": "Abrir configuración",
       "toggle_pin_focused_chat": "Fijar o desfijar el chat actual",

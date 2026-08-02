@@ -13,10 +13,8 @@ import {
   ChevronRight,
   Edit2,
   Loader2,
-  Maximize2,
   MessageSquare,
   MessageSquareWarning,
-  Minimize2,
   Search,
   Trash2,
   X,
@@ -28,7 +26,7 @@ import { DecisionHistoryView } from "@/components/sidebar/command-palette/Decisi
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { CommandPaletteShortcutLegend, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
+import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
 import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
@@ -276,6 +274,8 @@ export default function ChatCommandPalette({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<CommandPaletteDisplayItem | null>(null);
+  const [showDeleteKeyboardHints, setShowDeleteKeyboardHints] =
+    useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
@@ -995,16 +995,20 @@ export default function ChatCommandPalette({
   );
 
   const handleDelete = useCallback(
-    (item: CommandPaletteDisplayItem) => {
+    (item: CommandPaletteDisplayItem, fromKeyboardShortcut = false) => {
       if (!canManageConversation) return;
       if (!item.canManageConversation) return;
+      setShowDeleteKeyboardHints(fromKeyboardShortcut);
       setPendingDeleteItem(item);
     },
     [canManageConversation],
   );
 
   const handleCancelDelete = useCallback(() => {
-    if (!isDeleting) setPendingDeleteItem(null);
+    if (!isDeleting) {
+      setPendingDeleteItem(null);
+      setShowDeleteKeyboardHints(false);
+    }
   }, [isDeleting]);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -1020,6 +1024,7 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
+      setShowDeleteKeyboardHints(false);
       try {
         await refreshAfterCanonicalMutation(mutationId);
       } catch {
@@ -1040,6 +1045,7 @@ export default function ChatCommandPalette({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (pendingDeleteItem) return;
       const eventTarget =
         event.target instanceof HTMLElement ? event.target : null;
       const targetIsEditableDossierControl = Boolean(
@@ -1096,7 +1102,17 @@ export default function ChatCommandPalette({
         shiftKey: event.shiftKey,
         altKey: event.altKey,
         repeat: event.repeat,
+        focusedRowIndex: Number(
+          eventTarget?.closest<HTMLElement>("[data-palette-row-index]")
+            ?.dataset.paletteRowIndex ?? -1,
+        ),
+        usesCommandKey: shortcutLegend.usesCommandKey,
       });
+      if (action.type === "focus_search") {
+        event.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
       if (action.type === "select") {
         event.preventDefault();
         const item = keyboardItems[action.index];
@@ -1125,11 +1141,11 @@ export default function ChatCommandPalette({
       }
       if (action.type === "delete" && selectedPreview) {
         event.preventDefault();
-        handleDelete(selectedPreview);
+        handleDelete(selectedPreview, true);
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [
     activateItem,
     cancelRename,
@@ -1140,7 +1156,9 @@ export default function ChatCommandPalette({
     handleDelete,
     keyboardItems,
     onClose,
+    pendingDeleteItem,
     selectedPreview,
+    shortcutLegend.usesCommandKey,
     startRename,
   ]);
 
@@ -1453,7 +1471,7 @@ export default function ChatCommandPalette({
                               role="button"
                               tabIndex={0}
                               aria-disabled={isNavigationDisabled}
-                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
                                   ? "bg-black/5 dark:bg-white/5"
@@ -1845,44 +1863,16 @@ export default function ChatCommandPalette({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-black/5 px-4 py-2 dark:border-white/5">
-          <span className="text-[11px] text-black/30 dark:text-white/30">
-            {!isLedgerMode &&
-              footerCount > 0 &&
-              t(
-                isFiltering
-                  ? "command_palette.result_count"
-                  : "command_palette.conversation_count",
-                {
-                  count: footerCount,
-                  defaultValue_one: isFiltering
-                    ? "{{count}} result"
-                    : "{{count}} conversation",
-                  defaultValue_other: isFiltering
-                    ? "{{count}} results"
-                    : "{{count}} conversations",
-                },
-              )}
-          </span>
-          {shortcutLegend.isVisible && <CommandPaletteShortcutLegend hasManageActions={selectedCanManageShortcutActions} usesCommandKey={shortcutLegend.usesCommandKey} />}
-          <button
-            type="button"
-            onClick={toggleLayout}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-black/40 hover:bg-black/5 dark:text-white/40 dark:hover:bg-white/5"
-          >
-            {layoutMode === "expanded" ? (
-              <>
-                <Minimize2 className="h-3 w-3" />
-                {t("common.collapse", "Collapse")}
-              </>
-            ) : (
-              <>
-                <Maximize2 className="h-3 w-3" />
-                {t("common.expand", "Expand")}
-              </>
-            )}
-          </button>
-        </div>
+        <CommandPaletteFooter
+          footerCount={footerCount}
+          hasManageActions={selectedCanManageShortcutActions}
+          isFiltering={isFiltering}
+          isLedgerMode={isLedgerMode}
+          layoutMode={layoutMode}
+          onToggleLayout={toggleLayout}
+          shortcutLegendVisible={shortcutLegend.isVisible}
+          usesCommandKey={shortcutLegend.usesCommandKey}
+        />
         <ConfirmDialog
           isOpen={Boolean(pendingDeleteItem)}
           title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
@@ -1896,11 +1886,12 @@ export default function ChatCommandPalette({
             },
           )}
           confirmLabel={t(
-            "sidebar.delete_confirm.confirm",
-            "Delete conversation",
+            "common.delete",
+            "Delete",
           )}
           cancelLabel={t("common.cancel", "Cancel")}
           isBusy={isDeleting}
+          showKeyboardHints={showDeleteKeyboardHints}
           onCancel={handleCancelDelete}
           onConfirm={() => void handleConfirmDelete()}
         />

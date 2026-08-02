@@ -5,7 +5,6 @@ import {
   commandPaletteCanonicalRecallLimit,
   commandPaletteConversationNavigationDisabled,
   commandPaletteDecisionVerb,
-  commandPaletteDigitSelectionIndex,
   commandPaletteGroupsByLedgerState,
   commandPaletteItemFromSearch,
   commandPaletteItemsFromHistory,
@@ -347,10 +346,6 @@ describe("command palette conversation dossier", () => {
     const display = commandPaletteItemFromSearch(conversationDossier);
     expect(commandPaletteOpenMessageId(display, false)).toBe("message-7");
     expect(commandPaletteOpenMessageId(display, true)).toBeNull();
-    expect(commandPaletteDigitSelectionIndex("1", 3, false)).toBe(0);
-    expect(commandPaletteDigitSelectionIndex("3", 3, false)).toBe(2);
-    expect(commandPaletteDigitSelectionIndex("4", 3, false)).toBeNull();
-    expect(commandPaletteDigitSelectionIndex("1", 3, true)).toBeNull();
   });
 
   test("blocks only stream-owning conversation navigation", () => {
@@ -456,7 +451,7 @@ describe("command palette conversation dossier", () => {
     }
   });
 
-  test("routes scoped row actions only for a selected manageable row outside editable controls", () => {
+  test("routes OS-aware row actions for the selected manageable row", () => {
     const base = {
       itemCount: 3,
       hasSelection: true,
@@ -468,28 +463,153 @@ describe("command palette conversation dossier", () => {
       ctrlKey: false,
     };
 
-    expect(commandPaletteKeyboardAction({ ...base, key: "F2" })).toEqual({
+    expect(commandPaletteKeyboardAction({
+      ...base,
+      key: "R",
+      code: "KeyR",
+      metaKey: true,
+      shiftKey: true,
+    })).toEqual({
       type: "rename",
     });
-    expect(commandPaletteKeyboardAction({ ...base, key: "F2", shiftKey: true })).toEqual({
+    expect(commandPaletteKeyboardAction({
+      ...base,
+      key: "A",
+      code: "KeyA",
+      ctrlKey: true,
+      shiftKey: true,
+    })).toEqual({
       type: "archive",
     });
-    expect(commandPaletteKeyboardAction({ ...base, key: "Delete" })).toEqual({
+    expect(commandPaletteKeyboardAction({
+      ...base,
+      key: "D",
+      code: "KeyD",
+      metaKey: true,
+      shiftKey: true,
+      targetIsEditable: true,
+      targetIsSearchInput: true,
+    })).toEqual({
       type: "delete",
     });
     expect(
       commandPaletteKeyboardAction({
         ...base,
-        key: "Delete",
+        key: "D",
+        code: "KeyD",
+        metaKey: true,
+        shiftKey: true,
         targetIsEditable: true,
-        targetIsSearchInput: true,
+        targetIsSearchInput: false,
       }),
     ).toEqual({ type: "none" });
     expect(
       commandPaletteKeyboardAction({
         ...base,
-        key: "F2",
+        key: "R",
+        code: "KeyR",
+        metaKey: true,
+        shiftKey: true,
         selectedCanManageConversation: false,
+      }),
+    ).toEqual({ type: "none" });
+  });
+
+  test("uses modified digits for direct selection without stealing typed numbers", () => {
+    const base = {
+      itemCount: 3,
+      hasSelection: true,
+      targetIsEditable: true,
+      targetIsSearchInput: true,
+      isEditing: false,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      code: "Digit2",
+      key: "2",
+    };
+
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        metaKey: true,
+        altKey: true,
+        usesCommandKey: true,
+      }),
+    ).toEqual({ type: "select", index: 1 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        ctrlKey: true,
+        shiftKey: true,
+        usesCommandKey: false,
+      }),
+    ).toEqual({ type: "select", index: 1 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        usesCommandKey: true,
+      }),
+    ).toEqual({ type: "none" });
+  });
+
+  test("moves focus through visible rows and returns from the first row to search", () => {
+    const base = {
+      itemCount: 3,
+      hasSelection: true,
+      selectedCanManageConversation: true,
+      targetIsEditable: false,
+      targetIsSearchInput: false,
+      isEditing: false,
+      metaKey: false,
+      ctrlKey: false,
+    };
+
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowDown",
+        focusedRowIndex: 0,
+      }),
+    ).toEqual({ type: "select", index: 1 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowDown",
+        focusedRowIndex: 2,
+      }),
+    ).toEqual({ type: "select", index: 2 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowUp",
+        focusedRowIndex: 1,
+      }),
+    ).toEqual({ type: "select", index: 0 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowUp",
+        focusedRowIndex: 0,
+      }),
+    ).toEqual({ type: "focus_search" });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowDown",
+        focusedRowIndex: -1,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
+      }),
+    ).toEqual({ type: "select", index: 0 });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        key: "ArrowUp",
+        focusedRowIndex: -1,
+        targetIsEditable: true,
+        targetIsSearchInput: true,
       }),
     ).toEqual({ type: "none" });
   });

@@ -975,6 +975,8 @@
       "open_recents": "Open Recents",
       "delete_focused_chat": "Delete current chat",
       "rename_focused_chat": "Rename current chat",
+      "archive_focused_chat": "Archive current chat",
+      "toggle_read_focused_chat": "Mark current chat as read or unread",
       "expand_sidebar_recents": "Toggle sidebar and Recents",
       "open_settings": "Open Settings",
       "toggle_pin_focused_chat": "Pin or unpin current chat",
