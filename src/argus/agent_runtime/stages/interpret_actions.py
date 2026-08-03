@@ -50,6 +50,9 @@ from argus.agent_runtime.stages.artifact_context import (
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
 )
+from argus.agent_runtime.stages.interpret_internal.result_action_routing import (
+    typed_result_action_stage_result_if_applicable,
+)
 from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
     _deterministic_result_artifact_patch_stage_result_if_applicable,
     _result_artifact_patch_stage_result_if_applicable,
@@ -78,7 +81,6 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_dates": "date_range",
     "adjust_assumptions": "assumption",
 }
-TRANSPORT_RESULT_ACTION_TYPES = {"show_breakdown", "save_strategy"}
 COVERAGE_RECOVERY_ACTION_FIELDS = {
     "change_dates": "date_range",
     "change_asset": "asset_universe",
@@ -556,25 +558,13 @@ def result_action_stage_result_if_applicable(
     action = state.structured_action
     if action is None:
         return None
-    if action.type in TRANSPORT_RESULT_ACTION_TYPES:
-        reference = (
-            snapshot.latest_backtest_result_reference if snapshot is not None else None
-        )
-        return StageResult(
-            outcome="ready_to_respond",
-            stage_patch={
-                "assistant_response": None,
-                "result_action_request": {
-                    "type": action.type,
-                    "action": action.model_dump(mode="python"),
-                    "latest_result_reference": (
-                        reference.model_dump(mode="python")
-                        if reference is not None
-                        else None
-                    ),
-                },
-            },
-        )
+    typed_result = typed_result_action_stage_result_if_applicable(
+        state=state,
+        snapshot=snapshot,
+        language=language,
+    )
+    if typed_result is not None:
+        return typed_result
     if action.type != "refine_strategy":
         return None
     reference = (

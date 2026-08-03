@@ -204,6 +204,11 @@ for brand-new accounts, email anti-enumeration is preserved through the
 obfuscated-response guard, and username conflicts are serialized and typed —
 three review rounds, three distinct real regressions caught and fixed.
 
+PR #359 then closed issue #345 as `a35bb29f`: recommendation continuity at
+the full clean bar — live 40/40 with no waivers (the 17-failure waiver era
+formally over) and strategy-diverse acceptance evidence per the standing
+rule (weekly DCA recurring contribution, SMA 50/200 inheritance).
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
@@ -555,6 +560,23 @@ slices below describe delivered scope, not pending work.
 - Broad Research Lab / deep-research product work. Bounded, source-backed event
   context required by the later A4 freshness arc is not a general news feed or
   a broad Research Lab implementation.
+- Allowance brainstorming session (founder-led): define what Guests versus
+  registered users can do, and identify which capability boundaries naturally
+  become tiers or plans once product-market fit is found. Today Argus stays
+  deliberately open at near-full data capability to learn capability truth;
+  every capability boundary added in the meantime (lookback windows,
+  simulation allowances, discovery quotas) must stay policy-owned values so
+  future tiering changes policy, not design. Session output feeds the
+  allowance/tier design; no implementation before it.
+- Current-data window truthfulness design (PENDING founder lock; PR #363 is
+  founder-parked on it). Direction under discussion, not yet decided:
+  feasibility-aware Retest disposition on the dossier button (ready /
+  feasible-with-repair / impossible, with tooltip), a guided repair turn that
+  pulses the affected confirmation-card input for manual editing, anchor-date
+  clamping to earliest available riding the existing
+  `effective_date_range`/`adjustment_reason` contract, a strict definition of
+  "truly impossible," and a reconciliation path so users are never
+  dead-ended. No lane resumes until the founder locks this design.
 
 ### P2 Board
 

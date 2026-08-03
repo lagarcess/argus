@@ -3066,6 +3066,20 @@ localized sentence a tap submits as an ordinary user turn). The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 
+When the user selects `change_date_range` or `compare_buy_and_hold`, the web
+client submits a result-presented `refine_strategy` action whose payload carries
+the source `run_id` and `next_experiment_kind`. The backend seeds the follow-up
+from that owner-scoped canonical result draft. Buy-and-hold applies its typed
+patch immediately; a date-range row opens a date-only clarification and applies
+the user's bounded date answer to the anchored draft. All omitted,
+still-applicable owned facts carry forward, including modeled fees, slippage,
+and their provenance. Other Try next kinds keep the ordinary conversational
+turn path. The action label remains localized presentation copy; it is not the
+source of recommendation semantics. The date-only question follows the normal
+model-voiced clarification path with `prompt_source = llm_generated` when the
+clarifier succeeds. Deterministic copy is limited to the existing typed offline
+path and must declare `prompt_source = degraded_fallback`.
+
 ```json
 "next_experiments": {
   "version": "argus_next_experiments/v1",
