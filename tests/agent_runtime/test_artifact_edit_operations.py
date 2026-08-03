@@ -2909,6 +2909,132 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
 
 
 @pytest.mark.asyncio
+async def test_issue_339_primary_replacement_grounds_card_resolved_exclusion(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"AAPL", "NVDA"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+
+    async def invoke_stub(**kwargs):
+        del kwargs
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="replace",
+                    target="asset",
+                    symbols=["AAPL", "NVDA"],
+                )
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="keep AAPL, remove the second one, and add NVDA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL", "MSFT"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_universe=["AAPL", "NVDA"],
+            asset_universe_operation="replace",
+            asset_exclusions=["MSFT"],
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+    )
+
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["AAPL", "NVDA"]
+
+
+@pytest.mark.asyncio
+async def test_issue_339_typed_inclusion_uses_planner_replacement_boundary(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"AAPL", "MSFT"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+
+    async def invoke_stub(**kwargs):
+        del kwargs
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="replace", target="asset", symbols=["MSFT"]),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="replace AAPL with MSFT",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_inclusions=["MSFT"],
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+    )
+
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("current_strategy_type", "current_capital", "extra_parameters"),
     [

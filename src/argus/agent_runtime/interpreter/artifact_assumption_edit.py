@@ -864,10 +864,12 @@ def materialized_artifact_edit_targets(
         normalized_asset_symbols(primary_draft.asset_exclusions)
     )
     primary_provenance = primary_draft.field_provenance or {}
+    primary_asset_operation = normalized_asset_universe_operation(
+        primary_draft.asset_universe_operation
+    )
     primary_carries_explicit_asset_request = bool(
         primary_draft.asset_universe
-        and normalized_asset_universe_operation(primary_draft.asset_universe_operation)
-        is not None
+        and primary_asset_operation is not None
         and primary_provenance.get("asset_universe") == "explicit_user"
     )
     explicit_benchmark_symbol = (
@@ -902,9 +904,15 @@ def materialized_artifact_edit_targets(
     )
     materialized_assets = set(normalized_asset_symbols(draft.asset_universe))
     primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
+    card_resolved_asset_exclusions = (
+        (primary_asset_exclusions & current_assets) - primary_assets
+        if primary_carries_explicit_asset_request and primary_asset_operation == "replace"
+        else set()
+    )
     if (
-        not (primary_asset_inclusions | primary_asset_exclusions)
-        <= provider_grounded_asset_symbols
+        not primary_asset_inclusions <= provider_grounded_asset_symbols
+        or not primary_asset_exclusions
+        <= provider_grounded_asset_symbols | card_resolved_asset_exclusions
         or primary_asset_inclusions & primary_asset_exclusions
         or primary_assets & primary_asset_exclusions
     ):
@@ -1011,6 +1019,13 @@ def _materialized_target_matches_primary_delta(
         if primary_inclusions or primary_exclusions:
             expected_from_typed_roles = set(current)
             if operation == "replace":
+                expected_from_typed_roles = set(primary_requested)
+            elif (
+                operation is None
+                and planned_asset_replacement
+                and primary_inclusions
+                and not primary_exclusions
+            ):
                 expected_from_typed_roles = set(primary_requested)
             elif operation == "append":
                 expected_from_typed_roles.update(primary_requested)
