@@ -6,9 +6,17 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #357 at `9f97f1dc`, which keeps guest dossier
-decision actions visible behind a typed account-conversion gate and resumes
-the exact decision after conversion (issue #340). It follows PR #353 at
+Latest product change: PR #351 at `30af0dca`, which refreshes the canonical
+Recents projection immediately after a guest conversation is claimed by an
+existing account, before any pending follow-up resumes (issue #342). It
+follows PR #374 at `d8c7070a` (robust activity timestamp parsing and
+exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
+cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
+evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
+turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
+registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
+(rounded menu highlights, issue #343), PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
 at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
 at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
@@ -124,6 +132,64 @@ legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
 `docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
 environment variable, deployment, schema, or migration requirement. Issue
 #341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #352 then closed issue #334 as `0942507b`: Omnisearch and active-chat
+keyboard actions share one OS-aware behavior registry (EN/es-419 labels and
+execution from one source), with a contextual shortcut legend that stays
+quiet at rest, contextual Omnisearch actions, arrow navigation, quick jump,
+keyboard-aware delete confirmation, and a responsive help sheet. Its first
+head was returned for composed-tree modularity violations and re-landed
+after genuine extraction; ChatInterface.tsx now sits exactly at its budget
+limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #375 then closed issue #368 as `c334cf3e`: the stated-starting-capital
+recheck now also runs on `unsupported_or_out_of_scope` turns, so an explicit
+non-DCA capital amount survives capability-honesty recoveries without
+changing the unsupported verdict, dates, assets, or DCA behavior. Accepted
+evidence: red-first mocked regression plus one targeted live rerun of the
+original news-sentiment case, re-captured at the exact final head. The
+founder waived the ceremony reconcile-merge commit after an independently
+verified no-overlap disposition (all intervening landings were docs or
+web-only). This fix upgrades PR #363's pending evidence bar. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #370 then closed issue #341 as `c324f877`: explicit `timestamptz`/`uuid`
+casts on the nullable first-page dossier cursors repair the guest Decision
+history 500 (`AmbiguousParameter` on the untyped null comparison) — not a
+guest-guard or transport failure, and the issue was nearly closed as
+not-reproducible before the mandated real-browser re-evidencing surfaced
+the true failure in the Postgres reader. Evidence: same-session 500→200 at
+the exact head with the screenshot committed in-repo; guest workspace
+isolation re-proven. It added no environment variable, deployment, API,
+schema, or migration requirement.
+PR #360 then closed issue #349 as `42d96da7`: conversation-activity truth is
+now verified with durable in-repo evidence — registered manual-unread
+persists, survives reload, clears, and never reorders Recents; each Guest
+state is individually classified with owner actions account-only. Docs and
+four committed screenshots plus one date-stable Playwright fixture line; no
+product behavior, API, schema, or migration change.
+PR #374 then closed issue #371 as `d8c7070a`: `_as_datetime` normalizes
+Postgres-trimmed fractional seconds and trailing `Z` offsets with explicit
+regex-free string handling before parsing (founder-directed), repairing the
+~1-in-10 broken-Recents failure observed in live QA, and the API middleware
+now retains the exception in its failure log while keeping the HTTP body
+generic. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #351 then closed issue #342 as `30af0dca`: the guest-to-account handoff
+awaits the promise-returning Recents refresh after ownership confirmation and
+before a pending action resumes, so the claimed conversation is visible
+immediately; ordinary mutation refreshes remain fire-and-forget. Accepted on
+a founder-witnessed live conversion journey at the exact composed tree plus
+full composed-tree gates. Its first live-proof attempt discovered #371 and
+#372; the integration-side headroom extraction `34782abd` preceded this
+landing. No environment variable, deployment, API, schema, or migration
+requirement was added.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

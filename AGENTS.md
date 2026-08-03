@@ -156,6 +156,19 @@ Integration guardrails:
 - Every final READY report must include the original integration base, current
   integration SHA, reconciliation merge SHA if any, overlap disposition,
   evidence retained or invalidated, exact PR head, and terminal CI state.
+- Visual and browser acceptance evidence must be durable. Commit the
+  artifacts under `docs/reports/evidence/<issue-or-pr>/` in the lane's PR, or
+  upload the images as GitHub attachments on the issue/PR comment that cites
+  them. Local worktree paths or SHA-256 hashes alone are not durable
+  evidence: a claim whose images exist only in a local folder is not closed.
+  Evidence must be captured at the exact head it vouches for; if the head
+  moves afterward, re-capture or explicitly re-validate.
+- Before a READY claim, run `scripts/check_modularity_budget.py` against the
+  would-be merged tree (after the one-way reconciliation merge, or via
+  `git merge-tree` with current integration), not only against the worker
+  branch. Modularity budgets are a shared pool: two individually green
+  branches can exceed a watched file's limit when combined, and the violation
+  only exists on the merged result.
 - After the founder merges a worker PR, the active agent should run
   `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
   permit it. A cloud agent may perform that workflow; the local

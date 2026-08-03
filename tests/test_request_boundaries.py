@@ -486,7 +486,11 @@ def test_unexpected_error_is_generic_correlated_and_cors_safe(
         if record["extra"].get("request_id") == "unexpected-request-id"
     ]
     assert len(matching_records) == 1
-    assert "private failure detail" not in matching_records[0]["message"]
+    record = matching_records[0]
+    assert "private failure detail" not in record["message"]
+    assert record["exception"] is not None
+    assert record["exception"].type is RuntimeError
+    assert str(record["exception"].value) == "provider credential private failure detail"
 
 
 def test_unexpected_ingress_preflight_failure_is_generic_and_correlated(

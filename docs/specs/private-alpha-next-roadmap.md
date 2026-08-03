@@ -155,6 +155,50 @@ desktop/mobile browser gate plus focused backend and web suites. Issue #341
 (guest decision history) is unblocked and should dispatch from the
 post-#357 integration head with a red-first reproduction before its fix.
 
+PR #356 then closed issue #343 as `48de2f3f`: one rounded inset-pill
+highlight geometry across all menu surfaces, colors and behavior unchanged,
+with in-repo hover evidence. Landed tree verified byte-identical to the
+independently pre-verified composed tree; founder overruled the absent
+on-PR bot review after personal visual checks.
+
+PR #352 then closed issue #334 as `0942507b`: one OS-aware keyboard behavior
+registry across Omnisearch and chat, a contextual legend quiet at rest, and
+bilingual labels from a single source — verified twice on composed trees
+(1057/1057 web, 21/21 three-engine matrix) after a first-round send-back for
+cross-PR modularity stacking. ChatInterface.tsx is now exactly at its budget
+limit; lanes touching it must extract before adding. The completed
+chat-header-title spec moved to `docs/archive/` with a tombstone stub.
+
+PR #375 then closed issue #368 as `c334cf3e`: explicit stated capital now
+survives unsupported-request turns (typed intent gating only), proven by a
+red-first mocked regression and one exact-head targeted live rerun of the
+original failing case — re-captured after the review fix moved the head.
+Founder waived the ceremony reconcile commit on a verified no-overlap
+disposition. PR #363's held evidence decision should be revisited: its
+news-sentiment live failure now has a fixed root cause.
+
+PR #370 then closed issue #341 as `c324f877`: guest Decision history loads —
+the 500 was an untyped nullable first-page cursor in the Postgres dossier
+reader, found only after the mandated real-browser re-evidencing overturned
+an honest earlier non-reproduction from the non-Postgres reader. Fix is
+explicit cursor casts with a red-first regression; same-session 500→200
+evidence at the exact head lives in-repo. Guest isolation unchanged.
+
+PR #360 then closed issue #349 as `42d96da7`: the activity/read-state
+foundation is verified end to end with durable in-repo evidence (real local
+Postgres/RLS, both personas, zero provider spend); guest applicability is
+classified per state and manual-unread remains account-only.
+
+PR #374 then closed issue #371 as `d8c7070a`: regex-free timestamp
+normalization (founder-directed after the first-round regex missed the `Z`
+shape Python 3.10 cannot parse) plus exception retention in the API failure
+log. Unblocks the PR #351 live-proof rerun alongside #373.
+
+PR #351 then closed issue #342 as `30af0dca`: Recents refreshes immediately
+on guest-to-account conversion, proven by a founder-witnessed live journey
+at the exact composed tree (claim 200, instant Recents, all polls 200) —
+the same journey whose first attempt surfaced #371/#372.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

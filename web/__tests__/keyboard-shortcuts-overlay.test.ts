@@ -28,6 +28,7 @@ describe("keyboard shortcuts overlay", () => {
 
     expect(overlay).toContain("KEYBOARD_SHORTCUTS.filter");
     expect(overlay).toContain("max-h-[calc(100dvh-2rem)]");
+    expect(overlay).toContain("z-[130]");
     expect(chat).toContain("useChatKeyboardShortcuts");
     expect(keyboardShortcutHook).toContain(
       'matchesKeyboardShortcut("keyboard_shortcuts", event)',
@@ -61,6 +62,8 @@ describe("keyboard shortcuts overlay", () => {
       open_recents: "Open Recents",
       delete_focused_chat: "Delete current chat",
       rename_focused_chat: "Rename current chat",
+      archive_focused_chat: "Archive current chat",
+      toggle_read_focused_chat: "Mark current chat as read or unread",
       expand_sidebar_recents: "Toggle sidebar and Recents",
       open_settings: "Open Settings",
       toggle_pin_focused_chat: "Pin or unpin current chat",
@@ -144,6 +147,8 @@ describe("keyboard shortcuts overlay", () => {
       "open_recents",
       "delete_focused_chat",
       "rename_focused_chat",
+      "archive_focused_chat",
+      "toggle_read_focused_chat",
       "expand_sidebar_recents",
       "open_settings",
       "toggle_pin_focused_chat",

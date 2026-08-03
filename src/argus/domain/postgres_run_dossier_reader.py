@@ -162,9 +162,12 @@ where br.user_id = %(user_id)s
   and br.conversation_id = %(conversation_id)s
   and br.status = 'completed'
   and (
-      %(cursor_completed_at)s is null
+      %(cursor_completed_at)s::timestamptz is null
       or row(coalesce(br.updated_at, br.created_at), br.id)
-         < row(%(cursor_completed_at)s, %(cursor_run_id)s)
+         < row(
+             %(cursor_completed_at)s::timestamptz,
+             %(cursor_run_id)s::uuid
+         )
   )
 order by coalesce(br.updated_at, br.created_at) desc, br.id desc
 limit %(limit)s

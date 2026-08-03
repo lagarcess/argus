@@ -23,6 +23,7 @@ type UseGuestConversionInput = {
   account: UserResponse | null;
   conversationId: string | null;
   refreshAccount: () => Promise<UserResponse | null>;
+  refreshHistory: () => void | Promise<unknown>;
   onResume: (action: GuestPendingAction) => void | Promise<void>;
 };
 
@@ -30,6 +31,7 @@ export function useGuestConversion({
   account,
   conversationId,
   refreshAccount,
+  refreshHistory,
   onResume,
 }: UseGuestConversionInput) {
   const [isOpen, setIsOpen] = useState(false);
@@ -125,6 +127,10 @@ export function useGuestConversion({
       }
 
       await refreshAccount();
+      // The handoff changes the durable owner in the same request path. Refresh
+      // Recents before a pending follow-up can fail or navigate away, so the
+      // account's canonical conversation projection is visible immediately.
+      await refreshHistory();
       const actionLatch = latchRef.current;
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
@@ -133,7 +139,7 @@ export function useGuestConversion({
         await onResume(action);
       }
     },
-    [conversationId, onResume, refreshAccount],
+    [conversationId, onResume, refreshAccount, refreshHistory],
   );
 
   return {

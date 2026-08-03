@@ -1250,6 +1250,84 @@ async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
     assert "stated_starting_capital_recheck" in repaired.reason_codes
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "intent",
+    ["backtest_execution", "unsupported_or_out_of_scope"],
+)
+async def test_stated_starting_capital_recheck_preserves_unsupported_request(
+    monkeypatch,
+    intent: str,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    message = (
+        "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025, "
+        "buying when news sentiment turns positive and selling when it turns negative."
+    )
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, model_name
+        calls.append(schema_name)
+        assert schema_name == "StatedStartingCapitalAudit"
+        return schema_model(starting_capital=10000, confidence=0.95)
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    unsupported_constraint = interpreter_module.LLMUnsupportedConstraint(
+        category="unsupported_strategy_logic",
+        raw_value="news sentiment",
+        explanation="News sentiment rules are not executable.",
+    )
+    response = LLMInterpretationResponse(
+        intent=intent,
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test an AAPL news-sentiment strategy.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="news_sentiment",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2022-01-02", "end": "2025-01-02"},
+            entry_logic="Buy when news sentiment turns positive.",
+            exit_logic="Sell when news sentiment turns negative.",
+            evidence_spans={"capital_amount": "$10,000"},
+        ),
+        unsupported_constraints=[unsupported_constraint],
+        semantic_turn_act="unsupported_request",
+    )
+
+    repaired = await interpreter_module._audit_stated_starting_capital_fidelity(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls == ["StatedStartingCapitalAudit"]
+    assert repaired is not None
+    assert repaired.semantic_turn_act == "unsupported_request"
+    assert repaired.unsupported_constraints == [unsupported_constraint]
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 10000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
+    assert draft.evidence_spans["capital_amount"] == "$10,000"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.date_range == {"start": "2022-01-02", "end": "2025-01-02"}
+
+
 @pytest.mark.asyncio
 async def test_stated_starting_capital_recheck_runs_when_broad_audit_fails(
     monkeypatch,
