@@ -186,6 +186,7 @@ import {
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
+import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -201,7 +202,6 @@ import {
   resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
-
 type View = "chat" | "strategies" | "settings";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 type SendSelection =
@@ -1219,13 +1219,8 @@ export default function ChatInterface() {
           finishRequestTransport(requestSession);
           return;
         }
-        const errorPayload = event.data as typeof event.data &
-          Record<string, unknown>;
-        if (
-          errorPayload.failure_code === "account_conversion_required" &&
-          action?.type === "run_backtest" &&
-          recoverGuestSimulationRejection(action)
-        ) {
+        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
+        if (isGuestSimulationConversionRejection(errorPayload.failure_code, action) && recoverGuestSimulationRejection(action)) {
           setMessages((prev) => prev.filter((message) => message.id !== assistantId));
           finishRequestTransport(requestSession);
           return;

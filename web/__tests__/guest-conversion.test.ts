@@ -253,7 +253,7 @@ describe("guest conversion contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(experience).toContain("recoverGuestSimulationRejection");
-    expect(chat).toContain('errorPayload.failure_code === "account_conversion_required"');
+    expect(chat).toContain("isGuestSimulationConversionRejection");
     expect(chat).toContain("recoverGuestSimulationRejection(action)");
   });
 
