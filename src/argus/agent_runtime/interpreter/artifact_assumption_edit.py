@@ -844,7 +844,6 @@ def _materialized_target_matches_primary_delta(
         grounded = set(grounded_asset_symbols or set())
         primary_inclusions = set(primary_asset_inclusions or set())
         primary_exclusions = set(primary_asset_exclusions or set())
-        requested = primary_requested | grounded | primary_inclusions
         materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
         operation = normalized_asset_universe_operation(
             primary_draft.asset_universe_operation
@@ -852,6 +851,20 @@ def _materialized_target_matches_primary_delta(
         materialized_operation = normalized_asset_universe_operation(
             materialized_draft.asset_universe_operation
         )
+        if primary_inclusions or primary_exclusions:
+            expected_from_typed_roles = set(current)
+            if operation == "replace" and primary_requested:
+                expected_from_typed_roles = set(primary_requested)
+            elif operation == "append":
+                expected_from_typed_roles.update(primary_requested)
+            expected_from_typed_roles.update(primary_inclusions)
+            expected_from_typed_roles.difference_update(primary_exclusions)
+            return (
+                bool(materialized)
+                and materialized != current
+                and materialized == expected_from_typed_roles
+            )
+        requested = primary_requested | grounded
         if not requested or materialized == current:
             return False
         primary_replacement = operation == "replace" and primary_requested != current
@@ -884,20 +897,16 @@ def _materialized_target_matches_primary_delta(
             return False
         if planned_asset_replacement:
             if operation == "append":
-                expected_replacement = current | primary_requested | primary_inclusions
+                expected_replacement = current | primary_requested
             elif primary_requested and primary_requested != current:
-                expected_replacement = primary_requested | (primary_inclusions - current)
-            elif primary_inclusions or primary_exclusions:
-                expected_replacement = primary_inclusions or grounded
+                expected_replacement = primary_requested
             else:
                 expected_replacement = grounded
-            expected_replacement -= primary_exclusions
             return bool(materialized) and materialized == expected_replacement
         if primary_replacement:
             return True
         if operation == "append":
-            expected_append = current | primary_requested | primary_inclusions
-            expected_append -= primary_exclusions
+            expected_append = current | primary_requested
             return bool(materialized - current) and materialized == expected_append
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested

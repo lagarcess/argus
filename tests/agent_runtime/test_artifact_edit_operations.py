@@ -1377,6 +1377,91 @@ async def test_issue_339_primary_asset_exclusions_are_not_reintroduced(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("plan_shape", ["remove", "replace", "clear_add"])
+async def test_issue_339_typed_exclusion_can_become_the_explicit_benchmark(
+    monkeypatch,
+    plan_shape,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"MSFT"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        asset_operations = {
+            "remove": [
+                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
+            ],
+            "replace": [
+                EditOperation(op="replace", target="asset", symbols=["AAPL"]),
+            ],
+            "clear_add": [
+                EditOperation(op="clear", target="asset"),
+                EditOperation(op="add", target="asset", symbols=["AAPL"]),
+            ],
+        }
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                *asset_operations[plan_shape],
+                EditOperation(op="set", target="benchmark", value="MSFT"),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="remove MSFT and use MSFT as benchmark",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL", "MSFT"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_exclusions=["MSFT"],
+            comparison_baseline="MSFT",
+            field_provenance={"comparison_baseline": "explicit_user"},
+        ),
+    )
+
+    assert seen_models == ["primary-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert response.candidate_strategy_draft.comparison_baseline == "MSFT"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("operation_order", "grounded_symbols"),
     [
