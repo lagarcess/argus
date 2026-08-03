@@ -6,10 +6,11 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #374 at `d8c7070a`, which makes conversation
-activity timestamp parsing robust to Postgres-trimmed fractional seconds and
-`Z` offsets on Python 3.10 and retains exceptions in the API failure log
-(issue #371). It follows PR #370 at `c324f877` (typed first-page dossier
+Latest product change: PR #351 at `30af0dca`, which refreshes the canonical
+Recents projection immediately after a guest conversation is claimed by an
+existing account, before any pending follow-up resumes (issue #342). It
+follows PR #374 at `d8c7070a` (robust activity timestamp parsing and
+exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
 cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
 evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
 turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
@@ -179,6 +180,15 @@ regex-free string handling before parsing (founder-directed), repairing the
 ~1-in-10 broken-Recents failure observed in live QA, and the API middleware
 now retains the exception in its failure log while keeping the HTTP body
 generic. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #351 then closed issue #342 as `30af0dca`: the guest-to-account handoff
+awaits the promise-returning Recents refresh after ownership confirmation and
+before a pending action resumes, so the claimed conversation is visible
+immediately; ordinary mutation refreshes remain fire-and-forget. Accepted on
+a founder-witnessed live conversion journey at the exact composed tree plus
+full composed-tree gates. Its first live-proof attempt discovered #371 and
+#372; the integration-side headroom extraction `34782abd` preceded this
+landing. No environment variable, deployment, API, schema, or migration
 requirement was added.
 
 Current note: while the interim pivot is active, use
