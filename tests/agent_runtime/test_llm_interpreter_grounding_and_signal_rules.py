@@ -1252,8 +1252,13 @@ async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "intent",
+    ["backtest_execution", "unsupported_or_out_of_scope"],
+)
 async def test_stated_starting_capital_recheck_preserves_unsupported_request(
     monkeypatch,
+    intent: str,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -1283,7 +1288,7 @@ async def test_stated_starting_capital_recheck_preserves_unsupported_request(
         explanation="News sentiment rules are not executable.",
     )
     response = LLMInterpretationResponse(
-        intent="backtest_execution",
+        intent=intent,
         task_relation="new_task",
         requires_clarification=True,
         user_goal_summary="Test an AAPL news-sentiment strategy.",
