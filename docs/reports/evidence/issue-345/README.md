@@ -57,6 +57,27 @@ confirmation. A separate indicator-driven regression carries a 50/200 SMA
 crossover's `entry_rule`, `exit_rule`, and `rule_spec` through the same
 date-range recommendation/refine path.
 
+## Final-head DCA browser revalidation
+
+On 2026-08-03, local real-API browser QA repeated the complete non-buy-and-hold
+journey at code head `731730aa`. The source run was a weekly AAPL DCA strategy
+with an explicit `recurring_contribution = 1000`. Selecting **Test a different
+date range** produced a model-voiced clarification whose persisted metadata
+declared `prompt_source = llm_generated` and `requested_field = date_range`.
+The pending strategy retained:
+
+- `strategy_type = dca_accumulation`
+- `recurring_contribution = 1000` with `prior` provenance
+- `cadence = weekly` with `prior` provenance
+- daily data, SPY, a 40 bps fee, and 0.25 bps slippage
+
+After the user supplied January 3 through December 29, 2023, the final
+confirmation retained every field above. Its typed artifact patch declared
+`source = user_patch` and `changed_fields = ["date_range"]`. The viewport
+capture visibly shows **CONTRIBUTION $1,000**, **Cadence Weekly**, the refined
+dates, costs, daily data, and SPY:
+[`date-range-dca-continuity-exact-head-731730aa.png`](date-range-dca-continuity-exact-head-731730aa.png).
+
 ## Historical blocked-run comparison
 
 This record explains why PR #359 correctly remained Draft before issue #361's
