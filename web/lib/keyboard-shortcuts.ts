@@ -5,21 +5,37 @@ export type KeyboardShortcutId =
   | "open_recents"
   | "delete_focused_chat"
   | "rename_focused_chat"
+  | "archive_focused_chat"
+  | "toggle_read_focused_chat"
   | "expand_sidebar_recents"
   | "open_settings"
   | "toggle_pin_focused_chat"
-  | "quick_jump";
+  | "quick_jump"
+  | "command_palette_rename"
+  | "command_palette_archive"
+  | "command_palette_delete";
 
-export type KeyboardShortcutGroup = "navigation" | "chat" | "quick_jump";
+export type KeyboardShortcutGroup =
+  | "navigation"
+  | "chat"
+  | "quick_jump"
+  | "omnisearch";
 
 export type KeyboardShortcutEvent = Pick<
   KeyboardEvent,
   "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "repeat" | "shiftKey"
 >;
 
+export type KeyboardDeleteRequest = {
+  conversationId: string;
+  showKeyboardHints: boolean;
+};
+
 type KeyboardShortcutMatch =
   | "primary_key"
+  | "primary_shift_key"
   | "primary_shift_code"
+  | "shift_code"
   | "code"
   | "quick_jump";
 
@@ -27,6 +43,7 @@ export type KeyboardShortcutDefinition = {
   id: KeyboardShortcutId;
   group: KeyboardShortcutGroup;
   labelKey: string;
+  defaultLabel: string;
   match: KeyboardShortcutMatch;
   key?: string;
   code?: string;
@@ -39,6 +56,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "omnisearch",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.omnisearch",
+    defaultLabel: "Open search",
     match: "primary_key",
     key: "k",
     macDisplay: ["⌘", "K"],
@@ -48,6 +66,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "keyboard_shortcuts",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.keyboard_shortcuts",
+    defaultLabel: "Show keyboard shortcuts",
     match: "primary_key",
     key: "/",
     macDisplay: ["⌘", "/"],
@@ -57,6 +76,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "open_recents",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.open_recents",
+    defaultLabel: "Open Recents",
     match: "primary_shift_code",
     code: "Comma",
     macDisplay: ["⌘", "Shift", ","],
@@ -66,6 +86,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "expand_sidebar_recents",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.expand_sidebar_recents",
+    defaultLabel: "Toggle sidebar and Recents",
     match: "primary_shift_code",
     code: "Backslash",
     macDisplay: ["⌘", "Shift", "\\"],
@@ -75,6 +96,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "open_settings",
     group: "navigation",
     labelKey: "keyboard_shortcuts.shortcuts.open_settings",
+    defaultLabel: "Open Settings",
     match: "primary_shift_code",
     code: "Semicolon",
     macDisplay: ["⌘", "Shift", ";"],
@@ -84,6 +106,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "new_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.new_chat",
+    defaultLabel: "New chat",
     match: "primary_shift_code",
     code: "Period",
     macDisplay: ["⌘", "Shift", "."],
@@ -93,24 +116,47 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "delete_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.delete_focused_chat",
-    match: "primary_shift_code",
-    code: "KeyX",
-    macDisplay: ["⌘", "Shift", "X"],
-    otherDisplay: ["Ctrl", "Shift", "X"],
+    defaultLabel: "Delete current chat",
+    match: "primary_shift_key",
+    key: "d",
+    macDisplay: ["⌘", "Shift", "D"],
+    otherDisplay: ["Ctrl", "Shift", "D"],
   },
   {
     id: "rename_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.rename_focused_chat",
-    match: "code",
-    code: "F2",
-    macDisplay: ["F2"],
-    otherDisplay: ["F2"],
+    defaultLabel: "Rename current chat",
+    match: "primary_shift_key",
+    key: "r",
+    macDisplay: ["⌘", "Shift", "R"],
+    otherDisplay: ["Ctrl", "Shift", "R"],
+  },
+  {
+    id: "archive_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.archive_focused_chat",
+    defaultLabel: "Archive current chat",
+    match: "primary_shift_key",
+    key: "a",
+    macDisplay: ["⌘", "Shift", "A"],
+    otherDisplay: ["Ctrl", "Shift", "A"],
+  },
+  {
+    id: "toggle_read_focused_chat",
+    group: "chat",
+    labelKey: "keyboard_shortcuts.shortcuts.toggle_read_focused_chat",
+    defaultLabel: "Mark current chat as read or unread",
+    match: "primary_shift_key",
+    key: "u",
+    macDisplay: ["⌘", "Shift", "U"],
+    otherDisplay: ["Ctrl", "Shift", "U"],
   },
   {
     id: "toggle_pin_focused_chat",
     group: "chat",
     labelKey: "keyboard_shortcuts.shortcuts.toggle_pin_focused_chat",
+    defaultLabel: "Pin or unpin current chat",
     match: "primary_shift_code",
     code: "Quote",
     macDisplay: ["⌘", "Shift", "'"],
@@ -120,9 +166,40 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "quick_jump",
     group: "quick_jump",
     labelKey: "keyboard_shortcuts.shortcuts.quick_jump",
+    defaultLabel: "Quick-jump visible items",
     match: "quick_jump",
     macDisplay: ["⌘", "⌥", "1–9"],
     otherDisplay: ["Ctrl", "Shift", "1–9"],
+  },
+  {
+    id: "command_palette_rename",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.rename",
+    defaultLabel: "Rename",
+    match: "primary_shift_key",
+    key: "r",
+    macDisplay: ["⌘", "Shift", "R"],
+    otherDisplay: ["Ctrl", "Shift", "R"],
+  },
+  {
+    id: "command_palette_archive",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.archive",
+    defaultLabel: "Archive",
+    match: "primary_shift_key",
+    key: "a",
+    macDisplay: ["⌘", "Shift", "A"],
+    otherDisplay: ["Ctrl", "Shift", "A"],
+  },
+  {
+    id: "command_palette_delete",
+    group: "omnisearch",
+    labelKey: "command_palette.shortcut_legend.delete",
+    defaultLabel: "Delete",
+    match: "primary_shift_key",
+    key: "d",
+    macDisplay: ["⌘", "Shift", "D"],
+    otherDisplay: ["Ctrl", "Shift", "D"],
   },
 ];
 
@@ -153,11 +230,30 @@ export function matchesKeyboardShortcut(
     );
   }
 
+  if (shortcut.match === "primary_shift_key") {
+    return (
+      hasPrimaryModifier(event) &&
+      event.shiftKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === shortcut.key?.toLowerCase()
+    );
+  }
+
   if (shortcut.match === "primary_shift_code") {
     return (
       hasPrimaryModifier(event) &&
       event.shiftKey &&
       !event.altKey &&
+      event.code === shortcut.code
+    );
+  }
+
+  if (shortcut.match === "shift_code") {
+    return (
+      event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
       event.code === shortcut.code
     );
   }
@@ -171,12 +267,33 @@ export function matchesKeyboardShortcut(
   );
 }
 
+export type CommandPaletteRowAction = "rename" | "archive" | "delete";
+
+const COMMAND_PALETTE_ROW_ACTIONS: ReadonlyArray<
+  readonly [KeyboardShortcutId, CommandPaletteRowAction]
+> = [
+  ["command_palette_rename", "rename"],
+  ["command_palette_archive", "archive"],
+  ["command_palette_delete", "delete"],
+];
+
+export function commandPaletteRowActionForEvent(
+  event: KeyboardShortcutEvent,
+): CommandPaletteRowAction | null {
+  for (const [shortcutId, action] of COMMAND_PALETTE_ROW_ACTIONS) {
+    if (matchesKeyboardShortcut(shortcutId, event)) return action;
+  }
+  return null;
+}
+
 export function keyboardShortcutDisplay(
   id: KeyboardShortcutId,
   usesCommandKey: boolean,
 ): readonly string[] {
   const shortcut = keyboardShortcut(id);
-  return usesCommandKey ? shortcut.macDisplay : shortcut.otherDisplay;
+  return usesCommandKey
+    ? shortcut.macDisplay.map((key) => (key === "Shift" ? "⇧" : key))
+    : shortcut.otherDisplay;
 }
 
 export function keyboardShortcutHintDisplay(
@@ -184,7 +301,12 @@ export function keyboardShortcutHintDisplay(
   usesCommandKey: boolean,
 ): string {
   const keys = keyboardShortcutDisplay(id, usesCommandKey);
-  if (!usesCommandKey) return keys.join("+");
+  if (!usesCommandKey) {
+    return keys
+      .map((key) => (key === "Shift" ? "⇧" : key))
+      .join("+")
+      .replace("+⇧+", "⇧");
+  }
 
   return keys
     .map((key) => {
