@@ -674,12 +674,17 @@ def materialized_artifact_edit_targets(
         request.current_user_message,
         resolve_asset_candidate=resolve_asset_candidate,
     )
+    primary_provenance = primary_draft.field_provenance or {}
     primary_carries_explicit_asset_request = bool(
         primary_draft.asset_universe
         and normalized_asset_universe_operation(primary_draft.asset_universe_operation)
         is not None
-        and (primary_draft.field_provenance or {}).get("asset_universe")
-        == "explicit_user"
+        and primary_provenance.get("asset_universe") == "explicit_user"
+    )
+    explicit_benchmark_symbol = (
+        _normalized_ticker_symbol(primary_draft.comparison_baseline)
+        if primary_provenance.get("comparison_baseline") == "explicit_user"
+        else None
     )
     for benchmark_symbol in {
         _normalized_ticker_symbol(primary_draft.comparison_baseline),
@@ -689,6 +694,7 @@ def materialized_artifact_edit_targets(
             primary_carries_explicit_asset_request
             and planned_whole_universe_assets is not None
             and benchmark_symbol in planned_whole_universe_assets
+            and benchmark_symbol != explicit_benchmark_symbol
         ):
             grounded_asset_symbols.discard(benchmark_symbol)
     current_assets = set(
