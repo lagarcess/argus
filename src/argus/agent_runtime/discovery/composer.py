@@ -376,6 +376,7 @@ async def _recovery_result(
 ) -> StageResult:
     voiced = await _voiced_discovery_recovery(
         code=code,
+        retryable=retryable,
         current_user_message=current_user_message,
         language=language,
         unverified_names=unverified_names or [],
@@ -466,7 +467,7 @@ def _drop_reason_facts(
 
 _RECOVERY_VOICING_FACTS: dict[str, str] = {
     "discovery_unavailable": (
-        "Grounded source-backed discovery is not available right now, so you "
+        "Grounded source-backed discovery is not available for this request, so you "
         "cannot look up current candidates and you will not guess from memory."
     ),
     "discovery_search_failed": (
@@ -495,6 +496,7 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
 async def _voiced_discovery_recovery(
     *,
     code: RecoveryMessageCode,
+    retryable: bool,
     current_user_message: str,
     language: str,
     unverified_names: list[str],
@@ -506,6 +508,13 @@ async def _voiced_discovery_recovery(
         return None
     facts += _drop_reason_facts(unverified_names, uncorroborated_names or [])
     language_instruction = response_language_instruction(language)
+    next_step_instruction = (
+        "Offer one concrete next step: ask again in a moment or name a specific "
+        "symbol or company to test."
+        if retryable
+        else "Do not suggest retrying now or later. Ask only for a specific symbol "
+        "or company to test."
+    )
     messages = [
         {
             "role": "system",
@@ -514,8 +523,8 @@ async def _voiced_discovery_recovery(
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
                 "Reply in at most two short plain sentences: state the "
-                "situation honestly, then one concrete next step (retry, or "
-                "name a symbol to test). No reassurance boilerplate, no "
+                f"situation honestly. {next_step_instruction} "
+                "No reassurance boilerplate, no "
                 "tradable asset suggestions from memory, no providers or "
                 "internal tools, no investment advice."
             ),

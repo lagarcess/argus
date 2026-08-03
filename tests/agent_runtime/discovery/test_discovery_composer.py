@@ -579,6 +579,54 @@ class TestRetryAffordance:
         assert no_verified.patch["recovery"]["retryable"] is False
         assert "retry_last_turn" not in no_verified.patch
 
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
+        ("language", "user_message", "language_instruction"),
+        (
+            ("en", "Find current pharmaceutical stocks", "Answer in English."),
+            (
+                "es-419",
+                "Busca acciones farmacéuticas actuales",
+                "Answer in Spanish (Latin America).",
+            ),
+        ),
+    )
+    async def test_non_retryable_voice_prohibits_retry_in_each_locale(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        language: str,
+        user_message: str,
+        language_instruction: str,
+    ) -> None:
+        captured_messages: list[dict[str, str]] = []
+
+        async def _capture_voice(
+            *, task: str, messages: list[dict[str, str]]
+        ) -> str:
+            assert task == "chat_composer"
+            captured_messages.extend(messages)
+            return "safe localized response"
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _capture_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code="discovery_unavailable",
+            retryable=False,
+            current_user_message=user_message,
+            language=language,
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response == "safe localized response"
+        system_prompt = captured_messages[0]["content"]
+        assert language_instruction in system_prompt
+        assert "Do not suggest retrying now or later." in system_prompt
+        assert "Ask only for a specific symbol or company to test." in system_prompt
+        assert "(retry, or name a symbol to test)" not in system_prompt
+
 
 class TestVoicedRecoveryMetadata:
     @pytest.mark.asyncio()
