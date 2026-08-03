@@ -32,6 +32,22 @@ offline path declares `prompt_source = degraded_fallback`.
 The Spanish buy-and-hold recommendation continuity capture is
 [`buy-and-hold-continuity-es.png`](buy-and-hold-continuity-es.png).
 
+## Reconciled browser revalidation
+
+On 2026-08-03, browser QA repeated the complete English path after merging
+`origin/codex/private-alpha-next` and applying the clarified-date repair at code
+commit `5691eb10`. The live clarifier again persisted
+`prompt_source = llm_generated` and `requested_field = date_range`. The first
+answer attempt ended in an honest recoverable failure when every configured
+interpretation candidate failed; the durable Retry replayed the same request
+and produced the corrected confirmation.
+
+The final confirmation used January 3 through December 29, 2023 while
+preserving AAPL, the $1,000 weekly contribution, daily data, SPY, the 40 bps
+fee, and 0.25 bps slippage. Its typed patch metadata declared
+`source = user_patch` with only `date_range` in `changed_fields`. See
+[`date-range-cost-continuity-en-exact-head.png`](date-range-cost-continuity-en-exact-head.png).
+
 ## Historical blocked-run comparison
 
 This record explains why PR #359 correctly remained Draft before issue #361's
