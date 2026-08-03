@@ -6,10 +6,10 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #373 at `81e7a1ac`, which makes first-login guest
-claims succeed for brand-new accounts while preserving signup
-anti-enumeration for emails and adding serialized, typed username conflicts
-(issue #372). It follows PR #351 at `30af0dca` (immediate Recents refresh on
+Latest product change: PR #359 at `a35bb29f`, which makes result-card
+recommendations inherit prior owned facts through the shared clarify
+contract (issue #345). It follows PR #373 at `81e7a1ac` (first-login guest
+claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
 claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
 exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
 cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
@@ -201,6 +201,15 @@ keep the provider's indistinguishable duplicate path. Three review rounds
 each removed a real regression (FK failure, email oracle, username oracle).
 No environment variable, deployment, schema, or migration requirement was
 added; `docs/API_CONTRACT.md` records the username semantics.
+PR #359 then closed issue #345 as `a35bb29f`: recommendation follow-ups
+inherit every still-applicable owned fact (assets, capital, window,
+timeframe, benchmark, modeled costs) unless the user changes them, with the
+historical result immutable and the new confirmation active — routed through
+the shared clarify contract with model voice and degraded fallback. Accepted
+at the full clean bar: live 40/40 with no waivers, strategy-diverse browser
+proof (weekly DCA with recurring contribution; SMA 50/200 inheritance), and
+full deterministic gates. No environment variable, deployment, API, schema,
+or migration requirement was added.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

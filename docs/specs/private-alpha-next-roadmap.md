@@ -204,6 +204,11 @@ for brand-new accounts, email anti-enumeration is preserved through the
 obfuscated-response guard, and username conflicts are serialized and typed —
 three review rounds, three distinct real regressions caught and fixed.
 
+PR #359 then closed issue #345 as `a35bb29f`: recommendation continuity at
+the full clean bar — live 40/40 with no waivers (the 17-failure waiver era
+formally over) and strategy-diverse acceptance evidence per the standing
+rule (weekly DCA recurring contribution, SMA 50/200 inheritance).
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
