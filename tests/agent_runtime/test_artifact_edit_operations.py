@@ -645,8 +645,40 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
 
 
 @pytest.mark.asyncio
-async def test_issue_339_provider_grounded_replacement_can_remove_current_asset(
+@pytest.mark.parametrize(
+    (
+        "current_assets",
+        "asset_operation",
+        "symbols",
+        "expected_assets",
+        "current_user_message",
+    ),
+    [
+        pytest.param(
+            ["AAPL"],
+            "replace",
+            ["BRK.B"],
+            ["BRK.B"],
+            "switch the asset to Berkshire Hathaway Class B and benchmark to QQQ",
+            id="replacement-can-remove-prior-universe",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT"],
+            "remove",
+            ["MSFT"],
+            ["AAPL"],
+            "remove MSFT and change the benchmark to QQQ",
+            id="removal-can-remove-grounded-current-symbol",
+        ),
+    ],
+)
+async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
     monkeypatch,
+    current_assets,
+    asset_operation,
+    symbols,
+    expected_assets,
+    current_user_message,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -659,7 +691,7 @@ async def test_issue_339_provider_grounded_replacement_can_remove_current_asset(
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: {"BRK.B"},
+        lambda *_args, **_kwargs: set(symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
@@ -674,7 +706,7 @@ async def test_issue_339_provider_grounded_replacement_can_remove_current_asset(
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
-                EditOperation(op="replace", target="asset", symbols=["BRK.B"]),
+                EditOperation(op=asset_operation, target="asset", symbols=symbols),
                 EditOperation(op="set", target="benchmark", value="QQQ"),
             ],
             confidence=0.9,
@@ -688,14 +720,12 @@ async def test_issue_339_provider_grounded_replacement_can_remove_current_asset(
 
     response = await llm_interpreter._plan_pending_artifact_assumption_edit(
         request=InterpretationRequest(
-            current_user_message=(
-                "switch the asset to Berkshire Hathaway Class B and benchmark to QQQ"
-            ),
+            current_user_message=current_user_message,
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
                     strategy_type="buy_and_hold",
-                    asset_universe=["AAPL"],
+                    asset_universe=current_assets,
                     asset_class="equity",
                     comparison_baseline="SPY",
                 )
@@ -712,7 +742,7 @@ async def test_issue_339_provider_grounded_replacement_can_remove_current_asset(
 
     assert seen_models == ["primary-model"]
     assert response is not None
-    assert response.candidate_strategy_draft.asset_universe == ["BRK.B"]
+    assert response.candidate_strategy_draft.asset_universe == expected_assets
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
 
 

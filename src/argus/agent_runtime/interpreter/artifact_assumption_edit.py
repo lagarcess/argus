@@ -651,10 +651,24 @@ def materialized_artifact_edit_targets(
             current_strategy.asset_universe if current_strategy else []
         )
     )
+    materialized_assets = set(normalized_asset_symbols(draft.asset_universe))
     primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
-    if (
-        "asset" in materialized_targets
-        and (grounded_asset_symbols | primary_assets) - current_assets
+    additions = materialized_assets - current_assets
+    removals = current_assets - materialized_assets
+    planned_removals = {
+        symbol
+        for operation in plan.operations
+        if operation.target == "asset" and operation.op == "remove"
+        for symbol in normalized_asset_symbols(operation.symbols)
+    }
+    if "asset" in materialized_targets and (
+        (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))
+        or (
+            not additions
+            and bool(removals)
+            and removals <= grounded_asset_symbols
+            and removals <= planned_removals
+        )
     ):
         requested_targets.add("asset")
     matching_targets = {
@@ -731,7 +745,10 @@ def _materialized_target_matches_primary_delta(
             )
         if materialized_operation == "replace":
             additions = materialized - current
-            return bool(additions) and additions <= requested
+            if additions:
+                return additions <= requested
+            removals = current - materialized
+            return bool(removals) and removals <= requested
         changed_symbols = current ^ materialized
         return changed_symbols <= requested and (
             not primary_requested
