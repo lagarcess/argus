@@ -492,6 +492,23 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
     ),
 }
 
+_NON_RETRYABLE_NEXT_STEPS: dict[str, str] = {
+    "discovery_unavailable": (
+        "Do not suggest retrying now or later. Describe availability only as "
+        "unavailable for this request. Do not use time qualifiers or imply future "
+        "availability. Ask only for a specific symbol or company to test."
+    ),
+    "discovery_target_missing": (
+        "Do not suggest retrying. Do not describe discovery as unavailable. "
+        "Ask for a category or an anchor company to search."
+    ),
+    "discovery_no_verified_candidates": (
+        "Do not suggest retrying the same request. Do not describe discovery as "
+        "unavailable. Ask for a different category or a specific symbol or company "
+        "to test."
+    ),
+}
+
 
 async def _voiced_discovery_recovery(
     *,
@@ -512,9 +529,11 @@ async def _voiced_discovery_recovery(
         "Offer one concrete next step: ask again in a moment or name a specific "
         "symbol or company to test."
         if retryable
-        else "Do not suggest retrying now or later. Describe availability only as "
-        "unavailable for this request. Do not use time qualifiers or imply future "
-        "availability. Ask only for a specific symbol or company to test."
+        else _NON_RETRYABLE_NEXT_STEPS.get(
+            code,
+            "Do not suggest retrying the same request. Offer only a next step "
+            "supported by the stated situation.",
+        )
     )
     messages = [
         {

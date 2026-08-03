@@ -631,6 +631,54 @@ class TestRetryAffordance:
 
     @pytest.mark.asyncio()
     @pytest.mark.parametrize(
+        ("code", "expected_next_step"),
+        (
+            (
+                "discovery_target_missing",
+                "Ask for a category or an anchor company to search.",
+            ),
+            (
+                "discovery_no_verified_candidates",
+                "Ask for a different category or a specific symbol or company to test.",
+            ),
+        ),
+    )
+    async def test_other_non_retryable_voice_preserves_code_specific_next_step(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        code: str,
+        expected_next_step: str,
+    ) -> None:
+        captured_messages: list[dict[str, str]] = []
+
+        async def _capture_voice(
+            *, task: str, messages: list[dict[str, str]]
+        ) -> str:
+            assert task == "chat_composer"
+            captured_messages.extend(messages)
+            return "safe response"
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _capture_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code=code,
+            retryable=False,
+            current_user_message="Find some investments",
+            language="en",
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response == "safe response"
+        system_prompt = captured_messages[0]["content"]
+        assert expected_next_step in system_prompt
+        assert "Describe availability only as unavailable for this request." not in system_prompt
+        assert "Do not describe discovery as unavailable." in system_prompt
+
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
         ("language", "user_message"),
         (
             ("en", "Find current pharmaceutical stocks"),
