@@ -165,6 +165,8 @@ product behavior reads it, and no API path writes it.
   addresses are forbidden.
 - `username` is optional for Alpha. When supplied at signup, it is trimmed and
   case-folded before the case-insensitive uniqueness check and profile write.
+  Same-username signup attempts are serialized across API instances so only
+  the request that owns the available username may create an Auth user.
 ---
 
 ## 5.1 guest_workspaces

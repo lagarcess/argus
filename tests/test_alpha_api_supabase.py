@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -2349,19 +2350,27 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
     username_available = MagicMock(return_value=False)
     mock_gateway.attach_mock(username_available, "username_available")
 
-    response = client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "fresh@example.com",
-            "password": "password123",
-            "captcha_token": "captcha-proof",
-            "username": "PortfolioAlpha",
-        },
-    )
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        return_value=nullcontext(),
+    ) as serialize_username:
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "PortfolioAlpha",
+            },
+        )
 
     assert response.status_code == 409
     assert response.json()["code"] == "username_taken"
     assert response.json()["detail"] == "That username is already taken."
+    serialize_username.assert_called_once_with(
+        api_state.DATABASE_URL,
+        "portfolioalpha",
+    )
     username_available.assert_called_once_with("portfolioalpha")
     mock_gateway.signup.assert_not_called()
     mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()

@@ -1667,8 +1667,9 @@ attempts must not distinguish unlisted/disabled private-alpha emails from
 listed emails that fail provider signup.
 
 When an optional username is supplied, the server trims and case-folds it and
-checks profile availability before creating the Auth user. A conflict returns
-`409 username_taken`; the Auth provider and profile write are not called.
+serializes same-username signup attempts before checking profile availability
+and creating the Auth user. A conflict returns `409 username_taken`; the Auth
+provider and profile write are not called for the losing request.
 
 ```json
 {

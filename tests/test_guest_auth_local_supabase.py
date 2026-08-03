@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import re
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from threading import Event
 from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
@@ -956,6 +958,99 @@ def test_signup_taken_username_creates_no_auth_user_or_profile(
         if existing_user_id:
             with suppress(Exception):
                 gateway.delete_auth_user(existing_user_id)
+
+
+def test_concurrent_same_username_signup_calls_auth_only_for_winner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    first_email = f"username-race-first-{suffix}@example.test"
+    second_email = f"username-race-second-{suffix}@example.test"
+    username = f"serialized{suffix}"
+    password = f"Serialized-{secrets.token_urlsafe(18)}"
+    first_provider_complete = Event()
+    release_first_signup = Event()
+    second_provider_called = Event()
+    original_signup = gateway.signup
+
+    def paused_signup(**kwargs: Any) -> dict[str, Any]:
+        result = original_signup(**kwargs)
+        if kwargs["email"] == first_email:
+            first_provider_complete.set()
+            if not release_first_signup.wait(timeout=10):
+                raise RuntimeError("concurrent signup test did not release first request")
+        elif kwargs["email"] == second_email:
+            second_provider_called.set()
+        return result
+
+    gateway.signup = paused_signup  # type: ignore[method-assign]
+    try:
+        gateway.client.table("private_alpha_allowlist").insert(
+            [{"email": first_email}, {"email": second_email}]
+        ).execute()
+        payload = {
+            "password": password,
+            "captcha_token": "local-captcha-proof",
+            "username": username,
+            "language": "en",
+        }
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as first_client,
+            TestClient(app, base_url="http://localhost:3000") as second_client,
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            first = executor.submit(
+                first_client.post,
+                "/api/v1/auth/signup",
+                json={**payload, "email": first_email},
+            )
+            assert first_provider_complete.wait(timeout=10)
+            second = executor.submit(
+                second_client.post,
+                "/api/v1/auth/signup",
+                json={**payload, "email": second_email},
+            )
+            try:
+                assert not second_provider_called.wait(timeout=0.5)
+            finally:
+                release_first_signup.set()
+            first_response = first.result(timeout=10)
+            second_response = second.result(timeout=10)
+
+        assert first_response.status_code == 200, first_response.json()
+        assert second_response.status_code == 409, second_response.json()
+        assert second_response.json()["code"] == "username_taken"
+        assert gateway.get_user(user_id=str(first_response.json()["user"]["id"]))
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from auth.users where lower(email) = %s",
+                    (second_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+    finally:
+        release_first_signup.set()
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().in_(
+                "email", [first_email, second_email]
+            ).execute()
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select id::text from auth.users where lower(email) = any(%s)",
+                    ([first_email, second_email],),
+                )
+                user_ids = [row[0] for row in cursor.fetchall()]
+        for user_id in user_ids:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
 
 
 def test_signup_creates_profile_before_first_login_claims_pending_handoff(

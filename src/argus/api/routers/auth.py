@@ -43,6 +43,7 @@ from argus.api.schemas import (
     User,
     guest_safe_user,
 )
+from argus.domain.username_signup import serialized_username_signup
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -683,33 +684,33 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
     _enforce_auth_attempt_limit(request, action="signup", email=body.email)
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _signup_auth_problem(request)
-    if body.username is not None:
-        try:
-            username_available = api_state.supabase_gateway.username_available(
-                body.username
-            )
-        except Exception:
-            raise _signup_auth_problem(request) from None
-        if not username_available:
-            raise _username_taken_problem(request)
     try:
-        result = api_state.supabase_gateway.signup(
-            email=body.email,
-            password=body.password,
-            captcha_token=body.captcha_token,
-            display_name=body.display_name,
-            username=body.username,
-            language=body.language,
-        )
-        auth_user = result.get("user")
-        if not isinstance(auth_user, dict):
-            raise RuntimeError("Provider signup did not return an Auth user.")
-        identities = auth_user.get("identities")
-        # Supabase uses an empty identity list for its obfuscated existing-user
-        # response. Persisting that fake user would reveal the account exists.
-        if identities != []:
-            api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
-        return auth_response(request, result)
+        with serialized_username_signup(api_state.DATABASE_URL, body.username):
+            if body.username is not None and not (
+                api_state.supabase_gateway.username_available(body.username)
+            ):
+                raise _username_taken_problem(request)
+            result = api_state.supabase_gateway.signup(
+                email=body.email,
+                password=body.password,
+                captcha_token=body.captcha_token,
+                display_name=body.display_name,
+                username=body.username,
+                language=body.language,
+            )
+            auth_user = result.get("user")
+            if not isinstance(auth_user, dict):
+                raise RuntimeError("Provider signup did not return an Auth user.")
+            identities = auth_user.get("identities")
+            # Supabase uses an empty identity list for its obfuscated existing-user
+            # response. Persisting that fake user would reveal the account exists.
+            if identities != []:
+                api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+                    auth_user
+                )
+            return auth_response(request, result)
+    except HTTPException:
+        raise
     except Exception:
         raise _signup_auth_problem(request) from None
 
