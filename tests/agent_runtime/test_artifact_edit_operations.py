@@ -166,6 +166,24 @@ def test_compound_strategy_family_and_benchmark_are_both_required_targets():
     assert targets == {"strategy_family", "benchmark"}
 
 
+def test_role_separated_asset_inclusion_is_a_required_target():
+    from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+        _required_edit_targets_from_primary_draft,
+    )
+
+    targets = _required_edit_targets_from_primary_draft(
+        LLMStrategyDraft(
+            asset_universe=["AAPL", "MSFT"],
+            asset_universe_operation="replace",
+            asset_inclusions=["AAPL", "MSFT", "GOOGL"],
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+        current_strategy=StrategySummary(asset_universe=["AAPL", "MSFT"]),
+    )
+
+    assert targets == {"asset"}
+
+
 @pytest.mark.asyncio
 async def test_issue_339_legacy_strategy_fields_require_compound_planner_coverage(
     monkeypatch,
@@ -1057,6 +1075,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
         "correct_assets",
         "expected_models",
         "asset_evidence_span",
+        "asset_inclusions",
     ),
     [
         pytest.param(
@@ -1067,6 +1086,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["AAPL", "NVDA", "GOOGL"],
             ["primary-model"],
             "AAPL, NVDA, and GOOGL",
+            ["AAPL", "NVDA", "GOOGL"],
             id="augments-material-primary-replacement",
         ),
         pytest.param(
@@ -1077,6 +1097,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["NVDA", "GOOGL"],
             ["primary-model", "fallback-model"],
             None,
+            [],
             id="rejects-ungrounded-retention-from-unchanged-carrier",
         ),
         pytest.param(
@@ -1087,6 +1108,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["AAPL"],
             ["primary-model"],
             None,
+            [],
             id="accepts-grounded-subset-only-replacement",
         ),
         pytest.param(
@@ -1097,6 +1119,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["NVDA", "GOOGL"],
             ["primary-model", "fallback-model"],
             None,
+            [],
             id="rejects-truncated-grounded-replacement",
         ),
     ],
@@ -1110,6 +1133,7 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
     correct_assets,
     expected_models,
     asset_evidence_span,
+    asset_inclusions,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -1178,6 +1202,7 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
                 if asset_evidence_span is not None
                 else {}
             ),
+            asset_inclusions=asset_inclusions,
         ),
     )
 
@@ -1340,7 +1365,9 @@ async def test_issue_339_primary_asset_exclusions_are_not_reintroduced(
             asset_universe=["MSFT"],
             asset_universe_operation="replace",
             field_provenance={"asset_universe": "explicit_user"},
-            evidence_spans={"asset_universe": "MSFT"},
+            evidence_spans={"asset_universe": "replace AAPL with MSFT, not NVDA"},
+            asset_inclusions=["MSFT"],
+            asset_exclusions=["NVDA"],
         ),
     )
 
