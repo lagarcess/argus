@@ -1040,7 +1040,7 @@ def _materialized_target_matches_primary_delta(
             ):
                 expected_from_typed_roles = grounded_primary_requested
             elif operation == "append":
-                expected_from_typed_roles.update(primary_requested)
+                expected_from_typed_roles.update(grounded_primary_requested)
             expected_from_typed_roles.update(primary_inclusions)
             expected_from_typed_roles.difference_update(primary_exclusions)
             return (

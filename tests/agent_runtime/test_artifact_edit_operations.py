@@ -3155,15 +3155,42 @@ async def test_issue_339_typed_roles_use_planner_replacement_boundary(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "primary_operation",
+    (
+        "primary_operation",
+        "planner_operation",
+        "current_user_message",
+        "expected_assets",
+    ),
     [
-        pytest.param(None, id="operation-missing"),
-        pytest.param("replace", id="explicit-replace"),
+        pytest.param(
+            None,
+            "replace",
+            "replace AAPL with MSFT, not TSLA",
+            ["MSFT"],
+            id="operation-missing-replace",
+        ),
+        pytest.param(
+            "replace",
+            "replace",
+            "replace AAPL with MSFT, not TSLA",
+            ["MSFT"],
+            id="explicit-replace",
+        ),
+        pytest.param(
+            "append",
+            "add",
+            "add MSFT, not TSLA",
+            ["AAPL", "MSFT"],
+            id="explicit-append",
+        ),
     ],
 )
-async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
+async def test_issue_339_typed_asset_edit_rejects_ungrounded_primary_asset(
     monkeypatch,
     primary_operation,
+    planner_operation,
+    current_user_message,
+    expected_assets,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -3191,7 +3218,9 @@ async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
         symbols = ["MSFT", "NVDA"] if model_name == "primary-model" else ["MSFT"]
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
-            operations=[EditOperation(op="replace", target="asset", symbols=symbols)],
+            operations=[
+                EditOperation(op=planner_operation, target="asset", symbols=symbols)
+            ],
             confidence=0.9,
         )
 
@@ -3203,7 +3232,7 @@ async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
 
     response = await llm_interpreter._plan_pending_artifact_assumption_edit(
         request=InterpretationRequest(
-            current_user_message="replace AAPL with MSFT, not TSLA",
+            current_user_message=current_user_message,
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
@@ -3228,7 +3257,7 @@ async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
 
     assert seen_models == ["primary-model", "fallback-model"]
     assert response is not None
-    assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert response.candidate_strategy_draft.asset_universe == expected_assets
 
 
 @pytest.mark.asyncio
