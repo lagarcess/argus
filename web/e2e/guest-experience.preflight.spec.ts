@@ -258,7 +258,7 @@ test("durable retry fixture hydrates without sending an interpreter turn", async
   }
 });
 
-test("second-simulation gate fixture rekeys one durable confirmation without work", async ({
+test("exhausted-simulation gate fixture rekeys one durable confirmation without work", async ({
   page,
 }) => {
   assertExactLocalCandidate();

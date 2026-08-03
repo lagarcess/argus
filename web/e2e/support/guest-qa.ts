@@ -1394,11 +1394,11 @@ export function seedDistinctGuestConfirmation(params: {
   if (
     !source.metadata ||
     !source.workspace_active ||
-    source.completed_runs !== 1 ||
-    source.simulation_units !== 1
+    ![1, 2].includes(source.completed_runs) ||
+    source.simulation_units !== source.completed_runs
   ) {
     throw new Error(
-      "Distinct guest confirmation requires an active owner with one settled run",
+      "Distinct guest confirmation requires an active owner with settled runs",
     );
   }
   const metadata = rekeyGuestQaConfirmationMetadata(
