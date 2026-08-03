@@ -748,7 +748,7 @@ def materialized_artifact_edit_targets(
         or (
             planned_asset_replacement
             and bool(materialized_assets)
-            and materialized_assets <= grounded_asset_symbols
+            and materialized_assets == grounded_asset_symbols
         )
         or (
             not additions
@@ -850,10 +850,15 @@ def _materialized_target_matches_primary_delta(
             )
         ):
             return False
+        if planned_asset_replacement:
+            expected_replacement = (
+                primary_requested | (grounded - current)
+                if primary_requested != current
+                else grounded
+            )
+            return bool(materialized) and materialized == expected_replacement
         if primary_replacement:
             return True
-        if planned_asset_replacement:
-            return bool(materialized) and materialized <= grounded
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested
         if operation == "append":

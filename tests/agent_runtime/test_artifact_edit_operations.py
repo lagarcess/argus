@@ -999,6 +999,15 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["primary-model"],
             id="accepts-grounded-subset-only-replacement",
         ),
+        pytest.param(
+            {"NVDA", "GOOGL"},
+            "replace the basket with NVDA and GOOGL",
+            ["AAPL", "MSFT"],
+            ["NVDA"],
+            ["NVDA", "GOOGL"],
+            ["primary-model", "fallback-model"],
+            id="rejects-truncated-grounded-replacement",
+        ),
     ],
 )
 async def test_issue_339_grounded_replace_augments_primary_without_changing_retained_assets(
@@ -1081,7 +1090,20 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
 
 
 @pytest.mark.asyncio
-async def test_issue_339_clear_then_add_retries_ungrounded_retained_asset(monkeypatch):
+@pytest.mark.parametrize(
+    "wrong_assets",
+    [
+        pytest.param(
+            ["AAPL", "NVDA", "GOOGL"],
+            id="ungrounded-retained-asset",
+        ),
+        pytest.param(["NVDA"], id="truncated-grounded-replacement"),
+    ],
+)
+async def test_issue_339_clear_then_add_retries_invalid_final_universe(
+    monkeypatch,
+    wrong_assets,
+):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
 
@@ -1105,11 +1127,7 @@ async def test_issue_339_clear_then_add_retries_ungrounded_retained_asset(monkey
     async def invoke_stub(*, model_name, **kwargs):
         del kwargs
         seen_models.append(model_name)
-        assets = (
-            ["AAPL", "NVDA", "GOOGL"]
-            if model_name == "primary-model"
-            else ["NVDA", "GOOGL"]
-        )
+        assets = wrong_assets if model_name == "primary-model" else ["NVDA", "GOOGL"]
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
