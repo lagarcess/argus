@@ -763,6 +763,7 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
         "correct_removals",
         "correct_additions",
         "expected_assets",
+        "primary_draft_payload",
     ),
     [
         pytest.param(
@@ -774,6 +775,7 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
             ["Microsoft"],
             ["Nvidia"],
             ["AAPL", "NVDA"],
+            {},
             id="rejects-unrequested-removal",
         ),
         pytest.param(
@@ -785,7 +787,24 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
             ["Microsoft", "Tesla"],
             ["Nvidia"],
             ["AAPL", "NVDA"],
+            {},
             id="rejects-readded-requested-removal",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT", "TSLA"],
+            {"MSFT", "TSLA", "NVDA"},
+            "remove Microsoft and Tesla, then add Nvidia",
+            ["Microsoft", "Tesla"],
+            ["Microsoft", "Nvidia"],
+            ["Microsoft", "Tesla"],
+            ["Nvidia"],
+            ["AAPL", "NVDA"],
+            {
+                "asset_universe": ["AAPL", "MSFT", "NVDA"],
+                "asset_universe_operation": "replace",
+                "field_provenance": {"asset_universe": "explicit_user"},
+            },
+            id="rejects-readded-primary-replacement",
         ),
     ],
 )
@@ -799,6 +818,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
     correct_removals,
     correct_additions,
     expected_assets,
+    primary_draft_payload,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -860,7 +880,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             user=UserState(user_id="u-339"),
         ),
         preferred_model="wrong-model",
-        primary_draft=LLMStrategyDraft(),
+        primary_draft=LLMStrategyDraft(**primary_draft_payload),
     )
 
     assert seen_models == ["wrong-model", "correct-model"]
