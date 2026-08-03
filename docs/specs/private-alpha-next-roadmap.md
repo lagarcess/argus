@@ -177,6 +177,13 @@ Founder waived the ceremony reconcile commit on a verified no-overlap
 disposition. PR #363's held evidence decision should be revisited: its
 news-sentiment live failure now has a fixed root cause.
 
+PR #370 then closed issue #341 as `c324f877`: guest Decision history loads —
+the 500 was an untyped nullable first-page cursor in the Postgres dossier
+reader, found only after the mandated real-browser re-evidencing overturned
+an honest earlier non-reproduction from the non-Postgres reader. Fix is
+explicit cursor casts with a red-first regression; same-session 500→200
+evidence at the exact head lives in-repo. Guest isolation unchanged.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

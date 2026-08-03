@@ -6,11 +6,12 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #375 at `c334cf3e`, which preserves explicit stated
-starting capital on unsupported-request turns (issue #368). It follows PR
-#352 at `0942507b` (unified OS-aware keyboard registry and contextual
-shortcut legend, issue #334), PR #356 at `48de2f3f` (rounded menu
-highlights, issue #343), PR #357 at
+Latest product change: PR #370 at `c324f877`, which types the nullable
+first-page dossier cursors so guest Decision history loads (issue #341). It
+follows PR #375 at `c334cf3e` (stated-capital preservation on unsupported
+turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
+registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
+(rounded menu highlights, issue #343), PR #357 at
 `9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
 at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
@@ -154,6 +155,15 @@ founder waived the ceremony reconcile-merge commit after an independently
 verified no-overlap disposition (all intervening landings were docs or
 web-only). This fix upgrades PR #363's pending evidence bar. It added no
 environment variable, deployment, API, schema, or migration requirement.
+PR #370 then closed issue #341 as `c324f877`: explicit `timestamptz`/`uuid`
+casts on the nullable first-page dossier cursors repair the guest Decision
+history 500 (`AmbiguousParameter` on the untyped null comparison) — not a
+guest-guard or transport failure, and the issue was nearly closed as
+not-reproducible before the mandated real-browser re-evidencing surfaced
+the true failure in the Postgres reader. Evidence: same-session 500→200 at
+the exact head with the screenshot committed in-repo; guest workspace
+isolation re-proven. It added no environment variable, deployment, API,
+schema, or migration requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
