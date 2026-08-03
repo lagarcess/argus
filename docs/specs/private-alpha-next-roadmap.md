@@ -184,6 +184,26 @@ an honest earlier non-reproduction from the non-Postgres reader. Fix is
 explicit cursor casts with a red-first regression; same-session 500→200
 evidence at the exact head lives in-repo. Guest isolation unchanged.
 
+PR #360 then closed issue #349 as `42d96da7`: the activity/read-state
+foundation is verified end to end with durable in-repo evidence (real local
+Postgres/RLS, both personas, zero provider spend); guest applicability is
+classified per state and manual-unread remains account-only.
+
+PR #374 then closed issue #371 as `d8c7070a`: regex-free timestamp
+normalization (founder-directed after the first-round regex missed the `Z`
+shape Python 3.10 cannot parse) plus exception retention in the API failure
+log. Unblocks the PR #351 live-proof rerun alongside #373.
+
+PR #351 then closed issue #342 as `30af0dca`: Recents refreshes immediately
+on guest-to-account conversion, proven by a founder-witnessed live journey
+at the exact composed tree (claim 200, instant Recents, all polls 200) —
+the same journey whose first attempt surfaced #371/#372.
+
+PR #373 then closed issue #372 as `81e7a1ac`: first-login guest claims work
+for brand-new accounts, email anti-enumeration is preserved through the
+obfuscated-response guard, and username conflicts are serialized and typed —
+three review rounds, three distinct real regressions caught and fixed.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
