@@ -746,6 +746,11 @@ def materialized_artifact_edit_targets(
     if "asset" in materialized_targets and (
         (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))
         or (
+            planned_asset_replacement
+            and bool(materialized_assets)
+            and materialized_assets <= grounded_asset_symbols
+        )
+        or (
             not additions
             and bool(removals)
             and removals <= grounded_asset_symbols

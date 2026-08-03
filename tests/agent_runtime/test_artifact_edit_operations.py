@@ -990,6 +990,15 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["primary-model", "fallback-model"],
             id="rejects-ungrounded-retention-from-unchanged-carrier",
         ),
+        pytest.param(
+            {"AAPL"},
+            "replace the basket with AAPL",
+            ["AAPL", "MSFT"],
+            ["AAPL"],
+            ["AAPL"],
+            ["primary-model"],
+            id="accepts-grounded-subset-only-replacement",
+        ),
     ],
 )
 async def test_issue_339_grounded_replace_augments_primary_without_changing_retained_assets(
