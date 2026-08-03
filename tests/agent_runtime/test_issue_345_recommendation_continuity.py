@@ -89,23 +89,101 @@ def _source_result() -> ArtifactReference:
     )
 
 
-def _recommendation_action(kind: str, label: str) -> dict[str, object]:
+def _indicator_source_result() -> ArtifactReference:
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {**entry_rule, "direction": "bearish"}
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_above",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_below",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+    }
+    return ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-345-indicator",
+        artifact_status="completed",
+        metadata={
+            "run_id": "run-345-indicator",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "moving_average_crossover",
+                "symbols": ["AAPL"],
+                "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+                "resolved_strategy": {
+                    "requested_strategy_template": "moving_average_crossover",
+                    "strategy_type": "signal_strategy",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "entry_logic": "50-day SMA crosses above 200-day SMA",
+                    "exit_logic": "50-day SMA crosses below 200-day SMA",
+                    "entry_rule": entry_rule,
+                    "exit_rule": exit_rule,
+                    "rule_spec": rule_spec,
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 12000,
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+
+
+def _recommendation_action(
+    kind: str,
+    label: str,
+    *,
+    run_id: str = "run-345-source",
+) -> dict[str, object]:
     return {
         "type": "refine_strategy",
         "label": label,
         "presentation": "result",
         "payload": {
-            "run_id": "run-345-source",
+            "run_id": run_id,
             "next_experiment_kind": kind,
         },
     }
 
 
-def _recommendation_state(kind: str, label: str) -> RunState:
+def _recommendation_state(
+    kind: str,
+    label: str,
+    *,
+    run_id: str = "run-345-source",
+) -> RunState:
     return RunState.new(
         current_user_message=label,
         recent_thread_history=[],
-        action_context=_recommendation_action(kind, label),
+        action_context=_recommendation_action(kind, label, run_id=run_id),
     )
 
 
@@ -133,10 +211,21 @@ def _assert_owned_facts(strategy: StrategySummary) -> None:
     assert strategy.comparison_baseline == "SPY"
     assert strategy.extra_parameters["fee_rate"] == 0.004
     assert strategy.extra_parameters["slippage"] == 0.000025
-    assert strategy.extra_parameters["field_provenance"] == {
-        "fee_rate": "explicit_user",
-        "slippage": "explicit_user",
-    }
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == (
+        "explicit_user"
+    )
+    assert strategy.extra_parameters["field_provenance"]["slippage"] == (
+        "explicit_user"
+    )
+
+
+def _assert_dca_facts(strategy: StrategySummary) -> None:
+    assert strategy.cadence == "weekly"
+    assert strategy.extra_parameters["recurring_contribution"] == 1000
+    provenance = strategy.extra_parameters["field_provenance"]
+    assert provenance["capital_amount"] == "prior"
+    assert provenance["recurring_contribution"] == "prior"
+    assert provenance["cadence"] == "prior"
 
 
 @pytest.mark.parametrize(
@@ -278,6 +367,7 @@ def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
         "start": "2021-01-04",
         "end": "2025-12-31",
     }
+    _assert_dca_facts(strategy)
     _assert_owned_facts(strategy)
     _assert_source_is_unchanged(source, source_before)
 
@@ -331,7 +421,94 @@ def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
         "start": "2023-01-03",
         "end": "2023-12-29",
     }
+    _assert_dca_facts(patched)
     _assert_owned_facts(patched)
+    _assert_source_is_unchanged(source, source_before)
+
+
+def test_date_range_recommendation_preserves_indicator_parameters() -> None:
+    source = _indicator_source_result()
+    source_before = deepcopy(source.metadata)
+
+    clarification = interpret_stage(
+        state=_recommendation_state(
+            "change_date_range",
+            "Test a different date range",
+            run_id="run-345-indicator",
+        ),
+        user=UserState(user_id="u-345-indicator"),
+        latest_task_snapshot=_snapshot(source),
+        selected_thread_metadata={
+            "next_experiments_offered_kinds": ["change_date_range"],
+        },
+        structured_interpreter=None,
+    )
+
+    assert clarification.outcome == "needs_clarification"
+    pending = StrategySummary.model_validate(
+        clarification.patch["candidate_strategy_draft"]
+    )
+    assert pending.requested_strategy_template == "moving_average_crossover"
+    assert pending.strategy_type == "signal_strategy"
+    assert pending.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert pending.exit_rule == {**pending.entry_rule, "direction": "bearish"}
+    assert pending.rule_spec["entry"]["conditions"][0] == {
+        "left": {"kind": "indicator", "key": "sma", "period": 50},
+        "operator": "cross_above",
+        "right": {"kind": "indicator", "key": "sma", "period": 200},
+    }
+
+    interpretation = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Use the requested replacement date range.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2024-01-02", "end": "2024-12-31"},
+            extra_parameters={
+                "field_provenance": {"date_range": "explicit_user"},
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    confirmation = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use January 2 through December 31, 2024.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u-345-indicator"),
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+            latest_backtest_result_reference=source,
+            artifact_references=[source],
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+            "response_intent": clarification.patch["response_intent"],
+        },
+        structured_interpreter=lambda _: interpretation,
+    )
+
+    assert confirmation.outcome == "ready_for_confirmation", (
+        confirmation.decision.missing_required_fields,
+        confirmation.decision.reason_codes,
+        confirmation.patch.get("response_intent"),
+    )
+    refined = confirmation.decision.candidate_strategy_draft
+    assert refined.requested_strategy_template == "moving_average_crossover"
+    assert refined.strategy_type == "signal_strategy"
+    assert refined.entry_rule == pending.entry_rule
+    assert refined.exit_rule == pending.exit_rule
+    assert refined.rule_spec == pending.rule_spec
+    assert refined.date_range == {"start": "2024-01-02", "end": "2024-12-31"}
     _assert_source_is_unchanged(source, source_before)
 
 
@@ -438,6 +615,7 @@ def test_date_range_answer_repairs_misrouted_model_output_with_result_anchor(
         "start": "2023-01-03",
         "end": "2023-12-29",
     }
+    _assert_dca_facts(patched)
     _assert_owned_facts(patched)
     assert "pending_date_answer_route_repaired" in confirmation.decision.reason_codes
 
@@ -492,6 +670,7 @@ async def test_date_range_recommendation_uses_model_voice_with_provenance(
         "end": "2025-12-31",
     }
     _assert_owned_facts(request.candidate_strategy_draft)
+    _assert_dca_facts(request.candidate_strategy_draft)
     assert result["clarification"]["prompt_source"] == "llm_generated"
     assert result["clarification"]["requested_field"] == "date_range"
 

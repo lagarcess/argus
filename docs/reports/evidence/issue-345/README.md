@@ -43,10 +43,19 @@ interpretation candidate failed; the durable Retry replayed the same request
 and produced the corrected confirmation.
 
 The final confirmation used January 3 through December 29, 2023 while
-preserving AAPL, the $1,000 weekly contribution, daily data, SPY, the 40 bps
-fee, and 0.25 bps slippage. Its typed patch metadata declared
+preserving the non-buy-and-hold DCA contract: AAPL,
+`recurring_contribution = 1000`, `cadence = weekly`, daily data, SPY, the 40 bps
+fee, and 0.25 bps slippage. The rendered confirmation visibly labels the
+amount as **CONTRIBUTION** and the cadence as **Weekly**. Its typed patch metadata declared
 `source = user_patch` with only `date_range` in `changed_fields`. See
 [`date-range-cost-continuity-en-exact-head.png`](date-range-cost-continuity-en-exact-head.png).
+
+Targeted regressions additionally assert that the source-result adapter keeps
+the DCA contribution as a typed `recurring_contribution` with prior-artifact
+provenance through both the recommendation clarification and the refined
+confirmation. A separate indicator-driven regression carries a 50/200 SMA
+crossover's `entry_rule`, `exit_rule`, and `rule_spec` through the same
+date-range recommendation/refine path.
 
 ## Historical blocked-run comparison
 

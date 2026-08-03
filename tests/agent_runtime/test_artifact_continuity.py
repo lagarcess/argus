@@ -69,6 +69,12 @@ def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> N
     assert draft.date_range == {"start": "2021-01-01", "end": "2024-01-31"}
     assert draft.capital_amount == 200
     assert draft.cadence == "monthly"
+    assert draft.extra_parameters["recurring_contribution"] == 200
+    assert draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "prior",
+        "recurring_contribution": "prior",
+        "cadence": "prior",
+    }
     assert draft.timeframe == "1D"
     assert draft.comparison_baseline == "SPY"
 
@@ -100,6 +106,12 @@ def test_result_draft_recovers_dca_contribution_from_config_snapshot() -> None:
     assert draft.date_range == {"start": "2020-01-01", "end": "2026-07-03"}
     assert draft.capital_amount == 500
     assert draft.cadence == "monthly"
+    assert draft.extra_parameters["recurring_contribution"] == 500
+    assert draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "prior",
+        "recurring_contribution": "prior",
+        "cadence": "prior",
+    }
     assert draft.comparison_baseline == "SPY"
 
 
