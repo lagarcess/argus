@@ -335,6 +335,73 @@ def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
     _assert_source_is_unchanged(source, source_before)
 
 
+def test_date_range_answer_repairs_misrouted_model_output_with_result_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: _ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    source = _source_result()
+    clarification = interpret_stage(
+        state=_recommendation_state(
+            "change_date_range",
+            "Test a different date range",
+        ),
+        user=UserState(user_id="u-345"),
+        latest_task_snapshot=_snapshot(source),
+        selected_thread_metadata={
+            "next_experiments_offered_kinds": ["change_date_range"],
+        },
+        structured_interpreter=None,
+    )
+    pending = StrategySummary.model_validate(
+        clarification.patch["candidate_strategy_draft"]
+    )
+    model_output = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User supplied the requested replacement date range.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+        ),
+        semantic_turn_act="refine_current_idea",
+        reason_codes=["date_range_refinement"],
+    )
+
+    confirmation = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use Jan 3 through Dec 29, 2023.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u-345"),
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+            latest_backtest_result_reference=source,
+            artifact_references=[source],
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+            "response_intent": clarification.patch["response_intent"],
+        },
+        structured_interpreter=lambda _: model_output,
+    )
+
+    assert confirmation.outcome == "ready_for_confirmation"
+    patched = confirmation.decision.candidate_strategy_draft
+    assert patched.date_range == {
+        "start": "2023-01-03",
+        "end": "2023-12-29",
+    }
+    _assert_owned_facts(patched)
+    assert "pending_date_answer_route_repaired" in confirmation.decision.reason_codes
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("language", "model_prompt"),

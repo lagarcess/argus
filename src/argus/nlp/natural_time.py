@@ -87,16 +87,18 @@ def resolve_date_range_text(
     first = parsed[0]
     last = parsed[-1]
     if (
-        first.period == "month"
-        and last.period == "month"
+        first.period in {"day", "month"}
+        and last.period in {"day", "month"}
         and not _span_has_explicit_year(first.span)
         and _span_has_explicit_year(last.span)
     ):
-        first = _ParsedDate(
-            value=first.value.replace(year=last.value.year),
-            period=first.period,
-            span=first.span,
-        )
+        shared_year_first = first.value.replace(year=last.value.year)
+        if shared_year_first <= last.value:
+            first = _ParsedDate(
+                value=shared_year_first,
+                period=first.period,
+                span=first.span,
+            )
 
     start = _endpoint_date(first, endpoint="start", today=current_date)
     end = _endpoint_date(last, endpoint="end", today=current_date)

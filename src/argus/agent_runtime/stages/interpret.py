@@ -1703,6 +1703,7 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     if (
         interpretation.semantic_turn_act != "answer_pending_need"
         and not interpretation.requires_clarification
+        and "date_range_refinement" not in interpretation.reason_codes
         and _candidate_strategy_has_backtest_shape(
             interpretation.candidate_strategy_draft
         )
@@ -1714,6 +1715,7 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
         today=date.today(),
+        allow_result_anchor=True,
         require_explicit_range=(
             "pending_date_answer_unowned_candidate_stripped"
             in interpretation.reason_codes

@@ -34,6 +34,17 @@ def test_resolves_english_shared_year_month_span() -> None:
     assert resolved.payload == {"start": "2024-03-01", "end": "2024-10-31"}
 
 
+def test_resolves_english_shared_year_day_span() -> None:
+    resolved = resolve_date_range_text(
+        "Use Jan 3 through Dec 29, 2023.",
+        today=date(2026, 6, 1),
+        languages=("en", "es"),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2023-01-03", "end": "2023-12-29"}
+
+
 def test_resolves_compact_month_year_range() -> None:
     resolved = resolve_date_range_text(
         "Jan 2021-Jan 2024",
