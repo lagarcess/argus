@@ -155,6 +155,28 @@ desktop/mobile browser gate plus focused backend and web suites. Issue #341
 (guest decision history) is unblocked and should dispatch from the
 post-#357 integration head with a red-first reproduction before its fix.
 
+PR #356 then closed issue #343 as `48de2f3f`: one rounded inset-pill
+highlight geometry across all menu surfaces, colors and behavior unchanged,
+with in-repo hover evidence. Landed tree verified byte-identical to the
+independently pre-verified composed tree; founder overruled the absent
+on-PR bot review after personal visual checks.
+
+PR #352 then closed issue #334 as `0942507b`: one OS-aware keyboard behavior
+registry across Omnisearch and chat, a contextual legend quiet at rest, and
+bilingual labels from a single source — verified twice on composed trees
+(1057/1057 web, 21/21 three-engine matrix) after a first-round send-back for
+cross-PR modularity stacking. ChatInterface.tsx is now exactly at its budget
+limit; lanes touching it must extract before adding. The completed
+chat-header-title spec moved to `docs/archive/` with a tombstone stub.
+
+PR #375 then closed issue #368 as `c334cf3e`: explicit stated capital now
+survives unsupported-request turns (typed intent gating only), proven by a
+red-first mocked regression and one exact-head targeted live rerun of the
+original failing case — re-captured after the review fix moved the head.
+Founder waived the ceremony reconcile commit on a verified no-overlap
+disposition. PR #363's held evidence decision should be revisited: its
+news-sentiment live failure now has a fixed root cause.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

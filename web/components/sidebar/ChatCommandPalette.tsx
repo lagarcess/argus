@@ -13,10 +13,8 @@ import {
   ChevronRight,
   Edit2,
   Loader2,
-  Maximize2,
   MessageSquare,
   MessageSquareWarning,
-  Minimize2,
   Search,
   Trash2,
   X,
@@ -28,6 +26,7 @@ import { DecisionHistoryView } from "@/components/sidebar/command-palette/Decisi
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
 import { refreshCanonicalMutation } from "@/lib/canonical-mutation-refresh";
@@ -73,6 +72,7 @@ import {
   commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
+  isEditableKeyboardTarget,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
 import type {
@@ -121,16 +121,6 @@ const SEARCH_DEBOUNCE_MS = 200;
 const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
 export const commandPaletteDossierPanelClassName = (view: DossierPaneState["view"]) =>
   `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:h-auto md:max-h-none md:w-[44%] md:overflow-visible md:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
-
-function isEditableKeyboardTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
-  );
-}
 
 function formatRelativeDate(
   value: string,
@@ -283,9 +273,12 @@ export default function ChatCommandPalette({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<CommandPaletteDisplayItem | null>(null);
+  const [showDeleteKeyboardHints, setShowDeleteKeyboardHints] =
+    useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
+  const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
   );
@@ -605,12 +598,7 @@ export default function ChatCommandPalette({
     previewItem,
     groupedItems,
   );
-  const selectedNavigationDisabled =
-    commandPaletteConversationNavigationDisabled({
-      turnInFlight,
-      activeConversationId,
-      targetConversationId: selectedPreview?.conversationId ?? null,
-    });
+  const selectedNavigationDisabled = commandPaletteConversationNavigationDisabled({ turnInFlight, activeConversationId, targetConversationId: selectedPreview?.conversationId ?? null });
   const dossierContextKey = JSON.stringify([
     query.trim(),
     isLedgerMode,
@@ -1007,16 +995,20 @@ export default function ChatCommandPalette({
   );
 
   const handleDelete = useCallback(
-    (item: CommandPaletteDisplayItem) => {
+    (item: CommandPaletteDisplayItem, fromKeyboardShortcut = false) => {
       if (!canManageConversation) return;
       if (!item.canManageConversation) return;
+      setShowDeleteKeyboardHints(fromKeyboardShortcut);
       setPendingDeleteItem(item);
     },
     [canManageConversation],
   );
 
   const handleCancelDelete = useCallback(() => {
-    if (!isDeleting) setPendingDeleteItem(null);
+    if (!isDeleting) {
+      setPendingDeleteItem(null);
+      setShowDeleteKeyboardHints(false);
+    }
   }, [isDeleting]);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -1032,6 +1024,7 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       onMutated?.();
       setPendingDeleteItem(null);
+      setShowDeleteKeyboardHints(false);
       try {
         await refreshAfterCanonicalMutation(mutationId);
       } catch {
@@ -1052,6 +1045,7 @@ export default function ChatCommandPalette({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (pendingDeleteItem) return;
       const eventTarget =
         event.target instanceof HTMLElement ? event.target : null;
       const targetIsEditableDossierControl = Boolean(
@@ -1094,14 +1088,31 @@ export default function ChatCommandPalette({
       }
       const action = commandPaletteKeyboardAction({
         key: event.key,
+        code: event.code,
         itemCount: keyboardItems.length,
         hasSelection: Boolean(selectedPreview),
+        selectedCanManageConversation: Boolean(
+          canManageConversation && selectedPreview?.canManageConversation,
+        ),
         targetIsEditable: isEditableKeyboardTarget(event.target),
         targetIsSearchInput: event.target === inputRef.current,
         isEditing: Boolean(editingId),
         metaKey: event.metaKey,
         ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        repeat: event.repeat,
+        focusedRowIndex: Number(
+          eventTarget?.closest<HTMLElement>("[data-palette-row-index]")
+            ?.dataset.paletteRowIndex ?? -1,
+        ),
+        usesCommandKey: shortcutLegend.usesCommandKey,
       });
+      if (action.type === "focus_search") {
+        event.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
       if (action.type === "select") {
         event.preventDefault();
         const item = keyboardItems[action.index];
@@ -1116,18 +1127,39 @@ export default function ChatCommandPalette({
       if (action.type === "open" && selectedPreview) {
         event.preventDefault();
         activateItem(selectedPreview, action.openAtLeftOff);
+        return;
+      }
+      if (action.type === "rename" && selectedPreview) {
+        event.preventDefault();
+        startRename(selectedPreview);
+        return;
+      }
+      if (action.type === "archive" && selectedPreview) {
+        event.preventDefault();
+        void handleArchive(selectedPreview);
+        return;
+      }
+      if (action.type === "delete" && selectedPreview) {
+        event.preventDefault();
+        handleDelete(selectedPreview, true);
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [
     activateItem,
     cancelRename,
+    canManageConversation,
     dossierPaneState,
     editingId,
+    handleArchive,
+    handleDelete,
     keyboardItems,
     onClose,
+    pendingDeleteItem,
     selectedPreview,
+    shortcutLegend.usesCommandKey,
+    startRename,
   ]);
 
   const toggleLayout = () => {
@@ -1138,10 +1170,9 @@ export default function ChatCommandPalette({
     });
   };
 
-  const isLoading = isResultMode
-    ? isSearching || isLedgerLoading
-    : isColdStartLoading;
+  const isLoading = isResultMode ? isSearching || isLedgerLoading : isColdStartLoading;
   const footerCount = displayItems.length;
+  const selectedCanManageShortcutActions = Boolean(canManageConversation && selectedPreview?.canManageConversation);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
@@ -1272,6 +1303,8 @@ export default function ChatCommandPalette({
                 ? "border-b border-black/5 dark:border-white/5 md:border-b-0 md:border-r"
                 : ""
             }`}
+            data-command-palette-action-region
+            {...shortcutLegend.actionRegionProps}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
@@ -1438,7 +1471,7 @@ export default function ChatCommandPalette({
                               role="button"
                               tabIndex={0}
                               aria-disabled={isNavigationDisabled}
-                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
                                   ? "bg-black/5 dark:bg-white/5"
@@ -1818,17 +1851,6 @@ export default function ChatCommandPalette({
                         </span>
                         <ChevronRight className="h-4 w-4" />
                       </button>
-                      <p className="mt-1 text-[10px] text-black/25 dark:text-white/25">
-                        {t(
-                          "command_palette.open_at_match",
-                          "Enter opens the match",
-                        )}{" "}
-                        ·{" "}
-                        {t(
-                          "command_palette.open_at_left_off",
-                          "⌘/Ctrl+Enter opens where you left off",
-                        )}
-                      </p>
                     </>
                   )}
                 </div>
@@ -1846,43 +1868,16 @@ export default function ChatCommandPalette({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-black/5 px-4 py-2 dark:border-white/5">
-          <span className="text-[11px] text-black/30 dark:text-white/30">
-            {!isLedgerMode &&
-              footerCount > 0 &&
-              t(
-                isFiltering
-                  ? "command_palette.result_count"
-                  : "command_palette.conversation_count",
-                {
-                  count: footerCount,
-                  defaultValue_one: isFiltering
-                    ? "{{count}} result"
-                    : "{{count}} conversation",
-                  defaultValue_other: isFiltering
-                    ? "{{count}} results"
-                    : "{{count}} conversations",
-                },
-              )}
-          </span>
-          <button
-            type="button"
-            onClick={toggleLayout}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-black/40 hover:bg-black/5 dark:text-white/40 dark:hover:bg-white/5"
-          >
-            {layoutMode === "expanded" ? (
-              <>
-                <Minimize2 className="h-3 w-3" />
-                {t("common.collapse", "Collapse")}
-              </>
-            ) : (
-              <>
-                <Maximize2 className="h-3 w-3" />
-                {t("common.expand", "Expand")}
-              </>
-            )}
-          </button>
-        </div>
+        <CommandPaletteFooter
+          footerCount={footerCount}
+          hasManageActions={selectedCanManageShortcutActions}
+          isFiltering={isFiltering}
+          isLedgerMode={isLedgerMode}
+          layoutMode={layoutMode}
+          onToggleLayout={toggleLayout}
+          shortcutLegendVisible={shortcutLegend.isVisible}
+          usesCommandKey={shortcutLegend.usesCommandKey}
+        />
         <ConfirmDialog
           isOpen={Boolean(pendingDeleteItem)}
           title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
@@ -1896,11 +1891,12 @@ export default function ChatCommandPalette({
             },
           )}
           confirmLabel={t(
-            "sidebar.delete_confirm.confirm",
-            "Delete conversation",
+            "common.delete",
+            "Delete",
           )}
           cancelLabel={t("common.cancel", "Cancel")}
           isBusy={isDeleting}
+          showKeyboardHints={showDeleteKeyboardHints}
           onCancel={handleCancelDelete}
           onConfirm={() => void handleConfirmDelete()}
         />

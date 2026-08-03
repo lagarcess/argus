@@ -64,6 +64,7 @@ export function useQuickJump<T extends QuickJumpItem>({
       );
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       updateActive(event);
       const item = quickJumpItemForEvent(items, event, usesCommandKey);
       if (!item) return;

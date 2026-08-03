@@ -6,9 +6,12 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #357 at `9f97f1dc`, which keeps guest dossier
-decision actions visible behind a typed account-conversion gate and resumes
-the exact decision after conversion (issue #340). It follows PR #353 at
+Latest product change: PR #375 at `c334cf3e`, which preserves explicit stated
+starting capital on unsupported-request turns (issue #368). It follows PR
+#352 at `0942507b` (unified OS-aware keyboard registry and contextual
+shortcut legend, issue #334), PR #356 at `48de2f3f` (rounded menu
+highlights, issue #343), PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
 at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
 at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
@@ -124,6 +127,33 @@ legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
 `docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
 environment variable, deployment, schema, or migration requirement. Issue
 #341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #352 then closed issue #334 as `0942507b`: Omnisearch and active-chat
+keyboard actions share one OS-aware behavior registry (EN/es-419 labels and
+execution from one source), with a contextual shortcut legend that stays
+quiet at rest, contextual Omnisearch actions, arrow navigation, quick jump,
+keyboard-aware delete confirmation, and a responsive help sheet. Its first
+head was returned for composed-tree modularity violations and re-landed
+after genuine extraction; ChatInterface.tsx now sits exactly at its budget
+limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #375 then closed issue #368 as `c334cf3e`: the stated-starting-capital
+recheck now also runs on `unsupported_or_out_of_scope` turns, so an explicit
+non-DCA capital amount survives capability-honesty recoveries without
+changing the unsupported verdict, dates, assets, or DCA behavior. Accepted
+evidence: red-first mocked regression plus one targeted live rerun of the
+original news-sentiment case, re-captured at the exact final head. The
+founder waived the ceremony reconcile-merge commit after an independently
+verified no-overlap disposition (all intervening landings were docs or
+web-only). This fix upgrades PR #363's pending evidence bar. It added no
+environment variable, deployment, API, schema, or migration requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
