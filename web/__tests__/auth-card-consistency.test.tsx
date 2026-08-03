@@ -116,7 +116,7 @@ describe("auth card consistency", () => {
     const html = await renderLocalized(
       createElement(GuestConversionModal, {
         isOpen: true,
-        reason: "second_simulation",
+        reason: "simulation_limit",
         initialMode: "signup",
         publicAccountAccessEnabled: true,
         resetAt: "2026-08-09T00:00:00.000Z",
@@ -135,7 +135,7 @@ describe("auth card consistency", () => {
     const html = await renderLocalized(
       createElement(GuestConversionModal, {
         isOpen: true,
-        reason: "second_simulation",
+        reason: "simulation_limit",
         initialMode: "signup",
         publicAccountAccessEnabled: false,
         resetAt: "2026-08-09T00:00:00.000Z",

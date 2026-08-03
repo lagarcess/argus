@@ -1301,7 +1301,7 @@
       "eyebrow": "Sigue con Argus",
       "sign_in_title": "Iniciar sesión",
       "create_title": "Crea tu cuenta",
-      "second_simulation": "Inicia sesión para ejecutar otra simulación.",
+      "simulation_limit": "Inicia sesión para ejecutar otra simulación.",
       "simulation_limit_reset": "Este chat temporal ya no puede ejecutar más simulaciones. Vence el {{date}}. Crea una cuenta para continuar ahora.",
       "simulation_limit_request_access": "Este chat temporal ya no puede ejecutar más simulaciones. Vence el {{date}}. Solicita acceso o inicia sesión para continuar.",
       "message_limit": "Inicia sesión para conservar esta conversación y continuar.",

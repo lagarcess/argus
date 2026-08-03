@@ -94,7 +94,7 @@ def admit_durable_chat_job(
                     conversation_id=context.conversation_id,
                     surface="backtest",
                     capability_category="simulation",
-                    conversion_reason="second_simulation",
+                    conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
                 return ChatAdmissionResult(decision="conversion_required")
@@ -184,7 +184,7 @@ def admit_durable_chat_job(
                     conversation_id=context.conversation_id,
                     surface="backtest",
                     capability_category="simulation",
-                    conversion_reason="second_simulation",
+                    conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
             logger.warning(

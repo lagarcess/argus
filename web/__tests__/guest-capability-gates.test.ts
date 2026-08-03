@@ -25,7 +25,7 @@ describe("guest capability gate policy", () => {
     ).toEqual({ kind: "allow" });
   });
 
-  test("allows exact replay before converting a second unique guest simulation", () => {
+  test("allows exact replay before converting a third unique guest simulation", () => {
     expect(
       decideGuestSimulationGate({
         accountKind: "guest",
@@ -39,7 +39,7 @@ describe("guest capability gate policy", () => {
         availableNow: false,
         exactReplay: false,
       }),
-    ).toEqual({ kind: "convert", reason: "second_simulation" });
+    ).toEqual({ kind: "convert", reason: "simulation_limit" });
     expect(
       isExactGuestRunReplay(
         [

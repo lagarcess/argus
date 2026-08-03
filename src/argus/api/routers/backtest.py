@@ -203,7 +203,7 @@ def run_backtest(
                     conversation_id=payload.conversation_id,
                     surface="backtest",
                     capability_category="simulation",
-                    conversion_reason="second_simulation",
+                    conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
                 raise problem(
@@ -517,7 +517,7 @@ def _admit_direct_run(
             conversation_id=conversation_id,
             surface="backtest",
             capability_category="simulation",
-            conversion_reason="second_simulation",
+            conversion_reason="simulation_limit",
             terminal_outcome="limit_reached",
         )
         raise problem(

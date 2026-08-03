@@ -5,7 +5,7 @@ import type {
 import type { DecisionState } from "@/lib/run-dossier-contract";
 
 export type GuestConversionReason =
-  | "second_simulation"
+  | "simulation_limit"
   | "message_limit"
   | "save_decision"
   | "new_conversation"
@@ -46,7 +46,7 @@ type GuestPendingActionBase = {
 
 export type GuestPendingAction =
   | (GuestPendingActionBase & {
-      reason: "second_simulation";
+      reason: "simulation_limit";
       action: ChatActionOption;
     })
   | (GuestPendingActionBase & {

@@ -46,7 +46,7 @@ describe("guest conversion contract", () => {
   test("keeps the five contextual reasons typed and localized", () => {
     const actions: GuestPendingAction[] = [
       {
-        reason: "second_simulation",
+        reason: "simulation_limit",
         conversationId: "conversation-1",
         actionId: "run-2",
         action: {
@@ -84,7 +84,7 @@ describe("guest conversion contract", () => {
     ];
 
     expect(actions.map((action) => guestConversionBenefitKey(action.reason))).toEqual([
-      "guest.conversion.second_simulation",
+      "guest.conversion.simulation_limit",
       "guest.conversion.message_limit",
       "guest.conversion.save_decision",
       "guest.conversion.new_conversation",

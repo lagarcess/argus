@@ -124,7 +124,7 @@ export function useGuestExperience({
         await sendRef.current?.(action.text, action.mentions, undefined, {
           bypassGuestGate: true,
         });
-      } else if (action.reason === "second_simulation") {
+      } else if (action.reason === "simulation_limit") {
         await sendRef.current?.(
           action.action.label || action.action.value || "",
           {
@@ -263,7 +263,7 @@ export function useGuestExperience({
               conversion.requestConversion(
                 decision.reason,
                 {
-                  reason: "second_simulation",
+                  reason: "simulation_limit",
                   conversationId,
                   actionId: crypto.randomUUID(),
                   action,
@@ -364,9 +364,9 @@ export function useGuestExperience({
         return false;
       }
       conversion.requestConversion(
-        "second_simulation",
+        "simulation_limit",
         {
-          reason: "second_simulation",
+          reason: "simulation_limit",
           conversationId,
           actionId: crypto.randomUUID(),
           action,

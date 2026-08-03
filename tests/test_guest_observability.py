@@ -181,7 +181,7 @@ def test_browser_guest_event_schema_accepts_only_ui_owned_facts() -> None:
             "event": "conversion_prompt_shown",
             "language": "es-419",
             "surface": "conversion_modal",
-            "conversion_reason": "second_simulation",
+            "conversion_reason": "simulation_limit",
             "terminal_outcome": "shown",
         }
     )
@@ -190,7 +190,7 @@ def test_browser_guest_event_schema_accepts_only_ui_owned_facts() -> None:
         "event": "conversion_prompt_shown",
         "language": "es-419",
         "surface": "conversion_modal",
-        "conversion_reason": "second_simulation",
+        "conversion_reason": "simulation_limit",
         "terminal_outcome": "shown",
     }
 
