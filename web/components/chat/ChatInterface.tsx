@@ -214,7 +214,6 @@ type GuestPendingSubmission = {
   actionArg?: ChatActionOption;
   options?: SendOptions;
 };
-
 function isStarterSelectionMetadata(
   selection: SendSelection | undefined,
 ): selection is StarterSelectionMetadata {
