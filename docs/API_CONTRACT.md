@@ -1666,6 +1666,10 @@ still checking the allowlist before calling Supabase Auth signup. Public signup
 attempts must not distinguish unlisted/disabled private-alpha emails from
 listed emails that fail provider signup.
 
+When an optional username is supplied, the server trims and case-folds it and
+checks profile availability before creating the Auth user. A conflict returns
+`409 username_taken`; the Auth provider and profile write are not called.
+
 ```json
 {
   "type": "https://api.argus.app/problems/auth-signup-failed",

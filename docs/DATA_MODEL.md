@@ -163,7 +163,8 @@ product behavior reads it, and no API path writes it.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.
-- `username` is optional for Alpha.
+- `username` is optional for Alpha. When supplied at signup, it is trimmed and
+  case-folded before the case-insensitive uniqueness check and profile write.
 ---
 
 ## 5.1 guest_workspaces

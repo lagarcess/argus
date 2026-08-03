@@ -84,6 +84,16 @@ def _signup_auth_problem(request: Request) -> HTTPException:
     )
 
 
+def _username_taken_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=409,
+        code="username_taken",
+        title="Username Taken",
+        detail="That username is already taken.",
+    )
+
+
 def _enforce_auth_attempt_limit(
     request: Request,
     *,
@@ -673,6 +683,15 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
     _enforce_auth_attempt_limit(request, action="signup", email=body.email)
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _signup_auth_problem(request)
+    if body.username is not None:
+        try:
+            username_available = api_state.supabase_gateway.username_available(
+                body.username
+            )
+        except Exception:
+            raise _signup_auth_problem(request) from None
+        if not username_available:
+            raise _username_taken_problem(request)
     try:
         result = api_state.supabase_gateway.signup(
             email=body.email,

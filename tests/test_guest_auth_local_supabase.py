@@ -887,6 +887,77 @@ def test_disabled_public_email_cannot_link_real_anonymous_identity(
                 gateway.delete_auth_user(user_id)
 
 
+def test_signup_taken_username_creates_no_auth_user_or_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    existing_email = f"username-owner-{suffix}@example.test"
+    fresh_email = f"username-conflict-{suffix}@example.test"
+    username = f"portfolio{suffix}"
+    existing_user_id: str | None = None
+    try:
+        created_existing = gateway.client.auth.admin.create_user(
+            {
+                "email": existing_email,
+                "password": f"Existing-{secrets.token_urlsafe(18)}",
+                "email_confirm": True,
+                "user_metadata": {"username": username},
+            }
+        )
+        assert created_existing.user is not None
+        existing_user_id = str(created_existing.user.id)
+        gateway.get_or_create_profile_for_auth_user(
+            created_existing.user.model_dump(mode="json")
+        )
+        gateway.client.table("private_alpha_allowlist").insert(
+            {"email": fresh_email}
+        ).execute()
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            response = client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "email": fresh_email,
+                    "password": f"Fresh-{secrets.token_urlsafe(18)}",
+                    "captcha_token": "local-captcha-proof",
+                    "username": username.upper(),
+                    "language": "en",
+                },
+            )
+
+        assert response.status_code == 409, response.json()
+        assert response.json()["code"] == "username_taken"
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from auth.users where lower(email) = %s",
+                    (fresh_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+                cursor.execute(
+                    "select count(*) from public.profiles where lower(email) = %s",
+                    (fresh_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+    finally:
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().eq(
+                "email", fresh_email
+            ).execute()
+        if existing_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(existing_user_id)
+
+
 def test_signup_creates_profile_before_first_login_claims_pending_handoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

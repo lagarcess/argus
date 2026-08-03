@@ -115,6 +115,13 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+def _normalize_username(username: object) -> str | None:
+    if not isinstance(username, str):
+        return None
+    normalized = username.strip().casefold()
+    return normalized or None
+
+
 def _supabase_client_options() -> ClientOptions:
     return ClientOptions(
         httpx_client=httpx.Client(http2=False, timeout=120),
@@ -309,6 +316,19 @@ class SupabaseGateway(
             return response.model_dump(mode="json")
         except Exception as e:
             raise RuntimeError(f"Signup failed: {e}") from e
+
+    def username_available(self, username: str) -> bool:
+        normalized = _normalize_username(username)
+        if normalized is None:
+            return True
+        existing = (
+            self.client.table("profiles")
+            .select("username")
+            .ilike("username", normalized)
+            .limit(1)
+            .execute()
+        )
+        return _row_one(existing) is None
 
     def private_alpha_role_for_email(self, email: str) -> str | None:
         rows = (
@@ -1968,7 +1988,7 @@ class SupabaseGateway(
         payload = {
             "id": user_id,
             "email": email,
-            "username": user_metadata.get("username"),
+            "username": _normalize_username(user_metadata.get("username")),
             "display_name": user_metadata.get("display_name"),
             "language": language,
             "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
