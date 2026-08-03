@@ -175,10 +175,13 @@ import {
   hydrateMessagesFromApi,
   isFailedActionRetry,
   markComposerActionsInactive,
+  messageStreamPresentation,
+  messagesWithSavedDecisionState,
   resultRunIdFromFinalPayload,
   savedStrategyIdFromFinalPayload,
   settleOpenConfirmationsFromFinalPayload,
 } from "./chat-message-projection";
+import { openFeedbackDialogState } from "./feedback-dialog-state";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -2423,24 +2426,19 @@ export default function ChatInterface() {
                       <ConversationRetrievalState
                         state="error"
                         onRetry={() => {
-                          if (failedConversationId) {
-                            void loadConversation(failedConversationId);
-                          }
+                          if (failedConversationId) void loadConversation(failedConversationId);
                         }}
                       />
                     )}
                     {messages.map((msg, index) => {
-                      const latestAiIndex = messages.findLastIndex(
-                        (m) => m.role === "ai",
-                      );
-                      const isLatestAi =
-                        msg.role === "ai" && latestAiIndex === index;
-                      const isWorkingMessage =
-                        isLatestAi &&
-                        msg.kind === "text" &&
-                        (isStreamingResponse ||
-                          !!visibleStreamStatus ||
-                          (msg.content ?? "") === "");
+                      const { isLatestAi, isWorkingMessage } =
+                        messageStreamPresentation(
+                          messages,
+                          msg,
+                          index,
+                          isStreamingResponse,
+                          !!visibleStreamStatus,
+                        );
                       return (
                         <div
                           key={msg.id}
@@ -2459,15 +2457,9 @@ export default function ChatInterface() {
                             message={msg}
                             onAction={handleAction}
                             onFeedback={(type, context, rating) => {
-                              setFeedbackState({
-                                isOpen: true,
-                                type,
-                                context: {
-                                  ...context,
-                                  conversation_id: conversationId,
-                                },
-                                rating,
-                              });
+                              setFeedbackState(
+                                openFeedbackDialogState(type, context, rating, conversationId),
+                              );
                               setIsSidebarOpen(false);
                             }}
                             onToast={showToast}
@@ -2479,26 +2471,21 @@ export default function ChatInterface() {
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
                             onDecisionUnavailable={(artifactId) =>
-                              requestGuestDecision({
-                                surface: "result_card",
-                                artifactId,
-                              })
+                              requestGuestDecision({ surface: "result_card", artifactId })
                             }
                             onDecisionSaved={(decisionState) => {
                               setMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === msg.id && m.result
-                                    ? { ...m, result: { ...m.result, decisionState } }
-                                    : m,
+                                messagesWithSavedDecisionState(
+                                  prev,
+                                  msg.id,
+                                  decisionState,
                                 ),
                               );
                               if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
                             }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
                             resumeDecisionArtifactId={
-                              msg.id === resumeDecisionMessageId
-                                ? resumeDecisionArtifactId
-                                : null
+                              msg.id === resumeDecisionMessageId ? resumeDecisionArtifactId : null
                             }
                             onDecisionResumeHandled={clearResumeDecision}
                           />
