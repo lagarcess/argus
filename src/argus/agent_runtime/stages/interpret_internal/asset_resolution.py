@@ -1224,6 +1224,7 @@ def _missing_fields_for_interpretation(
         )
     incomplete_asset_context = (
         "provider_context_incomplete_asset_mentions" in interpretation.reason_codes
+        or "asset_universe_operation_needs_clarification" in interpretation.reason_codes
     )
     if incomplete_asset_context:
         required_missing_fields = list(

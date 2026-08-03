@@ -10,6 +10,7 @@ from loguru import logger
 
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+    _current_artifact_strategy,
     _normalized_ticker_symbol,
 )
 from argus.agent_runtime.interpreter.shared import (
@@ -79,6 +80,10 @@ def _asset_universe_operation_clarification_response(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
+    clarification_draft = _asset_universe_operation_clarification_draft(
+        response=response,
+        request=request,
+    )
     return response.model_copy(
         update={
             "intent": "conversation_followup",
@@ -87,9 +92,7 @@ def _asset_universe_operation_clarification_response(
             "assistant_response": asset_universe_operation_clarification_message(
                 language=request.user.language_preference
             ),
-            "candidate_strategy_draft": LLMStrategyDraft(
-                raw_user_phrasing=request.current_user_message
-            ),
+            "candidate_strategy_draft": clarification_draft,
             "missing_required_fields": [],
             "ambiguous_fields": [],
             "unsupported_constraints": [],
@@ -104,6 +107,30 @@ def _asset_universe_operation_clarification_response(
             "semantic_turn_act": "answer_pending_need",
         }
     )
+
+
+def _asset_universe_operation_clarification_draft(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMStrategyDraft:
+    """Keep proven non-asset edits while asking how to apply ambiguous assets."""
+
+    clarification = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
+    primary = response.candidate_strategy_draft
+    current = _current_artifact_strategy(request)
+    if (
+        primary.position_size is not None
+        and primary.field_provenance.get("position_size") == "explicit_user"
+        and primary.position_size != getattr(current, "position_size", None)
+    ):
+        clarification.sizing_mode = "position_size"
+        clarification.position_size = primary.position_size
+        clarification.field_provenance = {"position_size": "explicit_user"}
+        position_evidence = primary.evidence_spans.get("position_size")
+        if position_evidence:
+            clarification.evidence_spans = {"position_size": position_evidence}
+    return clarification
 
 
 def _plain_requested_asset_answer_can_use_provider_resolution(
