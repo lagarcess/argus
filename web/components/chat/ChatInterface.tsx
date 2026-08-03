@@ -171,8 +171,7 @@ import {
   type StrategyConfirmationPayload,
 } from "./types";
 import {
-  chatActionRequestFromAction,
-  chatHttpErrorDisplay,
+  chatActionRequestFromAction, chatHttpErrorDisplay,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -1668,10 +1667,7 @@ export default function ChatInterface() {
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
-        const httpErrorDisplay = chatHttpErrorDisplay(
-          rejectionCode,
-          fallbackMessage,
-        );
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
@@ -1682,9 +1678,7 @@ export default function ChatInterface() {
                         ...m,
                         content: staleConfirmationRejected
                           ? ""
-                          : isRateLimit
-                            ? t("chat.rate_limit_error")
-                            : httpErrorDisplay.content,
+                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
                         recoveryDisplay: staleConfirmationRejected
                           ? {
                               kind: "recovery_code" as const,
@@ -1692,9 +1686,7 @@ export default function ChatInterface() {
                             }
                           : isRateLimit
                             ? m.recoveryDisplay
-                            : httpErrorDisplay.recoveryDisplay ??
-                              m.recoveryDisplay,
-                        actions: m.actions,
+                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
                       }
                     : m,
                 ),
