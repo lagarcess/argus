@@ -5,6 +5,7 @@ import {
   decideGuestMessageGate,
   decideGuestNewConversationGate,
   decideGuestSimulationGate,
+  guestSimulationPrecheckResetAt,
   isExactGuestRunReplay,
 } from "../lib/guest-capability-gates";
 
@@ -71,6 +72,21 @@ describe("guest capability gate policy", () => {
         },
       ),
     ).toBe(false);
+  });
+
+  test("uses the visitor-day reset after a workspace renewal", () => {
+    const newWorkspaceExpiresAt = "2026-08-10T12:00:00Z";
+
+    expect(
+      guestSimulationPrecheckResetAt({
+        day: { period_end: "2026-08-04T00:00:00Z" },
+      }),
+    ).toBe("2026-08-04T00:00:00Z");
+    expect(
+      guestSimulationPrecheckResetAt({
+        day: { period_end: "2026-08-04T00:00:00Z" },
+      }),
+    ).not.toBe(newWorkspaceExpiresAt);
   });
 
   test("resets an empty guest chat and asks before replacing accepted content", () => {

@@ -233,15 +233,26 @@ describe("guest conversion contract", () => {
     expect(modal).toContain("mode={mode}");
   });
 
-  test("uses the fixed workspace expiry for exhausted-simulation recovery", () => {
+  test("uses the daily reset only for the renewed-workspace precheck", () => {
     const experience = readFileSync(
       join(root, "components/guest/useGuestExperience.ts"),
       "utf-8",
     );
+    const admission = experience.slice(
+      experience.indexOf("const admitSend"),
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
+    const authoritativeRejection = experience.slice(
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
 
-    expect(experience).toContain("effectiveAccount.guest?.expires_at ?? null");
-    expect(experience).not.toContain(
-      "usage.allowances.backtests.day?.period_end ?? null",
+    // A renewed workspace receives its own allowance; the visitor's daily
+    // window, not the old workspace expiry, is the truthful precheck reset.
+    expect(admission).toContain("guestSimulationPrecheckResetAt(usage.allowances.backtests)");
+    // The server-only workspace ceiling still names the actual temporary
+    // workspace expiry after an authoritative rejection.
+    expect(authoritativeRejection).toContain(
+      "account.guest?.expires_at ?? null",
     );
   });
 

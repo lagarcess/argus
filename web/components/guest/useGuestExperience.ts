@@ -19,6 +19,7 @@ import { getUsageAllowances } from "@/lib/argus-api";
 import {
   decideGuestMessageGate,
   decideGuestSimulationGate,
+  guestSimulationPrecheckResetAt,
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
@@ -268,7 +269,7 @@ export function useGuestExperience({
                   action,
                 },
                 "signup",
-                effectiveAccount.guest?.expires_at ?? null,
+                guestSimulationPrecheckResetAt(usage.allowances.backtests),
               );
               return false;
             }
