@@ -925,7 +925,12 @@ async def _stage_result_from_interpretation(
         unsupported_strategy_logic_owns_pending_need
         and "draft_only_indicator_text_preserved" in interpretation.reason_codes
     ):
-        missing_required_fields = []
+        missing_required_fields = (
+            ["asset_universe"]
+            if "provider_context_incomplete_asset_mentions"
+            in interpretation.reason_codes
+            else []
+        )
     pending_date_edit_reason_codes: list[str] = []
     # A planned edit or an explicit money answer may change another field
     # while reusing the prior window; that is not a date-answer noop.
@@ -3010,7 +3015,7 @@ def _canonicalized_strategy(
                 invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        asset_classes.update(provider_context_assets.resolved_asset_classes_from_strategy_context(updated, symbol) or {resolution.asset.asset_class})
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))

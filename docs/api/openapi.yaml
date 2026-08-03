@@ -1093,6 +1093,14 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -1452,6 +1460,14 @@ paths:
               format: uuid
             minItems: 1
             maxItems: 50
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
           - type: 'null'
       responses:
         '200':
@@ -3168,6 +3184,11 @@ components:
           type: string
           const: decision
           default: decision
+        availability:
+          type: string
+          enum:
+          - available
+          - account_conversion_required
         evidence_artifact_id:
           type: string
         decision_state:
@@ -3189,6 +3210,7 @@ components:
           maxLength: 160
       type: object
       required:
+      - availability
       - evidence_artifact_id
       - run_label
     SearchDossierDecision:

@@ -120,6 +120,80 @@ preserving the DESIGN.md body/UI and display-font ownership. Issue #350 is a
 separate low-priority fallback-order alignment; it is not unfinished font
 delivery or a promotion gate.
 
+PR #362 then repaired the sanctioned live-eval environment as `b2e8975c`,
+closing issue #361: `ARGUS_EVAL_ENV_FILE` now preloads before Argus imports,
+so calendar-aware cases exercise live market sessions instead of the synthetic
+fixture calendar and report `calendar_alignment` truthfully. The 17
+calendar-alignment failures lanes had waived as pre-existing are expected
+green from this SHA forward. Deployed runtime behavior is unchanged; the
+change is confined to `tests/evals/` and adds no configuration.
+
+PR #355 then closed issue #336 as `c01d5730`: assets and capital named in a
+terse opening turn ("let's test Apple with 10K") are provider-resolved and
+preserved, so the first clarification asks only for the genuinely missing
+field and the confirmation card inherits both facts without restatement.
+Provider reconciliation removes only stale asset blockers after every
+extracted traded-asset mention is accounted for; incomplete, ambiguous, and
+cross-class contexts remain blocked. The one full-suite live red at the gate
+was the baseline-reproduced comparison/category drift tracked by issue #364,
+not a #336 regression.
+
+PR #353 then closed issue #337 as `7e4c58f8`: stale rail attention markers
+clear only on proven typed continuity between the clarification and a later
+active confirmation, backed by backend-emitted `strategy_path_id` and
+`source_result_run_id` metadata; unproven recovery fails closed and Guest
+single-tick visibility is preserved. Its first exact-head gate run failed
+(e2e seed lacked real workflow metadata) and was repaired before acceptance —
+the independent re-verification discipline this batch exists for.
+
+PR #357 then closed issue #340 as `9f97f1dc`: guest dossiers keep decision
+actions visible and conversion-gate them through a typed availability
+contract (server authoritative, additive client-capability handshake, legacy
+clients unchanged), resuming the exact run, decision, and note after
+conversion. Verified at the exact head with the 6/6 EN/es-419
+desktop/mobile browser gate plus focused backend and web suites. Issue #341
+(guest decision history) is unblocked and should dispatch from the
+post-#357 integration head with a red-first reproduction before its fix.
+
+PR #356 then closed issue #343 as `48de2f3f`: one rounded inset-pill
+highlight geometry across all menu surfaces, colors and behavior unchanged,
+with in-repo hover evidence. Landed tree verified byte-identical to the
+independently pre-verified composed tree; founder overruled the absent
+on-PR bot review after personal visual checks.
+
+PR #352 then closed issue #334 as `0942507b`: one OS-aware keyboard behavior
+registry across Omnisearch and chat, a contextual legend quiet at rest, and
+bilingual labels from a single source — verified twice on composed trees
+(1057/1057 web, 21/21 three-engine matrix) after a first-round send-back for
+cross-PR modularity stacking. ChatInterface.tsx is now exactly at its budget
+limit; lanes touching it must extract before adding. The completed
+chat-header-title spec moved to `docs/archive/` with a tombstone stub.
+
+PR #375 then closed issue #368 as `c334cf3e`: explicit stated capital now
+survives unsupported-request turns (typed intent gating only), proven by a
+red-first mocked regression and one exact-head targeted live rerun of the
+original failing case — re-captured after the review fix moved the head.
+Founder waived the ceremony reconcile commit on a verified no-overlap
+disposition. PR #363's held evidence decision should be revisited: its
+news-sentiment live failure now has a fixed root cause.
+
+PR #370 then closed issue #341 as `c324f877`: guest Decision history loads —
+the 500 was an untyped nullable first-page cursor in the Postgres dossier
+reader, found only after the mandated real-browser re-evidencing overturned
+an honest earlier non-reproduction from the non-Postgres reader. Fix is
+explicit cursor casts with a red-first regression; same-session 500→200
+evidence at the exact head lives in-repo. Guest isolation unchanged.
+
+PR #360 then closed issue #349 as `42d96da7`: the activity/read-state
+foundation is verified end to end with durable in-repo evidence (real local
+Postgres/RLS, both personas, zero provider spend); guest applicability is
+classified per state and manual-unread remains account-only.
+
+PR #374 then closed issue #371 as `d8c7070a`: regex-free timestamp
+normalization (founder-directed after the first-round regex missed the `Z`
+shape Python 3.10 cannot parse) plus exception retention in the API failure
+log. Unblocks the PR #351 live-proof rerun alongside #373.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

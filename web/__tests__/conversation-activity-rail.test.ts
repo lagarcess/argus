@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Message, StrategyResultPayload } from "@/components/chat/types";
+import type {
+  Message,
+  StrategyConfirmationPayload,
+  StrategyPathContext,
+  StrategyResultPayload,
+} from "@/components/chat/types";
 import type { BacktestJob } from "@/lib/argus-api";
 import {
   conversationRailVisible,
@@ -75,7 +80,715 @@ function jobMessage(id: string, status: BacktestJob["status"]): Message {
   };
 }
 
+function confirmationMessage(
+  id: string,
+  confirmationState: NonNullable<
+    StrategyConfirmationPayload["confirmation_state"]
+  > = "active",
+  strategyPathContext?: StrategyPathContext,
+): Message {
+  return {
+    id,
+    role: "ai",
+    kind: "strategy_confirmation",
+    confirmation: {
+      confirmation_state: confirmationState,
+      title: "AAPL buy and hold",
+      statusLabel: "Ready to run",
+      summary: "AAPL with the supplied dates.",
+      rows: [{ label: "Assets", value: "AAPL" }],
+    },
+    strategyPathContext,
+  };
+}
+
 describe("conversation rail tick derivation", () => {
+  test("clears clarification attention after the same transcript reaches an active confirmation", () => {
+    const messages: Message[] = [
+      textMessage("user-idea", "user"),
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            capital_amount: 10_000,
+          },
+        },
+      }),
+      textMessage("user-asset", "user"),
+      textMessage("date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "date_range",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        },
+      }),
+      textMessage("user-dates", "user"),
+      confirmationMessage("recovered-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-01-02", end: "2025-07-31" },
+          capital_amount: 10_000,
+        },
+      }),
+      jobMessage("independent-failed-job", "failed"),
+    ];
+
+    expect(
+      deriveConversationRailTicks(messages).map((tick) => [
+        tick.messageId,
+        tick.kind,
+      ]),
+    ).toEqual([["independent-failed-job", "error_recovery"]]);
+  });
+
+  test("keeps clarification attention without a later active confirmation", () => {
+    for (const confirmationState of ["superseded", "cancelled"] as const) {
+      const ticks = deriveConversationRailTicks([
+        textMessage("asset-question", "ai", {
+          recoveryDisplay: {
+            kind: "clarification",
+            requestedField: "asset_universe",
+            semanticNeeds: ["asset_target"],
+          },
+          strategyPathContext: {
+            kind: "clarification",
+            requestedField: "asset_universe",
+            strategy: { capital_amount: 10_000 },
+          },
+        }),
+        confirmationMessage("inactive-confirmation", confirmationState, {
+          kind: "confirmation",
+          strategy: {
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        }),
+      ]);
+
+      expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+        ["asset-question", "error_recovery"],
+      ]);
+    }
+  });
+
+  test("keeps clarification attention when a later active confirmation has no typed path", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: { capital_amount: 10_000 },
+        },
+      }),
+      confirmationMessage("unproven-confirmation"),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification attention when the confirmation still lacks the requested field", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "date_range",
+          strategy: {
+            asset_universe: ["AAPL"],
+            capital_amount: 10_000,
+          },
+        },
+      }),
+      confirmationMessage("incomplete-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          capital_amount: 10_000,
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["date-question", "error_recovery"],
+    ]);
+  });
+
+  test("uses matching source-result identity for a refinement recovery", () => {
+    const recovery = textMessage("refinement-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "refinement",
+        semanticNeeds: ["refinement"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "refinement",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+        },
+        sourceResultRunId: "run-aapl",
+      },
+    });
+    const confirmation = (sourceResultRunId: string) =>
+      confirmationMessage("refined-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          capital_amount: 20_000,
+        },
+        sourceResultRunId,
+      });
+
+    expect(
+      deriveConversationRailTicks([
+        recovery,
+        confirmation("run-aapl"),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        recovery,
+        confirmation("run-msft"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["refinement-question", "error_recovery"]]);
+  });
+
+  test("keeps clarification attention when a later confirmation belongs to an unrelated strategy path", () => {
+    const clarificationPath = {
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "date_range",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          capital_amount: 10_000,
+        },
+      },
+    } as Partial<Message>;
+    const unrelatedConfirmationPath = {
+      strategyPathContext: {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["MSFT"],
+          date_range: { start: "2025-01-02", end: "2025-07-31" },
+          capital_amount: 5_000,
+        },
+      },
+    } as Partial<Message>;
+
+    const ticks = deriveConversationRailTicks([
+      textMessage("idea-a-date-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "date_range",
+          semanticNeeds: ["period"],
+        },
+        ...clarificationPath,
+      }),
+      textMessage("user-starts-idea-b", "user"),
+      {
+        ...confirmationMessage("idea-b-confirmation"),
+        ...unrelatedConfirmationPath,
+      },
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["idea-a-date-question", "error_recovery"],
+    ]);
+  });
+
+  test("requires a matching transcript path when a new idea reuses the same symbol", () => {
+    const clarification = textMessage("aapl-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "date_range",
+        semanticNeeds: ["period"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "date_range",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId: "assistant-aapl-question",
+      } as StrategyPathContext & { strategyPathId: string },
+    });
+    const confirmation = (strategyPathId?: string) =>
+      confirmationMessage("same-symbol-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-01-01", end: "2025-12-31" },
+        },
+        ...(strategyPathId ? { strategyPathId } : {}),
+      } as StrategyPathContext & { strategyPathId?: string });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation()]).map((tick) => [
+        tick.messageId,
+        tick.kind,
+      ]),
+    ).toEqual([["aapl-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("assistant-other-question"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["aapl-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("assistant-aapl-question"),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        {
+          ...confirmation("assistant-aapl-question"),
+          strategyPathContext: {
+            kind: "confirmation",
+            strategy: {
+              asset_universe: ["MSFT"],
+              date_range: { start: "2025-01-01", end: "2025-12-31" },
+            },
+            strategyPathId: "assistant-aapl-question",
+          },
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  test("resolves a requested optional parameter from its canonical confirmation location", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("capital-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "initial_capital",
+          semanticNeeds: ["capital_amount"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "initial_capital",
+          strategy: { asset_universe: ["AAPL"] },
+        },
+      }),
+      confirmationMessage("capital-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        optionalParameters: {
+          initial_capital: {
+            value: 10_000,
+            source: "user",
+            label: "Initial capital",
+          },
+        },
+      } as StrategyPathContext & {
+        optionalParameters: Record<string, unknown>;
+      }),
+    ]);
+
+    expect(ticks).toEqual([]);
+  });
+
+  test("resolves an assumption edit from a same-path user-owned optional parameter", () => {
+    const clarification = textMessage("assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId: "assistant-assumption-question",
+      },
+    });
+    const confirmation = (
+      source: "default" | "user",
+      strategyPathId = "assistant-assumption-question",
+    ) =>
+      confirmationMessage("assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId,
+        optionalParameters: {
+          initial_capital: {
+            value: 5_000,
+            source,
+            label: "Initial capital",
+          },
+        },
+      });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation("user")]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmationMessage("zero-cost-confirmation", "active", {
+          kind: "confirmation",
+          strategy: { asset_universe: ["AAPL"] },
+          strategyPathId: "assistant-assumption-question",
+          optionalParameters: {
+            fees: { value: 0, source: "user", label: "Fees" },
+          },
+        }),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([clarification, confirmation("default")]).map(
+        (tick) => [tick.messageId, tick.kind],
+      ),
+    ).toEqual([["assumption-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("user", "assistant-other-question"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["assumption-question", "error_recovery"]]);
+  });
+
+  test("does not let source-result identity bypass assumption evidence", () => {
+    const clarification = textMessage("result-assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: { asset_universe: ["AAPL"] },
+        sourceResultRunId: "run-aapl",
+        strategyPathId: "assistant-result-assumption-question",
+      },
+    });
+    const confirmation = ({
+      source = "user",
+      sourceResultRunId = "run-aapl",
+      strategyPathId = "assistant-result-assumption-question",
+    }: {
+      source?: "default" | "user";
+      sourceResultRunId?: string;
+      strategyPathId?: string;
+    }) =>
+      confirmationMessage("result-assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        sourceResultRunId,
+        strategyPathId,
+        optionalParameters: {
+          initial_capital: { value: 5_000, source },
+        },
+      });
+    const tickIds = (message: Message) =>
+      deriveConversationRailTicks([clarification, message]).map(
+        (tick) => tick.messageId,
+      );
+
+    expect(tickIds(confirmation({}))).toEqual([]);
+    expect(tickIds(confirmation({ source: "default" }))).toEqual([
+      "result-assumption-question",
+    ]);
+    expect(
+      tickIds(confirmation({ strategyPathId: "assistant-other-question" })),
+    ).toEqual(["result-assumption-question"]);
+    expect(tickIds(confirmation({ sourceResultRunId: "run-msft" }))).toEqual([
+      "result-assumption-question",
+    ]);
+  });
+
+  test("resolves an assumption edit from a same-path canonical strategy fact with provenance", () => {
+    const clarification = textMessage("dca-assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: {
+          strategy_type: "dca_accumulation",
+          asset_universe: ["AAPL"],
+          cadence: "monthly",
+          capital_amount: 100,
+        },
+        strategyPathId: "assistant-dca-assumption-question",
+      },
+    });
+    const confirmation = (withProvenance: boolean) =>
+      confirmationMessage("dca-assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "dca_accumulation",
+          asset_universe: ["AAPL"],
+          cadence: "weekly",
+          capital_amount: 200,
+          extra_parameters: withProvenance
+            ? {
+                recurring_contribution: 200,
+                recurring_cadence: "weekly",
+                field_provenance: {
+                  capital_amount: "recurring_contribution",
+                  cadence: "explicit_user",
+                },
+              }
+            : {},
+        },
+        strategyPathId: "assistant-dca-assumption-question",
+      });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation(true)]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([clarification, confirmation(false)]).map(
+        (tick) => [tick.messageId, tick.kind],
+      ),
+    ).toEqual([["dca-assumption-question", "error_recovery"]]);
+  });
+
+  test("clears clarification when confirmation canonicalizes an unchanged relative date fact", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            date_range: "past year",
+            capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2025-08-01",
+                end: "2026-08-01",
+              },
+            },
+          },
+        },
+      }),
+      textMessage("user-asset", "user"),
+      confirmationMessage("canonical-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "buy_and_hold",
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-08-01", end: "2026-08-01" },
+          capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+            effective_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(ticks).toEqual([]);
+  });
+
+  test("keeps clarification when pending canonicalization evidence is missing", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            date_range: "past year",
+            capital_amount: 10_000,
+          },
+        },
+      }),
+      confirmationMessage("unproven-canonical-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-08-01", end: "2026-08-01" },
+          capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+            effective_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification when canonical requested-date provenance conflicts", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            date_range: "past year",
+            capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2025-08-01",
+                end: "2026-08-01",
+              },
+            },
+          },
+        },
+      }),
+      confirmationMessage("stale-requested-date-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2025-08-01", end: "2026-08-01" },
+          capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past year",
+            requested_date_range: {
+              start: "2020-01-01",
+              end: "2021-01-01",
+            },
+            effective_date_range: {
+              start: "2025-08-01",
+              end: "2026-08-01",
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps clarification when canonical date provenance conflicts", () => {
+    const ticks = deriveConversationRailTicks([
+      textMessage("asset-question", "ai", {
+        recoveryDisplay: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          semanticNeeds: ["asset_target"],
+        },
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            date_range: "past year",
+            capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2026-07-01",
+                end: "2026-08-01",
+              },
+            },
+          },
+        },
+      }),
+      confirmationMessage("conflicting-canonical-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          asset_universe: ["AAPL"],
+          date_range: { start: "2026-07-01", end: "2026-08-01" },
+          capital_amount: 10_000,
+          extra_parameters: {
+            date_range_raw_text: "past month",
+            requested_date_range: {
+              start: "2026-07-01",
+              end: "2026-08-01",
+            },
+            effective_date_range: {
+              start: "2026-07-01",
+              end: "2026-08-01",
+            },
+          },
+        },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["asset-question", "error_recovery"],
+    ]);
+  });
+
+  test("keeps an unrelated recovery visible after confirmation", () => {
+    const ticks = deriveConversationRailTicks([
+      confirmationMessage("recovered-confirmation"),
+      textMessage("coverage-recovery", "ai", {
+        recoveryDisplay: { kind: "coverage_recovery", code: "partial_window" },
+      }),
+    ]);
+
+    expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
+      ["coverage-recovery", "error_recovery"],
+    ]);
+  });
+
   test("derives typed ticks from existing turn payloads only", () => {
     const messages: Message[] = [
       textMessage("u1", "user"),
@@ -156,16 +869,17 @@ describe("conversation rail tick derivation", () => {
 });
 
 describe("conversation rail visibility threshold", () => {
-  test("only long conversations with enough ticks earn the rail", () => {
+  test("a long Guest conversation keeps its one completed-backtest tick", () => {
     expect(
       conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES - 1, 5),
     ).toBe(false);
     expect(
-      conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, RAIL_MIN_TICKS - 1),
+      conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, 0),
     ).toBe(false);
     expect(
       conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, RAIL_MIN_TICKS),
     ).toBe(true);
+    expect(conversationRailVisible(RAIL_MIN_TRANSCRIPT_MESSAGES, 1)).toBe(true);
   });
 });
 
@@ -393,11 +1107,16 @@ describe("rail source discipline", () => {
       join(root, "components/chat/StrategyResultCard.tsx"),
       "utf-8",
     );
+    const projectionSrc = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     expect(cardSrc).toContain(
       "onDecisionSaved?.(response.decision.decision_state)",
     );
-    expect(interfaceSrc).toContain(
-      "{ ...m, result: { ...m.result, decisionState } }",
+    expect(interfaceSrc).toContain("messagesWithSavedDecisionState(");
+    expect(projectionSrc).toContain(
+      "{ ...message, result: { ...message.result, decisionState } }",
     );
   });
 

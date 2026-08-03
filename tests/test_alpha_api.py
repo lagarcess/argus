@@ -3637,6 +3637,7 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
     assert "send_text" not in retest
     assert change_decision == {
         "type": "decision",
+        "availability": "available",
         "evidence_artifact_id": artifact.id,
         "decision_state": "watching",
         "note": "Review after the next annual window.",
@@ -3645,7 +3646,7 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
     assert set(api_state.store.backtest_runs) == run_ids_before
 
 
-def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target() -> None:
+def test_search_actions_keep_latest_run_attribution_and_conversion_gate_guest() -> None:
     from argus.domain.conversation_recall import project_conversation_recall
 
     now = utcnow()
@@ -3721,14 +3722,21 @@ def test_search_actions_keep_latest_run_attribution_and_omit_guest_write_target(
         evidence=evidence,
         decisions=decisions,
         query="",
-        allow_decision_action=False,
+        decision_action_availability="account_conversion_required",
     )
 
     assert projected is not None
     _, item = projected
     assert item.dossier is not None
-    assert [action.type for action in item.dossier.actions] == ["retest_run"]
+    assert [action.type for action in item.dossier.actions] == [
+        "retest_run",
+        "decision",
+    ]
     assert item.dossier.actions[0].source_run_id == "latest-run"
+    decision_action = item.dossier.actions[1]
+    assert decision_action.type == "decision"
+    assert decision_action.evidence_artifact_id == "latest-evidence"
+    assert decision_action.availability == "account_conversion_required"
     assert item.dossier.decision is None
     assert item.total_runs == 2
     assert item.decided_runs == 1

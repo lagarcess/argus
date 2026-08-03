@@ -16,6 +16,10 @@ const chatInterface = readFileSync(
   join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
   "utf-8",
 );
+const toggleConversationUnread = readFileSync(
+  join(import.meta.dir, "../components/chat/toggleConversationUnread.ts"),
+  "utf-8",
+);
 
 async function renderMenu(
   overrides: Partial<React.ComponentProps<typeof ChatHeaderMenu>> = {},
@@ -123,11 +127,13 @@ describe("ChatHeaderMenu unread control", () => {
 
   test("uses the same owner, current cursor, and registered-only gate as Recents", () => {
     expect(chatInterface).toContain("conversationActivity.hasEffectiveUnread(conversationId)");
-    expect(chatInterface).toContain("conversationActivity.selectAttentionCursor(conversationId)");
     expect(chatInterface).toContain('conversationActivity.isMutationPending(conversationId, "mark_read")');
     expect(chatInterface).toContain('conversationActivity.isMutationPending(conversationId, "mark_unread")');
-    expect(chatInterface).toContain("conversationActivity.markRead(conversationId,");
-    expect(chatInterface).toContain("conversationActivity.markUnread(conversationId)");
+    expect(chatInterface).toContain("toggleConversationUnread(conversationActivity, conversationId)");
+    expect(toggleConversationUnread).toContain("activity.hasEffectiveUnread(conversationId)");
+    expect(toggleConversationUnread).toContain("activity.selectAttentionCursor(conversationId)");
+    expect(toggleConversationUnread).toContain("activity.markRead(");
+    expect(toggleConversationUnread).toContain("activity.markUnread(conversationId)");
     expect(chatInterface).toMatch(
       /conversationId &&\s*canManageConversation \?[\s\S]{0,900}<ChatHeaderMenu/,
     );

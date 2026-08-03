@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 
 type ConfirmDialogProps = {
   isOpen: boolean;
@@ -9,9 +10,35 @@ type ConfirmDialogProps = {
   confirmLabel: string;
   cancelLabel: string;
   isBusy?: boolean;
+  showKeyboardHints?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
+
+type ConfirmDialogKeyboardAction = "cancel" | "confirm" | "none";
+
+export function confirmDialogKeyboardAction({
+  key,
+  isBusy,
+  showKeyboardHints,
+  targetIsButton,
+}: {
+  key: string;
+  isBusy: boolean;
+  showKeyboardHints: boolean;
+  targetIsButton: boolean;
+}): ConfirmDialogKeyboardAction {
+  if (key === "Escape") return "cancel";
+  if (
+    key === "Enter" &&
+    showKeyboardHints &&
+    !isBusy &&
+    !targetIsButton
+  ) {
+    return "confirm";
+  }
+  return "none";
+}
 
 export function ConfirmDialog({
   isOpen,
@@ -20,20 +47,36 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   isBusy = false,
+  showKeyboardHints = false,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      const action = confirmDialogKeyboardAction({
+        key: event.key,
+        isBusy,
+        showKeyboardHints,
+        targetIsButton:
+          event.target instanceof Element &&
+          Boolean(event.target.closest("button")),
+      });
+      if (action === "cancel") {
         event.preventDefault();
+        event.stopPropagation();
         onCancel();
+        return;
+      }
+      if (action === "confirm") {
+        event.preventDefault();
+        event.stopPropagation();
+        onConfirm();
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, onCancel]);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [isBusy, isOpen, onCancel, onConfirm, showKeyboardHints]);
 
   if (!isOpen) return null;
 
@@ -71,7 +114,14 @@ export function ConfirmDialog({
             disabled={isBusy}
             className="rounded-full border border-black/10 px-4 py-2 text-[13px] font-medium text-black transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
           >
-            {cancelLabel}
+            <span className="inline-flex items-center gap-2">
+              {cancelLabel}
+              {showKeyboardHints && (
+                <KeyboardShortcutKeycap className="!h-6 !min-w-0 !rounded-md !px-2">
+                  Esc
+                </KeyboardShortcutKeycap>
+              )}
+            </span>
           </button>
           <button
             type="button"
@@ -79,7 +129,14 @@ export function ConfirmDialog({
             disabled={isBusy}
             className="rounded-full bg-[#d66d75] px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {confirmLabel}
+            <span className="inline-flex items-center gap-2">
+              {confirmLabel}
+              {showKeyboardHints && (
+                <KeyboardShortcutKeycap className="!h-6 !min-w-0 !rounded-md !bg-white/15 !px-2 !text-white">
+                  ↵
+                </KeyboardShortcutKeycap>
+              )}
+            </span>
           </button>
         </div>
       </div>

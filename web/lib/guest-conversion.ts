@@ -2,6 +2,7 @@ import type {
   ChatActionOption,
   ChatMention,
 } from "@/components/chat/types";
+import type { DecisionState } from "@/lib/run-dossier-contract";
 
 export type GuestConversionReason =
   | "second_simulation"
@@ -12,6 +13,30 @@ export type GuestConversionReason =
   | "discovery_searches";
 
 export type GuestConversionMode = "login" | "signup";
+
+export type GuestDecisionResumeTarget =
+  | {
+      surface: "result_card";
+      artifactId: string;
+    }
+  | {
+      surface: "omnisearch_dossier";
+      artifactId: string;
+      runId: string;
+      decisionState: DecisionState;
+      note: string;
+    };
+
+export type GuestDossierDecisionResumeTarget = Extract<
+  GuestDecisionResumeTarget,
+  { surface: "omnisearch_dossier" }
+>;
+
+export function dossierDecisionResumeTarget(
+  target: GuestDecisionResumeTarget | null | undefined,
+): GuestDossierDecisionResumeTarget | null {
+  return target?.surface === "omnisearch_dossier" ? target : null;
+}
 
 type GuestPendingActionBase = {
   reason: GuestConversionReason;
@@ -31,7 +56,7 @@ export type GuestPendingAction =
     })
   | (GuestPendingActionBase & {
       reason: "save_decision";
-      artifactId: string;
+      target: GuestDecisionResumeTarget;
     })
   | (GuestPendingActionBase & {
       reason: "new_conversation" | "keep_history";
@@ -67,7 +92,9 @@ export function pendingGuestActionSummary(
     reason: action.reason,
     conversation_id: action.conversationId,
     action_id: action.actionId,
-    ...("artifactId" in action ? { artifact_id: action.artifactId } : {}),
+    ...(action.reason === "save_decision"
+      ? { artifact_id: action.target.artifactId }
+      : {}),
   };
 }
 
