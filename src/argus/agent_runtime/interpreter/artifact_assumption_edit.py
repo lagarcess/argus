@@ -16,7 +16,6 @@ from argus.agent_runtime.artifact_edit_planner import (
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
     normalized_asset_universe_operation,
-    same_asset_universe,
 )
 from argus.agent_runtime.asset_text_grounding import (
     provider_grounded_asset_evidence_from_text,
@@ -226,10 +225,44 @@ def _has_conflicting_grounded_total_capital_aliases(
     )
 
 
+def _canonical_primary_asset_request(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+) -> tuple[set[str], set[str], set[str], set[str]]:
+    """Return current, flat, included, and excluded asset roles canonically."""
+
+    current_assets = set(
+        normalized_asset_symbols(
+            current_strategy.asset_universe if current_strategy else []
+        )
+    )
+    primary_assets = set(normalized_asset_symbols(draft.asset_universe))
+    typed_inclusions = set(normalized_asset_symbols(draft.asset_inclusions))
+    typed_exclusions = set(normalized_asset_symbols(draft.asset_exclusions))
+    provenance = draft.field_provenance or {}
+    if provenance.get("comparison_baseline") == "explicit_user":
+        benchmark_role_symbols = {
+            _normalized_ticker_symbol(draft.comparison_baseline),
+            _normalized_ticker_symbol(
+                current_strategy.comparison_baseline if current_strategy else None
+            ),
+        }
+        primary_assets.difference_update(
+            symbol
+            for symbol in benchmark_role_symbols
+            if symbol is not None
+            and symbol not in current_assets
+            and symbol not in typed_inclusions
+        )
+    return current_assets, primary_assets, typed_inclusions, typed_exclusions
+
+
 def _required_edit_targets_from_primary_draft(
     draft: LLMStrategyDraft | None,
     *,
     current_strategy: StrategySummary | None = None,
+    request: InterpretationRequest | None = None,
 ) -> set[str]:
     """Translate current-turn typed extraction into planner coverage requirements.
 
@@ -242,26 +275,34 @@ def _required_edit_targets_from_primary_draft(
         return set()
     provenance = draft.field_provenance or {}
     targets: set[str] = set()
-    current_assets = set(
-        normalized_asset_symbols(
-            current_strategy.asset_universe if current_strategy else []
-        )
+    (
+        current_assets,
+        primary_assets,
+        typed_asset_inclusions,
+        typed_asset_exclusions,
+    ) = _canonical_primary_asset_request(
+        draft,
+        current_strategy=current_strategy,
     )
-    typed_asset_inclusions = set(normalized_asset_symbols(draft.asset_inclusions))
-    typed_asset_exclusions = set(normalized_asset_symbols(draft.asset_exclusions))
-    if (
-        (
-            draft.asset_universe
-            and normalized_asset_universe_operation(draft.asset_universe_operation)
-            is not None
-            and not same_asset_universe(
-                draft.asset_universe,
-                current_strategy.asset_universe if current_strategy else [],
-            )
-        )
-        or bool(typed_asset_inclusions - current_assets)
-        or bool(typed_asset_exclusions & current_assets)
+    asset_operation = normalized_asset_universe_operation(draft.asset_universe_operation)
+    expected_assets: set[str] | None = None
+    if asset_operation == "replace" and (
+        draft.asset_universe or typed_asset_inclusions or typed_asset_exclusions
     ):
+        expected_assets = (
+            primary_assets | typed_asset_inclusions
+        ) - typed_asset_exclusions
+    elif asset_operation == "append" and (
+        draft.asset_universe or typed_asset_inclusions or typed_asset_exclusions
+    ):
+        expected_assets = (
+            current_assets | primary_assets | typed_asset_inclusions
+        ) - typed_asset_exclusions
+    elif typed_asset_inclusions or typed_asset_exclusions:
+        expected_assets = (
+            current_assets | typed_asset_inclusions
+        ) - typed_asset_exclusions
+    if expected_assets is not None and expected_assets != current_assets:
         targets.add("asset")
     if (
         str(draft.comparison_baseline or "").strip()
@@ -277,14 +318,20 @@ def _required_edit_targets_from_primary_draft(
         or draft.date_range_intent is not None
         or str(draft.date_range_raw_text or "").strip()
     ) and provenance.get("date_range") == "explicit_user"
-    date_matches_current = bool(
-        draft.date_range is not None
-        and current_strategy is not None
-        and draft.date_range == current_strategy.date_range
-        and draft.date_range_intent is None
-        and not str(draft.date_range_raw_text or "").strip()
+    canonical_date_request = _canonical_draft_date_request(
+        draft,
+        request=request,
     )
-    if has_explicit_date and not date_matches_current:
+    current_date_request = (
+        ("range", current_strategy.date_range)
+        if current_strategy is not None and current_strategy.date_range is not None
+        else None
+    )
+    if (
+        has_explicit_date
+        and canonical_date_request is not None
+        and canonical_date_request != current_date_request
+    ):
         targets.add("date_window")
 
     strategy_family_fields = (
@@ -294,15 +341,16 @@ def _required_edit_targets_from_primary_draft(
         "exit_rule",
         "rule_spec",
     )
-    has_explicit_strategy_family = any(
-        provenance.get(field_name) == "explicit_user"
+    explicit_strategy_family_fields = [
+        field_name
         for field_name in strategy_family_fields
-    )
-    strategy_family_changed = current_strategy is None or any(
+        if provenance.get(field_name) == "explicit_user"
+        and getattr(draft, field_name) is not None
+    ]
+    if explicit_strategy_family_fields and any(
         getattr(draft, field_name) != getattr(current_strategy, field_name, None)
-        for field_name in strategy_family_fields
-    )
-    if has_explicit_strategy_family and strategy_family_changed:
+        for field_name in explicit_strategy_family_fields
+    ):
         targets.add("strategy_family")
 
     capital_source = str(provenance.get("capital_amount") or "").strip()
@@ -695,6 +743,7 @@ def materialized_artifact_edit_targets(
     requested_targets = _required_edit_targets_from_primary_draft(
         primary_draft,
         current_strategy=current_strategy,
+        request=request,
     )
     planned_whole_universe_assets = _planned_whole_universe_asset_symbols(
         plan,
@@ -835,15 +884,20 @@ def _materialized_target_matches_primary_delta(
     if primary_draft is None:
         return False
     if target == "asset":
-        current = set(
-            normalized_asset_symbols(
-                current_strategy.asset_universe if current_strategy else []
-            )
+        (
+            current,
+            primary_requested,
+            primary_inclusions,
+            primary_exclusions,
+        ) = _canonical_primary_asset_request(
+            primary_draft,
+            current_strategy=current_strategy,
         )
-        primary_requested = set(normalized_asset_symbols(primary_draft.asset_universe))
         grounded = set(grounded_asset_symbols or set())
-        primary_inclusions = set(primary_asset_inclusions or set())
-        primary_exclusions = set(primary_asset_exclusions or set())
+        if primary_asset_inclusions is not None:
+            primary_inclusions = set(primary_asset_inclusions)
+        if primary_asset_exclusions is not None:
+            primary_exclusions = set(primary_asset_exclusions)
         materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
         operation = normalized_asset_universe_operation(
             primary_draft.asset_universe_operation
@@ -851,21 +905,6 @@ def _materialized_target_matches_primary_delta(
         materialized_operation = normalized_asset_universe_operation(
             materialized_draft.asset_universe_operation
         )
-        primary_provenance = primary_draft.field_provenance or {}
-        if primary_provenance.get("comparison_baseline") == "explicit_user":
-            benchmark_role_symbols = {
-                _normalized_ticker_symbol(primary_draft.comparison_baseline),
-                _normalized_ticker_symbol(
-                    current_strategy.comparison_baseline if current_strategy else None
-                ),
-            }
-            primary_requested.difference_update(
-                symbol
-                for symbol in benchmark_role_symbols
-                if symbol is not None
-                and symbol not in current
-                and symbol not in primary_inclusions
-            )
         if primary_inclusions or primary_exclusions:
             expected_from_typed_roles = set(current)
             if operation == "replace":
@@ -1160,12 +1199,14 @@ def _grounded_asset_symbols_from_message(
 def _canonical_draft_date_request(
     draft: LLMStrategyDraft,
     *,
-    request: InterpretationRequest,
+    request: InterpretationRequest | None,
 ) -> tuple[str, Any] | None:
     if draft.date_range_intent is not None:
         intent = _date_window_intent_bound_to_latest_result(
             draft.date_range_intent,
-            latest_result_window=_latest_result_date_window(request),
+            latest_result_window=(
+                _latest_result_date_window(request) if request is not None else None
+            ),
         )
         resolution = resolve_date_range_intent(intent) if intent is not None else None
         if resolution is not None:

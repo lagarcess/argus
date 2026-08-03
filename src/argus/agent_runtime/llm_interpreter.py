@@ -3442,7 +3442,7 @@ async def _plan_pending_artifact_assumption_edit(
         active_confirmation=active_confirmation,
         preferred_model=preferred_model,
         language=request.user.language_preference,
-        required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request)),
+        required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
         materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
     )
     # fmt: on
