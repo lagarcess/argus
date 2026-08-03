@@ -48,6 +48,13 @@ else
   unset ARGUS_GUEST_QA_ALLOW_TEST_DIFF || true
 fi
 
+# Durable preflight captures write the first language artifact before the
+# second language assertion runs. That expected evidence write must not make
+# the second assertion reject the otherwise pinned candidate as dirty.
+if [ "${ARGUS_GUEST_QA_CAPTURE_DURABLE_EVIDENCE:-}" = "true" ]; then
+  export ARGUS_GUEST_QA_ALLOW_TEST_DIFF=true
+fi
+
 export ARGUS_CANDIDATE_SHA="$candidate_sha"
 unset ARGUS_QA_APPROVED_SUPABASE_REF || true
 
