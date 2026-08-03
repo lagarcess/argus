@@ -914,6 +914,7 @@ export default function ChatInterface() {
     sendRef: guestSendRef,
     refreshAccount,
     refreshHistory,
+    refreshHistoryForActivity,
     closeTransientSidebar,
     startNewChat,
     onOpenFeedback: () =>
