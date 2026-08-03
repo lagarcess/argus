@@ -165,6 +165,21 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
     return prior
 
 
+def _current_total_capital_value(
+    strategy: StrategySummary | None,
+) -> float | None:
+    if strategy is None:
+        return None
+    extra_parameters = strategy.extra_parameters or {}
+    for field_name in ("initial_capital", "total_capital", "total_budget"):
+        value = extra_parameters.get(field_name)
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            return float(value)
+    if canonical_strategy_type(strategy.strategy_type) != "dca_accumulation":
+        return strategy.capital_amount
+    return None
+
+
 def _grounded_total_capital_alias_values(draft: LLMStrategyDraft) -> list[float]:
     provenance = draft.field_provenance or {}
     aliases = (
@@ -283,7 +298,7 @@ def _required_edit_targets_from_primary_draft(
         targets.add("strategy_family")
 
     capital_source = str(provenance.get("capital_amount") or "").strip()
-    current_capital = current_strategy.capital_amount if current_strategy else None
+    current_capital = _current_total_capital_value(current_strategy)
     if any(
         value != current_capital for value in _grounded_total_capital_alias_values(draft)
     ):
@@ -305,7 +320,9 @@ def _required_edit_targets_from_primary_draft(
             and capital_source in _RECURRING_CAPITAL_SOURCES
             and is_recurring_strategy
         )
-    ) and recurring_amount != current_capital:
+    ) and recurring_amount != (
+        current_strategy.capital_amount if current_strategy else None
+    ):
         targets.add("recurring_contribution")
 
     current_indicator_parameters = (
@@ -807,7 +824,7 @@ def _materialized_target_matches_primary_delta(
     if target == "capital":
         requested = _canonical_total_capital_value(primary_draft)
         materialized = _canonical_total_capital_value(materialized_draft)
-        current = current_strategy.capital_amount if current_strategy else None
+        current = _current_total_capital_value(current_strategy)
     elif target == "recurring_contribution":
         requested = (
             primary_draft.recurring_contribution

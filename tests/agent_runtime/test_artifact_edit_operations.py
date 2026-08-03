@@ -895,6 +895,7 @@ async def test_issue_339_compound_edit_retries_wrong_or_extra_values(
     "invalid_model",
     [
         "invented-capital-model",
+        "invented-dca-capital-model",
         "invented-asset-model",
         "wrong-asset-model",
         "wrong-asset-missing-operation-model",
@@ -912,6 +913,7 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
         "wrong-asset-missing-operation-model",
         "append-instead-of-replace-model",
     }
+    is_dca_request = invalid_model == "invented-dca-capital-model"
     fallback_model = "requested-asset-model" if is_asset_request else "complete-model"
     monkeypatch.setattr(
         artifact_edit_planner,
@@ -954,9 +956,13 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
         operations = [
             EditOperation(op="set", target="benchmark", value="QQQ"),
         ]
-        if model_name == "invented-capital-model":
+        if model_name in {"invented-capital-model", "invented-dca-capital-model"}:
             operations.append(
-                EditOperation(op="set", target="capital", number=5000),
+                EditOperation(
+                    op="set",
+                    target="capital",
+                    number=100 if is_dca_request else 5000,
+                ),
             )
         elif model_name == "invented-asset-model":
             operations.append(
@@ -984,11 +990,17 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
-                    strategy_type="buy_and_hold",
+                    strategy_type=(
+                        "dca_accumulation" if is_dca_request else "buy_and_hold"
+                    ),
                     asset_universe=["AAPL"],
                     asset_class="equity",
-                    capital_amount=1000,
+                    cadence="monthly" if is_dca_request else None,
+                    capital_amount=100 if is_dca_request else 1000,
                     comparison_baseline="SPY",
+                    extra_parameters=(
+                        {"recurring_contribution": 100} if is_dca_request else {}
+                    ),
                 )
             ),
             selected_thread_metadata={
