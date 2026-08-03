@@ -404,24 +404,6 @@ def test_gateway_private_alpha_role_ignores_disabled_allowlist_row():
     assert gateway.private_alpha_email_allowed("disabled@example.com") is False
 
 
-def test_gateway_username_availability_uses_case_folded_profile_identity():
-    client_mock = MagicMock()
-    query = MagicMock()
-    query.select.return_value = query
-    query.ilike.return_value = query
-    query.limit.return_value = query
-    query.execute.return_value.data = [{"username": "portfolioalpha"}]
-    client_mock.table.return_value = query
-
-    gateway = SupabaseGateway(client=client_mock)
-
-    assert gateway.username_available(" PortfolioAlpha ") is False
-    client_mock.table.assert_called_once_with("profiles")
-    query.select.assert_called_once_with("username")
-    query.ilike.assert_called_once_with("username", "portfolioalpha")
-    query.limit.assert_called_once_with(1)
-
-
 def _runtime_success_result(
     *,
     symbol: str = "TSLA",
@@ -2347,12 +2329,9 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
-    username_available = MagicMock(return_value=False)
-    mock_gateway.attach_mock(username_available, "username_available")
-
     with patch(
         "argus.api.routers.auth.serialized_username_signup",
-        return_value=nullcontext(),
+        return_value=nullcontext(False),
     ) as serialize_username:
         response = client.post(
             "/api/v1/auth/signup",
@@ -2371,7 +2350,6 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
         api_state.DATABASE_URL,
         "portfolioalpha",
     )
-    username_available.assert_called_once_with("portfolioalpha")
     mock_gateway.signup.assert_not_called()
     mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
 

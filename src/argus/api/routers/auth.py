@@ -685,10 +685,11 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _signup_auth_problem(request)
     try:
-        with serialized_username_signup(api_state.DATABASE_URL, body.username):
-            if body.username is not None and not (
-                api_state.supabase_gateway.username_available(body.username)
-            ):
+        with serialized_username_signup(
+            api_state.DATABASE_URL,
+            body.username,
+        ) as username_available:
+            if body.username is not None and not username_available:
                 raise _username_taken_problem(request)
             result = api_state.supabase_gateway.signup(
                 email=body.email,

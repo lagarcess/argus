@@ -27,6 +27,7 @@ from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from argus.domain.usage_limits import message_usage_settlement
+from argus.domain.username_signup import serialized_username_signup
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
@@ -958,6 +959,54 @@ def test_signup_taken_username_creates_no_auth_user_or_profile(
         if existing_user_id:
             with suppress(Exception):
                 gateway.delete_auth_user(existing_user_id)
+
+
+def test_username_availability_treats_pattern_characters_as_literals() -> None:
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    email = f"username-literal-{suffix}@example.test"
+    username_pairs = [
+        (f"underscore_{suffix}", f"underscoreX{suffix}"),
+        (f"percent%{suffix}", f"percentX{suffix}"),
+        (f"star*{suffix}", f"starX{suffix}"),
+    ]
+    user_id: str | None = None
+    try:
+        created = gateway.client.auth.admin.create_user(
+            {
+                "email": email,
+                "password": f"Literal-{secrets.token_urlsafe(18)}",
+                "email_confirm": True,
+                "user_metadata": {"username": username_pairs[0][1]},
+            }
+        )
+        assert created.user is not None
+        user_id = str(created.user.id)
+        gateway.get_or_create_profile_for_auth_user(
+            created.user.model_dump(mode="json")
+        )
+
+        for literal_username, pattern_match_username in username_pairs:
+            gateway.client.table("profiles").update(
+                {"username": pattern_match_username}
+            ).eq("id", user_id).execute()
+            with serialized_username_signup(
+                LOCAL_DATABASE_URL,
+                literal_username,
+            ) as available:
+                assert available is True
+            gateway.client.table("profiles").update(
+                {"username": literal_username}
+            ).eq("id", user_id).execute()
+            with serialized_username_signup(
+                LOCAL_DATABASE_URL,
+                literal_username,
+            ) as available:
+                assert available is False
+    finally:
+        if user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
 
 
 def test_concurrent_same_username_signup_calls_auth_only_for_winner(

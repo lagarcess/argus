@@ -10,9 +10,9 @@ import psycopg
 def serialized_username_signup(
     database_url: str,
     username: str | None,
-) -> Iterator[None]:
+) -> Iterator[bool]:
     if username is None:
-        yield
+        yield True
         return
     if not database_url:
         raise RuntimeError("Username signup serialization requires PostgreSQL.")
@@ -24,4 +24,14 @@ def serialized_username_signup(
                 "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 (normalized,),
             )
-        yield
+            cursor.execute(
+                "select not exists ("
+                "select 1 from public.profiles "
+                "where lower(username) = lower(%s) limit 1"
+                ")",
+                (normalized,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("Username availability query returned no result.")
+            yield bool(row[0])

@@ -317,19 +317,6 @@ class SupabaseGateway(
         except Exception as e:
             raise RuntimeError(f"Signup failed: {e}") from e
 
-    def username_available(self, username: str) -> bool:
-        normalized = _normalize_username(username)
-        if normalized is None:
-            return True
-        existing = (
-            self.client.table("profiles")
-            .select("username")
-            .ilike("username", normalized)
-            .limit(1)
-            .execute()
-        )
-        return _row_one(existing) is None
-
     def private_alpha_role_for_email(self, email: str) -> str | None:
         rows = (
             self.client.table("private_alpha_allowlist")
