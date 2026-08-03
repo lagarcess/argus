@@ -12,6 +12,10 @@ from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
 )
+from argus.api.client_capabilities import (
+    ClientCapabilitiesHeader,
+    dossier_decision_action_availability,
+)
 from argus.api.conversation_activity import conversation_activity_service
 from argus.api.dependencies import (
     current_user,
@@ -498,11 +502,16 @@ def delete_conversation(
 def list_run_dossiers(
     conversation_id: str,
     request: Request,
+    client_capabilities: ClientCapabilitiesHeader = None,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedRunDossiers:
     context = account_context(request)
+    decision_action_availability = dossier_decision_action_availability(
+        can_save_decision=context.capabilities.can_save_decision,
+        raw_client_capabilities=client_capabilities,
+    )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
@@ -597,11 +606,7 @@ def list_run_dossiers(
             artifact=row.artifact,
             decision=row.decision,
             result_message_id=row.result_message_id,
-            decision_action_availability=(
-                "available"
-                if context.capabilities.can_save_decision
-                else "account_conversion_required"
-            ),
+            decision_action_availability=decision_action_availability,
             language=user.language,
         )
         for row in selected_rows

@@ -19,9 +19,12 @@ boundary in `docs/API_CONTRACT.md`.
 
 1. `can_save_decision` remains `false` for guests and direct guest decision
    writes continue returning `403 account_conversion_required`.
-2. Every eligible evidence-backed run dossier includes its backend-owned
-   `decision` action. The action carries a typed availability value:
-   `available` or `account_conversion_required`.
+2. Every eligible evidence-backed run dossier requested by a client advertising
+   `dossier_decision_conversion_v1` includes its backend-owned `decision`
+   action. The action carries a typed availability value: `available` or
+   `account_conversion_required`. A client without that additive signal keeps
+   the legacy omission when the account cannot save decisions; registered
+   `available` actions are unaffected.
 3. The frontend never invents an evidence id or decision action. It renders and
    routes only the backend-projected action.
 4. Selecting Add decision or Edit on a guest dossier opens the existing account
@@ -57,6 +60,10 @@ boundary in `docs/API_CONTRACT.md`.
   availability contract and document conversion-gated client behavior.
 - `src/argus/api/schemas.py` and `web/lib/run-dossier-contract.ts` -- keep the
   Python and TypeScript action discriminants aligned.
+- `X-Argus-Client-Capabilities` -- use the additive
+  `dossier_decision_conversion_v1` presentation handshake so rolling API/web
+  deploys and already-open legacy tabs fail closed without changing account
+  policy or mutation authorization.
 - Checked-in OpenAPI artifact -- regenerate if this repository stores the
   affected schema as generated API evidence.
 - `docs/DATA_MODEL.md` -- no change; no table, ownership, RLS, or durable state

@@ -1068,6 +1068,15 @@ def test_search_full_aggregate_projects_exact_dossier_without_hydrating_all_chil
         "00000000-0000-0000-0000-000000000301"
     )
     assert decision_action.decision_state == "watching"
+    legacy_scored = scored_supabase_search_items(
+        raw=result.rows,
+        query="search",
+        decision_action_availability=None,
+    )
+    assert legacy_scored[0][1].dossier is not None
+    assert [action.type for action in legacy_scored[0][1].dossier.actions] == [
+        "retest_run"
+    ]
     hydration_sql = str(pool.cursor.executions[1][0])
     assert "latest_run_decision_payload" in hydration_sql
     assert "decision.evidence_artifact_id" in hydration_sql

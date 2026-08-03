@@ -527,11 +527,36 @@ def test_guest_history_is_limited_to_the_active_workspace(
         user=user,
     )
     assert page.total_runs == 1
-    assert [action.type for action in page.items[0].actions] == [
+    assert [action.type for action in page.items[0].actions] == ["retest_run"]
+
+    capable_request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [
+                (
+                    b"x-argus-client-capabilities",
+                    b"dossier_decision_conversion_v1",
+                )
+            ],
+        }
+    )
+    capable_request.state.request_id = "run-dossier-capable-guest-test"
+    store_account_context(capable_request, guest_account_context(workspace))
+    capable_page = list_run_dossiers(
+        conversation_id=conversation.id,
+        request=capable_request,
+        client_capabilities="dossier_decision_conversion_v1",
+        limit=20,
+        cursor=None,
+        user=user,
+    )
+    assert [action.type for action in capable_page.items[0].actions] == [
         "retest_run",
         "decision",
     ]
-    decision_action = page.items[0].actions[1]
+    decision_action = capable_page.items[0].actions[1]
     assert decision_action.type == "decision"
     assert decision_action.evidence_artifact_id == source_row.artifact["id"]
     assert decision_action.availability == "account_conversion_required"

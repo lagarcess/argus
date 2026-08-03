@@ -325,6 +325,10 @@ git commit -m "fix(web): resume guest dossier decisions after conversion"
 **Interfaces:**
 - Documents the exact `availability` enum and guest client behavior.
 - Generated OpenAPI remains structurally identical to `app.openapi()`.
+- Documents the optional `X-Argus-Client-Capabilities` header and additive
+  `dossier_decision_conversion_v1` rollout handshake on both dossier reads;
+  missing support preserves the legacy guest omission while registered action
+  projection and write authorization remain unchanged.
 
 - [ ] **Step 1: Update the human contract**
 

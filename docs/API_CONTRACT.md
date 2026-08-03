@@ -3549,6 +3549,18 @@ false and direct guest writes still fail with `403 account_conversion_required`.
 Asset rollups have no `actions` field. Unsupported or incomplete stored run
 shapes omit `retest_run` rather than guessing.
 
+During rolling frontend/API deployments, conversion-gated decision actions are
+projected only when the request advertises
+`X-Argus-Client-Capabilities: dossier_decision_conversion_v1`. A missing or
+unknown signal preserves the legacy omission for accounts that cannot save
+decisions, so an already-open older client cannot mistake action presence for
+write access. Overlong signals are rejected by request validation. Registered
+`availability: "available"` projection is unchanged. This header is an additive
+presentation-compatibility handshake, not authorization or account-policy
+truth; the account context and mutation endpoint continue to own those
+boundaries. The same rule applies to `GET /search` and
+`GET /conversations/{conversation_id}/run-dossiers`.
+
 **Ranking Logic:**
 Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.

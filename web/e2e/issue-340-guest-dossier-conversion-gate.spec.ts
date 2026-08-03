@@ -212,6 +212,9 @@ async function mockJourney(page: Page, language: LocaleFixture["language"]) {
   await page.route("**/api/v1/conversations**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/run-dossiers")) {
+      expect(
+        route.request().headers()["x-argus-client-capabilities"],
+      ).toBe("dossier_decision_conversion_v1");
       await fulfillJson(route, {
         items: [
           searchPayload(accountKind).items[0].dossier,
@@ -265,9 +268,12 @@ async function mockJourney(page: Page, language: LocaleFixture["language"]) {
   await page.route("**/api/v1/history**", (route) =>
     fulfillJson(route, { items: [], next_cursor: null }),
   );
-  await page.route("**/api/v1/search**", (route) =>
-    fulfillJson(route, searchPayload(accountKind)),
-  );
+  await page.route("**/api/v1/search**", (route) => {
+    expect(route.request().headers()["x-argus-client-capabilities"]).toBe(
+      "dossier_decision_conversion_v1",
+    );
+    return fulfillJson(route, searchPayload(accountKind));
+  });
   await page.route("**/api/v1/analytics/guest-events", (route) =>
     fulfillJson(route, { success: true }),
   );

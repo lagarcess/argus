@@ -7,6 +7,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
+from argus.api.client_capabilities import (
+    ClientCapabilitiesHeader,
+    dossier_decision_action_availability,
+)
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
 from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
@@ -49,6 +53,7 @@ LEDGER_DECISION_STATE_ORDER: tuple[DecisionState, ...] = (
 def search(
     q: Annotated[str, Query(max_length=512)],
     request: Request,
+    client_capabilities: ClientCapabilitiesHeader = None,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
     decision_state: DecisionState | None = Query(None),  # noqa: B008
@@ -61,6 +66,10 @@ def search(
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedSearch:
     context = account_context(request)
+    decision_action_availability = dossier_decision_action_availability(
+        can_save_decision=context.capabilities.can_save_decision,
+        raw_client_capabilities=client_capabilities,
+    )
     query = q.strip().lower()
     requested_conversation_ids = list(
         dict.fromkeys(str(value) for value in (conversation_id or ()))
@@ -182,11 +191,7 @@ def search(
             scored_supabase_search_items(
                 raw=raw,
                 query=query,
-                decision_action_availability=(
-                    "available"
-                    if context.capabilities.can_save_decision
-                    else "account_conversion_required"
-                ),
+                decision_action_availability=decision_action_availability,
                 language=user.language,
             )
         )
@@ -200,11 +205,7 @@ def search(
                     if id_scoped_recall
                     else limit + 1
                 ),
-                decision_action_availability=(
-                    "available"
-                    if context.capabilities.can_save_decision
-                    else "account_conversion_required"
-                ),
+                decision_action_availability=decision_action_availability,
                 include_conversation_rows=conversation_search_enabled,
                 cursor_updated_at=cursor_dt,
                 cursor_id=cursor_id,

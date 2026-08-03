@@ -32,7 +32,7 @@ def memory_search_read(
     user: User,
     query: str,
     source_limit: int,
-    decision_action_availability: DecisionActionAvailability = "available",
+    decision_action_availability: DecisionActionAvailability | None = "available",
     include_conversation_rows: bool = True,
     cursor_updated_at: datetime | None = None,
     cursor_id: str | None = None,
@@ -88,7 +88,7 @@ def scored_supabase_search_items(
     *,
     raw: dict[str, list[dict[str, object]]],
     query: str,
-    decision_action_availability: DecisionActionAvailability = "available",
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> list[ScoredSearchItem]:
     """Adapt persistent and injected-gateway rows to the shared projector."""
@@ -114,6 +114,11 @@ def scored_supabase_search_items(
                         and action.get("type") == "decision"
                         else action
                         for action in raw_actions
+                        if not (
+                            isinstance(action, dict)
+                            and action.get("type") == "decision"
+                            and decision_action_availability is None
+                        )
                     ]
                 normalized_item["dossier"] = normalized_dossier
             item = SearchItem.model_validate(normalized_item)
@@ -191,7 +196,7 @@ def _project_rows(
     decisions: list[Mapping[str, Any]],
     messages: list[Mapping[str, Any]],
     query: str,
-    decision_action_availability: DecisionActionAvailability = "available",
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> list[ScoredSearchItem]:
     runs_by_conversation = _group_by_conversation(runs)

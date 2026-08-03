@@ -176,7 +176,7 @@ def project_conversation_recall(
     decisions: Sequence[Mapping[str, Any]],
     messages: Sequence[Mapping[str, Any]] = (),
     query: str,
-    decision_action_availability: DecisionActionAvailability = "available",
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> tuple[int, SearchItem] | None:
     """Build one bounded search row from existing conversation-owned truth."""

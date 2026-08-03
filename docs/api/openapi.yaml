@@ -1093,6 +1093,14 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -1452,6 +1460,14 @@ paths:
               format: uuid
             minItems: 1
             maxItems: 50
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
           - type: 'null'
       responses:
         '200':
