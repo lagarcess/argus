@@ -6,11 +6,11 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest integration change: PR #362 at `b2e8975c`, an eval-harness-only repair
-of the sanctioned live-eval environment (issue #361). The latest product
-change remains PR #348 at `38874bae`, which self-hosts canonical Inter and
-Space Grotesk fonts without changing typography ownership. The preceding
-runtime changes remain PR #331 at `ec3a0a52` and PR #330 at `94476226`.
+Latest product change: PR #355 at `c01d5730`, which preserves provider-resolved
+opening-turn assets and capital through clarification (issue #336). It follows
+PR #362 at `b2e8975c`, an eval-harness-only repair of the sanctioned live-eval
+environment (issue #361), and PR #348 at `38874bae`, which self-hosts canonical
+Inter and Space Grotesk fonts without changing typography ownership.
 Later commits may reconcile documentation and issue state without changing
 product behavior. New work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning either product SHA. The
@@ -92,6 +92,15 @@ report `calendar_alignment` truthfully instead of failing 17 of 39 cases under
 the leaked synthetic fixture calendar. The change is confined to
 `tests/evals/` and added no environment variable, deployment, API, schema, or
 migration requirement.
+PR #355 then closed issue #336 as `c01d5730`: provider-resolved assets and
+capital supplied in a terse opening turn survive into clarification and the
+confirmation card, with post-LLM provider-context reconciliation removing only
+stale asset blockers once every extracted traded-asset mention is accounted
+for. Mixed, ambiguous, underfilled, overflow, and cross-class contexts stay
+blocked. Accepted evidence includes the exact-head live-eval gate and a
+founder-witnessed browser reproduction of the original G-01 transcript. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
