@@ -910,6 +910,96 @@ async def test_issue_339_partial_date_requires_only_changed_endpoints(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("date_range_intent", "date_range"),
+    [
+        pytest.param(None, {}, id="empty-flat-range"),
+        pytest.param(
+            LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start=None,
+            ),
+            None,
+            id="unresolved-start-patch",
+        ),
+        pytest.param(
+            LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="end",
+                end=None,
+            ),
+            None,
+            id="unresolved-end-patch",
+        ),
+    ],
+)
+async def test_issue_339_malformed_explicit_date_stays_required(
+    monkeypatch,
+    date_range_intent,
+    date_range,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="set", target="benchmark", value="QQQ")],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message=(
+                "change the benchmark to QQQ and change the start date to "
+                "April 1, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["LOW", "HD"],
+                    asset_class="equity",
+                    date_range={"start": "2026-03-02", "end": "2026-07-30"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range=date_range,
+            date_range_intent=date_range_intent,
+            date_range_raw_text="change the start date to April 1, 2026",
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                "date_range": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["primary-model", "fallback-model"]
+    assert response is None
+
+
+@pytest.mark.asyncio
 async def test_issue_339_unchanged_explicit_strategy_field_is_not_required(
     monkeypatch,
 ):

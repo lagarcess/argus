@@ -271,14 +271,17 @@ def _changed_date_endpoints(
         or not isinstance(canonical_date_request[1], dict)
     ):
         return None
-    return {
+    requested_endpoints = {
         endpoint: canonical_date_request[1][endpoint]
         for endpoint in ("start", "end")
-        if endpoint in canonical_date_request[1]
-        and (
-            not isinstance(current_range, dict)
-            or canonical_date_request[1][endpoint] != current_range.get(endpoint)
-        )
+        if canonical_date_request[1].get(endpoint) is not None
+    }
+    if not requested_endpoints:
+        return None
+    return {
+        endpoint: value
+        for endpoint, value in requested_endpoints.items()
+        if (not isinstance(current_range, dict) or value != current_range.get(endpoint))
     }
 
 
@@ -352,10 +355,9 @@ def _required_edit_targets_from_primary_draft(
         canonical_date_request,
         current_range=current_range,
     )
-    if (
-        has_explicit_date
-        and canonical_date_request is not None
-        and (
+    if has_explicit_date and (
+        canonical_date_request is None
+        or (
             bool(changed_date_endpoints)
             if changed_date_endpoints is not None
             else canonical_date_request != current_date_request
