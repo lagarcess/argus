@@ -97,7 +97,7 @@ export const GUEST_ACCEPTANCE_CHECKS = [
     title: "Recents restores the temporary conversation and expiry",
   },
   { number: 10, title: "Omnisearch is owner scoped and honest" },
-  { number: 11, title: "Second simulation converts before admission" },
+  { number: 11, title: "Third simulation converts before admission" },
   { number: 12, title: "Add decision preserves typed action identity" },
   { number: 13, title: "New chat choices match account-access mode" },
   { number: 14, title: "Canceling authentication loses nothing" },
