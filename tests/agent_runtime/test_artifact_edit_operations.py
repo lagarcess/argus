@@ -1216,7 +1216,29 @@ async def test_issue_339_replacement_asset_can_match_current_benchmark(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_issue_339_explicit_benchmark_is_not_added_to_traded_assets(monkeypatch):
+@pytest.mark.parametrize(
+    ("current_user_message", "grounded_symbols", "wrong_extra_asset"),
+    [
+        pytest.param(
+            "replace the basket with AAPL and change the benchmark to SPY",
+            {"AAPL", "SPY"},
+            "SPY",
+            id="requested-benchmark",
+        ),
+        pytest.param(
+            "replace the basket with AAPL and change the benchmark from QQQ to SPY",
+            {"AAPL", "QQQ", "SPY"},
+            "QQQ",
+            id="prior-benchmark",
+        ),
+    ],
+)
+async def test_issue_339_explicit_benchmark_is_not_added_to_traded_assets(
+    monkeypatch,
+    current_user_message,
+    grounded_symbols,
+    wrong_extra_asset,
+):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
 
@@ -1228,7 +1250,7 @@ async def test_issue_339_explicit_benchmark_is_not_added_to_traded_assets(monkey
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: {"AAPL", "SPY"},
+        lambda *_args, **_kwargs: set(grounded_symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
@@ -1240,7 +1262,9 @@ async def test_issue_339_explicit_benchmark_is_not_added_to_traded_assets(monkey
     async def invoke_stub(*, model_name, **kwargs):
         del kwargs
         seen_models.append(model_name)
-        assets = ["AAPL", "SPY"] if model_name == "primary-model" else ["AAPL"]
+        assets = (
+            ["AAPL", wrong_extra_asset] if model_name == "primary-model" else ["AAPL"]
+        )
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
@@ -1258,9 +1282,7 @@ async def test_issue_339_explicit_benchmark_is_not_added_to_traded_assets(monkey
 
     response = await llm_interpreter._plan_pending_artifact_assumption_edit(
         request=InterpretationRequest(
-            current_user_message=(
-                "replace the basket with AAPL and change the benchmark to SPY"
-            ),
+            current_user_message=current_user_message,
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(

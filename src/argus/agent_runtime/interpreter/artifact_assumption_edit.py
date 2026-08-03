@@ -686,15 +686,24 @@ def materialized_artifact_edit_targets(
         if primary_provenance.get("comparison_baseline") == "explicit_user"
         else None
     )
-    for benchmark_symbol in {
+    benchmark_role_symbols = {
         _normalized_ticker_symbol(primary_draft.comparison_baseline),
         _normalized_ticker_symbol(draft.comparison_baseline),
-    }:
+    }
+    explicit_benchmark_role_symbols: set[str | None] = set()
+    if explicit_benchmark_symbol is not None:
+        benchmark_role_symbols.add(
+            _normalized_ticker_symbol(
+                current_strategy.comparison_baseline if current_strategy else None
+            )
+        )
+        explicit_benchmark_role_symbols = set(benchmark_role_symbols)
+    for benchmark_symbol in benchmark_role_symbols:
         if not (
             primary_carries_explicit_asset_request
             and planned_whole_universe_assets is not None
             and benchmark_symbol in planned_whole_universe_assets
-            and benchmark_symbol != explicit_benchmark_symbol
+            and benchmark_symbol not in explicit_benchmark_role_symbols
         ):
             grounded_asset_symbols.discard(benchmark_symbol)
     current_assets = set(
