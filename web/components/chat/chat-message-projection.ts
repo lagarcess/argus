@@ -417,6 +417,9 @@ const RETEST_COVERAGE_PROBLEM_CODES: ReadonlySet<string> = new Set([
   "market_data_unavailable",
   "insufficient_common_data",
   "no_common_data_window",
+  "kraken_ohlc_window_exceeded",
+  "provider_history_start_unavailable",
+  "provider_timeframe_unavailable",
 ]);
 
 export function chatHttpErrorDisplay(

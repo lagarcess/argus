@@ -351,6 +351,9 @@
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "kraken_ohlc_window_exceeded": "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+      "provider_history_start_unavailable": "Market history is not available that far back. Choose a later start date.",
+      "provider_timeframe_unavailable": "That timeframe is not available for this market. Choose a supported timeframe.",
       "actions": {
         "change_dates": "Change dates",
         "change_asset": "Change asset",

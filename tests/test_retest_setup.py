@@ -373,3 +373,43 @@ def test_malformed_indicator_run_still_projects_a_dossier(
     }
 
     assert project_retest_action(run=run, today=_TODAY) is None
+
+
+def test_impossible_currency_pair_window_is_not_offered_as_retest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Eligibility must not advertise a Retest that admission always rejects."""
+    from argus.domain.run_dossiers import project_retest_action
+
+    run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
+    config_snapshot = dict(run["config_snapshot"])
+    config_snapshot["asset_class"] = "currency_pair"
+    config_snapshot["symbols"] = ["EUR/USD"]
+    config_snapshot["benchmark_symbol"] = "EUR/USD"
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "1D",
+    }
+    run.update(
+        {
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+            "conversation_result_card": {
+                **run["conversation_result_card"],
+                "evidence_artifact_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+                "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
+                "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
+            },
+        }
+    )
+
+    assert project_retest_action(run=run, today=_TODAY) is None

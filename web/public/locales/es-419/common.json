@@ -351,6 +351,9 @@
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "insufficient_common_data": "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "market_data_unavailable": "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+      "kraken_ohlc_window_exceeded": "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+      "provider_history_start_unavailable": "El historial del mercado no está disponible desde una fecha tan antigua. Elige una fecha de inicio posterior.",
+      "provider_timeframe_unavailable": "Ese marco temporal no está disponible para este mercado. Elige un marco temporal compatible.",
       "actions": {
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",

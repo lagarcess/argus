@@ -76,9 +76,7 @@ def project_run_dossier(
         digest=artifact.get("digest"),
         title=artifact.get("title"),
         payload=(
-            artifact.get("payload")
-            if isinstance(artifact.get("payload"), dict)
-            else None
+            artifact.get("payload") if isinstance(artifact.get("payload"), dict) else None
         ),
     )
     metric_rows: list[SearchDossierMetric] = []
@@ -265,7 +263,10 @@ def project_retest_action(
     """
     # Imported lazily: `domain` does not otherwise depend on `agent_runtime`,
     # and eligibility must not fork from the materializer it mirrors.
-    from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
+    from argus.agent_runtime.retest_confirmation import (
+        retest_confirmation_payload,
+        retest_window_violation_code,
+    )
 
     if not has_finalized_evidence_identity(run.get("conversation_result_card")):
         # Admission rejects an unfinalized run/evidence tuple, so offering it
@@ -274,12 +275,15 @@ def project_retest_action(
     setup = retest_setup_from_run(run, today=today or date.today())
     if setup is None:
         return None
+    if retest_window_violation_code(setup) is not None:
+        return None
     if retest_confirmation_payload(setup) is None:
         return None
     return SearchRetestAction(
         source_run_id=setup.source_run_id,
         run_label=run_label_for(run),
     )
+
 
 def run_label_for(run: Mapping[str, Any]) -> str:
     card = run.get("conversation_result_card")
@@ -310,9 +314,7 @@ def run_date_span(run: Mapping[str, Any]) -> tuple[date | None, date | None]:
     config = mapping(run.get("config_snapshot"))
     config_date_range = mapping(config.get("date_range"))
     card = run.get("conversation_result_card")
-    card_date_range = (
-        mapping(card.get("date_range")) if isinstance(card, Mapping) else {}
-    )
+    card_date_range = mapping(card.get("date_range")) if isinstance(card, Mapping) else {}
     return (
         date_value(
             config.get("start_date")
@@ -357,9 +359,7 @@ def text_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [
-        bounded
-        for item in value[:5]
-        if (bounded := _bounded_text(item, 40)) is not None
+        bounded for item in value[:5] if (bounded := _bounded_text(item, 40)) is not None
     ]
 
 

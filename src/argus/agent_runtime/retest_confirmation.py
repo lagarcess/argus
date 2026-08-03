@@ -110,15 +110,11 @@ def prepare_retest_confirmation_payload(
     if payload is None:
         return RetestConfirmationPreparation()
 
-    try:
-        validate_market_data_window(
-            asset_class=cast(AssetClass, setup.asset_class),
-            timeframe=setup.timeframe,
-            start_date=setup.start,
-            end_date=setup.end,
+    window_violation_code = retest_window_violation_code(setup)
+    if window_violation_code is not None:
+        return RetestConfirmationPreparation(
+            coverage_error_code=window_violation_code,
         )
-    except ValueError as exc:
-        return RetestConfirmationPreparation(coverage_error_code=str(exc))
 
     preflight = prepare_confirmation_launch(dict(payload["launch_payload"]))
     if preflight.outcome == "coverage_failure":
@@ -157,6 +153,20 @@ def prepare_retest_confirmation_payload(
     return RetestConfirmationPreparation(
         confirmation_payload=covered_payload,
     )
+
+
+def retest_window_violation_code(setup: RetestSetup) -> str | None:
+    """Return the deterministic provider-window violation for a Retest."""
+    try:
+        validate_market_data_window(
+            asset_class=cast(AssetClass, setup.asset_class),
+            timeframe=setup.timeframe,
+            start_date=setup.start,
+            end_date=setup.end,
+        )
+    except ValueError as exc:
+        return str(exc)
+    return None
 
 
 def retest_runtime_result(

@@ -71,6 +71,21 @@ describe("chat recovery display", () => {
       en: "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
       es: "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
     },
+    {
+      code: "kraken_ohlc_window_exceeded",
+      en: "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+      es: "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+    },
+    {
+      code: "provider_history_start_unavailable",
+      en: "Market history is not available that far back. Choose a later start date.",
+      es: "El historial del mercado no está disponible desde una fecha tan antigua. Elige una fecha de inicio posterior.",
+    },
+    {
+      code: "provider_timeframe_unavailable",
+      en: "That timeframe is not available for this market. Choose a supported timeframe.",
+      es: "Ese marco temporal no está disponible para este mercado. Elige un marco temporal compatible.",
+    },
   ])(
     "maps Retest HTTP $code to typed English and Spanish coverage recovery",
     ({ code, en, es }) => {

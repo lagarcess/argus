@@ -7,6 +7,8 @@ const CREATED_AT = "2026-06-16T12:00:00Z";
 const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
 const COVERAGE_RECOVERY_PROMPT =
   "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
+const WINDOW_REJECTION_BACKEND_DETAIL =
+  "Kraken OHLC returns only the latest 720 candles.";
 const TIMEFRAME_RECOVERY_REQUEST = "Test AAPL with five-minute bars";
 const DEGRADED_TIMEFRAME_RECOVERY_REQUEST =
   "Test AAPL with five-minute bars while clarification is unavailable";
@@ -52,6 +54,8 @@ type MockChatApi = {
 
 type MockChatApiOptions = {
   language?: "en" | "es-419";
+  initialConfirmation?: boolean;
+  rejectRunWithWindowViolation?: boolean;
 };
 
 type MockDateRange = {
@@ -395,6 +399,13 @@ async function mockChatApi(
     );
   };
 
+  if (options.initialConfirmation) {
+    upsertConfirmationMessages(
+      "Buy and hold AAPL with SPY in early 2025.",
+      "msg-confirmation-initial",
+    );
+  }
+
   const upsertResultMessages = (runAction: StreamRequest["action"]) => {
     messages.splice(
       0,
@@ -526,6 +537,24 @@ async function mockChatApi(
   await page.route("**/api/v1/chat/stream", async (route) => {
     const body = route.request().postDataJSON() as StreamRequest;
     streamRequests.push(body);
+
+    if (
+      options.rejectRunWithWindowViolation &&
+      body.action?.type === "run_backtest"
+    ) {
+      return route.fulfill({
+        status: 422,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "https://api.argus.app/problems/market-data-window-violation",
+          title: "Market Data Window Violation",
+          status: 422,
+          detail: WINDOW_REJECTION_BACKEND_DETAIL,
+          code: "kraken_ohlc_window_exceeded",
+          request_id: "browser-window-rejection",
+        }),
+      });
+    }
 
     if (body.message === retryPrompt) {
       retryAttempts += 1;
@@ -1280,6 +1309,52 @@ test("successful LLM coverage recovery preserves exact voice and actions after r
   await page.reload({ waitUntil: "networkidle" });
   await expectCoverageRecovery();
 });
+
+for (const testCase of [
+  {
+    language: "en" as const,
+    localized:
+      "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+  },
+  {
+    language: "es-419" as const,
+    localized:
+      "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+  },
+]) {
+  test(`Retest window rejection is localized in the rendered chat (${testCase.language})`, async ({
+    page,
+  }) => {
+    const api = await mockChatApi(page, {
+      language: testCase.language,
+      initialConfirmation: true,
+      rejectRunWithWindowViolation: true,
+    });
+
+    const runLabel =
+      testCase.language === "es-419" ? "Ejecutar backtest" : "Run backtest";
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+      waitUntil: "networkidle",
+    });
+    await expect(page.getByRole("button", { name: runLabel })).toBeVisible();
+    const requestCountBeforeRun = api.streamRequests.length;
+    await page.getByRole("button", { name: runLabel }).click();
+    await expect.poll(() => api.streamRequests.length).toBe(requestCountBeforeRun + 1);
+
+    await expect(page.getByText(testCase.localized, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(WINDOW_REJECTION_BACKEND_DETAIL, { exact: true }),
+    ).toHaveCount(0);
+
+    const evidenceDir = process.env.ARGUS_EVIDENCE_DIR;
+    if (evidenceDir) {
+      await page.screenshot({
+        path: `${evidenceDir}/localized-window-rejection-${testCase.language}.png`,
+        fullPage: true,
+      });
+    }
+  });
+}
 
 for (const testCase of [
   {
