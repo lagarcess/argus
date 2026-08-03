@@ -806,6 +806,22 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
             },
             id="rejects-readded-primary-replacement",
         ),
+        pytest.param(
+            ["AAPL", "MSFT"],
+            {"NVDA"},
+            "remove the second one and add Nvidia",
+            ["AAPL"],
+            ["Nvidia"],
+            ["MSFT"],
+            ["Nvidia"],
+            ["AAPL", "NVDA"],
+            {
+                "asset_universe": ["AAPL", "NVDA"],
+                "asset_universe_operation": "replace",
+                "field_provenance": {"asset_universe": "explicit_user"},
+            },
+            id="accepts-primary-resolved-ordinal-removal",
+        ),
     ],
 )
 async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
