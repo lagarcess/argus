@@ -601,6 +601,34 @@ _MATERIALIZED_FIELD_TARGETS = {
 }
 
 
+def _planned_whole_universe_asset_symbols(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    asset_symbol_resolver: Callable[[str], str | None] | None,
+) -> set[str] | None:
+    """Return the final typed asset set after a replace/clear boundary."""
+
+    replacement: set[str] | None = None
+    for operation in plan.operations:
+        if operation.target != "asset":
+            continue
+        symbols = set(
+            resolved_asset_operation_symbols(
+                operation.symbols,
+                asset_symbol_resolver=asset_symbol_resolver,
+            )
+        )
+        if operation.op == "replace":
+            replacement = symbols
+        elif operation.op == "clear":
+            replacement = set()
+        elif replacement is not None and operation.op == "add":
+            replacement.update(symbols)
+        elif replacement is not None and operation.op == "remove":
+            replacement.difference_update(symbols)
+    return replacement
+
+
 def materialized_artifact_edit_targets(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -638,15 +666,31 @@ def materialized_artifact_edit_targets(
         primary_draft,
         current_strategy=current_strategy,
     )
+    planned_whole_universe_assets = _planned_whole_universe_asset_symbols(
+        plan,
+        asset_symbol_resolver=asset_symbol_resolver,
+    )
     grounded_asset_symbols = _grounded_asset_symbols_from_message(
         request.current_user_message,
         resolve_asset_candidate=resolve_asset_candidate,
     )
-    if primary_draft is not None:
-        grounded_asset_symbols.discard(
-            _normalized_ticker_symbol(primary_draft.comparison_baseline)
-        )
-    grounded_asset_symbols.discard(_normalized_ticker_symbol(draft.comparison_baseline))
+    primary_carries_explicit_asset_request = bool(
+        primary_draft.asset_universe
+        and normalized_asset_universe_operation(primary_draft.asset_universe_operation)
+        is not None
+        and (primary_draft.field_provenance or {}).get("asset_universe")
+        == "explicit_user"
+    )
+    for benchmark_symbol in {
+        _normalized_ticker_symbol(primary_draft.comparison_baseline),
+        _normalized_ticker_symbol(draft.comparison_baseline),
+    }:
+        if not (
+            primary_carries_explicit_asset_request
+            and planned_whole_universe_assets is not None
+            and benchmark_symbol in planned_whole_universe_assets
+        ):
+            grounded_asset_symbols.discard(benchmark_symbol)
     current_assets = set(
         normalized_asset_symbols(
             current_strategy.asset_universe if current_strategy else []
@@ -665,10 +709,7 @@ def materialized_artifact_edit_targets(
             asset_symbol_resolver=asset_symbol_resolver,
         )
     }
-    planned_asset_replacement = any(
-        operation.target == "asset" and operation.op == "replace"
-        for operation in plan.operations
-    )
+    planned_asset_replacement = planned_whole_universe_assets is not None
     if "asset" in materialized_targets and (
         (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))
         or (
