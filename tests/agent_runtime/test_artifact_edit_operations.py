@@ -3109,6 +3109,129 @@ async def test_issue_339_planner_steps_aside_for_explicit_position_size_edit(
     assert response is None
 
 
+def test_issue_339_position_size_merge_drops_echoed_capital_context():
+    from argus.agent_runtime.stages.interpret_internal.contextual_merge import (
+        _strategy_with_contextual_merge,
+    )
+
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        extra_parameters={
+            "initial_capital": 10_000,
+            "field_provenance": {
+                "capital_amount": "starting_capital",
+                "initial_capital": "starting_capital",
+            },
+        },
+    )
+    incoming = StrategySummary(
+        sizing_mode="position_size",
+        position_size=0.5,
+        capital_amount=10_000,
+        extra_parameters={
+            "initial_capital": 10_000,
+            "starting_capital": 10_000,
+            "field_provenance": {
+                "position_size": "explicit_user",
+                "capital_amount": "starting_capital",
+                "initial_capital": "starting_capital",
+            },
+        },
+    )
+
+    merged = _strategy_with_contextual_merge(
+        strategy=incoming,
+        snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={"requested_field": "assumption"},
+        semantic_turn_act="refine_current_idea",
+        task_relation="refine",
+        current_user_message="set position size to 50%",
+    )
+
+    assert merged.sizing_mode == "position_size"
+    assert merged.position_size == 0.5
+    assert merged.capital_amount is None
+    assert "initial_capital" not in merged.extra_parameters
+    assert "starting_capital" not in merged.extra_parameters
+    assert merged.extra_parameters["field_provenance"] == {
+        "position_size": "explicit_user"
+    }
+
+
+@pytest.mark.parametrize(
+    ("strategy_type", "capital_source", "incoming_position_source"),
+    [
+        pytest.param(
+            "buy_and_hold",
+            "starting_capital",
+            None,
+            id="unproven-buy-and-hold-echo",
+        ),
+        pytest.param(
+            "dca_accumulation",
+            "recurring_contribution",
+            "explicit_user",
+            id="unsupported-dca-position-size",
+        ),
+    ],
+)
+def test_issue_339_position_size_merge_ignores_unowned_echo(
+    strategy_type,
+    capital_source,
+    incoming_position_source,
+):
+    from argus.agent_runtime.stages.interpret_internal.contextual_merge import (
+        _strategy_with_contextual_merge,
+    )
+
+    prior_extra_parameters = {
+        "field_provenance": {"capital_amount": capital_source},
+    }
+    if strategy_type == "dca_accumulation":
+        prior_extra_parameters["recurring_contribution"] = 100
+    incoming_provenance = {"comparison_baseline": "explicit_user"}
+    if incoming_position_source is not None:
+        incoming_provenance["position_size"] = incoming_position_source
+
+    merged = _strategy_with_contextual_merge(
+        strategy=StrategySummary(
+            sizing_mode="position_size",
+            position_size=0.5,
+            comparison_baseline="QQQ",
+            extra_parameters={"field_provenance": incoming_provenance},
+        ),
+        snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type=strategy_type,
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+                sizing_mode="capital_amount",
+                capital_amount=100,
+                extra_parameters=prior_extra_parameters,
+            )
+        ),
+        selected_thread_metadata={"requested_field": "assumption"},
+        semantic_turn_act="refine_current_idea",
+        task_relation="refine",
+        current_user_message="use QQQ as the benchmark",
+    )
+
+    assert merged.strategy_type == strategy_type
+    assert merged.comparison_baseline == "QQQ"
+    assert merged.sizing_mode == "capital_amount"
+    assert merged.capital_amount == 100
+    assert merged.position_size is None
+    assert "position_size" not in merged.extra_parameters["field_provenance"]
+    if strategy_type == "dca_accumulation":
+        assert merged.extra_parameters["recurring_contribution"] == 100
+
+
 @pytest.mark.asyncio
 async def test_issue_339_typed_roles_use_planner_replacement_boundary(
     monkeypatch,
@@ -3354,7 +3477,12 @@ async def test_issue_339_position_size_survives_asset_boundary_clarification(
         candidate_strategy_draft=LLMStrategyDraft(
             asset_universe=["MSFT"],
             sizing_mode="capital_amount",
+            capital_amount=10_000,
             position_size=0.5,
+            extra_parameters={
+                "initial_capital": 10_000,
+                "starting_capital": 10_000,
+            },
             field_provenance={
                 "asset_universe": "explicit_user",
                 "position_size": "explicit_user",
