@@ -24,7 +24,10 @@ def test_candidate_text_requires_name_or_explicit_symbol_evidence() -> None:
         ResolvedAssetStub("TSLA", "equity", name="Tesla Inc."),
     )
 
-def test_candidate_text_does_not_ground_short_lowercase_symbols_without_case_signal() -> None:
+
+def test_candidate_text_does_not_ground_short_lowercase_symbols_without_case_signal() -> (
+    None
+):
     assert not _candidate_text_supports_resolved_asset(
         "me",
         ResolvedAssetStub("ME", "equity", name="23andMe Holding Co."),
@@ -33,6 +36,7 @@ def test_candidate_text_does_not_ground_short_lowercase_symbols_without_case_sig
         "ME",
         ResolvedAssetStub("ME", "equity", name="23andMe Holding Co."),
     )
+
 
 def test_candidate_text_keeps_lowercase_action_words_from_becoming_assets() -> None:
     assert not _candidate_text_supports_resolved_asset(
@@ -52,6 +56,7 @@ def test_candidate_text_keeps_lowercase_action_words_from_becoming_assets() -> N
         ResolvedAssetStub("WANT", "equity", name="Direxion Daily Consumer ETF"),
     )
 
+
 def test_candidate_text_does_not_ground_single_word_from_long_fund_name() -> None:
     assert not _candidate_text_supports_resolved_asset(
         "investment",
@@ -65,6 +70,7 @@ def test_candidate_text_does_not_ground_single_word_from_long_fund_name() -> Non
         "apple",
         ResolvedAssetStub("AAPL", "equity", name="Apple Inc."),
     )
+
 
 def test_provider_ticker_mentions_support_lowercase_exact_ticker_evidence() -> None:
     def resolve_candidate(query: str) -> AssetResolution | None:
@@ -111,9 +117,7 @@ def test_provider_ticker_mentions_support_lowercase_exact_ticker_evidence() -> N
     )
 
     assert [mention.raw_text for mention in compound_mentions] == ["GOOGL"]
-    assert [mention.asset.canonical_symbol for mention in compound_mentions] == [
-        "GOOGL"
-    ]
+    assert [mention.asset.canonical_symbol for mention in compound_mentions] == ["GOOGL"]
 
 
 @pytest.mark.asyncio
@@ -179,7 +183,10 @@ async def test_asset_grounding_keeps_lowercase_provider_ticker_from_messy_turn(
     assert calls == []
     assert audited.candidate_strategy_draft.asset_universe == ["ETH"]
 
-def test_extra_provider_asset_benchmark_evidence_requires_grounded_primary_asset() -> None:
+
+def test_extra_provider_asset_benchmark_evidence_requires_grounded_primary_asset() -> (
+    None
+):
     from argus.agent_runtime.benchmark_evidence import (
         current_message_has_extra_provider_asset_for_benchmark,
     )
@@ -221,20 +228,18 @@ def test_extra_provider_asset_benchmark_evidence_requires_grounded_primary_asset
     assert current_message_has_extra_provider_asset_for_benchmark(
         LLMStrategyDraft(asset_universe=["AAPL"], asset_class="equity"),
         current_message="apple qqq from the start of 2024",
-        resolved_asset_mentions=[
-            ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
-        ],
+        resolved_asset_mentions=[ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")],
         resolve_candidate=resolve_candidate,
     )
     assert not current_message_has_extra_provider_asset_for_benchmark(
         LLMStrategyDraft(asset_universe=["APPX"], asset_class="equity"),
         current_message=(
-            "lets see what an investment of 500 in nu could have made this "
-            "year so far"
+            "lets see what an investment of 500 in nu could have made this " "year so far"
         ),
         resolved_asset_mentions=[],
         resolve_candidate=resolve_candidate,
     )
+
 
 @pytest.mark.asyncio
 async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
@@ -319,6 +324,7 @@ async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
     assert result is not None
     assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
 
+
 @pytest.mark.asyncio
 async def test_stated_run_field_fidelity_audit_repairs_pending_dca_contribution_role(
     monkeypatch,
@@ -390,6 +396,7 @@ async def test_stated_run_field_fidelity_audit_repairs_pending_dca_contribution_
     assert draft.cadence == "weekly"
     assert draft.field_provenance["capital_amount"] == "recurring_contribution"
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_stated_run_field_fidelity_audit_checks_dca_assumption_replies_with_prior_contribution(
@@ -479,6 +486,7 @@ async def test_stated_run_field_fidelity_audit_checks_dca_assumption_replies_wit
     assert draft.field_provenance["capital_amount"] == "recurring_contribution"
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
 
+
 def test_dca_executable_shape_uses_canonical_dca_contract() -> None:
     assert not _llm_strategy_draft_has_executable_shape(
         LLMStrategyDraft(strategy_type="dca_accumulation", cadence="weekly")
@@ -502,6 +510,7 @@ def test_dca_executable_shape_uses_canonical_dca_contract() -> None:
             entry_rule={"type": "rsi_threshold", "threshold": 30},
         )
     )
+
 
 def test_structured_interpretation_rejects_underfilled_dca_shape() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -534,12 +543,11 @@ def test_structured_interpretation_rejects_underfilled_dca_shape() -> None:
         ),
     )
 
+
 def test_structured_interpretation_rejects_supported_partial_clarification() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    current_turn = (
-        "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
-    )
+    current_turn = "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -571,12 +579,11 @@ def test_structured_interpretation_rejects_supported_partial_clarification() -> 
         ),
     )
 
+
 def test_structured_interpretation_rejects_fresh_supported_pending_need_label() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    current_turn = (
-        "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
-    )
+    current_turn = "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
     response = LLMInterpretationResponse(
         intent="strategy_drafting",
         task_relation="continue",
@@ -607,6 +614,7 @@ def test_structured_interpretation_rejects_fresh_supported_pending_need_label() 
             user=UserState(user_id="u1", language_preference="en"),
         ),
     )
+
 
 def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -654,6 +662,7 @@ def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch)
     assert result.unsupported_constraints[0].category == "unsupported_asset_mix"
     assert "currency pairs" in result.unsupported_constraints[0].explanation
 
+
 def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -665,7 +674,10 @@ def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
     assert "currency pair benchmark is the tested pair itself" in prompt
     assert "Kraken" in prompt
 
-def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus() -> None:
+
+def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus() -> (
+    None
+):
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )
@@ -675,6 +687,7 @@ def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus
     assert "why did this result happen" in prompt
     assert "why/how the result happened" in prompt
     assert "why_underperformed" in prompt
+
 
 def test_llm_interpreter_prompt_names_artifact_target_contract() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -687,6 +700,7 @@ def test_llm_interpreter_prompt_names_artifact_target_contract() -> None:
     assert "latest_result only when" in prompt
     assert "pending_refinement" in prompt
     assert "do not let a completed result capture unrelated turns" in prompt
+
 
 def test_llm_interpreter_maps_latest_result_context_to_artifact_target() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -718,6 +732,7 @@ def test_llm_interpreter_maps_latest_result_context_to_artifact_target() -> None
 
     assert result.artifact_target == "none"
 
+
 def test_llm_interpreter_maps_context_question_focus() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -746,6 +761,7 @@ def test_llm_interpreter_maps_context_question_focus() -> None:
     assert result.artifact_target == "none"
     assert result.capability_question_focus is None
 
+
 def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -761,6 +777,7 @@ def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> No
     assert "do not add benchmark symbols to asset_universe" in prompt
     assert "exact start/end dates" in prompt
     assert "never replace them with past year" in prompt
+
 
 def test_focused_strategy_repair_prompt_preserves_benchmark_comparisons() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -785,6 +802,7 @@ def test_focused_strategy_repair_prompt_preserves_benchmark_comparisons() -> Non
     assert "executable buy_and_hold" in prompt
     assert "not unsupported" in prompt
     assert "any language" in prompt
+
 
 def test_stated_run_field_prompt_preserves_reference_benchmarks_semantically() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -824,6 +842,7 @@ def test_stated_run_field_prompt_preserves_reference_benchmarks_semantically() -
     assert "asset_universe" in prompt
     assert "user-stated comparison asset" in prompt
 
+
 def test_llm_interpreter_prompt_preserves_valuation_as_valid_context() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -836,6 +855,7 @@ def test_llm_interpreter_prompt_preserves_valuation_as_valid_context() -> None:
     assert "concept is financially real" in prompt
     assert "executable historical price/indicator rule" in prompt
     assert "supported proxy" in prompt
+
 
 def test_llm_interpreter_prompt_understands_crossover_shorthand() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -850,6 +870,7 @@ def test_llm_interpreter_prompt_understands_crossover_shorthand() -> None:
     assert "do not ask what the buy trigger is" in prompt
     assert "ask only for truly missing run facts" in prompt
 
+
 def test_llm_interpreter_prompt_uses_provider_date_allowances() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
@@ -863,6 +884,7 @@ def test_llm_interpreter_prompt_uses_provider_date_allowances() -> None:
     assert "preserve those requested fields" in prompt
     assert "do not silently widen the timeframe" in prompt
     assert "provider names, candle counts, and provider plumbing" in prompt
+
 
 def test_llm_interpreter_prompt_contracts_language_agnostic_metadata() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -883,6 +905,7 @@ def test_llm_interpreter_prompt_contracts_language_agnostic_metadata() -> None:
     assert "detected input language is metadata" in prompt
     assert "short, messy, or grammatically imperfect" in prompt
 
+
 def test_llm_strategy_draft_carries_language_and_evidence_metadata() -> None:
     draft = LLMStrategyDraft(
         raw_user_phrasing="Compra y manten ETH de enero 2024 a marzo 2024.",
@@ -902,15 +925,13 @@ def test_llm_strategy_draft_carries_language_and_evidence_metadata() -> None:
     assert draft.language == "es-419"
     assert draft.date_range_raw_text == "enero 2024 a marzo 2024"
     assert strategy.extra_parameters["language"] == "es-419"
-    assert (
-        strategy.extra_parameters["date_range_raw_text"]
-        == "enero 2024 a marzo 2024"
-    )
+    assert strategy.extra_parameters["date_range_raw_text"] == "enero 2024 a marzo 2024"
     assert strategy.extra_parameters["evidence_spans"] == {
         "strategy_type": "Compra y manten",
         "asset_universe": "ETH",
         "date_range": "enero 2024 a marzo 2024",
     }
+
 
 def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
     draft = LLMStrategyDraft(
@@ -935,15 +956,17 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
     strategy = _strategy_from_llm(draft)
 
     assert strategy.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "start": date(
+            date.today().year - 1, date.today().month, date.today().day
+        ).isoformat(),
         "end": date.today().isoformat(),
     }
     assert strategy.extra_parameters["date_range_intent"] == {
         "kind": "rolling_window",
-            "start": None,
-            "end": None,
-            "day_offset": None,
-            "count": 12,
+        "start": None,
+        "end": None,
+        "day_offset": None,
+        "count": 12,
         "unit": "month",
         "anchor": "today",
         "year": None,
@@ -951,6 +974,7 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
         "confidence": 0.8,
         "evidence": "durante los últimos 12 meses",
     }
+
 
 def test_llm_strategy_draft_keeps_untyped_evidence_as_provenance_only() -> None:
     # Issue #241: the builder no longer establishes temporal direction from
@@ -978,6 +1002,7 @@ def test_llm_strategy_draft_keeps_untyped_evidence_as_provenance_only() -> None:
     assert "date_range_intent" not in strategy.extra_parameters
     assert strategy.date_range == {"start": "2025-06-15", "end": "2026-06-15"}
     assert strategy.extra_parameters["evidence_spans"]["window"] == "last 12 months"
+
 
 def test_current_message_run_field_contract_prefers_bounded_date_evidence_span() -> None:
     response = LLMInterpretationResponse(
@@ -1011,7 +1036,10 @@ def test_current_message_run_field_contract_prefers_bounded_date_evidence_span()
         "end": "2024-03-31",
     }
 
-def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_scan() -> None:
+
+def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_scan() -> (
+    None
+):
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -1044,18 +1072,21 @@ def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_sca
 
     assert repaired is not None
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "start": date(
+            date.today().year - 1, date.today().month, date.today().day
+        ).isoformat(),
         "end": date.today().isoformat(),
     }
 
-def test_current_message_run_field_contract_recovers_supported_current_turn_window() -> None:
+
+def test_current_message_run_field_contract_recovers_supported_current_turn_window() -> (
+    None
+):
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
         requires_clarification=True,
-        assistant_response=(
-            "To run the test, I just need the specific 12-month window."
-        ),
+        assistant_response=("To run the test, I just need the specific 12-month window."),
         user_goal_summary=(
             "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
         ),
@@ -1097,9 +1128,12 @@ def test_current_message_run_field_contract_recovers_supported_current_turn_wind
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "start": date(
+            date.today().year - 1, date.today().month, date.today().day
+        ).isoformat(),
         "end": date.today().isoformat(),
     }
+
 
 @pytest.mark.asyncio
 async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
@@ -1169,6 +1203,7 @@ async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
     assert draft.capital_amount == 100000
     assert draft.field_provenance["capital_amount"] == "starting_capital"
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
@@ -1250,6 +1285,7 @@ async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
     assert "stated_starting_capital_recheck" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_stated_starting_capital_recheck_runs_when_broad_audit_fails(
     monkeypatch,
@@ -1319,6 +1355,7 @@ async def test_stated_starting_capital_recheck_runs_when_broad_audit_fails(
     assert draft.capital_amount == 100000
     assert draft.field_provenance["capital_amount"] == "starting_capital"
     assert "stated_starting_capital_recheck" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_stated_starting_capital_recheck_runs_when_broad_audit_skips(
@@ -1394,6 +1431,7 @@ async def test_stated_starting_capital_recheck_runs_when_broad_audit_skips(
     assert draft.field_provenance["capital_amount"] == "starting_capital"
     assert "stated_starting_capital_recheck" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_stated_starting_capital_recheck_surfaces_draft_prose_evidence(
     monkeypatch,
@@ -1457,13 +1495,14 @@ async def test_stated_starting_capital_recheck_surfaces_draft_prose_evidence(
         if content.startswith("Structured draft JSON:")
     )
     assert prose_index < draft_index
-    assert "capital_amount\": null" in prompt_blocks[prose_index]
+    assert 'capital_amount": null' in prompt_blocks[prose_index]
     assert "capital inicial de 100.000" in prompt_blocks[prose_index]
     assert "compra y manten eth ultimos 8 meses 100k" in prompt_blocks[prose_index]
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
     assert draft.capital_amount == 100000
     assert draft.field_provenance["capital_amount"] == "starting_capital"
+
 
 @pytest.mark.asyncio
 async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model_failure(
@@ -1562,6 +1601,7 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_
         "openrouter_structured_model_candidates",
         lambda *args, **kwargs: ["test-model"],
     )
+
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         normalized = symbol.strip().upper()
         if normalized not in {"AAPL", "MSFT", "QQQ", "TSLA"}:
@@ -1619,9 +1659,7 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_
     )
     result = await interpreter.ainvoke(
         InterpretationRequest(
-            current_user_message=(
-                "compare it to QQQ, keep the same assets and dates"
-            ),
+            current_user_message=("compare it to QQQ, keep the same assets and dates"),
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=pending,
@@ -1818,9 +1856,10 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
-    assert result.candidate_strategy_draft.extra_parameters[
-        "asset_universe_operation"
-    ] == "append"
+    assert (
+        result.candidate_strategy_draft.extra_parameters["asset_universe_operation"]
+        == "append"
+    )
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
         "asset_universe": "explicit_user"
     }
@@ -1885,7 +1924,7 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
                     ),
                     strategy_type="buy_and_hold",
                     strategy_thesis="Buy and hold the selected equities.",
-                    asset_universe=["MSFT"],
+                    asset_universe=["AAPL", "TSLA"],
                     asset_universe_operation="replace",
                     date_range={"start": "2026-03-01", "end": "2026-06-05"},
                     capital_amount=75000,
@@ -2004,9 +2043,7 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
         "start": "2026-03-01",
         "end": "2026-06-05",
     }
-    assert result.candidate_strategy_draft.extra_parameters[
-        "date_range_intent"
-    ] == {
+    assert result.candidate_strategy_draft.extra_parameters["date_range_intent"] == {
         "kind": "explicit_range",
         "start": "2026-03-01",
         "end": "2026-06-05",
@@ -2307,9 +2344,7 @@ async def test_llm_interpreter_routes_lowercase_ticker_asset_edit_to_planner(
     )
     result = await interpreter.ainvoke(
         InterpretationRequest(
-            current_user_message=(
-                "can you add googl, remove msft, and keep it at 75k?"
-            ),
+            current_user_message=("can you add googl, remove msft, and keep it at 75k?"),
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 active_confirmation_reference=ArtifactReference(
@@ -2477,9 +2512,7 @@ async def test_llm_interpreter_allows_rsi_threshold_edit_from_active_confirmatio
     assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
     assert result.intent == "backtest_execution"
-    parameters = result.candidate_strategy_draft.extra_parameters[
-        "indicator_parameters"
-    ]
+    parameters = result.candidate_strategy_draft.extra_parameters["indicator_parameters"]
     assert parameters["indicator"] == "rsi"
     assert parameters["entry_threshold"] == 20.0
     assert parameters["exit_threshold"] == 60.0
@@ -2897,9 +2930,10 @@ async def test_llm_interpreter_plans_active_artifact_asset_operation_when_model_
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == ["GOOGL", "NVDA"]
-    assert result.candidate_strategy_draft.extra_parameters[
-        "asset_universe_operation"
-    ] == "append"
+    assert (
+        result.candidate_strategy_draft.extra_parameters["asset_universe_operation"]
+        == "append"
+    )
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
         "asset_universe": "explicit_user"
     }
@@ -3385,6 +3419,7 @@ def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:
     )
     assert "signal_rule_plan_repair" in repaired.reason_codes
 
+
 def test_signal_rule_plan_ready_drops_unplanned_risk_rules() -> None:
     rule_spec = {
         "entry": {
@@ -3434,6 +3469,7 @@ def test_signal_rule_plan_ready_drops_unplanned_risk_rules() -> None:
     assert repaired.candidate_strategy_draft.rule_spec == rule_spec
     assert repaired.candidate_strategy_draft.risk_rules == []
 
+
 def test_signal_rule_plan_draft_only_routes_to_unsupported_recovery() -> None:
     response = LLMInterpretationResponse(
         intent="strategy_drafting",
@@ -3465,6 +3501,7 @@ def test_signal_rule_plan_draft_only_routes_to_unsupported_recovery() -> None:
     assert repaired.unsupported_constraints[0].category == "unsupported_strategy_logic"
     assert "Sentiment/news" in repaired.unsupported_constraints[0].explanation
     assert "signal_rule_plan_draft_only" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
@@ -3565,9 +3602,8 @@ async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
     assert repaired.unsupported_constraints == []
     assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"
     assert repaired.candidate_strategy_draft.rule_spec == rule_spec
-    assert (
-        "supported_signal_rule_contract_recovery" in repaired.reason_codes
-    )
+    assert "supported_signal_rule_contract_recovery" in repaired.reason_codes
+
 
 def test_structured_ma_crossover_is_executable_without_text_parser() -> None:
     draft = LLMStrategyDraft(
@@ -3586,6 +3622,7 @@ def test_structured_ma_crossover_is_executable_without_text_parser() -> None:
     )
 
     assert _llm_strategy_draft_has_executable_shape(draft)
+
 
 @pytest.mark.asyncio
 async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
@@ -3690,6 +3727,7 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     }
     assert draft.exit_logic
 
+
 @pytest.mark.asyncio
 async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     monkeypatch,
@@ -3758,9 +3796,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
             ),
             capital_amount=10000,
         ),
-        assistant_response=(
-            "I can't run a full 50/200 moving-average crossover yet."
-        ),
+        assistant_response=("I can't run a full 50/200 moving-average crossover yet."),
     )
 
     repaired = await interpreter_module._response_ready_for_runtime(
@@ -3800,6 +3836,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     }
     assert draft.exit_logic
 
+
 @pytest.mark.asyncio
 async def test_structured_signal_draft_canonicalizes_interpreter_asset(
     monkeypatch,
@@ -3832,9 +3869,7 @@ async def test_structured_signal_draft_canonicalizes_interpreter_asset(
         intent="backtest_execution",
         task_relation="new_task",
         requires_clarification=False,
-        user_goal_summary=(
-            "Backtest a 50/200 moving-average crossover for Tesla."
-        ),
+        user_goal_summary=("Backtest a 50/200 moving-average crossover for Tesla."),
         candidate_strategy_draft=LLMStrategyDraft(
             strategy_type="signal_strategy",
             raw_user_phrasing=(
@@ -3893,6 +3928,7 @@ async def test_structured_signal_draft_canonicalizes_interpreter_asset(
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
     assert draft.entry_rule and draft.exit_rule
+
 
 @pytest.mark.asyncio
 async def test_structured_signal_draft_rejects_catalog_matches_not_supported_by_user_text(
@@ -3981,6 +4017,7 @@ async def test_structured_signal_draft_rejects_catalog_matches_not_supported_by_
     assert draft.asset_class is None
     assert "asset_universe" in repaired.missing_required_fields
     assert "provider_catalog_asset_recovery" not in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_unsupported_supported_rule_classification_gets_signal_rule_repair(
@@ -4078,6 +4115,7 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     assert draft.capital_amount == 10000
     assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
     assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
+
 
 @pytest.mark.asyncio
 async def test_supported_rule_repair_audits_dropped_user_stated_capital(
@@ -4322,6 +4360,7 @@ async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(
     assert repaired.assistant_response
     assert "entry_logic" in repaired.missing_required_fields
 
+
 def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:
     response = LLMInterpretationResponse(
         intent="backtest_execution",
@@ -4372,6 +4411,7 @@ def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:
     assert draft.exit_rule is None
     assert draft.rule_spec is None
 
+
 def test_signal_grounding_audit_prompt_accepts_common_crossover_shorthand() -> None:
     messages = _signal_rule_grounding_messages(
         current_user_message="buy when the 50 crosses the 200",
@@ -4404,6 +4444,7 @@ def test_signal_grounding_audit_prompt_accepts_common_crossover_shorthand() -> N
     assert "opposite-crossover exit" in prompt
     assert "do not ask the user to restate" in prompt
 
+
 def test_pending_signal_rule_planning_response_preserves_prior_artifact() -> None:
     response = LLMInterpretationResponse(
         intent="strategy_drafting",
@@ -4435,6 +4476,7 @@ def test_pending_signal_rule_planning_response_preserves_prior_artifact() -> Non
     assert draft.strategy_thesis is None
     assert draft.entry_logic is None
     assert draft.rule_spec is None
+
 
 def test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters(
     monkeypatch,
@@ -4476,9 +4518,7 @@ def test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters(
         ),
     )
 
-    parameters = result.candidate_strategy_draft.extra_parameters[
-        "indicator_parameters"
-    ]
+    parameters = result.candidate_strategy_draft.extra_parameters["indicator_parameters"]
     assert parameters["indicator"] == "rsi"
     assert parameters["entry_threshold"] == 20
     assert parameters["exit_threshold"] == 60

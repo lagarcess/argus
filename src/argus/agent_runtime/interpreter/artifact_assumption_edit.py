@@ -738,43 +738,30 @@ def _materialized_target_matches_primary_delta(
         )
         if not requested or materialized == current:
             return False
-        grounded_additions = grounded - current
-        primary_replacement_constrains_current = operation == "replace" and (
-            not grounded_additions or bool(grounded_additions & primary_requested)
-        )
-        primary_replacement_removals = (
-            current - primary_requested
-            if primary_replacement_constrains_current
-            else set()
-        )
-        requested_removals = grounded | primary_replacement_removals
+        primary_replacement = operation == "replace"
+        if primary_replacement:
+            primary_additions = primary_requested - current
+            materialized_additions = materialized - current
+            if (
+                materialized & current != primary_requested & current
+                or not primary_additions <= materialized_additions
+                or not materialized_additions <= primary_additions | (grounded - current)
+            ):
+                return False
         expected_removals = (
             planned_asset_removals & current if planned_asset_removals else set()
         )
         if planned_asset_removals and (
             not expected_removals
             or current - materialized != expected_removals
-            or (
-                primary_replacement_constrains_current
-                and expected_removals != primary_replacement_removals
-            )
-            or not expected_removals <= requested_removals
+            or (primary_replacement and expected_removals != current - primary_requested)
+            or (not primary_replacement and not expected_removals <= grounded)
         ):
             return False
-        if (
-            not planned_asset_removals
-            and operation == "replace"
-            and primary_requested - current
-        ):
-            return materialized == primary_requested
+        if primary_replacement:
+            return True
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested
-        if (
-            not planned_asset_removals
-            and operation == "replace"
-            and materialized == primary_requested
-        ):
-            return True
         if operation == "append":
             return (
                 current <= materialized
@@ -789,7 +776,7 @@ def _materialized_target_matches_primary_delta(
                     return (
                         additions <= requested
                         and bool(expected_removals)
-                        and removals <= requested_removals
+                        and removals <= grounded
                         and removals == expected_removals
                     )
                 return additions <= requested
@@ -797,7 +784,7 @@ def _materialized_target_matches_primary_delta(
             if planned_asset_removals:
                 return (
                     bool(expected_removals)
-                    and removals <= requested_removals
+                    and removals <= grounded
                     and removals == expected_removals
                 )
             return bool(removals) and removals <= requested
