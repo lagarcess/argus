@@ -629,6 +629,29 @@ def _planned_whole_universe_asset_symbols(
     return replacement
 
 
+def _planned_asset_removals_after_last_replacement(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    asset_symbol_resolver: Callable[[str], str | None] | None,
+) -> set[str]:
+    """Return removals that still affect the final ordered asset result."""
+
+    removals: set[str] = set()
+    for operation in plan.operations:
+        if operation.target != "asset":
+            continue
+        if operation.op in {"replace", "clear"}:
+            removals.clear()
+        elif operation.op == "remove":
+            removals.update(
+                resolved_asset_operation_symbols(
+                    operation.symbols,
+                    asset_symbol_resolver=asset_symbol_resolver,
+                )
+            )
+    return removals
+
+
 def materialized_artifact_edit_targets(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -715,15 +738,10 @@ def materialized_artifact_edit_targets(
     primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
     additions = materialized_assets - current_assets
     removals = current_assets - materialized_assets
-    planned_removals = {
-        symbol
-        for operation in plan.operations
-        if operation.target == "asset" and operation.op == "remove"
-        for symbol in resolved_asset_operation_symbols(
-            operation.symbols,
-            asset_symbol_resolver=asset_symbol_resolver,
-        )
-    }
+    planned_removals = _planned_asset_removals_after_last_replacement(
+        plan,
+        asset_symbol_resolver=asset_symbol_resolver,
+    )
     planned_asset_replacement = planned_whole_universe_assets is not None
     if "asset" in materialized_targets and (
         (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))

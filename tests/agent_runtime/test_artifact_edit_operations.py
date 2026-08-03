@@ -1145,6 +1145,86 @@ async def test_issue_339_clear_then_add_retries_ungrounded_retained_asset(monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("replacement_boundary", ["replace", "clear_then_add"])
+async def test_issue_339_final_replacement_supersedes_prior_asset_removal(
+    monkeypatch,
+    replacement_boundary,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"MSFT", "NVDA"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        boundary_operations = (
+            [EditOperation(op="replace", target="asset", symbols=["NVDA"])]
+            if replacement_boundary == "replace"
+            else [
+                EditOperation(op="clear", target="asset"),
+                EditOperation(op="add", target="asset", symbols=["NVDA"]),
+            ]
+        )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
+                *boundary_operations,
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="remove MSFT, then replace the basket with NVDA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL", "MSFT"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_universe=["NVDA"],
+            asset_universe_operation="replace",
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+    )
+
+    assert seen_models == ["primary-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["NVDA"]
+
+
+@pytest.mark.asyncio
 async def test_issue_339_replacement_asset_can_match_current_benchmark(monkeypatch):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
