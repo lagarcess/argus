@@ -3126,7 +3126,7 @@ export async function safeScreenshot(
 export async function safeVisibleProductScreenshot(
   page: Page,
   name: string,
-): Promise<void> {
+): Promise<string> {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Unsafe screenshot name");
   const visibleText = await page.locator("body").innerText();
   if (
@@ -3148,6 +3148,7 @@ export async function safeVisibleProductScreenshot(
     ],
   });
   chmodSync(destination, 0o600);
+  return destination;
 }
 
 export function assertSafeEvidence(evidence: SafeEvidence): void {
