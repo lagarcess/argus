@@ -853,7 +853,7 @@ def _materialized_target_matches_primary_delta(
         )
         if primary_inclusions or primary_exclusions:
             expected_from_typed_roles = set(current)
-            if operation == "replace" and primary_requested:
+            if operation == "replace":
                 expected_from_typed_roles = set(primary_requested)
             elif operation == "append":
                 expected_from_typed_roles.update(primary_requested)
