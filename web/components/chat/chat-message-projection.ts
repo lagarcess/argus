@@ -188,6 +188,43 @@ export function resultRunIdFromFinalPayload(
   );
 }
 
+export type MessageStreamPresentation = {
+  isLatestAi: boolean;
+  isWorkingMessage: boolean;
+};
+
+export function messageStreamPresentation(
+  messages: Message[],
+  message: Message,
+  index: number,
+  isStreamingResponse: boolean,
+  hasVisibleStreamStatus: boolean,
+): MessageStreamPresentation {
+  const latestAiIndex = messages.findLastIndex((m) => m.role === "ai");
+  const isLatestAi = message.role === "ai" && latestAiIndex === index;
+  return {
+    isLatestAi,
+    isWorkingMessage:
+      isLatestAi &&
+      message.kind === "text" &&
+      (isStreamingResponse ||
+        hasVisibleStreamStatus ||
+        (message.content ?? "") === ""),
+  };
+}
+
+export function messagesWithSavedDecisionState(
+  messages: Message[],
+  messageId: string,
+  decisionState: NonNullable<Message["result"]>["decisionState"],
+): Message[] {
+  return messages.map((message) =>
+    message.id === messageId && message.result
+      ? { ...message, result: { ...message.result, decisionState } }
+      : message,
+  );
+}
+
 export function markComposerActionsInactive(messages: Message[]): Message[] {
   return messages.map((message) => {
     if (message.kind === "strategy_result" && message.result) {
