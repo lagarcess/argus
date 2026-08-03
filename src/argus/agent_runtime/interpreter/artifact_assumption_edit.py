@@ -258,6 +258,30 @@ def _canonical_primary_asset_request(
     return current_assets, primary_assets, typed_inclusions, typed_exclusions
 
 
+def _changed_date_endpoints(
+    canonical_date_request: tuple[str, Any] | None,
+    *,
+    current_range: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return only explicitly requested range endpoints that would change."""
+
+    if (
+        canonical_date_request is None
+        or canonical_date_request[0] != "range"
+        or not isinstance(canonical_date_request[1], dict)
+    ):
+        return None
+    return {
+        endpoint: canonical_date_request[1][endpoint]
+        for endpoint in ("start", "end")
+        if endpoint in canonical_date_request[1]
+        and (
+            not isinstance(current_range, dict)
+            or canonical_date_request[1][endpoint] != current_range.get(endpoint)
+        )
+    }
+
+
 def _required_edit_targets_from_primary_draft(
     draft: LLMStrategyDraft | None,
     *,
@@ -322,15 +346,20 @@ def _required_edit_targets_from_primary_draft(
         draft,
         request=request,
     )
-    current_date_request = (
-        ("range", current_strategy.date_range)
-        if current_strategy is not None and current_strategy.date_range is not None
-        else None
+    current_range = current_strategy.date_range if current_strategy is not None else None
+    current_date_request = ("range", current_range) if current_range is not None else None
+    changed_date_endpoints = _changed_date_endpoints(
+        canonical_date_request,
+        current_range=current_range,
     )
     if (
         has_explicit_date
         and canonical_date_request is not None
-        and canonical_date_request != current_date_request
+        and (
+            bool(changed_date_endpoints)
+            if changed_date_endpoints is not None
+            else canonical_date_request != current_date_request
+        )
     ):
         targets.add("date_window")
 
@@ -1018,27 +1047,18 @@ def _materialized_target_matches_primary_delta(
             and materialized[0] == "range"
             and isinstance(materialized[1], dict)
         ):
-            changed_endpoints = {
-                endpoint: requested[1][endpoint]
-                for endpoint in ("start", "end")
-                if endpoint in requested[1]
-                and (
-                    not isinstance(current_range, dict)
-                    or requested[1][endpoint] != current_range.get(endpoint)
-                )
-            }
-            materialized_changed_endpoints = {
-                endpoint
-                for endpoint in ("start", "end")
-                if endpoint in materialized[1]
-                and (
-                    not isinstance(current_range, dict)
-                    or materialized[1][endpoint] != current_range.get(endpoint)
-                )
-            }
+            changed_endpoints = _changed_date_endpoints(
+                requested,
+                current_range=current_range,
+            )
+            materialized_changed_endpoints = _changed_date_endpoints(
+                materialized,
+                current_range=current_range,
+            )
             return (
                 bool(changed_endpoints)
-                and materialized_changed_endpoints == set(changed_endpoints)
+                and materialized_changed_endpoints is not None
+                and set(materialized_changed_endpoints) == set(changed_endpoints)
                 and all(
                     materialized[1].get(endpoint) == value
                     for endpoint, value in changed_endpoints.items()
