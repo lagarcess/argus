@@ -441,11 +441,9 @@ async def _planned_artifact_edit_interpretation(
     )
     if plan is None or plan.outcome != "ready_to_confirm":
         return None
-    if artifact_target in {"pending_refinement", "latest_result"} and (
-        _edit_plan_reshapes_non_recurring_strategy(
-            plan,
-            prior_strategy_type=prior_strategy.strategy_type,
-        )
+    if _edit_plan_reshapes_non_recurring_strategy(
+        plan,
+        prior_strategy_type=prior_strategy.strategy_type,
     ):
         return None
     candidate = StrategySummary(raw_user_phrasing=current_user_message)

@@ -643,6 +643,110 @@ def test_issue_272_cases_run_the_real_two_stage_measurement_topology(
         assert result["status"] == "passed"
 
 
+def test_issue_339_compound_edit_materializes_complete_confirmation(
+    monkeypatch: Any,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.domain.backtesting import coverage as coverage_module
+    from argus.domain.backtesting.coverage import (
+        CoverageDateRange,
+        PreparedMarketData,
+    )
+    from argus.domain.market_data import ResolvedAsset
+
+    case = {case.id: case for case in load_eval_cases()}[
+        "compound_benchmark_start_date_preserves_confirmation_issue_339"
+    ]
+
+    class CompoundEditInterpreter:
+        async def ainvoke(self, request: Any) -> StructuredInterpretation:
+            snapshot = request.latest_task_snapshot
+            assert snapshot is not None
+            assert snapshot.active_confirmation_reference is not None
+            assert snapshot.pending_strategy_summary is not None
+            edited = snapshot.pending_strategy_summary.model_copy(
+                update={
+                    "comparison_baseline": "QQQ",
+                    "date_range": {
+                        "start": "2026-04-01",
+                        "end": "2026-07-30",
+                    },
+                    "extra_parameters": {
+                        "field_provenance": {
+                            "comparison_baseline": "explicit_user",
+                            "date_range": "explicit_user",
+                        }
+                    },
+                },
+                deep=True,
+            )
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="Change the benchmark and start date.",
+                candidate_strategy_draft=edited,
+                semantic_turn_act="refine_current_idea",
+                artifact_target="active_confirmation",
+                reason_codes=["artifact_assumption_edit_planned"],
+            )
+
+    monkeypatch.setattr(
+        harness,
+        "OpenRouterStructuredInterpreter",
+        lambda **_kwargs: CompoundEditInterpreter(),
+    )
+
+    def resolve_asset(symbol: str) -> ResolvedAsset:
+        canonical = symbol.strip().upper()
+        if canonical not in {"LOW", "HD", "QQQ"}:
+            raise ValueError("unsupported_symbol")
+        return ResolvedAsset(
+            canonical_symbol=canonical,
+            asset_class="equity",
+            name=canonical,
+            raw_symbol=canonical,
+            provider="issue-339-test",
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset)
+
+    def prepared_coverage(config: dict[str, Any]) -> PreparedMarketData:
+        assert config["symbols"] == ["LOW", "HD"]
+        assert config["benchmark_symbol"] == "QQQ"
+        expected_window = CoverageDateRange(
+            start="2026-04-01",
+            end="2026-07-30",
+        )
+        return PreparedMarketData(
+            requested_date_range=expected_window,
+            effective_date_range=expected_window,
+            outcome="full_coverage",
+            adjustment_reason=None,
+            dataset_id="issue-339-full-turn-coverage",
+            bars_by_symbol={},
+            observations_by_symbol={"LOW": 84, "HD": 84, "QQQ": 84},
+        )
+
+    monkeypatch.setattr(
+        coverage_module,
+        "prepare_market_data",
+        prepared_coverage,
+    )
+
+    result = harness.run_eval_case(case, run_prose_judge=False)
+
+    assert result["failed_checks"] == []
+    assert result["status"] == "passed"
+    assert result["typed_outcome"]["assets"] == ["LOW", "HD"]
+    assert result["typed_outcome"]["benchmark_symbol"] == "QQQ"
+    assert result["typed_outcome"]["date_range"] == {
+        "start": "2026-04-01",
+        "end": "2026-07-30",
+    }
+
+
 def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> None:
     case = {
         case.id: case for case in load_eval_cases()

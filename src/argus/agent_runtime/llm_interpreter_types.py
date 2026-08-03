@@ -160,6 +160,22 @@ class LLMStrategyDraft(BaseModel):
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
+    asset_inclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "includes in an anchored artifact edit. Do not copy carried assets or "
+            "symbols the user excludes."
+        ),
+    )
+    asset_exclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "excludes from an anchored artifact edit. Do not treat exclusions as "
+            "members of asset_universe."
+        ),
+    )
     asset_universe_operation: Literal["append", "add", "replace"] | None = Field(
         default=None,
         description=(

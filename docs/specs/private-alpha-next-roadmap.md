@@ -209,6 +209,12 @@ the full clean bar — live 40/40 with no waivers (the 17-failure waiver era
 formally over) and strategy-diverse acceptance evidence per the standing
 rule (weekly DCA recurring contribution, SMA 50/200 inheritance).
 
+PR #358 then closed issue #339 as `7b3221a1`: compound edits are
+all-or-retry via required-target coverage over the full typed edit
+vocabulary — a general completeness invariant, not a two-field patch — after
+six adversarial review rounds. Issue #335 (inline confirmation-card editing)
+is unblocked and stacked for the next cycle.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

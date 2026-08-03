@@ -1963,7 +1963,7 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
                     ),
                     strategy_type="buy_and_hold",
                     strategy_thesis="Buy and hold the selected equities.",
-                    asset_universe=["MSFT"],
+                    asset_universe=["AAPL", "TSLA"],
                     asset_universe_operation="replace",
                     date_range={"start": "2026-03-01", "end": "2026-06-05"},
                     capital_amount=75000,
