@@ -36,7 +36,6 @@ def _response_needs_stated_starting_capital_recheck(
     if response.semantic_turn_act in {
         "approval",
         "result_followup",
-        "unsupported_request",
     }:
         return False
     draft = response.candidate_strategy_draft
