@@ -1183,7 +1183,7 @@ export default function ChatInterface() {
     const clearNeutralGuestSubmission = () => { if (isDeferredGuestSubmission) setGuestSubmissionPending(false); };
     const recoverQuotaRejectedRun = (failureCode: unknown) => {
       if (!isGuestSimulationConversionRejection(failureCode, action) || !recoverGuestSimulationRejection(action)) return false;
-      setMessages((prev) => prev.filter((message) => message.id !== assistantId));
+      void loadConversation(requestSession.identity.conversationId);
       finishRequestTransport(requestSession);
       return true;
     };

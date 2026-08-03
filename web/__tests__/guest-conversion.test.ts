@@ -268,6 +268,7 @@ describe("guest conversion contract", () => {
     expect(chat).toContain("errorPayload.code");
     expect(chat).toContain("finalPayload.code");
     expect(chat).toContain("finalPayload.final_response_payload");
+    expect(chat).toContain("loadConversation(requestSession.identity.conversationId)");
     expect(chat.indexOf("errorPayload.code")).toBeLessThan(
       chat.indexOf("throwIfAmbiguousRunSseError", chat.indexOf('event.event === "error"')),
     );
