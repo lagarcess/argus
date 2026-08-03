@@ -63,6 +63,30 @@ def test_activity_datetime_accepts_postgres_trimmed_fractional_seconds(
     )
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            "2026-08-03T03:30:18+00:00",
+            datetime(2026, 8, 3, 3, 30, 18, tzinfo=timezone.utc),
+        ),
+        (
+            "2026-08-03T03:31:24.02766Z",
+            datetime(2026, 8, 3, 3, 31, 24, 27_660, tzinfo=timezone.utc),
+        ),
+        (
+            "2026-08-03T03:30:18Z",
+            datetime(2026, 8, 3, 3, 30, 18, tzinfo=timezone.utc),
+        ),
+    ],
+)
+def test_activity_datetime_accepts_fractionless_and_z_timestamps(
+    value: str,
+    expected: datetime,
+) -> None:
+    assert _as_datetime(value, field="occurred_at") == expected
+
+
 def _source(
     *,
     conversation_id: str,

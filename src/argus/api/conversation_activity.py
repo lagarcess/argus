@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,11 +22,6 @@ from argus.domain.retest_setup import EVIDENCE_IDENTITY_KEYS
 from argus.domain.store import AlphaStore, utcnow
 
 _MAX_CONVERSATIONS = 100
-_ISO_FRACTION_RE = re.compile(
-    r"^(?P<prefix>.*\d{2}:\d{2}:\d{2}\.)"
-    r"(?P<fraction>\d{1,6})"
-    r"(?P<zone>Z|[+-]\d{2}(?::?\d{2})?)$"
-)
 
 
 class ConversationActivityConflict(ValueError):
@@ -38,15 +32,29 @@ def _as_datetime(value: Any, *, field: str) -> datetime:
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, str):
-        match = _ISO_FRACTION_RE.fullmatch(value)
-        if match is not None:
-            value = (
-                f"{match.group('prefix')}"
-                f"{match.group('fraction').ljust(6, '0')}"
-                f"{match.group('zone')}"
+        normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+        time_separator = max(normalized.find("T"), normalized.find(" "))
+        hour_separator = normalized.find(":", time_separator + 1)
+        seconds_separator = normalized.find(":", hour_separator + 1)
+        if time_separator >= 0 and hour_separator >= 0 and seconds_separator >= 0:
+            offset_start = len(normalized)
+            for marker in ("+", "-"):
+                candidate = normalized.find(marker, seconds_separator + 1)
+                if candidate != -1:
+                    offset_start = min(offset_start, candidate)
+            fraction_start = normalized.find(
+                ".", seconds_separator + 1, offset_start
             )
+            if fraction_start != -1:
+                fraction = normalized[fraction_start + 1 : offset_start]
+                if fraction.isdigit() and 1 <= len(fraction) <= 6:
+                    normalized = (
+                        f"{normalized[: fraction_start + 1]}"
+                        f"{fraction.ljust(6, '0')}"
+                        f"{normalized[offset_start:]}"
+                    )
         try:
-            parsed = datetime.fromisoformat(value)
+            parsed = datetime.fromisoformat(normalized)
         except ValueError as exc:
             raise RuntimeError(f"Invalid conversation activity {field}.") from exc
     else:
