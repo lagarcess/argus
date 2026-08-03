@@ -3,7 +3,7 @@
 This directory contains the exact-head local-Supabase browser captures for the
 guest simulation exhaustion recovery modal.
 
-Recaptured at candidate head `17cffb74115993b8f174de3a0b4f818befab660b` on
+Recaptured at candidate head `40bd4fbbfd0931a4bf4a9eb0de4197af88d90425` on
 2026-08-03 after a fresh `supabase db reset --local` applied
 `20260802090000_raise_guest_simulation_allowance.sql`. The browser acceptance
 journey exhausted the two-simulation workspace allowance, then verified the
