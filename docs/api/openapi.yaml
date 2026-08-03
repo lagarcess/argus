@@ -2613,6 +2613,7 @@ components:
           anyOf:
           - type: string
             enum:
+            - second_simulation
             - simulation_limit
             - message_limit
             - save_decision
@@ -2699,6 +2700,7 @@ components:
         reason:
           type: string
           enum:
+          - second_simulation
           - simulation_limit
           - message_limit
           - save_decision

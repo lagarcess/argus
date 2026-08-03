@@ -433,17 +433,11 @@ def _guest_handoff_claim_payload(
     if not source_user_id:
         raise _guest_handoff_problem(request, "guest_handoff_invalid")
     pending_raw = claimed.get("pending_action")
-    if isinstance(pending_raw, dict):
-        # Handoffs created before the neutral reason rename remain claimable.
-        pending_raw = {
-            **pending_raw,
-            "reason": (
-                "simulation_limit"
-                if pending_raw.get("reason") == "second_simulation"
-                else pending_raw.get("reason")
-            ),
-        }
-    pending_action = GuestPendingAction.model_validate(pending_raw) if pending_raw else None
+    pending_action = (
+        GuestPendingAction.model_validate(pending_raw)
+        if isinstance(pending_raw, dict)
+        else None
+    )
     return source_user_id, GuestHandoffClaimResponse(
         conversation_id=str(claimed["conversation_id"]),
         pending_action=pending_action,
