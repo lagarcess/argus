@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,6 +23,11 @@ from argus.domain.retest_setup import EVIDENCE_IDENTITY_KEYS
 from argus.domain.store import AlphaStore, utcnow
 
 _MAX_CONVERSATIONS = 100
+_ISO_FRACTION_RE = re.compile(
+    r"^(?P<prefix>.*\d{2}:\d{2}:\d{2}\.)"
+    r"(?P<fraction>\d{1,6})"
+    r"(?P<zone>Z|[+-]\d{2}(?::?\d{2})?)$"
+)
 
 
 class ConversationActivityConflict(ValueError):
@@ -32,6 +38,13 @@ def _as_datetime(value: Any, *, field: str) -> datetime:
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, str):
+        match = _ISO_FRACTION_RE.fullmatch(value)
+        if match is not None:
+            value = (
+                f"{match.group('prefix')}"
+                f"{match.group('fraction').ljust(6, '0')}"
+                f"{match.group('zone')}"
+            )
         try:
             parsed = datetime.fromisoformat(value)
         except ValueError as exc:
