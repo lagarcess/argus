@@ -185,6 +185,7 @@ import {
   settleOpenConfirmationsFromFinalPayload,
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
+import { messageElementRegistrar } from "./transcript-element-refs";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -2446,13 +2447,7 @@ export default function ChatInterface() {
                       return (
                         <div
                           key={msg.id}
-                          ref={(element) => {
-                            if (element) {
-                              messageElementRefs.current.set(msg.id, element);
-                            } else {
-                              messageElementRefs.current.delete(msg.id);
-                            }
-                          }}
+                          ref={messageElementRegistrar(messageElementRefs, msg.id)}
                           data-message-id={msg.id}
                           tabIndex={-1}
                           className="scroll-m-24 outline-none"
