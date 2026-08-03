@@ -22,14 +22,23 @@ The persisted assistant-message metadata declared:
 After the user supplied January 3 through December 29, 2023, the new
 confirmation preserved AAPL, the $1,000 weekly contribution, daily data, SPY,
 the 40 bps fee, and 0.25 bps slippage. See
-[`screenshots/issue-345/date-range-cost-continuity-en.png`](screenshots/issue-345/date-range-cost-continuity-en.png).
+[`date-range-cost-continuity-en.png`](date-range-cost-continuity-en.png).
 
 Automated coverage separately proves that both English and Spanish use the
 clarifier response as the assistant prompt and declare
 `prompt_source = llm_generated`. When the clarifier is unavailable, the typed
 offline path declares `prompt_source = degraded_fallback`.
 
-## Clean-head live-eval comparison
+The Spanish buy-and-hold recommendation continuity capture is
+[`buy-and-hold-continuity-es.png`](buy-and-hold-continuity-es.png).
+
+## Historical blocked-run comparison
+
+This record explains why PR #359 correctly remained Draft before issue #361's
+live-eval environment repair landed. It is historical failure evidence, not the
+readiness scorecard. Readiness requires a new full live suite on the reconciled
+exact head with no waiver; that scorecard is attached durably to PR #359 after
+the run so recording it does not move the evaluated Git head.
 
 Both runs used the identical command and canonical linked `.env` topology on
 Python 3.10.20:
