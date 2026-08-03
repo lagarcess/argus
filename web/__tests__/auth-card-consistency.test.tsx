@@ -126,7 +126,8 @@ describe("auth card consistency", () => {
       }),
     );
 
-    match(html, /This temporary chat can’t run more simulations/);
+    match(html, /This temporary chat has reached today’s simulation limit/);
+    match(html, /It resets on/);
     match(html, /Aug 9, 2026/);
     match(html, /Create your account/);
   });

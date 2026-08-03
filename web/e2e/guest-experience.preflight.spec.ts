@@ -355,12 +355,12 @@ for (const expectation of [
   {
     language: "en" as const,
     runLabel: /Run backtest/i,
-    resetCopy: /temporary chat can’t run more simulations\. It expires on/i,
+    resetCopy: /temporary chat has reached today’s simulation limit\. It resets on/i,
   },
   {
     language: "es-419" as const,
     runLabel: /Ejecutar backtest/i,
-    resetCopy: /chat temporal ya no puede ejecutar más simulaciones\. Vence el/i,
+    resetCopy: /chat temporal alcanzó el límite de simulaciones de hoy\. Se restablece el/i,
   },
 ]) {
   test(`exhausted guest simulation shows truthful conversion recovery in ${expectation.language}`, async ({
