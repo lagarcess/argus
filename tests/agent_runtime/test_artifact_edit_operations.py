@@ -523,6 +523,8 @@ async def test_issue_339_accepts_primary_matching_delta_without_provenance(
         ),
         preferred_model="primary-model",
         primary_draft=LLMStrategyDraft(
+            asset_universe=["LOW", "HD"],
+            asset_universe_operation="replace",
             comparison_baseline="QQQ",
             date_range={"start": "2026-04-01", "end": "2026-07-30"},
             date_range_intent=LLMDateRangeIntent(
@@ -542,20 +544,48 @@ async def test_issue_339_accepts_primary_matching_delta_without_provenance(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("primary_field", "field_provenance"),
+    ("primary_draft_payload", "expected_capital"),
     [
-        pytest.param("initial_capital", {}, id="initial-capital-without-provenance"),
         pytest.param(
-            "total_capital",
-            {"total_capital": "explicit_user"},
+            {"initial_capital": 5000},
+            5000,
+            id="initial-capital-without-provenance",
+        ),
+        pytest.param(
+            {
+                "total_capital": 5000,
+                "field_provenance": {"total_capital": "explicit_user"},
+            },
+            5000,
             id="grounded-total-capital",
+        ),
+        pytest.param(
+            {
+                "initial_capital": 1000,
+                "total_capital": 5000,
+                "field_provenance": {"total_capital": "explicit_user"},
+            },
+            5000,
+            id="grounded-total-capital-outranks-stale-initial-capital",
+        ),
+        pytest.param(
+            {
+                "initial_capital": 1000,
+                "total_capital": 5000,
+                "field_provenance": {
+                    "initial_capital": "explicit_user",
+                    "total_capital": "explicit_user",
+                },
+            },
+            None,
+            id="conflicting-grounded-capital-aliases-fail-closed",
         ),
     ],
 )
 async def test_issue_339_audits_primary_capital_delta_without_required_target(
     monkeypatch,
-    primary_field,
-    field_provenance,
+    primary_draft_payload,
+    expected_capital,
 ):
     from argus.agent_runtime import llm_interpreter
 
@@ -603,15 +633,15 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
             user=UserState(user_id="u-339"),
         ),
         preferred_model="wrong-model",
-        primary_draft=LLMStrategyDraft(
-            **{primary_field: 5000},
-            field_provenance=field_provenance,
-        ),
+        primary_draft=LLMStrategyDraft(**primary_draft_payload),
     )
 
     assert seen_models == ["wrong-model", "matching-model"]
+    if expected_capital is None:
+        assert response is None
+        return
     assert response is not None
-    assert response.candidate_strategy_draft.initial_capital == 5000
+    assert response.candidate_strategy_draft.initial_capital == expected_capital
 
 
 @pytest.mark.asyncio

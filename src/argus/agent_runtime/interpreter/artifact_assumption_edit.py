@@ -15,6 +15,7 @@ from argus.agent_runtime.artifact_edit_planner import (
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
     normalized_asset_universe_operation,
+    same_asset_universe,
 )
 from argus.agent_runtime.asset_text_grounding import (
     provider_grounded_asset_evidence_from_text,
@@ -164,6 +165,51 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
     return prior
 
 
+def _grounded_total_capital_alias_values(draft: LLMStrategyDraft) -> list[float]:
+    provenance = draft.field_provenance or {}
+    aliases = (
+        ("initial_capital", draft.initial_capital),
+        ("total_capital", draft.total_capital),
+        ("capital_amount", draft.capital_amount),
+    )
+    return [
+        value
+        for field_name, value in aliases
+        if value is not None
+        and str(provenance.get(field_name) or "").strip() in _TOTAL_CAPITAL_SOURCES
+        and not (
+            field_name == "capital_amount"
+            and canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+        )
+    ]
+
+
+def _canonical_total_capital_value(draft: LLMStrategyDraft) -> float | None:
+    grounded_values = _grounded_total_capital_alias_values(draft)
+    if grounded_values:
+        requested = grounded_values[0]
+        return (
+            requested
+            if all(value == requested for value in grounded_values[1:])
+            else None
+        )
+    if draft.initial_capital is not None:
+        return draft.initial_capital
+    if draft.total_capital is not None:
+        return draft.total_capital
+    return draft.capital_amount
+
+
+def _has_conflicting_grounded_total_capital_aliases(
+    draft: LLMStrategyDraft,
+) -> bool:
+    grounded_values = _grounded_total_capital_alias_values(draft)
+    return bool(
+        grounded_values
+        and any(value != grounded_values[0] for value in grounded_values[1:])
+    )
+
+
 def _required_edit_targets_from_primary_draft(
     draft: LLMStrategyDraft | None,
     *,
@@ -184,6 +230,10 @@ def _required_edit_targets_from_primary_draft(
         draft.asset_universe
         and normalized_asset_universe_operation(draft.asset_universe_operation)
         is not None
+        and not same_asset_universe(
+            draft.asset_universe,
+            current_strategy.asset_universe if current_strategy else [],
+        )
     ):
         targets.add("asset")
     if (
@@ -233,26 +283,9 @@ def _required_edit_targets_from_primary_draft(
         targets.add("strategy_family")
 
     capital_source = str(provenance.get("capital_amount") or "").strip()
-    initial_capital_source = str(provenance.get("initial_capital") or "").strip()
-    total_capital_source = str(provenance.get("total_capital") or "").strip()
     current_capital = current_strategy.capital_amount if current_strategy else None
-    if (
-        (
-            draft.initial_capital is not None
-            and initial_capital_source in _TOTAL_CAPITAL_SOURCES
-            and draft.initial_capital != current_capital
-        )
-        or (
-            draft.total_capital is not None
-            and total_capital_source in _TOTAL_CAPITAL_SOURCES
-            and draft.total_capital != current_capital
-        )
-        or (
-            draft.capital_amount is not None
-            and capital_source in _TOTAL_CAPITAL_SOURCES
-            and canonical_strategy_type(draft.strategy_type) != "dca_accumulation"
-            and draft.capital_amount != current_capital
-        )
+    if any(
+        value != current_capital for value in _grounded_total_capital_alias_values(draft)
     ):
         targets.add("capital")
     recurring_source = str(provenance.get("recurring_contribution") or "").strip()
@@ -575,6 +608,8 @@ def materialized_artifact_edit_targets(
         materialized_targets.add("date_window")
     if primary_draft is None:
         return materialized_targets
+    if _has_conflicting_grounded_total_capital_aliases(primary_draft):
+        return None
     current_strategy = _current_artifact_strategy(request)
     primary_has_material_delta = _primary_draft_has_material_delta(
         primary_draft,
@@ -770,20 +805,8 @@ def _materialized_target_matches_primary_delta(
         )
 
     if target == "capital":
-        requested = (
-            primary_draft.initial_capital
-            if primary_draft.initial_capital is not None
-            else (
-                primary_draft.total_capital
-                if primary_draft.total_capital is not None
-                else primary_draft.capital_amount
-            )
-        )
-        materialized = (
-            materialized_draft.initial_capital
-            if materialized_draft.initial_capital is not None
-            else materialized_draft.total_capital
-        )
+        requested = _canonical_total_capital_value(primary_draft)
+        materialized = _canonical_total_capital_value(materialized_draft)
         current = current_strategy.capital_amount if current_strategy else None
     elif target == "recurring_contribution":
         requested = (
