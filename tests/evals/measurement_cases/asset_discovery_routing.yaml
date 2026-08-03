@@ -146,6 +146,33 @@ cases:
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
+  - id: asset_discovery_spanish_generated_pharma_escalation_issue_344
+    # Exact es-419 action emitted by the general-knowledge discovery sidecar.
+    # Bilingual acceptance requires this ordinary natural-language turn to
+    # retain the same typed current-fact route as its English equivalent.
+    prompt: "Buscar acciones actuales para esta categoría: acciones farmacéuticas"
+    user_language: es
+    ui_language: es-419
+    recent_thread_history:
+      - role: user
+        content: "busca acciones farmacéuticas"
+      - role: assistant
+        content: "Aquí tienes acciones farmacéuticas de conocimiento general, no de una búsqueda actual."
+    expected:
+      intent: conversation_followup
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      asset_discovery:
+        relationship: category
+        anchor_symbols: []
+        asset_class_hint: equity
+        category_description_includes_any: ["farmac", "pharma"]
+        needs_current_facts: true
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria:
+        ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+
   - id: asset_discovery_not_direct_backtest_issue_244
     # A direct request to test a named asset is never asset_discovery. The
     # executable confirmation pipeline is the misroute proof: the discovery
