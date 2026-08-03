@@ -3,11 +3,13 @@
 This directory contains the exact-head local-Supabase browser captures for the
 guest simulation exhaustion recovery modal.
 
-Captured at candidate head `642d00b43db4861f48e3937c52e0de24b6c73c17` on
+Recaptured at candidate head `17cffb74115993b8f174de3a0b4f818befab660b` on
 2026-08-03 after a fresh `supabase db reset --local` applied
 `20260802090000_raise_guest_simulation_allowance.sql`. The browser acceptance
 journey exhausted the two-simulation workspace allowance, then verified the
-truthful reset time and conversion offer in both languages.
+truthful visitor-day reset time and conversion offer in both languages. The
+capture runner permits its own first-language evidence write while it runs the
+Spanish assertion, so the bilingual capture is one pinned candidate journey.
 
 - `guest-quota-recovery-en.png` verifies the English reset-time and conversion
   offer after the two-simulation allowance is exhausted.
