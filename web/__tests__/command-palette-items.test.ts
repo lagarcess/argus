@@ -451,6 +451,33 @@ describe("command palette conversation dossier", () => {
     }
   });
 
+  test("leaves focused-row Enter activation to the row keyboard handler", () => {
+    const base = {
+      key: "Enter",
+      itemCount: 3,
+      hasSelection: true,
+      targetIsEditable: false,
+      targetIsSearchInput: false,
+      isEditing: false,
+      focusedRowIndex: 1,
+    };
+
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ type: "none" });
+    expect(
+      commandPaletteKeyboardAction({
+        ...base,
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toEqual({ type: "none" });
+  });
+
   test("routes OS-aware row actions for the selected manageable row", () => {
     const base = {
       itemCount: 3,

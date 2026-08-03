@@ -281,7 +281,7 @@ export function commandPaletteKeyboardAction({
       ? { type: "focus_search" }
       : { type: "select", index: focusedRowIndex - 1 };
   }
-  if (key === "Enter" && hasSelection) {
+  if (key === "Enter" && hasSelection && focusedRowIndex < 0) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };
   }
   const rowAction = commandPaletteRowActionForEvent({
