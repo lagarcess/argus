@@ -956,6 +956,7 @@ export default function ChatInterface() {
     requestGuestSignIn,
     requestNewChat,
     requestOmnisearch,
+    recoverGuestSimulationRejection,
     resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
@@ -1220,6 +1221,15 @@ export default function ChatInterface() {
         }
         const errorPayload = event.data as typeof event.data &
           Record<string, unknown>;
+        if (
+          errorPayload.failure_code === "account_conversion_required" &&
+          action?.type === "run_backtest" &&
+          recoverGuestSimulationRejection(action)
+        ) {
+          setMessages((prev) => prev.filter((message) => message.id !== assistantId));
+          finishRequestTransport(requestSession);
+          return;
+        }
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
         const errorStrategyPathContext =

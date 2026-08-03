@@ -350,6 +350,31 @@ export function useGuestExperience({
     );
   }, [conversationId, conversion]);
 
+  const recoverGuestSimulationRejection = useCallback(
+    (action: ChatActionOption) => {
+      if (
+        account?.account_kind !== "guest" ||
+        !conversationId ||
+        action.type !== "run_backtest"
+      ) {
+        return false;
+      }
+      conversion.requestConversion(
+        "second_simulation",
+        {
+          reason: "second_simulation",
+          conversationId,
+          actionId: crypto.randomUUID(),
+          action,
+        },
+        "signup",
+        account.guest?.expires_at ?? null,
+      );
+      return true;
+    },
+    [account, conversationId, conversion],
+  );
+
   const clearResumeDecision = useCallback(
     () => setResumeDecisionTarget(null),
     [],
@@ -371,6 +396,7 @@ export function useGuestExperience({
   return {
     ...shell,
     admitSend,
+    recoverGuestSimulationRejection,
     requestGuestSearchUpgrade,
     resumeDecisionTarget,
     resumeDecisionArtifactId,

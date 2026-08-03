@@ -1303,6 +1303,7 @@
       "create_title": "Create your account",
       "second_simulation": "Sign in to run another simulation.",
       "simulation_limit_reset": "This temporary chat can’t run more simulations. It expires on {{date}}. Create an account to continue now.",
+      "simulation_limit_request_access": "This temporary chat can’t run more simulations. It expires on {{date}}. Request access or sign in to continue.",
       "message_limit": "Sign in to keep this conversation and continue.",
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",

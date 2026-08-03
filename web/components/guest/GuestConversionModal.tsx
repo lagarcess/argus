@@ -123,9 +123,14 @@ export default function GuestConversionModal({
         </p>
         {reason === "second_simulation" && resetAt ? (
           <p className="mb-5 pr-12 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-            {t("guest.conversion.simulation_limit_reset", {
+            {t(
+              publicAccountAccessEnabled
+                ? "guest.conversion.simulation_limit_reset"
+                : "guest.conversion.simulation_limit_request_access",
+              {
               date: formatAllowancePeriodEnd(resetAt, locale),
-            })}
+              },
+            )}
           </p>
         ) : null}
         {mode === "request" ? (

@@ -131,6 +131,24 @@ describe("auth card consistency", () => {
     match(html, /Create your account/);
   });
 
+  test("simulation exhaustion does not promise signup when public access is disabled", async () => {
+    const html = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "second_simulation",
+        initialMode: "signup",
+        publicAccountAccessEnabled: false,
+        resetAt: "2026-08-09T00:00:00.000Z",
+        locale: "en-US",
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
+
+    match(html, /Request access or sign in to continue/);
+    doesNotMatch(html, /Create an account to continue now/);
+  });
+
   test("forgot password uses the canonical 20px card radius", async () => {
     const html = await renderLocalized(createElement(ForgotPasswordPage));
 

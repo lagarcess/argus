@@ -245,6 +245,18 @@ describe("guest conversion contract", () => {
     );
   });
 
+  test("opens quota recovery for an authoritative workspace-limit rejection", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(experience).toContain("recoverGuestSimulationRejection");
+    expect(chat).toContain('errorPayload.failure_code === "account_conversion_required"');
+    expect(chat).toContain("recoverGuestSimulationRejection(action)");
+  });
+
   test("derives the New-chat auth mode from server-owned public access truth", () => {
     expect(newConversationConversionMode(false)).toBe("login");
     expect(newConversationConversionMode(true)).toBe("signup");
