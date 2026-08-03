@@ -302,12 +302,58 @@ class TestOpenRouterWebSearch:
         (
             "Example Inc. recently completed its IPO.",
             "Acme S.A. completed a public listing.",
+            "U.S. Bancorp announced a public offering.",
         ),
     )
     def test_preserves_corporate_abbreviations_in_adjacent_claim(
         self, supported_claim: str
     ) -> None:
         unsupported_claim = "Unsupported Corp (BAD) is not documented here."
+        marker = "[[1]](https://example.com/listing)"
+        content = f"{unsupported_claim} {supported_claim}{marker}"
+        marker_start = content.index(marker)
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/listing",
+                                    "title": "Public listing",
+                                    "start_index": marker_start,
+                                    "end_index": marker_start + len(marker),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert [result.snippet for result in packet.results] == [supported_claim]
+
+    @pytest.mark.parametrize(
+        "supported_claim",
+        (
+            "eBay completed a public offering.",
+            "iRobot completed a public offering.",
+            "monday.com completed a public offering.",
+        ),
+    )
+    def test_separates_claim_before_lowercase_styled_company_name(
+        self, supported_claim: str
+    ) -> None:
+        unsupported_claim = "Unsupported Inc."
         marker = "[[1]](https://example.com/listing)"
         content = f"{unsupported_claim} {supported_claim}{marker}"
         marker_start = content.index(marker)

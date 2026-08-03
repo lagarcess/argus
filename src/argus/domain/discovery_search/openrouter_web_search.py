@@ -146,6 +146,23 @@ def _citation_span(
     return start, end
 
 
+def _is_dotted_name_prefix(token: str) -> bool:
+    parts = token.strip("([{\"'").rstrip(".").split(".")
+    return len(parts) >= 2 and all(
+        len(part) == 1 and part.isalpha() and part.isupper() for part in parts
+    )
+
+
+def _starts_lowercase_styled_name(text: str) -> bool:
+    token = text.split(maxsplit=1)[0].strip("([{\"'")
+    core = token.rstrip(".,;:!?")
+    domain_parts = core.split(".")
+    return bool(core) and core[0].islower() and (
+        any(character.isupper() for character in core[1:])
+        or (len(domain_parts) >= 2 and any(len(part) > 1 for part in domain_parts))
+    )
+
+
 def _cited_message_context(
     content: str,
     citation: dict[str, Any],
@@ -173,11 +190,13 @@ def _cited_message_context(
     while (period_break := boundary_text.rfind(". ", 0, period_search_end)) >= 0:
         preceding_token = boundary_text[: period_break + 1].rsplit(maxsplit=1)[-1]
         following_text = boundary_text[period_break + 2 :].lstrip()
-        if (
+        starts_new_claim = (
             preceding_token.casefold() not in _CLAIM_ABBREVIATIONS
             or not following_text
             or not following_text[0].islower()
-        ):
+            or _starts_lowercase_styled_name(following_text)
+        )
+        if starts_new_claim and not _is_dotted_name_prefix(preceding_token):
             claim_break = max(claim_break, period_break)
             break
         period_search_end = period_break
