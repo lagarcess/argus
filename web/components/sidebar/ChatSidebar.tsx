@@ -119,6 +119,8 @@ export type ChatSidebarProps = {
   settingsOpenRequest?: number;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
+  /** Keep background shortcut hints visually quiet while a foreground surface owns focus. */
+  shortcutHintsSuppressed?: boolean;
   canManageConversation?: boolean;
   showProfileMenu?: boolean;
   isGuest?: boolean;
@@ -161,6 +163,7 @@ export default function ChatSidebar({
   settingsOpenRequest = 0,
   strategiesEnabled = false,
   omnisearchEnabled = false,
+  shortcutHintsSuppressed = false,
   canManageConversation = true,
   showProfileMenu = true,
   isGuest = false,
@@ -182,6 +185,8 @@ export default function ChatSidebar({
   >(() => new Set());
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const [showShortcutHints, setShowShortcutHints] = useState(false);
+  const shortcutHintsVisible =
+    showShortcutHints && !shortcutHintsSuppressed;
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -501,7 +506,7 @@ export default function ChatSidebar({
           label={t("chat.new_chat")}
           collapsed={!isOpen}
           shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
-          showShortcutHint={showShortcutHints}
+          showShortcutHint={shortcutHintsVisible}
           onClick={() => {
             onNewChat();
           }}
@@ -514,7 +519,7 @@ export default function ChatSidebar({
             label={t("common.search", "Search")}
             collapsed={!isOpen}
             shortcutHint={keyboardShortcutHintDisplay("omnisearch", usesCommandKey)}
-            showShortcutHint={showShortcutHints}
+            showShortcutHint={shortcutHintsVisible}
             onClick={onOpenSearch}
             iconSize={20}
           />
@@ -541,7 +546,7 @@ export default function ChatSidebar({
               "expand_sidebar_recents",
               usesCommandKey,
             )}
-            showShortcutHint={showShortcutHints}
+            showShortcutHint={shortcutHintsVisible}
             onClick={() => {
               if (!isOpen) {
                 // When collapsed: expand sidebar + open recents
@@ -919,7 +924,7 @@ export default function ChatSidebar({
                 "open_settings",
                 usesCommandKey,
               )}
-              showShortcutHint={showShortcutHints}
+              showShortcutHint={shortcutHintsVisible}
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               iconSize={20}
             />

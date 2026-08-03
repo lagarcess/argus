@@ -215,21 +215,25 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const shortcuts = readFileSync(join(root, "lib/keyboard-shortcuts.ts"), "utf-8");
     const headerMenu = readFileSync(
       join(root, "components/chat/ChatHeaderMenu.tsx"),
       "utf-8",
     );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
-    expect(chat).toMatch(
-      /const \[pendingHeaderDeleteId, setPendingHeaderDeleteId\] = useState<\s*string \| null\s*>\(null\);/,
-    );
+    expect(chat).toContain('import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";');
+    expect(chat).toContain("useState<KeyboardDeleteRequest | null>(null)");
+    expect(shortcuts).toContain("export type KeyboardDeleteRequest = {");
+    expect(shortcuts).toContain("conversationId: string;");
+    expect(shortcuts).toContain("showKeyboardHints: boolean;");
     expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
     expect(chat).toContain("if (!conversationId) return;");
-    expect(chat).toContain("setPendingHeaderDeleteId(conversationId);");
-    expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
-    expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
-    expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
+    expect(chat).toContain("setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });");
+    expect(chat).toContain("deleteConversation(pendingHeaderDelete.conversationId)");
+    expect(chat).toContain("handleConversationRemoved(pendingHeaderDelete.conversationId);");
+    expect(chat).toContain("isOpen={Boolean(pendingHeaderDelete)}");
+    expect(chat).toContain("showKeyboardHints={pendingHeaderDelete?.showKeyboardHints}");
     expect(chat).toContain(') : currentView === "chat" &&');
     expect(chat).toContain("conversationId &&");
     expect(chat).toContain("canManageConversation ? (");
