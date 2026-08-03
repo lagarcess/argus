@@ -7,7 +7,9 @@ Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 Latest product change: PR #370 at `c324f877`, which types the nullable
-first-page dossier cursors so guest Decision history loads (issue #341). It
+first-page dossier cursors so guest Decision history loads (issue #341).
+PR #360 then landed issue #349's durable verification evidence as `42d96da7`
+(docs, in-repo screenshots, and one date-stable test fixture only). It
 follows PR #375 at `c334cf3e` (stated-capital preservation on unsupported
 turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
 registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
@@ -164,6 +166,12 @@ the true failure in the Postgres reader. Evidence: same-session 500→200 at
 the exact head with the screenshot committed in-repo; guest workspace
 isolation re-proven. It added no environment variable, deployment, API,
 schema, or migration requirement.
+PR #360 then closed issue #349 as `42d96da7`: conversation-activity truth is
+now verified with durable in-repo evidence — registered manual-unread
+persists, survives reload, clears, and never reorders Recents; each Guest
+state is individually classified with owner actions account-only. Docs and
+four committed screenshots plus one date-stable Playwright fixture line; no
+product behavior, API, schema, or migration change.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
