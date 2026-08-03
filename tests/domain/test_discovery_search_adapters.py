@@ -253,6 +253,42 @@ class TestOpenRouterWebSearch:
             other_claim,
         ]
 
+    def test_uses_only_adjacent_same_line_claim_before_marker(self) -> None:
+        unsupported_claim = "Unsupported Corp (BAD) is not documented here."
+        supported_claim = "Supported Corp (GOOD) completed an IPO."
+        marker = "[[1]](https://example.com/good)"
+        content = f"{unsupported_claim} {supported_claim}{marker}"
+        marker_start = content.index(marker)
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/good",
+                                    "title": "Supported Corp listing",
+                                    "start_index": marker_start,
+                                    "end_index": marker_start + len(marker),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert [result.snippet for result in packet.results] == [supported_claim]
+
     def test_missing_model_fails_closed_without_http(self) -> None:
         calls: list[int] = []
 

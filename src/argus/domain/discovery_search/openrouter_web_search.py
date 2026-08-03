@@ -150,7 +150,15 @@ def _cited_message_context(
     claim_floor = previous_citation_end if previous_citation_end <= start else 0
     line_start = content.rfind("\n", claim_floor, start) + 1
     claim_start = max(claim_floor, line_start, start - 400)
-    return content[claim_start:start].strip()
+    claim = content[claim_start:start].strip()
+    boundary_text = claim[:-1] if claim.endswith((".", "!", "?", ";")) else claim
+    claim_break = max(
+        boundary_text.rfind(separator) for separator in ("\n", ". ", "! ", "? ", "; ")
+    )
+    if claim_break < 0:
+        return claim
+    separator_width = 1 if boundary_text[claim_break] == "\n" else 2
+    return claim[claim_break + separator_width :].strip()
 
 
 def _reported_cost(payload: Any) -> float | None:
