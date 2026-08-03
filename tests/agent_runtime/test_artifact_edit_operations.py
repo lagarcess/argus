@@ -800,7 +800,7 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
             ["Nvidia"],
             ["AAPL", "NVDA"],
             {
-                "asset_universe": ["AAPL", "MSFT", "NVDA"],
+                "asset_universe": ["AAPL", "NVDA"],
                 "asset_universe_operation": "replace",
                 "field_provenance": {"asset_universe": "explicit_user"},
             },
@@ -808,8 +808,8 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
         ),
         pytest.param(
             ["AAPL", "MSFT"],
-            {"NVDA"},
-            "remove the second one and add Nvidia",
+            {"AAPL", "NVDA"},
+            "keep AAPL, remove the second one, and add Nvidia",
             ["AAPL"],
             ["Nvidia"],
             ["MSFT"],
@@ -821,6 +821,22 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
                 "field_provenance": {"asset_universe": "explicit_user"},
             },
             id="accepts-primary-resolved-ordinal-removal",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT", "TSLA"],
+            {"MSFT", "GOOGL"},
+            "add GOOGL and remove Microsoft",
+            ["AAPL"],
+            ["GOOGL"],
+            ["Microsoft"],
+            ["GOOGL"],
+            ["AAPL", "TSLA", "GOOGL"],
+            {
+                "asset_universe": ["MSFT"],
+                "asset_universe_operation": "replace",
+                "field_provenance": {"asset_universe": "explicit_user"},
+            },
+            id="repairs-primary-missing-grounded-addition",
         ),
     ],
 )
