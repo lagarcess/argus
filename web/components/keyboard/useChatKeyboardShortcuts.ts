@@ -24,17 +24,11 @@ type UseChatKeyboardShortcutsOptions = {
   closeTransientSidebar: () => void;
   requestDelete: () => void;
   startRename: () => void;
+  archiveConversation: () => void | Promise<void>;
+  toggleRead: () => void | Promise<void>;
   togglePin: () => void | Promise<void>;
   showChatOptions: () => void;
 };
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
 
 export function useChatKeyboardShortcuts(
   options: UseChatKeyboardShortcutsOptions,
@@ -53,7 +47,6 @@ export function useChatKeyboardShortcuts(
       const current = optionsRef.current;
       if (
         !matchesKeyboardShortcut("keyboard_shortcuts", event) ||
-        isEditableShortcutTarget(event.target) ||
         !canOpenKeyboardShortcuts({
           searchOverlayOpen: current.searchOverlayOpen,
           recentsQuickPeekOpen: isRecentsQuickPeekOpen,
@@ -66,8 +59,8 @@ export function useChatKeyboardShortcuts(
       event.preventDefault();
       setKeyboardShortcutsOpen((open) => !open);
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [isRecentsQuickPeekOpen]);
 
   useEffect(() => {
@@ -78,8 +71,7 @@ export function useChatKeyboardShortcuts(
         current.searchOverlayOpen ||
         isRecentsQuickPeekOpen ||
         current.deleteConfirmationOpen ||
-        current.modalOpen ||
-        isEditableShortcutTarget(event.target)
+        current.modalOpen
       ) {
         return;
       }
@@ -135,13 +127,23 @@ export function useChatKeyboardShortcuts(
         current.startRename();
         return;
       }
+      if (matchesKeyboardShortcut("archive_focused_chat", event)) {
+        event.preventDefault();
+        void current.archiveConversation();
+        return;
+      }
+      if (matchesKeyboardShortcut("toggle_read_focused_chat", event)) {
+        event.preventDefault();
+        void current.toggleRead();
+        return;
+      }
       if (matchesKeyboardShortcut("toggle_pin_focused_chat", event)) {
         event.preventDefault();
         void current.togglePin();
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
 
   return {

@@ -7,6 +7,7 @@ const {
   keyboardShortcutHintDisplay,
   keyboardShortcutDisplay,
   matchesKeyboardShortcut,
+  commandPaletteRowActionForEvent,
   quickJumpHintDisplay,
 } = keyboardShortcuts;
 const quickJumpIndexForEvent = (
@@ -29,10 +30,16 @@ describe("keyboard shortcut registry", () => {
       "new_chat",
       "delete_focused_chat",
       "rename_focused_chat",
+      "archive_focused_chat",
+      "toggle_read_focused_chat",
       "toggle_pin_focused_chat",
       "quick_jump",
+      "command_palette_rename",
+      "command_palette_archive",
+      "command_palette_delete",
     ]);
     expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.labelKey)).toBe(true);
+    expect(KEYBOARD_SHORTCUTS.every((shortcut) => shortcut.defaultLabel)).toBe(true);
   });
 
   test("matches Command or Control without matching a bare modifier", () => {
@@ -89,7 +96,7 @@ describe("keyboard shortcut registry", () => {
     ]);
     expect(keyboardShortcutDisplay("open_recents", true)).toEqual([
       "⌘",
-      "Shift",
+      "⇧",
       ",",
     ]);
     expect(keyboardShortcutDisplay("quick_jump", false)).toEqual([
@@ -99,6 +106,35 @@ describe("keyboard shortcut registry", () => {
     ]);
     expect(keyboardShortcutHintDisplay("new_chat", true)).toBe("⌘⇧.");
     expect(keyboardShortcutHintDisplay("omnisearch", false)).toBe("Ctrl+K");
+    expect(keyboardShortcutHintDisplay("command_palette_rename", true)).toBe(
+      "⌘⇧R",
+    );
+    expect(keyboardShortcutHintDisplay("command_palette_archive", false)).toBe(
+      "Ctrl⇧A",
+    );
+    expect(keyboardShortcutHintDisplay("command_palette_delete", true)).toBe(
+      "⌘⇧D",
+    );
+    expect(keyboardShortcutDisplay("rename_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "R",
+    ]);
+    expect(keyboardShortcutDisplay("archive_focused_chat", false)).toEqual([
+      "Ctrl",
+      "Shift",
+      "A",
+    ]);
+    expect(keyboardShortcutDisplay("delete_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "D",
+    ]);
+    expect(keyboardShortcutDisplay("toggle_read_focused_chat", true)).toEqual([
+      "⌘",
+      "⇧",
+      "U",
+    ]);
     expect(quickJumpHintDisplay(1, true)).toBe("⌘⌥1");
     expect(quickJumpHintDisplay(9, false)).toBe("Ctrl+Shift+9");
   });
@@ -145,7 +181,7 @@ describe("keyboard shortcut registry", () => {
     ).toBe(false);
   });
 
-  test("matches finalized action bindings by physical key code", () => {
+  test("matches punctuation positions and finalized action bindings", () => {
     expect(
       matchesKeyboardShortcut("open_recents", {
         key: "<",
@@ -166,6 +202,23 @@ describe("keyboard shortcut registry", () => {
         altKey: false,
       }),
     ).toBe(false);
+    for (const [id, code] of [
+      ["rename_focused_chat", "KeyR"],
+      ["archive_focused_chat", "KeyA"],
+      ["delete_focused_chat", "KeyD"],
+      ["toggle_read_focused_chat", "KeyU"],
+    ] as const) {
+      expect(
+        matchesKeyboardShortcut(id, {
+          key: code.slice(-1),
+          code,
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: true,
+          altKey: false,
+        }),
+      ).toBe(true);
+    }
     expect(
       matchesKeyboardShortcut("rename_focused_chat", {
         key: "F2",
@@ -175,7 +228,102 @@ describe("keyboard shortcut registry", () => {
         shiftKey: false,
         altKey: false,
       }),
+    ).toBe(false);
+    expect(
+      matchesKeyboardShortcut("delete_focused_chat", {
+        key: "X",
+        code: "KeyX",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("matches mnemonic letters by the logical key on non-US layouts", () => {
+    expect(
+      matchesKeyboardShortcut("archive_focused_chat", {
+        key: "A",
+        code: "KeyQ",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
     ).toBe(true);
+    expect(
+      matchesKeyboardShortcut("archive_focused_chat", {
+        key: "Q",
+        code: "KeyA",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("owns the intuitive Omnisearch row actions in the shared registry", () => {
+    expect(KEYBOARD_SHORTCUTS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "command_palette_rename",
+          group: "omnisearch",
+          key: "r",
+        }),
+        expect.objectContaining({
+          id: "command_palette_archive",
+          group: "omnisearch",
+          key: "a",
+        }),
+        expect.objectContaining({
+          id: "command_palette_delete",
+          group: "omnisearch",
+          key: "d",
+        }),
+      ]),
+    );
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "R",
+        code: "KeyR",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe("rename");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "A",
+        code: "KeyA",
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe("archive");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "D",
+        code: "KeyD",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe("delete");
+    expect(
+      commandPaletteRowActionForEvent({
+        key: "x",
+        code: "KeyX",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   test("matches quick-jump digits by code across shifted layouts", () => {
