@@ -115,6 +115,13 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+def _normalize_username(username: object) -> str | None:
+    if not isinstance(username, str):
+        return None
+    normalized = username.strip().casefold()
+    return normalized or None
+
+
 def _supabase_client_options() -> ClientOptions:
     return ClientOptions(
         httpx_client=httpx.Client(http2=False, timeout=120),
@@ -1968,7 +1975,7 @@ class SupabaseGateway(
         payload = {
             "id": user_id,
             "email": email,
-            "username": user_metadata.get("username"),
+            "username": _normalize_username(user_metadata.get("username")),
             "display_name": user_metadata.get("display_name"),
             "language": language,
             "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
