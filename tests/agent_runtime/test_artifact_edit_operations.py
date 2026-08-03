@@ -753,8 +753,52 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (
+        "current_assets",
+        "grounded_symbols",
+        "current_user_message",
+        "wrong_removals",
+        "wrong_additions",
+        "correct_removals",
+        "correct_additions",
+        "expected_assets",
+    ),
+    [
+        pytest.param(
+            ["AAPL", "MSFT"],
+            {"MSFT", "NVDA"},
+            "remove Microsoft and add Nvidia",
+            ["Microsoft", "AAPL"],
+            ["Nvidia"],
+            ["Microsoft"],
+            ["Nvidia"],
+            ["AAPL", "NVDA"],
+            id="rejects-unrequested-removal",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT", "TSLA"],
+            {"MSFT", "TSLA", "NVDA"},
+            "remove Microsoft and Tesla, then add Nvidia",
+            ["Microsoft", "Tesla"],
+            ["Microsoft", "Nvidia"],
+            ["Microsoft", "Tesla"],
+            ["Nvidia"],
+            ["AAPL", "NVDA"],
+            id="rejects-readded-requested-removal",
+        ),
+    ],
+)
 async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
     monkeypatch,
+    current_assets,
+    grounded_symbols,
+    current_user_message,
+    wrong_removals,
+    wrong_additions,
+    correct_removals,
+    correct_additions,
+    expected_assets,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -767,7 +811,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: {"MSFT", "NVDA"},
+        lambda *_args, **_kwargs: set(grounded_symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
@@ -775,6 +819,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
         lambda _resolve_asset_candidate: lambda symbol: {
             "microsoft": "MSFT",
             "nvidia": "NVDA",
+            "tesla": "TSLA",
         }.get(symbol.strip().casefold(), symbol.strip().upper()),
     )
     seen_models: list[str] = []
@@ -782,12 +827,13 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
     async def invoke_stub(*, model_name, **kwargs):
         del kwargs
         seen_models.append(model_name)
-        removals = ["Microsoft", "AAPL"] if model_name == "wrong-model" else ["Microsoft"]
+        removals = wrong_removals if model_name == "wrong-model" else correct_removals
+        additions = wrong_additions if model_name == "wrong-model" else correct_additions
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
                 EditOperation(op="remove", target="asset", symbols=removals),
-                EditOperation(op="add", target="asset", symbols=["Nvidia"]),
+                EditOperation(op="add", target="asset", symbols=additions),
             ],
             confidence=0.9,
         )
@@ -800,12 +846,12 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
 
     response = await llm_interpreter._plan_pending_artifact_assumption_edit(
         request=InterpretationRequest(
-            current_user_message="remove Microsoft and add Nvidia",
+            current_user_message=current_user_message,
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
                     strategy_type="buy_and_hold",
-                    asset_universe=["AAPL", "MSFT"],
+                    asset_universe=current_assets,
                     asset_class="equity",
                     comparison_baseline="SPY",
                 )
@@ -819,7 +865,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
 
     assert seen_models == ["wrong-model", "correct-model"]
     assert response is not None
-    assert response.candidate_strategy_draft.asset_universe == ["AAPL", "NVDA"]
+    assert response.candidate_strategy_draft.asset_universe == expected_assets
 
 
 @pytest.mark.asyncio

@@ -751,17 +751,26 @@ def _materialized_target_matches_primary_delta(
             )
         if materialized_operation == "replace":
             additions = materialized - current
+            expected_removals = (
+                planned_asset_removals & current if planned_asset_removals else set()
+            )
             if additions:
                 removals = current - materialized
                 if planned_asset_removals:
                     return (
                         additions <= requested
-                        and bool(removals)
+                        and bool(expected_removals)
                         and removals <= requested
-                        and removals <= planned_asset_removals
+                        and removals == expected_removals
                     )
                 return additions <= requested
             removals = current - materialized
+            if planned_asset_removals:
+                return (
+                    bool(expected_removals)
+                    and removals <= requested
+                    and removals == expected_removals
+                )
             return bool(removals) and removals <= requested
         changed_symbols = current ^ materialized
         return changed_symbols <= requested and (
