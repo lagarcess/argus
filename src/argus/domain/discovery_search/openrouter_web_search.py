@@ -120,9 +120,7 @@ def _cited_message_context(content: str, citation: dict[str, Any]) -> str:
         or end > len(content)
     ):
         return ""
-    context_start = max(0, start - 400)
-    context_end = min(len(content), end + 400)
-    return content[context_start:context_end]
+    return content[start:end]
 
 
 def _reported_cost(payload: Any) -> float | None:

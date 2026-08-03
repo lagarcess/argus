@@ -2199,9 +2199,7 @@ async def _response_ready_for_runtime(
     if discovery_response is not None:
         return discovery_response
     return await _audited_response_ready_for_runtime(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
+        response=response, preferred_model=preferred_model, request=request,
         asset_resolution_context=asset_resolution_context,
     )
 

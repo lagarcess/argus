@@ -199,11 +199,15 @@ class TestOpenRouterWebSearch:
         assert packet.results[0].source_date is None
         assert packet.cost_usd == 0.0123
 
-    def test_uses_cited_message_context_when_annotation_omits_content(self) -> None:
+    def test_uses_only_each_cited_span_when_annotations_omit_content(self) -> None:
         content = (
             "Recent market coverage identifies Example Corp (EXM) as a newly "
-            "listed public company."
+            "listed public company. Separate coverage names Other Corp (OTH)."
         )
+        example_start = content.index("Example Corp")
+        example_end = content.index(". Separate")
+        other_start = content.index("Other Corp")
+        other_end = content.index(".", other_start)
         payload = {
             "choices": [
                 {
@@ -215,10 +219,19 @@ class TestOpenRouterWebSearch:
                                 "url_citation": {
                                     "url": "https://example.com/exm",
                                     "title": "Example Corp listing",
-                                    "start_index": content.index("Example Corp"),
-                                    "end_index": len(content),
+                                    "start_index": example_start,
+                                    "end_index": example_end,
                                 },
-                            }
+                            },
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/oth",
+                                    "title": "Other Corp listing",
+                                    "start_index": other_start,
+                                    "end_index": other_end,
+                                },
+                            },
                         ],
                     }
                 }
@@ -232,7 +245,10 @@ class TestOpenRouterWebSearch:
             "recent IPOs", max_results=5, timeout_seconds=8.0
         )
 
-        assert packet.results[0].snippet == content
+        assert [result.snippet for result in packet.results] == [
+            "Example Corp (EXM) as a newly listed public company",
+            "Other Corp (OTH)",
+        ]
 
     def test_missing_model_fails_closed_without_http(self) -> None:
         calls: list[int] = []
