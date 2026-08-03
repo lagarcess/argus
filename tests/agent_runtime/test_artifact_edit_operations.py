@@ -2910,8 +2910,31 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
 
 
 @pytest.mark.asyncio
-async def test_issue_339_primary_replacement_grounds_card_resolved_exclusion(
+@pytest.mark.parametrize(
+    ("primary_operation", "primary_assets", "planner_operations"),
+    [
+        pytest.param(
+            "replace",
+            ["AAPL", "NVDA"],
+            [EditOperation(op="replace", target="asset", symbols=["AAPL", "NVDA"])],
+            id="replace",
+        ),
+        pytest.param(
+            "append",
+            ["NVDA"],
+            [
+                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
+                EditOperation(op="add", target="asset", symbols=["NVDA"]),
+            ],
+            id="mixed-append",
+        ),
+    ],
+)
+async def test_issue_339_primary_asset_edit_grounds_card_resolved_exclusion(
     monkeypatch,
+    primary_operation,
+    primary_assets,
+    planner_operations,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -2931,13 +2954,7 @@ async def test_issue_339_primary_replacement_grounds_card_resolved_exclusion(
         del kwargs
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
-            operations=[
-                EditOperation(
-                    op="replace",
-                    target="asset",
-                    symbols=["AAPL", "NVDA"],
-                )
-            ],
+            operations=planner_operations,
             confidence=0.9,
         )
 
@@ -2964,8 +2981,9 @@ async def test_issue_339_primary_replacement_grounds_card_resolved_exclusion(
         ),
         preferred_model="primary-model",
         primary_draft=LLMStrategyDraft(
-            asset_universe=["AAPL", "NVDA"],
-            asset_universe_operation="replace",
+            asset_universe=primary_assets,
+            asset_inclusions=["NVDA"],
+            asset_universe_operation=primary_operation,
             asset_exclusions=["MSFT"],
             field_provenance={"asset_universe": "explicit_user"},
         ),

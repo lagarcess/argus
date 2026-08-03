@@ -913,7 +913,8 @@ def materialized_artifact_edit_targets(
     primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
     card_resolved_asset_exclusions = (
         (primary_asset_exclusions & current_assets) - primary_assets
-        if primary_carries_explicit_asset_request and primary_asset_operation == "replace"
+        if primary_carries_explicit_asset_request
+        and primary_asset_operation in {"append", "replace"}
         else set()
     )
     if (
