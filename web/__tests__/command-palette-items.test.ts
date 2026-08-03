@@ -73,6 +73,7 @@ const conversationDossier = {
       },
       {
         type: "decision",
+        availability: "available",
         evidence_artifact_id: "evidence-2",
         decision_state: null,
         note: null,
