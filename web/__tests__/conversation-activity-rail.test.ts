@@ -1107,11 +1107,16 @@ describe("rail source discipline", () => {
       join(root, "components/chat/StrategyResultCard.tsx"),
       "utf-8",
     );
+    const projectionSrc = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     expect(cardSrc).toContain(
       "onDecisionSaved?.(response.decision.decision_state)",
     );
-    expect(interfaceSrc).toContain(
-      "{ ...m, result: { ...m.result, decisionState } }",
+    expect(interfaceSrc).toContain("messagesWithSavedDecisionState(");
+    expect(projectionSrc).toContain(
+      "{ ...message, result: { ...message.result, decisionState } }",
     );
   });
 
