@@ -40,6 +40,7 @@ from argus.domain.supabase_gateway import (
     QuotaExceededError,
     SupabaseGateway,
 )
+from argus.domain.username_signup import UsernameSignupPrevalidation
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -2322,6 +2323,77 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     )
 
 
+def test_signup_retry_does_not_reveal_profile_creation_through_username(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.side_effect = [
+        {
+            "session": None,
+            "user": {
+                "id": "fresh-user-id",
+                "email": "fresh@example.com",
+                "identities": [{"id": "fresh-identity-id"}],
+            },
+        },
+        {
+            "session": None,
+            "user": {
+                "id": "obfuscated-user-id",
+                "email": "fresh@example.com",
+                "identities": [],
+            },
+        },
+    ]
+    headers = {"X-Forwarded-For": "203.0.113.93"}
+
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        side_effect=[
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=False,
+                    username_available=True,
+                )
+            ),
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=True,
+                    username_available=False,
+                )
+            ),
+        ],
+    ):
+        first = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+        retry = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["user"]["identities"] == []
+    assert mock_gateway.signup.call_count == 2
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
+
+
 def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
     mock_gateway,
     monkeypatch,
@@ -2331,7 +2403,12 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
     mock_gateway.private_alpha_email_allowed.return_value = True
     with patch(
         "argus.api.routers.auth.serialized_username_signup",
-        return_value=nullcontext(False),
+        return_value=nullcontext(
+            UsernameSignupPrevalidation(
+                auth_user_exists=False,
+                username_available=False,
+            )
+        ),
     ) as serialize_username:
         response = client.post(
             "/api/v1/auth/signup",
@@ -2348,6 +2425,7 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
     assert response.json()["detail"] == "That username is already taken."
     serialize_username.assert_called_once_with(
         api_state.DATABASE_URL,
+        "fresh@example.com",
         "portfolioalpha",
     )
     mock_gateway.signup.assert_not_called()

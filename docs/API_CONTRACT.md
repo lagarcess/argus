@@ -1667,9 +1667,13 @@ attempts must not distinguish unlisted/disabled private-alpha emails from
 listed emails that fail provider signup.
 
 When an optional username is supplied, the server trims and case-folds it and
-serializes same-username signup attempts before checking profile availability
-and creating the Auth user. A conflict returns `409 username_taken`; the Auth
-provider and profile write are not called for the losing request.
+serializes same-email and same-username signup attempts before checking profile
+availability and creating the Auth user. A conflict for an email that can
+create a new Auth user returns `409 username_taken`; the Auth provider and
+profile write are not called for the losing request. If the Auth email already
+exists, Argus preserves Supabase's public duplicate-signup response instead of
+letting the username check reveal that account. An obfuscated response with an
+empty identity list never creates a profile.
 
 ```json
 {

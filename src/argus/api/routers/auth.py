@@ -687,9 +687,14 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
     try:
         with serialized_username_signup(
             api_state.DATABASE_URL,
+            body.email,
             body.username,
-        ) as username_available:
-            if body.username is not None and not username_available:
+        ) as prevalidation:
+            if (
+                body.username is not None
+                and not prevalidation.auth_user_exists
+                and not prevalidation.username_available
+            ):
                 raise _username_taken_problem(request)
             result = api_state.supabase_gateway.signup(
                 email=body.email,

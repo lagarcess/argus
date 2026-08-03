@@ -992,17 +992,26 @@ def test_username_availability_treats_pattern_characters_as_literals() -> None:
             ).eq("id", user_id).execute()
             with serialized_username_signup(
                 LOCAL_DATABASE_URL,
+                f"username-probe-{suffix}@example.test",
                 literal_username,
             ) as available:
-                assert available is True
+                assert available.username_available is True
             gateway.client.table("profiles").update(
                 {"username": literal_username}
             ).eq("id", user_id).execute()
             with serialized_username_signup(
                 LOCAL_DATABASE_URL,
+                f"username-probe-{suffix}@example.test",
                 literal_username,
             ) as available:
-                assert available is False
+                assert available.username_available is False
+        with serialized_username_signup(
+            LOCAL_DATABASE_URL,
+            email,
+            username_pairs[-1][0],
+        ) as existing_email_prevalidation:
+            assert existing_email_prevalidation.auth_user_exists is True
+            assert existing_email_prevalidation.username_available is False
     finally:
         if user_id:
             with suppress(Exception):
