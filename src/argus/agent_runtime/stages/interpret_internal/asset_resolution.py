@@ -1222,6 +1222,13 @@ def _missing_fields_for_interpretation(
         required_missing_fields = list(
             dict.fromkeys(["entry_logic", *required_missing_fields])
         )
+    incomplete_asset_context = (
+        "provider_context_incomplete_asset_mentions" in interpretation.reason_codes
+    )
+    if incomplete_asset_context:
+        required_missing_fields = list(
+            dict.fromkeys(["asset_universe", *required_missing_fields])
+        )
     allowed_missing_fields = set(required_missing_fields)
     missing = [
         field
@@ -1231,6 +1238,11 @@ def _missing_fields_for_interpretation(
     if "entry_logic" in required_missing_fields and "entry_logic" not in missing:
         missing.insert(0, "entry_logic")
     missing.extend(required_missing_fields)
+    if incomplete_asset_context:
+        missing = [
+            "asset_universe",
+            *[field for field in missing if field != "asset_universe"],
+        ]
     return list(dict.fromkeys(missing))
 
 
