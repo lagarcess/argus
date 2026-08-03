@@ -199,15 +199,18 @@ class TestOpenRouterWebSearch:
         assert packet.results[0].source_date is None
         assert packet.cost_usd == 0.0123
 
-    def test_uses_only_each_cited_span_when_annotations_omit_content(self) -> None:
+    def test_uses_only_each_claim_before_a_citation_marker(self) -> None:
+        example_claim = "Example Corp (EXM) is a newly listed public company."
+        example_marker = "[[1]](https://example.com/exm)"
+        other_claim = "Other Corp (OTH) completed a separate listing."
+        other_marker = "[[2]](https://example.com/oth)"
         content = (
-            "Recent market coverage identifies Example Corp (EXM) as a newly "
-            "listed public company. Separate coverage names Other Corp (OTH)."
+            f"{example_claim}{example_marker}\n{other_claim}{other_marker}"
         )
-        example_start = content.index("Example Corp")
-        example_end = content.index(". Separate")
-        other_start = content.index("Other Corp")
-        other_end = content.index(".", other_start)
+        example_start = content.index(example_marker)
+        example_end = example_start + len(example_marker)
+        other_start = content.index(other_marker)
+        other_end = other_start + len(other_marker)
         payload = {
             "choices": [
                 {
@@ -246,8 +249,8 @@ class TestOpenRouterWebSearch:
         )
 
         assert [result.snippet for result in packet.results] == [
-            "Example Corp (EXM) as a newly listed public company",
-            "Other Corp (OTH)",
+            example_claim,
+            other_claim,
         ]
 
     def test_missing_model_fails_closed_without_http(self) -> None:

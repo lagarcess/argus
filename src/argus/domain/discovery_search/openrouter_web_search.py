@@ -88,26 +88,35 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
     if not isinstance(message_content, str):
         message_content = ""
     sanitized: list[SearchResult] = []
+    previous_citation_end = 0
     for annotation in annotations:
         if not isinstance(annotation, dict):
             continue
         citation = annotation.get("url_citation", annotation)
         if not isinstance(citation, dict):
             continue
+        citation_span = _citation_span(message_content, citation)
         result = sanitize_search_result(
             title=str(citation.get("title") or ""),
             url=str(citation.get("url") or ""),
             snippet=str(citation.get("content") or "")
-            or _cited_message_context(message_content, citation),
+            or _cited_message_context(
+                message_content,
+                citation,
+                previous_citation_end=previous_citation_end,
+            ),
             source_date=None,
         )
         if result is not None:
             sanitized.append(result)
+        if citation_span is not None:
+            previous_citation_end = max(previous_citation_end, citation_span[1])
     return sanitized
 
 
-def _cited_message_context(content: str, citation: dict[str, Any]) -> str:
-    """Recover bounded evidence when OpenRouter omits citation content."""
+def _citation_span(
+    content: str, citation: dict[str, Any]
+) -> tuple[int, int] | None:
     start = citation.get("start_index")
     end = citation.get("end_index")
     if (
@@ -119,8 +128,29 @@ def _cited_message_context(content: str, citation: dict[str, Any]) -> str:
         or end < start
         or end > len(content)
     ):
+        return None
+    return start, end
+
+
+def _cited_message_context(
+    content: str,
+    citation: dict[str, Any],
+    *,
+    previous_citation_end: int = 0,
+) -> str:
+    """Recover only the claim structurally attached to a citation marker."""
+    span = _citation_span(content, citation)
+    if span is None:
         return ""
-    return content[start:end]
+    start, end = span
+    annotated = content[start:end].strip()
+    citation_url = str(citation.get("url") or "").strip()
+    if not citation_url or citation_url not in annotated:
+        return annotated
+    claim_floor = previous_citation_end if previous_citation_end <= start else 0
+    line_start = content.rfind("\n", claim_floor, start) + 1
+    claim_start = max(claim_floor, line_start, start - 400)
+    return content[claim_start:start].strip()
 
 
 def _reported_cost(payload: Any) -> float | None:
