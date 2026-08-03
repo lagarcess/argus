@@ -1180,8 +1180,12 @@ export default function ChatInterface() {
 
     const canApplyVisibleStreamUpdate = () =>
       requestSessions.canWriteVisible(requestSession);
-    const clearNeutralGuestSubmission = () => {
-      if (isDeferredGuestSubmission) setGuestSubmissionPending(false);
+    const clearNeutralGuestSubmission = () => { if (isDeferredGuestSubmission) setGuestSubmissionPending(false); };
+    const recoverQuotaRejectedRun = (failureCode: unknown) => {
+      if (!isGuestSimulationConversionRejection(failureCode, action) || !recoverGuestSimulationRejection(action)) return false;
+      setMessages((prev) => prev.filter((message) => message.id !== assistantId));
+      finishRequestTransport(requestSession);
+      return true;
     };
     const handleStreamEvent = (event: ChatStreamEvent) => {
       if (event.event === "stage_start") {
@@ -1214,14 +1218,10 @@ export default function ChatInterface() {
       if (event.event === "error") {
         if (!requestSessions.authorize(requestSession, "error")) return;
         clearNeutralGuestSubmission();
+        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
+        if (recoverQuotaRejectedRun(errorPayload.code)) return;
         throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
         if (!canApplyVisibleStreamUpdate()) {
-          finishRequestTransport(requestSession);
-          return;
-        }
-        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
-        if (isGuestSimulationConversionRejection(errorPayload.code, action) && recoverGuestSimulationRejection(action)) {
-          setMessages((prev) => prev.filter((message) => message.id !== assistantId));
           finishRequestTransport(requestSession);
           return;
         }
@@ -1291,8 +1291,8 @@ export default function ChatInterface() {
         if (!identityAuthorized) return;
         clearNeutralGuestSubmission();
         setStreamStatus(null);
-        const finalPayload = event.data as typeof event.data &
-          Record<string, unknown>;
+        const finalPayload = event.data as typeof event.data & Record<string, unknown>;
+        if (recoverQuotaRejectedRun(finalPayload.code)) return;
         const finalText =
           event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;

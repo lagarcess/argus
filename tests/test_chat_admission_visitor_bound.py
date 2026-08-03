@@ -67,13 +67,14 @@ def test_exhausted_visitor_with_existing_reservation_replays(monkeypatch) -> Non
 def test_replay_ignores_a_transient_first_simulation_counter_failure(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(flow, "read_visitor_used", MagicMock(side_effect=RuntimeError))
     gateway = _gateway(reservation={"id": "job-1"}, decision="replay")
+    gateway.list_current_usage_counters.side_effect = RuntimeError
 
     result = _admit(gateway)
 
     assert result.decision == "replay"
     gateway.admit_backtest_job.assert_called_once()
+    gateway.list_current_usage_counters.assert_not_called()
 
 
 def test_exhausted_visitor_without_reservation_requires_conversion(
@@ -137,11 +138,17 @@ def test_only_first_fresh_admission_emits_first_simulation(monkeypatch) -> None:
     )
 
     first = _gateway(reservation=None, decision="admitted")
-    monkeypatch.setattr(flow, "read_visitor_used", lambda *a, **k: 0)
+    first.list_current_usage_counters.return_value = [
+        {"resource": "backtest_runs", "used_count": 1}
+    ]
     _admit(first)
 
     second = _gateway(reservation=None, decision="admitted")
-    monkeypatch.setattr(flow, "read_visitor_used", lambda *a, **k: 1)
+    # The visitor-day counter can reset between these admissions. The durable
+    # guest-session counter is the identity that must suppress the duplicate.
+    second.list_current_usage_counters.return_value = [
+        {"resource": "backtest_runs", "used_count": 2}
+    ]
     _admit(second)
 
     assert events == ["first_simulation_admitted"]

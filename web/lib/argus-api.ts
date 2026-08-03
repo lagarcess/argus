@@ -382,6 +382,7 @@ export type ChatStreamEvent =
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
+  code?: string;
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;
