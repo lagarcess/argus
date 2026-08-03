@@ -1345,6 +1345,8 @@ for (const testCase of [
     await expect(
       page.getByText(WINDOW_REJECTION_BACKEND_DETAIL, { exact: true }),
     ).toHaveCount(0);
+    await page.waitForTimeout(300);
+    expect(api.streamRequests).toHaveLength(requestCountBeforeRun + 1);
 
     const evidenceDir = process.env.ARGUS_EVIDENCE_DIR;
     if (evidenceDir) {
