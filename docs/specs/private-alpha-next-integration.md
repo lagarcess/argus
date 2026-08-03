@@ -6,11 +6,13 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #355 at `c01d5730`, which preserves provider-resolved
-opening-turn assets and capital through clarification (issue #336). It follows
-PR #362 at `b2e8975c`, an eval-harness-only repair of the sanctioned live-eval
-environment (issue #361), and PR #348 at `38874bae`, which self-hosts canonical
-Inter and Space Grotesk fonts without changing typography ownership.
+Latest product change: PR #353 at `7e4c58f8`, which clears a resolved
+clarification's rail attention marker only on proven typed continuity
+(issue #337). It follows PR #355 at `c01d5730`, which preserves
+provider-resolved opening-turn assets and capital through clarification
+(issue #336), PR #362 at `b2e8975c`, an eval-harness-only repair of the
+sanctioned live-eval environment (issue #361), and PR #348 at `38874bae`,
+which self-hosts canonical Inter and Space Grotesk fonts.
 Later commits may reconcile documentation and issue state without changing
 product behavior. New work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning either product SHA. The
@@ -101,6 +103,16 @@ blocked. Accepted evidence includes the exact-head live-eval gate and a
 founder-witnessed browser reproduction of the original G-01 transcript. It
 added no environment variable, deployment, API, schema, or migration
 requirement.
+PR #353 then closed issue #337 as `7e4c58f8`: a rail needs-attention tick for
+a clarification clears only when a later active confirmation is proven, via
+backend-owned typed metadata (`strategy_path_id`, `source_result_run_id`, and
+provenance-checked user values), to continue the same strategy path; unproven
+or unrelated confirmations fail closed. The Guest rail keeps its single
+legitimate completed-run tick visible. The first exact-head verification
+failed and was repaired (e2e seed omitted real workflow metadata) before
+acceptance; the final head passed the real local-Supabase Guest replay
+independently. It added no environment variable, deployment, API, schema, or
+migration requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

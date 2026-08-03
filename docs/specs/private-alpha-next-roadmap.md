@@ -138,6 +138,14 @@ cross-class contexts remain blocked. The one full-suite live red at the gate
 was the baseline-reproduced comparison/category drift tracked by issue #364,
 not a #336 regression.
 
+PR #353 then closed issue #337 as `7e4c58f8`: stale rail attention markers
+clear only on proven typed continuity between the clarification and a later
+active confirmation, backed by backend-emitted `strategy_path_id` and
+`source_result_run_id` metadata; unproven recovery fails closed and Guest
+single-tick visibility is preserved. Its first exact-head gate run failed
+(e2e seed lacked real workflow metadata) and was repaired before acceptance —
+the independent re-verification discipline this batch exists for.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
