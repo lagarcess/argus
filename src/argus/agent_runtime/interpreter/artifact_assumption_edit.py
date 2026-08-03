@@ -455,6 +455,13 @@ def _required_edit_targets_from_primary_draft(
     ):
         targets.add("strategy_family")
 
+    if (
+        draft.position_size is not None
+        and provenance.get("position_size") == "explicit_user"
+        and draft.position_size != getattr(current_strategy, "position_size", None)
+    ):
+        targets.add("position_size")
+
     current_capital = _current_total_capital_value(current_strategy)
     if any(
         value != current_capital
@@ -1024,7 +1031,7 @@ def _materialized_target_matches_primary_delta(
                 operation is None
                 and planned_asset_replacement
                 and primary_inclusions
-                and not primary_exclusions
+                and (not primary_exclusions or bool(primary_requested))
             ):
                 expected_from_typed_roles = set(primary_requested)
             elif operation == "append":

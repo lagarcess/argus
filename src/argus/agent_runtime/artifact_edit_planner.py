@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -93,6 +93,9 @@ async def plan_artifact_assumption_edit(
         return None
 
     required_target_set = set(required_targets or ())
+    supported_targets = set(get_args(EditOperation.model_fields["target"].annotation))
+    if not required_target_set <= supported_targets:
+        return None
     messages = _artifact_assumption_edit_messages(
         current_user_message=current_user_message,
         prior_strategy=prior_strategy,
