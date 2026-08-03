@@ -1292,12 +1292,7 @@ export default function ChatInterface() {
         clearNeutralGuestSubmission();
         setStreamStatus(null);
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
-        const finalResponsePayload =
-          typeof finalPayload.final_response_payload === "object" &&
-          finalPayload.final_response_payload !== null
-            ? (finalPayload.final_response_payload as Record<string, unknown>)
-            : null;
-        if (recoverQuotaRejectedRun(finalResponsePayload?.code ?? finalPayload.code)) return;
+        if (recoverQuotaRejectedRun((finalPayload.final_response_payload as { code?: unknown } | undefined)?.code ?? finalPayload.code)) return;
         const finalText =
           event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
