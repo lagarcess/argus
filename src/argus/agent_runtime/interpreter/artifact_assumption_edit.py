@@ -665,6 +665,10 @@ def materialized_artifact_edit_targets(
             asset_symbol_resolver=asset_symbol_resolver,
         )
     }
+    planned_asset_replacement = any(
+        operation.target == "asset" and operation.op == "replace"
+        for operation in plan.operations
+    )
     if "asset" in materialized_targets and (
         (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))
         or (
@@ -689,6 +693,7 @@ def materialized_artifact_edit_targets(
                 request=request,
                 grounded_asset_symbols=grounded_asset_symbols,
                 planned_asset_removals=planned_removals,
+                planned_asset_replacement=planned_asset_replacement,
             )
         )
     }
@@ -715,6 +720,7 @@ def _materialized_target_matches_primary_delta(
     request: InterpretationRequest,
     grounded_asset_symbols: set[str] | None = None,
     planned_asset_removals: set[str] | None = None,
+    planned_asset_replacement: bool = False,
 ) -> bool:
     """Prove the candidate applied the primary interpreter's requested value."""
 
@@ -760,6 +766,8 @@ def _materialized_target_matches_primary_delta(
             return False
         if primary_replacement:
             return True
+        if planned_asset_replacement:
+            return bool(materialized) and materialized <= grounded
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested
         if operation == "append":

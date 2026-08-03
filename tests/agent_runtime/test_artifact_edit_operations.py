@@ -962,8 +962,44 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (
+        "grounded_symbols",
+        "current_user_message",
+        "primary_assets",
+        "wrong_assets",
+        "correct_assets",
+        "expected_models",
+    ),
+    [
+        pytest.param(
+            {"AAPL", "NVDA", "GOOGL"},
+            "replace the basket with AAPL, NVDA, and GOOGL",
+            ["AAPL", "NVDA"],
+            ["AAPL", "NVDA", "GOOGL"],
+            ["AAPL", "NVDA", "GOOGL"],
+            ["primary-model"],
+            id="augments-material-primary-replacement",
+        ),
+        pytest.param(
+            {"NVDA", "GOOGL"},
+            "replace the basket with NVDA and GOOGL",
+            ["AAPL", "MSFT"],
+            ["AAPL", "NVDA", "GOOGL"],
+            ["NVDA", "GOOGL"],
+            ["primary-model", "fallback-model"],
+            id="rejects-ungrounded-retention-from-unchanged-carrier",
+        ),
+    ],
+)
 async def test_issue_339_grounded_replace_augments_primary_without_changing_retained_assets(
     monkeypatch,
+    grounded_symbols,
+    current_user_message,
+    primary_assets,
+    wrong_assets,
+    correct_assets,
+    expected_models,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -976,7 +1012,7 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: {"AAPL", "NVDA", "GOOGL"},
+        lambda *_args, **_kwargs: set(grounded_symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
@@ -988,13 +1024,14 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
     async def invoke_stub(*, model_name, **kwargs):
         del kwargs
         seen_models.append(model_name)
+        assets = wrong_assets if model_name == "primary-model" else correct_assets
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             operations=[
                 EditOperation(
                     op="replace",
                     target="asset",
-                    symbols=["AAPL", "NVDA", "GOOGL"],
+                    symbols=assets,
                 )
             ],
             confidence=0.9,
@@ -1008,7 +1045,7 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
 
     response = await llm_interpreter._plan_pending_artifact_assumption_edit(
         request=InterpretationRequest(
-            current_user_message="replace the basket with AAPL, NVDA, and GOOGL",
+            current_user_message=current_user_message,
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
@@ -1023,19 +1060,15 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
         ),
         preferred_model="primary-model",
         primary_draft=LLMStrategyDraft(
-            asset_universe=["AAPL", "NVDA"],
+            asset_universe=primary_assets,
             asset_universe_operation="replace",
             field_provenance={"asset_universe": "explicit_user"},
         ),
     )
 
-    assert seen_models == ["primary-model"]
+    assert seen_models == expected_models
     assert response is not None
-    assert response.candidate_strategy_draft.asset_universe == [
-        "AAPL",
-        "NVDA",
-        "GOOGL",
-    ]
+    assert response.candidate_strategy_draft.asset_universe == correct_assets
 
 
 @pytest.mark.asyncio
