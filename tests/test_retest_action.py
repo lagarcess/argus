@@ -655,6 +655,64 @@ def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
     )
 
 
+def test_extended_currency_pair_window_returns_typed_violation_before_preflight(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["asset_class"] = "currency_pair"
+    config_snapshot["symbols"] = ["EUR/USD"]
+    config_snapshot["benchmark_symbol"] = "EUR/USD"
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "1D",
+    }
+    currency_pair_run = stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+
+    def _forbidden_preflight(*_: Any, **__: Any) -> Any:
+        raise AssertionError("window validation must run before provider preflight")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.retest_confirmation.prepare_confirmation_launch",
+        _forbidden_preflight,
+    )
+    client, conversation_id, source_run = _client_with_owned_run(
+        currency_pair_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "kraken_ohlc_window_exceeded"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+
+
 def test_provider_timeout_returns_typed_unavailable_without_persisting_turn(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,

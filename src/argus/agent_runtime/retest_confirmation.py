@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import (
@@ -17,6 +17,10 @@ from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.confirmation_preflight import (
     materialize_confirmation_strategy,
     prepare_confirmation_launch,
+)
+from argus.domain.market_data.capabilities import (
+    AssetClass,
+    validate_market_data_window,
 )
 from argus.domain.retest_setup import RetestSetup
 
@@ -105,6 +109,16 @@ def prepare_retest_confirmation_payload(
     )
     if payload is None:
         return RetestConfirmationPreparation()
+
+    try:
+        validate_market_data_window(
+            asset_class=cast(AssetClass, setup.asset_class),
+            timeframe=setup.timeframe,
+            start_date=setup.start,
+            end_date=setup.end,
+        )
+    except ValueError as exc:
+        return RetestConfirmationPreparation(coverage_error_code=str(exc))
 
     preflight = prepare_confirmation_launch(dict(payload["launch_payload"]))
     if preflight.outcome == "coverage_failure":
