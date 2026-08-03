@@ -738,7 +738,7 @@ def _materialized_target_matches_primary_delta(
         )
         if not requested or materialized == current:
             return False
-        primary_replacement = operation == "replace"
+        primary_replacement = operation == "replace" and primary_requested != current
         if primary_replacement:
             primary_additions = primary_requested - current
             materialized_additions = materialized - current

@@ -653,6 +653,7 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
         "grounded_symbols",
         "expected_assets",
         "current_user_message",
+        "primary_asset_universe",
     ),
     [
         pytest.param(
@@ -662,6 +663,7 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
             {"BRK.B"},
             ["BRK.B"],
             "switch the asset to Berkshire Hathaway Class B and benchmark to QQQ",
+            None,
             id="replacement-can-remove-prior-universe",
         ),
         pytest.param(
@@ -671,7 +673,18 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
             {"MSFT"},
             ["AAPL"],
             "remove Microsoft and change the benchmark to QQQ",
+            None,
             id="removal-can-resolve-grounded-company-alias",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT"],
+            "remove",
+            ["Microsoft"],
+            {"MSFT"},
+            ["AAPL"],
+            "remove Microsoft and change the benchmark to QQQ",
+            ["AAPL", "MSFT"],
+            id="unchanged-primary-replacement-does-not-block-removal",
         ),
     ],
 )
@@ -683,6 +696,7 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
     grounded_symbols,
     expected_assets,
     current_user_message,
+    primary_asset_universe,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -741,8 +755,19 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
         ),
         preferred_model="primary-model",
         primary_draft=LLMStrategyDraft(
+            asset_universe=primary_asset_universe or [],
+            asset_universe_operation=(
+                "replace" if primary_asset_universe is not None else None
+            ),
             comparison_baseline="QQQ",
-            field_provenance={"comparison_baseline": "explicit_user"},
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                **(
+                    {"asset_universe": "explicit_user"}
+                    if primary_asset_universe is not None
+                    else {}
+                ),
+            },
         ),
     )
 
