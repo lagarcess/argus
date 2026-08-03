@@ -1025,21 +1025,20 @@ def _materialized_target_matches_primary_delta(
         )
         if primary_inclusions or primary_exclusions:
             expected_from_typed_roles = set(current)
+            grounded_primary_requested = {
+                symbol
+                for symbol in primary_requested
+                if symbol in current or symbol in grounded or symbol in primary_inclusions
+            }
             if operation == "replace":
-                expected_from_typed_roles = set(primary_requested)
+                expected_from_typed_roles = grounded_primary_requested
             elif (
                 operation is None
                 and planned_asset_replacement
                 and primary_inclusions
                 and (not primary_exclusions or bool(primary_requested))
             ):
-                expected_from_typed_roles = {
-                    symbol
-                    for symbol in primary_requested
-                    if symbol in current
-                    or symbol in grounded
-                    or symbol in primary_inclusions
-                }
+                expected_from_typed_roles = grounded_primary_requested
             elif operation == "append":
                 expected_from_typed_roles.update(primary_requested)
             expected_from_typed_roles.update(primary_inclusions)

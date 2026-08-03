@@ -3154,8 +3154,16 @@ async def test_issue_339_typed_roles_use_planner_replacement_boundary(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "primary_operation",
+    [
+        pytest.param(None, id="operation-missing"),
+        pytest.param("replace", id="explicit-replace"),
+    ],
+)
 async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
     monkeypatch,
+    primary_operation,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -3213,6 +3221,7 @@ async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
             asset_universe=["MSFT", "NVDA"],
             asset_inclusions=["MSFT"],
             asset_exclusions=["TSLA"],
+            asset_universe_operation=primary_operation,
             field_provenance={"asset_universe": "explicit_user"},
         ),
     )
