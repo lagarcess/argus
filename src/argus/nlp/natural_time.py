@@ -92,7 +92,10 @@ def resolve_date_range_text(
         and not _span_has_explicit_year(first.span)
         and _span_has_explicit_year(last.span)
     ):
-        shared_year_first = first.value.replace(year=last.value.year)
+        try:
+            shared_year_first = first.value.replace(year=last.value.year)
+        except ValueError:
+            return None
         if shared_year_first <= last.value:
             first = _ParsedDate(
                 value=shared_year_first,

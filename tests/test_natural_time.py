@@ -45,6 +45,16 @@ def test_resolves_english_shared_year_day_span() -> None:
     assert resolved.payload == {"start": "2023-01-03", "end": "2023-12-29"}
 
 
+def test_rejects_invalid_shared_year_leap_day() -> None:
+    resolved = resolve_date_range_text(
+        "Feb 29 through Mar 2, 2023",
+        today=date(2026, 6, 1),
+        languages=("en", "es"),
+    )
+
+    assert resolved is None
+
+
 def test_resolves_compact_month_year_range() -> None:
     resolved = resolve_date_range_text(
         "Jan 2021-Jan 2024",
