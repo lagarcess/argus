@@ -1657,6 +1657,87 @@ async def test_issue_339_typed_asset_inclusion_can_share_explicit_benchmark_role
 
 
 @pytest.mark.asyncio
+async def test_issue_339_typed_append_rejects_replacement_that_drops_current_assets(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"SPY"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        asset_operation = EditOperation(
+            op="replace" if model_name == "primary-model" else "add",
+            target="asset",
+            symbols=["SPY"],
+        )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                asset_operation,
+                EditOperation(op="set", target="benchmark", value="SPY"),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="add SPY and use SPY as benchmark",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    comparison_baseline="QQQ",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_universe=["AAPL"],
+            asset_universe_operation="append",
+            asset_inclusions=["SPY"],
+            comparison_baseline="SPY",
+            field_provenance={
+                "asset_universe": "explicit_user",
+                "comparison_baseline": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["primary-model", "fallback-model"]
+    assert response is not None
+    assert set(response.candidate_strategy_draft.asset_universe) == {"AAPL", "SPY"}
+    assert response.candidate_strategy_draft.comparison_baseline == "SPY"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("current_user_message", "grounded_symbols", "wrong_extra_asset"),
     [

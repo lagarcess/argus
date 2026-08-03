@@ -765,7 +765,11 @@ def materialized_artifact_edit_targets(
     )
     planned_asset_replacement = planned_whole_universe_assets is not None
     if "asset" in materialized_targets and (
-        (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))
+        (
+            bool(additions)
+            and additions
+            <= (grounded_asset_symbols | primary_assets | primary_asset_inclusions)
+        )
         or (
             planned_asset_replacement
             and bool(materialized_assets)
@@ -840,7 +844,7 @@ def _materialized_target_matches_primary_delta(
         grounded = set(grounded_asset_symbols or set())
         primary_inclusions = set(primary_asset_inclusions or set())
         primary_exclusions = set(primary_asset_exclusions or set())
-        requested = primary_requested | grounded
+        requested = primary_requested | grounded | primary_inclusions
         materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
         operation = normalized_asset_universe_operation(
             primary_draft.asset_universe_operation
@@ -879,7 +883,9 @@ def _materialized_target_matches_primary_delta(
         ):
             return False
         if planned_asset_replacement:
-            if primary_requested and primary_requested != current:
+            if operation == "append":
+                expected_replacement = current | primary_requested | primary_inclusions
+            elif primary_requested and primary_requested != current:
                 expected_replacement = primary_requested | (primary_inclusions - current)
             elif primary_inclusions or primary_exclusions:
                 expected_replacement = primary_inclusions or grounded
@@ -889,14 +895,12 @@ def _materialized_target_matches_primary_delta(
             return bool(materialized) and materialized == expected_replacement
         if primary_replacement:
             return True
+        if operation == "append":
+            expected_append = current | primary_requested | primary_inclusions
+            expected_append -= primary_exclusions
+            return bool(materialized - current) and materialized == expected_append
         if materialized_operation == "append":
             return bool(materialized - current) and materialized <= requested
-        if operation == "append":
-            return (
-                current <= materialized
-                and primary_requested <= materialized
-                and (current ^ materialized) <= requested
-            )
         if materialized_operation == "replace":
             additions = materialized - current
             if additions:
