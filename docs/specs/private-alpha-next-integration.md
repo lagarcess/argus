@@ -6,9 +6,11 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #359 at `a35bb29f`, which makes result-card
-recommendations inherit prior owned facts through the shared clarify
-contract (issue #345). It follows PR #373 at `81e7a1ac` (first-login guest
+Latest product change: PR #358 at `7b3221a1`, which makes compound artifact
+edits all-or-retry: a turn's full set of typed edit targets must provably
+materialize before ready_to_confirm (issue #339). It follows PR #359 at
+`a35bb29f` (recommendation continuity through the shared clarify contract,
+issue #345) and PR #373 at `81e7a1ac` (first-login guest
 claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
 claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
 exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
@@ -210,6 +212,17 @@ at the full clean bar: live 40/40 with no waivers, strategy-diverse browser
 proof (weekly DCA with recurring contribution; SMA 50/200 inheritance), and
 full deterministic gates. No environment variable, deployment, API, schema,
 or migration requirement was added.
+PR #358 then closed issue #339 as `7b3221a1`: the artifact-edit planner
+derives required typed targets from the entire turn — any operation count
+over the full edit vocabulary — and only plans that provably materialize
+every target may claim ready_to_confirm, verified against the real
+application path; partial application retries or asks, and unsupported
+content declines to the normal flow. Six adversarial review rounds hardened
+coverage against faked completeness. The lane's 24/41 live report was
+independently diagnosed and lane-confirmed as the known root-.env
+synthetic-calendar misconfiguration, corroborated by #359's adjacent 40/40.
+Issue #335 is unblocked and stacked for the next cycle. No environment
+variable, deployment, API, schema, or migration requirement was added.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
