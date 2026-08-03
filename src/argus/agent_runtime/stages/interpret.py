@@ -1693,15 +1693,14 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
-    candidate_endpoints = _date_range_endpoints(
-        interpretation.candidate_strategy_draft.date_range
-    )
+    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
     if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
         return interpretation
     if candidate_endpoints is not None and any(candidate_endpoints):
         return interpretation
     if (
         interpretation.semantic_turn_act != "answer_pending_need"
+        and "date_range_refinement" not in interpretation.reason_codes
         and not interpretation.requires_clarification
         and _candidate_strategy_has_backtest_shape(
             interpretation.candidate_strategy_draft
@@ -1713,7 +1712,7 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
-        today=date.today(),
+        today=date.today(), allow_result_anchor=True,
         require_explicit_range=(
             "pending_date_answer_unowned_candidate_stripped"
             in interpretation.reason_codes
