@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from typing import Any, cast
 
 from argus.api.schemas import (
+    DecisionActionAvailability,
     DecisionState,
     RunDossier,
     RunDossierTested,
@@ -59,7 +60,7 @@ def project_run_dossier(
     artifact: Mapping[str, Any],
     decision: Mapping[str, Any] | None,
     result_message_id: str | None,
-    allow_decision_action: bool,
+    decision_action_availability: DecisionActionAvailability | None,
     language: str,
 ) -> RunDossier:
     """Project one run and its artifact into the bounded public dossier shape."""
@@ -114,9 +115,10 @@ def project_run_dossier(
     retest_action = project_retest_action(run=run)
     if retest_action is not None:
         actions.append(retest_action)
-    if allow_decision_action:
+    if decision_action_availability is not None:
         actions.append(
             SearchDecisionAction(
+                availability=decision_action_availability,
                 evidence_artifact_id=artifact_id,
                 decision_state=(
                     cast(DecisionState, decision_state)

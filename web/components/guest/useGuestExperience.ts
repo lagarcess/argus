@@ -29,6 +29,7 @@ import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
   newConversationConversionMode,
+  type GuestDecisionResumeTarget,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 
@@ -102,8 +103,8 @@ export function useGuestExperience({
 }: UseGuestExperienceInput) {
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [isReplacingConversation, setIsReplacingConversation] = useState(false);
-  const [resumeDecisionArtifactId, setResumeDecisionArtifactId] =
-    useState<string | null>(null);
+  const [resumeDecisionTarget, setResumeDecisionTarget] =
+    useState<GuestDecisionResumeTarget | null>(null);
   const pendingGuestAdmissionRef = useRef<AbortController | null>(null);
 
   useEffect(
@@ -134,7 +135,7 @@ export function useGuestExperience({
           { bypassGuestGate: true },
         );
       } else if (action.reason === "save_decision") {
-        setResumeDecisionArtifactId(action.artifactId);
+        setResumeDecisionTarget(action.target);
       } else if (action.reason === "new_conversation") {
         await startNewChat();
       }
@@ -158,13 +159,13 @@ export function useGuestExperience({
     onOpenFeedback,
     onNewChat: startNewChat,
     onRequestNonEmptyGuestChoice: () => setIsNewConversationOpen(true),
-    onRequestGuestDecision: (artifactId) => {
+    onRequestGuestDecision: (target) => {
       if (!conversationId) return;
       conversion.requestConversion("save_decision", {
         reason: "save_decision",
         conversationId,
         actionId: crypto.randomUUID(),
-        artifactId,
+        target,
       });
     },
     onOpenOmnisearch,
@@ -345,9 +346,13 @@ export function useGuestExperience({
   }, [conversationId, conversion]);
 
   const clearResumeDecision = useCallback(
-    () => setResumeDecisionArtifactId(null),
+    () => setResumeDecisionTarget(null),
     [],
   );
+  const resumeDecisionArtifactId =
+    resumeDecisionTarget?.surface === "result_card"
+      ? resumeDecisionTarget.artifactId
+      : null;
   const resumeDecisionMessageId = latestDecisionResumeMessageId(
     messages,
     resumeDecisionArtifactId,
@@ -362,6 +367,7 @@ export function useGuestExperience({
     ...shell,
     admitSend,
     requestGuestSearchUpgrade,
+    resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
     clearResumeDecision,

@@ -393,6 +393,7 @@ def pending_strategy_metadata_fallback_context_from_message(
         "latest_task_type": "backtest_execution",
         "last_stage_outcome": stage_outcome,
         "fallback_source": "pending_strategy_metadata",
+        "strategy_path_id": source_message.id,
     }
     if isinstance(requested_field, str) and requested_field:
         selected_thread_metadata["requested_field"] = requested_field

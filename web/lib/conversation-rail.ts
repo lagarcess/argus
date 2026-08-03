@@ -35,11 +35,326 @@ export type ConversationRailTick = {
 
 /** The rail only earns space on longer conversations. */
 export const RAIL_MIN_TRANSCRIPT_MESSAGES = 12;
-export const RAIL_MIN_TICKS = 2;
+export const RAIL_MIN_TICKS = 1;
 
 const RAIL_PREVIEW_METRIC_LIMIT = 3;
 
 const FAILED_JOB_STATUSES = new Set(["failed", "canceled", "expired"]);
+
+const STRATEGY_PATH_FIELDS = [
+  "strategy_type",
+  "asset_universe",
+  "asset_class",
+  "date_range",
+  "capital_amount",
+  "sizing_mode",
+  "timeframe",
+  "cadence",
+  "comparison_baseline",
+  "indicators",
+  "constraints",
+  "fee_bps",
+  "slippage_bps",
+] as const;
+
+const STRONG_STRATEGY_PATH_FIELDS = new Set<string>([
+  "asset_universe",
+  "date_range",
+  "capital_amount",
+  "timeframe",
+  "cadence",
+  "comparison_baseline",
+  "indicators",
+  "constraints",
+  "fee_bps",
+  "slippage_bps",
+]);
+
+const USER_OWNED_STRATEGY_PROVENANCE = new Set([
+  "explicit_user",
+  "recurring_contribution",
+  "starting_capital",
+]);
+
+function meaningfulPathValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function samePathValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => samePathValue(value, right[index]))
+    );
+  }
+  if (
+    typeof left !== "object" ||
+    left === null ||
+    typeof right !== "object" ||
+    right === null
+  ) {
+    return false;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) =>
+        key === rightKeys[index] &&
+        samePathValue(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
+function canonicalDateRange(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const dateRange = value as Record<string, unknown>;
+  return typeof dateRange.start === "string" &&
+    dateRange.start.trim() &&
+    typeof dateRange.end === "string" &&
+    dateRange.end.trim()
+    ? dateRange
+    : null;
+}
+
+function strategyExtraParameters(
+  strategy: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const value = strategy.extra_parameters;
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizedDateRangeText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  return normalized || null;
+}
+
+function sameCanonicalizedDateRange(
+  pendingValue: unknown,
+  pendingStrategy: Record<string, unknown>,
+  confirmedStrategy: Record<string, unknown>,
+): boolean {
+  const pendingText = normalizedDateRangeText(pendingValue);
+  const pendingExtra = strategyExtraParameters(pendingStrategy);
+  const confirmedExtra = strategyExtraParameters(confirmedStrategy);
+  if (!pendingText || !pendingExtra || !confirmedExtra) return false;
+
+  const pendingRequested = canonicalDateRange(
+    pendingExtra.requested_date_range,
+  );
+  const confirmedRequested = canonicalDateRange(
+    confirmedExtra.requested_date_range,
+  );
+  const effective = canonicalDateRange(confirmedExtra.effective_date_range);
+  const confirmed = canonicalDateRange(confirmedStrategy.date_range);
+  if (
+    !pendingRequested ||
+    !confirmedRequested ||
+    !effective ||
+    !confirmed ||
+    !samePathValue(pendingRequested, confirmedRequested) ||
+    !samePathValue(confirmed, effective)
+  ) {
+    return false;
+  }
+
+  const pendingRawText = normalizedDateRangeText(
+    pendingExtra.date_range_raw_text,
+  );
+  return (
+    pendingRawText === pendingText &&
+    normalizedDateRangeText(confirmedExtra.date_range_raw_text) ===
+      pendingRawText
+  );
+}
+
+function sameStrategyPathFact(
+  field: (typeof STRATEGY_PATH_FIELDS)[number],
+  pendingValue: unknown,
+  pendingStrategy: Record<string, unknown>,
+  confirmedStrategy: Record<string, unknown>,
+): boolean {
+  const confirmedValue = confirmedStrategy[field];
+  return (
+    samePathValue(pendingValue, confirmedValue) ||
+    (field === "date_range" &&
+      sameCanonicalizedDateRange(
+        pendingValue,
+        pendingStrategy,
+        confirmedStrategy,
+      ))
+  );
+}
+
+function confirmedRequestedFieldValue(
+  context: NonNullable<Message["strategyPathContext"]>,
+  requestedField: string,
+): unknown {
+  if (requestedField === "assumption") {
+    for (const value of Object.values(context.optionalParameters ?? {})) {
+      const parameter = recordValue(value);
+      if (
+        parameter?.source === "user" &&
+        meaningfulPathValue(parameter.value)
+      ) {
+        return parameter.value;
+      }
+    }
+
+    const extraParameters = strategyExtraParameters(context.strategy);
+    const fieldProvenance = recordValue(extraParameters?.field_provenance);
+    for (const [field, provenance] of Object.entries(fieldProvenance ?? {})) {
+      if (
+        typeof provenance !== "string" ||
+        !USER_OWNED_STRATEGY_PROVENANCE.has(provenance)
+      ) {
+        continue;
+      }
+      const strategyValue = context.strategy[field];
+      if (meaningfulPathValue(strategyValue)) return strategyValue;
+      const extraValue = extraParameters?.[field];
+      if (meaningfulPathValue(extraValue)) return extraValue;
+    }
+    return undefined;
+  }
+
+  const strategyValue = context.strategy[requestedField];
+  if (meaningfulPathValue(strategyValue)) return strategyValue;
+  const optionalParameter = context.optionalParameters?.[requestedField];
+  if (
+    typeof optionalParameter !== "object" ||
+    optionalParameter === null ||
+    Array.isArray(optionalParameter)
+  ) {
+    return undefined;
+  }
+  return (optionalParameter as Record<string, unknown>).value;
+}
+
+function confirmationContinuesClarification(
+  clarification: Message,
+  confirmation: Message,
+): boolean {
+  const pending = clarification.strategyPathContext;
+  const confirmed = confirmation.strategyPathContext;
+  if (
+    pending?.kind !== "clarification" ||
+    confirmed?.kind !== "confirmation" ||
+    !pending.requestedField
+  ) {
+    return false;
+  }
+  const hasSourceResultIdentity = Boolean(
+    pending.sourceResultRunId || confirmed.sourceResultRunId,
+  );
+  const hasMatchingSourceResultId = Boolean(
+    pending.sourceResultRunId &&
+      pending.sourceResultRunId === confirmed.sourceResultRunId,
+  );
+  const hasMatchingStrategyPathId = Boolean(
+    pending.strategyPathId &&
+      pending.strategyPathId === confirmed.strategyPathId,
+  );
+  if (pending.requestedField === "assumption") {
+    return (
+      (!hasSourceResultIdentity || hasMatchingSourceResultId) &&
+      hasMatchingStrategyPathId &&
+      meaningfulPathValue(
+        confirmedRequestedFieldValue(confirmed, pending.requestedField),
+      )
+    );
+  }
+  if (hasSourceResultIdentity) return hasMatchingSourceResultId;
+  if (
+    (pending.strategyPathId || confirmed.strategyPathId) &&
+    !hasMatchingStrategyPathId
+  ) {
+    return false;
+  }
+  if (
+    !meaningfulPathValue(
+      confirmedRequestedFieldValue(confirmed, pending.requestedField),
+    )
+  ) {
+    return false;
+  }
+  if (hasMatchingStrategyPathId) return true;
+
+  let strongMatches = 0;
+  for (const field of STRATEGY_PATH_FIELDS) {
+    if (field === pending.requestedField) continue;
+    const pendingValue = pending.strategy[field];
+    if (!meaningfulPathValue(pendingValue)) continue;
+    if (
+      !sameStrategyPathFact(
+        field,
+        pendingValue,
+        pending.strategy,
+        confirmed.strategy,
+      )
+    ) {
+      return false;
+    }
+    if (STRONG_STRATEGY_PATH_FIELDS.has(field)) strongMatches += 1;
+  }
+  return strongMatches > 0;
+}
+
+function activeConfirmation(message: Message): boolean {
+  const confirmation = message.confirmation;
+  return (
+    message.role === "ai" &&
+    message.kind === "strategy_confirmation" &&
+    confirmation !== undefined &&
+    (confirmation.confirmation_state ?? "active") === "active"
+  );
+}
+
+function clarificationResolvedByLaterConfirmation(
+  messages: readonly Message[],
+  recovery: Message,
+  recoveryIndex: number,
+): boolean {
+  return messages
+    .slice(recoveryIndex + 1)
+    .some(
+      (message) =>
+        activeConfirmation(message) &&
+        confirmationContinuesClarification(recovery, message),
+    );
+}
+
+function unresolvedClarification(
+  messages: readonly Message[],
+  message: Message,
+  messageIndex: number,
+): boolean {
+  return (
+    message.recoveryDisplay?.kind !== "clarification" ||
+    !clarificationResolvedByLaterConfirmation(messages, message, messageIndex)
+  );
+}
 
 export function deriveConversationRailTicks(
   messages: Message[],
@@ -50,7 +365,10 @@ export function deriveConversationRailTicks(
       // Retry-history normalization can move a coalesced assistant failure's
       // recovery onto its owning user turn — that turn is then the failure's
       // only visible carrier.
-      if (message.recoveryDisplay) {
+      if (
+        message.recoveryDisplay &&
+        unresolvedClarification(messages, message, index)
+      ) {
         ticks.push({
           messageId: message.id,
           messageIndex: index,
@@ -105,7 +423,8 @@ export function deriveConversationRailTicks(
       return;
     }
     if (
-      message.recoveryDisplay ||
+      (message.recoveryDisplay &&
+        unresolvedClarification(messages, message, index)) ||
       message.assistantRecoveryCode ||
       message.contentPresentation === "superseded_runtime_failure"
     ) {

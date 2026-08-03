@@ -6,9 +6,14 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #348 at `38874bae`, which self-hosts canonical Inter
-and Space Grotesk fonts without changing typography ownership. The preceding
-runtime changes remain PR #331 at `ec3a0a52` and PR #330 at `94476226`.
+Latest product change: PR #356 at `48de2f3f`, which standardizes menu-row
+hover/selected highlights as rounded inset pills across Settings, Profile,
+Recents overflow, and chat-header menus (issue #343). It follows PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
+`7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
+at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
+at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
+`38874bae` (self-hosted canonical fonts).
 Later commits may reconcile documentation and issue state without changing
 product behavior. New work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning either product SHA. The
@@ -83,6 +88,51 @@ as `38874bae`, removing the Google Fonts network dependency from build,
 runtime, and provider-free browser QA. It added no environment variable,
 deployment, API, schema, or migration requirement. The separate low-priority
 fallback-order alignment remains issue #350.
+PR #362 then repaired the sanctioned live-eval harness as `b2e8975c`, closing
+issue #361: the explicit `ARGUS_EVAL_ENV_FILE` environment now preloads before
+Argus imports, so calendar-aware live cases exercise real market sessions and
+report `calendar_alignment` truthfully instead of failing 17 of 39 cases under
+the leaked synthetic fixture calendar. The change is confined to
+`tests/evals/` and added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #355 then closed issue #336 as `c01d5730`: provider-resolved assets and
+capital supplied in a terse opening turn survive into clarification and the
+confirmation card, with post-LLM provider-context reconciliation removing only
+stale asset blockers once every extracted traded-asset mention is accounted
+for. Mixed, ambiguous, underfilled, overflow, and cross-class contexts stay
+blocked. Accepted evidence includes the exact-head live-eval gate and a
+founder-witnessed browser reproduction of the original G-01 transcript. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #353 then closed issue #337 as `7e4c58f8`: a rail needs-attention tick for
+a clarification clears only when a later active confirmation is proven, via
+backend-owned typed metadata (`strategy_path_id`, `source_result_run_id`, and
+provenance-checked user values), to continue the same strategy path; unproven
+or unrelated confirmations fail closed. The Guest rail keeps its single
+legitimate completed-run tick visible. The first exact-head verification
+failed and was repaired (e2e seed omitted real workflow metadata) before
+acceptance; the final head passed the real local-Supabase Guest replay
+independently. It added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #357 then closed issue #340 as `9f97f1dc`: guest Omnisearch dossiers keep
+Add/Edit decision actions visible and conversion-gate activation through a
+typed `available | account_conversion_required` availability contract across
+Python, OpenAPI, and TypeScript, then resume the exact run, decision state,
+and note after conversion. The server remains authoritative and no guest
+write path exists; the gated presentation activates only for clients
+declaring the additive `dossier_decision_conversion_v1` capability header, so
+legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
+`docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
+environment variable, deployment, schema, or migration requirement. Issue
+#341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

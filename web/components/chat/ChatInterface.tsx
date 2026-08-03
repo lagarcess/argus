@@ -111,6 +111,7 @@ import {
   loadAllConversationMessagePages,
   resolveOrdinaryTransportAmbiguityView,
   snapshotOrdinaryTransportMessageIds,
+  strategyPathContextFromMetadata,
 } from "@/lib/chat-message-hydration";
 import {
   hydrateResultActionsForRun,
@@ -174,10 +175,13 @@ import {
   hydrateMessagesFromApi,
   isFailedActionRetry,
   markComposerActionsInactive,
+  messageStreamPresentation,
+  messagesWithSavedDecisionState,
   resultRunIdFromFinalPayload,
   savedStrategyIdFromFinalPayload,
   settleOpenConfirmationsFromFinalPayload,
 } from "./chat-message-projection";
+import { openFeedbackDialogState } from "./feedback-dialog-state";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -947,6 +951,7 @@ export default function ChatInterface() {
     requestGuestSignIn,
     requestNewChat,
     requestOmnisearch,
+    resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
     clearResumeDecision,
@@ -1212,6 +1217,8 @@ export default function ChatInterface() {
           Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
+        const errorStrategyPathContext =
+          strategyPathContextFromMetadata(errorPayload);
         // Same gate the `final` frame applies: a retryable failure wears the
         const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
           errorPayload.recovery,
@@ -1241,6 +1248,7 @@ export default function ChatInterface() {
                       id: durableRetry.requestMessageId,
                       content: durableRetry.persistedMessage,
                       recoveryDisplay: errorRecoveryDisplay,
+                      strategyPathContext: errorStrategyPathContext,
                       actions: [durableRetry.action],
                     }
                   : m.id === assistantId
@@ -1252,6 +1260,7 @@ export default function ChatInterface() {
                           t("chat.error_backtest"),
                         ),
                         recoveryDisplay: errorRecoveryDisplay,
+                        strategyPathContext: errorStrategyPathContext,
                         assistantRecoveryCode: errorAssistantRecoveryCode,
                         actions:
                           visibleRetryAction && !durableRetryAction
@@ -1285,6 +1294,8 @@ export default function ChatInterface() {
           applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalStrategyPathContext =
+          strategyPathContextFromMetadata(finalPayload);
         const finalAssistantRecoveryCode = retryableAssistantRecoveryCode(
           finalPayload.recovery,
         );
@@ -1339,6 +1350,7 @@ export default function ChatInterface() {
                   kind: "strategy_confirmation",
                   content: undefined,
                   confirmation,
+                  strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
                 }),
               ),
@@ -1409,6 +1421,7 @@ export default function ChatInterface() {
                   finalText,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
+                  strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   contentPresentation:
@@ -1427,6 +1440,7 @@ export default function ChatInterface() {
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
+                strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 contentPresentation:
@@ -2276,6 +2290,9 @@ export default function ChatInterface() {
             isGuest={isGuest}
             groundedDiscoveryAvailable={canUseGroundedDiscovery}
             canManageConversation={canManageConversation}
+            onDecisionUnavailable={requestGuestDecision}
+            decisionResumeTarget={resumeDecisionTarget}
+            onDecisionResumeHandled={clearResumeDecision}
             onMutated={refreshHistory}
             onConversationRemoved={handleConversationRemoved}
           />
@@ -2409,24 +2426,19 @@ export default function ChatInterface() {
                       <ConversationRetrievalState
                         state="error"
                         onRetry={() => {
-                          if (failedConversationId) {
-                            void loadConversation(failedConversationId);
-                          }
+                          if (failedConversationId) void loadConversation(failedConversationId);
                         }}
                       />
                     )}
                     {messages.map((msg, index) => {
-                      const latestAiIndex = messages.findLastIndex(
-                        (m) => m.role === "ai",
-                      );
-                      const isLatestAi =
-                        msg.role === "ai" && latestAiIndex === index;
-                      const isWorkingMessage =
-                        isLatestAi &&
-                        msg.kind === "text" &&
-                        (isStreamingResponse ||
-                          !!visibleStreamStatus ||
-                          (msg.content ?? "") === "");
+                      const { isLatestAi, isWorkingMessage } =
+                        messageStreamPresentation(
+                          messages,
+                          msg,
+                          index,
+                          isStreamingResponse,
+                          !!visibleStreamStatus,
+                        );
                       return (
                         <div
                           key={msg.id}
@@ -2445,15 +2457,9 @@ export default function ChatInterface() {
                             message={msg}
                             onAction={handleAction}
                             onFeedback={(type, context, rating) => {
-                              setFeedbackState({
-                                isOpen: true,
-                                type,
-                                context: {
-                                  ...context,
-                                  conversation_id: conversationId,
-                                },
-                                rating,
-                              });
+                              setFeedbackState(
+                                openFeedbackDialogState(type, context, rating, conversationId),
+                              );
                               setIsSidebarOpen(false);
                             }}
                             onToast={showToast}
@@ -2464,22 +2470,22 @@ export default function ChatInterface() {
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
-                            onDecisionUnavailable={requestGuestDecision}
+                            onDecisionUnavailable={(artifactId) =>
+                              requestGuestDecision({ surface: "result_card", artifactId })
+                            }
                             onDecisionSaved={(decisionState) => {
                               setMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === msg.id && m.result
-                                    ? { ...m, result: { ...m.result, decisionState } }
-                                    : m,
+                                messagesWithSavedDecisionState(
+                                  prev,
+                                  msg.id,
+                                  decisionState,
                                 ),
                               );
                               if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
                             }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
                             resumeDecisionArtifactId={
-                              msg.id === resumeDecisionMessageId
-                                ? resumeDecisionArtifactId
-                                : null
+                              msg.id === resumeDecisionMessageId ? resumeDecisionArtifactId : null
                             }
                             onDecisionResumeHandled={clearResumeDecision}
                           />

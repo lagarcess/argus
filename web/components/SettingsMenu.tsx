@@ -114,7 +114,7 @@ export function SettingsMenu() {
             {/* Language Setting Row */}
             <button
               onClick={() => { setIsLanguageModalOpen(true); setIsOpen(false); }}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              className="w-full flex items-center justify-between rounded-[10px] px-3 py-2.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
               <span className="font-medium text-[15px] text-black dark:text-white tracking-tight">{t('settings.app.language')}</span>
               <span className="text-[14px] text-gray-500 dark:text-gray-400">{currentLangLabel}</span>
@@ -154,7 +154,7 @@ export function SettingsMenu() {
                   <button
                     key={l.code}
                     onClick={() => changeLanguage(l.code)}
-                    className="flex justify-between items-center px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    className="mx-1 flex justify-between items-center rounded-[10px] px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     <span className="font-medium text-[15px] text-black dark:text-white">{l.name}</span>
                     {normalizeEnabledLanguage(lang) === l.code ? (
