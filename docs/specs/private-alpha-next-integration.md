@@ -6,9 +6,12 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #370 at `c324f877`, which types the nullable
-first-page dossier cursors so guest Decision history loads (issue #341). It
-follows PR #375 at `c334cf3e` (stated-capital preservation on unsupported
+Latest product change: PR #374 at `d8c7070a`, which makes conversation
+activity timestamp parsing robust to Postgres-trimmed fractional seconds and
+`Z` offsets on Python 3.10 and retains exceptions in the API failure log
+(issue #371). It follows PR #370 at `c324f877` (typed first-page dossier
+cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
+evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
 turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
 registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
 (rounded menu highlights, issue #343), PR #357 at
@@ -164,6 +167,19 @@ the true failure in the Postgres reader. Evidence: same-session 500→200 at
 the exact head with the screenshot committed in-repo; guest workspace
 isolation re-proven. It added no environment variable, deployment, API,
 schema, or migration requirement.
+PR #360 then closed issue #349 as `42d96da7`: conversation-activity truth is
+now verified with durable in-repo evidence — registered manual-unread
+persists, survives reload, clears, and never reorders Recents; each Guest
+state is individually classified with owner actions account-only. Docs and
+four committed screenshots plus one date-stable Playwright fixture line; no
+product behavior, API, schema, or migration change.
+PR #374 then closed issue #371 as `d8c7070a`: `_as_datetime` normalizes
+Postgres-trimmed fractional seconds and trailing `Z` offsets with explicit
+regex-free string handling before parsing (founder-directed), repairing the
+~1-in-10 broken-Recents failure observed in live QA, and the API middleware
+now retains the exception in its failure log while keeping the HTTP body
+generic. No environment variable, deployment, API, schema, or migration
+requirement was added.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
