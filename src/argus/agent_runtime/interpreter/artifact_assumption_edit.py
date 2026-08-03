@@ -851,22 +851,22 @@ def _materialized_target_matches_primary_delta(
         materialized_operation = normalized_asset_universe_operation(
             materialized_draft.asset_universe_operation
         )
+        primary_provenance = primary_draft.field_provenance or {}
+        if primary_provenance.get("comparison_baseline") == "explicit_user":
+            benchmark_role_symbols = {
+                _normalized_ticker_symbol(primary_draft.comparison_baseline),
+                _normalized_ticker_symbol(
+                    current_strategy.comparison_baseline if current_strategy else None
+                ),
+            }
+            primary_requested.difference_update(
+                symbol
+                for symbol in benchmark_role_symbols
+                if symbol is not None
+                and symbol not in current
+                and symbol not in primary_inclusions
+            )
         if primary_inclusions or primary_exclusions:
-            primary_provenance = primary_draft.field_provenance or {}
-            if primary_provenance.get("comparison_baseline") == "explicit_user":
-                benchmark_role_symbols = {
-                    _normalized_ticker_symbol(primary_draft.comparison_baseline),
-                    _normalized_ticker_symbol(
-                        current_strategy.comparison_baseline if current_strategy else None
-                    ),
-                }
-                primary_requested.difference_update(
-                    symbol
-                    for symbol in benchmark_role_symbols
-                    if symbol is not None
-                    and symbol not in current
-                    and symbol not in primary_inclusions
-                )
             expected_from_typed_roles = set(current)
             if operation == "replace":
                 expected_from_typed_roles = set(primary_requested)

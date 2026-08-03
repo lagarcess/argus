@@ -1742,7 +1742,17 @@ async def test_issue_339_typed_asset_inclusion_can_share_explicit_benchmark_role
 
 
 @pytest.mark.asyncio
-async def test_issue_339_typed_replacement_rejects_flat_benchmark_leak(monkeypatch):
+@pytest.mark.parametrize(
+    "asset_inclusions",
+    [
+        pytest.param(["AAPL"], id="typed-role"),
+        pytest.param([], id="legacy-flat"),
+    ],
+)
+async def test_issue_339_primary_replacement_rejects_flat_benchmark_leak(
+    monkeypatch,
+    asset_inclusions,
+):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
 
@@ -1801,7 +1811,7 @@ async def test_issue_339_typed_replacement_rejects_flat_benchmark_leak(monkeypat
         primary_draft=LLMStrategyDraft(
             asset_universe=["AAPL", "SPY"],
             asset_universe_operation="replace",
-            asset_inclusions=["AAPL"],
+            asset_inclusions=asset_inclusions,
             comparison_baseline="SPY",
             field_provenance={
                 "asset_universe": "explicit_user",
