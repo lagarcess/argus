@@ -6,9 +6,10 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #352 at `0942507b`, which unifies Omnisearch and
-chat keyboard actions behind one OS-aware behavior registry with a contextual
-shortcut legend (issue #334). It follows PR #356 at `48de2f3f` (rounded menu
+Latest product change: PR #375 at `c334cf3e`, which preserves explicit stated
+starting capital on unsupported-request turns (issue #368). It follows PR
+#352 at `0942507b` (unified OS-aware keyboard registry and contextual
+shortcut legend, issue #334), PR #356 at `48de2f3f` (rounded menu
 highlights, issue #343), PR #357 at
 `9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
@@ -142,6 +143,16 @@ keyboard-aware delete confirmation, and a responsive help sheet. Its first
 head was returned for composed-tree modularity violations and re-landed
 after genuine extraction; ChatInterface.tsx now sits exactly at its budget
 limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #375 then closed issue #368 as `c334cf3e`: the stated-starting-capital
+recheck now also runs on `unsupported_or_out_of_scope` turns, so an explicit
+non-DCA capital amount survives capability-honesty recoveries without
+changing the unsupported verdict, dates, assets, or DCA behavior. Accepted
+evidence: red-first mocked regression plus one targeted live rerun of the
+original news-sentiment case, re-captured at the exact final head. The
+founder waived the ceremony reconcile-merge commit after an independently
+verified no-overlap disposition (all intervening landings were docs or
+web-only). This fix upgrades PR #363's pending evidence bar. It added no
 environment variable, deployment, API, schema, or migration requirement.
 
 Current note: while the interim pivot is active, use

@@ -169,6 +169,14 @@ cross-PR modularity stacking. ChatInterface.tsx is now exactly at its budget
 limit; lanes touching it must extract before adding. The completed
 chat-header-title spec moved to `docs/archive/` with a tombstone stub.
 
+PR #375 then closed issue #368 as `c334cf3e`: explicit stated capital now
+survives unsupported-request turns (typed intent gating only), proven by a
+red-first mocked regression and one exact-head targeted live rerun of the
+original failing case — re-captured after the review fix moved the head.
+Founder waived the ceremony reconcile commit on a verified no-overlap
+disposition. PR #363's held evidence decision should be revisited: its
+news-sentiment live failure now has a fixed root cause.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
