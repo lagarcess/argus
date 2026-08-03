@@ -161,14 +161,12 @@ Local evidence pack for the guarded final head:
 - `temp/qa-evidence-guest/<exact-head-sha>/authoritative/issue-337-guest-recovered.png`
 - `temp/qa-evidence-guest/<exact-head-sha>/authoritative/issue-337-guest-recovered-reload.png`
 
-SHA-256 before reload:
-`a097a27c1c70af6a66d6cd38ae6fa1fa8297721573dade9bd19b80b159a6895a`.
-
-SHA-256 after reload:
-`a097a27c1c70af6a66d6cd38ae6fa1fa8297721573dade9bd19b80b159a6895a`.
-
-The identical hashes confirm that reload preserved the same visible Guest
-result and single completed-backtest rail marker.
+The final run's literal head SHA and screenshot SHA-256 fingerprints are
+recorded together in the PR #353 disposition. The before- and after-reload
+fingerprints matched within that run, confirming that reload preserved the
+same visible Guest result and single completed-backtest rail marker. Keeping
+the run-specific fingerprints outside this committed report avoids presenting
+an earlier run's time-sensitive Guest-expiry pixels as final-head evidence.
 
 ## Disposition
 
