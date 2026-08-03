@@ -408,9 +408,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(
         resumedUsage.body.allowances.backtests.guest_session,
       ).toMatchObject({
-        limit: 1,
+        limit: 2,
         used: 1,
-        remaining: 0,
+        remaining: 1,
       });
       evidence.simulation_usage_matches = true;
 
@@ -883,10 +883,10 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expect(messageWindow.used).toBe(database.chat_units);
         expect(messageWindow.period_end).toBe(primaryExpiry);
         expect(simulationWindow.used).toBe(database.simulation_units);
-        expect(simulationWindow.limit).toBe(1);
-        expect(simulationWindow.remaining).toBe(0);
+        expect(simulationWindow.limit).toBe(2);
+        expect(simulationWindow.remaining).toBe(1);
         expect(simulationWindow.period_end).toBe(primaryExpiry);
-        expect(usage.body.allowances.backtests.available_now).toBe(false);
+        expect(usage.body.allowances.backtests.available_now).toBe(true);
         expect(database.simulation_units).toBe(1);
         expect(messages.status).toBe(200);
         expect(
@@ -1338,24 +1338,47 @@ test("@guest-experience exact-head 20-check matrix", async ({
           name: /Run backtest/i,
         });
         await expect(secondRunButton).toBeVisible();
-        const before = ownerSnapshot(primaryOwner);
-        const graphBeforeClick = conversationGraph(
-          primaryOwner,
-          primaryConversation,
+        const secondRunResponse = page.waitForResponse((response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/chat/stream"),
         );
-        const mutationsBefore = mergeMutationCounts(monitors);
-        const usageResponse = page.waitForResponse((response) => {
-          const url = new URL(response.url());
-          return (
-            response.request().method() === "GET" &&
-            url.pathname.endsWith("/api/v1/me/usage")
-          );
-        });
         await secondRunButton.click();
+        expect((await secondRunResponse).status()).toBe(200);
+        await expect(resultCards(page)).toHaveCount(2, { timeout: 240_000 });
+        await expect
+          .poll(() => ownerSnapshot(primaryOwner).completed_runs, {
+            timeout: 60_000,
+          })
+          .toBe(2);
+
+        const thirdConfirmation = seedDistinctGuestConfirmation({
+          userId: primaryOwner,
+          conversationId: primaryConversation,
+          sourceMessageId: secondState.facts.messageId,
+        });
+        await page.reload({ waitUntil: "domcontentloaded" });
+        const thirdCard = confirmationCards(page).filter({
+          has: page.locator('[data-confirmation-status="ready_to_run"]'),
+        }).last();
+        await expect(thirdCard).toBeVisible();
+        await expect(
+          thirdCard.getByText(strategySymbol, { exact: true }),
+        ).toBeVisible();
+        const thirdRunButton = thirdCard.getByRole("button", {
+          name: /Run backtest/i,
+        });
+        const before = ownerSnapshot(primaryOwner);
+        const graphBeforeClick = conversationGraph(primaryOwner, primaryConversation);
+        const mutationsBefore = mergeMutationCounts(monitors);
+        const usageResponse = page.waitForResponse((response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname.endsWith("/api/v1/me/usage"),
+        );
+        await thirdRunButton.click();
         const usageAtGate = (await (await usageResponse).json()) as GuestUsage;
         expect(usageAtGate.allowances.backtests.guest_session).toMatchObject({
-          limit: 1,
-          used: 1,
+          limit: 2,
+          used: 2,
           remaining: 0,
         });
         expect(usageAtGate.allowances.backtests.available_now).toBe(false);
@@ -1389,6 +1412,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
             conversationGraph(primaryOwner, primaryConversation),
           ),
         ).toBe(true);
+        expect(thirdConfirmation.messageId).toBeTruthy();
         expect(
           (mutationsAfter["POST /api/v1/chat/stream"] ?? 0) -
             (mutationsBefore["POST /api/v1/chat/stream"] ?? 0),

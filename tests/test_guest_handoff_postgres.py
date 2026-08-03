@@ -320,6 +320,27 @@ def _delete_fixture_identities(connection, graph: dict[str, Any]) -> None:
         )
 
 
+def test_handoff_validator_accepts_renamed_and_legacy_simulation_reasons() -> None:
+    conversation_id = str(uuid.uuid4())
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            for reason in ("second_simulation", "simulation_limit"):
+                cursor.execute(
+                    "select argus_private.valid_guest_pending_action(%s::jsonb, %s::uuid)",
+                    (
+                        (
+                            '{"reason":"'
+                            + reason
+                            + '","conversation_id":"'
+                            + conversation_id
+                            + '","action_id":"run-action-1"}'
+                        ),
+                        conversation_id,
+                    ),
+                )
+                assert cursor.fetchone()[0] is True
+
+
 def test_handoff_storage_and_privileged_claim_contract_exist() -> None:
     with _connect() as connection:
         with connection.cursor() as cursor:

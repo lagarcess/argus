@@ -481,11 +481,11 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
                         "resource": "backtest_runs",
                         "period": "guest_session",
                         "used_count": 1,
-                        "limit_count": 1,
+                        "limit_count": 2,
                     }
                 ],
                 "visitor_used": [1],
-                "usage": {"used": 1, "remaining": 0, "limit": 1},
+                "usage": {"used": 1, "remaining": 1, "limit": 2},
             }
     finally:
         if user_id:
