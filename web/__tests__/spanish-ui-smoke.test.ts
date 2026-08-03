@@ -153,6 +153,31 @@ describe("Spanish UI Smoke Harness", () => {
     expect(json).toBeDefined();
   });
 
+  test("non-retryable discovery copy makes no temporal promise in either locale", () => {
+    const locales = {
+      en: readLocale(enLocalePath),
+      "es-419": readLocale(esLocalePath),
+    };
+    const cases = [
+      {
+        locale: "en" as const,
+        expected:
+          "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
+      },
+      {
+        locale: "es-419" as const,
+        expected:
+          "La búsqueda actual respaldada por fuentes no está disponible para esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
+      },
+    ];
+
+    for (const { locale, expected } of cases) {
+      expect(valueAtPath(locales[locale], "chat.recovery.discovery_unavailable")).toBe(
+        expected,
+      );
+    }
+  });
+
   test("Spanish smoke keys exist for the private-alpha UI surface", () => {
     const en = readLocale(enLocalePath);
     const es = readLocale(esLocalePath);

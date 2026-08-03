@@ -666,6 +666,11 @@ class TestRetryAffordance:
             "retryable": False,
         }
         assert "prompt_source" not in patch["recovery"]
+        assert str(patch["assistant_response"]) == (
+            "Current source-backed discovery is not available for this request, "
+            "and I will not guess from memory. Name a symbol or company you already "
+            "have in mind and I can test it. Everything in this chat is unchanged."
+        )
 
 
 class TestVoicedRecoveryMetadata:

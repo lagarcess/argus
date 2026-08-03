@@ -161,9 +161,9 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "asset."
     ),
     "discovery_unavailable": (
-        "I cannot look up current source-backed candidates yet, and I do not "
-        "want to guess from memory. Name a symbol or company you already have "
-        "in mind and I can test it. Everything in this chat is unchanged."
+        "Current source-backed discovery is not available for this request, and I "
+        "will not guess from memory. Name a symbol or company you already have in "
+        "mind and I can test it. Everything in this chat is unchanged."
     ),
     "discovery_search_failed": (
         "I could not complete a source-backed lookup just now, and I will not "
