@@ -231,6 +231,16 @@ export type CommandPaletteKeyboardAction =
   | { type: "archive" }
   | { type: "delete" };
 
+export function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
+
 export function commandPaletteKeyboardAction({
   key,
   itemCount,

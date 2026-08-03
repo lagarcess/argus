@@ -72,6 +72,7 @@ import {
   commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
+  isEditableKeyboardTarget,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
 import type {
@@ -115,16 +116,6 @@ const SEARCH_DEBOUNCE_MS = 200;
 const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
 export const commandPaletteDossierPanelClassName = (view: DossierPaneState["view"]) =>
   `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:h-auto md:max-h-none md:w-[44%] md:overflow-visible md:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
-
-function isEditableKeyboardTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
-  );
-}
 
 function formatRelativeDate(
   value: string,

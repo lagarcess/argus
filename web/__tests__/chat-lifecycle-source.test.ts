@@ -215,14 +215,18 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const shortcuts = readFileSync(join(root, "lib/keyboard-shortcuts.ts"), "utf-8");
     const headerMenu = readFileSync(
       join(root, "components/chat/ChatHeaderMenu.tsx"),
       "utf-8",
     );
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
-    expect(chat).toContain("const [pendingHeaderDelete, setPendingHeaderDelete] = useState<{");
-    expect(chat).toContain("conversationId: string; showKeyboardHints: boolean;");
+    expect(chat).toContain('import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";');
+    expect(chat).toContain("useState<KeyboardDeleteRequest | null>(null)");
+    expect(shortcuts).toContain("export type KeyboardDeleteRequest = {");
+    expect(shortcuts).toContain("conversationId: string;");
+    expect(shortcuts).toContain("showKeyboardHints: boolean;");
     expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
     expect(chat).toContain("if (!conversationId) return;");
     expect(chat).toContain("setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });");

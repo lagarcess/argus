@@ -55,6 +55,7 @@ import {
   type BacktestRun, type BacktestJobResponse,
   type SearchConversationItem,
 } from "@/lib/argus-api";
+import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
 import { omnisearchEnabled, strategiesEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
@@ -249,9 +250,7 @@ export default function ChatInterface() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
-  const [pendingHeaderDelete, setPendingHeaderDelete] = useState<{
-    conversationId: string; showKeyboardHints: boolean;
-  } | null>(null);
+  const [pendingHeaderDelete, setPendingHeaderDelete] = useState<KeyboardDeleteRequest | null>(null);
   const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);
   const [headerRenameValue, setHeaderRenameValue] = useState("");
   const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
@@ -899,10 +898,8 @@ export default function ChatInterface() {
   });
   const archiveActiveConversation = useArchiveActiveConversation({
     conversationId, onArchived: handleConversationRemoved,
-    onSuccess: () => showToast(t("common.archive", "Archive")),
-    onError: () => showToast(t("common.error_occurred"), "error"),
+    onSuccess: () => showToast(t("common.archive", "Archive")), onError: () => showToast(t("common.error_occurred"), "error"),
   });
-
   const guestBootstrapRequired = profileState === "bootstrap_required";
   const guestExperience = useGuestExperience({
     account,
@@ -2047,7 +2044,6 @@ export default function ChatInterface() {
     setHeaderRenameValue(renamePrefillTitle(activeTitleRecord));
     setIsRenamingHeaderChat(true);
   };
-
   const handleSaveHeaderRename = async () => {
     if (!conversationId || isSavingHeaderRename) return;
     const nextTitle = headerRenameValue.trim();
@@ -2090,7 +2086,6 @@ export default function ChatInterface() {
     setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });
     closeChatOptions();
   };
-
   const handleConfirmHeaderDelete = async () => {
     if (!pendingHeaderDelete || isDeletingHeaderChat) return;
     setIsDeletingHeaderChat(true);
@@ -2105,7 +2100,6 @@ export default function ChatInterface() {
       setPendingHeaderDelete(null);
     }
   };
-
   // One in-flight lock for every way to start a turn. The composer already
   // disables itself while a turn runs; persistent discovery rows have to obey
   // the same lock or they become a way to spam turns around it.

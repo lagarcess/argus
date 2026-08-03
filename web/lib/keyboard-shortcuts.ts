@@ -26,6 +26,11 @@ export type KeyboardShortcutEvent = Pick<
   "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "repeat" | "shiftKey"
 >;
 
+export type KeyboardDeleteRequest = {
+  conversationId: string;
+  showKeyboardHints: boolean;
+};
+
 type KeyboardShortcutMatch =
   | "primary_key"
   | "primary_shift_key"
