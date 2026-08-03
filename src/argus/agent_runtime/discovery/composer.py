@@ -374,13 +374,17 @@ async def _recovery_result(
     unverified_names: list[str] | None = None,
     uncorroborated_names: list[str] | None = None,
 ) -> StageResult:
-    voiced = await _voiced_discovery_recovery(
-        code=code,
-        retryable=retryable,
-        current_user_message=current_user_message,
-        language=language,
-        unverified_names=unverified_names or [],
-        uncorroborated_names=uncorroborated_names or [],
+    voiced = (
+        None
+        if code == "discovery_unavailable" and not retryable
+        else await _voiced_discovery_recovery(
+            code=code,
+            retryable=retryable,
+            current_user_message=current_user_message,
+            language=language,
+            unverified_names=unverified_names or [],
+            uncorroborated_names=uncorroborated_names or [],
+        )
     )
     # The typed recovery object persists in both branches so codes such as a
     # retryable discovery_search_failed survive into metadata and analytics.

@@ -627,6 +627,46 @@ class TestRetryAffordance:
         assert "Ask only for a specific symbol or company to test." in system_prompt
         assert "(retry, or name a symbol to test)" not in system_prompt
 
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
+        ("language", "user_message"),
+        (
+            ("en", "Find current pharmaceutical stocks"),
+            ("es-419", "Busca acciones farmacéuticas actuales"),
+        ),
+    )
+    async def test_unavailable_recovery_uses_typed_copy_without_llm_voice(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        language: str,
+        user_message: str,
+    ) -> None:
+        provider = _FakeProvider(
+            SearchUnavailableError(reason="authentication_failed")
+        )
+        _wire(flag_on, provider=provider, extraction=_extraction())
+
+        async def _unexpected_voice(**_: Any) -> str | None:
+            pytest.fail("non-retryable unavailable recovery must not call the LLM")
+
+        flag_on.setattr(
+            composer_module, "_voiced_discovery_recovery", _unexpected_voice
+        )
+
+        result = await discovery_stage_result_if_applicable(
+            decision=_decision(),
+            current_user_message=user_message,
+            language=language,
+        )
+
+        assert result is not None
+        patch = result.patch
+        assert patch["recovery"] == {
+            "code": "discovery_unavailable",
+            "retryable": False,
+        }
+        assert "prompt_source" not in patch["recovery"]
+
 
 class TestVoicedRecoveryMetadata:
     @pytest.mark.asyncio()
