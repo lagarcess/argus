@@ -349,6 +349,64 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
   }
 });
 
+for (const expectation of [
+  {
+    language: "en" as const,
+    runLabel: /Run backtest/i,
+    resetCopy: /temporary chat can’t run more simulations\. It expires on/i,
+  },
+  {
+    language: "es-419" as const,
+    runLabel: /Ejecutar backtest/i,
+    resetCopy: /chat temporal ya no puede ejecutar más simulaciones\. Vence el/i,
+  },
+]) {
+  test(`exhausted guest simulation shows truthful conversion recovery in ${expectation.language}`, async ({
+    page,
+  }) => {
+    assertExactLocalCandidate();
+    assertZeroState();
+    const backend = new BackendController();
+    let guestOwner = "";
+    try {
+      await backend.start(false);
+      const guest = await freshGuest(page, {
+        language: expectation.language,
+        onBootstrapOwner(owner) {
+          guestOwner = owner;
+        },
+      });
+      guestOwner = guest.user.id;
+      const created = await apiJson<{ conversation: { id: string } }>(
+        page.context().request,
+        "/conversations",
+        { method: "POST", data: { title: null, language: expectation.language } },
+      );
+      expect(created.status).toBe(200);
+      seedGuestSimulationExhaustionFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      seedGuestActiveConfirmationFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      await page.goto(`/chat?conversation=${created.body.conversation.id}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: expectation.runLabel }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(expectation.resetCopy)).toBeVisible();
+    } finally {
+      await backend.stop();
+      if (guestOwner) await deleteDisposableIdentity(guestOwner);
+      purgeDisposableQaEvidence();
+      assertZeroState();
+    }
+  });
+}
+
 test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
   page,
 }) => {
