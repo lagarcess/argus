@@ -199,6 +199,11 @@ on guest-to-account conversion, proven by a founder-witnessed live journey
 at the exact composed tree (claim 200, instant Recents, all polls 200) —
 the same journey whose first attempt surfaced #371/#372.
 
+PR #373 then closed issue #372 as `81e7a1ac`: first-login guest claims work
+for brand-new accounts, email anti-enumeration is preserved through the
+obfuscated-response guard, and username conflicts are serialized and typed —
+three review rounds, three distinct real regressions caught and fixed.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
