@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import type { UserResponse } from "@/lib/guest-account";
+import type { GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 import { decideGuestNewConversationGate } from "@/lib/guest-capability-gates";
 import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 
@@ -13,7 +14,7 @@ type GuestShellActionsInput = {
   onOpenFeedback: () => void;
   onNewChat: () => void | Promise<unknown>;
   onRequestNonEmptyGuestChoice: () => void;
-  onRequestGuestDecision: (artifactId: string) => void;
+  onRequestGuestDecision: (target: GuestDecisionResumeTarget) => void;
   onOpenOmnisearch: () => void;
   onRequestSignIn: () => void;
   omnisearchShortcutEnabled: boolean;
@@ -56,7 +57,7 @@ export function useGuestShellActions({
   }, [onRequestSignIn]);
 
   const requestGuestDecision = useCallback(
-    (artifactId: string) => onRequestGuestDecision(artifactId),
+    (target: GuestDecisionResumeTarget) => onRequestGuestDecision(target),
     [onRequestGuestDecision],
   );
 

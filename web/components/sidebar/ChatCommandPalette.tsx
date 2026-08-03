@@ -79,12 +79,14 @@ import type {
   DecisionState as RunDossierDecisionState,
   SearchDecisionAction,
 } from "@/lib/run-dossier-contract";
+import { dossierDecisionResumeTarget, type GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 import {
   isRecentRecallResponse,
   loadCommandPaletteRecentRecall,
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
+import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type ChatCommandPaletteProps = {
@@ -100,6 +102,9 @@ type ChatCommandPaletteProps = {
   isGuest?: boolean;
   groundedDiscoveryAvailable?: boolean;
   canManageConversation?: boolean;
+  onDecisionUnavailable?: (target: GuestDecisionResumeTarget) => void;
+  decisionResumeTarget?: GuestDecisionResumeTarget | null;
+  onDecisionResumeHandled?: () => void;
   onMutated?: () => void;
   onConversationRemoved?: (conversationId: string) => void;
 };
@@ -249,6 +254,9 @@ export default function ChatCommandPalette({
   isGuest = false,
   groundedDiscoveryAvailable = true,
   canManageConversation = true,
+  onDecisionUnavailable,
+  decisionResumeTarget,
+  onDecisionResumeHandled,
   onMutated,
   onConversationRemoved,
 }: ChatCommandPaletteProps) {
@@ -713,7 +721,7 @@ export default function ChatCommandPalette({
   );
 
   const refreshAfterCanonicalMutation = useCallback(
-    async (mutationId: number) => {
+    async (mutationId = ++canonicalMutationIdRef.current) => {
       const currentSignature = searchSignatureRef.current;
       const [currentQuery, currentLedgerMode] = JSON.parse(
         currentSignature,
@@ -744,6 +752,7 @@ export default function ChatCommandPalette({
     },
     [refreshCanonicalSearch],
   );
+  useDossierDecisionResumeRefresh(decisionResumeTarget, refreshAfterCanonicalMutation, history.refresh);
 
   const saveDecision = useCallback(
     async (
@@ -1753,6 +1762,11 @@ export default function ChatCommandPalette({
                         onSaveDecision={(action, draft) =>
                           saveDecision(selectedDossier.run_id, action, draft)
                         }
+                        onDecisionUnavailable={onDecisionUnavailable}
+                        resumeDecisionTarget={dossierDecisionResumeTarget(
+                          decisionResumeTarget,
+                        )}
+                        onDecisionResumeHandled={onDecisionResumeHandled}
                       />
                     )
                   ) : (

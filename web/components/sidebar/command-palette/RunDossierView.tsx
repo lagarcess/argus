@@ -18,6 +18,7 @@ import {
   formatRunDossierMetrics,
   formatRunDossierSetup,
 } from "@/lib/run-dossier-items";
+import type { GuestDossierDecisionResumeTarget } from "@/lib/guest-conversion";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 import { DecisionEditor } from "./DecisionEditor";
@@ -35,6 +36,9 @@ type RunDossierViewProps = {
     action: SearchDecisionAction,
     draft: { decision_state: DecisionState; note: string },
   ) => Promise<void>;
+  onDecisionUnavailable?: (target: DossierDecisionResumeTarget) => void;
+  resumeDecisionTarget?: DossierDecisionResumeTarget | null;
+  onDecisionResumeHandled?: () => void;
   openConversationDisabled?: boolean;
   retestDisabled?: boolean;
 };
@@ -43,6 +47,29 @@ export type DecisionDraft = {
   state: DecisionState;
   note: string;
 };
+
+export type DossierDecisionResumeTarget = GuestDossierDecisionResumeTarget;
+
+export function matchingDecisionResumeDraft({
+  action,
+  runId,
+  target,
+}: {
+  action: SearchDecisionAction | undefined;
+  runId: string;
+  target: DossierDecisionResumeTarget | null | undefined;
+}): DecisionDraft | null {
+  if (
+    !action ||
+    !target ||
+    action.availability !== "available" ||
+    action.evidence_artifact_id !== target.artifactId ||
+    runId !== target.runId
+  ) {
+    return null;
+  }
+  return { state: target.decisionState, note: target.note };
+}
 
 export type DecisionSaveLifecycleOutcome = {
   draft: DecisionDraft | null;
@@ -83,6 +110,9 @@ export function RunDossierView({
   onOpenConversation,
   onRetest,
   onSaveDecision,
+  onDecisionUnavailable,
+  resumeDecisionTarget,
+  onDecisionResumeHandled,
   openConversationDisabled = false,
   retestDisabled = false,
 }: RunDossierViewProps) {
@@ -109,6 +139,24 @@ export function RunDossierView({
   }, [decisionAction?.evidence_artifact_id, dossier.run_id]);
 
   useEffect(() => {
+    const resumedDraft = matchingDecisionResumeDraft({
+      action: decisionAction,
+      runId: dossier.run_id,
+      target: resumeDecisionTarget,
+    });
+    if (!resumedDraft) return;
+    setSaved(false);
+    setSaveFailed(false);
+    setDraft(resumedDraft);
+    onDecisionResumeHandled?.();
+  }, [
+    decisionAction,
+    dossier.run_id,
+    onDecisionResumeHandled,
+    resumeDecisionTarget,
+  ]);
+
+  useEffect(() => {
     if (!saved) return;
     const timeout = window.setTimeout(() => setSaved(false), 2000);
     return () => window.clearTimeout(timeout);
@@ -126,12 +174,23 @@ export function RunDossierView({
 
   const startDecisionEdit = () => {
     if (!decisionAction) return;
-    setSaved(false);
-    setSaveFailed(false);
-    setDraft({
+    const nextDraft = {
       state: decisionAction.decision_state ?? "watching",
       note: decisionAction.note ?? "",
-    });
+    };
+    if (decisionAction.availability === "account_conversion_required") {
+      onDecisionUnavailable?.({
+        surface: "omnisearch_dossier",
+        artifactId: decisionAction.evidence_artifact_id,
+        runId: dossier.run_id,
+        decisionState: nextDraft.state,
+        note: nextDraft.note,
+      });
+      return;
+    }
+    setSaved(false);
+    setSaveFailed(false);
+    setDraft(nextDraft);
   };
 
   const saveDecision = async (
@@ -238,27 +297,36 @@ export function RunDossierView({
                 data-dossier-metrics-layout="compact"
                 className="mt-3 grid grid-cols-2 border-y border-black/[0.06] dark:border-white/[0.08]"
               >
-                {metrics.map((metric, index) => (
-                  <div
-                    key={metric.name}
-                    className={`flex min-w-0 items-baseline justify-between gap-2 py-2 ${
-                      index % 2 === 0
-                        ? "pr-3"
-                        : "border-l border-black/[0.06] pl-3 dark:border-white/[0.08]"
-                    } ${
-                      index >= 2
-                        ? "border-t border-black/[0.06] dark:border-white/[0.08]"
-                        : ""
-                    }`}
-                  >
-                    <dt className="min-w-0 text-[9px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
-                      {metric.name}
-                    </dt>
-                    <dd className="shrink-0 text-[13px] font-medium text-black/70 dark:text-white/70">
-                      {metric.value}
-                    </dd>
-                  </div>
-                ))}
+                {metrics.map((metric, index) => {
+                  const spansFullRow =
+                    metrics.length % 2 === 1 && index === metrics.length - 1;
+                  return (
+                    <div
+                      key={metric.name}
+                      data-dossier-metric-span={
+                        spansFullRow ? "full" : undefined
+                      }
+                      className={`flex min-w-0 items-baseline justify-between gap-2 py-2 ${
+                        spansFullRow
+                          ? "col-span-2"
+                          : index % 2 === 0
+                            ? "pr-3"
+                            : "border-l border-black/[0.06] pl-3 dark:border-white/[0.08]"
+                      } ${
+                        index >= 2
+                          ? "border-t border-black/[0.06] dark:border-white/[0.08]"
+                          : ""
+                      }`}
+                    >
+                      <dt className="min-w-0 text-[9px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
+                        {metric.name}
+                      </dt>
+                      <dd className="shrink-0 text-[13px] font-medium text-black/70 dark:text-white/70">
+                        {metric.value}
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
             )}
           </div>
