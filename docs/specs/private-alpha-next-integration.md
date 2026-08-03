@@ -6,9 +6,10 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #356 at `48de2f3f`, which standardizes menu-row
-hover/selected highlights as rounded inset pills across Settings, Profile,
-Recents overflow, and chat-header menus (issue #343). It follows PR #357 at
+Latest product change: PR #352 at `0942507b`, which unifies Omnisearch and
+chat keyboard actions behind one OS-aware behavior registry with a contextual
+shortcut legend (issue #334). It follows PR #356 at `48de2f3f` (rounded menu
+highlights, issue #343), PR #357 at
 `9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
 at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
@@ -133,6 +134,15 @@ in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
 overruled the absent on-PR Codex review after personal visual checks. It
 added no environment variable, deployment, API, schema, or migration
 requirement.
+PR #352 then closed issue #334 as `0942507b`: Omnisearch and active-chat
+keyboard actions share one OS-aware behavior registry (EN/es-419 labels and
+execution from one source), with a contextual shortcut legend that stays
+quiet at rest, contextual Omnisearch actions, arrow navigation, quick jump,
+keyboard-aware delete confirmation, and a responsive help sheet. Its first
+head was returned for composed-tree modularity violations and re-landed
+after genuine extraction; ChatInterface.tsx now sits exactly at its budget
+limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
