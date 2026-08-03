@@ -685,7 +685,11 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
         auth_user = result.get("user")
         if not isinstance(auth_user, dict):
             raise RuntimeError("Provider signup did not return an Auth user.")
-        api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+        identities = auth_user.get("identities")
+        # Supabase uses an empty identity list for its obfuscated existing-user
+        # response. Persisting that fake user would reveal the account exists.
+        if identities != []:
+            api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
         return auth_response(request, result)
     except Exception:
         raise _signup_auth_problem(request) from None
