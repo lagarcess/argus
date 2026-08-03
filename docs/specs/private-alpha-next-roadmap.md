@@ -155,6 +155,12 @@ desktop/mobile browser gate plus focused backend and web suites. Issue #341
 (guest decision history) is unblocked and should dispatch from the
 post-#357 integration head with a red-first reproduction before its fix.
 
+PR #356 then closed issue #343 as `48de2f3f`: one rounded inset-pill
+highlight geometry across all menu surfaces, colors and behavior unchanged,
+with in-repo hover evidence. Landed tree verified byte-identical to the
+independently pre-verified composed tree; founder overruled the absent
+on-PR bot review after personal visual checks.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

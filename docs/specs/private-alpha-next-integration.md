@@ -6,9 +6,10 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #357 at `9f97f1dc`, which keeps guest dossier
-decision actions visible behind a typed account-conversion gate and resumes
-the exact decision after conversion (issue #340). It follows PR #353 at
+Latest product change: PR #356 at `48de2f3f`, which standardizes menu-row
+hover/selected highlights as rounded inset pills across Settings, Profile,
+Recents overflow, and chat-header menus (issue #343). It follows PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
 `7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
 at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
 at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
@@ -124,6 +125,14 @@ legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
 `docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
 environment variable, deployment, schema, or migration requirement. Issue
 #341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
