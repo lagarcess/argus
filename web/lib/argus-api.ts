@@ -1022,6 +1022,7 @@ export async function streamChatMessage(
 
   const response = await fetch(`${ARGUS_API_BASE_URL}/chat/stream`, {
     method: "POST",
+    credentials: "include",
     signal: options.signal,
     headers: {
       "Content-Type": "application/json",

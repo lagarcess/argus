@@ -176,6 +176,7 @@ describe("conversation activity API contract", () => {
     expect(new Headers(request?.headers).get("X-Request-Id")).toBe(
       "caller-request-1",
     );
+    expect(request?.credentials).toBe("include");
     expect(request?.signal).toBe(controller.signal);
   });
 });
