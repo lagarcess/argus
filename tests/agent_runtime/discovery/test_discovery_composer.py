@@ -624,6 +624,8 @@ class TestRetryAffordance:
         system_prompt = captured_messages[0]["content"]
         assert language_instruction in system_prompt
         assert "Do not suggest retrying now or later." in system_prompt
+        assert "Describe availability only as unavailable for this request." in system_prompt
+        assert "Do not use time qualifiers or imply future availability." in system_prompt
         assert "Ask only for a specific symbol or company to test." in system_prompt
         assert "(retry, or name a symbol to test)" not in system_prompt
 
@@ -635,7 +637,7 @@ class TestRetryAffordance:
             ("es-419", "Busca acciones farmacéuticas actuales"),
         ),
     )
-    async def test_unavailable_recovery_uses_typed_copy_without_llm_voice(
+    async def test_unavailable_recovery_passes_nonretryable_fact_to_voice(
         self,
         flag_on: pytest.MonkeyPatch,
         language: str,
@@ -645,13 +647,13 @@ class TestRetryAffordance:
             SearchUnavailableError(reason="authentication_failed")
         )
         _wire(flag_on, provider=provider, extraction=_extraction())
+        captured_retryable: list[bool] = []
 
-        async def _unexpected_voice(**_: Any) -> str | None:
-            pytest.fail("non-retryable unavailable recovery must not call the LLM")
+        async def _safe_voice(**kwargs: Any) -> str | None:
+            captured_retryable.append(kwargs["retryable"])
+            return "safe localized response"
 
-        flag_on.setattr(
-            composer_module, "_voiced_discovery_recovery", _unexpected_voice
-        )
+        flag_on.setattr(composer_module, "_voiced_discovery_recovery", _safe_voice)
 
         result = await discovery_stage_result_if_applicable(
             decision=_decision(),
@@ -664,13 +666,10 @@ class TestRetryAffordance:
         assert patch["recovery"] == {
             "code": "discovery_unavailable",
             "retryable": False,
+            "prompt_source": "llm_generated",
         }
-        assert "prompt_source" not in patch["recovery"]
-        assert str(patch["assistant_response"]) == (
-            "Current source-backed discovery is not available for this request, "
-            "and I will not guess from memory. Name a symbol or company you already "
-            "have in mind and I can test it. Everything in this chat is unchanged."
-        )
+        assert captured_retryable == [False]
+        assert str(patch["assistant_response"]) == "safe localized response"
 
 
 class TestVoicedRecoveryMetadata:

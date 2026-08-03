@@ -374,17 +374,13 @@ async def _recovery_result(
     unverified_names: list[str] | None = None,
     uncorroborated_names: list[str] | None = None,
 ) -> StageResult:
-    voiced = (
-        None
-        if code == "discovery_unavailable" and not retryable
-        else await _voiced_discovery_recovery(
-            code=code,
-            retryable=retryable,
-            current_user_message=current_user_message,
-            language=language,
-            unverified_names=unverified_names or [],
-            uncorroborated_names=uncorroborated_names or [],
-        )
+    voiced = await _voiced_discovery_recovery(
+        code=code,
+        retryable=retryable,
+        current_user_message=current_user_message,
+        language=language,
+        unverified_names=unverified_names or [],
+        uncorroborated_names=uncorroborated_names or [],
     )
     # The typed recovery object persists in both branches so codes such as a
     # retryable discovery_search_failed survive into metadata and analytics.
@@ -516,8 +512,9 @@ async def _voiced_discovery_recovery(
         "Offer one concrete next step: ask again in a moment or name a specific "
         "symbol or company to test."
         if retryable
-        else "Do not suggest retrying now or later. Ask only for a specific symbol "
-        "or company to test."
+        else "Do not suggest retrying now or later. Describe availability only as "
+        "unavailable for this request. Do not use time qualifiers or imply future "
+        "availability. Ask only for a specific symbol or company to test."
     )
     messages = [
         {
