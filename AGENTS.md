@@ -169,6 +169,11 @@ Integration guardrails:
   branch. Modularity budgets are a shared pool: two individually green
   branches can exceed a watched file's limit when combined, and the violation
   only exists on the merged result.
+- Write the terminal audit only after the final Codex review has returned,
+  and record that review's outcome in it. An audit that races an in-flight
+  review request can be truthful for minutes and stale on arrival; review
+  responses may arrive as inline threads without a summary comment, so check
+  the PR's unresolved-thread count, not just for a bot comment.
 - After the founder merges a worker PR, the active agent should run
   `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
   permit it. A cloud agent may perform that workflow; the local
