@@ -738,11 +738,14 @@ def _materialized_target_matches_primary_delta(
         )
         if not requested or materialized == current:
             return False
-        primary_replacement_is_authoritative = (
-            operation == "replace" and grounded - current <= primary_requested
+        grounded_additions = grounded - current
+        primary_replacement_constrains_current = operation == "replace" and (
+            not grounded_additions or bool(grounded_additions & primary_requested)
         )
         primary_replacement_removals = (
-            current - primary_requested if primary_replacement_is_authoritative else set()
+            current - primary_requested
+            if primary_replacement_constrains_current
+            else set()
         )
         requested_removals = grounded | primary_replacement_removals
         expected_removals = (
@@ -752,7 +755,7 @@ def _materialized_target_matches_primary_delta(
             not expected_removals
             or current - materialized != expected_removals
             or (
-                primary_replacement_is_authoritative
+                primary_replacement_constrains_current
                 and expected_removals != primary_replacement_removals
             )
             or not expected_removals <= requested_removals

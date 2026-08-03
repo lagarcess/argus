@@ -838,6 +838,22 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
             },
             id="repairs-primary-missing-grounded-addition",
         ),
+        pytest.param(
+            ["AAPL", "MSFT"],
+            {"AAPL", "NVDA", "GOOGL"},
+            "keep AAPL, remove the second one, and add NVDA and GOOGL",
+            ["AAPL"],
+            ["NVDA", "GOOGL"],
+            ["MSFT"],
+            ["NVDA", "GOOGL"],
+            ["AAPL", "NVDA", "GOOGL"],
+            {
+                "asset_universe": ["AAPL", "NVDA"],
+                "asset_universe_operation": "replace",
+                "field_provenance": {"asset_universe": "explicit_user"},
+            },
+            id="preserves-primary-retention-with-missing-grounded-addition",
+        ),
     ],
 )
 async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
