@@ -61,6 +61,11 @@ def draft_from_result_metadata(metadata: dict[str, Any]) -> StrategySummary:
         or config.get("benchmark_symbol")
         or metadata.get("benchmark_symbol"),
     )
+    _preserve_dca_parameters(
+        values,
+        config=config,
+        resolved_parameters=resolved_parameters,
+    )
 
     return _strategy_from_values(values)
 
@@ -158,6 +163,35 @@ def _preserve_execution_realism(
         field_provenance.setdefault(rate_key, "explicit_user")
     if not field_provenance:
         return
+    extra_parameters["field_provenance"] = field_provenance
+    values["extra_parameters"] = extra_parameters
+
+
+def _preserve_dca_parameters(
+    values: dict[str, Any],
+    *,
+    config: dict[str, Any],
+    resolved_parameters: dict[str, Any],
+) -> None:
+    strategy_type = str(values.get("strategy_type") or config.get("template") or "")
+    if strategy_type != "dca_accumulation":
+        return
+
+    contribution = resolved_parameters.get("recurring_contribution")
+    if _blank(contribution):
+        contribution = config.get("recurring_contribution")
+    cadence = values.get("cadence")
+    if _blank(contribution) and _blank(cadence):
+        return
+
+    extra_parameters = _dict(values.get("extra_parameters"))
+    field_provenance = _dict(extra_parameters.get("field_provenance"))
+    if not _blank(contribution):
+        extra_parameters.setdefault("recurring_contribution", contribution)
+        field_provenance.setdefault("capital_amount", "prior")
+        field_provenance.setdefault("recurring_contribution", "prior")
+    if not _blank(cadence):
+        field_provenance.setdefault("cadence", "prior")
     extra_parameters["field_provenance"] = field_provenance
     values["extra_parameters"] = extra_parameters
 

@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from argus.agent_runtime.next_experiments import NEXT_EXPERIMENT_ACTION_LABELS
+from argus.agent_runtime.next_experiments import (
+    NEXT_EXPERIMENT_ACTION_LABELS,
+    continuity_next_experiment_kind,
+    continuity_next_experiment_label_key,
+)
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
@@ -123,6 +127,16 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
             )
             if localized:
                 return localized
+        return payload.action.label or payload.message or ""
+    continuity_kind = continuity_next_experiment_kind(
+        action_type=action_type,
+        action_payload=payload.action.payload,
+    )
+    if continuity_kind is not None:
+        label_key = continuity_next_experiment_label_key(continuity_kind)
+        localized = _localized_action_label(label_key or "", language=language)
+        if localized:
+            return localized
         return payload.action.label or payload.message or ""
     action_messages = {
         "run_backtest": "run backtest",
