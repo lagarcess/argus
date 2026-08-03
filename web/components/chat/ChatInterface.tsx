@@ -948,6 +948,7 @@ export default function ChatInterface() {
     requestGuestSignIn,
     requestNewChat,
     requestOmnisearch,
+    resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
     clearResumeDecision,
@@ -2286,6 +2287,9 @@ export default function ChatInterface() {
             isGuest={isGuest}
             groundedDiscoveryAvailable={canUseGroundedDiscovery}
             canManageConversation={canManageConversation}
+            onDecisionUnavailable={requestGuestDecision}
+            decisionResumeTarget={resumeDecisionTarget}
+            onDecisionResumeHandled={clearResumeDecision}
             onMutated={refreshHistory}
             onConversationRemoved={handleConversationRemoved}
           />
@@ -2474,7 +2478,12 @@ export default function ChatInterface() {
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}
                             canSaveDecision={canSaveDecision}
-                            onDecisionUnavailable={requestGuestDecision}
+                            onDecisionUnavailable={(artifactId) =>
+                              requestGuestDecision({
+                                surface: "result_card",
+                                artifactId,
+                              })
+                            }
                             onDecisionSaved={(decisionState) => {
                               setMessages((prev) =>
                                 prev.map((m) =>

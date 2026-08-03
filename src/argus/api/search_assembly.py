@@ -7,7 +7,12 @@ from typing import Any, Iterable, Mapping
 
 from argus.api import state as api_state
 from argus.api.memory_search_candidates import bounded_memory_search_snapshot
-from argus.api.schemas import SearchAssetRollup, SearchItem, User
+from argus.api.schemas import (
+    DecisionActionAvailability,
+    SearchAssetRollup,
+    SearchItem,
+    User,
+)
 from argus.domain.conversation_recall import (
     project_conversation_recall,
 )
@@ -27,7 +32,7 @@ def memory_search_read(
     user: User,
     query: str,
     source_limit: int,
-    allow_decision_action: bool = True,
+    decision_action_availability: DecisionActionAvailability | None = "available",
     include_conversation_rows: bool = True,
     cursor_updated_at: datetime | None = None,
     cursor_id: str | None = None,
@@ -60,7 +65,7 @@ def memory_search_read(
                 decisions=snapshot.decisions,
                 messages=snapshot.messages,
                 query=query,
-                allow_decision_action=allow_decision_action,
+                decision_action_availability=decision_action_availability,
                 language=user.language,
             )
             if include_conversation_rows
@@ -83,7 +88,7 @@ def scored_supabase_search_items(
     *,
     raw: dict[str, list[dict[str, object]]],
     query: str,
-    allow_decision_action: bool = True,
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> list[ScoredSearchItem]:
     """Adapt persistent and injected-gateway rows to the shared projector."""
@@ -94,21 +99,29 @@ def scored_supabase_search_items(
             raw_item = row.get("item")
             if not isinstance(raw_item, dict):
                 continue
-            item = SearchItem.model_validate(raw_item)
-            if not allow_decision_action and item.dossier is not None:
-                item = item.model_copy(
-                    update={
-                        "dossier": item.dossier.model_copy(
-                            update={
-                                "actions": [
-                                    action
-                                    for action in item.dossier.actions
-                                    if action.type != "decision"
-                                ]
-                            }
+            normalized_item = dict(raw_item)
+            raw_dossier = normalized_item.get("dossier")
+            if isinstance(raw_dossier, dict):
+                normalized_dossier = dict(raw_dossier)
+                raw_actions = normalized_dossier.get("actions")
+                if isinstance(raw_actions, list):
+                    normalized_dossier["actions"] = [
+                        {
+                            **action,
+                            "availability": decision_action_availability,
+                        }
+                        if isinstance(action, dict)
+                        and action.get("type") == "decision"
+                        else action
+                        for action in raw_actions
+                        if not (
+                            isinstance(action, dict)
+                            and action.get("type") == "decision"
+                            and decision_action_availability is None
                         )
-                    }
-                )
+                    ]
+                normalized_item["dossier"] = normalized_dossier
+            item = SearchItem.model_validate(normalized_item)
             projected.append((int(row.get("score") or 0), item))
         return projected
 
@@ -169,7 +182,7 @@ def scored_supabase_search_items(
         decisions=decisions,
         messages=messages,
         query=query,
-        allow_decision_action=allow_decision_action,
+        decision_action_availability=decision_action_availability,
         language=language,
     )
 
@@ -183,7 +196,7 @@ def _project_rows(
     decisions: list[Mapping[str, Any]],
     messages: list[Mapping[str, Any]],
     query: str,
-    allow_decision_action: bool = True,
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> list[ScoredSearchItem]:
     runs_by_conversation = _group_by_conversation(runs)
@@ -202,7 +215,7 @@ def _project_rows(
             decisions=decisions_by_conversation[conversation_id],
             messages=messages_by_conversation[conversation_id],
             query=query,
-            allow_decision_action=allow_decision_action,
+            decision_action_availability=decision_action_availability,
             language=language,
         )
         if item is not None:
