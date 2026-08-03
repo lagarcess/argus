@@ -22,6 +22,7 @@ type GuestConversionModalProps = {
   initialMode: GuestConversionMode;
   publicAccountAccessEnabled: boolean;
   resetAt?: string | null;
+  resetKind?: "daily" | "workspace";
   locale?: "en-US" | "es-419";
   onClose: () => void;
   onAuthenticate: (
@@ -35,6 +36,7 @@ export default function GuestConversionModal({
   initialMode,
   publicAccountAccessEnabled,
   resetAt = null,
+  resetKind = "daily",
   locale = "en-US",
   onClose,
   onAuthenticate,
@@ -124,9 +126,13 @@ export default function GuestConversionModal({
         {reason === "simulation_limit" && resetAt ? (
           <p className="mb-5 pr-12 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
             {t(
-              publicAccountAccessEnabled
-                ? "guest.conversion.simulation_limit_reset"
-                : "guest.conversion.simulation_limit_request_access",
+              resetKind === "daily"
+                ? publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_limit_reset"
+                  : "guest.conversion.simulation_limit_request_access"
+                : publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_workspace_limit_reset"
+                  : "guest.conversion.simulation_workspace_limit_request_access",
               {
               date: formatAllowancePeriodEnd(resetAt, locale),
               },

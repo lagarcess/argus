@@ -270,6 +270,7 @@ export function useGuestExperience({
                 },
                 "signup",
                 guestSimulationPrecheckResetAt(usage.allowances.backtests),
+                "daily",
               );
               return false;
             }
@@ -373,6 +374,7 @@ export function useGuestExperience({
         },
         "signup",
         account.guest?.expires_at ?? null,
+        "workspace",
       );
       return true;
     },
