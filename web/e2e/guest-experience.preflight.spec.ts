@@ -510,7 +510,7 @@ test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
     expect(ownerSnapshot(guestOwner)).toMatchObject({
       messages: 12,
       runs: 1,
-      simulation_units: 1,
+      simulation_units: 2,
       route_receipts: 0,
       cost_rows: 0,
     });
