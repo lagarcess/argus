@@ -3141,6 +3141,7 @@ def test_search_supabase_projects_localized_actions_without_generation(
     }
     assert decision == {
         "type": "decision",
+        "availability": "available",
         "evidence_artifact_id": "evidence-action-es",
         "decision_state": "promising",
         "note": "Revisar el próximo año.",

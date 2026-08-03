@@ -6,6 +6,10 @@ import type {
   SearchLedgerGroup,
 } from "./argus-api";
 import type { SearchDossierAction } from "./run-dossier-contract";
+import {
+  commandPaletteRowActionForEvent,
+  quickJumpIndexForEvent,
+} from "./keyboard-shortcuts";
 
 export type CommandPaletteDisplayItem = {
   id: string;
@@ -218,52 +222,110 @@ export function commandPaletteConversationNavigationDisabled({
   );
 }
 
-export function commandPaletteDigitSelectionIndex(
-  key: string,
-  itemCount: number,
-  isEditableTarget: boolean,
-) {
-  if (isEditableTarget || !/^[1-9]$/.test(key)) return null;
-  const index = Number(key) - 1;
-  return index < itemCount ? index : null;
-}
-
 export type CommandPaletteKeyboardAction =
   | { type: "none" }
   | { type: "select"; index: number }
-  | { type: "open"; openAtLeftOff: boolean };
+  | { type: "focus_search" }
+  | { type: "open"; openAtLeftOff: boolean }
+  | { type: "rename" }
+  | { type: "archive" }
+  | { type: "delete" };
+
+export function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
 
 export function commandPaletteKeyboardAction({
   key,
   itemCount,
   hasSelection,
+  selectedCanManageConversation,
   targetIsEditable,
   targetIsSearchInput,
   isEditing,
   metaKey,
   ctrlKey,
+  shiftKey = false,
+  altKey = false,
+  code = key,
+  repeat = false,
+  focusedRowIndex = -1,
+  usesCommandKey = false,
 }: {
   key: string;
   itemCount: number;
   hasSelection: boolean;
+  selectedCanManageConversation?: boolean;
   targetIsEditable: boolean;
   targetIsSearchInput: boolean;
   isEditing: boolean;
   metaKey: boolean;
   ctrlKey: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  code?: string;
+  repeat?: boolean;
+  focusedRowIndex?: number;
+  usesCommandKey?: boolean;
 }): CommandPaletteKeyboardAction {
   if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
     return { type: "none" };
   }
-  if (key === "Enter" && hasSelection) {
+  if (key === "ArrowDown" && itemCount > 0) {
+    if (targetIsSearchInput) return { type: "select", index: 0 };
+    if (focusedRowIndex >= 0) {
+      return {
+        type: "select",
+        index: Math.min(focusedRowIndex + 1, itemCount - 1),
+      };
+    }
+  }
+  if (key === "ArrowUp" && focusedRowIndex >= 0) {
+    return focusedRowIndex === 0
+      ? { type: "focus_search" }
+      : { type: "select", index: focusedRowIndex - 1 };
+  }
+  if (key === "Enter" && hasSelection && focusedRowIndex < 0) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };
   }
-  const index = commandPaletteDigitSelectionIndex(
+  const rowAction = commandPaletteRowActionForEvent({
     key,
-    itemCount,
-    targetIsEditable,
+    code,
+    metaKey,
+    ctrlKey,
+    shiftKey,
+    altKey,
+    repeat,
+  });
+  if (
+    hasSelection &&
+    selectedCanManageConversation &&
+    (!targetIsEditable || targetIsSearchInput) &&
+    rowAction
+  ) {
+    return { type: rowAction };
+  }
+  const index = quickJumpIndexForEvent(
+    {
+      key,
+      code,
+      metaKey,
+      ctrlKey,
+      shiftKey,
+      altKey,
+      repeat,
+    },
+    usesCommandKey,
   );
-  return index === null ? { type: "none" } : { type: "select", index };
+  return index === null || index >= itemCount
+    ? { type: "none" }
+    : { type: "select", index };
 }
 
 export function commandPaletteRequestIsCurrent({

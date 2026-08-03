@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 import {
   KEYBOARD_SHORTCUTS,
   keyboardShortcutDisplay,
+  type KeyboardShortcutGroup,
+  type KeyboardShortcutId,
 } from "@/lib/keyboard-shortcuts";
 
 type KeyboardShortcutsOverlayProps = {
@@ -15,6 +17,35 @@ type KeyboardShortcutsOverlayProps = {
 function usesCommandKey(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+}
+
+const HELP_GROUPS: ReadonlyArray<{
+  id: Exclude<KeyboardShortcutGroup, "omnisearch">;
+  className: string;
+}> = [
+  { id: "navigation", className: "" },
+  { id: "chat", className: "" },
+  { id: "quick_jump", className: "md:col-span-2" },
+];
+
+const CHAT_HELP_ORDER: readonly KeyboardShortcutId[] = [
+  "new_chat",
+  "rename_focused_chat",
+  "archive_focused_chat",
+  "toggle_read_focused_chat",
+  "toggle_pin_focused_chat",
+  "delete_focused_chat",
+];
+
+function shortcutsForHelpGroup(group: KeyboardShortcutGroup) {
+  const shortcuts = KEYBOARD_SHORTCUTS.filter(
+    (shortcut) => shortcut.group === group,
+  );
+  if (group !== "chat") return shortcuts;
+  return [...shortcuts].sort(
+    (left, right) =>
+      CHAT_HELP_ORDER.indexOf(left.id) - CHAT_HELP_ORDER.indexOf(right.id),
+  );
 }
 
 export default function KeyboardShortcutsOverlay({
@@ -40,7 +71,7 @@ export default function KeyboardShortcutsOverlay({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
       <button
         type="button"
         className="absolute inset-0 cursor-default"
@@ -48,7 +79,7 @@ export default function KeyboardShortcutsOverlay({
         aria-label={t("keyboard_shortcuts.close", "Close keyboard shortcuts")}
       />
       <section
-        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-[18px] border border-black/10 bg-white p-5 text-black dark:border-white/10 dark:bg-[#1b1d20] dark:text-white"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-[860px] overflow-y-auto rounded-[18px] border border-black/10 bg-white p-5 text-black dark:border-white/10 dark:bg-[#1b1d20] dark:text-white md:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="argus-keyboard-shortcuts-title"
@@ -84,19 +115,21 @@ export default function KeyboardShortcutsOverlay({
           </button>
         </div>
 
-        <div className="mt-6 space-y-5">
-          {(["navigation", "chat", "quick_jump"] as const).map((group) => {
-            const shortcuts = KEYBOARD_SHORTCUTS.filter(
-              (shortcut) => shortcut.group === group,
-            );
+        <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+          {HELP_GROUPS.map((group) => {
+            const shortcuts = shortcutsForHelpGroup(group.id);
             return (
-              <div key={group}>
+              <div
+                key={group.id}
+                data-shortcut-group={group.id}
+                className={group.className}
+              >
                 <p className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45">
                   {t(
-                    `keyboard_shortcuts.groups.${group}`,
-                    group === "chat"
+                    `keyboard_shortcuts.groups.${group.id}`,
+                    group.id === "chat"
                       ? "Chat"
-                      : group === "quick_jump"
+                      : group.id === "quick_jump"
                         ? "Quick jump"
                         : "Navigation",
                   )}
@@ -110,12 +143,14 @@ export default function KeyboardShortcutsOverlay({
                     return (
                       <div
                         key={shortcut.id}
-                        className={`flex min-h-12 items-center justify-between gap-4 px-4 py-3 ${
+                        className={`flex min-h-11 items-center justify-between gap-4 px-3.5 py-2.5 ${
                           index > 0 ? "border-t border-black/[0.06] dark:border-white/[0.08]" : ""
                         }`}
                       >
-                        <span className="text-[14px] text-black/75 dark:text-white/80">
-                          {t(shortcut.labelKey)}
+                        <span className="min-w-0 text-[14px] text-black/75 dark:text-white/80">
+                          {t(shortcut.labelKey, {
+                            defaultValue: shortcut.defaultLabel,
+                          }).trim() || shortcut.defaultLabel}
                         </span>
                         <span className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
                           {keys.map((key) => (
@@ -131,7 +166,7 @@ export default function KeyboardShortcutsOverlay({
                     );
                   })}
                 </div>
-                {group === "quick_jump" ? (
+                {group.id === "quick_jump" ? (
                   <p className="mt-2 px-1 text-[12px] leading-relaxed text-black/50 dark:text-white/55">
                     {t(
                       "keyboard_shortcuts.quick_jump_description",

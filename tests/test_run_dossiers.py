@@ -112,7 +112,7 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
             "updated_at": created_at,
         },
         result_message_id="message-1",
-        allow_decision_action=True,
+        decision_action_availability="available",
         language="en",
     )
 
@@ -136,6 +136,7 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
     assert not hasattr(dossier.actions[0], "canonical_setup")
     assert not hasattr(dossier.actions[0], "send_text")
     assert dossier.actions[1].type == "decision"
+    assert dossier.actions[1].availability == "available"
     assert dossier.actions[1].evidence_artifact_id == artifact["id"]
 
 
@@ -177,7 +178,7 @@ def test_unfinalized_evidence_identity_is_not_offered_a_retest() -> None:
         artifact=_artifact(run_id="run-1", created_at=created_at),
         decision=None,
         result_message_id="message-1",
-        allow_decision_action=True,
+        decision_action_availability="available",
         language="en",
     )
 
@@ -551,6 +552,38 @@ def test_guest_history_is_limited_to_the_active_workspace(
     )
     assert page.total_runs == 1
     assert [action.type for action in page.items[0].actions] == ["retest_run"]
+
+    capable_request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [
+                (
+                    b"x-argus-client-capabilities",
+                    b"dossier_decision_conversion_v1",
+                )
+            ],
+        }
+    )
+    capable_request.state.request_id = "run-dossier-capable-guest-test"
+    store_account_context(capable_request, guest_account_context(workspace))
+    capable_page = list_run_dossiers(
+        conversation_id=conversation.id,
+        request=capable_request,
+        client_capabilities="dossier_decision_conversion_v1",
+        limit=20,
+        cursor=None,
+        user=user,
+    )
+    assert [action.type for action in capable_page.items[0].actions] == [
+        "retest_run",
+        "decision",
+    ]
+    decision_action = capable_page.items[0].actions[1]
+    assert decision_action.type == "decision"
+    assert decision_action.evidence_artifact_id == source_row.artifact["id"]
+    assert decision_action.availability == "account_conversion_required"
 
     with pytest.raises(HTTPException) as hidden:
         list_run_dossiers(

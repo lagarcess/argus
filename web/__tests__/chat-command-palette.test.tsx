@@ -22,6 +22,7 @@ const decisionAction = (
   runLabel: string,
 ): SearchDecisionAction => ({
   type: "decision",
+  availability: "available",
   evidence_artifact_id: evidenceArtifactId,
   decision_state: "watching",
   note: `${runLabel} note`,

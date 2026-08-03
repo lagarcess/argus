@@ -989,10 +989,15 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     expect(chat).toContain("isStreamingResponse");
-    expect(chat).toContain("latestAiIndex");
+    expect(chat).toContain("messageStreamPresentation(");
     expect(chat).toContain("isWorkingMessage");
-    expect(chat).toContain('(msg.content ?? "") === ""');
+    expect(projection).toContain("latestAiIndex");
+    expect(projection).toContain('(message.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
     expect(message).toContain("{!isUser && !isStreaming && (");
     expect(message).not.toContain("{copyFeedback && (");

@@ -14,6 +14,7 @@ export type SearchRetestAction = {
 
 export type SearchDecisionAction = {
   type: "decision";
+  availability: "available" | "account_conversion_required";
   evidence_artifact_id: string;
   decision_state: DecisionState | null;
   note: string | null;
