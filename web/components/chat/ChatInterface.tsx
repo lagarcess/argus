@@ -111,6 +111,7 @@ import {
   loadAllConversationMessagePages,
   resolveOrdinaryTransportAmbiguityView,
   snapshotOrdinaryTransportMessageIds,
+  strategyPathContextFromMetadata,
 } from "@/lib/chat-message-hydration";
 import {
   hydrateResultActionsForRun,
@@ -1212,6 +1213,8 @@ export default function ChatInterface() {
           Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
+        const errorStrategyPathContext =
+          strategyPathContextFromMetadata(errorPayload);
         // Same gate the `final` frame applies: a retryable failure wears the
         const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
           errorPayload.recovery,
@@ -1241,6 +1244,7 @@ export default function ChatInterface() {
                       id: durableRetry.requestMessageId,
                       content: durableRetry.persistedMessage,
                       recoveryDisplay: errorRecoveryDisplay,
+                      strategyPathContext: errorStrategyPathContext,
                       actions: [durableRetry.action],
                     }
                   : m.id === assistantId
@@ -1252,6 +1256,7 @@ export default function ChatInterface() {
                           t("chat.error_backtest"),
                         ),
                         recoveryDisplay: errorRecoveryDisplay,
+                        strategyPathContext: errorStrategyPathContext,
                         assistantRecoveryCode: errorAssistantRecoveryCode,
                         actions:
                           visibleRetryAction && !durableRetryAction
@@ -1285,6 +1290,8 @@ export default function ChatInterface() {
           applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalStrategyPathContext =
+          strategyPathContextFromMetadata(finalPayload);
         const finalAssistantRecoveryCode = retryableAssistantRecoveryCode(
           finalPayload.recovery,
         );
@@ -1339,6 +1346,7 @@ export default function ChatInterface() {
                   kind: "strategy_confirmation",
                   content: undefined,
                   confirmation,
+                  strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
                 }),
               ),
@@ -1409,6 +1417,7 @@ export default function ChatInterface() {
                   finalText,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
+                  strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   contentPresentation:
@@ -1427,6 +1436,7 @@ export default function ChatInterface() {
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
+                strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 contentPresentation:

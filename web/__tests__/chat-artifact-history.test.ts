@@ -131,6 +131,57 @@ function resultMessageWithResultActions(runId: string): Message {
 }
 
 describe("chat artifact history", () => {
+  test("hydrates backend-owned strategy context on a confirmation card", () => {
+    const confirmation = confirmationMessage().confirmation!;
+    const { messages } = hydrateMessagesFromApi([
+      {
+        id: "assistant-confirmation-linked",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-08-02T00:00:00Z",
+        metadata: {
+          strategy_path_id: "assistant-capital-question",
+          confirmation_card: confirmation,
+          confirmation_payload: {
+            strategy: {
+              strategy_type: "buy_and_hold",
+              asset_universe: ["AAPL"],
+              date_range: { start: "2025-01-02", end: "2025-07-31" },
+              capital_amount: 10_000,
+            },
+            optional_parameters: {
+              initial_capital: {
+                value: 10_000,
+                source: "user",
+                label: "Initial capital",
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(messages[0]?.strategyPathContext).toEqual({
+      kind: "confirmation",
+      strategy: {
+        strategy_type: "buy_and_hold",
+        asset_universe: ["AAPL"],
+        date_range: { start: "2025-01-02", end: "2025-07-31" },
+        capital_amount: 10_000,
+      },
+      sourceResultRunId: null,
+      strategyPathId: "assistant-capital-question",
+      optionalParameters: {
+        initial_capital: {
+          value: 10_000,
+          source: "user",
+          label: "Initial capital",
+        },
+      },
+    });
+  });
+
   test.each([
     ["run_backtest", "Running", "superseded"],
     ["change_dates", "Editing", "superseded"],
