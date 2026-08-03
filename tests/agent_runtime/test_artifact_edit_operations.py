@@ -3109,7 +3109,16 @@ async def test_issue_339_planner_steps_aside_for_explicit_position_size_edit(
     assert response is None
 
 
-def test_issue_339_position_size_merge_drops_echoed_capital_context():
+@pytest.mark.parametrize(
+    "pending_asset_answer",
+    [
+        pytest.param(False, id="echoed-capital-context"),
+        pytest.param(True, id="pending-asset-answer"),
+    ],
+)
+def test_issue_339_owned_position_size_merge_clears_cash_context(
+    pending_asset_answer,
+):
     from argus.agent_runtime.stages.interpret_internal.contextual_merge import (
         _strategy_with_contextual_merge,
     )
@@ -3129,30 +3138,55 @@ def test_issue_339_position_size_merge_drops_echoed_capital_context():
             },
         },
     )
+    incoming_extra_parameters = {
+        "field_provenance": {"position_size": "explicit_user"},
+    }
+    incoming_capital = None
+    if not pending_asset_answer:
+        incoming_capital = 10_000
+        incoming_extra_parameters.update(
+            {
+                "initial_capital": 10_000,
+                "starting_capital": 10_000,
+                "field_provenance": {
+                    "position_size": "explicit_user",
+                    "capital_amount": "starting_capital",
+                    "initial_capital": "starting_capital",
+                },
+            }
+        )
     incoming = StrategySummary(
+        asset_universe=["MSFT"] if pending_asset_answer else [],
         sizing_mode="position_size",
         position_size=0.5,
-        capital_amount=10_000,
-        extra_parameters={
-            "initial_capital": 10_000,
-            "starting_capital": 10_000,
-            "field_provenance": {
-                "position_size": "explicit_user",
-                "capital_amount": "starting_capital",
-                "initial_capital": "starting_capital",
-            },
-        },
+        capital_amount=incoming_capital,
+        extra_parameters=incoming_extra_parameters,
     )
 
     merged = _strategy_with_contextual_merge(
         strategy=incoming,
         snapshot=TaskSnapshot(pending_strategy_summary=prior),
-        selected_thread_metadata={"requested_field": "assumption"},
-        semantic_turn_act="refine_current_idea",
-        task_relation="refine",
-        current_user_message="set position size to 50%",
+        selected_thread_metadata=(
+            {
+                "requested_field": "asset_universe",
+                "last_stage_outcome": "await_user_reply",
+            }
+            if pending_asset_answer
+            else {"requested_field": "assumption"}
+        ),
+        semantic_turn_act=(
+            "answer_pending_need" if pending_asset_answer else "refine_current_idea"
+        ),
+        task_relation="continue" if pending_asset_answer else "refine",
+        current_user_message=(
+            "MSFT, and set position size to 50%"
+            if pending_asset_answer
+            else "set position size to 50%"
+        ),
     )
 
+    if pending_asset_answer:
+        assert merged.asset_universe == ["MSFT"]
     assert merged.sizing_mode == "position_size"
     assert merged.position_size == 0.5
     assert merged.capital_amount is None

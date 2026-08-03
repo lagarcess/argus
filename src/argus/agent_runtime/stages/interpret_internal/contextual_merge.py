@@ -214,7 +214,7 @@ def _strategy_with_contextual_merge(
             "resolution_provenance",
         }:
             continue
-        if preserve_prior_money_context and key in {
+        if preserve_prior_money_context and not position_size_owns_edit and key in {
             "capital_amount",
             "initial_capital",
             "total_capital",
