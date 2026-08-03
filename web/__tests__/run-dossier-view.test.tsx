@@ -7,6 +7,7 @@ import {
 } from "../components/sidebar/command-palette/DecisionEditor";
 import { decisionNoteElementOverflows } from "../components/sidebar/command-palette/DecisionNoteDisplay";
 import {
+  matchingDecisionResumeDraft,
   resolveDecisionSaveLifecycle,
   RunDossierView,
 } from "../components/sidebar/command-palette/RunDossierView";
@@ -19,6 +20,7 @@ import type {
 
 const decisionAction: SearchDecisionAction = {
   type: "decision",
+  availability: "available",
   evidence_artifact_id: "evidence-7",
   decision_state: "watching",
   note: "Hold through earnings.\nReview risk first.",
@@ -142,6 +144,47 @@ describe("single-run dossier view", () => {
     expect(metricsMarkup).toContain("border-l");
     expect(metricsMarkup).toContain("border-t");
     expect(metricsMarkup).not.toContain("bg-black/[0.025]");
+  });
+
+  test("uses the full final row for odd metric counts without changing even grids", () => {
+    const renderWithMetricCount = (count: number) =>
+      renderToStaticMarkup(
+        <RunDossierView
+          dossier={{
+            ...dossierWithWatchingDecisionAndMultilineNote,
+            outcome: {
+              ...dossierWithWatchingDecisionAndMultilineNote.outcome,
+              metrics:
+                dossierWithWatchingDecisionAndMultilineNote.outcome.metrics.slice(
+                  0,
+                  count,
+                ),
+            },
+          }}
+          totalRuns={7}
+          decidedRuns={5}
+          onOpenHistory={() => {}}
+          onOpenConversation={() => {}}
+          onRetest={() => {}}
+          onSaveDecision={async () => {}}
+        />,
+      );
+
+    const oneMetric = renderWithMetricCount(1);
+    const threeMetrics = renderWithMetricCount(3);
+    const fourMetrics = renderWithMetricCount(4);
+
+    expect(oneMetric.match(/data-dossier-metric-span="full"/g)).toHaveLength(1);
+    expect(oneMetric).toMatch(
+      /data-dossier-metric-span="full"[^>]*class="[^"]*col-span-2/,
+    );
+    expect(threeMetrics.match(/data-dossier-metric-span="full"/g)).toHaveLength(
+      1,
+    );
+    expect(threeMetrics).toMatch(
+      /data-dossier-metric-span="full"[^>]*class="[^"]*col-span-2/,
+    );
+    expect(fourMetrics).not.toContain('data-dossier-metric-span="full"');
   });
 
   test("shows one run decision beside its verbatim note without repeated headings", () => {
@@ -286,6 +329,66 @@ describe("single-run dossier view", () => {
 
     expect(text.match(/No decision saved/g)).toHaveLength(1);
     expect(text).toContain("Add decision");
+  });
+
+  test("keeps a conversion-gated decision action visibly available", () => {
+    const html = renderToStaticMarkup(
+      <RunDossierView
+        dossier={{
+          ...dossierWithWatchingDecisionAndMultilineNote,
+          decision: null,
+          actions: [
+            {
+              ...decisionAction,
+              availability: "account_conversion_required",
+              decision_state: null,
+              note: null,
+            },
+          ],
+        }}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenHistory={() => {}}
+        onOpenConversation={() => {}}
+        onRetest={() => {}}
+        onSaveDecision={async () => {
+          throw new Error("guest mutation must stay unreachable");
+        }}
+      />,
+    );
+
+    expect(visibleText(html)).toContain("Add decision");
+  });
+
+  test("resumes only the exact available dossier action with its preserved note", () => {
+    const target = {
+      artifactId: "evidence-7",
+      runId: "run-7",
+      decisionState: "watching" as const,
+      note: "Keep this exact note",
+    };
+
+    expect(
+      matchingDecisionResumeDraft({
+        action: decisionAction,
+        runId: "run-7",
+        target,
+      }),
+    ).toEqual({ state: "watching", note: "Keep this exact note" });
+    expect(
+      matchingDecisionResumeDraft({
+        action: decisionAction,
+        runId: "another-run",
+        target,
+      }),
+    ).toBeNull();
+    expect(
+      matchingDecisionResumeDraft({
+        action: { ...decisionAction, availability: "account_conversion_required" },
+        runId: "run-7",
+        target,
+      }),
+    ).toBeNull();
   });
 
   test("accessibly disables transcript navigation without a result anchor", () => {

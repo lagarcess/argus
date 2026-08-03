@@ -530,12 +530,16 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
         assert kwargs["fallback_selected_thread_metadata"]["requested_field"] == (
             "initial_capital"
         )
+        assert kwargs["fallback_selected_thread_metadata"]["strategy_path_id"] == (
+            clarification_message.id
+        )
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
             "type": "final",
             "payload": {
                 "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL buy and hold.",
+                "strategy_path_id": clarification_message.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "buy_and_hold",
@@ -557,7 +561,7 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
-    create_message(
+    clarification_message = create_message(
         user_id=user_id,
         conversation_id=conversation["id"],
         role="assistant",
@@ -577,7 +581,15 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
     assert final["confirmation"]["summary"]
+    assert final["strategy_path_id"] == clarification_message.id
     assert captured["thread_id"] == conversation["id"]
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert persisted[-1]["metadata"]["strategy_path_id"] == clarification_message.id
+    assert persisted[-1]["metadata"]["confirmation_payload"][
+        "optional_parameters"
+    ]["initial_capital"]["value"] == 10000
 
 
 def test_adjust_assumptions_action_round_trips_pending_edit_after_reload(
@@ -2134,9 +2146,10 @@ def test_response_option_action_accepts_the_current_recovery_message_identity(
     assert captured["fallback_selected_thread_metadata"] == {
         "latest_task_type": "backtest_execution",
         "last_stage_outcome": "await_user_reply",
-        "fallback_source": "validated_response_option_source",
-        "validated_source_assistant_id": current_recovery.id,
-        "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
+            "fallback_source": "validated_response_option_source",
+            "validated_source_assistant_id": current_recovery.id,
+            "strategy_path_id": current_recovery.id,
+            "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
         "clarification": _timeframe_recovery_metadata("NVDA")["clarification"],
         "requested_field": "timeframe",
     }
@@ -3412,8 +3425,9 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
         yield {
             "type": "final",
             "payload": {
-                "stage_outcome": "ready_for_confirmation",
+                "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL recurring buys.",
+                "source_result_run_id": run.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "dca_accumulation",
@@ -3442,6 +3456,18 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
 
     assert response.status_code == 200
     assert captured["message"].startswith("i want to do recurrent biweekly")
+    [final] = _stream_payloads(response.text, "final")
+    assert final["source_result_run_id"] == run.id
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_confirmation = persisted[-1]
+    assert persisted_confirmation["role"] == "assistant"
+    assert persisted_confirmation["metadata"]["source_result_run_id"] == run.id
+    assert persisted_confirmation["metadata"]["confirmation_payload"] == final[
+        "confirmation_payload"
+    ]
 
 
 def test_refine_strategy_action_uses_card_run_before_runtime_memory(

@@ -138,7 +138,7 @@ def _serialized_response(page: RunDossierSourcePage) -> dict[str, Any]:
                 artifact=row.artifact,
                 decision=row.decision,
                 result_message_id=row.result_message_id,
-                allow_decision_action=True,
+                decision_action_availability="available",
                 language="en",
             )
             for row in page.rows
@@ -180,6 +180,29 @@ def test_postgres_reader_uses_scalar_counts_and_one_bounded_page_query() -> None
     )
     assert "order by coalesce(br.updated_at, br.created_at) desc, br.id desc" in page_sql
     assert pool.timeouts == [2.0]
+
+
+def test_postgres_reader_types_nullable_first_page_cursor_parameters() -> None:
+    pool = _Pool(
+        [
+            [{"total_runs": 1, "decided_runs": 0}],
+            [_source_row()],
+        ]
+    )
+
+    PostgresRunDossierReader(pool).list_source_rows(
+        user_id=OWNER_ID,
+        conversation_id=CONVERSATION_ID,
+        limit=21,
+        cursor_completed_at=None,
+        cursor_run_id=None,
+    )
+
+    page_sql, page_params = pool.cursor.executions[-1]
+    assert page_params["cursor_completed_at"] is None
+    assert page_params["cursor_run_id"] is None
+    assert "%(cursor_completed_at)s::timestamptz is null" in page_sql
+    assert "%(cursor_run_id)s::uuid" in page_sql
 
 
 def test_postgres_reader_validates_cursor_pivot_before_counts_or_page() -> None:

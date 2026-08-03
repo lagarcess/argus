@@ -389,6 +389,7 @@ from argus.nlp.natural_time import (
     resolve_rolling_window_intent_text,
 )
 
+_carry_asset_blocker = provider_context_assets.carry_incomplete_asset_blocker
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
 
@@ -486,10 +487,10 @@ class OpenRouterStructuredInterpreter:
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
-                return self._to_runtime_interpretation(
-                    repaired_response,
-                    request=request,
+                repaired_response = _carry_asset_blocker(
+                    repaired_response, asset_resolution_context
                 )
+                return self._to_runtime_interpretation(repaired_response, request=request)
             repaired_response = await _focused_strategy_repair_after_candidate_failures(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
@@ -502,10 +503,7 @@ class OpenRouterStructuredInterpreter:
                     preferred_model=candidate_models[0] if candidate_models else "",
                     request=request,
                 )
-                return self._to_runtime_interpretation(
-                    repaired_response,
-                    request=request,
-                )
+                return self._to_runtime_interpretation(repaired_response, request=request)
             self.last_status = "failed"
             return None
 
@@ -557,8 +555,7 @@ class OpenRouterStructuredInterpreter:
         from argus.llm.openrouter import resolve_openrouter_model
 
         fallback_model_name = resolve_openrouter_model(
-            fallback=True,
-            task="interpretation",
+            fallback=True, task="interpretation"
         )
 
         # Don't retry with the same model name if resolve returned the same thing
@@ -625,6 +622,9 @@ class OpenRouterStructuredInterpreter:
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
+            repaired_response = _carry_asset_blocker(
+                repaired_response, asset_resolution_context
+            )
             return self._to_runtime_interpretation(repaired_response, request=request)
         repaired_response = await _focused_strategy_repair_after_candidate_failures(
             request=request,
@@ -638,10 +638,7 @@ class OpenRouterStructuredInterpreter:
                 preferred_model=fallback_model_name or primary_model_name,
                 request=request,
             )
-            return self._to_runtime_interpretation(
-                repaired_response,
-                request=request,
-            )
+            return self._to_runtime_interpretation(repaired_response, request=request)
         return None
 
     def _messages(
@@ -1053,7 +1050,9 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
-        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)
+        strategy = _strategy_from_llm(
+            response.candidate_strategy_draft, request.current_user_message
+        )
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(
@@ -2221,7 +2220,7 @@ async def _audited_response_ready_for_runtime(
         request=request,
     )
     if planned_artifact_edit is not None:
-        return planned_artifact_edit
+        return _carry_asset_blocker(planned_artifact_edit, asset_resolution_context)
     if _response_can_skip_optional_runtime_readiness_audits(
         response=response,
         request=request,
@@ -2611,7 +2610,7 @@ async def _audited_response_ready_for_runtime(
             primary_draft=response.candidate_strategy_draft,
         )
         if planned_response is not None:
-            return planned_response
+            return _carry_asset_blocker(planned_response, asset_resolution_context)
         raise ValueError(
             "OpenRouter interpretation replayed the active artifact without a "
             "material current-turn update"
@@ -2661,7 +2660,7 @@ async def _audited_response_ready_for_runtime(
         primary_draft=response.candidate_strategy_draft,
     )
     if planned_response is not None:
-        return planned_response
+        return _carry_asset_blocker(planned_response, asset_resolution_context)
     repaired_response = await _repair_incomplete_strategy_extraction(
         failed_response=response,
         preferred_model=preferred_model,
@@ -2730,6 +2729,7 @@ async def _ready_active_artifact_edit_planned_response(
         draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
     ):
         return None
+
     async def _planned_with_primary() -> LLMInterpretationResponse | None:
         return await _plan_pending_artifact_assumption_edit(
             request=request,
@@ -5229,7 +5229,10 @@ def _validate_capability_boundaries(
             invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        context_asset_classes = (
+            provider_context_assets.resolved_asset_classes_from_strategy_context(strategy, symbol)
+        )
+        asset_classes.update(context_asset_classes or {resolution.asset.asset_class})
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
     if field_owned_indicator_symbols and (
         "field_owned_indicator_asset_token_removed" not in response.reason_codes

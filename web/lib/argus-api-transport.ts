@@ -10,6 +10,26 @@ export const ARGUS_API_BASE_URL = (() => {
   return "http://127.0.0.1:8000/api/v1";
 })();
 
+export const ARGUS_CLIENT_CAPABILITIES = [
+  "dossier_decision_conversion_v1",
+] as const;
+
+export function argusApiRequestHeaders(
+  optionsHeaders?: HeadersInit,
+  authHeaders: Record<string, string> = {},
+): Headers {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    ...authHeaders,
+  });
+  new Headers(optionsHeaders).forEach((value, key) => headers.set(key, value));
+  headers.set(
+    "X-Argus-Client-Capabilities",
+    ARGUS_CLIENT_CAPABILITIES.join(","),
+  );
+  return headers;
+}
+
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -29,13 +49,9 @@ export async function apiFetch<T>(
   }
 
   const response = await fetch(`${ARGUS_API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...(options?.headers || {}),
-    },
     credentials: "include",
     ...options,
+    headers: argusApiRequestHeaders(options?.headers, authHeaders),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -61,12 +77,9 @@ export async function unauthenticatedApiFetch<T>(
   options?: RequestInit,
 ): Promise<T> {
   const response = await fetch(`${ARGUS_API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers || {}),
-    },
     credentials: "include",
     ...options,
+    headers: argusApiRequestHeaders(options?.headers),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

@@ -87,6 +87,35 @@ def test_decision_note_write_schema_caps_new_notes_without_narrowing_reads(
     assert action_note["maxLength"] == 2000
 
 
+def test_dossier_decision_action_requires_typed_availability(generated: dict) -> None:
+    schema = generated["components"]["schemas"]["SearchDecisionAction"]
+
+    assert "availability" in schema["required"]
+    assert schema["properties"]["availability"] == {
+        "type": "string",
+        "enum": ["available", "account_conversion_required"],
+        "title": "Availability",
+    }
+
+
+def test_dossier_reads_declare_client_capability_negotiation(generated: dict) -> None:
+    for path in (
+        "/api/v1/search",
+        "/api/v1/conversations/{conversation_id}/run-dossiers",
+    ):
+        parameters = {
+            parameter["name"]: parameter
+            for parameter in generated["paths"][path]["get"]["parameters"]
+        }
+        capability = parameters["X-Argus-Client-Capabilities"]
+        assert capability["in"] == "header"
+        assert capability["required"] is False
+        assert capability["schema"]["anyOf"][0] == {
+            "type": "string",
+            "maxLength": 1024,
+        }
+
+
 def test_prefix_appears_exactly_once_per_public_operation(
     generated: dict, checked: dict
 ) -> None:

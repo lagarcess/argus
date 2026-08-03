@@ -84,18 +84,25 @@ def provider_asset_resolution_context_from_extraction(
     resolve_asset_candidate: Callable[..., AssetResolution],
 ) -> str | None:
     rows: list[dict[str, object]] = []
+    all_traded_asset_mentions_accounted_for = (
+        extraction.all_traded_asset_mentions_included
+    )
+    traded_candidate_row_count = 0
     seen: set[str] = set()
+    retained_traded_rows: dict[tuple[str, str], dict[str, object]] = {}
     for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
         raw_key = raw_text.casefold()
         if not raw_key or raw_key in seen:
             continue
         seen.add(raw_key)
-        role = mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
+        role = (
+            mention.role if mention.role in {"traded_asset", "benchmark"} else "unknown"
+        )
         field = (
             "comparison_baseline"
             if role == "benchmark"
-            else f"asset_universe[{len(rows)}]"
+            else f"asset_universe[{traded_candidate_row_count}]"
         )
         try:
             resolution_kwargs: dict[str, Any] = {
@@ -108,6 +115,8 @@ def provider_asset_resolution_context_from_extraction(
                 resolution_kwargs["asset_class_hint"] = asset_class_hint
             resolution = resolve_asset_candidate(raw_text, **resolution_kwargs)
         except ValueError:
+            if role in {"traded_asset", "unknown"}:
+                all_traded_asset_mentions_accounted_for = False
             continue
         row = _provider_asset_resolution_context_row(
             resolution=resolution,
@@ -116,13 +125,47 @@ def provider_asset_resolution_context_from_extraction(
             confidence=mention.confidence,
         )
         if row is not None:
+            if role in {"traded_asset", "unknown"}:
+                resolved_symbol = (
+                    str(row.get("symbol") or "").strip().upper()
+                    if row.get("status") == "resolved"
+                    else ""
+                )
+                resolved_asset_identity = (
+                    (
+                        resolved_symbol,
+                        str(row.get("asset_class") or "").strip().lower(),
+                    )
+                    if resolved_symbol
+                    else None
+                )
+                if (
+                    resolved_asset_identity
+                    and resolved_asset_identity in retained_traded_rows
+                ):
+                    retained_row = retained_traded_rows[resolved_asset_identity]
+                    aliases = retained_row.get("aliases")
+                    if not isinstance(aliases, list):
+                        aliases = []
+                        retained_row["aliases"] = aliases
+                    aliases.append(raw_text)
+                    continue
+                if traded_candidate_row_count >= 5:
+                    all_traded_asset_mentions_accounted_for = False
+                    continue
+                if resolved_asset_identity:
+                    retained_traded_rows[resolved_asset_identity] = row
+                traded_candidate_row_count += 1
             rows.append(row)
-        if len(rows) >= 5:
-            break
-    if not rows:
+        elif role in {"traded_asset", "unknown"}:
+            all_traded_asset_mentions_accounted_for = False
+    if not rows and all_traded_asset_mentions_accounted_for:
         return None
     payload = {
         "asset_resolution_candidates": rows,
+        "all_traded_asset_mentions_accounted_for": (
+            all_traded_asset_mentions_accounted_for
+        ),
         "extraction_contract": (
             "Use resolved traded_asset/unknown rows as asset_universe candidates "
             "when the user is buying, holding, testing, or including them. Use "
@@ -163,8 +206,11 @@ def _asset_mention_extraction_messages(
                 "short raw text span and whether the user framed it as a traded asset, "
                 "a benchmark/comparison, or unknown. Also classify whether the span "
                 "is a company_name, ticker, crypto asset, currency_pair, or unknown. "
-                "Return at most five distinct mentions. If none are visible, return "
-                "an empty list."
+                "Return at most six distinct mentions. If more than six are visible, "
+                "preserve traded-asset and unknown spans before benchmark spans. If "
+                "the six-item limit omits any traded-asset or unknown span, set "
+                "all_traded_asset_mentions_included to false; otherwise set it to "
+                "true. If none are visible, return an empty list and true."
             ),
         },
         {"role": "user", "content": request.current_user_message},

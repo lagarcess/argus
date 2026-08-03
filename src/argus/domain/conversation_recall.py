@@ -7,6 +7,7 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 from argus.api.schemas import (
+    DecisionActionAvailability,
     DecisionState,
     SearchAssetDecisionCounts,
     SearchAssetRollup,
@@ -175,7 +176,7 @@ def project_conversation_recall(
     decisions: Sequence[Mapping[str, Any]],
     messages: Sequence[Mapping[str, Any]] = (),
     query: str,
-    allow_decision_action: bool = True,
+    decision_action_availability: DecisionActionAvailability | None = "available",
     language: str = "en",
 ) -> tuple[int, SearchItem] | None:
     """Build one bounded search row from existing conversation-owned truth."""
@@ -312,7 +313,7 @@ def project_conversation_recall(
             artifact=latest_artifact,
             decision=latest_decision,
             result_message_id=result_message_id_for(latest_run, conversation_messages),
-            allow_decision_action=allow_decision_action,
+            decision_action_availability=decision_action_availability,
             language=language,
         )
     eligible_decisions = [

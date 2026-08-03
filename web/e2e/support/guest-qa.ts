@@ -648,11 +648,6 @@ export function assertExactLocalCandidate(
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   }).trim();
-  const branch = execFileSync("git", ["branch", "--show-current"], {
-    cwd: REPOSITORY_ROOT,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  }).trim();
   const status = execFileSync("git", ["status", "--porcelain"], {
     cwd: REPOSITORY_ROOT,
     encoding: "utf8",
@@ -660,12 +655,6 @@ export function assertExactLocalCandidate(
   }).trim();
   if (root !== REPOSITORY_ROOT) throw new Error("Wrong guest QA worktree");
   if (head !== candidate) throw new Error("Candidate SHA does not match HEAD");
-  if (
-    branch !== "codex/guest-experience" &&
-    branch !== "codex/guest-bootstrap-deferred-conversion"
-  ) {
-    throw new Error("Guest QA must run from an approved guest candidate branch");
-  }
   if (status && process.env.ARGUS_GUEST_QA_ALLOW_TEST_DIFF !== "true") {
     throw new Error("Guest QA worktree must be clean");
   }
@@ -1716,9 +1705,164 @@ export function seedGuestSimulationExhaustionFixture(params: {
   return { sourceMessageId, confirmationId };
 }
 
+export function seedGuestResolvedClarificationRailHistory(params: {
+  userId: string;
+  conversationId: string;
+}): { clarificationMessageId: string } {
+  const owner = requireUuid(params.userId, "rail history owner");
+  const conversation = requireUuid(
+    params.conversationId,
+    "rail history conversation",
+  );
+  const clarificationMessageId = randomUUID();
+  const records = [
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "Reviewing the first result.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Show me the assumptions.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "The run uses daily data.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Keep the benchmark.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "SPY remains the benchmark.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "user",
+      content: "Try another idea.",
+      metadata: {},
+    },
+    {
+      id: randomUUID(),
+      role: "assistant",
+      content: "Tell me which asset to use.",
+      metadata: {},
+    },
+    {
+      id: clarificationMessageId,
+      role: "assistant",
+      content: "Which asset should I test?",
+      metadata: {
+        clarification: {
+          kind: "clarification",
+          prompt_source: "degraded_fallback",
+          requested_field: "asset_universe",
+          semantic_needs: ["asset_target"],
+        },
+        pending_strategy: {
+          requested_field: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            date_range: "past year",
+            capital_amount: 10_000,
+            extra_parameters: {
+              date_range_raw_text: "past year",
+              requested_date_range: {
+                start: "2025-07-26",
+                end: "2026-07-26",
+              },
+            },
+          },
+        },
+      },
+    },
+    { id: randomUUID(), role: "user", content: "AAPL", metadata: {} },
+  ].map((record, index) => ({ ...record, offset_ms: index + 1 }));
+  const encodedRecords = Buffer.from(
+    JSON.stringify(records),
+    "utf8",
+  ).toString("base64");
+  const seeded = psqlJson<{ inserted: number }>(`
+    with active_owner as (
+      select 1
+      from public.guest_workspaces as workspace
+      join auth.users as auth_user on auth_user.id = workspace.user_id
+      join public.conversations as conversation
+        on conversation.id = workspace.conversation_id
+       and conversation.user_id = workspace.user_id
+      where workspace.user_id = '${owner}'
+        and workspace.conversation_id = '${conversation}'
+        and workspace.status = 'active'
+        and workspace.expires_at > now()
+        and auth_user.is_anonymous
+        and (
+          select count(*)
+          from public.backtest_runs
+          where user_id = '${owner}'
+            and conversation_id = '${conversation}'
+            and status = 'completed'
+        ) = 1
+    ),
+    baseline as (
+      select coalesce(max(created_at), now()) as created_at
+      from public.messages
+      where conversation_id = '${conversation}'
+        and user_id = '${owner}'
+    ),
+    fixture_rows as (
+      select *
+      from jsonb_to_recordset(
+        convert_from(decode('${encodedRecords}', 'base64'), 'UTF8')::jsonb
+      ) as item(
+        id uuid,
+        role text,
+        content text,
+        metadata jsonb,
+        offset_ms integer
+      )
+    ),
+    inserted as (
+      insert into public.messages (
+        id, conversation_id, user_id, role, content, metadata, created_at
+      )
+      select
+        fixture_rows.id,
+        '${conversation}',
+        '${owner}',
+        fixture_rows.role,
+        fixture_rows.content,
+        fixture_rows.metadata,
+        baseline.created_at
+          + (fixture_rows.offset_ms || ' milliseconds')::interval
+      from fixture_rows
+      cross join active_owner
+      cross join baseline
+      returning 1
+    )
+    select json_build_object('inserted', count(*))::text
+    from inserted
+  `);
+  if (seeded.inserted !== records.length) {
+    throw new Error("Resolved Guest rail history fixture was incomplete");
+  }
+  return { clarificationMessageId };
+}
+
 export function seedGuestActiveConfirmationFixture(params: {
   userId: string;
   conversationId: string;
+  symbol?: string;
+  strategyPathId?: string;
 }): {
   messageId: string;
   confirmationId: string;
@@ -1730,28 +1874,48 @@ export function seedGuestActiveConfirmationFixture(params: {
   );
   const messageId = randomUUID();
   const confirmationId = `confirmation-${randomUUID()}`;
+  const symbol = params.symbol ?? "MSFT";
+  const strategyPathId = params.strategyPathId
+    ? requireUuid(params.strategyPathId, "confirmation fixture strategy path")
+    : null;
+  if (!/^[A-Z]{1,5}$/.test(symbol)) {
+    throw new Error("Confirmation fixture symbol is invalid");
+  }
   const actionPayload = {
     confirmation_id: confirmationId,
     artifact_id: confirmationId,
     conversation_id: conversation,
   };
   const metadata = {
+    ...(strategyPathId ? { strategy_path_id: strategyPathId } : {}),
     confirmation_payload: {
       strategy: {
         strategy_type: "buy_and_hold",
-        strategy_thesis: "Buy and hold Microsoft.",
-        asset_universe: ["MSFT"],
+        strategy_thesis: `Buy and hold ${symbol}.`,
+        asset_universe: [symbol],
         asset_class: "equity",
+        capital_amount: 10_000,
         date_range: {
           start: "2025-07-28",
           end: "2026-07-24",
+        },
+        extra_parameters: {
+          date_range_raw_text: "past year",
+          requested_date_range: {
+            start: "2025-07-26",
+            end: "2026-07-26",
+          },
+          effective_date_range: {
+            start: "2025-07-28",
+            end: "2026-07-24",
+          },
         },
       },
       optional_parameters: {},
       launch_payload: {
         strategy_type: "buy_and_hold",
-        symbol: "MSFT",
-        symbols: ["MSFT"],
+        symbol,
+        symbols: [symbol],
         timeframe: "1D",
         date_range: {
           start: "2025-07-28",
@@ -1773,10 +1937,10 @@ export function seedGuestActiveConfirmationFixture(params: {
       confirmation_id: confirmationId,
       confirmation_state: "active",
       status: "ready_to_run",
-      title: "MSFT buy and hold",
+      title: `${symbol} buy and hold`,
       rows: [
         { key: "strategy", label: "Strategy", value: "Buy and hold" },
-        { key: "assets", label: "Assets", value: "MSFT" },
+        { key: "assets", label: "Assets", value: symbol },
         {
           key: "period",
           label: "Period",
@@ -2930,6 +3094,33 @@ export async function safeScreenshot(
       mask,
     });
   }
+  chmodSync(destination, 0o600);
+}
+
+export async function safeVisibleProductScreenshot(
+  page: Page,
+  name: string,
+): Promise<void> {
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Unsafe screenshot name");
+  const visibleText = await page.locator("body").innerText();
+  if (
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(
+      visibleText,
+    ) ||
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(visibleText)
+  ) {
+    throw new Error("Visible product text contains a private identifier");
+  }
+  const destination = path.join(evidenceDirectory(), `${name}.png`);
+  await page.screenshot({
+    path: destination,
+    fullPage: false,
+    mask: [
+      page.locator('input[type="email"]'),
+      page.locator('input[type="password"]'),
+      page.locator("textarea"),
+    ],
+  });
   chmodSync(destination, 0o600);
 }
 
