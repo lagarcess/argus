@@ -1395,7 +1395,8 @@ export function seedDistinctGuestConfirmation(params: {
     !source.metadata ||
     !source.workspace_active ||
     ![1, 2].includes(source.completed_runs) ||
-    source.simulation_units !== source.completed_runs
+    source.simulation_units < source.completed_runs ||
+    source.simulation_units > 2
   ) {
     throw new Error(
       "Distinct guest confirmation requires an active owner with settled runs",
