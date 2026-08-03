@@ -16,6 +16,20 @@ from argus.domain.discovery_search.contracts import (
 from argus.domain.discovery_search.http_post import post_json
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
+_CLAIM_ABBREVIATIONS = frozenset(
+    (
+        "a.g.",
+        "c.v.",
+        "co.",
+        "corp.",
+        "inc.",
+        "l.p.",
+        "ltd.",
+        "n.v.",
+        "s.a.",
+        "s.p.a.",
+    )
+)
 
 
 class OpenRouterWebSearchProvider:
@@ -153,8 +167,15 @@ def _cited_message_context(
     claim = content[claim_start:start].strip()
     boundary_text = claim[:-1] if claim.endswith((".", "!", "?", ";")) else claim
     claim_break = max(
-        boundary_text.rfind(separator) for separator in ("\n", ". ", "! ", "? ", "; ")
+        boundary_text.rfind(separator) for separator in ("\n", "! ", "? ", "; ")
     )
+    period_search_end = len(boundary_text)
+    while (period_break := boundary_text.rfind(". ", 0, period_search_end)) >= 0:
+        preceding_token = boundary_text[: period_break + 1].rsplit(maxsplit=1)[-1]
+        if preceding_token.casefold() not in _CLAIM_ABBREVIATIONS:
+            claim_break = max(claim_break, period_break)
+            break
+        period_search_end = period_break
     if claim_break < 0:
         return claim
     separator_width = 1 if boundary_text[claim_break] == "\n" else 2
