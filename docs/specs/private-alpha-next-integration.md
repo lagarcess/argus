@@ -6,13 +6,13 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #353 at `7e4c58f8`, which clears a resolved
-clarification's rail attention marker only on proven typed continuity
-(issue #337). It follows PR #355 at `c01d5730`, which preserves
-provider-resolved opening-turn assets and capital through clarification
-(issue #336), PR #362 at `b2e8975c`, an eval-harness-only repair of the
-sanctioned live-eval environment (issue #361), and PR #348 at `38874bae`,
-which self-hosts canonical Inter and Space Grotesk fonts.
+Latest product change: PR #357 at `9f97f1dc`, which keeps guest dossier
+decision actions visible behind a typed account-conversion gate and resumes
+the exact decision after conversion (issue #340). It follows PR #353 at
+`7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
+at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
+at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
+`38874bae` (self-hosted canonical fonts).
 Later commits may reconcile documentation and issue state without changing
 product behavior. New work must branch from the current remote
 `codex/private-alpha-next` head rather than pinning either product SHA. The
@@ -113,6 +113,17 @@ failed and was repaired (e2e seed omitted real workflow metadata) before
 acceptance; the final head passed the real local-Supabase Guest replay
 independently. It added no environment variable, deployment, API, schema, or
 migration requirement.
+PR #357 then closed issue #340 as `9f97f1dc`: guest Omnisearch dossiers keep
+Add/Edit decision actions visible and conversion-gate activation through a
+typed `available | account_conversion_required` availability contract across
+Python, OpenAPI, and TypeScript, then resume the exact run, decision state,
+and note after conversion. The server remains authoritative and no guest
+write path exists; the gated presentation activates only for clients
+declaring the additive `dossier_decision_conversion_v1` capability header, so
+legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
+`docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
+environment variable, deployment, schema, or migration requirement. Issue
+#341 is now unblocked for dispatch from the post-#357 integration head.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
