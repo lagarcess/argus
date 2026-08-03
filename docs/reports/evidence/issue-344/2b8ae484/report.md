@@ -49,6 +49,10 @@ The failing case is `asset_discovery_comparison_anchor_english_issue_244`. It is
 
 The browser snapshots reported zero console errors. Development-only warnings were present. Provider variance is visible rather than hidden: successful discovery can truthfully end with grounded candidates or a verified-empty result after resolver validation.
 
+### Post-review browser supplement
+
+Mandatory independent review found that this first repaired-head matrix did not preserve the locked general-knowledge-to-current escalation journey or English failure/recovery parity. The gap was closed on later code head `97f3c2a4` without a product-code change. The authoritative bilingual escalation and failure ladder is preserved in `../97f3c2a4/report.md` with ten final-head screenshots.
+
 ## Durable state observations
 
 The isolated database contained only aggregate test evidence at audit end:
@@ -84,6 +88,7 @@ Integration advanced once more after acceptance capture. That final delta only r
 - `528cce13` remains committed under `docs/reports/evidence/issue-344/528cce13/` as historical evidence. It is **not retained as current acceptance authority** because later citation and interpreter semantics changed.
 - `2a758d2c` remains committed under `docs/reports/evidence/issue-344/2a758d2c/` as historical evidence. It is **not retained as current acceptance authority** because independent review found a same-line multi-claim citation-attribution defect, and integration advanced afterward.
 - Exact code SHA `2b8ae484` isolates a URL marker to the immediately adjacent claim, includes the one-way integration merge, and owns the live and browser evidence in this directory.
+- Code head `97f3c2a4` adds the missing locked bilingual escalation and English/Spanish failure-recovery browser evidence under `../97f3c2a4/`; that supplement supersedes this directory for the full browser matrix.
 - A later commit that adds only this evidence directory may retain the `2b8ae484` live/browser proof after an exact-final-head hermetic rerun and a diff confirming that the later commit is documentation-only.
 
 ## Ambiguity and exclusions
