@@ -563,6 +563,15 @@ slices below describe delivered scope, not pending work.
   simulation allowances, discovery quotas) must stay policy-owned values so
   future tiering changes policy, not design. Session output feeds the
   allowance/tier design; no implementation before it.
+- Current-data window truthfulness design (PENDING founder lock; PR #363 is
+  founder-parked on it). Direction under discussion, not yet decided:
+  feasibility-aware Retest disposition on the dossier button (ready /
+  feasible-with-repair / impossible, with tooltip), a guided repair turn that
+  pulses the affected confirmation-card input for manual editing, anchor-date
+  clamping to earliest available riding the existing
+  `effective_date_range`/`adjustment_reason` contract, a strict definition of
+  "truly impossible," and a reconciliation path so users are never
+  dead-ended. No lane resumes until the founder locks this design.
 
 ### P2 Board
 
