@@ -1847,12 +1847,12 @@ window.
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
 - `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the one fixed
-  session window.
+  both calendar windows have capacity; for guests it follows the visitor-owned
+  UTC `day` window. The separate workspace ceiling is admission-only.
 - `limiting_window` is backend-derived: registered accounts use the calendar
   window with the smaller remaining capacity (`day` on ties), while guests use
-  `guest_session`. The frontend must not compute, estimate, or hardcode quota
-  truth; it renders these derived fields.
+  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
+  renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 

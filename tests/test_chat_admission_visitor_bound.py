@@ -64,6 +64,18 @@ def test_exhausted_visitor_with_existing_reservation_replays(monkeypatch) -> Non
     gateway.admit_backtest_job.assert_called_once()
 
 
+def test_replay_ignores_a_transient_first_simulation_counter_failure(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(flow, "read_visitor_used", MagicMock(side_effect=RuntimeError))
+    gateway = _gateway(reservation={"id": "job-1"}, decision="replay")
+
+    result = _admit(gateway)
+
+    assert result.decision == "replay"
+    gateway.admit_backtest_job.assert_called_once()
+
+
 def test_exhausted_visitor_without_reservation_requires_conversion(
     monkeypatch,
 ) -> None:

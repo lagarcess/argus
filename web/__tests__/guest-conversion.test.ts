@@ -254,6 +254,7 @@ describe("guest conversion contract", () => {
 
     expect(experience).toContain("recoverGuestSimulationRejection");
     expect(chat).toContain("isGuestSimulationConversionRejection");
+    expect(chat).toContain("errorPayload.code");
     expect(chat).toContain("recoverGuestSimulationRejection(action)");
   });
 

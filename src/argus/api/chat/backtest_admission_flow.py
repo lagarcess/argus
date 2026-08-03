@@ -77,35 +77,36 @@ def admit_durable_chat_job(
             operation_scope=CHAT_RUN_SCOPE,
             idempotency_key=idempotency_key,
         )
-        now = datetime.now(timezone.utc)
-        is_first_guest_simulation = all(
-            read_visitor_used(
+        if existing_reservation is None:
+            now = datetime.now(timezone.utc)
+            is_first_guest_simulation = all(
+                read_visitor_used(
+                    gateway.client,
+                    visitor_key=visitor_key,
+                    resource=SIMULATION_USAGE_RESOURCE,
+                    period=period,
+                    now=now,
+                )
+                == 0
+                for period, _ in GUEST_SIMULATION_VISITOR_LIMITS
+            )
+            if not visitor_within_limits(
                 gateway.client,
                 visitor_key=visitor_key,
                 resource=SIMULATION_USAGE_RESOURCE,
-                period=period,
+                limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
                 now=now,
-            )
-            == 0
-            for period, _ in GUEST_SIMULATION_VISITOR_LIMITS
-        )
-        if existing_reservation is None and not visitor_within_limits(
-            gateway.client,
-            visitor_key=visitor_key,
-            resource=SIMULATION_USAGE_RESOURCE,
-            limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
-            now=now,
-        ):
-            emit_verified_guest_funnel_event(
-                "guest_limit_reached",
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-                surface="backtest",
-                capability_category="simulation",
-                conversion_reason="second_simulation",
-                terminal_outcome="limit_reached",
-            )
-            return ChatAdmissionResult(decision="conversion_required")
+            ):
+                emit_verified_guest_funnel_event(
+                    "guest_limit_reached",
+                    user_id=context.user_id,
+                    conversation_id=context.conversation_id,
+                    surface="backtest",
+                    capability_category="simulation",
+                    conversion_reason="second_simulation",
+                    terminal_outcome="limit_reached",
+                )
+                return ChatAdmissionResult(decision="conversion_required")
 
     for attempt in (1, 2):
         outcome = gateway.admit_backtest_job(

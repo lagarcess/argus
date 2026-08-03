@@ -1220,7 +1220,7 @@ export default function ChatInterface() {
           return;
         }
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
-        if (isGuestSimulationConversionRejection(errorPayload.failure_code, action) && recoverGuestSimulationRejection(action)) {
+        if (isGuestSimulationConversionRejection(errorPayload.code, action) && recoverGuestSimulationRejection(action)) {
           setMessages((prev) => prev.filter((message) => message.id !== assistantId));
           finishRequestTransport(requestSession);
           return;
