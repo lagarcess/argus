@@ -2289,6 +2289,7 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     mock_gateway.get_or_create_profile_for_auth_user.side_effect = (
         lambda auth_user: profile_rows.add(str(auth_user["id"]))
     )
+    headers = {"X-Forwarded-For": "203.0.113.92"}
 
     fresh = client.post(
         "/api/v1/auth/signup",
@@ -2297,6 +2298,7 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
             "password": "password123",
             "captcha_token": "captcha-proof",
         },
+        headers=headers,
     )
     duplicate = client.post(
         "/api/v1/auth/signup",
@@ -2305,6 +2307,7 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
             "password": "password123",
             "captcha_token": "captcha-proof",
         },
+        headers=headers,
     )
 
     assert fresh.status_code == duplicate.status_code == 200
