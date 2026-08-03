@@ -753,6 +753,76 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
 
 
 @pytest.mark.asyncio
+async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["correct-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"MSFT", "NVDA"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: {
+            "microsoft": "MSFT",
+            "nvidia": "NVDA",
+        }.get(symbol.strip().casefold(), symbol.strip().upper()),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        removals = ["Microsoft", "AAPL"] if model_name == "wrong-model" else ["Microsoft"]
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="remove", target="asset", symbols=removals),
+                EditOperation(op="add", target="asset", symbols=["Nvidia"]),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="remove Microsoft and add Nvidia",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL", "MSFT"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="wrong-model",
+        primary_draft=LLMStrategyDraft(),
+    )
+
+    assert seen_models == ["wrong-model", "correct-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["AAPL", "NVDA"]
+
+
+@pytest.mark.asyncio
 async def test_issue_339_compound_edit_retries_date_operation_that_cannot_materialize(
     monkeypatch,
 ):

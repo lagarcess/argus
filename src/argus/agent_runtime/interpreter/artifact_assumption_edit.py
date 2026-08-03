@@ -688,6 +688,7 @@ def materialized_artifact_edit_targets(
                 current_strategy=current_strategy,
                 request=request,
                 grounded_asset_symbols=grounded_asset_symbols,
+                planned_asset_removals=planned_removals,
             )
         )
     }
@@ -713,6 +714,7 @@ def _materialized_target_matches_primary_delta(
     current_strategy: StrategySummary | None,
     request: InterpretationRequest,
     grounded_asset_symbols: set[str] | None = None,
+    planned_asset_removals: set[str] | None = None,
 ) -> bool:
     """Prove the candidate applied the primary interpreter's requested value."""
 
@@ -750,6 +752,14 @@ def _materialized_target_matches_primary_delta(
         if materialized_operation == "replace":
             additions = materialized - current
             if additions:
+                removals = current - materialized
+                if planned_asset_removals:
+                    return (
+                        additions <= requested
+                        and bool(removals)
+                        and removals <= requested
+                        and removals <= planned_asset_removals
+                    )
                 return additions <= requested
             removals = current - materialized
             return bool(removals) and removals <= requested
