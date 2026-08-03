@@ -700,10 +700,11 @@ def materialized_artifact_edit_targets(
         plan,
         asset_symbol_resolver=asset_symbol_resolver,
     )
-    grounded_asset_symbols = _grounded_asset_symbols_from_message(
+    provider_grounded_asset_symbols = _grounded_asset_symbols_from_message(
         request.current_user_message,
         resolve_asset_candidate=resolve_asset_candidate,
     )
+    grounded_asset_symbols = set(provider_grounded_asset_symbols)
     primary_asset_inclusions = set(
         normalized_asset_symbols(primary_draft.asset_inclusions)
     )
@@ -742,8 +743,6 @@ def materialized_artifact_edit_targets(
             and benchmark_symbol not in explicit_benchmark_role_symbols
         ):
             grounded_asset_symbols.discard(benchmark_symbol)
-            primary_asset_inclusions.discard(benchmark_symbol)
-            primary_asset_exclusions.discard(benchmark_symbol)
     current_assets = set(
         normalized_asset_symbols(
             current_strategy.asset_universe if current_strategy else []
@@ -753,7 +752,7 @@ def materialized_artifact_edit_targets(
     primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
     if (
         not (primary_asset_inclusions | primary_asset_exclusions)
-        <= grounded_asset_symbols
+        <= provider_grounded_asset_symbols
         or primary_asset_inclusions & primary_asset_exclusions
         or primary_assets & primary_asset_exclusions
     ):
@@ -858,7 +857,8 @@ def _materialized_target_matches_primary_delta(
             if (
                 materialized & current != primary_requested & current
                 or not primary_additions <= materialized_additions
-                or not materialized_additions <= primary_additions | (grounded - current)
+                or not materialized_additions
+                <= primary_additions | (grounded - current) | primary_inclusions
             ):
                 return False
         expected_removals = (
