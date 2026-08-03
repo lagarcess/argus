@@ -2909,8 +2909,28 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
 
 
 @pytest.mark.asyncio
-async def test_issue_339_dca_recurring_capital_uses_active_strategy_family(
+@pytest.mark.parametrize(
+    ("current_strategy_type", "current_capital", "extra_parameters"),
+    [
+        pytest.param(
+            "dca_accumulation",
+            100,
+            {"recurring_contribution": 100},
+            id="active-dca",
+        ),
+        pytest.param(
+            "buy_and_hold",
+            200,
+            {},
+            id="active-buy-and-hold",
+        ),
+    ],
+)
+async def test_issue_339_recurring_capital_respects_role_and_artifact_family(
     monkeypatch,
+    current_strategy_type,
+    current_capital,
+    extra_parameters,
 ):
     from argus.agent_runtime import llm_interpreter
 
@@ -2952,13 +2972,13 @@ async def test_issue_339_dca_recurring_capital_uses_active_strategy_family(
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
-                    strategy_type="dca_accumulation",
+                    strategy_type=current_strategy_type,
                     asset_universe=["AAPL"],
                     asset_class="equity",
                     cadence="monthly",
-                    capital_amount=100,
+                    capital_amount=current_capital,
                     comparison_baseline="SPY",
-                    extra_parameters={"recurring_contribution": 100},
+                    extra_parameters=extra_parameters,
                 )
             ),
             selected_thread_metadata={"requested_field": "assumption"},
@@ -2972,6 +2992,9 @@ async def test_issue_339_dca_recurring_capital_uses_active_strategy_family(
     )
 
     assert seen_models == ["starting-capital-model", "recurring-model"]
+    if current_strategy_type != "dca_accumulation":
+        assert response is None
+        return
     assert response is not None
     assert response.candidate_strategy_draft.initial_capital is None
     assert response.candidate_strategy_draft.recurring_contribution == 200

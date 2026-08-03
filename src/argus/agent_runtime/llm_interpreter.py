@@ -3448,16 +3448,15 @@ async def _plan_pending_artifact_assumption_edit(
     # fmt: on
     if plan is None:
         return None
-    if _selected_requested_field_base(request) == "refinement":
-        # The refine prompt invites reshapes the edit-operation set cannot
-        # express; the online guard reads the interpreter response, which the
-        # model-failure paths never have, so the plan itself is checked here.
-        prior = _current_artifact_strategy(request)
-        if _edit_plan_reshapes_non_recurring_strategy(
-            plan,
-            prior_strategy_type=prior.strategy_type if prior is not None else None,
-        ):
-            return None
+    # Recurring fields reshape a non-recurring artifact regardless of which
+    # artifact-edit entry point produced the plan. The edit-operation set cannot
+    # change strategy family, so let the full interpretation path own that turn.
+    prior = _current_artifact_strategy(request)
+    if _edit_plan_reshapes_non_recurring_strategy(
+        plan,
+        prior_strategy_type=prior.strategy_type if prior is not None else None,
+    ):
+        return None
     return _response_from_artifact_assumption_edit_plan(
         plan=plan,
         request=request,

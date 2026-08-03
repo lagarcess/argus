@@ -180,6 +180,19 @@ def _current_total_capital_value(
     return None
 
 
+def _current_recurring_contribution_value(
+    strategy: StrategySummary | None,
+) -> float | None:
+    if strategy is None:
+        return None
+    recurring = (strategy.extra_parameters or {}).get("recurring_contribution")
+    if isinstance(recurring, int | float) and not isinstance(recurring, bool):
+        return float(recurring)
+    if canonical_strategy_type(strategy.strategy_type) == "dca_accumulation":
+        return strategy.capital_amount
+    return None
+
+
 def _effective_draft_strategy_type(
     draft: LLMStrategyDraft,
     *,
@@ -199,15 +212,18 @@ def _draft_capital_amount_is_recurring(
     current_strategy: StrategySummary | None,
 ) -> bool:
     provenance = draft.field_provenance or {}
+    capital_source = str(provenance.get("capital_amount") or "").strip()
     return bool(
         draft.capital_amount is not None
-        and str(provenance.get("capital_amount") or "").strip()
-        in _RECURRING_CAPITAL_SOURCES
-        and _effective_draft_strategy_type(
-            draft,
-            current_strategy=current_strategy,
+        and capital_source in _RECURRING_CAPITAL_SOURCES
+        and (
+            capital_source not in _TOTAL_CAPITAL_SOURCES
+            or _effective_draft_strategy_type(
+                draft,
+                current_strategy=current_strategy,
+            )
+            == "dca_accumulation"
         )
-        == "dca_accumulation"
     )
 
 
@@ -439,7 +455,6 @@ def _required_edit_targets_from_primary_draft(
     ):
         targets.add("strategy_family")
 
-    capital_source = str(provenance.get("capital_amount") or "").strip()
     current_capital = _current_total_capital_value(current_strategy)
     if any(
         value != current_capital
@@ -450,29 +465,20 @@ def _required_edit_targets_from_primary_draft(
     ):
         targets.add("capital")
     recurring_source = str(provenance.get("recurring_contribution") or "").strip()
-    is_recurring_strategy = (
-        _effective_draft_strategy_type(
-            draft,
-            current_strategy=current_strategy,
-        )
-        == "dca_accumulation"
+    capital_amount_is_recurring = _draft_capital_amount_is_recurring(
+        draft,
+        current_strategy=current_strategy,
     )
     recurring_amount = draft.recurring_contribution
-    if recurring_amount is None and is_recurring_strategy:
+    if recurring_amount is None and capital_amount_is_recurring:
         recurring_amount = draft.capital_amount
     if (
         (
             draft.recurring_contribution is not None
             and recurring_source in _RECURRING_CAPITAL_SOURCES
         )
-        or (
-            draft.capital_amount is not None
-            and capital_source in _RECURRING_CAPITAL_SOURCES
-            and is_recurring_strategy
-        )
-    ) and recurring_amount != (
-        current_strategy.capital_amount if current_strategy else None
-    ):
+        or (draft.capital_amount is not None and capital_amount_is_recurring)
+    ) and recurring_amount != _current_recurring_contribution_value(current_strategy):
         targets.add("recurring_contribution")
 
     current_indicator_parameters = (
@@ -1178,7 +1184,7 @@ def _materialized_target_matches_primary_delta(
             else primary_draft.capital_amount
         )
         materialized = materialized_draft.recurring_contribution
-        current = current_strategy.capital_amount if current_strategy else None
+        current = _current_recurring_contribution_value(current_strategy)
     elif target in {"cadence", "timeframe"}:
         requested = getattr(primary_draft, target)
         materialized = getattr(materialized_draft, target)
