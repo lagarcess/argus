@@ -253,8 +253,16 @@ class TestOpenRouterWebSearch:
             other_claim,
         ]
 
-    def test_uses_only_adjacent_same_line_claim_before_marker(self) -> None:
-        unsupported_claim = "Unsupported Corp (BAD) is not documented here."
+    @pytest.mark.parametrize(
+        "unsupported_claim",
+        (
+            "Unsupported Corp (BAD) is not documented here.",
+            "Unsupported Corp.",
+        ),
+    )
+    def test_uses_only_adjacent_same_line_claim_before_marker(
+        self, unsupported_claim: str
+    ) -> None:
         supported_claim = "Supported Corp (GOOD) completed an IPO."
         marker = "[[1]](https://example.com/good)"
         content = f"{unsupported_claim} {supported_claim}{marker}"

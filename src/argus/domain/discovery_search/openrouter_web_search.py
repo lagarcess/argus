@@ -172,7 +172,12 @@ def _cited_message_context(
     period_search_end = len(boundary_text)
     while (period_break := boundary_text.rfind(". ", 0, period_search_end)) >= 0:
         preceding_token = boundary_text[: period_break + 1].rsplit(maxsplit=1)[-1]
-        if preceding_token.casefold() not in _CLAIM_ABBREVIATIONS:
+        following_text = boundary_text[period_break + 2 :].lstrip()
+        if (
+            preceding_token.casefold() not in _CLAIM_ABBREVIATIONS
+            or not following_text
+            or not following_text[0].islower()
+        ):
             claim_break = max(claim_break, period_break)
             break
         period_search_end = period_break
