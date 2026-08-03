@@ -831,11 +831,18 @@ def _materialized_target_matches_primary_delta(
         expected_removals = (
             planned_asset_removals & current if planned_asset_removals else set()
         )
-        if planned_asset_removals and (
-            not expected_removals
-            or current - materialized != expected_removals
-            or (primary_replacement and expected_removals != current - primary_requested)
-            or (not primary_replacement and not expected_removals <= grounded)
+        if (
+            planned_asset_removals
+            and not planned_asset_replacement
+            and (
+                not expected_removals
+                or current - materialized != expected_removals
+                or (
+                    primary_replacement
+                    and expected_removals != current - primary_requested
+                )
+                or (not primary_replacement and not expected_removals <= grounded)
+            )
         ):
             return False
         if primary_replacement:

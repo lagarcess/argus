@@ -1145,10 +1145,35 @@ async def test_issue_339_clear_then_add_retries_ungrounded_retained_asset(monkey
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("replacement_boundary", ["replace", "clear_then_add"])
-async def test_issue_339_final_replacement_supersedes_prior_asset_removal(
+@pytest.mark.parametrize(
+    ("operation_order", "grounded_symbols"),
+    [
+        pytest.param(
+            "remove_then_replace",
+            {"MSFT", "NVDA"},
+            id="remove-then-replace",
+        ),
+        pytest.param(
+            "remove_then_clear_add",
+            {"MSFT", "NVDA"},
+            id="remove-then-clear-add",
+        ),
+        pytest.param(
+            "replace_then_remove",
+            {"NVDA"},
+            id="replace-then-remove",
+        ),
+        pytest.param(
+            "clear_add_then_remove",
+            {"NVDA"},
+            id="clear-add-then-remove",
+        ),
+    ],
+)
+async def test_issue_339_replacement_boundary_orders_asset_removals(
     monkeypatch,
-    replacement_boundary,
+    operation_order,
+    grounded_symbols,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -1161,7 +1186,7 @@ async def test_issue_339_final_replacement_supersedes_prior_asset_removal(
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: {"MSFT", "NVDA"},
+        lambda *_args, **_kwargs: set(grounded_symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
@@ -1173,20 +1198,37 @@ async def test_issue_339_final_replacement_supersedes_prior_asset_removal(
     async def invoke_stub(*, model_name, **kwargs):
         del kwargs
         seen_models.append(model_name)
-        boundary_operations = (
-            [EditOperation(op="replace", target="asset", symbols=["NVDA"])]
-            if replacement_boundary == "replace"
-            else [
+        operations_by_order = {
+            "remove_then_replace": [
+                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
+                EditOperation(op="replace", target="asset", symbols=["NVDA"]),
+            ],
+            "remove_then_clear_add": [
+                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
                 EditOperation(op="clear", target="asset"),
                 EditOperation(op="add", target="asset", symbols=["NVDA"]),
-            ]
-        )
+            ],
+            "replace_then_remove": [
+                EditOperation(
+                    op="replace",
+                    target="asset",
+                    symbols=["AAPL", "NVDA"],
+                ),
+                EditOperation(op="remove", target="asset", symbols=["AAPL"]),
+            ],
+            "clear_add_then_remove": [
+                EditOperation(op="clear", target="asset"),
+                EditOperation(
+                    op="add",
+                    target="asset",
+                    symbols=["AAPL", "NVDA"],
+                ),
+                EditOperation(op="remove", target="asset", symbols=["AAPL"]),
+            ],
+        }
         return ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
-            operations=[
-                EditOperation(op="remove", target="asset", symbols=["MSFT"]),
-                *boundary_operations,
-            ],
+            operations=operations_by_order[operation_order],
             confidence=0.9,
         )
 
