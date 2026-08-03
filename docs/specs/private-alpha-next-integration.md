@@ -6,9 +6,10 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #358 at `7b3221a1`, which makes compound artifact
-edits all-or-retry: a turn's full set of typed edit targets must provably
-materialize before ready_to_confirm (issue #339). It follows PR #359 at
+Latest product change: PR #354 at `4a6a237a`, which makes guest quota
+exhaustion truthful and forward-moving — real reset time, conversion offer,
+and a two-simulation allowance (issue #346). It follows PR #358 at
+`7b3221a1` (all-or-retry compound edits, issue #339) and PR #359 at
 `a35bb29f` (recommendation continuity through the shared clarify contract,
 issue #345) and PR #373 at `81e7a1ac` (first-login guest
 claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
@@ -223,6 +224,18 @@ independently diagnosed and lane-confirmed as the known root-.env
 synthetic-calendar misconfiguration, corroborated by #359's adjacent 40/40.
 Issue #335 is unblocked and stacked for the next cycle. No environment
 variable, deployment, API, schema, or migration requirement was added.
+PR #354 then closed issue #346 as `4a6a237a`: the guest quota-exhaustion
+message states the actual reset time and offers conversion; the guest
+allowance rises to two simulations via migration
+`20260802090000_raise_guest_simulation_allowance.sql` (landed in-repo and
+preview-proven; hosted application remains a promotion-runbook step);
+visitor prechecks use the daily reset horizon; first-admission
+classification is atomic; and the authoritative public-launch canary in
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` now expects the two-simulation policy.
+`first_result_completed` idempotency is explicitly deferred to #376. The
+lane also fixed a real guest chat-stream cookie-auth gap its browser matrix
+exposed, and its dead-at-birth Supabase preview branch was deleted and
+recreated to prove the migration on hosted preview infrastructure.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

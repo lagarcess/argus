@@ -1581,7 +1581,7 @@ defaults to `true` and controls presentation only. The independent
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+expiry plus limits `1/10/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
@@ -1837,30 +1837,31 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `day` set to
-`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
-expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
-simulation counter reports `available_now: false`. Guest responses never
-fabricate registered hour/day windows.
+Guests receive the same typed resource keys with `hour` and `guest_session`
+set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
+as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
+reports `available_now: false`. The separate workspace-lifetime ceiling is
+enforced during admission and is not misrepresented as another UI reset
+window.
 
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
 - Registered accounts receive both active UTC calendar windows. Guests receive
-  only the fixed `guest_session` window. Every populated window carries the
+  only the visitor-owned UTC `day` window. Every populated window carries the
   exact backend-owned `period_end`; clients may localize its display, but must
   not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
 - `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the one fixed
-  session window.
+  both calendar windows have capacity; for guests it follows the visitor-owned
+  UTC `day` window. The separate workspace ceiling is admission-only.
 - `limiting_window` is backend-derived: registered accounts use the calendar
   window with the smaller remaining capacity (`day` on ties), while guests use
-  `guest_session`. The frontend must not compute, estimate, or hardcode quota
-  truth; it renders these derived fields.
+  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
+  renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 

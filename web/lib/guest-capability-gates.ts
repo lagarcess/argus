@@ -31,7 +31,13 @@ export function decideGuestSimulationGate(input: {
   ) {
     return { kind: "allow" };
   }
-  return { kind: "convert", reason: "second_simulation" };
+  return { kind: "convert", reason: "simulation_limit" };
+}
+
+export function guestSimulationPrecheckResetAt(input: {
+  day: { period_end: string } | null;
+}): string | null {
+  return input.day?.period_end ?? null;
 }
 
 export function decideGuestNewConversationGate(input: {

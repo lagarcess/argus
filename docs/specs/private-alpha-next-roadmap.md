@@ -215,6 +215,12 @@ vocabulary — a general completeness invariant, not a two-field patch — after
 six adversarial review rounds. Issue #335 (inline confirmation-card editing)
 is unblocked and stacked for the next cycle.
 
+PR #354 then closed issue #346 as `4a6a237a`: truthful guest quota recovery
+with a two-simulation allowance, atomic first-admission classification, and
+the public-launch canary updated to the new policy — the stale cloud lane
+taken over locally and finished with bilingual in-repo browser evidence.
+Issue #294 keeps the funnel-data tuning mandate against this new baseline.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and

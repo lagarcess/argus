@@ -218,7 +218,7 @@ Run this against the exact internet-facing canary SHA before opening traffic:
 - [ ] Clean incognito context: new identity only after the same challenge and
       velocity controls.
 - [ ] Eleventh useful response: conversion gate before provider work.
-- [ ] Second unique simulation: conversion gate before admission.
+- [ ] Third unique simulation: conversion gate before admission.
 - [ ] Sixth feedback submission: conversion-required response.
 - [ ] Copied conversation URL: zero cross-owner results.
 - [ ] Replayed expensive action: zero duplicate charge or computation.

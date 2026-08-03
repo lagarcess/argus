@@ -1166,7 +1166,7 @@ Tracks resource consumption for quotas and limits.
 - Usage counters are operational safety data, not monetization data in Alpha.
 - For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
   `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
-  assistant terminals, one unique simulation admission, and five feedback
+  assistant terminals, two unique simulation admissions, and five feedback
   submissions over the identity lifetime.
 - Registered users continue to use the existing UTC hour/day accounting.
 

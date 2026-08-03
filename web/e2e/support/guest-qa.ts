@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -97,7 +97,7 @@ export const GUEST_ACCEPTANCE_CHECKS = [
     title: "Recents restores the temporary conversation and expiry",
   },
   { number: 10, title: "Omnisearch is owner scoped and honest" },
-  { number: 11, title: "Second simulation converts before admission" },
+  { number: 11, title: "Third simulation converts before admission" },
   { number: 12, title: "Add decision preserves typed action identity" },
   { number: 13, title: "New chat choices match account-access mode" },
   { number: 14, title: "Canceling authentication loses nothing" },
@@ -1394,11 +1394,12 @@ export function seedDistinctGuestConfirmation(params: {
   if (
     !source.metadata ||
     !source.workspace_active ||
-    source.completed_runs !== 1 ||
-    source.simulation_units !== 1
+    ![1, 2].includes(source.completed_runs) ||
+    source.simulation_units < source.completed_runs ||
+    source.simulation_units > 2
   ) {
     throw new Error(
-      "Distinct guest confirmation requires an active owner with one settled run",
+      "Distinct guest confirmation requires an active owner with settled runs",
     );
   }
   const metadata = rekeyGuestQaConfirmationMetadata(
@@ -1444,13 +1445,13 @@ export function seedDistinctGuestConfirmation(params: {
           where user_id = '${owner}'
             and conversation_id = '${conversation}'
             and status = 'completed'
-        ) = 1
+        ) between 1 and 2
         and coalesce((
           select sum(used_count)
           from public.usage_counters
           where user_id = '${owner}'
             and resource = 'backtest_runs'
-        ), 0) = 1
+        ), 0) between 1 and 2
     ),
     inserted_confirmation as (
       insert into public.messages (
@@ -1496,6 +1497,13 @@ export function seedGuestSimulationExhaustionFixture(params: {
   const sourceMessageId = randomUUID();
   const resultMessageId = randomUUID();
   const confirmationId = `confirmation-${randomUUID()}`;
+  const visitorKey = `visitor:${createHmac(
+    "sha256",
+    process.env.ARGUS_VISITOR_KEY_SECRET ?? "argus-visitor-key",
+  )
+    .update("127.0.0.1")
+    .digest("hex")
+    .slice(0, 32)}`;
   const resultCard = {
     title: "MSFT buy and hold",
     symbols: ["MSFT"],
@@ -1686,9 +1694,26 @@ export function seedGuestSimulationExhaustionFixture(params: {
       )
       select
         '${owner}', 'backtest_runs', 'guest_session',
-        active_owner.created_at, active_owner.expires_at, 1, 1
+        active_owner.created_at, active_owner.expires_at, 2, 2
       from active_owner
       cross join inserted_result
+      returning 1
+    ),
+    inserted_visitor_usage as (
+      insert into public.visitor_usage_counters (
+        visitor_key, resource, period, period_start, period_end,
+        used_count, limit_count
+      )
+      values (
+        '${visitorKey}', 'backtest_runs', 'day', date_trunc('day', now()),
+        date_trunc('day', now()) + interval '1 day', 2, 2
+      )
+      on conflict (visitor_key, resource, period, period_start) do update
+      set
+        period_end = excluded.period_end,
+        used_count = excluded.used_count,
+        limit_count = excluded.limit_count,
+        updated_at = now()
       returning 1
     )
     select json_build_object(
@@ -1697,6 +1722,7 @@ export function seedGuestSimulationExhaustionFixture(params: {
       and exists(select 1 from inserted_run)
       and exists(select 1 from inserted_source)
       and exists(select 1 from inserted_usage)
+      and exists(select 1 from inserted_visitor_usage)
     )::text
   `);
   if (!seeded.ok) {
@@ -2012,7 +2038,7 @@ export function seedGuestActiveConfirmationFixture(params: {
           from public.usage_counters
           where user_id = '${owner}'
             and resource = 'backtest_runs'
-        ), 0) = 1
+        ), 0) = 2
     ),
     inserted_confirmation as (
       insert into public.messages (
@@ -2668,6 +2694,7 @@ export async function freshGuest(
   page: Page,
   options: {
     timeoutMs?: number;
+    language?: "en" | "es-419";
     onBootstrapOwner?: (owner: string) => void;
   } = {},
 ): Promise<GuestMe> {
@@ -2681,7 +2708,7 @@ export async function freshGuest(
     const bootstrapResponse = await page.context().request.post(
       `${LOCAL_API_BASE}/auth/guest`,
       {
-        data: { captcha_token: captchaToken, language: "en" },
+        data: { captcha_token: captchaToken, language: options.language ?? "en" },
         headers: { origin: LOCAL_APP_ORIGIN },
         timeout: timeoutMs,
       },
@@ -3100,7 +3127,7 @@ export async function safeScreenshot(
 export async function safeVisibleProductScreenshot(
   page: Page,
   name: string,
-): Promise<void> {
+): Promise<string> {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error("Unsafe screenshot name");
   const visibleText = await page.locator("body").innerText();
   if (
@@ -3122,6 +3149,7 @@ export async function safeVisibleProductScreenshot(
     ],
   });
   chmodSync(destination, 0o600);
+  return destination;
 }
 
 export function assertSafeEvidence(evidence: SafeEvidence): void {

@@ -23,7 +23,7 @@ def _context() -> BacktestJobShadowContext:
         allowance_limits=[
             {
                 "period": "guest_session",
-                "limit": 1,
+                "limit": 2,
                 "period_start": "2026-07-28T00:00:00+00:00",
                 "period_end": "2026-08-04T00:00:00+00:00",
             }
@@ -62,6 +62,19 @@ def test_exhausted_visitor_with_existing_reservation_replays(monkeypatch) -> Non
 
     assert result.decision == "replay"
     gateway.admit_backtest_job.assert_called_once()
+
+
+def test_replay_ignores_a_transient_first_simulation_counter_failure(
+    monkeypatch,
+) -> None:
+    gateway = _gateway(reservation={"id": "job-1"}, decision="replay")
+    gateway.list_current_usage_counters.side_effect = RuntimeError
+
+    result = _admit(gateway)
+
+    assert result.decision == "replay"
+    gateway.admit_backtest_job.assert_called_once()
+    gateway.list_current_usage_counters.assert_not_called()
 
 
 def test_exhausted_visitor_without_reservation_requires_conversion(
@@ -112,3 +125,30 @@ def test_replay_decision_never_charges_the_visitor(monkeypatch) -> None:
 
     assert result.decision == "replay"
     assert charges == []
+
+
+def test_only_first_fresh_admission_emits_first_simulation(monkeypatch) -> None:
+    monkeypatch.setattr(flow, "visitor_within_limits", lambda *a, **k: True)
+    monkeypatch.setattr(flow, "settle_visitor_usage", lambda *a, **k: None)
+    events: list[str] = []
+    monkeypatch.setattr(
+        flow,
+        "emit_verified_guest_funnel_event",
+        lambda kind, **kwargs: events.append(kind),
+    )
+
+    first = _gateway(reservation=None, decision="admitted")
+    first.list_current_usage_counters.return_value = [
+        {"resource": "backtest_runs", "used_count": 1}
+    ]
+    _admit(first)
+
+    second = _gateway(reservation=None, decision="admitted")
+    # The visitor-day counter can reset between these admissions. The durable
+    # guest-session counter is the identity that must suppress the duplicate.
+    second.list_current_usage_counters.return_value = [
+        {"resource": "backtest_runs", "used_count": 2}
+    ]
+    _admit(second)
+
+    assert events == ["first_simulation_admitted"]
