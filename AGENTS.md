@@ -169,6 +169,30 @@ Integration guardrails:
   branch. Modularity budgets are a shared pool: two individually green
   branches can exceed a watched file's limit when combined, and the violation
   only exists on the merged result.
+- Write the terminal audit only after the final Codex review has returned,
+  and record that review's outcome in it. An audit that races an in-flight
+  review request can be truthful for minutes and stale on arrival; review
+  responses may arrive as inline threads without a summary comment, so check
+  the PR's unresolved-thread count, not just for a bot comment.
+- Behavioral acceptance evidence for strategy-surface changes must span the
+  supported strategy-shape space, not one canonical shape. Include at least
+  one non-buy-and-hold strategy (for example DCA with an explicit
+  `recurring_contribution`, or an indicator-driven template) unless the
+  surface is provably strategy-agnostic. This is a macro rule: as new
+  strategy shapes ship, acceptance evidence diversifies with them instead of
+  standardizing on the oldest, fastest-to-drive shape. Facts most likely to
+  be dropped by a defect (contribution cadence, indicator parameters,
+  modeled costs) deserve evidence before facts that rarely break (dates,
+  capital).
+- Test suites must scale by construction, not duplication. Prefer shared
+  fixtures, factories, and pytest parametrization over copy-pasted cases
+  with hardcoded values; derive expected values from the same canonical
+  constants and builders the code under test uses instead of repeating magic
+  literals; use Faker for incidental data. Hardcoded fixture values that
+  encode convenient fictions — weekend trading days, always-present
+  fractional seconds, a single strategy shape — are how green suites hide
+  real breakage: fixture realism is part of test correctness. Style details
+  live in `.agent/rules/testing.md`; this bullet governs when suites grow.
 - After the founder merges a worker PR, the active agent should run
   `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
   permit it. A cloud agent may perform that workflow; the local

@@ -6,10 +6,11 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #351 at `30af0dca`, which refreshes the canonical
-Recents projection immediately after a guest conversation is claimed by an
-existing account, before any pending follow-up resumes (issue #342). It
-follows PR #374 at `d8c7070a` (robust activity timestamp parsing and
+Latest product change: PR #373 at `81e7a1ac`, which makes first-login guest
+claims succeed for brand-new accounts while preserving signup
+anti-enumeration for emails and adding serialized, typed username conflicts
+(issue #372). It follows PR #351 at `30af0dca` (immediate Recents refresh on
+claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
 exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
 cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
 evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
@@ -190,6 +191,16 @@ full composed-tree gates. Its first live-proof attempt discovered #371 and
 #372; the integration-side headroom extraction `34782abd` preceded this
 landing. No environment variable, deployment, API, schema, or migration
 requirement was added.
+PR #373 then closed issue #372 as `81e7a1ac`: signup eagerly creates the
+destination profile (guarded against Supabase's obfuscated duplicate
+response) so a brand-new account's first-login claim satisfies the handoff
+foreign key; optional usernames are prevalidated case-insensitively before
+Auth-user creation under transaction-scoped advisory locks, returning typed
+`409 username_taken` for new-account conflicts while existing-email requests
+keep the provider's indistinguishable duplicate path. Three review rounds
+each removed a real regression (FK failure, email oracle, username oracle).
+No environment variable, deployment, schema, or migration requirement was
+added; `docs/API_CONTRACT.md` records the username semantics.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import re
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from threading import Event
 from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
@@ -25,6 +27,7 @@ from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from argus.domain.usage_limits import message_usage_settlement
+from argus.domain.username_signup import serialized_username_signup
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
@@ -885,6 +888,350 @@ def test_disabled_public_email_cannot_link_real_anonymous_identity(
         if user_id:
             with suppress(Exception):
                 gateway.delete_auth_user(user_id)
+
+
+def test_signup_taken_username_creates_no_auth_user_or_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    existing_email = f"username-owner-{suffix}@example.test"
+    fresh_email = f"username-conflict-{suffix}@example.test"
+    username = f"portfolio{suffix}"
+    existing_user_id: str | None = None
+    try:
+        created_existing = gateway.client.auth.admin.create_user(
+            {
+                "email": existing_email,
+                "password": f"Existing-{secrets.token_urlsafe(18)}",
+                "email_confirm": True,
+                "user_metadata": {"username": username},
+            }
+        )
+        assert created_existing.user is not None
+        existing_user_id = str(created_existing.user.id)
+        gateway.get_or_create_profile_for_auth_user(
+            created_existing.user.model_dump(mode="json")
+        )
+        gateway.client.table("private_alpha_allowlist").insert(
+            {"email": fresh_email}
+        ).execute()
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as client,
+        ):
+            response = client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "email": fresh_email,
+                    "password": f"Fresh-{secrets.token_urlsafe(18)}",
+                    "captcha_token": "local-captcha-proof",
+                    "username": username.upper(),
+                    "language": "en",
+                },
+            )
+
+        assert response.status_code == 409, response.json()
+        assert response.json()["code"] == "username_taken"
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from auth.users where lower(email) = %s",
+                    (fresh_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+                cursor.execute(
+                    "select count(*) from public.profiles where lower(email) = %s",
+                    (fresh_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+    finally:
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().eq(
+                "email", fresh_email
+            ).execute()
+        if existing_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(existing_user_id)
+
+
+def test_username_availability_treats_pattern_characters_as_literals() -> None:
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    email = f"username-literal-{suffix}@example.test"
+    username_pairs = [
+        (f"underscore_{suffix}", f"underscoreX{suffix}"),
+        (f"percent%{suffix}", f"percentX{suffix}"),
+        (f"star*{suffix}", f"starX{suffix}"),
+    ]
+    user_id: str | None = None
+    try:
+        created = gateway.client.auth.admin.create_user(
+            {
+                "email": email,
+                "password": f"Literal-{secrets.token_urlsafe(18)}",
+                "email_confirm": True,
+                "user_metadata": {"username": username_pairs[0][1]},
+            }
+        )
+        assert created.user is not None
+        user_id = str(created.user.id)
+        gateway.get_or_create_profile_for_auth_user(
+            created.user.model_dump(mode="json")
+        )
+
+        for literal_username, pattern_match_username in username_pairs:
+            gateway.client.table("profiles").update(
+                {"username": pattern_match_username}
+            ).eq("id", user_id).execute()
+            with serialized_username_signup(
+                LOCAL_DATABASE_URL,
+                f"username-probe-{suffix}@example.test",
+                literal_username,
+            ) as available:
+                assert available.username_available is True
+            gateway.client.table("profiles").update(
+                {"username": literal_username}
+            ).eq("id", user_id).execute()
+            with serialized_username_signup(
+                LOCAL_DATABASE_URL,
+                f"username-probe-{suffix}@example.test",
+                literal_username,
+            ) as available:
+                assert available.username_available is False
+        with serialized_username_signup(
+            LOCAL_DATABASE_URL,
+            email,
+            username_pairs[-1][0],
+        ) as existing_email_prevalidation:
+            assert existing_email_prevalidation.auth_user_exists is True
+            assert existing_email_prevalidation.username_available is False
+    finally:
+        if user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
+
+
+def test_concurrent_same_username_signup_calls_auth_only_for_winner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    first_email = f"username-race-first-{suffix}@example.test"
+    second_email = f"username-race-second-{suffix}@example.test"
+    username = f"serialized{suffix}"
+    password = f"Serialized-{secrets.token_urlsafe(18)}"
+    first_provider_complete = Event()
+    release_first_signup = Event()
+    second_provider_called = Event()
+    original_signup = gateway.signup
+
+    def paused_signup(**kwargs: Any) -> dict[str, Any]:
+        result = original_signup(**kwargs)
+        if kwargs["email"] == first_email:
+            first_provider_complete.set()
+            if not release_first_signup.wait(timeout=10):
+                raise RuntimeError("concurrent signup test did not release first request")
+        elif kwargs["email"] == second_email:
+            second_provider_called.set()
+        return result
+
+    gateway.signup = paused_signup  # type: ignore[method-assign]
+    try:
+        gateway.client.table("private_alpha_allowlist").insert(
+            [{"email": first_email}, {"email": second_email}]
+        ).execute()
+        payload = {
+            "password": password,
+            "captcha_token": "local-captcha-proof",
+            "username": username,
+            "language": "en",
+        }
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as first_client,
+            TestClient(app, base_url="http://localhost:3000") as second_client,
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            first = executor.submit(
+                first_client.post,
+                "/api/v1/auth/signup",
+                json={**payload, "email": first_email},
+            )
+            assert first_provider_complete.wait(timeout=10)
+            second = executor.submit(
+                second_client.post,
+                "/api/v1/auth/signup",
+                json={**payload, "email": second_email},
+            )
+            try:
+                assert not second_provider_called.wait(timeout=0.5)
+            finally:
+                release_first_signup.set()
+            first_response = first.result(timeout=10)
+            second_response = second.result(timeout=10)
+
+        assert first_response.status_code == 200, first_response.json()
+        assert second_response.status_code == 409, second_response.json()
+        assert second_response.json()["code"] == "username_taken"
+        assert gateway.get_user(user_id=str(first_response.json()["user"]["id"]))
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from auth.users where lower(email) = %s",
+                    (second_email,),
+                )
+                assert cursor.fetchone()[0] == 0
+    finally:
+        release_first_signup.set()
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().in_(
+                "email", [first_email, second_email]
+            ).execute()
+        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select id::text from auth.users where lower(email) = any(%s)",
+                    ([first_email, second_email],),
+                )
+                user_ids = [row[0] for row in cursor.fetchall()]
+        for user_id in user_ids:
+            with suppress(Exception):
+                gateway.delete_auth_user(user_id)
+
+
+def test_signup_creates_profile_before_first_login_claims_pending_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    email = f"first-login-claim-{secrets.token_hex(6)}@example.test"
+    password = f"FirstLogin-{secrets.token_urlsafe(18)}"
+    source_user_id: str | None = None
+    destination_user_id: str | None = None
+    conversation_id: str | None = None
+    try:
+        gateway.client.table("private_alpha_allowlist").insert({"email": email}).execute()
+
+        guest = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        guest_user = guest["user"]
+        source_user_id = str(guest_user["id"])
+        guest_profile = gateway.get_or_create_profile_for_auth_user(guest_user)
+        gateway.create_guest_workspace(
+            user_id=source_user_id,
+            created_at=guest_profile.created_at,
+        )
+        conversation = gateway.create_conversation(
+            user_id=source_user_id,
+            title="First login claim proof",
+            title_source="system_default",
+            language="en",
+        )
+        conversation_id = conversation.id
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as guest_client,
+            TestClient(app, base_url="http://localhost:3000") as signup_client,
+        ):
+            guest_client.cookies.set(
+                "sb-auth-token",
+                str(guest["session"]["access_token"]),
+            )
+            guest_client.cookies.set(
+                "sb-refresh-token",
+                str(guest["session"]["refresh_token"]),
+            )
+            handoff = guest_client.post(
+                "/api/v1/auth/guest/handoffs",
+                json={
+                    "destination_email": email,
+                    "source_conversation_id": conversation_id,
+                    "pending_action": {
+                        "reason": "keep_history",
+                        "conversation_id": conversation_id,
+                        "action_id": "first-login-keep-history",
+                    },
+                },
+                headers={"origin": "http://localhost:3000"},
+            )
+            assert handoff.status_code == 201, handoff.json()
+
+            signed_up = signup_client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                    "language": "en",
+                },
+            )
+            assert signed_up.status_code == 200, signed_up.json()
+            destination_user_id = str(signed_up.json()["user"]["id"])
+
+            signed_in = guest_client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                },
+            )
+
+        assert signed_in.status_code == 200, signed_in.json()
+        assert signed_in.json()["guest_claim"] == {
+            "conversation_id": conversation_id,
+            "pending_action": {
+                "reason": "keep_history",
+                "conversation_id": conversation_id,
+                "action_id": "first-login-keep-history",
+                "artifact_id": None,
+            },
+        }
+        assert gateway.get_user(user_id=destination_user_id) is not None
+        transferred = (
+            gateway.client.table("conversations")
+            .select("id,user_id")
+            .eq("id", conversation_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert transferred == {
+            "id": conversation_id,
+            "user_id": destination_user_id,
+        }
+    finally:
+        if destination_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(destination_user_id)
+        if source_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(source_user_id)
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().eq(
+                "email", email
+            ).execute()
 
 
 def test_existing_account_claim_preserves_same_conversation_and_deletes_source_only_after_claim(
