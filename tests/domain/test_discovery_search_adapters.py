@@ -387,6 +387,44 @@ class TestOpenRouterWebSearch:
 
         assert [result.snippet for result in packet.results] == [supported_claim]
 
+    @pytest.mark.parametrize("corporate_suffix", ("S.A.", "N.V.", "L.P.", "C.V."))
+    def test_separates_claim_after_dotted_corporate_suffix(
+        self, corporate_suffix: str
+    ) -> None:
+        supported_claim = "Supported Corp completed an IPO."
+        marker = "[[1]](https://example.com/listing)"
+        content = f"Unsupported {corporate_suffix} {supported_claim}{marker}"
+        marker_start = content.index(marker)
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/listing",
+                                    "title": "Public listing",
+                                    "start_index": marker_start,
+                                    "end_index": marker_start + len(marker),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert [result.snippet for result in packet.results] == [supported_claim]
+
     def test_missing_model_fails_closed_without_http(self) -> None:
         calls: list[int] = []
 

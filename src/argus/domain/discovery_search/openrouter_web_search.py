@@ -147,6 +147,8 @@ def _citation_span(
 
 
 def _is_dotted_name_prefix(token: str) -> bool:
+    if token.casefold() in _CLAIM_ABBREVIATIONS:
+        return False
     parts = token.strip("([{\"'").rstrip(".").split(".")
     return len(parts) >= 2 and all(
         len(part) == 1 and part.isalpha() and part.isupper() for part in parts
