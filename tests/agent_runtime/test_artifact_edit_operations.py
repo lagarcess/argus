@@ -2906,3 +2906,72 @@ async def test_issue_339_retries_plan_with_ungrounded_materialized_mutation(
     else:
         assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
         assert response.candidate_strategy_draft.initial_capital is None
+
+
+@pytest.mark.asyncio
+async def test_issue_339_dca_recurring_capital_uses_active_strategy_family(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["recurring-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target=(
+                        "capital"
+                        if model_name == "starting-capital-model"
+                        else "recurring_contribution"
+                    ),
+                    number=200,
+                )
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="change my monthly contribution to $200",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    cadence="monthly",
+                    capital_amount=100,
+                    comparison_baseline="SPY",
+                    extra_parameters={"recurring_contribution": 100},
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="starting-capital-model",
+        primary_draft=LLMStrategyDraft(
+            capital_amount=200,
+            field_provenance={"capital_amount": "recurring_contribution"},
+        ),
+    )
+
+    assert seen_models == ["starting-capital-model", "recurring-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.initial_capital is None
+    assert response.candidate_strategy_draft.recurring_contribution == 200

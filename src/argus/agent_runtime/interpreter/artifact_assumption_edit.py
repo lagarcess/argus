@@ -180,7 +180,42 @@ def _current_total_capital_value(
     return None
 
 
-def _grounded_total_capital_alias_values(draft: LLMStrategyDraft) -> list[float]:
+def _effective_draft_strategy_type(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+) -> str:
+    draft_strategy_type = canonical_strategy_type(draft.strategy_type)
+    if draft_strategy_type:
+        return draft_strategy_type
+    return canonical_strategy_type(
+        current_strategy.strategy_type if current_strategy is not None else None
+    )
+
+
+def _draft_capital_amount_is_recurring(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+) -> bool:
+    provenance = draft.field_provenance or {}
+    return bool(
+        draft.capital_amount is not None
+        and str(provenance.get("capital_amount") or "").strip()
+        in _RECURRING_CAPITAL_SOURCES
+        and _effective_draft_strategy_type(
+            draft,
+            current_strategy=current_strategy,
+        )
+        == "dca_accumulation"
+    )
+
+
+def _grounded_total_capital_alias_values(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None = None,
+) -> list[float]:
     provenance = draft.field_provenance or {}
     aliases = (
         ("initial_capital", draft.initial_capital),
@@ -194,13 +229,23 @@ def _grounded_total_capital_alias_values(draft: LLMStrategyDraft) -> list[float]
         and str(provenance.get(field_name) or "").strip() in _TOTAL_CAPITAL_SOURCES
         and not (
             field_name == "capital_amount"
-            and canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+            and _draft_capital_amount_is_recurring(
+                draft,
+                current_strategy=current_strategy,
+            )
         )
     ]
 
 
-def _canonical_total_capital_value(draft: LLMStrategyDraft) -> float | None:
-    grounded_values = _grounded_total_capital_alias_values(draft)
+def _canonical_total_capital_value(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None = None,
+) -> float | None:
+    grounded_values = _grounded_total_capital_alias_values(
+        draft,
+        current_strategy=current_strategy,
+    )
     if grounded_values:
         requested = grounded_values[0]
         return (
@@ -212,13 +257,23 @@ def _canonical_total_capital_value(draft: LLMStrategyDraft) -> float | None:
         return draft.initial_capital
     if draft.total_capital is not None:
         return draft.total_capital
+    if _draft_capital_amount_is_recurring(
+        draft,
+        current_strategy=current_strategy,
+    ):
+        return None
     return draft.capital_amount
 
 
 def _has_conflicting_grounded_total_capital_aliases(
     draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None = None,
 ) -> bool:
-    grounded_values = _grounded_total_capital_alias_values(draft)
+    grounded_values = _grounded_total_capital_alias_values(
+        draft,
+        current_strategy=current_strategy,
+    )
     return bool(
         grounded_values
         and any(value != grounded_values[0] for value in grounded_values[1:])
@@ -387,12 +442,20 @@ def _required_edit_targets_from_primary_draft(
     capital_source = str(provenance.get("capital_amount") or "").strip()
     current_capital = _current_total_capital_value(current_strategy)
     if any(
-        value != current_capital for value in _grounded_total_capital_alias_values(draft)
+        value != current_capital
+        for value in _grounded_total_capital_alias_values(
+            draft,
+            current_strategy=current_strategy,
+        )
     ):
         targets.add("capital")
     recurring_source = str(provenance.get("recurring_contribution") or "").strip()
     is_recurring_strategy = (
-        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+        _effective_draft_strategy_type(
+            draft,
+            current_strategy=current_strategy,
+        )
+        == "dca_accumulation"
     )
     recurring_amount = draft.recurring_contribution
     if recurring_amount is None and is_recurring_strategy:
@@ -763,9 +826,12 @@ def materialized_artifact_edit_targets(
         materialized_targets.add("date_window")
     if primary_draft is None:
         return materialized_targets
-    if _has_conflicting_grounded_total_capital_aliases(primary_draft):
-        return None
     current_strategy = _current_artifact_strategy(request)
+    if _has_conflicting_grounded_total_capital_aliases(
+        primary_draft,
+        current_strategy=current_strategy,
+    ):
+        return None
     primary_has_material_delta = _primary_draft_has_material_delta(
         primary_draft,
         current_strategy=current_strategy,
@@ -1096,8 +1162,14 @@ def _materialized_target_matches_primary_delta(
         )
 
     if target == "capital":
-        requested = _canonical_total_capital_value(primary_draft)
-        materialized = _canonical_total_capital_value(materialized_draft)
+        requested = _canonical_total_capital_value(
+            primary_draft,
+            current_strategy=current_strategy,
+        )
+        materialized = _canonical_total_capital_value(
+            materialized_draft,
+            current_strategy=current_strategy,
+        )
         current = _current_total_capital_value(current_strategy)
     elif target == "recurring_contribution":
         requested = (
