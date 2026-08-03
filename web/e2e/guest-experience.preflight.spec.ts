@@ -400,19 +400,21 @@ for (const expectation of [
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
       await expect(dialog.getByText(expectation.resetCopy)).toBeVisible();
-      const screenshot = await safeVisibleProductScreenshot(
-        page,
-        `issue-346-exhausted-${expectation.language}`,
-      );
-      const durableDirectory = path.join(
-        process.cwd(),
-        "../docs/reports/evidence/issue-346",
-      );
-      mkdirSync(durableDirectory, { recursive: true });
-      copyFileSync(
-        screenshot,
-        path.join(durableDirectory, `guest-quota-recovery-${expectation.language}.png`),
-      );
+      if (process.env.ARGUS_GUEST_QA_CAPTURE_DURABLE_EVIDENCE === "true") {
+        const screenshot = await safeVisibleProductScreenshot(
+          page,
+          `issue-346-exhausted-${expectation.language}`,
+        );
+        const durableDirectory = path.join(
+          process.cwd(),
+          "../docs/reports/evidence/issue-346",
+        );
+        mkdirSync(durableDirectory, { recursive: true });
+        copyFileSync(
+          screenshot,
+          path.join(durableDirectory, `guest-quota-recovery-${expectation.language}.png`),
+        );
+      }
     } finally {
       await backend.stop();
       if (guestOwner) await deleteDisposableIdentity(guestOwner);
