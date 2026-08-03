@@ -43,6 +43,38 @@ class _RecordingClarifier:
         return self.response
 
 
+_DCA_CONTRIBUTION = 1000.0
+_DCA_CADENCE = "weekly"
+_SMA_FAST_PERIOD = 50
+_SMA_SLOW_PERIOD = 200
+
+
+def _moving_average_rule(direction: str) -> dict[str, object]:
+    return {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": _SMA_FAST_PERIOD,
+        "slow_indicator": "sma",
+        "slow_period": _SMA_SLOW_PERIOD,
+        "direction": direction,
+    }
+
+
+def _moving_average_condition(operator: str) -> dict[str, object]:
+    return {
+        "left": {"kind": "indicator", "key": "sma", "period": _SMA_FAST_PERIOD},
+        "operator": operator,
+        "right": {"kind": "indicator", "key": "sma", "period": _SMA_SLOW_PERIOD},
+    }
+
+
+def _moving_average_rule_spec() -> dict[str, object]:
+    return {
+        "entry": {"conditions": [_moving_average_condition("cross_above")]},
+        "exit": {"conditions": [_moving_average_condition("cross_below")]},
+    }
+
+
 def _source_result() -> ArtifactReference:
     realism = {
         "enabled": True,
@@ -77,9 +109,9 @@ def _source_result() -> ArtifactReference:
                 },
                 "resolved_parameters": {
                     "timeframe": "1D",
-                    "capital_amount": 1000,
-                    "recurring_contribution": 1000,
-                    "cadence": "weekly",
+                    "capital_amount": _DCA_CONTRIBUTION,
+                    "recurring_contribution": _DCA_CONTRIBUTION,
+                    "cadence": _DCA_CADENCE,
                     "benchmark_symbol": "SPY",
                     "engine_config": {"_execution_realism": dict(realism)},
                 },
@@ -90,35 +122,9 @@ def _source_result() -> ArtifactReference:
 
 
 def _indicator_source_result() -> ArtifactReference:
-    entry_rule = {
-        "type": "moving_average_crossover",
-        "fast_indicator": "sma",
-        "fast_period": 50,
-        "slow_indicator": "sma",
-        "slow_period": 200,
-        "direction": "bullish",
-    }
-    exit_rule = {**entry_rule, "direction": "bearish"}
-    rule_spec = {
-        "entry": {
-            "conditions": [
-                {
-                    "left": {"kind": "indicator", "key": "sma", "period": 50},
-                    "operator": "cross_above",
-                    "right": {"kind": "indicator", "key": "sma", "period": 200},
-                }
-            ]
-        },
-        "exit": {
-            "conditions": [
-                {
-                    "left": {"kind": "indicator", "key": "sma", "period": 50},
-                    "operator": "cross_below",
-                    "right": {"kind": "indicator", "key": "sma", "period": 200},
-                }
-            ]
-        },
-    }
+    entry_rule = _moving_average_rule("bullish")
+    exit_rule = _moving_average_rule("bearish")
+    rule_spec = _moving_average_rule_spec()
     return ArtifactReference(
         artifact_kind="backtest_result",
         artifact_id="run-345-indicator",
@@ -206,7 +212,7 @@ def _assert_source_is_unchanged(
 def _assert_owned_facts(strategy: StrategySummary) -> None:
     assert strategy.asset_universe == ["WMT", "HD", "TGT"]
     assert strategy.asset_class == "equity"
-    assert strategy.capital_amount == 1000
+    assert strategy.capital_amount == _DCA_CONTRIBUTION
     assert strategy.timeframe == "1D"
     assert strategy.comparison_baseline == "SPY"
     assert strategy.extra_parameters["fee_rate"] == 0.004
@@ -220,8 +226,10 @@ def _assert_owned_facts(strategy: StrategySummary) -> None:
 
 
 def _assert_dca_facts(strategy: StrategySummary) -> None:
-    assert strategy.cadence == "weekly"
-    assert strategy.extra_parameters["recurring_contribution"] == 1000
+    assert strategy.cadence == _DCA_CADENCE
+    assert (
+        strategy.extra_parameters["recurring_contribution"] == _DCA_CONTRIBUTION
+    )
     provenance = strategy.extra_parameters["field_provenance"]
     assert provenance["capital_amount"] == "prior"
     assert provenance["recurring_contribution"] == "prior"
@@ -362,7 +370,7 @@ def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
     assert result.patch["missing_required_fields"] == ["date_range"]
     strategy = StrategySummary.model_validate(result.patch["candidate_strategy_draft"])
     assert strategy.strategy_type == "dca_accumulation"
-    assert strategy.cadence == "weekly"
+    assert strategy.cadence == _DCA_CADENCE
     assert strategy.date_range == {
         "start": "2021-01-04",
         "end": "2025-12-31",
@@ -450,20 +458,9 @@ def test_date_range_recommendation_preserves_indicator_parameters() -> None:
     )
     assert pending.requested_strategy_template == "moving_average_crossover"
     assert pending.strategy_type == "signal_strategy"
-    assert pending.entry_rule == {
-        "type": "moving_average_crossover",
-        "fast_indicator": "sma",
-        "fast_period": 50,
-        "slow_indicator": "sma",
-        "slow_period": 200,
-        "direction": "bullish",
-    }
-    assert pending.exit_rule == {**pending.entry_rule, "direction": "bearish"}
-    assert pending.rule_spec["entry"]["conditions"][0] == {
-        "left": {"kind": "indicator", "key": "sma", "period": 50},
-        "operator": "cross_above",
-        "right": {"kind": "indicator", "key": "sma", "period": 200},
-    }
+    assert pending.entry_rule == _moving_average_rule("bullish")
+    assert pending.exit_rule == _moving_average_rule("bearish")
+    assert pending.rule_spec == _moving_average_rule_spec()
 
     interpretation = StructuredInterpretation(
         intent="strategy_drafting",
