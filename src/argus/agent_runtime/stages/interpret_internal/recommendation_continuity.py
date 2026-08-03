@@ -61,7 +61,7 @@ def change_date_range_recommendation_result(
             "strategy": strategy.model_dump(mode="python"),
             "current_user_message": state.current_user_message,
             "structured_action": action.model_dump(mode="python"),
-            "latest_run_id": reference.artifact_id,
+            "latest_run_id": anchor.artifact_id,
         },
         "options": [],
     }

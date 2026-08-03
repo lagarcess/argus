@@ -335,6 +335,46 @@ def test_date_range_recommendation_routes_anchored_draft_to_clarifier(
     _assert_source_is_unchanged(source, source_before)
 
 
+def test_date_range_recommendation_persists_selected_run_when_latest_differs() -> (
+    None
+):
+    selected = _source_result()
+    latest = selected.model_copy(
+        deep=True,
+        update={
+            "artifact_id": "run-345-latest",
+            "metadata": {
+                **selected.metadata,
+                "run_id": "run-345-latest",
+            },
+        },
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="results_explanation",
+        completed=True,
+        latest_backtest_result_reference=latest,
+        artifact_references=[latest, selected],
+    )
+
+    result = interpret_stage(
+        state=_recommendation_state(
+            "change_date_range",
+            "Test a different date range",
+        ),
+        user=UserState(user_id="u-345"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "next_experiments_offered_kinds": ["change_date_range"],
+        },
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["response_intent"]["facts"]["latest_run_id"] == (
+        selected.artifact_id
+    )
+
+
 def test_date_range_answer_repairs_misrouted_model_output_with_result_anchor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
