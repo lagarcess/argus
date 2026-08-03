@@ -944,6 +944,14 @@ class SignupRequest(BaseModel):
     display_name: str | None = None
     username: str | None = None
 
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().casefold()
+        return normalized or None
+
 
 class LoginRequest(BaseModel):
     email: str

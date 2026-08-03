@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,7 @@ from argus.domain.supabase_gateway import (
     QuotaExceededError,
     SupabaseGateway,
 )
+from argus.domain.username_signup import UsernameSignupPrevalidation
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -2249,10 +2251,185 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     assert response.status_code == 200
     mock_gateway.private_alpha_email_allowed.assert_called_once_with("beta@example.com")
     mock_gateway.signup.assert_called_once()
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once_with(
+        mock_gateway.signup.return_value["user"]
+    )
     assert "mark_private_alpha_signup_accepted" not in [
         call[0] for call in mock_gateway.method_calls
     ]
     assert response.cookies.get("sb-auth-token") == "access-token-123"
+
+
+def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    fresh_provider_response = {
+        "session": None,
+        "user": {
+            "id": "fresh-user-id",
+            "email": "fresh@example.com",
+            "identities": [{"id": "fresh-identity-id"}],
+        },
+    }
+    duplicate_provider_response = {
+        "session": None,
+        "user": {
+            "id": "obfuscated-user-id",
+            "email": "existing@example.com",
+            "identities": [],
+        },
+    }
+    mock_gateway.signup.side_effect = [
+        fresh_provider_response,
+        duplicate_provider_response,
+    ]
+    profile_rows: set[str] = set()
+    mock_gateway.get_or_create_profile_for_auth_user.side_effect = (
+        lambda auth_user: profile_rows.add(str(auth_user["id"]))
+    )
+    headers = {"X-Forwarded-For": "203.0.113.92"}
+
+    fresh = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "fresh@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+        headers=headers,
+    )
+    duplicate = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "existing@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+        headers=headers,
+    )
+
+    assert fresh.status_code == duplicate.status_code == 200
+    assert fresh.json() == fresh_provider_response
+    assert duplicate.json() == duplicate_provider_response
+    assert set(fresh.json()) == set(duplicate.json()) == {"session", "user"}
+    assert set(fresh.json()["user"]) == set(duplicate.json()["user"])
+    assert profile_rows == {"fresh-user-id"}
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once_with(
+        fresh_provider_response["user"]
+    )
+
+
+def test_signup_retry_does_not_reveal_profile_creation_through_username(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.side_effect = [
+        {
+            "session": None,
+            "user": {
+                "id": "fresh-user-id",
+                "email": "fresh@example.com",
+                "identities": [{"id": "fresh-identity-id"}],
+            },
+        },
+        {
+            "session": None,
+            "user": {
+                "id": "obfuscated-user-id",
+                "email": "fresh@example.com",
+                "identities": [],
+            },
+        },
+    ]
+    headers = {"X-Forwarded-For": "203.0.113.93"}
+
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        side_effect=[
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=False,
+                    username_available=True,
+                )
+            ),
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=True,
+                    username_available=False,
+                )
+            ),
+        ],
+    ):
+        first = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+        retry = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["user"]["identities"] == []
+    assert mock_gateway.signup.call_count == 2
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
+
+
+def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        return_value=nullcontext(
+            UsernameSignupPrevalidation(
+                auth_user_exists=False,
+                username_available=False,
+            )
+        ),
+    ) as serialize_username:
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "PortfolioAlpha",
+            },
+        )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "username_taken"
+    assert response.json()["detail"] == "That username is already taken."
+    serialize_username.assert_called_once_with(
+        api_state.DATABASE_URL,
+        "fresh@example.com",
+        "portfolioalpha",
+    )
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
 
 
 def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
