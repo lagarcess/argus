@@ -887,6 +887,129 @@ def test_disabled_public_email_cannot_link_real_anonymous_identity(
                 gateway.delete_auth_user(user_id)
 
 
+def test_signup_creates_profile_before_first_login_claims_pending_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "false")
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    gateway = _gateway()
+    email = f"first-login-claim-{secrets.token_hex(6)}@example.test"
+    password = f"FirstLogin-{secrets.token_urlsafe(18)}"
+    source_user_id: str | None = None
+    destination_user_id: str | None = None
+    conversation_id: str | None = None
+    try:
+        gateway.client.table("private_alpha_allowlist").insert({"email": email}).execute()
+
+        guest = gateway.sign_in_anonymously(
+            captcha_token="local-captcha-proof",
+            language="en",
+        )
+        guest_user = guest["user"]
+        source_user_id = str(guest_user["id"])
+        guest_profile = gateway.get_or_create_profile_for_auth_user(guest_user)
+        gateway.create_guest_workspace(
+            user_id=source_user_id,
+            created_at=guest_profile.created_at,
+        )
+        conversation = gateway.create_conversation(
+            user_id=source_user_id,
+            title="First login claim proof",
+            title_source="system_default",
+            language="en",
+        )
+        conversation_id = conversation.id
+
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
+            TestClient(app, base_url="http://localhost:3000") as guest_client,
+            TestClient(app, base_url="http://localhost:3000") as signup_client,
+        ):
+            guest_client.cookies.set(
+                "sb-auth-token",
+                str(guest["session"]["access_token"]),
+            )
+            guest_client.cookies.set(
+                "sb-refresh-token",
+                str(guest["session"]["refresh_token"]),
+            )
+            handoff = guest_client.post(
+                "/api/v1/auth/guest/handoffs",
+                json={
+                    "destination_email": email,
+                    "source_conversation_id": conversation_id,
+                    "pending_action": {
+                        "reason": "keep_history",
+                        "conversation_id": conversation_id,
+                        "action_id": "first-login-keep-history",
+                    },
+                },
+                headers={"origin": "http://localhost:3000"},
+            )
+            assert handoff.status_code == 201, handoff.json()
+
+            signed_up = signup_client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                    "language": "en",
+                },
+            )
+            assert signed_up.status_code == 200, signed_up.json()
+            destination_user_id = str(signed_up.json()["user"]["id"])
+
+            signed_in = guest_client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": email,
+                    "password": password,
+                    "captcha_token": "local-captcha-proof",
+                },
+            )
+
+        assert signed_in.status_code == 200, signed_in.json()
+        assert signed_in.json()["guest_claim"] == {
+            "conversation_id": conversation_id,
+            "pending_action": {
+                "reason": "keep_history",
+                "conversation_id": conversation_id,
+                "action_id": "first-login-keep-history",
+                "artifact_id": None,
+            },
+        }
+        assert gateway.get_user(user_id=destination_user_id) is not None
+        transferred = (
+            gateway.client.table("conversations")
+            .select("id,user_id")
+            .eq("id", conversation_id)
+            .single()
+            .execute()
+            .data
+        )
+        assert transferred == {
+            "id": conversation_id,
+            "user_id": destination_user_id,
+        }
+    finally:
+        if destination_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(destination_user_id)
+        if source_user_id:
+            with suppress(Exception):
+                gateway.delete_auth_user(source_user_id)
+        with suppress(Exception):
+            gateway.client.table("private_alpha_allowlist").delete().eq(
+                "email", email
+            ).execute()
+
+
 def test_existing_account_claim_preserves_same_conversation_and_deletes_source_only_after_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
