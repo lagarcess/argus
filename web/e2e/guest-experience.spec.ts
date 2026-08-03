@@ -408,9 +408,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       expect(
         resumedUsage.body.allowances.backtests.guest_session,
       ).toMatchObject({
-        limit: 1,
+        limit: 2,
         used: 1,
-        remaining: 0,
+        remaining: 1,
       });
       evidence.simulation_usage_matches = true;
 
@@ -883,10 +883,10 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expect(messageWindow.used).toBe(database.chat_units);
         expect(messageWindow.period_end).toBe(primaryExpiry);
         expect(simulationWindow.used).toBe(database.simulation_units);
-        expect(simulationWindow.limit).toBe(1);
-        expect(simulationWindow.remaining).toBe(0);
+        expect(simulationWindow.limit).toBe(2);
+        expect(simulationWindow.remaining).toBe(1);
         expect(simulationWindow.period_end).toBe(primaryExpiry);
-        expect(usage.body.allowances.backtests.available_now).toBe(false);
+        expect(usage.body.allowances.backtests.available_now).toBe(true);
         expect(database.simulation_units).toBe(1);
         expect(messages.status).toBe(200);
         expect(
