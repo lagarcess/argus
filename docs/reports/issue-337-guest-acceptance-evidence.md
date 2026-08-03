@@ -105,9 +105,11 @@ The rail now treats those canonical facts as resolution evidence only when:
 - the canonical value is meaningful, including an explicit numeric zero.
 
 Default-only optional parameters, missing or unknown provenance, and mismatched
-path ids remain fail-closed and keep the attention marker visible. Focused
-tests cover both the capital and recurring-contribution shapes plus each
-negative boundary.
+path ids remain fail-closed and keep the attention marker visible. Matching
+`source_result_run_id` values cannot bypass these assumption-specific checks;
+when a result-derived assumption path carries source identity, that identity
+must also agree. Focused tests cover the capital, recurring-contribution, and
+result-derived shapes plus each negative boundary.
 
 ## Integration reconciliation
 
@@ -171,7 +173,7 @@ Result: `1 passed`.
 
 Focused verification also passed:
 
-- frontend rail/hydration/artifact history: `116 passed`;
+- frontend rail/hydration/artifact history: `117 passed`;
 - backend workflow/reload guardrails: `111 passed`;
 - focused frontend ESLint: passed;
 - production Next.js build/type check inside the browser gate: passed.

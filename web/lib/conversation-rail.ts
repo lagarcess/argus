@@ -265,16 +265,27 @@ function confirmationContinuesClarification(
   ) {
     return false;
   }
-  if (pending.sourceResultRunId || confirmed.sourceResultRunId) {
-    return Boolean(
-      pending.sourceResultRunId &&
-        pending.sourceResultRunId === confirmed.sourceResultRunId,
-    );
-  }
+  const hasSourceResultIdentity = Boolean(
+    pending.sourceResultRunId || confirmed.sourceResultRunId,
+  );
+  const hasMatchingSourceResultId = Boolean(
+    pending.sourceResultRunId &&
+      pending.sourceResultRunId === confirmed.sourceResultRunId,
+  );
   const hasMatchingStrategyPathId = Boolean(
     pending.strategyPathId &&
       pending.strategyPathId === confirmed.strategyPathId,
   );
+  if (pending.requestedField === "assumption") {
+    return (
+      (!hasSourceResultIdentity || hasMatchingSourceResultId) &&
+      hasMatchingStrategyPathId &&
+      meaningfulPathValue(
+        confirmedRequestedFieldValue(confirmed, pending.requestedField),
+      )
+    );
+  }
+  if (hasSourceResultIdentity) return hasMatchingSourceResultId;
   if (
     (pending.strategyPathId || confirmed.strategyPathId) &&
     !hasMatchingStrategyPathId
@@ -287,9 +298,6 @@ function confirmationContinuesClarification(
     )
   ) {
     return false;
-  }
-  if (pending.requestedField === "assumption") {
-    return hasMatchingStrategyPathId;
   }
   if (hasMatchingStrategyPathId) return true;
 

@@ -481,6 +481,56 @@ describe("conversation rail tick derivation", () => {
     ).toEqual([["assumption-question", "error_recovery"]]);
   });
 
+  test("does not let source-result identity bypass assumption evidence", () => {
+    const clarification = textMessage("result-assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: { asset_universe: ["AAPL"] },
+        sourceResultRunId: "run-aapl",
+        strategyPathId: "assistant-result-assumption-question",
+      },
+    });
+    const confirmation = ({
+      source = "user",
+      sourceResultRunId = "run-aapl",
+      strategyPathId = "assistant-result-assumption-question",
+    }: {
+      source?: "default" | "user";
+      sourceResultRunId?: string;
+      strategyPathId?: string;
+    }) =>
+      confirmationMessage("result-assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        sourceResultRunId,
+        strategyPathId,
+        optionalParameters: {
+          initial_capital: { value: 5_000, source },
+        },
+      });
+    const tickIds = (message: Message) =>
+      deriveConversationRailTicks([clarification, message]).map(
+        (tick) => tick.messageId,
+      );
+
+    expect(tickIds(confirmation({}))).toEqual([]);
+    expect(tickIds(confirmation({ source: "default" }))).toEqual([
+      "result-assumption-question",
+    ]);
+    expect(
+      tickIds(confirmation({ strategyPathId: "assistant-other-question" })),
+    ).toEqual(["result-assumption-question"]);
+    expect(tickIds(confirmation({ sourceResultRunId: "run-msft" }))).toEqual([
+      "result-assumption-question",
+    ]);
+  });
+
   test("resolves an assumption edit from a same-path canonical strategy fact with provenance", () => {
     const clarification = textMessage("dca-assumption-question", "ai", {
       recoveryDisplay: {
