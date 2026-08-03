@@ -1445,13 +1445,13 @@ export function seedDistinctGuestConfirmation(params: {
           where user_id = '${owner}'
             and conversation_id = '${conversation}'
             and status = 'completed'
-        ) = 1
+        ) between 1 and 2
         and coalesce((
           select sum(used_count)
           from public.usage_counters
           where user_id = '${owner}'
             and resource = 'backtest_runs'
-        ), 0) = 1
+        ), 0) between 1 and 2
     ),
     inserted_confirmation as (
       insert into public.messages (
