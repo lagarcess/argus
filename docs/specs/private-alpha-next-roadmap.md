@@ -189,6 +189,11 @@ foundation is verified end to end with durable in-repo evidence (real local
 Postgres/RLS, both personas, zero provider spend); guest applicability is
 classified per state and manual-unread remains account-only.
 
+PR #374 then closed issue #371 as `d8c7070a`: regex-free timestamp
+normalization (founder-directed after the first-round regex missed the `Z`
+shape Python 3.10 cannot parse) plus exception retention in the API failure
+log. Unblocks the PR #351 live-proof rerun alongside #373.
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
