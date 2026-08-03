@@ -5250,6 +5250,91 @@ def _seed_completed_run(user_id: str, conversation_id: str) -> str:
     return run_id
 
 
+@pytest.mark.parametrize(
+    "next_experiment_kind",
+    ["change_date_range", "compare_buy_and_hold"],
+)
+def test_historical_recommendation_action_loads_card_run_before_runtime(
+    monkeypatch,
+    next_experiment_kind: str,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Captured the historical action context.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    historical_run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Historical AAPL result.",
+        metadata={
+            "result_run_id": historical_run_id,
+            "latest_run_id": historical_run_id,
+            "result_card": {"title": "Historical AAPL result"},
+        },
+    )
+    latest_run_id = _seed_completed_run(user_id, conversation["id"])
+    latest_run = api_state.store.backtest_runs[latest_run_id]
+    latest_run.symbols = ["MSFT"]
+    latest_run.config_snapshot = {"template": "buy_and_hold", "symbols": ["MSFT"]}
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Latest MSFT result.",
+        metadata={
+            "result_run_id": latest_run_id,
+            "latest_run_id": latest_run_id,
+            "result_card": {"title": "Latest MSFT result"},
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Try next",
+                "presentation": "result",
+                "payload": {
+                    "run_id": historical_run_id,
+                    "next_experiment_kind": next_experiment_kind,
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == latest_run_id
+    references = captured["fallback_artifact_references"]
+    assert {reference.artifact_id for reference in references} == {
+        historical_run_id,
+        latest_run_id,
+    }
+
+
 def _fact_answer_metadata(run_id: str) -> dict[str, Any]:
     return {
         "conversation_mode": "confirm",
