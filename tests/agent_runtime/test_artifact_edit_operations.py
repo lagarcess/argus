@@ -10,6 +10,7 @@ from argus.agent_runtime.artifact_edit_planner import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMDateRangeIntent,
+    LLMInterpretationResponse,
     LLMStrategyDraft,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
@@ -3150,6 +3151,276 @@ async def test_issue_339_typed_roles_use_planner_replacement_boundary(
 
     assert response is not None
     assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
+
+
+@pytest.mark.asyncio
+async def test_issue_339_typed_replacement_rejects_ungrounded_primary_asset(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda *_args, **_kwargs: {"AAPL", "MSFT", "TSLA"},
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        symbols = ["MSFT", "NVDA"] if model_name == "primary-model" else ["MSFT"]
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="replace", target="asset", symbols=symbols)],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="replace AAPL with MSFT, not TSLA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_universe=["MSFT", "NVDA"],
+            asset_inclusions=["MSFT"],
+            asset_exclusions=["TSLA"],
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+    )
+
+    assert seen_models == ["primary-model", "fallback-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
+
+
+@pytest.mark.asyncio
+async def test_issue_339_position_size_survives_asset_boundary_clarification(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.stages.interpret import interpret_stage_async
+    from argus.agent_runtime.state.models import RunState
+
+    class StaticInterpreter:
+        def __init__(self, interpretation):
+            self.interpretation = interpretation
+
+        def __call__(self, _request):
+            return self.interpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    planner_calls: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        planner_calls.append(model_name)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="replace", target="asset", symbols=["MSFT"]),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    first_request = InterpretationRequest(
+        current_user_message="set position size to 50% and swap AAPL for MSFT",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+                timeframe="1D",
+                date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                sizing_mode="capital_amount",
+                capital_amount=10_000,
+                extra_parameters={
+                    "initial_capital": 10_000,
+                    "field_provenance": {
+                        "capital_amount": "starting_capital",
+                        "initial_capital": "starting_capital",
+                    },
+                },
+            )
+        ),
+        selected_thread_metadata={
+            "requested_field": "assumption",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u-339"),
+    )
+    first_primary = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="Set 50% position sizing and swap AAPL for MSFT.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            asset_universe=["MSFT"],
+            sizing_mode="capital_amount",
+            position_size=0.5,
+            field_provenance={
+                "asset_universe": "explicit_user",
+                "position_size": "explicit_user",
+            },
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    clarification = await llm_interpreter._ready_active_artifact_edit_planned_response(
+        response=first_primary,
+        preferred_model="primary-model",
+        request=first_request,
+    )
+
+    assert clarification is not None
+    assert clarification.requires_clarification is True
+    assert planner_calls == []
+    first_runtime = (
+        llm_interpreter.OpenRouterStructuredInterpreter._to_runtime_interpretation(
+            object(),
+            clarification,
+            request=first_request,
+        )
+    )
+    assert first_runtime.candidate_strategy_draft.sizing_mode == "position_size"
+    assert first_runtime.candidate_strategy_draft.position_size == 0.5
+    first_stage = await interpret_stage_async(
+        state=RunState.new(
+            current_user_message=first_request.current_user_message,
+            recent_thread_history=[],
+        ),
+        user=first_request.user,
+        latest_task_snapshot=first_request.latest_task_snapshot,
+        selected_thread_metadata=first_request.selected_thread_metadata,
+        structured_interpreter=StaticInterpreter(first_runtime),
+    )
+    assert first_stage.outcome == "needs_clarification"
+    assert first_stage.decision.missing_required_fields == ["asset_universe"]
+    pending = StrategySummary.model_validate(
+        first_stage.patch["candidate_strategy_draft"]
+    )
+    assert pending.asset_universe == ["AAPL"]
+    assert pending.sizing_mode == "position_size"
+    assert pending.position_size == 0.5
+    assert pending.capital_amount is None
+    assert "initial_capital" not in pending.extra_parameters
+    assert pending.extra_parameters["field_provenance"] == {
+        "position_size": "explicit_user"
+    }
+
+    second_request = InterpretationRequest(
+        current_user_message="replace",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u-339"),
+    )
+    second_primary = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Replace AAPL with MSFT.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            asset_universe=["MSFT"],
+            asset_universe_operation="replace",
+            field_provenance={"asset_universe": "explicit_user"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    planned = await llm_interpreter._ready_active_artifact_edit_planned_response(
+        response=second_primary,
+        preferred_model="primary-model",
+        request=second_request,
+    )
+
+    assert planned is not None
+    second_runtime = (
+        llm_interpreter.OpenRouterStructuredInterpreter._to_runtime_interpretation(
+            object(),
+            planned,
+            request=second_request,
+        )
+    )
+    second_stage = await interpret_stage_async(
+        state=RunState.new(
+            current_user_message=second_request.current_user_message,
+            recent_thread_history=[],
+        ),
+        user=second_request.user,
+        latest_task_snapshot=second_request.latest_task_snapshot,
+        selected_thread_metadata=second_request.selected_thread_metadata,
+        structured_interpreter=StaticInterpreter(second_runtime),
+    )
+    assert planner_calls == ["primary-model"]
+    assert second_stage.outcome == "ready_for_confirmation", {
+        "outcome": second_stage.outcome,
+        "missing_required_fields": second_stage.decision.missing_required_fields,
+        "requires_clarification": second_stage.decision.requires_clarification,
+        "reason_codes": second_stage.decision.reason_codes,
+        "strategy": {
+            "assets": second_stage.decision.candidate_strategy_draft.asset_universe,
+            "date_range": second_stage.decision.candidate_strategy_draft.date_range,
+            "timeframe": second_stage.decision.candidate_strategy_draft.timeframe,
+            "position_size": (
+                second_stage.decision.candidate_strategy_draft.position_size
+            ),
+        },
+    }
+    confirmation = StrategySummary.model_validate(
+        second_stage.patch["candidate_strategy_draft"]
+    )
+    assert confirmation.asset_universe == ["MSFT"]
+    assert confirmation.position_size == 0.5
+    assert confirmation.capital_amount is None
+    assert "initial_capital" not in confirmation.extra_parameters
+    assert confirmation.extra_parameters["field_provenance"] == {
+        "asset_universe": "explicit_user",
+        "position_size": "explicit_user",
+    }
 
 
 @pytest.mark.asyncio

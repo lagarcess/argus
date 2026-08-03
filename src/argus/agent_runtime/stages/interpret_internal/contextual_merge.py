@@ -177,6 +177,11 @@ def _strategy_with_contextual_merge(
         if strategy_family_changed and incoming_strategy_family is not None
         else prior.model_copy(deep=True)
     )
+    if strategy.sizing_mode == "position_size" and strategy.position_size is not None:
+        merged.capital_amount = None
+        merged.extra_parameters = _extra_parameters_without_unrequested_money_context(
+            merged.extra_parameters
+        )
     incoming = strategy.model_dump(mode="python")
     for key, value in incoming.items():
         if key == "raw_user_phrasing":
