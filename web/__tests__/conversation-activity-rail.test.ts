@@ -421,6 +421,117 @@ describe("conversation rail tick derivation", () => {
     expect(ticks).toEqual([]);
   });
 
+  test("resolves an assumption edit from a same-path user-owned optional parameter", () => {
+    const clarification = textMessage("assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId: "assistant-assumption-question",
+      },
+    });
+    const confirmation = (
+      source: "default" | "user",
+      strategyPathId = "assistant-assumption-question",
+    ) =>
+      confirmationMessage("assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: { asset_universe: ["AAPL"] },
+        strategyPathId,
+        optionalParameters: {
+          initial_capital: {
+            value: 5_000,
+            source,
+            label: "Initial capital",
+          },
+        },
+      });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation("user")]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmationMessage("zero-cost-confirmation", "active", {
+          kind: "confirmation",
+          strategy: { asset_universe: ["AAPL"] },
+          strategyPathId: "assistant-assumption-question",
+          optionalParameters: {
+            fees: { value: 0, source: "user", label: "Fees" },
+          },
+        }),
+      ]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([clarification, confirmation("default")]).map(
+        (tick) => [tick.messageId, tick.kind],
+      ),
+    ).toEqual([["assumption-question", "error_recovery"]]);
+    expect(
+      deriveConversationRailTicks([
+        clarification,
+        confirmation("user", "assistant-other-question"),
+      ]).map((tick) => [tick.messageId, tick.kind]),
+    ).toEqual([["assumption-question", "error_recovery"]]);
+  });
+
+  test("resolves an assumption edit from a same-path canonical strategy fact with provenance", () => {
+    const clarification = textMessage("dca-assumption-question", "ai", {
+      recoveryDisplay: {
+        kind: "clarification",
+        requestedField: "assumption",
+        semanticNeeds: ["assumption"],
+      },
+      strategyPathContext: {
+        kind: "clarification",
+        requestedField: "assumption",
+        strategy: {
+          strategy_type: "dca_accumulation",
+          asset_universe: ["AAPL"],
+          cadence: "monthly",
+          capital_amount: 100,
+        },
+        strategyPathId: "assistant-dca-assumption-question",
+      },
+    });
+    const confirmation = (withProvenance: boolean) =>
+      confirmationMessage("dca-assumption-confirmation", "active", {
+        kind: "confirmation",
+        strategy: {
+          strategy_type: "dca_accumulation",
+          asset_universe: ["AAPL"],
+          cadence: "weekly",
+          capital_amount: 200,
+          extra_parameters: withProvenance
+            ? {
+                recurring_contribution: 200,
+                recurring_cadence: "weekly",
+                field_provenance: {
+                  capital_amount: "recurring_contribution",
+                  cadence: "explicit_user",
+                },
+              }
+            : {},
+        },
+        strategyPathId: "assistant-dca-assumption-question",
+      });
+
+    expect(
+      deriveConversationRailTicks([clarification, confirmation(true)]),
+    ).toEqual([]);
+    expect(
+      deriveConversationRailTicks([clarification, confirmation(false)]).map(
+        (tick) => [tick.messageId, tick.kind],
+      ),
+    ).toEqual([["dca-assumption-question", "error_recovery"]]);
+  });
+
   test("clears clarification when confirmation canonicalizes an unchanged relative date fact", () => {
     const ticks = deriveConversationRailTicks([
       textMessage("asset-question", "ai", {

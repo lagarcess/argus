@@ -70,6 +70,12 @@ const STRONG_STRATEGY_PATH_FIELDS = new Set<string>([
   "slippage_bps",
 ]);
 
+const USER_OWNED_STRATEGY_PROVENANCE = new Set([
+  "explicit_user",
+  "recurring_contribution",
+  "starting_capital",
+]);
+
 function meaningfulPathValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim().length > 0;
@@ -127,6 +133,12 @@ function strategyExtraParameters(
   strategy: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const value = strategy.extra_parameters;
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
@@ -199,6 +211,34 @@ function confirmedRequestedFieldValue(
   context: NonNullable<Message["strategyPathContext"]>,
   requestedField: string,
 ): unknown {
+  if (requestedField === "assumption") {
+    for (const value of Object.values(context.optionalParameters ?? {})) {
+      const parameter = recordValue(value);
+      if (
+        parameter?.source === "user" &&
+        meaningfulPathValue(parameter.value)
+      ) {
+        return parameter.value;
+      }
+    }
+
+    const extraParameters = strategyExtraParameters(context.strategy);
+    const fieldProvenance = recordValue(extraParameters?.field_provenance);
+    for (const [field, provenance] of Object.entries(fieldProvenance ?? {})) {
+      if (
+        typeof provenance !== "string" ||
+        !USER_OWNED_STRATEGY_PROVENANCE.has(provenance)
+      ) {
+        continue;
+      }
+      const strategyValue = context.strategy[field];
+      if (meaningfulPathValue(strategyValue)) return strategyValue;
+      const extraValue = extraParameters?.[field];
+      if (meaningfulPathValue(extraValue)) return extraValue;
+    }
+    return undefined;
+  }
+
   const strategyValue = context.strategy[requestedField];
   if (meaningfulPathValue(strategyValue)) return strategyValue;
   const optionalParameter = context.optionalParameters?.[requestedField];
@@ -247,6 +287,9 @@ function confirmationContinuesClarification(
     )
   ) {
     return false;
+  }
+  if (pending.requestedField === "assumption") {
+    return hasMatchingStrategyPathId;
   }
   if (hasMatchingStrategyPathId) return true;
 

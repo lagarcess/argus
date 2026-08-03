@@ -84,8 +84,30 @@ clarification row created by the fixture:
 - the helper validates the id as a UUID and writes it as top-level
   `strategy_path_id`, matching the real persisted confirmation shape.
 
-No production rail predicate, runtime contract, API contract, database schema,
-or localization behavior changed in this correction.
+The fixture correction itself did not change the production rail predicate,
+runtime contract, API contract, database schema, or localization behavior.
+
+## Final review correction: canonical assumption fields
+
+The final exact-head review found one additional reachable rail case. The
+`adjust_assumptions` action persists the umbrella
+`requested_field: "assumption"`, while a successful answer is stored under a
+concrete canonical field. For example, “Use a $5,000 starting amount” becomes
+`confirmation_payload.optional_parameters.initial_capital` with
+`source: "user"`; recurring contributions and execution costs carry their
+canonical strategy values plus typed field provenance.
+
+The rail now treats those canonical facts as resolution evidence only when:
+
+- the confirmation carries the same `strategy_path_id` as the clarification;
+- an optional parameter is explicitly backend-owned by the user, or a
+  canonical strategy fact has recognized user provenance; and
+- the canonical value is meaningful, including an explicit numeric zero.
+
+Default-only optional parameters, missing or unknown provenance, and mismatched
+path ids remain fail-closed and keep the attention marker visible. Focused
+tests cover both the capital and recurring-contribution shapes plus each
+negative boundary.
 
 ## Integration reconciliation
 
@@ -149,7 +171,7 @@ Result: `1 passed`.
 
 Focused verification also passed:
 
-- frontend rail/hydration/artifact history: `114 passed`;
+- frontend rail/hydration/artifact history: `116 passed`;
 - backend workflow/reload guardrails: `111 passed`;
 - focused frontend ESLint: passed;
 - production Next.js build/type check inside the browser gate: passed.
