@@ -29,6 +29,7 @@ from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
     _TOTAL_CAPITAL_SOURCES,
     _date_window_intent_bound_to_latest_result,
+    _draft_semantic_evidence_spans,
     _field_path_base,
     _latest_result_date_window,
     _supported_dca_cadence_value,
@@ -291,11 +292,7 @@ def _required_edit_targets_from_primary_draft(
         getattr(draft, field_name) != getattr(current_strategy, field_name, None)
         for field_name in strategy_family_fields
     )
-    if (
-        draft.requested_strategy_template is not None
-        and has_explicit_strategy_family
-        and strategy_family_changed
-    ):
+    if has_explicit_strategy_family and strategy_family_changed:
         targets.add("strategy_family")
 
     capital_source = str(provenance.get("capital_amount") or "").strip()
@@ -697,6 +694,15 @@ def materialized_artifact_edit_targets(
         request.current_user_message,
         resolve_asset_candidate=resolve_asset_candidate,
     )
+    primary_asset_evidence_symbols: set[str] = set()
+    primary_asset_evidence = str(
+        _draft_semantic_evidence_spans(primary_draft).get("asset_universe") or ""
+    ).strip()
+    if primary_asset_evidence and primary_asset_evidence in request.current_user_message:
+        primary_asset_evidence_symbols = _grounded_asset_symbols_from_message(
+            primary_asset_evidence,
+            resolve_asset_candidate=resolve_asset_candidate,
+        )
     primary_provenance = primary_draft.field_provenance or {}
     primary_carries_explicit_asset_request = bool(
         primary_draft.asset_universe
@@ -729,6 +735,7 @@ def materialized_artifact_edit_targets(
             and benchmark_symbol not in explicit_benchmark_role_symbols
         ):
             grounded_asset_symbols.discard(benchmark_symbol)
+            primary_asset_evidence_symbols.discard(benchmark_symbol)
     current_assets = set(
         normalized_asset_symbols(
             current_strategy.asset_universe if current_strategy else []
@@ -771,6 +778,7 @@ def materialized_artifact_edit_targets(
                 current_strategy=current_strategy,
                 request=request,
                 grounded_asset_symbols=grounded_asset_symbols,
+                primary_asset_evidence_symbols=primary_asset_evidence_symbols,
                 planned_asset_removals=planned_removals,
                 planned_asset_replacement=planned_asset_replacement,
             )
@@ -798,6 +806,7 @@ def _materialized_target_matches_primary_delta(
     current_strategy: StrategySummary | None,
     request: InterpretationRequest,
     grounded_asset_symbols: set[str] | None = None,
+    primary_asset_evidence_symbols: set[str] | None = None,
     planned_asset_removals: set[str] | None = None,
     planned_asset_replacement: bool = False,
 ) -> bool:
@@ -813,6 +822,7 @@ def _materialized_target_matches_primary_delta(
         )
         primary_requested = set(normalized_asset_symbols(primary_draft.asset_universe))
         grounded = set(grounded_asset_symbols or set())
+        primary_evidence = set(primary_asset_evidence_symbols or set())
         requested = primary_requested | grounded
         materialized = set(normalized_asset_symbols(materialized_draft.asset_universe))
         operation = normalized_asset_universe_operation(
@@ -852,8 +862,8 @@ def _materialized_target_matches_primary_delta(
             return False
         if planned_asset_replacement:
             expected_replacement = (
-                primary_requested | (grounded - current)
-                if primary_requested != current
+                primary_requested | (primary_evidence - current)
+                if primary_requested and primary_requested != current
                 else grounded
             )
             return bool(materialized) and materialized == expected_replacement

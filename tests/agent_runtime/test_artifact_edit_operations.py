@@ -166,6 +166,92 @@ def test_compound_strategy_family_and_benchmark_are_both_required_targets():
     assert targets == {"strategy_family", "benchmark"}
 
 
+@pytest.mark.asyncio
+async def test_issue_339_legacy_strategy_fields_require_compound_planner_coverage(
+    monkeypatch,
+):
+    from argus.agent_runtime import llm_interpreter
+
+    crossover_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        operations = [EditOperation(op="set", target="benchmark", value="QQQ")]
+        if model_name == "fallback-model":
+            operations.append(
+                EditOperation(
+                    op="replace",
+                    target="strategy_family",
+                    strategy_template="moving_average_crossover",
+                    entry_rule=crossover_rule,
+                )
+            )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=operations,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="use a 50/200 crossover and benchmark QQQ",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    requested_strategy_template="buy_and_hold",
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "assumption"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            entry_rule=crossover_rule,
+            exit_rule={**crossover_rule, "direction": "bearish"},
+            comparison_baseline="QQQ",
+            field_provenance={
+                "strategy_type": "explicit_user",
+                "entry_rule": "explicit_user",
+                "exit_rule": "explicit_user",
+                "comparison_baseline": "explicit_user",
+            },
+        ),
+    )
+
+    assert seen_models == ["primary-model", "fallback-model"]
+    assert response is not None
+    assert (
+        response.candidate_strategy_draft.requested_strategy_template
+        == "moving_average_crossover"
+    )
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+
+
 @pytest.mark.parametrize(
     "entry_rule",
     [
@@ -970,6 +1056,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
         "wrong_assets",
         "correct_assets",
         "expected_models",
+        "asset_evidence_span",
     ),
     [
         pytest.param(
@@ -979,6 +1066,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["AAPL", "NVDA", "GOOGL"],
             ["AAPL", "NVDA", "GOOGL"],
             ["primary-model"],
+            "AAPL, NVDA, and GOOGL",
             id="augments-material-primary-replacement",
         ),
         pytest.param(
@@ -988,6 +1076,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["AAPL", "NVDA", "GOOGL"],
             ["NVDA", "GOOGL"],
             ["primary-model", "fallback-model"],
+            None,
             id="rejects-ungrounded-retention-from-unchanged-carrier",
         ),
         pytest.param(
@@ -997,6 +1086,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["AAPL"],
             ["AAPL"],
             ["primary-model"],
+            None,
             id="accepts-grounded-subset-only-replacement",
         ),
         pytest.param(
@@ -1006,6 +1096,7 @@ async def test_issue_339_retries_mixed_asset_edit_with_unrequested_removal(
             ["NVDA"],
             ["NVDA", "GOOGL"],
             ["primary-model", "fallback-model"],
+            None,
             id="rejects-truncated-grounded-replacement",
         ),
     ],
@@ -1018,6 +1109,7 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
     wrong_assets,
     correct_assets,
     expected_models,
+    asset_evidence_span,
 ):
     from argus.agent_runtime import llm_interpreter
     from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -1081,6 +1173,11 @@ async def test_issue_339_grounded_replace_augments_primary_without_changing_reta
             asset_universe=primary_assets,
             asset_universe_operation="replace",
             field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans=(
+                {"asset_universe": asset_evidence_span}
+                if asset_evidence_span is not None
+                else {}
+            ),
         ),
     )
 
@@ -1169,6 +1266,87 @@ async def test_issue_339_clear_then_add_retries_invalid_final_universe(
     assert seen_models == ["primary-model", "fallback-model"]
     assert response is not None
     assert response.candidate_strategy_draft.asset_universe == ["NVDA", "GOOGL"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("plan_shape", ["replace", "clear_add"])
+async def test_issue_339_primary_asset_exclusions_are_not_reintroduced(
+    monkeypatch,
+    plan_shape,
+):
+    from argus.agent_runtime import llm_interpreter
+    from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["fallback-model"],
+    )
+    monkeypatch.setattr(
+        artifact_assumption_edit,
+        "_grounded_asset_symbols_from_message",
+        lambda message, **_kwargs: (
+            {"MSFT"} if message == "MSFT" else {"AAPL", "MSFT", "NVDA"}
+        ),
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "_asset_edit_symbol_resolver",
+        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+    )
+    seen_models: list[str] = []
+
+    async def invoke_stub(*, model_name, **kwargs):
+        del kwargs
+        seen_models.append(model_name)
+        assets = ["MSFT", "NVDA"] if model_name == "primary-model" else ["MSFT"]
+        operations = (
+            [EditOperation(op="replace", target="asset", symbols=assets)]
+            if plan_shape == "replace"
+            else [
+                EditOperation(op="clear", target="asset"),
+                EditOperation(op="add", target="asset", symbols=assets),
+            ]
+        )
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=operations,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    response = await llm_interpreter._plan_pending_artifact_assumption_edit(
+        request=InterpretationRequest(
+            current_user_message="replace AAPL with MSFT, not NVDA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={"requested_field": "asset_universe"},
+            user=UserState(user_id="u-339"),
+        ),
+        preferred_model="primary-model",
+        primary_draft=LLMStrategyDraft(
+            asset_universe=["MSFT"],
+            asset_universe_operation="replace",
+            field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans={"asset_universe": "MSFT"},
+        ),
+    )
+
+    assert seen_models == ["primary-model", "fallback-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["MSFT"]
 
 
 @pytest.mark.asyncio
