@@ -267,6 +267,7 @@ describe("guest conversion contract", () => {
     expect(chat).toContain("isGuestSimulationConversionRejection");
     expect(chat).toContain("errorPayload.code");
     expect(chat).toContain("finalPayload.code");
+    expect(chat).toContain("finalResponsePayload?.code ?? finalPayload.code");
     expect(chat.indexOf("errorPayload.code")).toBeLessThan(
       chat.indexOf("throwIfAmbiguousRunSseError", chat.indexOf('event.event === "error"')),
     );
