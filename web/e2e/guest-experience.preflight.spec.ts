@@ -379,14 +379,16 @@ test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
       userId: guestOwner,
       conversationId,
     });
-    seedGuestResolvedClarificationRailHistory({
-      userId: guestOwner,
-      conversationId,
-    });
+    const { clarificationMessageId } =
+      seedGuestResolvedClarificationRailHistory({
+        userId: guestOwner,
+        conversationId,
+      });
     seedGuestActiveConfirmationFixture({
       userId: guestOwner,
       conversationId,
       symbol: "AAPL",
+      strategyPathId: clarificationMessageId,
     });
 
     const assertRecoveredRail = async () => {

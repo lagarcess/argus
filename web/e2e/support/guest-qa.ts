@@ -1862,6 +1862,7 @@ export function seedGuestActiveConfirmationFixture(params: {
   userId: string;
   conversationId: string;
   symbol?: string;
+  strategyPathId?: string;
 }): {
   messageId: string;
   confirmationId: string;
@@ -1874,6 +1875,9 @@ export function seedGuestActiveConfirmationFixture(params: {
   const messageId = randomUUID();
   const confirmationId = `confirmation-${randomUUID()}`;
   const symbol = params.symbol ?? "MSFT";
+  const strategyPathId = params.strategyPathId
+    ? requireUuid(params.strategyPathId, "confirmation fixture strategy path")
+    : null;
   if (!/^[A-Z]{1,5}$/.test(symbol)) {
     throw new Error("Confirmation fixture symbol is invalid");
   }
@@ -1883,6 +1887,7 @@ export function seedGuestActiveConfirmationFixture(params: {
     conversation_id: conversation,
   };
   const metadata = {
+    ...(strategyPathId ? { strategy_path_id: strategyPathId } : {}),
     confirmation_payload: {
       strategy: {
         strategy_type: "buy_and_hold",
