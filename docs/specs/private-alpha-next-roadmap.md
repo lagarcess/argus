@@ -555,6 +555,14 @@ slices below describe delivered scope, not pending work.
 - Broad Research Lab / deep-research product work. Bounded, source-backed event
   context required by the later A4 freshness arc is not a general news feed or
   a broad Research Lab implementation.
+- Allowance brainstorming session (founder-led): define what Guests versus
+  registered users can do, and identify which capability boundaries naturally
+  become tiers or plans once product-market fit is found. Today Argus stays
+  deliberately open at near-full data capability to learn capability truth;
+  every capability boundary added in the meantime (lookback windows,
+  simulation allowances, discovery quotas) must stay policy-owned values so
+  future tiering changes policy, not design. Session output feeds the
+  allowance/tier design; no implementation before it.
 
 ### P2 Board
 
