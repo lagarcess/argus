@@ -11,6 +11,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     ResolvedArtifactEdit,
     apply_edit_operations,
+    resolved_asset_operation_symbols,
 )
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
@@ -659,7 +660,10 @@ def materialized_artifact_edit_targets(
         symbol
         for operation in plan.operations
         if operation.target == "asset" and operation.op == "remove"
-        for symbol in normalized_asset_symbols(operation.symbols)
+        for symbol in resolved_asset_operation_symbols(
+            operation.symbols,
+            asset_symbol_resolver=asset_symbol_resolver,
+        )
     }
     if "asset" in materialized_targets and (
         (bool(additions) and additions <= (grounded_asset_symbols | primary_assets))

@@ -475,7 +475,7 @@ def apply_edit_operations(
         op = operation.op
 
         if target == "asset":
-            patch = _normalized_operation_symbols(
+            patch = resolved_asset_operation_symbols(
                 operation.symbols,
                 asset_symbol_resolver=asset_symbol_resolver,
             )
@@ -679,11 +679,13 @@ def _rules_form_opposite_crossover(
     )
 
 
-def _normalized_operation_symbols(
+def resolved_asset_operation_symbols(
     symbols: list[str],
     *,
     asset_symbol_resolver: Callable[[str], str | None] | None,
 ) -> list[str]:
+    """Resolve asset-operation values through the materializer's symbol path."""
+
     resolved_symbols: list[str] = []
     for symbol in symbols:
         raw_symbol = str(symbol or "").strip()

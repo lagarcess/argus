@@ -650,6 +650,7 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
         "current_assets",
         "asset_operation",
         "symbols",
+        "grounded_symbols",
         "expected_assets",
         "current_user_message",
     ),
@@ -658,6 +659,7 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
             ["AAPL"],
             "replace",
             ["BRK.B"],
+            {"BRK.B"},
             ["BRK.B"],
             "switch the asset to Berkshire Hathaway Class B and benchmark to QQQ",
             id="replacement-can-remove-prior-universe",
@@ -665,10 +667,11 @@ async def test_issue_339_audits_primary_capital_delta_without_required_target(
         pytest.param(
             ["AAPL", "MSFT"],
             "remove",
-            ["MSFT"],
+            ["Microsoft"],
+            {"MSFT"},
             ["AAPL"],
-            "remove MSFT and change the benchmark to QQQ",
-            id="removal-can-remove-grounded-current-symbol",
+            "remove Microsoft and change the benchmark to QQQ",
+            id="removal-can-resolve-grounded-company-alias",
         ),
     ],
 )
@@ -677,6 +680,7 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
     current_assets,
     asset_operation,
     symbols,
+    grounded_symbols,
     expected_assets,
     current_user_message,
 ):
@@ -691,12 +695,14 @@ async def test_issue_339_provider_grounded_asset_edit_can_remove_current_asset(
     monkeypatch.setattr(
         artifact_assumption_edit,
         "_grounded_asset_symbols_from_message",
-        lambda *_args, **_kwargs: set(symbols),
+        lambda *_args, **_kwargs: set(grounded_symbols),
     )
     monkeypatch.setattr(
         llm_interpreter,
         "_asset_edit_symbol_resolver",
-        lambda _resolve_asset_candidate: lambda symbol: symbol.strip().upper(),
+        lambda _resolve_asset_candidate: lambda symbol: (
+            "MSFT" if symbol.strip().casefold() == "microsoft" else symbol.strip().upper()
+        ),
     )
     seen_models: list[str] = []
 
