@@ -6,9 +6,13 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #354 at `4a6a237a`, which makes guest quota
-exhaustion truthful and forward-moving — real reset time, conversion offer,
-and a two-simulation allowance (issue #346). It follows PR #358 at
+Latest product change: PR #366 at `2b023576`, which makes grounded
+discovery's failures as honest as its successes — typed routing for current
+searches, working Retry for transient failures, non-retryable honesty with a
+forward path for configuration failures, and fail-closed citation evidence
+(issue #344). This completes the #347 checkpoint-gap batch for this cycle;
+the integration head is the promotion-freeze candidate. It follows PR #354
+at `4a6a237a` (truthful guest quota recovery, issue #346) and PR #358 at
 `7b3221a1` (all-or-retry compound edits, issue #339) and PR #359 at
 `a35bb29f` (recommendation continuity through the shared clarify contract,
 issue #345) and PR #373 at `81e7a1ac` (first-login guest
@@ -236,6 +240,15 @@ classification is atomic; and the authoritative public-launch canary in
 lane also fixed a real guest chat-stream cookie-auth gap its browser matrix
 exposed, and its dead-at-birth Supabase preview branch was deleted and
 recreated to prove the migration on hosted preview infrastructure.
+PR #366 then closed issue #344 as `2b023576`: recent-IPO, trending-crypto,
+multi-category, and escalation requests route through the typed discovery
+path with resolver-validated cited candidates; transient failures retry and
+genuinely recover; configuration failures stop honestly without dead-end
+affordances or wait-promises, redirecting to provider-free symbol testing;
+and citation fallback evidence is bounded and fail-closed. Sixteen per-SHA
+in-repo evidence sets with probe-vs-proof labeling; provider-mode breadth is
+parked as #377. This was the cycle's final landing before the promotion
+freeze.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA

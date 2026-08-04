@@ -221,6 +221,12 @@ the public-launch canary updated to the new policy — the stale cloud lane
 taken over locally and finished with bilingual in-repo browser evidence.
 Issue #294 keeps the funnel-data tuning mandate against this new baseline.
 
+PR #366 then closed issue #344 as `2b023576`: honest, recoverable grounded
+discovery — the sixteenth and final landing of the checkpoint-gap batch.
+**The integration head at this landing is the promotion-freeze candidate:
+everything after it stacks for the next cycle** (#335 inline editing, #332,
+#369, #377, the parked #363 design, and the allowance session).
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
