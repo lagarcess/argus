@@ -70,6 +70,16 @@ services:
         sync: false
       - key: ARGUS_VISITOR_KEY_SECRET
         sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: POSTHOG_PROJECT_TOKEN
+        sync: false
+      - key: POSTHOG_REGION
+        value: us
+      - key: ARGUS_ENABLE_EXECUTION_REALISM
+        value: "true"
+      - key: ARGUS_DISCOVERY_SEARCH_PROVIDER
+        value: perplexity_direct
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
         sync: false
       - key: DATABASE_URL
