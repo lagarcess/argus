@@ -44,7 +44,7 @@ type RunDossierViewProps = {
 };
 
 export type DecisionDraft = {
-  state: DecisionState;
+  state: DecisionState | null;
   note: string;
 };
 
@@ -175,7 +175,7 @@ export function RunDossierView({
   const startDecisionEdit = () => {
     if (!decisionAction) return;
     const nextDraft = {
-      state: decisionAction.decision_state ?? "watching",
+      state: decisionAction.decision_state ?? null,
       note: decisionAction.note ?? "",
     };
     if (decisionAction.availability === "account_conversion_required") {

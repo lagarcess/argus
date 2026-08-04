@@ -25,7 +25,7 @@ const DECISION_STATES: readonly DecisionState[] = [
 
 type DecisionEditorProps = {
   action: SearchDecisionAction;
-  decisionState: DecisionState;
+  decisionState: DecisionState | null;
   note: string;
   saving: boolean;
   error: boolean;
@@ -103,7 +103,7 @@ export function DecisionEditor({
   const noteTooLong = noteCount > DECISION_NOTE_MAX_LENGTH;
 
   const save = () => {
-    if (saving || noteTooLong) return;
+    if (saving || noteTooLong || decisionState === null) return;
     void onSave(action, { decision_state: decisionState, note });
   };
 
@@ -188,7 +188,7 @@ export function DecisionEditor({
         </button>
         <button
           type="button"
-          disabled={saving || noteTooLong}
+          disabled={saving || noteTooLong || decisionState === null}
           onClick={save}
           className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#191c1f] px-4 text-[13px] font-medium text-white disabled:opacity-55 dark:bg-white dark:text-[#191c1f]"
         >
