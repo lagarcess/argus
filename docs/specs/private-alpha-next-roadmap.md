@@ -298,6 +298,41 @@ selected before there is a real, demonstrated user cohort asking for it —
 this is explicitly a wait-for-signal item, not a candidate for the next
 planning cycle.
 
+## Promotion Readiness — 2026-08-04
+
+The freeze holds: the product tip is unchanged at `2b023576` (PR #366).
+Everything landed after it is promotion housekeeping — env-template parity and
+the three-key OpenRouter policy, the real support address
+(`support@get-argus.com`, Cloudflare Email Routing to the founder's inbox),
+and the Render spend-discipline lock (AGENTS.md local-compute rule, runbook
+note, and a guard test pinning the mode scripts' dispatch posture). Promotion
+candidate tip: `58fe1049`, CI green at every step.
+
+Pre-flight is complete and its findings are the promotion agent's brief:
+
+- Hosted migration census: exactly four migrations apply, in order — avatar
+  theme, conversation-activity read states, guest allowance raise,
+  simulation-limit handoff reason. Ten older “missing” stamps are renumbering
+  artifacts of a past history squash — never re-apply them. The June
+  `MIGRATIONS_FAILED` branch status is dead signage.
+- Env truth is layered: render.yaml plus a dashboard-set layer. The ceremony
+  reconciles declared-vs-live; the discovery stack (provider, search model,
+  daily ceiling, Perplexity key) is the highest-risk gap and gets a hosted
+  probe. `ARGUS_VISITOR_KEY_SECRET` (fresh high-entropy value) and
+  `NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL` are already set on the services; the
+  deploy bakes them in. Hosted key identity must verify as the argus-prod
+  OpenRouter key.
+- The scheduled Private Alpha Canary has been red daily since 2026-07-13 for
+  one structural reason: GitHub executes main's copy of the workflow yml,
+  which predates the capture-path contract the integration scripts require
+  (`missing_capture_destination` at stage `capture`, before any product
+  check; the daily Render warmup passed throughout, so production stayed
+  healthy). Promotion itself heals it by updating main. **The closing
+  release gate is the first scheduled canary green after deploy.** That
+  first green also writes the first real per-run cost into
+  `cost_ledger_entries`; canary cadence (keep daily vs thin out) is a
+  founder decision made from that measured number.
+
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
 active pointer.
