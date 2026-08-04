@@ -113,6 +113,13 @@ SHA/status check with `ARGUS_CANARY_SHA`.
 .github/warmup-render.sh --expect-mode real-workflow
 ```
 
+Render workflow dispatch is ceremony-gated spend: the hosted product (real
+users), the scheduled Private Alpha Canary workflow, and these promotion steps
+are the only paths that run paid `workflow_proof` / `run_backtest_job` tasks.
+Local and dev-agent work runs backtests in-process on local compute; the mode
+scripts pin dispatch off (dev hard-off, QA default-off with explicit
+pre-export opt-in).
+
 11. Run the authoritative Spanish release journey with privacy-safe evidence.
 This is the only release canary: it checks the exact deployed SHA, the real
 Render workflow, finalized evidence identity, explicit decision capture, reload

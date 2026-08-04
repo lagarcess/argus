@@ -467,6 +467,13 @@ manually juggle backend mode flags for normal work.
   `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and no live provider
   keys. A clean mocked sweep should be seconds-scale; a run stretching into
   minutes means stop and check for leaked credentials or live provider paths.
+- Local compute rule: local and dev-agent backtests run in-process on the
+  developer machine. Never set `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`
+  or dispatch paid Render workflow tasks (`workflow_proof`,
+  `run_backtest_job`) from local work without explicit founder authorization.
+  Paid Render dispatch belongs to the hosted product, the scheduled canary,
+  and promotion ceremonies; the mode scripts pin it off (dev hard-off, QA
+  default-off with explicit pre-export opt-in).
 
 ### Worktree Environment Contract
 
