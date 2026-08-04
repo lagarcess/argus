@@ -475,6 +475,22 @@ manually juggle backend mode flags for normal work.
   and promotion ceremonies; the mode scripts pin it off (dev hard-off, QA
   default-off with explicit pre-export opt-in).
 
+### Release Acceptance Environment Parity
+
+- Release-candidate acceptance runs on the local candidate stack: local
+  Supabase (Docker) reset to the candidate schema, env overlay layered over
+  untouched canonical files, real provider keys, captcha off. Never run
+  `scripts/qa/write-local-env.sh` in the canonical checkout; it overwrites
+  `.env` and `web/.env.local`.
+- Acceptance includes an environment-parity pass: `.env.example` must be at
+  par with every variable the code reads, and cross-checked against the
+  integration `.env`. Any variable intended live on hosted services must be
+  declared in the release contract (release profile, `render.yaml`, and the
+  `argus-env.sh` contract arrays) before promotion. The promotion agent
+  derives "what needs setting on hosted" from that contract; discovering
+  undeclared live variables at a promotion red gate means acceptance missed
+  this step.
+
 ### Worktree Environment Contract
 
 The worktree checked out on `codex/private-alpha-next` owns the canonical local
