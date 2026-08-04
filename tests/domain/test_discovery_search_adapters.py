@@ -541,6 +541,67 @@ class TestOpenRouterWebSearch:
 
         assert [result.snippet for result in packet.results] == [supported_claim]
 
+    @pytest.mark.parametrize(
+        ("claim", "citation_title", "expected_snippet"),
+        (
+            (
+                "Unsupported Inc. adidas completed an IPO.",
+                "adidas IPO",
+                "adidas completed an IPO.",
+            ),
+            (
+                "Unsupported Inc. bp announced a public offering.",
+                "bp public offering",
+                "bp announced a public offering.",
+            ),
+            (
+                "Example Inc. today announced an IPO.",
+                "Today announced IPO",
+                "Example Inc. today announced an IPO.",
+            ),
+            (
+                "Example Inc. company completed an IPO.",
+                "Company news",
+                "Example Inc. company completed an IPO.",
+            ),
+        ),
+    )
+    def test_uses_exact_title_style_for_lowercase_claim_boundary(
+        self, claim: str, citation_title: str, expected_snippet: str
+    ) -> None:
+        marker = "[[1]](https://example.com/listing)"
+        content = f"{claim}{marker}"
+        marker_start = content.index(marker)
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/listing",
+                                    "title": citation_title,
+                                    "start_index": marker_start,
+                                    "end_index": marker_start + len(marker),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert [result.snippet for result in packet.results] == [expected_snippet]
+
     @pytest.mark.parametrize("corporate_suffix", ("S.A.", "N.V.", "L.P.", "C.V."))
     def test_separates_claim_after_dotted_corporate_suffix(
         self, corporate_suffix: str

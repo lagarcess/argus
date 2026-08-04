@@ -201,13 +201,18 @@ def _is_dotted_name_prefix(token: str, *, preceding_text: str) -> bool:
     return claim_prefix == token
 
 
-def _starts_lowercase_styled_name(text: str) -> bool:
+def _starts_lowercase_styled_name(
+    text: str, *, citation_title: str = ""
+) -> bool:
     token = text.split(maxsplit=1)[0].strip("([{\"'")
     core = token.rstrip(".,;:!?")
     domain_parts = core.split(".")
+    title_token = citation_title.split(maxsplit=1)[0].strip("([{\"'")
+    title_core = title_token.rstrip(".,;:!?")
     return bool(core) and core[0].islower() and (
         any(character.isupper() for character in core[1:])
         or (len(domain_parts) >= 2 and any(len(part) > 1 for part in domain_parts))
+        or (core.islower() and title_core == core)
     )
 
 
@@ -248,7 +253,10 @@ def _cited_message_context(
             preceding_token.casefold() not in _CLAIM_ABBREVIATIONS
             or not following_text
             or not following_text[0].islower()
-            or _starts_lowercase_styled_name(following_text)
+            or _starts_lowercase_styled_name(
+                following_text,
+                citation_title=str(citation.get("title") or ""),
+            )
         )
         if starts_new_claim and not _is_dotted_name_prefix(
             preceding_token,
