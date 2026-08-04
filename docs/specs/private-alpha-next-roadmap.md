@@ -348,9 +348,11 @@ from all user-facing copy (rule locked in `.agent/rules/coding-standards.md`).
 Eyes-open guest metering postures are recorded in
 `GUEST_PUBLIC_LAUNCH_SAFETY.md`. Findings filed instead of fixed: pending-card
 NL edits ignored in any language (evidence on #335), reply language follows
-workspace not message language (#378), Run-backtest action as localized token
-chip without message metering (#379). None are batch regressions; promotion
-proceeds on `70ba33cc`.
+workspace not message language (#378), and the Run-backtest action's shape
+(fake English user bubble, message metering, no typed equivalent) which is
+parked for founder design discussion (#379 closed pending it; the dossier
+retest token chip is the candidate pattern). None are batch regressions;
+promotion proceeds on `70ba33cc`.
 
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
