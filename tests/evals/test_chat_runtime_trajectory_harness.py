@@ -1047,6 +1047,11 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
     assert discovery_recovery.expectation.stage_outcome == "ready_to_respond"
     assert discovery_recovery.expectation.recovery_code == "discovery_unavailable"
+    assert discovery_recovery.expectation.route_budget is not None
+    assert discovery_recovery.expectation.route_budget.max_calls == 1
+    assert discovery_recovery.expectation.checkpoints == {
+        "discovery.route_receipt_count": 1
+    }
 
     orphan_recovery = _trajectory_for_issue("#240").steps[3]
     assert orphan_recovery.expectation.reload_state == "abandoned"

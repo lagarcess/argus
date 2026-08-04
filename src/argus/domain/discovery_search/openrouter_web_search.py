@@ -114,15 +114,13 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
         citation_span = _citation_span(message_content, citation)
         if citation_span is not None:
             citation_start, _ = citation_span
+            citation_separator = message_content[
+                previous_citation_end or 0 : citation_start
+            ]
             starts_new_group = (
                 previous_citation_end is None
                 or citation_start < previous_citation_end
-                or any(
-                    character.isalnum()
-                    for character in message_content[
-                        previous_citation_end:citation_start
-                    ]
-                )
+                or not _continues_citation_group(citation_separator)
             )
             if starts_new_group:
                 claim_floor = (
@@ -151,6 +149,14 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
                 previous_citation_end or 0, citation_span[1]
             )
     return sanitized
+
+
+def _continues_citation_group(separator: str) -> bool:
+    words = "".join(
+        character.casefold() if character.isalnum() else " "
+        for character in separator
+    ).split()
+    return not words or words in (["and"], ["y"])
 
 
 def _citation_span(

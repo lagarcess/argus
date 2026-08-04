@@ -353,6 +353,60 @@ class TestOpenRouterWebSearch:
             ("https://example.com/valid", shared_claim)
         ]
 
+    @pytest.mark.parametrize("citation_connector", (" and ", ", and ", " y "))
+    def test_preserves_shared_claim_across_citation_conjunction(
+        self, citation_connector: str
+    ) -> None:
+        shared_claim = "Example Corp (EXM) completed an IPO."
+        dropped_marker = "[[1]](javascript:alert(1))"
+        valid_marker = "[[2]](https://example.com/valid)"
+        content = (
+            f"{shared_claim}{dropped_marker}{citation_connector}{valid_marker}"
+        )
+        dropped_start = content.index(dropped_marker)
+        valid_start = content.index(valid_marker)
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "javascript:alert(1)",
+                                    "title": "Dropped source",
+                                    "start_index": dropped_start,
+                                    "end_index": dropped_start
+                                    + len(dropped_marker),
+                                },
+                            },
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://example.com/valid",
+                                    "title": "Valid source",
+                                    "start_index": valid_start,
+                                    "end_index": valid_start + len(valid_marker),
+                                },
+                            },
+                        ],
+                    }
+                }
+            ]
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        )
+
+        packet = _openrouter(transport).search(
+            "recent IPOs", max_results=5, timeout_seconds=8.0
+        )
+
+        assert [(result.url, result.snippet) for result in packet.results] == [
+            ("https://example.com/valid", shared_claim)
+        ]
+
     @pytest.mark.parametrize(
         "unsupported_claim",
         (

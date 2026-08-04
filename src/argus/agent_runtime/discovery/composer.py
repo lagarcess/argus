@@ -14,6 +14,7 @@ from argus.agent_runtime.discovery.contracts import (
 from argus.agent_runtime.discovery.extraction import extract_candidates
 from argus.agent_runtime.discovery.model_knowledge import name_candidates
 from argus.agent_runtime.discovery.validation import validated_candidates
+from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
     recovery_message,
@@ -387,14 +388,17 @@ async def _recovery_result(
     # prompt_source=llm_generated tells clients the voiced prose owns display;
     # without it (deterministic fallback), clients render localized copy from
     # the code.
-    assistant_response = voiced or recovery_message(code, retryable=retryable)
-    stage_patch: dict[str, Any] = {"assistant_response": assistant_response}
+    assistant_response = voiced or (
+        _NON_RETRYABLE_UNAVAILABLE_MESSAGES[runtime_locale(language)]
+        if code == "discovery_unavailable" and not retryable
+        else recovery_message(code, retryable=retryable)
+    )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": assistant_response,
+        "recovery": {"code": code, "retryable": retryable},
+    }
     if voiced:
-        stage_patch["recovery"] = {
-            "code": code,
-            "retryable": retryable,
-            "prompt_source": "llm_generated",
-        }
+        stage_patch["recovery"]["prompt_source"] = "llm_generated"
     # retryable=True is the whole signal; the API layer owns the durable retry.
     if usage is not None:
         stage_patch["discovery_usage"] = usage
@@ -509,6 +513,19 @@ _NON_RETRYABLE_NEXT_STEPS: dict[str, str] = {
     ),
 }
 
+_NON_RETRYABLE_UNAVAILABLE_MESSAGES = {
+    "en": (
+        "Current source-backed discovery is not available for this request, and I "
+        "will not guess from memory. Name a symbol or company you already have in "
+        "mind and I can test it. Everything in this chat is unchanged."
+    ),
+    "es-419": (
+        "La búsqueda actual respaldada por fuentes no está disponible para esta "
+        "solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa "
+        "que tengas en mente y puedo probarla. Todo en este chat sigue igual."
+    ),
+}
+
 
 async def _voiced_discovery_recovery(
     *,
@@ -519,6 +536,8 @@ async def _voiced_discovery_recovery(
     unverified_names: list[str],
     uncorroborated_names: list[str] | None = None,
 ) -> str | None:
+    if code == "discovery_unavailable" and not retryable:
+        return None
     message = current_user_message.strip()
     facts = _RECOVERY_VOICING_FACTS.get(code)
     if not message or facts is None:

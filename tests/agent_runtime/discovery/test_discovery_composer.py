@@ -581,34 +581,23 @@ class TestRetryAffordance:
 
     @pytest.mark.asyncio()
     @pytest.mark.parametrize(
-        ("language", "user_message", "language_instruction"),
+        ("language", "user_message"),
         (
-            ("en", "Find current pharmaceutical stocks", "Answer in English."),
-            (
-                "es-419",
-                "Busca acciones farmacéuticas actuales",
-                "Answer in Spanish (Latin America).",
-            ),
+            ("en", "Find current pharmaceutical stocks"),
+            ("es-419", "Busca acciones farmacéuticas actuales"),
         ),
     )
-    async def test_non_retryable_voice_prohibits_retry_in_each_locale(
+    async def test_non_retryable_unavailable_skips_voice_in_each_locale(
         self,
         flag_on: pytest.MonkeyPatch,
         language: str,
         user_message: str,
-        language_instruction: str,
     ) -> None:
-        captured_messages: list[dict[str, str]] = []
-
-        async def _capture_voice(
-            *, task: str, messages: list[dict[str, str]]
-        ) -> str:
-            assert task == "chat_composer"
-            captured_messages.extend(messages)
-            return "safe localized response"
+        async def _unexpected_voice(**kwargs: Any) -> str:
+            raise AssertionError(f"unexpected voice call: {kwargs}")
 
         flag_on.setattr(
-            composer_module, "invoke_openrouter_chat_completion", _capture_voice
+            composer_module, "invoke_openrouter_chat_completion", _unexpected_voice
         )
 
         response = await composer_module._voiced_discovery_recovery(
@@ -620,14 +609,34 @@ class TestRetryAffordance:
             uncorroborated_names=[],
         )
 
-        assert response == "safe localized response"
-        system_prompt = captured_messages[0]["content"]
-        assert language_instruction in system_prompt
-        assert "Do not suggest retrying now or later." in system_prompt
-        assert "Describe availability only as unavailable for this request." in system_prompt
-        assert "Do not use time qualifiers or imply future availability." in system_prompt
-        assert "Ask only for a specific symbol or company to test." in system_prompt
-        assert "(retry, or name a symbol to test)" not in system_prompt
+        assert response is None
+
+    @pytest.mark.asyncio()
+    async def test_unavailable_recovery_rejects_generated_retry_promise(
+        self,
+        flag_on: pytest.MonkeyPatch,
+    ) -> None:
+        async def _unsafe_voice(
+            *, task: str, messages: list[dict[str, str]]
+        ) -> str:
+            assert task == "chat_composer"
+            assert messages
+            return "Current discovery is unavailable, so try again later."
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _unsafe_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code="discovery_unavailable",
+            retryable=False,
+            current_user_message="Find current pharmaceutical stocks",
+            language="en",
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response is None
 
     @pytest.mark.asyncio()
     @pytest.mark.parametrize(
@@ -679,30 +688,37 @@ class TestRetryAffordance:
 
     @pytest.mark.asyncio()
     @pytest.mark.parametrize(
-        ("language", "user_message"),
+        ("language", "user_message", "expected_response"),
         (
-            ("en", "Find current pharmaceutical stocks"),
-            ("es-419", "Busca acciones farmacéuticas actuales"),
+            (
+                "en",
+                "Find current pharmaceutical stocks",
+                "Current source-backed discovery is not available for this request, "
+                "and I will not guess from memory. Name a symbol or company you "
+                "already have in mind and I can test it. Everything in this chat is "
+                "unchanged.",
+            ),
+            (
+                "es-419",
+                "Busca acciones farmacéuticas actuales",
+                "La búsqueda actual respaldada por fuentes no está disponible para "
+                "esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o "
+                "una empresa que tengas en mente y puedo probarla. Todo en este chat "
+                "sigue igual.",
+            ),
         ),
     )
-    async def test_unavailable_recovery_passes_nonretryable_fact_to_voice(
+    async def test_unavailable_recovery_uses_deterministic_localized_copy(
         self,
         flag_on: pytest.MonkeyPatch,
         language: str,
         user_message: str,
+        expected_response: str,
     ) -> None:
         provider = _FakeProvider(
             SearchUnavailableError(reason="authentication_failed")
         )
         _wire(flag_on, provider=provider, extraction=_extraction())
-        captured_retryable: list[bool] = []
-
-        async def _safe_voice(**kwargs: Any) -> str | None:
-            captured_retryable.append(kwargs["retryable"])
-            return "safe localized response"
-
-        flag_on.setattr(composer_module, "_voiced_discovery_recovery", _safe_voice)
-
         result = await discovery_stage_result_if_applicable(
             decision=_decision(),
             current_user_message=user_message,
@@ -714,10 +730,8 @@ class TestRetryAffordance:
         assert patch["recovery"] == {
             "code": "discovery_unavailable",
             "retryable": False,
-            "prompt_source": "llm_generated",
         }
-        assert captured_retryable == [False]
-        assert str(patch["assistant_response"]) == "safe localized response"
+        assert str(patch["assistant_response"]) == expected_response
 
 
 class TestVoicedRecoveryMetadata:
