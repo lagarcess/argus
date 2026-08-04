@@ -23,7 +23,7 @@ export type GuestDecisionResumeTarget =
       surface: "omnisearch_dossier";
       artifactId: string;
       runId: string;
-      decisionState: DecisionState;
+      decisionState: DecisionState | null;
       note: string;
     };
 
