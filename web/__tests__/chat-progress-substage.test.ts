@@ -66,7 +66,7 @@ describe("sub-stage progress events", () => {
         : t(`chat.status.${stage}`)) || t("chat.status.preparing");
 
     expect(label("discovery_search", "cybersecurity stocks")).toBe(
-      "Searching the web — cybersecurity stocks",
+      "Searching the web: cybersecurity stocks",
     );
     expect(label("discovery_search")).toBe("Searching the web...");
     expect(label("discovery_verify")).toBe(

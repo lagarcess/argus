@@ -678,7 +678,7 @@
       "intent_education": "Thinking...",
       "intent_unsupported_request": "Thinking...",
       "discovery_search": "Searching the web...",
-      "discovery_search_detail": "Searching the web — {{detail}}",
+      "discovery_search_detail": "Searching the web: {{detail}}",
       "discovery_verify": "Verifying candidates against supported markets..."
     },
     "confirmation": {
@@ -1153,7 +1153,7 @@
       "submit": "Request access",
       "submitting": "Requesting access...",
       "accepted_title": "Request received",
-      "accepted_description": "Thanks — we received your request. If access is approved, we’ll email you with the next step.",
+      "accepted_description": "Thanks, we received your request. If access is approved, we’ll email you with the next step.",
       "approved_prompt": "Already approved?",
       "approved_action": "Sign up",
       "existing_prompt": "Already have an account?",
@@ -1227,7 +1227,7 @@
       "internal_error": "Argus couldn’t complete this account request. Please try again.",
       "account_already_registered": "This session already belongs to a permanent account.",
       "guest_bootstrap_failed": "We couldn’t start a temporary conversation. Please try again.",
-      "account_exists_use_login": "You already have an account. Sign in instead — your conversation comes with you.",
+      "account_exists_use_login": "You already have an account. Sign in instead and your conversation comes with you.",
       "guest_identity_link_failed": "We couldn’t finish creating the account. Your conversation is safe; try again.",
       "csrf_origin_rejected": "We couldn’t verify this request. Refresh the page and try again.",
       "registered_account_required": "Sign in to claim this temporary conversation.",

@@ -73,7 +73,7 @@ describe("public alpha access request client", () => {
       submitting: "Requesting access...",
       accepted_title: "Request received",
       accepted_description:
-        "Thanks — we received your request. If access is approved, we’ll email you with the next step.",
+        "Thanks, we received your request. If access is approved, we’ll email you with the next step.",
       approved_prompt: "Already approved?",
       approved_action: "Sign up",
       existing_prompt: "Already have an account?",

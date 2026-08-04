@@ -474,7 +474,7 @@ export default function ChatMessage({
                       ) : null}
                       {candidate.reason_text ? (
                         <>
-                          <NextMoveSeparator>—</NextMoveSeparator>
+                          <NextMoveSeparator>·</NextMoveSeparator>
                           <NextMoveDetail>{candidate.reason_text}</NextMoveDetail>
                         </>
                       ) : null}

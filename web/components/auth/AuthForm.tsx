@@ -75,7 +75,7 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Readonly<
   account_exists_use_login: {
     key: "auth.errors.account_exists_use_login",
     fallback:
-      "You already have an account. Sign in instead — your conversation comes with you.",
+      "You already have an account. Sign in instead and your conversation comes with you.",
   },
   guest_bootstrap_failed: {
     key: "auth.errors.guest_bootstrap_failed",
