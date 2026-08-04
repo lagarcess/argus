@@ -174,6 +174,12 @@ Integration guardrails:
   review request can be truthful for minutes and stale on arrival; review
   responses may arrive as inline threads without a summary comment, so check
   the PR's unresolved-thread count, not just for a bot comment.
+- A review loop terminates when one review pass scoped to the latest fix's
+  delta returns clean and the PR's unresolved-thread count is zero. Do not
+  re-request review on an unchanged head, and do not let unchanged code
+  become a new source of findings to keep a loop alive. Findings that arrive
+  after the terminal state are either new scope — spin them out to an owned
+  issue — or declined with one line of rationale; neither reopens the loop.
 - Behavioral acceptance evidence for strategy-surface changes must span the
   supported strategy-shape space, not one canonical shape. Include at least
   one non-buy-and-hold strategy (for example DCA with an explicit
