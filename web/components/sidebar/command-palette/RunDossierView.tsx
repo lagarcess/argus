@@ -425,7 +425,7 @@ export function RunDossierView({
         )}
         disabled={conversationUnavailable}
         onClick={onOpenConversation}
-        className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/5 dark:text-white/35 dark:hover:text-white"
+        className="mt-auto flex min-h-11 shrink-0 items-center justify-between pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/35 dark:hover:text-white"
       >
         <span>
           {t(
